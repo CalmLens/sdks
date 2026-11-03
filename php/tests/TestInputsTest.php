@@ -96,15 +96,26 @@ final class TestInputsTest extends TestCase
         }
     }
 
-    /** Each cell's level as packages/sdk-contract/testInputs.ts records it: the index of the cell's first red value among the data levels, or -1. */
+    /** Each cell's level as packages/sdk-contract/testInputs.ts records it: "r" for the outer ring, else the data level (0-3) nearest the luma of the cell's top-left pixel. */
     private static function fixtureLevels(string $rgba, int $width, int $cells): string
     {
         $size = intdiv($width, $cells);
         $levels = '';
         for ($row = 0; $row < $cells; $row++) {
             for ($column = 0; $column < $cells; $column++) {
-                $index = array_search(ord($rgba[($row * $size * $width + $column * $size) * 4]), TestImageGrid::LEVELS, true);
-                $levels .= $index === false ? '-1' : (string) $index;
+                if ($row === 0 || $column === 0 || $row === $cells - 1 || $column === $cells - 1) {
+                    $levels .= 'r';
+                    continue;
+                }
+                $offset = ($row * $size * $width + $column * $size) * 4;
+                $luma = (77 * ord($rgba[$offset]) + 150 * ord($rgba[$offset + 1]) + 29 * ord($rgba[$offset + 2])) >> 8;
+                $nearest = 0;
+                foreach (TestImageGrid::LEVELS as $level => $target) {
+                    if (abs($target - $luma) < abs(TestImageGrid::LEVELS[$nearest] - $luma)) {
+                        $nearest = $level;
+                    }
+                }
+                $levels .= (string) $nearest;
             }
         }
         return $levels;

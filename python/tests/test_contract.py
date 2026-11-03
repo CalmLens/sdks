@@ -1048,12 +1048,20 @@ class SignedTestInputTests(unittest.TestCase):
 
 
 def _fixture_levels(image: testing.PaintedTestImage, cells: int) -> str:
-    """Each cell's level as packages/sdk-contract/testInputs.ts records it: the index of the cell's
-    first red value among the data levels, or -1."""
+    """Each cell's level as packages/sdk-contract/testInputs.ts records it: "r" for the outer ring,
+    else the data level (0-3) nearest the luma of the cell's top-left pixel."""
     levels = _signed_test_inputs._GRID_LEVELS
     size = image.width // cells
-    return "".join(str(levels.index(red) if (red := image.rgba[(row * size * image.width + column * size) * 4])
-                       in levels else -1) for row in range(cells) for column in range(cells))
+
+    def level(row: int, column: int) -> str:
+        if row in (0, cells - 1) or column in (0, cells - 1):
+            return "r"
+        offset = (row * size * image.width + column * size) * 4
+        red, green, blue = image.rgba[offset:offset + 3]
+        luma = (77 * red + 150 * green + 29 * blue) >> 8
+        return str(min(range(len(levels)), key=lambda index: abs(levels[index] - luma)))
+
+    return "".join(level(row, column) for row in range(cells) for column in range(cells))
 
 
 def _decode_png(png: bytes) -> tuple[int, int, bytes]:

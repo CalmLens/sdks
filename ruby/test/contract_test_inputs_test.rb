@@ -106,14 +106,19 @@ class ContractTestInputsTest < Minitest::Test
     assert_equal CalmLens::SdkErrorCodes::INVALID_ARGUMENT, error.code
   end
 
-  # Each cell's level as packages/sdk-contract/testInputs.ts records it: the index of the cell's
-  # first red value among the data levels, or -1.
+  # Each cell's level as packages/sdk-contract/testInputs.ts records it: "r" for the outer ring,
+  # else the data level (0-3) nearest the luma of the cell's top-left pixel.
   def fixture_levels(image, cells)
     levels = TestInputs.const_get(:Grid)::LEVELS
     size = image.width / cells
     Array.new(cells * cells) do |cell|
       row, column = cell.divmod(cells)
-      levels.index(image.rgba.getbyte(((row * size * image.width) + (column * size)) * 4)) || -1
+      next 'r' if [0, cells - 1].include?(row) || [0, cells - 1].include?(column)
+
+      offset = ((row * size * image.width) + (column * size)) * 4
+      red, green, blue = image.rgba.byteslice(offset, 3).bytes
+      luma = ((77 * red) + (150 * green) + (29 * blue)) >> 8
+      levels.each_index.min_by { |index| (levels[index] - luma).abs }
     end.join
   end
 

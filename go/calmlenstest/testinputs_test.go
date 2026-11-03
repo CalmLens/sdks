@@ -13,7 +13,6 @@ import (
 	"image"
 	"image/png"
 	"reflect"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -189,16 +188,34 @@ func TestTestInputsContract(t *testing.T) {
 	}
 }
 
-// fixtureLevels is each cell's level as packages/sdk-contract/testInputs.ts records it: the index
-// of the cell's first red value among the data levels, or -1.
+// fixtureLevels is each cell's level as packages/sdk-contract/testInputs.ts records it: "r" for
+// the outer ring, else the data level (0-3) nearest the luma of the cell's top-left pixel.
 func fixtureLevels(painted *TestImage, cells int) string {
 	size := painted.Width / cells
 	var levels strings.Builder
 	for row := range cells {
 		for column := range cells {
-			red := int(painted.RGBA[(row*size*painted.Width+column*size)*4])
-			levels.WriteString(strconv.Itoa(slices.Index(testImageGridLevels[:], red)))
+			if row == 0 || column == 0 || row == cells-1 || column == cells-1 {
+				levels.WriteString("r")
+				continue
+			}
+			pixel := painted.RGBA[(row*size*painted.Width+column*size)*4:]
+			luma := (77*int(pixel[0]) + 150*int(pixel[1]) + 29*int(pixel[2])) >> 8
+			nearest := 0
+			for level, target := range testImageGridLevels {
+				if abs(target-luma) < abs(testImageGridLevels[nearest]-luma) {
+					nearest = level
+				}
+			}
+			levels.WriteString(strconv.Itoa(nearest))
 		}
 	}
 	return levels.String()
+}
+
+func abs(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
 }

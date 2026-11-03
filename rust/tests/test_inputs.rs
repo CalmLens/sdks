@@ -90,19 +90,25 @@ fn media_phrases_match_the_contract() {
     }
 }
 
-/// Each cell's level as `packages/sdk-contract/testInputs.ts` records it: the index of the cell's
-/// first red value among the data levels, or -1.
+/// Each cell's level as `packages/sdk-contract/testInputs.ts` records it: "r" for the outer ring,
+/// else the data level (0-3) nearest the luma of the cell's top-left pixel.
 fn fixture_levels(image: &TestImage, cells: usize) -> String {
-    let levels = [72, 128, 184, 240];
+    let levels: [i32; 4] = [72, 128, 184, 240];
     let width = image.width as usize;
     let size = width / cells;
     (0..cells * cells)
         .map(|cell| {
-            let red = image.rgba[((cell / cells) * size * width + (cell % cells) * size) * 4];
-            levels
-                .iter()
-                .position(|&level| level == red)
-                .map_or(-1, |index| index as i32)
+            let (row, column) = (cell / cells, cell % cells);
+            if row == 0 || column == 0 || row == cells - 1 || column == cells - 1 {
+                return "r".to_string();
+            }
+            let offset = (row * size * width + column * size) * 4;
+            let [red, green, blue] =
+                [0, 1, 2].map(|channel| i32::from(image.rgba[offset + channel]));
+            let luma = (77 * red + 150 * green + 29 * blue) >> 8;
+            (0..levels.len())
+                .min_by_key(|&index| (levels[index] - luma).abs())
+                .unwrap()
                 .to_string()
         })
         .collect()
