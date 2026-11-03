@@ -56,3 +56,29 @@ test("rejects the contract's invalid inputs", async () => {
     ).toBeUndefined();
   }
 });
+
+test("paints the contract's test images byte for byte and rejects ones too large", async () => {
+  for (const testCase of fixture.images) {
+    const image = await paintTestImage(scenarioOf(testCase), testCase.key);
+    expect({ name: testCase.name, width: image.width, height: image.height }).toEqual({
+      name: testCase.name,
+      width: testCase.width,
+      height: testCase.height,
+    });
+    const digest = new Bun.CryptoHasher("sha256").update(image.rgba).digest("hex");
+    expect({ name: testCase.name, digest }).toEqual({
+      name: testCase.name,
+      digest: testCase.rgbaSha256,
+    });
+    expect(await detectTestImage(image, testCase.key)).toEqual(
+      testCase.signal ? testInputForSignal(testCase.signal, "image") : testCase.input,
+    );
+  }
+  for (const rejection of fixture.imageRejections)
+    expect(
+      await paintTestImage(scenarioOf(rejection), rejection.key).then(
+        () => rejection.name,
+        () => undefined,
+      ),
+    ).toBeUndefined();
+});

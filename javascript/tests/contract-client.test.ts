@@ -2,10 +2,11 @@
 // packages/sdk-contract (format in its README.md) to sdks/go/testdata: requests.json, paths.json,
 // errors.json, client-cases.json and surface.json's defaults. The fixtures are recorded from this
 // SDK, so replaying the committed copies is what catches a regression here.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import {
   DEFAULT_MAX_RESPONSE_BYTES,
   DEFAULT_MAX_RETRIES,
+  DEFAULT_PART_SIZE_BYTES,
   DEFAULT_TIMEOUT_MS,
 } from "../src/client/CalmLensConnection";
 import { ENSURE_LENSES_MAX_PER_REQUEST } from "../src/client/CalmLensServerClient";
@@ -303,6 +304,9 @@ const checkHeader = (
 const sortPairs = (pairs: [string, string][]) =>
   [...pairs].sort((a, b) => (`${a[0]}\0${a[1]}` < `${b[0]}\0${b[1]}` ? -1 : 1));
 
+// The longest scripted case waits through about 8 seconds of listed sleeps.
+setDefaultTimeout(20_000);
+
 describe("scripted client cases", () => {
   const notApplicable = new Map(
     surface.capabilities.map(({ id, notApplicable }) => [id, notApplicable?.javascript]),
@@ -491,6 +495,7 @@ describe("client defaults", () => {
     retryMaxDelayMs: RETRY_MAX_DELAY_MS,
     retryAfterMaxMs: RETRY_AFTER_MAX_MS,
     maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
+    partSizeBytes: DEFAULT_PART_SIZE_BYTES,
     signedUrlExpiresInSeconds: DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
     uploadTokenExpiresInSeconds: UPLOAD_TOKEN_DEFAULT_TTL_SECONDS,
     waitForDecisionTimeoutMs: DEFAULT_DECISION_TIMEOUT_MS,

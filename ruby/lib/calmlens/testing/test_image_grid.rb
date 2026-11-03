@@ -33,8 +33,7 @@ module CalmLens
         x ^= 0x11d if x.anybits?(256)
       end
       (255...512).each { |i| EXP[i] = EXP[i - 255] }
-      EXP.freeze
-      LOG.freeze
+      [EXP, LOG].each(&:freeze)
 
       module_function
 

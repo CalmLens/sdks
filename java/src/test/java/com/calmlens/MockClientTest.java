@@ -43,16 +43,16 @@ class MockClientTest {
     assertEquals(2, decided.requests().size());
     assertEquals(0, decided.remainingResponses());
 
-    // Checks at 0, 0.5, 1.25, 2.375, 4.0625 and 6.59375s, then a wait for the rest of the 10s and a last check.
+    // Checks at 0, 0.5, 1.25, 2.375, 4.0625, 6.0625 and 8.0625s (at most 2s apart), then a wait for the rest of the 10s and a last check.
     MockCalmLensServerClient pending = new MockCalmLensServerClient();
-    for (int i = 0; i < 8; i++) pending.enqueue(200, Fixtures.asset("asset-1", "processing", "pending"));
+    for (int i = 0; i < 9; i++) pending.enqueue(200, Fixtures.asset("asset-1", "processing", "pending"));
     long started = System.nanoTime();
     CalmLensException error = assertThrows(CalmLensException.class,
         () -> pending.client.assets.waitForDecision(new Models.WaitForDecision("asset-1").timeout(Duration.ofSeconds(10))));
     assertTrue(Duration.ofNanos(System.nanoTime() - started).compareTo(Duration.ofSeconds(5)) < 0);
     assertEquals(ErrorCodes.SDK_TIMEOUT, error.getCode());
     assertEquals(Map.of("assetId", "asset-1", "classificationStatus", "processing", "moderationStatus", "pending"), error.getDetails());
-    assertEquals(7, pending.requests().size());
+    assertEquals(8, pending.requests().size());
     assertEquals(1, pending.remainingResponses());
   }
 
