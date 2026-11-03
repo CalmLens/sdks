@@ -1353,7 +1353,7 @@ impl Backend {
         let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
         // Cursors are `<n>_mock`: the number of events already delivered. Without one, the
         // page is empty and its cursor marks now. `nextCursor` is never null: it is where to
-        // keep polling from.
+        // keep polling from. The mock's key holds every permission, so no event type is excluded.
         let start = match q.get("cursor") {
             None => events.len(),
             Some(cursor) => cursor
@@ -1365,7 +1365,7 @@ impl Backend {
         let end = (start + size).min(events.len());
         Ok(json!({
             "items": events[start..end], "nextCursor": format!("{end}_mock"),
-            "hasMore": end < events.len(),
+            "hasMore": end < events.len(), "excludedTypes": [],
         }))
     }
 

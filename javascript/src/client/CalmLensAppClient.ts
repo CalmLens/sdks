@@ -6,6 +6,7 @@ import {
   splitsIntoParts,
 } from "./CalmLensConnection";
 import { invalidArgument, invalidConfig } from "./CalmLensError";
+import { APP_OPTION_KEYS } from "./CalmLensOptionKeys";
 import type {
   CalmLensAppClientOptions,
   RetrieveAssetOptions,
@@ -13,9 +14,15 @@ import type {
   UploadedAsset,
   UploadPresetSubmitAssetOptions,
 } from "./CalmLensTypes";
-import { encodePathSegment, validateAppClientOptions } from "./CalmLensUtils";
+import { checkOptionKeys, encodePathSegment, validateAppClientOptions } from "./CalmLensUtils";
 
 const inspectSymbol = Symbol.for("nodejs.util.inspect.custom");
+
+/** `options`, once `checkOptionKeys` finds only keys `operation` takes. */
+const checked = <T>(operation: string, options: T): T => {
+  checkOptionKeys(options, operation, APP_OPTION_KEYS);
+  return options;
+};
 
 /**
  * The CalmLens client for browsers and React Native apps. It uploads through an upload preset,
@@ -109,21 +116,19 @@ export default class CalmLensAppClient {
   get assets() {
     return {
       /** Uploads a file and queues it for moderation. */
-      create: (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
-        this.submit(options, true),
+      create: async (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
+        this.submit(checked("assets.create", options), true),
 
       /** Uploads a file and waits for its moderation decision. */
-      classify: (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
-        this.submit(options, false),
+      classify: async (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
+        this.submit(checked("assets.classify", options), false),
 
       /**
        * Uploads the next part of a multipart upload this client started. The upload's queue
        * mode, chosen when it started, applies when the final part arrives.
        */
-      uploadPart: async ({
-        assetId,
-        ...options
-      }: UploadAssetPartOptions): Promise<UploadedAsset> => {
+      uploadPart: async (partOptions: UploadAssetPartOptions): Promise<UploadedAsset> => {
+        const { assetId, ...options } = checked("assets.uploadPart", partOptions);
         const encodedAssetId = encodePathSegment(assetId, "Asset ID");
         const data = await this.#connection.uploadPart(
           `${this.uploadsPath}/${encodedAssetId}/part`,
@@ -134,7 +139,8 @@ export default class CalmLensAppClient {
       },
 
       /** Checks an upload this client made. `status` is present when the preset shows decisions. */
-      retrieve: async ({ assetId }: RetrieveAssetOptions): Promise<UploadedAsset> => {
+      retrieve: async (options: RetrieveAssetOptions): Promise<UploadedAsset> => {
+        const { assetId } = checked("assets.retrieve", options);
         const encodedAssetId = encodePathSegment(assetId, "Asset ID");
         const data = await this.#connection.json<unknown>(
           "GET",

@@ -1794,19 +1794,21 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     def _events(self, query: dict[str, Any]) -> dict[str, Any]:
         # Cursors are positions in the feed (``mock_<n>``), so events added later reach cursors
-        # taken before them. Like the API, ``nextCursor`` is never null.
+        # taken before them. Like the API, ``nextCursor`` is never null. The mock's key holds every
+        # permission, so no event type is excluded.
         size = _bounded_int(query.get("pageSize", _DEFAULT_PAGE_SIZE), "pageSize", _MAX_PAGE_SIZE)
         events = [e for e in self.database_storage.events if e["projectId"] == self.project_id]
         cursor = query.get("cursor")
         if not cursor:
-            return {"items": [], "nextCursor": f"mock_{len(events)}", "hasMore": False}
+            return {"items": [], "nextCursor": f"mock_{len(events)}", "hasMore": False, "excludedTypes": []}
         found = re.fullmatch(r"mock_([0-9]+)", str(cursor))
         if not found or int(found.group(1)) > len(events):
             raise _Failure(error_codes.INVALID_CURSOR)
         position = int(found.group(1))
         page = events[position:position + size]
         following = position + len(page)
-        return {"items": page, "nextCursor": f"mock_{following}", "hasMore": following < len(events)}
+        return {"items": page, "nextCursor": f"mock_{following}", "hasMore": following < len(events),
+                "excludedTypes": []}
 
     def _search(self, query: dict[str, Any]) -> dict[str, Any]:
         # Keyword search like the API's; the mock has no semantic index, so every mode is

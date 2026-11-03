@@ -11,7 +11,8 @@ final class Events extends Resource
     /**
      * One page of events after `cursor` (a previous page's `nextCursor`), oldest first, with
      * `pageSize` 1 to 100 (50 by default). Without `cursor` the page is empty and its `nextCursor`
-     * is now.
+     * is now. `excludedTypes` lists the event types the feed never includes, because the API key
+     * lacks the permission to see them.
      */
     public function list(array $options = []): array
     {

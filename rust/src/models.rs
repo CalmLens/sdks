@@ -2878,6 +2878,10 @@ pub struct EventsPage {
     /// Whether more events are available now.
     #[serde(default)]
     pub has_more: bool,
+    /// Event types this feed never includes, because the API key lacks the permission to see
+    /// them. Give the key that permission to receive them.
+    #[serde(default)]
+    pub excluded_types: Vec<EventType>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<EventsPage, _>")]
     pub extra: HashMap<String, Value>,
@@ -2889,6 +2893,7 @@ impl EventsPage {
             items,
             next_cursor: next_cursor.into(),
             has_more,
+            excluded_types: Vec::new(),
             extra: HashMap::new(),
         }
     }

@@ -1769,6 +1769,8 @@ final class MockApi {
     page.add("items", items);
     page.addProperty("nextCursor", "mock_" + end);
     page.addProperty("hasMore", end < feed.size());
+    // The mock's key holds every permission, so no event type is excluded.
+    page.add("excludedTypes", new JsonArray());
     return page;
   }
 

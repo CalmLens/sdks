@@ -1208,6 +1208,9 @@ class EventsPage(TypedDict):
     #: receive later events.
     nextCursor: str
     hasMore: bool
+    #: Event types this feed never includes, because the API key lacks the permission to see them.
+    #: Give the key that permission to receive them.
+    excludedTypes: list[EventType]
 
 
 # ---- Request options --------------------------------------------------------------------------

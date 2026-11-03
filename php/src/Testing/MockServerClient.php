@@ -1546,19 +1546,20 @@ final class MockServerClient
     /**
      * Without `cursor` the page is empty and its `nextCursor` is now, like the API; `pageSize` is 1
      * to 100, 50 by default. Cursors are `mock_<n>`: the number of events in the feed when taken.
+     * The mock's key holds every permission, so no event type is excluded.
      */
     private function listEvents(array $query): array
     {
         $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
         if (!isset($query['cursor']) || $query['cursor'] === '') {
-            return ['items' => [], 'nextCursor' => 'mock_' . count($this->events), 'hasMore' => false];
+            return ['items' => [], 'nextCursor' => 'mock_' . count($this->events), 'hasMore' => false, 'excludedTypes' => []];
         }
         if (!preg_match('/^mock_(\d+)$/D', (string) $query['cursor'], $match) || (int) $match[1] > count($this->events)) {
             self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
         }
         $taken = array_slice($this->events, (int) $match[1], $size);
         $next = (int) $match[1] + count($taken);
-        return ['items' => $taken, 'nextCursor' => 'mock_' . $next, 'hasMore' => $next < count($this->events)];
+        return ['items' => $taken, 'nextCursor' => 'mock_' . $next, 'hasMore' => $next < count($this->events), 'excludedTypes' => []];
     }
 
     // Policies: the project starts on its General preset policy, following automatic updates. The

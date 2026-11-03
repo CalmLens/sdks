@@ -705,7 +705,14 @@ module CalmLens
     "createdAt" => Integer
   }
   # Unlike other lists, `nextCursor` is never nil: keep it to receive later events.
-  type events_page = { "items" => Array[event], "nextCursor" => String, "hasMore" => bool }
+  # `excludedTypes` are the event types the feed never includes, because the API key lacks the permission
+  # to see them.
+  type events_page = {
+    "items" => Array[event],
+    "nextCursor" => String,
+    "hasMore" => bool,
+    "excludedTypes" => Array[event_type]
+  }
 
   # ---- Method options -------------------------------------------------------------------------
 

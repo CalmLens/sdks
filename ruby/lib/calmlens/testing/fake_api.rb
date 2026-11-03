@@ -411,11 +411,12 @@ module CalmLens
       def project_folders = @state.folders.values.select { |item| item['projectId'] == @project_id }
 
       # Like the API: without a cursor, no events and a `nextCursor` for now; with one, up to `pageSize`
-      # events added since, oldest first. `nextCursor` is never nil.
+      # events added since, oldest first. `nextCursor` is never nil. The mock's key holds every permission,
+      # so no event type is excluded.
       def events(query)
         size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
         feed = @state.events
-        return { 'items' => [], 'nextCursor' => "mock_#{feed.size}", 'hasMore' => false } unless query['cursor']
+        return { 'items' => [], 'nextCursor' => "mock_#{feed.size}", 'hasMore' => false, 'excludedTypes' => [] } unless query['cursor']
 
         match = query['cursor'].to_s.match(/\Amock_(\d+)\z/)
         position = match && Integer(match[1], 10)
@@ -423,7 +424,7 @@ module CalmLens
 
         taken = feed[position, size]
         following = position + taken.size
-        { 'items' => taken, 'nextCursor' => "mock_#{following}", 'hasMore' => following < feed.size }
+        { 'items' => taken, 'nextCursor' => "mock_#{following}", 'hasMore' => following < feed.size, 'excludedTypes' => [] }
       end
 
       # Saves lenses in order, like the API: an unchanged definition returns the stored lens, a

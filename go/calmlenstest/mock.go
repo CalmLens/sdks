@@ -1109,10 +1109,11 @@ func (m *MockServerClient) listEvents(q url.Values) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Cursors are "<sequence>_mock": the number of events already delivered.
+	// Cursors are "<sequence>_mock": the number of events already delivered. The mock's key
+	// holds every permission, so no event type is excluded.
 	cursor := q.Get("cursor")
 	if cursor == "" {
-		return calmlens.JSON{"items": []calmlens.JSON{}, "nextCursor": fmt.Sprintf("%d_mock", len(m.events)), "hasMore": false}, nil
+		return calmlens.JSON{"items": []calmlens.JSON{}, "nextCursor": fmt.Sprintf("%d_mock", len(m.events)), "hasMore": false, "excludedTypes": []string{}}, nil
 	}
 	sequence, ok := strings.CutSuffix(cursor, "_mock")
 	position, err := strconv.Atoi(sequence)
@@ -1121,7 +1122,7 @@ func (m *MockServerClient) listEvents(q url.Values) (any, error) {
 	}
 	end := min(position+size, len(m.events))
 	events := append([]calmlens.JSON{}, m.events[position:end]...)
-	return calmlens.JSON{"items": events, "nextCursor": fmt.Sprintf("%d_mock", end), "hasMore": end < len(m.events)}, nil
+	return calmlens.JSON{"items": events, "nextCursor": fmt.Sprintf("%d_mock", end), "hasMore": end < len(m.events), "excludedTypes": []string{}}, nil
 }
 
 // ensureLenses saves each definition in order like the API: a new identifier is created, an

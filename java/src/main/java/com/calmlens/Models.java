@@ -2723,10 +2723,15 @@ public final class Models {
    * @param items events, oldest first
    * @param nextCursor pass as {@code cursor} to get newer events; never null, so persist it to resume
    * @param hasMore whether more events are available now
+   * @param excludedTypes event types this feed never includes, because the API key lacks the
+   *     permission to see them; give the key that permission to receive them
    */
-  public record EventsPage(List<Event> items, String nextCursor, boolean hasMore) {
-    /** Copies events; a missing list becomes empty. */
-    public EventsPage { items = listOrEmpty(items); }
+  public record EventsPage(List<Event> items, String nextCursor, boolean hasMore, List<String> excludedTypes) {
+    /** Copies the lists; a missing list becomes empty. */
+    public EventsPage {
+      items = listOrEmpty(items);
+      excludedTypes = listOrEmpty(excludedTypes);
+    }
   }
 
   /**

@@ -122,6 +122,50 @@ export const validateRequestOptions = (options: {
   assertInteger("maxRetries", options.maxRetries, 0);
 };
 
+/**
+ * Option keys of methods that send no request of their own, or that take keys of their own beside
+ * a request's; CalmLensOptionKeys, generated from the API, has the rest.
+ */
+const LOCAL_OPTION_KEYS: Readonly<Record<string, readonly string[]>> = {
+  "assets.waitForDecision": ["assetId", "signal", "timeoutMs"],
+  "cdn.getAssetUrl": ["assetIdentifier", "lens", "resource", "transform", "viewerClaims"],
+  "cdn.serve": ["assetIdentifier", "init", "lens", "resource", "transform", "viewerClaims"],
+  "uploadTokens.sign": ["expiresInSeconds", "externalId", "uploadPresetId"],
+};
+/** Uploads also take an `idempotencyKey`, which the SDK sends as a header. */
+const IDEMPOTENT_OPERATIONS = [
+  "assets.create",
+  "assets.classify",
+  "assets.uploadPart",
+  "text.classify",
+];
+
+/**
+ * Throws `sdk/invalid-argument` for an option `operation` doesn't take, such as a misspelt key,
+ * instead of silently dropping it. `apiKeys` is the client's generated table of the keys each
+ * method sends to the API. Anything other than an object is left to the method's own checks.
+ */
+export const checkOptionKeys = (
+  options: unknown,
+  operation: string,
+  apiKeys: Readonly<Record<string, readonly string[]>>,
+) => {
+  if (!options || typeof options !== "object" || Array.isArray(options)) return;
+  const allowed = LOCAL_OPTION_KEYS[operation] ?? apiKeys[operation];
+  if (!allowed) throw new Error(`No option keys for ${operation}`);
+  const unknown = Object.keys(options).filter(
+    (key) =>
+      !allowed.includes(key) &&
+      !(key === "idempotencyKey" && IDEMPOTENT_OPERATIONS.includes(operation)),
+  );
+  if (unknown.length) {
+    throw invalidArgument(
+      `Unknown option${unknown.length > 1 ? "s" : ""} for ${operation}: ${unknown.join(", ")}`,
+      { operation, options: unknown },
+    );
+  }
+};
+
 export const toTextAssetOptions = ({
   text,
   name,

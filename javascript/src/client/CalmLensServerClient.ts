@@ -15,6 +15,7 @@ import {
   splitsIntoParts,
 } from "./CalmLensConnection";
 import { CalmLensError, invalidArgument, invalidConfig, SDK_ERROR_CODES } from "./CalmLensError";
+import { SERVER_OPTION_KEYS } from "./CalmLensOptionKeys";
 import type { TransportRequest } from "./CalmLensTransport";
 import type {
   AddHashListEntryOptions,
@@ -80,6 +81,7 @@ import type {
 } from "./CalmLensTypes";
 import { signUploadTokenWithApiKey } from "./CalmLensUploadTokens";
 import {
+  checkOptionKeys,
   DEFAULT_CDN_BASE_URL,
   DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
   encodePathSegment,
@@ -110,6 +112,12 @@ const getEnsureLensCacheKey = (options: EnsureLensOptions): string =>
   });
 
 const requireId = (value: unknown, name: string): string => encodePathSegment(value, name);
+
+/** `options`, once `checkOptionKeys` finds only keys `operation` takes. */
+const checked = <T>(operation: string, options: T): T => {
+  checkOptionKeys(options, operation, SERVER_OPTION_KEYS);
+  return options;
+};
 
 /**
  * Iterators stop rather than loop: a page that says more follow must not hand back a cursor this
@@ -259,7 +267,8 @@ export default class CalmLensServerClient {
        * platform confirms the viewer's age; CalmLens does not verify this claim, and anyone can
        * add it to a public URL.
        */
-      getAssetUrl: ({ assetIdentifier, ...options }: CdnAssetUrlOptions): string => {
+      getAssetUrl: (urlOptions: CdnAssetUrlOptions): string => {
+        const { assetIdentifier, ...options } = checked("cdn.getAssetUrl", urlOptions);
         const { projectId, cdnBaseUrl } = this.#settings;
         return getAssetUrl({ projectId, cdnBaseUrl, assetIdentifier, ...options });
       },
@@ -269,11 +278,8 @@ export default class CalmLensServerClient {
        * the `Response` as soon as headers arrive, so the body streams. Non-2xx responses are
        * returned, not thrown; `timeoutMs` covers only the wait for headers.
        */
-      serve: async ({
-        assetIdentifier,
-        init,
-        ...urlOptions
-      }: CdnServeOptions): Promise<Response> => {
+      serve: async (options: CdnServeOptions): Promise<Response> => {
+        const { assetIdentifier, init, ...urlOptions } = checked("cdn.serve", options);
         const url = this.cdn.getAssetUrl({ assetIdentifier, ...urlOptions });
         const method = (init?.method?.toUpperCase() ?? "GET") as TransportRequest["method"];
         const { response } = await this.#connection.transport.send(
@@ -299,7 +305,7 @@ export default class CalmLensServerClient {
        * `text` unless you pass `name`.
        */
       classify: async (options: ClassifyTextOptions): Promise<Asset> =>
-        this.buildAssets().classify(toTextAssetOptions(options)),
+        this.buildAssets().classify(toTextAssetOptions(checked("text.classify", options))),
     };
   }
 
@@ -321,7 +327,7 @@ export default class CalmLensServerClient {
       sign: async (options: SignUploadTokenOptions): Promise<SignedUploadToken> => {
         return signUploadTokenWithApiKey(
           this.#apiKey,
-          options,
+          checked("uploadTokens.sign", options),
           this.#connection.hooks?.uploadTokenTime(),
         );
       },
@@ -334,41 +340,52 @@ export default class CalmLensServerClient {
       search: async (
         options: Partial<AssetSearchQuery> & { query: string },
       ): Promise<AssetSearchResponse> =>
-        this.request("GET", `${this.projectPath}/assets/search`, { query: options }),
+        this.request("GET", `${this.projectPath}/assets/search`, {
+          query: checked("assets.search", options),
+        }),
 
       /** Lists one page of the project's assets, with optional filter and ordering. */
       list: async (options: ListAssetsOptions = {}): Promise<AssetPage> =>
         this.request("GET", `${this.projectPath}/assets`, {
-          query: options,
+          query: checked("assets.list", options),
         }),
 
       /**
        * Yields every asset matching `options`, fetching pages as needed. The cursor keeps the position
        * stable when other assets are inserted or deleted.
        */
-      iterate: (options: IterateAssetsOptions = {}): AsyncGenerator<Asset, void, undefined> =>
-        this.iteratePages((cursor) => this.buildAssets().list({ ...options, cursor })),
+      iterate: (options: IterateAssetsOptions = {}): AsyncGenerator<Asset, void, undefined> => {
+        checked("assets.iterate", options);
+        return this.iteratePages((cursor) => this.buildAssets().list({ ...options, cursor }));
+      },
 
       /** Retrieves an asset with its status and classification results. */
-      retrieve: async ({ assetId }: RetrieveAssetOptions): Promise<Asset> =>
-        this.request("GET", `/assets/${requireId(assetId, "Asset ID")}`),
+      retrieve: async (options: RetrieveAssetOptions): Promise<Asset> => {
+        const { assetId } = checked("assets.retrieve", options);
+        return this.request("GET", `/assets/${requireId(assetId, "Asset ID")}`);
+      },
 
       /** Updates an asset's editable fields. */
-      update: async ({ assetId, ...body }: UpdateAssetOptions): Promise<Asset> =>
-        this.request("PATCH", `/assets/${requireId(assetId, "Asset ID")}`, { body }),
+      update: async (options: UpdateAssetOptions): Promise<Asset> => {
+        const { assetId, ...body } = checked("assets.update", options);
+        return this.request("PATCH", `/assets/${requireId(assetId, "Asset ID")}`, { body });
+      },
 
       /** Lists one page of the assets extracted from a website or multimedia document. */
       listChildren: async (
-        { assetId, ...options }: ListAssetChildrenOptions = {} as ListAssetChildrenOptions,
-      ): Promise<AssetChildrenPage> =>
-        this.request("GET", `/assets/${requireId(assetId, "Asset ID")}/children`, {
-          query: options,
-        }),
+        options: ListAssetChildrenOptions = {} as ListAssetChildrenOptions,
+      ): Promise<AssetChildrenPage> => {
+        const { assetId, ...query } = checked("assets.listChildren", options);
+        return this.request("GET", `/assets/${requireId(assetId, "Asset ID")}/children`, {
+          query,
+        });
+      },
 
       /** Yields every child of an asset, fetching pages as needed. */
       iterateChildren: (
         options: IterateAssetChildrenOptions,
       ): AsyncGenerator<Asset, void, undefined> => {
+        checked("assets.iterateChildren", options);
         requireId(options?.assetId, "Asset ID");
         return this.iteratePages((cursor) =>
           this.buildAssets().listChildren({ ...options, cursor }),
@@ -381,13 +398,14 @@ export default class CalmLensServerClient {
        * `Idempotency-Key`.
        */
       create: async (options: SubmitAssetOptions): Promise<Asset> =>
-        this.submitAsset(options, true),
+        this.submitAsset(checked("assets.create", options), true),
 
       /**
        * Uploads an asset and waits for its moderation decision. Audio and video still finish
        * in the background. Retried safely with an `Idempotency-Key`.
        */
       classify: async (options: SubmitAssetOptions): Promise<Asset> => {
+        checked("assets.classify", options);
         if (
           options &&
           "content" in options &&
@@ -403,7 +421,8 @@ export default class CalmLensServerClient {
        * Uploads the next part of a multipart upload. The upload's queue mode, chosen when it
        * started, applies when the final part arrives; pass `queue` to override it.
        */
-      uploadPart: async ({ assetId, ...options }: UploadAssetPartOptions): Promise<Asset> => {
+      uploadPart: async (partOptions: UploadAssetPartOptions): Promise<Asset> => {
+        const { assetId, ...options } = checked("assets.uploadPart", partOptions);
         const encodedAssetId = requireId(assetId, "Asset ID");
         return expectAsset(
           await this.#connection.uploadPart(`/assets/${encodedAssetId}/part`, options),
@@ -414,10 +433,10 @@ export default class CalmLensServerClient {
        * Creates a short-lived signed CDN URL, so browsers can load private content without
        * an API key.
        */
-      createSignedUrl: async ({
-        assetId,
-        ...options
-      }: CreateAssetSignedUrlOptions): Promise<PostAssetSignedUrlResponse> => {
+      createSignedUrl: async (
+        signedUrlOptions: CreateAssetSignedUrlOptions,
+      ): Promise<PostAssetSignedUrlResponse> => {
+        const { assetId, ...options } = checked("assets.createSignedUrl", signedUrlOptions);
         const encodedAssetId = requireId(assetId, "Asset ID");
         validateSignedUrlOptions(options);
         return this.request("POST", `/assets/${encodedAssetId}/signed-url`, {
@@ -432,18 +451,22 @@ export default class CalmLensServerClient {
       },
 
       /** Moves an asset into a folder, or to the project root with `folderId: null`. */
-      move: async ({ assetId, folderId }: MoveAssetOptions): Promise<Asset> =>
-        this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/move`, {
+      move: async (options: MoveAssetOptions): Promise<Asset> => {
+        const { assetId, folderId } = checked("assets.move", options);
+        return this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/move`, {
           body: { folderId },
-        }),
+        });
+      },
 
       /**
        * Processes an asset that failed (classification status `failed`) again. It returns to
        * `processing` and is
        * moderated like a new upload; its content must still be stored.
        */
-      retry: async ({ assetId }: RetryAssetOptions): Promise<Asset> =>
-        this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/retry`),
+      retry: async (options: RetryAssetOptions): Promise<Asset> => {
+        const { assetId } = checked("assets.retry", options);
+        return this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/retry`);
+      },
 
       /**
        * Records a reviewer's decision, replacing the policy's: the asset's moderation status
@@ -451,8 +474,10 @@ export default class CalmLensServerClient {
        * event is sent. An asset still pending moderation can only be blocked or purged. Purging
        * needs `confirmPurge: true` and permanently deletes the stored content.
        */
-      decide: async ({ assetId, ...body }: DecideAssetOptions): Promise<Asset> =>
-        this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/decision`, { body }),
+      decide: async (options: DecideAssetOptions): Promise<Asset> => {
+        const { assetId, ...body } = checked("assets.decide", options);
+        return this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/decision`, { body });
+      },
 
       /**
        * Completes the policy evidence behind a decided asset's moderation decision: the report's
@@ -461,20 +486,20 @@ export default class CalmLensServerClient {
        * and returns in `processing`; use it when the policy has changed since the decision
        * (`asset/policy-changed`).
        */
-      explain: async ({ assetId, rerun }: ExplainAssetOptions): Promise<Asset> =>
-        this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/explain`, {
+      explain: async (options: ExplainAssetOptions): Promise<Asset> => {
+        const { assetId, rerun } = checked("assets.explain", options);
+        return this.request("POST", `/assets/${requireId(assetId, "Asset ID")}/explain`, {
           body: rerun ? { rerun } : {},
-        }),
+        });
+      },
 
       /**
        * Waits until an asset's `classification.moderation.status` is no longer `pending` (`allowed`,
        * `limited`, `age-restricted`, `blocked` or `purged`), or its `classification.status` is `failed`, and returns that asset, checking every few seconds. Rejects with `sdk/timeout` if there is no
        * decision within `timeoutMs` (default 60000). Webhooks report decisions without polling.
        */
-      waitForDecision: async ({
-        assetId,
-        ...options
-      }: WaitForAssetDecisionOptions): Promise<Asset> => {
+      waitForDecision: async (waitOptions: WaitForAssetDecisionOptions): Promise<Asset> => {
+        const { assetId, ...options } = checked("assets.waitForDecision", waitOptions);
         requireId(assetId, "Asset ID");
         const client = options.signal ? this.withRequestOptions({ signal: options.signal }) : this;
         return pollForDecision(
@@ -490,11 +515,14 @@ export default class CalmLensServerClient {
        * keeping the asset record, metadata and classification results. The returned asset has
        * `content.status` set to `removed` and `content.removalReason` to `requested`; the CDN no longer serves it.
        */
-      deleteContent: async ({ assetId }: DeleteAssetContentOptions): Promise<Asset> =>
-        this.request("DELETE", `/assets/${requireId(assetId, "Asset ID")}/content`),
+      deleteContent: async (options: DeleteAssetContentOptions): Promise<Asset> => {
+        const { assetId } = checked("assets.deleteContent", options);
+        return this.request("DELETE", `/assets/${requireId(assetId, "Asset ID")}/content`);
+      },
 
       /** Deletes an asset record together with its stored content. */
-      delete: async ({ assetId }: DeleteAssetOptions): Promise<void> => {
+      delete: async (options: DeleteAssetOptions): Promise<void> => {
+        const { assetId } = checked("assets.delete", options);
         await this.request("DELETE", `/assets/${requireId(assetId, "Asset ID")}`);
       },
 
@@ -506,7 +534,8 @@ export default class CalmLensServerClient {
        * `asset.deleted` or `asset.content-removed` for each asset. Assets under a safety hold
        * are skipped. Not retried: it carries no `Idempotency-Key`.
        */
-      batch: async ({ assetIds, operation }: BatchAssetsOptions): Promise<BatchAssetsResponse> => {
+      batch: async (options: BatchAssetsOptions): Promise<BatchAssetsResponse> => {
+        const { assetIds, operation } = checked("assets.batch", options);
         validateBatchAssetsOptions({ assetIds, operation });
         return this.request("POST", `${this.projectPath}/assets/batch`, {
           body: { assetIds, operation },
@@ -523,7 +552,9 @@ export default class CalmLensServerClient {
        * events reshaped as `{ id, type, createdAt, projectId, data }`.
        */
       list: async (options: ListEventsOptions = {}): Promise<GetEventsResponse> =>
-        this.request("GET", `${this.projectPath}/events`, { query: { ...options } }),
+        this.request("GET", `${this.projectPath}/events`, {
+          query: { ...checked("events.list", options) },
+        }),
 
       /**
        * Yields pages of events after `cursor` until no more are waiting. Save each page's
@@ -532,7 +563,8 @@ export default class CalmLensServerClient {
        */
       pages: (
         options: ListEventsOptions = {},
-      ): AsyncGenerator<GetEventsResponse, void, undefined> => this.iterateEventPages(options),
+      ): AsyncGenerator<GetEventsResponse, void, undefined> =>
+        this.iterateEventPages(checked("events.pages", options)),
     };
   }
 
@@ -574,28 +606,39 @@ export default class CalmLensServerClient {
        * `nextCursor` as `cursor` for the next page; fetch a branch when it is opened.
        */
       list: async (options: ListFoldersOptions = {}): Promise<FolderPage> =>
-        this.request("GET", `${this.projectPath}/folders`, { query: options }),
+        this.request("GET", `${this.projectPath}/folders`, {
+          query: checked("folders.list", options),
+        }),
 
-      retrieve: async ({ folderId }: FolderIdOptions): Promise<Folder> =>
-        this.request("GET", `/folders/${requireId(folderId, "Folder ID")}`),
+      retrieve: async (options: FolderIdOptions): Promise<Folder> => {
+        const { folderId } = checked("folders.retrieve", options);
+        return this.request("GET", `/folders/${requireId(folderId, "Folder ID")}`);
+      },
 
       /** Creates a folder at the project root or inside `parentId`. */
       create: async (options: CreateFolderOptions): Promise<Folder> =>
-        this.request("POST", `${this.projectPath}/folders`, { body: options }),
+        this.request("POST", `${this.projectPath}/folders`, {
+          body: checked("folders.create", options),
+        }),
 
-      update: async ({ folderId, ...body }: UpdateFolderOptions): Promise<Folder> =>
-        this.request("PATCH", `/folders/${requireId(folderId, "Folder ID")}`, { body }),
+      update: async (options: UpdateFolderOptions): Promise<Folder> => {
+        const { folderId, ...body } = checked("folders.update", options);
+        return this.request("PATCH", `/folders/${requireId(folderId, "Folder ID")}`, { body });
+      },
 
       /** Deletes an empty folder; throws `folder/not-empty` otherwise. */
-      delete: async ({ folderId }: FolderIdOptions): Promise<void> => {
+      delete: async (options: FolderIdOptions): Promise<void> => {
+        const { folderId } = checked("folders.delete", options);
         await this.request("DELETE", `/folders/${requireId(folderId, "Folder ID")}`);
       },
 
       /** Moves a folder under `parentId`, or to the project root with `parentId: null`. */
-      move: async ({ folderId, parentId }: MoveFolderOptions): Promise<Folder> =>
-        this.request("POST", `/folders/${requireId(folderId, "Folder ID")}/move`, {
+      move: async (options: MoveFolderOptions): Promise<Folder> => {
+        const { folderId, parentId } = checked("folders.move", options);
+        return this.request("POST", `/folders/${requireId(folderId, "Folder ID")}/move`, {
           body: { parentId },
-        }),
+        });
+      },
     };
   }
 
@@ -607,39 +650,54 @@ export default class CalmLensServerClient {
     return {
       /** Lists one page of the project's hash lists, newest first. */
       list: async (options: ListHashListsOptions = {}): Promise<HashListPage> =>
-        this.request("GET", `${this.projectPath}/hash-lists`, { query: options }),
+        this.request("GET", `${this.projectPath}/hash-lists`, {
+          query: checked("hashLists.list", options),
+        }),
 
-      retrieve: async ({ hashListId }: HashListIdOptions): Promise<HashList> =>
-        this.request("GET", `/hash-lists/${requireId(hashListId, "Hash list ID")}`),
+      retrieve: async (options: HashListIdOptions): Promise<HashList> => {
+        const { hashListId } = checked("hashLists.retrieve", options);
+        return this.request("GET", `/hash-lists/${requireId(hashListId, "Hash list ID")}`);
+      },
 
       create: async (options: CreateHashListOptions): Promise<HashList> =>
-        this.request("POST", `${this.projectPath}/hash-lists`, { body: options }),
+        this.request("POST", `${this.projectPath}/hash-lists`, {
+          body: checked("hashLists.create", options),
+        }),
 
       /** Renames a list or changes its action; the new action applies to later uploads. */
-      update: async ({ hashListId, ...body }: UpdateHashListOptions): Promise<HashList> =>
-        this.request("PATCH", `/hash-lists/${requireId(hashListId, "Hash list ID")}`, { body }),
+      update: async (options: UpdateHashListOptions): Promise<HashList> => {
+        const { hashListId, ...body } = checked("hashLists.update", options);
+        return this.request("PATCH", `/hash-lists/${requireId(hashListId, "Hash list ID")}`, {
+          body,
+        });
+      },
 
       /** Deletes the list and every entry in it. */
-      delete: async ({ hashListId }: HashListIdOptions): Promise<void> => {
+      delete: async (options: HashListIdOptions): Promise<void> => {
+        const { hashListId } = checked("hashLists.delete", options);
         await this.request("DELETE", `/hash-lists/${requireId(hashListId, "Hash list ID")}`);
       },
 
       /** Lists one page of a list's entries, newest first. */
-      listEntries: async ({
-        hashListId,
-        ...query
-      }: ListHashListEntriesOptions): Promise<HashListEntryPage> =>
-        this.request("GET", `/hash-lists/${requireId(hashListId, "Hash list ID")}/entries`, {
+      listEntries: async (options: ListHashListEntriesOptions): Promise<HashListEntryPage> => {
+        const { hashListId, ...query } = checked("hashLists.listEntries", options);
+        return this.request("GET", `/hash-lists/${requireId(hashListId, "Hash list ID")}/entries`, {
           query,
-        }),
+        });
+      },
 
       /** Adds a hash, or an image asset's hash; a hash already in the list returns its entry. */
-      addEntry: async ({ hashListId, ...body }: AddHashListEntryOptions): Promise<HashListEntry> =>
-        this.request("POST", `/hash-lists/${requireId(hashListId, "Hash list ID")}/entries`, {
-          body,
-        }),
+      addEntry: async (options: AddHashListEntryOptions): Promise<HashListEntry> => {
+        const { hashListId, ...body } = checked("hashLists.addEntry", options);
+        return this.request(
+          "POST",
+          `/hash-lists/${requireId(hashListId, "Hash list ID")}/entries`,
+          { body },
+        );
+      },
 
-      removeEntry: async ({ entryId }: HashListEntryIdOptions): Promise<void> => {
+      removeEntry: async (options: HashListEntryIdOptions): Promise<void> => {
+        const { entryId } = checked("hashLists.removeEntry", options);
         await this.request(
           "DELETE",
           `/hash-list-entries/${requireId(entryId, "Hash list entry ID")}`,
@@ -660,36 +718,43 @@ export default class CalmLensServerClient {
       /** Lists the organisation's policies and the ID of the one the project uses. */
       list: async (): Promise<PolicyList> => this.request("GET", `${this.projectPath}/policies`),
 
-      retrieve: async ({ policyId }: PolicyIdOptions): Promise<Policy> =>
-        this.request("GET", policyPath(policyId)),
+      retrieve: async (options: PolicyIdOptions): Promise<Policy> =>
+        this.request("GET", policyPath(checked("policies.retrieve", options).policyId)),
 
       /** Creates a policy from `settings`, or a copy of a built-in preset with `presetId`. */
       create: async (options: CreatePolicyOptions): Promise<Policy> =>
-        this.request("POST", `${this.projectPath}/policies`, { body: options }),
+        this.request("POST", `${this.projectPath}/policies`, {
+          body: checked("policies.create", options),
+        }),
 
       /** Changes the name, description or settings; later moderation uses them. */
-      update: async ({ policyId, ...body }: UpdatePolicyOptions): Promise<Policy> =>
-        this.request("PATCH", policyPath(policyId), { body }),
+      update: async (options: UpdatePolicyOptions): Promise<Policy> => {
+        const { policyId, ...body } = checked("policies.update", options);
+        return this.request("PATCH", policyPath(policyId), { body });
+      },
 
       /** Resets a preset copy to its pinned version, or updates an unchanged copy to the latest. */
-      applyPreset: async ({ policyId, ...body }: ApplyPolicyPresetOptions): Promise<Policy> =>
-        this.request("POST", `${policyPath(policyId)}/preset`, { body }),
+      applyPreset: async (options: ApplyPolicyPresetOptions): Promise<Policy> => {
+        const { policyId, ...body } = checked("policies.applyPreset", options);
+        return this.request("POST", `${policyPath(policyId)}/preset`, { body });
+      },
 
       /** Switches automatic updates on or off for the project's preset policy. */
-      setAutomaticUpdates: async ({
-        policyId,
-        ...body
-      }: SetPolicyAutomaticUpdatesOptions): Promise<Policy> =>
-        this.request("PUT", `${policyPath(policyId)}/automatic-updates`, { body }),
+      setAutomaticUpdates: async (options: SetPolicyAutomaticUpdatesOptions): Promise<Policy> => {
+        const { policyId, ...body } = checked("policies.setAutomaticUpdates", options);
+        return this.request("PUT", `${policyPath(policyId)}/automatic-updates`, { body });
+      },
 
       /** Deletes a policy that no project or upload preset uses. */
-      delete: async ({ policyId }: PolicyIdOptions): Promise<void> => {
-        await this.request("DELETE", policyPath(policyId));
+      delete: async (options: PolicyIdOptions): Promise<void> => {
+        await this.request("DELETE", policyPath(checked("policies.delete", options).policyId));
       },
 
       /** Chooses the policy the project moderates with. */
       assign: async (options: AssignPolicyOptions): Promise<Policy> =>
-        this.request("PUT", `${this.projectPath}/policy`, { body: options }),
+        this.request("PUT", `${this.projectPath}/policy`, {
+          body: checked("policies.assign", options),
+        }),
     };
   }
 
@@ -698,6 +763,7 @@ export default class CalmLensServerClient {
    * Supplying the same definition and version is idempotent.
    */
   async ensureLens(options: EnsureLensOptions): Promise<Lens> {
+    checked("ensureLens", options);
     if (!options?.identifier) throw invalidArgument("Lens identifier is required");
     const [lens] = await this.ensureLenses({ lenses: [options] });
     return lens!;
@@ -708,13 +774,15 @@ export default class CalmLensServerClient {
    * consecutive requests of at most {@link ENSURE_LENSES_MAX_PER_REQUEST} definitions, in order.
    * Each lens follows the same versioning and idempotency rules as ensureLens().
    */
-  async ensureLenses({ lenses }: EnsureLensesOptions): Promise<Lens[]> {
+  async ensureLenses(options: EnsureLensesOptions): Promise<Lens[]> {
+    const { lenses } = checked("ensureLenses", options);
     if (!Array.isArray(lenses) || lenses.length === 0) {
       throw invalidArgument("At least one lens is required");
     }
     if (lenses.some((option) => !option?.identifier)) {
       throw invalidArgument("Lens identifier is required");
     }
+    for (const lens of lenses) checked("ensureLens", lens);
     const { ensuredLenses, pendingEnsureLenses } = this.#lenses;
 
     const missingOptions: EnsureLensOptions[] = [];

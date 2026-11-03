@@ -1304,6 +1304,9 @@ type EventsPage struct {
 	Items      []Event `json:"items"`
 	NextCursor string  `json:"nextCursor"`
 	HasMore    bool    `json:"hasMore"`
+	// ExcludedTypes are the event types (EventType constants) this feed never includes, because
+	// the API key lacks the permission to see them. Give the key that permission to receive them.
+	ExcludedTypes []string `json:"excludedTypes"`
 }
 
 // CDNAssetURLOptions identifies CDN content. AssetIdentifier is an asset ID or external
