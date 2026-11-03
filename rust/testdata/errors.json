@@ -2401,6 +2401,294 @@
     }
   },
   {
+    "code": "policy/not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-policy-not-found"
+      },
+      "body": {
+        "code": "policy/not-found",
+        "message": "Policy not found. Check the policy ID in the portal.",
+        "requestId": "req-policy-not-found",
+        "details": {
+          "reason": "policy_not_found"
+        }
+      }
+    },
+    "expected": {
+      "code": "policy/not-found",
+      "status": 404,
+      "requestId": "req-policy-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "policy_not_found"
+      }
+    }
+  },
+  {
+    "code": "policy/revision-conflict",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-policy-revision-conflict"
+      },
+      "body": {
+        "code": "policy/revision-conflict",
+        "message": "The policy changed. Retrieve it again and retry with its current revision.",
+        "requestId": "req-policy-revision-conflict",
+        "details": {
+          "reason": "policy_revision_conflict"
+        }
+      }
+    },
+    "expected": {
+      "code": "policy/revision-conflict",
+      "status": 409,
+      "requestId": "req-policy-revision-conflict",
+      "retryAfter": null,
+      "details": {
+        "reason": "policy_revision_conflict"
+      }
+    }
+  },
+  {
+    "code": "policy/projects-changed",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-policy-projects-changed"
+      },
+      "body": {
+        "code": "policy/projects-changed",
+        "message": "The projects using this policy changed. Retrieve it again and review the affected projects before saving.",
+        "requestId": "req-policy-projects-changed",
+        "details": {
+          "reason": "policy_projects_changed"
+        }
+      }
+    },
+    "expected": {
+      "code": "policy/projects-changed",
+      "status": 409,
+      "requestId": "req-policy-projects-changed",
+      "retryAfter": null,
+      "details": {
+        "reason": "policy_projects_changed"
+      }
+    }
+  },
+  {
+    "code": "policy/in-use",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-policy-in-use"
+      },
+      "body": {
+        "code": "policy/in-use",
+        "message": "Projects or upload presets still use this policy. Choose another policy for each of them before deleting it.",
+        "requestId": "req-policy-in-use",
+        "details": {
+          "reason": "policy_in_use"
+        }
+      }
+    },
+    "expected": {
+      "code": "policy/in-use",
+      "status": 409,
+      "requestId": "req-policy-in-use",
+      "retryAfter": null,
+      "details": {
+        "reason": "policy_in_use"
+      }
+    }
+  },
+  {
+    "code": "policy/used-by-another-project",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-policy-used-by-another-project"
+      },
+      "body": {
+        "code": "policy/used-by-another-project",
+        "message": "Another project uses or owns this policy, so it can only be changed from the portal or that project.",
+        "requestId": "req-policy-used-by-another-project",
+        "details": {
+          "reason": "policy_used_by_another_project"
+        }
+      }
+    },
+    "expected": {
+      "code": "policy/used-by-another-project",
+      "status": 409,
+      "requestId": "req-policy-used-by-another-project",
+      "retryAfter": null,
+      "details": {
+        "reason": "policy_used_by_another_project"
+      }
+    }
+  },
+  {
+    "code": "policy/no-preset",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-policy-no-preset"
+      },
+      "body": {
+        "code": "policy/no-preset",
+        "message": "This policy has no preset baseline.",
+        "requestId": "req-policy-no-preset",
+        "details": {
+          "reason": "policy_no_preset"
+        }
+      }
+    },
+    "expected": {
+      "code": "policy/no-preset",
+      "status": 400,
+      "requestId": "req-policy-no-preset",
+      "retryAfter": null,
+      "details": {
+        "reason": "policy_no_preset"
+      }
+    }
+  },
+  {
+    "code": "policy/preset-version-conflict",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-policy-preset-version-conflict"
+      },
+      "body": {
+        "code": "policy/preset-version-conflict",
+        "message": "The preset changed. Review the latest differences and retry with its version.",
+        "requestId": "req-policy-preset-version-conflict",
+        "details": {
+          "reason": "policy_preset_version_conflict"
+        }
+      }
+    },
+    "expected": {
+      "code": "policy/preset-version-conflict",
+      "status": 409,
+      "requestId": "req-policy-preset-version-conflict",
+      "retryAfter": null,
+      "details": {
+        "reason": "policy_preset_version_conflict"
+      }
+    }
+  },
+  {
+    "code": "policy/preset-update-unavailable",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-policy-preset-update-unavailable"
+      },
+      "body": {
+        "code": "policy/preset-update-unavailable",
+        "message": "Only an unchanged copy of an older preset version can be updated. Reset or review your changes first.",
+        "requestId": "req-policy-preset-update-unavailable",
+        "details": {
+          "reason": "policy_preset_update_unavailable"
+        }
+      }
+    },
+    "expected": {
+      "code": "policy/preset-update-unavailable",
+      "status": 409,
+      "requestId": "req-policy-preset-update-unavailable",
+      "retryAfter": null,
+      "details": {
+        "reason": "policy_preset_update_unavailable"
+      }
+    }
+  },
+  {
+    "code": "policy/automatic-updates-unavailable",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-policy-automatic-updates-unavailable"
+      },
+      "body": {
+        "code": "policy/automatic-updates-unavailable",
+        "message": "Automatic updates can only be switched on for a saved copy of a project's preset policy, and off for one that has them.",
+        "requestId": "req-policy-automatic-updates-unavailable",
+        "details": {
+          "reason": "policy_automatic_updates_unavailable"
+        }
+      }
+    },
+    "expected": {
+      "code": "policy/automatic-updates-unavailable",
+      "status": 409,
+      "requestId": "req-policy-automatic-updates-unavailable",
+      "retryAfter": null,
+      "details": {
+        "reason": "policy_automatic_updates_unavailable"
+      }
+    }
+  },
+  {
     "code": "upload-preset/not-found",
     "status": 404,
     "operation": "assets.retrieve",

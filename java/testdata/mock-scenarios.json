@@ -2382,6 +2382,302 @@
       ]
     },
     {
+      "name": "policies keep revisions, reset to their preset and can't be deleted while in use",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "policies.list",
+          "save": "initial",
+          "expect": {
+            "result": {
+              "policies.length": 1,
+              "policies.0.name": "General",
+              "policies.0.automaticUpdates": true,
+              "policies.0.preset.id": "general-community",
+              "policies.0.preset.projectId": "project-1",
+              "policies.0.projectIds": [
+                "project-1"
+              ]
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.create",
+          "args": {
+            "presetId": "children-platform"
+          },
+          "save": "kids",
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "pol"
+              },
+              "name": "Kids",
+              "revision": 1,
+              "automaticUpdates": false,
+              "preset.id": "children-platform",
+              "preset.version": 1,
+              "preset.latestVersion": 1,
+              "preset.projectId": null,
+              "projectIds": []
+            },
+            "httpStatus": 201
+          }
+        },
+        {
+          "operation": "policies.update",
+          "args": {
+            "policyId": {
+              "$ref": "kids.id"
+            },
+            "revision": 2,
+            "settings": {
+              "categorySettings": {
+                "profanity": {
+                  "action": "block"
+                }
+              }
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "policy/revision-conflict",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "policies.update",
+          "args": {
+            "policyId": {
+              "$ref": "kids.id"
+            },
+            "revision": 1,
+            "name": "Kids section",
+            "settings": {
+              "categorySettings": {
+                "profanity": {
+                  "action": "block"
+                }
+              }
+            }
+          },
+          "expect": {
+            "result": {
+              "name": "Kids section",
+              "revision": 2,
+              "settings.categorySettings.profanity.action": "block"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.applyPreset",
+          "args": {
+            "policyId": {
+              "$ref": "kids.id"
+            },
+            "operation": "reset",
+            "revision": 2,
+            "presetVersion": 2
+          },
+          "expect": {
+            "error": {
+              "code": "policy/preset-version-conflict",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "policies.applyPreset",
+          "args": {
+            "policyId": {
+              "$ref": "kids.id"
+            },
+            "operation": "reset",
+            "revision": 2,
+            "presetVersion": 1
+          },
+          "expect": {
+            "result": {
+              "revision": 3,
+              "settings": {
+                "categorySettings": {}
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.setAutomaticUpdates",
+          "args": {
+            "policyId": {
+              "$ref": "kids.id"
+            },
+            "enabled": true,
+            "revision": 3,
+            "presetVersion": 1
+          },
+          "expect": {
+            "error": {
+              "code": "policy/automatic-updates-unavailable",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "policies.assign",
+          "args": {
+            "policyId": {
+              "$ref": "kids.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "kids.id"
+              },
+              "projectIds": [
+                "project-1"
+              ]
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.delete",
+          "args": {
+            "policyId": {
+              "$ref": "kids.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "policy/in-use",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "policies.list",
+          "expect": {
+            "result": {
+              "policies.length": 2,
+              "projectPolicyId": {
+                "$ref": "kids.id"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.assign",
+          "args": {
+            "policyId": {
+              "$ref": "initial.projectPolicyId"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.delete",
+          "args": {
+            "policyId": {
+              "$ref": "kids.id"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.retrieve",
+          "args": {
+            "policyId": {
+              "$ref": "kids.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "policy/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a project's preset policy switches automatic updates off and on",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "policies.list",
+          "save": "initial",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.setAutomaticUpdates",
+          "args": {
+            "policyId": {
+              "$ref": "initial.projectPolicyId"
+            },
+            "enabled": false,
+            "revision": 1,
+            "presetVersion": 1
+          },
+          "expect": {
+            "result": {
+              "automaticUpdates": false,
+              "revision": 2
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.update",
+          "args": {
+            "policyId": {
+              "$ref": "initial.projectPolicyId"
+            },
+            "revision": 2,
+            "name": "Our rules"
+          },
+          "expect": {
+            "result": {
+              "name": "Our rules",
+              "automaticUpdates": false,
+              "revision": 3
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.setAutomaticUpdates",
+          "args": {
+            "policyId": {
+              "$ref": "initial.projectPolicyId"
+            },
+            "enabled": true,
+            "revision": 3,
+            "presetVersion": 1
+          },
+          "expect": {
+            "result": {
+              "name": "General",
+              "automaticUpdates": true,
+              "revision": 4
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
       "name": "a folder with assets cannot be deleted",
       "mock": {},
       "steps": [

@@ -114,6 +114,29 @@
         "entryId": ".."
       },
       "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "policies.retrieve",
+      "options": {
+        "policyId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "policies.update",
+      "options": {
+        "policyId": ".",
+        "revision": 1,
+        "name": "Renamed"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "policies.delete",
+      "options": {
+        "policyId": ".."
+      },
+      "error": "sdk/invalid-argument"
     }
   ],
   "cdnUrls": [

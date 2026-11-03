@@ -150,6 +150,24 @@ error_codes! {
     HashListEntryLimitReached = "hash-list/entry-limit-reached", 409;
     /// `hash-list/asset-not-hashed` (HTTP 409): This asset has no perceptual hash. Only image assets that finished processing can be added.
     HashListAssetNotHashed = "hash-list/asset-not-hashed", 409;
+    /// `policy/not-found` (HTTP 404): Policy not found. Check the policy ID in the portal.
+    PolicyNotFound = "policy/not-found", 404;
+    /// `policy/revision-conflict` (HTTP 409): The policy changed. Retrieve it again and retry with its current revision.
+    PolicyRevisionConflict = "policy/revision-conflict", 409;
+    /// `policy/projects-changed` (HTTP 409): The projects using this policy changed. Retrieve it again and review the affected projects before saving.
+    PolicyProjectsChanged = "policy/projects-changed", 409;
+    /// `policy/in-use` (HTTP 409): Projects or upload presets still use this policy. Choose another policy for each of them before deleting it.
+    PolicyInUse = "policy/in-use", 409;
+    /// `policy/used-by-another-project` (HTTP 409): Another project uses or owns this policy, so it can only be changed from the portal or that project.
+    PolicyUsedByAnotherProject = "policy/used-by-another-project", 409;
+    /// `policy/no-preset` (HTTP 400): This policy has no preset baseline.
+    PolicyNoPreset = "policy/no-preset", 400;
+    /// `policy/preset-version-conflict` (HTTP 409): The preset changed. Review the latest differences and retry with its version.
+    PolicyPresetVersionConflict = "policy/preset-version-conflict", 409;
+    /// `policy/preset-update-unavailable` (HTTP 409): Only an unchanged copy of an older preset version can be updated. Reset or review your changes first.
+    PolicyPresetUpdateUnavailable = "policy/preset-update-unavailable", 409;
+    /// `policy/automatic-updates-unavailable` (HTTP 409): Automatic updates can only be switched on for a saved copy of a project's preset policy, and off for one that has them.
+    PolicyAutomaticUpdatesUnavailable = "policy/automatic-updates-unavailable", 409;
     /// `upload-preset/not-found` (HTTP 404): Upload preset not found. Check the preset ID in the portal.
     UploadPresetNotFound = "upload-preset/not-found", 404;
     /// `upload-preset/disabled` (HTTP 403): This upload preset is paused. Turn it on in the portal to accept uploads.

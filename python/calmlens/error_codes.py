@@ -75,6 +75,15 @@ HASH_LIST_ENTRY_NOT_FOUND = "hash-list/entry-not-found"
 HASH_LIST_LIMIT_REACHED = "hash-list/limit-reached"
 HASH_LIST_ENTRY_LIMIT_REACHED = "hash-list/entry-limit-reached"
 HASH_LIST_ASSET_NOT_HASHED = "hash-list/asset-not-hashed"
+POLICY_NOT_FOUND = "policy/not-found"
+POLICY_REVISION_CONFLICT = "policy/revision-conflict"
+POLICY_PROJECTS_CHANGED = "policy/projects-changed"
+POLICY_IN_USE = "policy/in-use"
+POLICY_USED_BY_ANOTHER_PROJECT = "policy/used-by-another-project"
+POLICY_NO_PRESET = "policy/no-preset"
+POLICY_PRESET_VERSION_CONFLICT = "policy/preset-version-conflict"
+POLICY_PRESET_UPDATE_UNAVAILABLE = "policy/preset-update-unavailable"
+POLICY_AUTOMATIC_UPDATES_UNAVAILABLE = "policy/automatic-updates-unavailable"
 UPLOAD_PRESET_NOT_FOUND = "upload-preset/not-found"
 UPLOAD_PRESET_DISABLED = "upload-preset/disabled"
 UPLOAD_PRESET_TOKEN_REQUIRED = "upload-preset/token-required"
@@ -188,6 +197,15 @@ STATUS_BY_CODE: dict[str, int] = {
     "hash-list/limit-reached": 409,
     "hash-list/entry-limit-reached": 409,
     "hash-list/asset-not-hashed": 409,
+    "policy/not-found": 404,
+    "policy/revision-conflict": 409,
+    "policy/projects-changed": 409,
+    "policy/in-use": 409,
+    "policy/used-by-another-project": 409,
+    "policy/no-preset": 400,
+    "policy/preset-version-conflict": 409,
+    "policy/preset-update-unavailable": 409,
+    "policy/automatic-updates-unavailable": 409,
     "upload-preset/not-found": 404,
     "upload-preset/disabled": 403,
     "upload-preset/token-required": 401,

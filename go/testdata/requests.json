@@ -1747,6 +1747,396 @@
     "response": {}
   },
   {
+    "operation": "policies.list",
+    "options": {},
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/policies",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "policies": [
+        {
+          "id": "pol-1",
+          "name": "Kids section",
+          "description": "",
+          "settings": {
+            "categorySettings": {
+              "profanity": {
+                "action": "block"
+              }
+            }
+          },
+          "revision": 3,
+          "automaticUpdates": false,
+          "preset": {
+            "id": "children-platform",
+            "version": 30,
+            "latestVersion": 30,
+            "projectId": null
+          },
+          "projectIds": [
+            "project-1"
+          ],
+          "createdAt": 1760000000000,
+          "updatedAt": 1760000000000
+        }
+      ],
+      "projectPolicyId": "pol-1"
+    }
+  },
+  {
+    "operation": "policies.retrieve",
+    "options": {
+      "policyId": "pol-1"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/policies/pol-1",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "pol-1",
+      "name": "Kids section",
+      "description": "",
+      "settings": {
+        "categorySettings": {
+          "profanity": {
+            "action": "block"
+          }
+        }
+      },
+      "revision": 3,
+      "automaticUpdates": false,
+      "preset": {
+        "id": "children-platform",
+        "version": 30,
+        "latestVersion": 30,
+        "projectId": null
+      },
+      "projectIds": [
+        "project-1"
+      ],
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "operation": "policies.retrieve",
+    "options": {
+      "policyId": "a/b?c#d"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/policies/a%2Fb%3Fc%23d",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "pol-1",
+      "name": "Kids section",
+      "description": "",
+      "settings": {
+        "categorySettings": {
+          "profanity": {
+            "action": "block"
+          }
+        }
+      },
+      "revision": 3,
+      "automaticUpdates": false,
+      "preset": {
+        "id": "children-platform",
+        "version": 30,
+        "latestVersion": 30,
+        "projectId": null
+      },
+      "projectIds": [
+        "project-1"
+      ],
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "operation": "policies.create",
+    "options": {
+      "presetId": "children-platform",
+      "name": "Kids section"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/policies",
+      "query": {},
+      "body": {
+        "presetId": "children-platform",
+        "name": "Kids section"
+      }
+    },
+    "response": {
+      "id": "pol-1",
+      "name": "Kids section",
+      "description": "",
+      "settings": {
+        "categorySettings": {
+          "profanity": {
+            "action": "block"
+          }
+        }
+      },
+      "revision": 3,
+      "automaticUpdates": false,
+      "preset": {
+        "id": "children-platform",
+        "version": 30,
+        "latestVersion": 30,
+        "projectId": null
+      },
+      "projectIds": [
+        "project-1"
+      ],
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "operation": "policies.create",
+    "options": {
+      "name": "Strict",
+      "description": "No profanity",
+      "settings": {
+        "categorySettings": {}
+      }
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/policies",
+      "query": {},
+      "body": {
+        "name": "Strict",
+        "description": "No profanity",
+        "settings": {
+          "categorySettings": {}
+        }
+      }
+    },
+    "response": {
+      "id": "pol-1",
+      "name": "Kids section",
+      "description": "",
+      "settings": {
+        "categorySettings": {
+          "profanity": {
+            "action": "block"
+          }
+        }
+      },
+      "revision": 3,
+      "automaticUpdates": false,
+      "preset": {
+        "id": "children-platform",
+        "version": 30,
+        "latestVersion": 30,
+        "projectId": null
+      },
+      "projectIds": [
+        "project-1"
+      ],
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "operation": "policies.update",
+    "options": {
+      "policyId": "pol-1",
+      "revision": 3,
+      "name": "Renamed",
+      "settings": {
+        "categorySettings": {}
+      }
+    },
+    "request": {
+      "method": "PATCH",
+      "path": "/v1/projects/project-1/policies/pol-1",
+      "query": {},
+      "body": {
+        "revision": 3,
+        "name": "Renamed",
+        "settings": {
+          "categorySettings": {}
+        }
+      }
+    },
+    "response": {
+      "id": "pol-1",
+      "name": "Kids section",
+      "description": "",
+      "settings": {
+        "categorySettings": {
+          "profanity": {
+            "action": "block"
+          }
+        }
+      },
+      "revision": 3,
+      "automaticUpdates": false,
+      "preset": {
+        "id": "children-platform",
+        "version": 30,
+        "latestVersion": 30,
+        "projectId": null
+      },
+      "projectIds": [
+        "project-1"
+      ],
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "operation": "policies.applyPreset",
+    "options": {
+      "policyId": "pol-1",
+      "operation": "reset",
+      "revision": 3,
+      "presetVersion": 30
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/policies/pol-1/preset",
+      "query": {},
+      "body": {
+        "operation": "reset",
+        "revision": 3,
+        "presetVersion": 30
+      }
+    },
+    "response": {
+      "id": "pol-1",
+      "name": "Kids section",
+      "description": "",
+      "settings": {
+        "categorySettings": {
+          "profanity": {
+            "action": "block"
+          }
+        }
+      },
+      "revision": 3,
+      "automaticUpdates": false,
+      "preset": {
+        "id": "children-platform",
+        "version": 30,
+        "latestVersion": 30,
+        "projectId": null
+      },
+      "projectIds": [
+        "project-1"
+      ],
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "operation": "policies.setAutomaticUpdates",
+    "options": {
+      "policyId": "pol-1",
+      "enabled": true,
+      "revision": 3,
+      "presetVersion": 30
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/policies/pol-1/automatic-updates",
+      "query": {},
+      "body": {
+        "enabled": true,
+        "revision": 3,
+        "presetVersion": 30
+      }
+    },
+    "response": {
+      "id": "pol-1",
+      "name": "Kids section",
+      "description": "",
+      "settings": {
+        "categorySettings": {
+          "profanity": {
+            "action": "block"
+          }
+        }
+      },
+      "revision": 3,
+      "automaticUpdates": false,
+      "preset": {
+        "id": "children-platform",
+        "version": 30,
+        "latestVersion": 30,
+        "projectId": null
+      },
+      "projectIds": [
+        "project-1"
+      ],
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
+    "operation": "policies.delete",
+    "options": {
+      "policyId": "pol-1"
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/projects/project-1/policies/pol-1",
+      "query": {},
+      "body": null
+    },
+    "response": {}
+  },
+  {
+    "operation": "policies.assign",
+    "options": {
+      "policyId": "pol-1"
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/policy",
+      "query": {},
+      "body": {
+        "policyId": "pol-1"
+      }
+    },
+    "response": {
+      "id": "pol-1",
+      "name": "Kids section",
+      "description": "",
+      "settings": {
+        "categorySettings": {
+          "profanity": {
+            "action": "block"
+          }
+        }
+      },
+      "revision": 3,
+      "automaticUpdates": false,
+      "preset": {
+        "id": "children-platform",
+        "version": 30,
+        "latestVersion": 30,
+        "projectId": null
+      },
+      "projectIds": [
+        "project-1"
+      ],
+      "createdAt": 1760000000000,
+      "updatedAt": 1760000000000
+    }
+  },
+  {
     "operation": "events.list",
     "options": {
       "cursor": "123_abc",
@@ -11443,6 +11833,544 @@
       "label": "example",
       "sourceAssetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "createdAt": 1767225600000
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "policies.list",
+    "options": {},
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/policies",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "policies": [
+        {
+          "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+          "name": "example",
+          "description": "example",
+          "settings": {
+            "categorySettings": {
+              "sexual": {
+                "allowances": [
+                  {
+                    "name": "example",
+                    "when": [
+                      "sexual-pornographic-media"
+                    ],
+                    "match": "all",
+                    "action": "allow"
+                  }
+                ],
+                "restrictions": [
+                  {
+                    "name": "example",
+                    "when": [
+                      "sexual-pornographic-media"
+                    ],
+                    "match": "all",
+                    "unless": [
+                      "sexual-nudity"
+                    ],
+                    "action": "purge"
+                  }
+                ],
+                "action": "block"
+              }
+            },
+            "linkSafety": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
+          "revision": 1,
+          "automaticUpdates": true,
+          "preset": {
+            "id": "general-community",
+            "version": 1,
+            "latestVersion": 1,
+            "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+          },
+          "projectIds": [
+            "proj_8fK2mQx7Lp4NvB3tRz9Y"
+          ],
+          "createdAt": 1767225600000,
+          "updatedAt": 1767225900000
+        }
+      ],
+      "projectPolicyId": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C"
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "policies.retrieve",
+    "options": {
+      "policyId": "pol-1"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/policies/pol-1",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+      "name": "example",
+      "description": "example",
+      "settings": {
+        "categorySettings": {
+          "sexual": {
+            "allowances": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "action": "allow"
+              }
+            ],
+            "restrictions": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "unless": [
+                  "sexual-nudity"
+                ],
+                "action": "purge"
+              }
+            ],
+            "action": "block"
+          }
+        },
+        "linkSafety": {
+          "verdictActions": {
+            "phishing": "allow"
+          },
+          "offPlatformLinks": {
+            "action": "limit",
+            "allowedDomains": [
+              "example.com"
+            ]
+          }
+        }
+      },
+      "revision": 1,
+      "automaticUpdates": true,
+      "preset": {
+        "id": "general-community",
+        "version": 1,
+        "latestVersion": 1,
+        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      },
+      "projectIds": [
+        "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      ],
+      "createdAt": 1767225600000,
+      "updatedAt": 1767225900000
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "policies.create",
+    "options": {
+      "presetId": "children-platform",
+      "name": "Kids section"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/policies",
+      "query": {},
+      "body": {
+        "presetId": "children-platform",
+        "name": "Kids section"
+      }
+    },
+    "response": {
+      "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+      "name": "example",
+      "description": "example",
+      "settings": {
+        "categorySettings": {
+          "sexual": {
+            "allowances": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "action": "allow"
+              }
+            ],
+            "restrictions": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "unless": [
+                  "sexual-nudity"
+                ],
+                "action": "purge"
+              }
+            ],
+            "action": "block"
+          }
+        },
+        "linkSafety": {
+          "verdictActions": {
+            "phishing": "allow"
+          },
+          "offPlatformLinks": {
+            "action": "limit",
+            "allowedDomains": [
+              "example.com"
+            ]
+          }
+        }
+      },
+      "revision": 1,
+      "automaticUpdates": true,
+      "preset": {
+        "id": "general-community",
+        "version": 1,
+        "latestVersion": 1,
+        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      },
+      "projectIds": [
+        "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      ],
+      "createdAt": 1767225600000,
+      "updatedAt": 1767225900000
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "policies.update",
+    "options": {
+      "policyId": "pol-1",
+      "revision": 3,
+      "name": "Renamed",
+      "settings": {
+        "categorySettings": {}
+      }
+    },
+    "request": {
+      "method": "PATCH",
+      "path": "/v1/projects/project-1/policies/pol-1",
+      "query": {},
+      "body": {
+        "revision": 3,
+        "name": "Renamed",
+        "settings": {
+          "categorySettings": {}
+        }
+      }
+    },
+    "response": {
+      "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+      "name": "example",
+      "description": "example",
+      "settings": {
+        "categorySettings": {
+          "sexual": {
+            "allowances": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "action": "allow"
+              }
+            ],
+            "restrictions": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "unless": [
+                  "sexual-nudity"
+                ],
+                "action": "purge"
+              }
+            ],
+            "action": "block"
+          }
+        },
+        "linkSafety": {
+          "verdictActions": {
+            "phishing": "allow"
+          },
+          "offPlatformLinks": {
+            "action": "limit",
+            "allowedDomains": [
+              "example.com"
+            ]
+          }
+        }
+      },
+      "revision": 1,
+      "automaticUpdates": true,
+      "preset": {
+        "id": "general-community",
+        "version": 1,
+        "latestVersion": 1,
+        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      },
+      "projectIds": [
+        "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      ],
+      "createdAt": 1767225600000,
+      "updatedAt": 1767225900000
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "policies.applyPreset",
+    "options": {
+      "policyId": "pol-1",
+      "operation": "reset",
+      "revision": 3,
+      "presetVersion": 30
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/policies/pol-1/preset",
+      "query": {},
+      "body": {
+        "operation": "reset",
+        "revision": 3,
+        "presetVersion": 30
+      }
+    },
+    "response": {
+      "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+      "name": "example",
+      "description": "example",
+      "settings": {
+        "categorySettings": {
+          "sexual": {
+            "allowances": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "action": "allow"
+              }
+            ],
+            "restrictions": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "unless": [
+                  "sexual-nudity"
+                ],
+                "action": "purge"
+              }
+            ],
+            "action": "block"
+          }
+        },
+        "linkSafety": {
+          "verdictActions": {
+            "phishing": "allow"
+          },
+          "offPlatformLinks": {
+            "action": "limit",
+            "allowedDomains": [
+              "example.com"
+            ]
+          }
+        }
+      },
+      "revision": 1,
+      "automaticUpdates": true,
+      "preset": {
+        "id": "general-community",
+        "version": 1,
+        "latestVersion": 1,
+        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      },
+      "projectIds": [
+        "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      ],
+      "createdAt": 1767225600000,
+      "updatedAt": 1767225900000
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "policies.setAutomaticUpdates",
+    "options": {
+      "policyId": "pol-1",
+      "enabled": true,
+      "revision": 3,
+      "presetVersion": 30
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/policies/pol-1/automatic-updates",
+      "query": {},
+      "body": {
+        "enabled": true,
+        "revision": 3,
+        "presetVersion": 30
+      }
+    },
+    "response": {
+      "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+      "name": "example",
+      "description": "example",
+      "settings": {
+        "categorySettings": {
+          "sexual": {
+            "allowances": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "action": "allow"
+              }
+            ],
+            "restrictions": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "unless": [
+                  "sexual-nudity"
+                ],
+                "action": "purge"
+              }
+            ],
+            "action": "block"
+          }
+        },
+        "linkSafety": {
+          "verdictActions": {
+            "phishing": "allow"
+          },
+          "offPlatformLinks": {
+            "action": "limit",
+            "allowedDomains": [
+              "example.com"
+            ]
+          }
+        }
+      },
+      "revision": 1,
+      "automaticUpdates": true,
+      "preset": {
+        "id": "general-community",
+        "version": 1,
+        "latestVersion": 1,
+        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      },
+      "projectIds": [
+        "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      ],
+      "createdAt": 1767225600000,
+      "updatedAt": 1767225900000
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "policies.assign",
+    "options": {
+      "policyId": "pol-1"
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/policy",
+      "query": {},
+      "body": {
+        "policyId": "pol-1"
+      }
+    },
+    "response": {
+      "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+      "name": "example",
+      "description": "example",
+      "settings": {
+        "categorySettings": {
+          "sexual": {
+            "allowances": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "action": "allow"
+              }
+            ],
+            "restrictions": [
+              {
+                "name": "example",
+                "when": [
+                  "sexual-pornographic-media"
+                ],
+                "match": "all",
+                "unless": [
+                  "sexual-nudity"
+                ],
+                "action": "purge"
+              }
+            ],
+            "action": "block"
+          }
+        },
+        "linkSafety": {
+          "verdictActions": {
+            "phishing": "allow"
+          },
+          "offPlatformLinks": {
+            "action": "limit",
+            "allowedDomains": [
+              "example.com"
+            ]
+          }
+        }
+      },
+      "revision": 1,
+      "automaticUpdates": true,
+      "preset": {
+        "id": "general-community",
+        "version": 1,
+        "latestVersion": 1,
+        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      },
+      "projectIds": [
+        "proj_8fK2mQx7Lp4NvB3tRz9Y"
+      ],
+      "createdAt": 1767225600000,
+      "updatedAt": 1767225900000
     },
     "fullModel": true
   },

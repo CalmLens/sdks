@@ -444,6 +444,118 @@
       }
     },
     {
+      "id": "policies.list",
+      "kind": "method",
+      "description": "List the moderation policies of the project's organisation, and which one the project uses. Policies are shared by the organisation's projects.",
+      "names": {
+        "javascript": "policies.list",
+        "python": "policies.list",
+        "go": "Policies.List",
+        "rust": "policies().list",
+        "java": "policies.list",
+        "ruby": "policies.list",
+        "php": "policies->list"
+      }
+    },
+    {
+      "id": "policies.retrieve",
+      "kind": "method",
+      "description": "Get one of the organisation's moderation policies by ID",
+      "names": {
+        "javascript": "policies.retrieve",
+        "python": "policies.retrieve",
+        "go": "Policies.Retrieve",
+        "rust": "policies().retrieve",
+        "java": "policies.retrieve",
+        "ruby": "policies.retrieve",
+        "php": "policies->retrieve"
+      }
+    },
+    {
+      "id": "policies.create",
+      "kind": "method",
+      "description": "Create a moderation policy in the project's organisation, from settings or as a copy of a built-in preset. It moderates nothing until you assign it to a project or name it on an upload preset.",
+      "names": {
+        "javascript": "policies.create",
+        "python": "policies.create",
+        "go": "Policies.Create",
+        "rust": "policies().create",
+        "java": "policies.create",
+        "ruby": "policies.create",
+        "php": "policies->create"
+      }
+    },
+    {
+      "id": "policies.update",
+      "kind": "method",
+      "description": "Change a policy's name, description or settings. Changes apply to later moderation. Saving a policy that follows automatic updates pins it as a copy under the same ID. Only policies that no other project uses or owns can be changed through a project's key.",
+      "names": {
+        "javascript": "policies.update",
+        "python": "policies.update",
+        "go": "Policies.Update",
+        "rust": "policies().update",
+        "java": "policies.update",
+        "ruby": "policies.update",
+        "php": "policies->update"
+      }
+    },
+    {
+      "id": "policies.applyPreset",
+      "kind": "method",
+      "description": "Reset a policy copied from a preset to its pinned preset version, or update an unchanged copy to the latest preset release",
+      "names": {
+        "javascript": "policies.applyPreset",
+        "python": "policies.apply_preset",
+        "go": "Policies.ApplyPreset",
+        "rust": "policies().apply_preset",
+        "java": "policies.applyPreset",
+        "ruby": "policies.apply_preset",
+        "php": "policies->applyPreset"
+      }
+    },
+    {
+      "id": "policies.setAutomaticUpdates",
+      "kind": "method",
+      "description": "Switch automatic updates on or off for a project's preset policy. A policy that follows automatic updates always has the latest preset settings.",
+      "names": {
+        "javascript": "policies.setAutomaticUpdates",
+        "python": "policies.set_automatic_updates",
+        "go": "Policies.SetAutomaticUpdates",
+        "rust": "policies().set_automatic_updates",
+        "java": "policies.setAutomaticUpdates",
+        "ruby": "policies.set_automatic_updates",
+        "php": "policies->setAutomaticUpdates"
+      }
+    },
+    {
+      "id": "policies.delete",
+      "kind": "method",
+      "description": "Delete a policy that no project or upload preset uses. Only policies that no other project owns can be deleted through a project's key.",
+      "names": {
+        "javascript": "policies.delete",
+        "python": "policies.delete",
+        "go": "Policies.Delete",
+        "rust": "policies().delete",
+        "java": "policies.delete",
+        "ruby": "policies.delete",
+        "php": "policies->delete"
+      }
+    },
+    {
+      "id": "policies.assign",
+      "kind": "method",
+      "description": "Choose the policy the project moderates with. Later uploads use it, except those through an upload preset that names its own policy.",
+      "names": {
+        "javascript": "policies.assign",
+        "python": "policies.assign",
+        "go": "Policies.Assign",
+        "rust": "policies().assign",
+        "java": "policies.assign",
+        "ruby": "policies.assign",
+        "php": "policies->assign"
+      }
+    },
+    {
       "id": "text.classify",
       "kind": "method",
       "description": "Moderates text and waits for the decision.",
