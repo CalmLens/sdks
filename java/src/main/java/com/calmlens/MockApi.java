@@ -92,7 +92,7 @@ final class MockApi {
   /** Open multipart uploads by asset ID: their queue choice and declared total size. */
   private final Map<String, JsonObject> uploads = new HashMap<>();
   private final Map<String, JsonObject> lenses = new LinkedHashMap<>();
-  /** Whether the request being answered created a hash list or hash list entry. */
+  /** Whether the request being answered created a hash list, hash list entry or policy. */
   private boolean created;
   /** The key's grants once {@link MockCalmLensServerClient#setApiKeyGrants} replaced them, else null. */
   JsonArray grants;
@@ -141,7 +141,9 @@ final class MockApi {
       "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list", "events.pages", "folders.list",
       "folders.retrieve", "folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
       "hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete", "hashLists.listEntries",
-      "hashLists.addEntry", "hashLists.removeEntry", "ensureLens", "ensureLenses");
+      "hashLists.addEntry", "hashLists.removeEntry", "policies.list", "policies.retrieve", "policies.create",
+      "policies.update", "policies.applyPreset", "policies.setAutomaticUpdates", "policies.delete", "policies.assign",
+      "ensureLens", "ensureLenses");
 
   /** A request URL's path after the API or CDN base URL, with its segments decoded. */
   String relativePath(String url) {
@@ -164,6 +166,16 @@ final class MockApi {
     String method = request.method();
     if (parts.size() >= 3 && parts.get(0).equals("projects")) {
       String route = method + " " + String.join("/", parts.subList(2, parts.size()));
+      if (parts.get(2).equals("policies") && (parts.size() == 4 || parts.size() == 5)) {
+        return switch (method + " " + (parts.size() == 5 ? parts.get(4) : "")) {
+          case "GET " -> Set.of("policies.retrieve");
+          case "PATCH " -> Set.of("policies.update");
+          case "DELETE " -> Set.of("policies.delete");
+          case "POST preset" -> Set.of("policies.applyPreset");
+          case "PUT automatic-updates" -> Set.of("policies.setAutomaticUpdates");
+          default -> Set.of();
+        };
+      }
       return switch (route) {
         case "GET events" -> Set.of("events.list", "events.pages");
         case "PUT lenses" -> Set.of("ensureLens", "ensureLenses");
@@ -171,6 +183,9 @@ final class MockApi {
         case "POST folders" -> Set.of("folders.create");
         case "GET hash-lists" -> Set.of("hashLists.list");
         case "POST hash-lists" -> Set.of("hashLists.create");
+        case "GET policies" -> Set.of("policies.list");
+        case "POST policies" -> Set.of("policies.create");
+        case "PUT policy" -> Set.of("policies.assign");
         case "GET assets/search" -> Set.of("assets.search");
         case "GET assets" -> Set.of("assets.list", "assets.iterate");
         case "POST assets/batch" -> Set.of("assets.batch");
@@ -239,8 +254,8 @@ final class MockApi {
       // A failed request frees its key, as the API does.
       return error(failure);
     }
-    // Like the API: deletes answer 200 with an empty object, a new folder, hash list or hash list
-    // entry is 201 Created and a queued batch 202 Accepted.
+    // Like the API: deletes answer 200 with an empty object, a new folder, hash list, hash list
+    // entry or policy is 201 Created and a queued batch 202 Accepted.
     byte[] bytes = Json.write(result == null ? new JsonObject() : result).getBytes(StandardCharsets.UTF_8);
     Set<String> operations = operations(request);
     int status = operations.contains("folders.create") || created ? 201 : operations.contains("assets.batch") ? 202 : 200;
@@ -364,6 +379,9 @@ final class MockApi {
         case "POST folders": return createFolder(body, now);
         case "GET hash-lists": return page(projectHashLists(), q, Json.write(new JsonPrimitive(projectId + "/hash-lists")));
         case "POST hash-lists": return createHashList(body, now);
+        case "GET policies": return listPolicies();
+        case "POST policies": return createPolicy(body, now);
+        case "PUT policy": return assignPolicy(body);
         case "GET assets/search": return search(q);
         case "GET assets": {
           String folderId = str(q, "folderId");
@@ -380,6 +398,8 @@ final class MockApi {
         case "POST assets/batch": return batch(body, now);
         default: break;
       }
+      if (parts.get(2).equals("policies") && (parts.size() == 4 || parts.size() == 5))
+        return policyRoute(method, parts.get(3), parts.size() == 5 ? parts.get(4) : "", body, now);
     } else if (parts.size() == 2 || parts.size() == 3) {
       String suffix = parts.size() == 3 ? parts.get(2) : "";
       if (parts.get(0).equals("assets")) return assetRoute(method, parts.get(1), suffix, q, body, raw, now);
@@ -1511,6 +1531,174 @@ final class MockApi {
       return "[" + String.join(",", items) + "]";
     }
     return Json.write(value);
+  }
+
+  // ------------------------------------------------------------------ Policies
+  // The project starts on its General preset policy, following automatic updates. The mock holds
+  // no built-in preset settings: a preset's settings are {"categorySettings": {}} at version 1,
+  // and uploads are never decided by a policy.
+
+  /** The built-in presets the mock knows, by display name. */
+  private static final Map<String, String> PRESET_NAMES = Map.of("general-community", "General",
+      "children-platform", "Kids", "education-support", "Learning and support", "wholesome-community", "Teen-safe");
+
+  /** Stored policies in the API's shape, without {@code preset.latestVersion} and {@code projectIds}. */
+  private final Map<String, JsonObject> policies = new LinkedHashMap<>();
+  /** Each policy's reset baseline: the settings of its preset version. */
+  private final Map<String, JsonObject> policyBaselines = new HashMap<>();
+  private String projectPolicyId;
+
+  private void ensurePolicies() {
+    if (projectPolicyId != null) return;
+    projectPolicyId = str(newPolicy("General", "", emptySettings(), true, "general-community", projectId, now()), "id");
+  }
+
+  private static JsonObject emptySettings() {
+    JsonObject settings = new JsonObject();
+    settings.add("categorySettings", new JsonObject());
+    return settings;
+  }
+
+  private JsonObject newPolicy(String name, String description, JsonObject settings, boolean automaticUpdates,
+      String presetId, String presetProjectId, long now) {
+    JsonObject policy = new JsonObject();
+    policy.addProperty("id", createId("pol"));
+    policy.addProperty("name", name);
+    policy.addProperty("description", description);
+    policy.add("settings", settings);
+    policy.addProperty("revision", 1);
+    policy.addProperty("automaticUpdates", automaticUpdates);
+    if (presetId == null) policy.add("preset", JsonNull.INSTANCE);
+    else {
+      JsonObject preset = new JsonObject();
+      preset.addProperty("id", presetId);
+      preset.addProperty("version", 1);
+      preset.add("projectId", nullable(presetProjectId));
+      policy.add("preset", preset);
+    }
+    policy.addProperty("createdAt", now);
+    policy.addProperty("updatedAt", now);
+    policies.put(str(policy, "id"), policy);
+    policyBaselines.put(str(policy, "id"), settings.deepCopy());
+    return policy;
+  }
+
+  /** A stored policy as the API shows it. */
+  private JsonObject toPolicy(JsonObject stored) {
+    JsonObject policy = new JsonObject();
+    for (String key : List.of("id", "name", "description", "settings", "revision", "automaticUpdates")) policy.add(key, stored.get(key).deepCopy());
+    JsonElement preset = stored.get("preset").deepCopy();
+    if (preset.isJsonObject()) preset.getAsJsonObject().addProperty("latestVersion", 1);
+    policy.add("preset", preset);
+    JsonArray projectIds = new JsonArray();
+    if (str(stored, "id").equals(projectPolicyId)) projectIds.add(projectId);
+    policy.add("projectIds", projectIds);
+    policy.add("createdAt", stored.get("createdAt"));
+    policy.add("updatedAt", stored.get("updatedAt"));
+    return policy;
+  }
+
+  private JsonObject policy(String id) throws Failure {
+    ensurePolicies();
+    JsonObject policy = policies.get(id);
+    if (policy == null) throw new Failure(ErrorCodes.POLICY_NOT_FOUND, "Policy not found");
+    return policy;
+  }
+
+  private JsonObject listPolicies() {
+    ensurePolicies();
+    JsonArray items = new JsonArray();
+    policies.values().forEach(policy -> items.add(toPolicy(policy)));
+    JsonObject list = new JsonObject();
+    list.add("policies", items);
+    list.addProperty("projectPolicyId", projectPolicyId);
+    return list;
+  }
+
+  private JsonObject createPolicy(JsonObject body, long now) throws Failure {
+    ensurePolicies();
+    String name = str(body, "name"), preset = str(body, "presetId");
+    JsonElement settings = body.get("settings");
+    boolean hasSettings = settings != null && !settings.isJsonNull();
+    if (hasSettings == (preset != null) || preset != null && !PRESET_NAMES.containsKey(preset)
+        || preset == null && (name == null || name.isBlank()) || hasSettings && !settings.isJsonObject())
+      throw new Failure(ErrorCodes.INVALID_VALUE, "Send settings with a name, or presetId");
+    String description = str(body, "description");
+    JsonObject policy = newPolicy(name != null && !name.isBlank() ? name.trim() : PRESET_NAMES.get(preset),
+        description == null ? "" : description, preset != null ? emptySettings() : settings.getAsJsonObject().deepCopy(),
+        false, preset, null, now);
+    created = true;
+    return toPolicy(policy);
+  }
+
+  /** Saves the changes under the next revision, once {@code revision} is the current one. */
+  private JsonObject savePolicy(JsonObject policy, JsonObject body, long now, java.util.function.Consumer<JsonObject> change) throws Failure {
+    JsonElement revision = body.get("revision");
+    long current = policy.get("revision").getAsLong();
+    if (revision == null || !revision.isJsonPrimitive() || !revision.getAsJsonPrimitive().isNumber() || revision.getAsDouble() != current)
+      throw new Failure(ErrorCodes.POLICY_REVISION_CONFLICT, "The policy changed");
+    change.accept(policy);
+    policy.addProperty("revision", current + 1);
+    policy.addProperty("updatedAt", now);
+    return toPolicy(policy);
+  }
+
+  private JsonElement policyRoute(String method, String id, String action, JsonObject body, long now) throws Failure, IOException {
+    JsonObject policy = policy(id);
+    JsonObject preset = policy.get("preset").isJsonObject() ? policy.getAsJsonObject("preset") : null;
+    switch (method + " " + action) {
+      case "GET ": return toPolicy(policy);
+      case "PATCH ":
+        return savePolicy(policy, body, now, saved -> {
+          if (str(body, "name") != null) saved.addProperty("name", str(body, "name").trim());
+          if (str(body, "description") != null) saved.addProperty("description", str(body, "description"));
+          if (body.has("settings") && !body.get("settings").isJsonNull()) saved.add("settings", body.get("settings").deepCopy());
+          // Saving a policy that follows its preset pins it as a copy.
+          saved.addProperty("automaticUpdates", false);
+        });
+      case "DELETE ":
+        if (id.equals(projectPolicyId)) throw new Failure(ErrorCodes.POLICY_IN_USE, "Projects still use this policy");
+        policies.remove(id);
+        policyBaselines.remove(id);
+        return null;
+      case "POST preset":
+        if (preset == null || bool(policy, "automaticUpdates")) throw new Failure(ErrorCodes.POLICY_NO_PRESET, "This policy has no preset baseline");
+        if (!presetVersionIs(body, preset.get("version").getAsLong()))
+          throw new Failure(ErrorCodes.POLICY_PRESET_VERSION_CONFLICT, "The preset changed");
+        // The mock's presets have one release, so an update never has a newer one to apply.
+        if ("update".equals(str(body, "operation")))
+          throw new Failure(ErrorCodes.POLICY_PRESET_UPDATE_UNAVAILABLE, "Only an unchanged copy of an older preset version can be updated");
+        return savePolicy(policy, body, now, saved -> saved.add("settings", policyBaselines.get(id).deepCopy()));
+      case "PUT automatic-updates": {
+        boolean enabled = bool(body, "enabled");
+        if (preset == null || !projectId.equals(str(preset, "projectId")) || bool(policy, "automaticUpdates") == enabled)
+          throw new Failure(ErrorCodes.POLICY_AUTOMATIC_UPDATES_UNAVAILABLE, "Automatic updates can't be switched this way for this policy");
+        JsonElement revision = body.get("revision");
+        if (revision == null || !revision.isJsonPrimitive() || !revision.getAsJsonPrimitive().isNumber() || revision.getAsDouble() != policy.get("revision").getAsLong())
+          throw new Failure(ErrorCodes.POLICY_REVISION_CONFLICT, "The policy changed");
+        if (!presetVersionIs(body, 1)) throw new Failure(ErrorCodes.POLICY_PRESET_VERSION_CONFLICT, "The preset changed");
+        return savePolicy(policy, body, now, saved -> {
+          saved.addProperty("automaticUpdates", enabled);
+          if (enabled) {
+            saved.addProperty("name", PRESET_NAMES.get(str(preset, "id")));
+            saved.addProperty("description", "");
+            saved.add("settings", policyBaselines.get(id).deepCopy());
+          }
+        });
+      }
+      default: throw unsupported(method, "/projects/" + projectId + "/policies/" + id + (action.isEmpty() ? "" : "/" + action));
+    }
+  }
+
+  private static boolean presetVersionIs(JsonObject body, long version) {
+    JsonElement value = body.get("presetVersion");
+    return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber() && value.getAsDouble() == version;
+  }
+
+  private JsonObject assignPolicy(JsonObject body) throws Failure {
+    JsonObject policy = policy(String.valueOf(str(body, "policyId")));
+    projectPolicyId = str(policy, "id");
+    return toPolicy(policy);
   }
 
   /**

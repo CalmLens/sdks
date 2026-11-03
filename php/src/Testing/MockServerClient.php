@@ -27,7 +27,7 @@ use Psr\Http\Message\ResponseInterface;
  * error handling, then reach an in-memory stand-in for the API and CDN instead of the network.
  *
  * The stand-in is stateful: uploads (including multipart uploads) create assets you can
- * retrieve, list, search, update, move and delete; folders, hash lists, lenses, idempotency keys
+ * retrieve, list, search, update, move and delete; folders, hash lists, policies, lenses, idempotency keys
  * and the events feed behave like the API's (uploads are not matched against hash lists); the CDN serves stored bytes and placeholders; and errors use
  * the API's codes, statuses, `X-Request-Id` header and body shape (schema errors are
  * `validation/<issue>` with the field in `details.path`). It does not classify content: the
@@ -39,7 +39,8 @@ use Psr\Http\Message\ResponseInterface;
  * ThumbHash for its placeholder, which goes with its content. Like the API, a completed upload adds
  * `asset.uploaded`, then `asset.classified` and the automated `asset.<status>` once decided, or
  * `asset.failed`; deleting an asset, removing its content and retrying it add `asset.deleted`,
- * `asset.content-removed` and `asset.retried`.
+ * `asset.content-removed` and `asset.retried`. The project starts on its General preset policy;
+ * the mock's presets have one release (version 1) and no settings, and policies never decide uploads.
  *
  * Like the CDN, it checks delivery first: blocked, purged and failed assets, and assets whose
  * content was removed or is still uploading, return 403 `asset/not-available` whatever the key.
@@ -71,7 +72,9 @@ final class MockServerClient
         'assets.retry', 'assets.explain', 'assets.decide', 'assets.deleteContent', 'assets.delete', 'assets.batch', 'text.classify',
         'cdn.serve', 'events.list', 'folders.list', 'folders.retrieve', 'folders.create', 'folders.update', 'folders.delete',
         'folders.move', 'hashLists.list', 'hashLists.retrieve', 'hashLists.create', 'hashLists.update', 'hashLists.delete',
-        'hashLists.listEntries', 'hashLists.addEntry', 'hashLists.removeEntry', 'ensureLens', 'ensureLenses'];
+        'hashLists.listEntries', 'hashLists.addEntry', 'hashLists.removeEntry', 'policies.list', 'policies.retrieve',
+        'policies.create', 'policies.update', 'policies.applyPreset', 'policies.setAutomaticUpdates', 'policies.delete',
+        'policies.assign', 'ensureLens', 'ensureLenses'];
     private const ACTIVE_CONTENT_TYPES = ['image/svg+xml', 'application/xhtml+xml', 'text/html', 'application/xml', 'text/xml'];
 
     /** @var array<string, array> Assets by ID, with the API's field names. Change them to arrange a test. */
@@ -105,7 +108,7 @@ final class MockServerClient
     /** Every API cursor list returns this many items unless `pageSize` says otherwise. */
     private const DEFAULT_PAGE_SIZE = 50;
     private const MAX_PAGE_SIZE = 100;
-    /** The status of the response being answered: 200, 201 for a new folder, hash list or entry, or 202 for a queued batch. */
+    /** The status of the response being answered: 200, 201 for a new folder, hash list, entry or policy, or 202 for a queued batch. */
     private int $status = 200;
     private \Closure $now;
     private \Closure $createId;
@@ -124,7 +127,7 @@ final class MockServerClient
      * @param ?string $apiKey the client's API key. Its grants, from `createApiKey()`, decide CDN
      *   downloads of private and age-restricted content; the default key has none.
      * @param ?callable $createId receives the prefix of the new object's ID (`asset`, `fldr`, `hl`,
-     *   `hle`, `lens`, `evt` or `rev`) and returns the ID; by default, like the API, the prefix, `_`
+     *   `hle`, `pol`, `lens`, `evt` or `rev`) and returns the ID; by default, like the API, the prefix, `_`
      *   and 20 random base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
      * @param int $maxRetries retries for the mock's client; 0 by default so enqueued failures surface.
      * @param int $maxResponseBytes the largest response body the mock's client reads, as for `ServerClient`.
@@ -368,6 +371,11 @@ final class MockServerClient
         }
         $method = $request->getMethod();
         if (($parts[0] ?? null) === 'projects') {
+            if (($parts[2] ?? null) === 'policies' && isset($parts[3]) && count($parts) <= 5) {
+                $name = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'POST preset' => 'applyPreset',
+                    'PUT automatic-updates' => 'setAutomaticUpdates'][$method . ' ' . ($parts[4] ?? '')] ?? null;
+                return $name === null ? [] : ["policies.$name"];
+            }
             $route = $method . ' ' . implode('/', array_slice($parts, 2));
             return match ($route) {
                 'GET events' => ['events.list'],
@@ -376,6 +384,9 @@ final class MockServerClient
                 'POST folders' => ['folders.create'],
                 'GET hash-lists' => ['hashLists.list'],
                 'POST hash-lists' => ['hashLists.create'],
+                'GET policies' => ['policies.list'],
+                'POST policies' => ['policies.create'],
+                'PUT policy' => ['policies.assign'],
                 'GET assets' => ['assets.list'],
                 'GET assets/search' => ['assets.search'],
                 'POST assets/batch' => ['assets.batch'],
@@ -529,6 +540,9 @@ final class MockServerClient
             if (($parts[1] ?? null) !== $this->projectId) {
                 self::fail(ErrorCodes::API_KEY_PROJECT_MISMATCH);
             }
+            if (($parts[2] ?? null) === 'policies' && isset($parts[3]) && count($parts) <= 5) {
+                return $this->policyRoute($method, $parts[3], $parts[4] ?? '', $json);
+            }
             $route = $method . ' ' . implode('/', array_slice($parts, 2));
             return match (true) {
                 $route === 'GET events' => $this->listEvents($query),
@@ -537,6 +551,9 @@ final class MockServerClient
                 $route === 'POST folders' => $this->createFolder($json),
                 $route === 'GET hash-lists' => $this->page($this->hashLists, $query, $this->projectId . '/hash-lists'),
                 $route === 'POST hash-lists' => $this->createHashList($json),
+                $route === 'GET policies' => $this->listPolicies(),
+                $route === 'POST policies' => $this->createPolicy($json),
+                $route === 'PUT policy' => $this->assignPolicy($json),
                 $route === 'GET assets' => $this->listAssets($query),
                 $route === 'GET assets/search' => $this->search($query),
                 $route === 'POST assets/batch' => $this->batch($json),
@@ -1538,6 +1555,148 @@ final class MockServerClient
         $taken = array_slice($this->events, (int) $match[1], $size);
         $next = (int) $match[1] + count($taken);
         return ['items' => $taken, 'nextCursor' => 'mock_' . $next, 'hasMore' => $next < count($this->events)];
+    }
+
+    // Policies: the project starts on its General preset policy, following automatic updates. The
+    // mock holds no built-in preset settings: a preset's settings are `{"categorySettings": {}}` at
+    // version 1, and uploads are never decided by a policy.
+
+    /** The built-in presets the mock knows, by display name. */
+    private const PRESET_NAMES = ['general-community' => 'General', 'children-platform' => 'Kids',
+        'education-support' => 'Learning and support', 'wholesome-community' => 'Teen-safe'];
+
+    /** @var array<string, array> Policies by ID, without `preset.latestVersion` and `projectIds`, each with its reset `baseline`. */
+    private array $policies = [];
+    private ?string $projectPolicyId = null;
+
+    private function ensurePolicies(): void
+    {
+        if ($this->projectPolicyId === null) {
+            $this->projectPolicyId = $this->newPolicy('General', '', self::emptySettings(), true, 'general-community', $this->projectId)['id'];
+        }
+    }
+
+    private static function emptySettings(): array { return ['categorySettings' => new \stdClass()]; }
+
+    private function newPolicy(string $name, string $description, array $settings, bool $automaticUpdates, ?string $preset, ?string $presetProjectId): array
+    {
+        $now = ($this->now)();
+        $policy = ['id' => ($this->createId)('pol'), 'name' => $name, 'description' => $description, 'settings' => $settings,
+            'revision' => 1, 'automaticUpdates' => $automaticUpdates,
+            'preset' => $preset === null ? null : ['id' => $preset, 'version' => 1, 'projectId' => $presetProjectId],
+            'createdAt' => $now, 'updatedAt' => $now, 'baseline' => $settings];
+        return $this->policies[$policy['id']] = $policy;
+    }
+
+    /** A stored policy as the API shows it. */
+    private function toPolicy(array $policy): array
+    {
+        $shown = array_diff_key($policy, ['baseline' => true, 'createdAt' => true, 'updatedAt' => true]);
+        if ($shown['preset'] !== null) {
+            $shown['preset']['latestVersion'] = 1;
+        }
+        return $shown + ['projectIds' => $policy['id'] === $this->projectPolicyId ? [$this->projectId] : [],
+            'createdAt' => $policy['createdAt'], 'updatedAt' => $policy['updatedAt']];
+    }
+
+    private function policy(mixed $id): array
+    {
+        $this->ensurePolicies();
+        return (is_string($id) ? $this->policies[$id] ?? null : null) ?? self::fail(ErrorCodes::POLICY_NOT_FOUND, null, 'Policy not found.');
+    }
+
+    private function listPolicies(): array
+    {
+        $this->ensurePolicies();
+        return ['policies' => array_values(array_map(fn (array $policy) => $this->toPolicy($policy), $this->policies)),
+            'projectPolicyId' => $this->projectPolicyId];
+    }
+
+    private function createPolicy(array $json): array
+    {
+        $this->ensurePolicies();
+        $name = $json['name'] ?? null;
+        $preset = is_string($json['presetId'] ?? null) ? $json['presetId'] : null;
+        $settings = $json['settings'] ?? null;
+        if (($settings === null) === ($preset === null) || ($preset !== null && !isset(self::PRESET_NAMES[$preset]))
+            || ($preset === null && (!is_string($name) || trim($name) === '')) || ($settings !== null && !is_array($settings))) {
+            self::fail(ErrorCodes::INVALID_VALUE, null, 'Send settings with a name, or presetId');
+        }
+        $policy = $this->newPolicy(is_string($name) && trim($name) !== '' ? trim($name) : self::PRESET_NAMES[$preset],
+            is_string($json['description'] ?? null) ? $json['description'] : '', $preset !== null ? self::emptySettings() : $settings,
+            false, $preset, null);
+        // Like the API, a new policy is 201 Created.
+        $this->status = 201;
+        return $this->toPolicy($policy);
+    }
+
+    /** Saves `$values` under the next revision, once `$revision` is the current one. */
+    private function savePolicy(array $policy, mixed $revision, array $values): array
+    {
+        if ($revision !== $policy['revision']) {
+            self::fail(ErrorCodes::POLICY_REVISION_CONFLICT, null, 'The policy changed.');
+        }
+        $saved = array_replace($policy, $values, ['revision' => $policy['revision'] + 1, 'updatedAt' => ($this->now)()]);
+        return $this->toPolicy($this->policies[$policy['id']] = $saved);
+    }
+
+    /** GET, PATCH and DELETE /projects/:id/policies/:policyId, its preset and its automatic updates, like the API. */
+    private function policyRoute(string $method, string $id, string $action, array $json): ?array
+    {
+        $policy = $this->policy($id);
+        $preset = $policy['preset'];
+        switch ($method . ' ' . $action) {
+            case 'GET ':
+                return $this->toPolicy($policy);
+            case 'PATCH ':
+                return $this->savePolicy($policy, $json['revision'] ?? null, array_filter([
+                    'name' => is_string($json['name'] ?? null) ? trim($json['name']) : null,
+                    'description' => is_string($json['description'] ?? null) ? $json['description'] : null,
+                    'settings' => $json['settings'] ?? null,
+                ], fn ($value) => $value !== null) + [
+                    // Saving a policy that follows its preset pins it as a copy.
+                    'automaticUpdates' => false,
+                ]);
+            case 'DELETE ':
+                if ($id === $this->projectPolicyId) {
+                    self::fail(ErrorCodes::POLICY_IN_USE, null, 'Projects still use this policy.');
+                }
+                unset($this->policies[$id]);
+                return null;
+            case 'POST preset':
+                if ($preset === null || $policy['automaticUpdates']) {
+                    self::fail(ErrorCodes::POLICY_NO_PRESET, null, 'This policy has no preset baseline.');
+                }
+                if (($json['presetVersion'] ?? null) !== $preset['version']) {
+                    self::fail(ErrorCodes::POLICY_PRESET_VERSION_CONFLICT, null, 'The preset changed.');
+                }
+                // The mock's presets have one release, so an update never has a newer one to apply.
+                if (($json['operation'] ?? null) === 'update') {
+                    self::fail(ErrorCodes::POLICY_PRESET_UPDATE_UNAVAILABLE, null, 'Only an unchanged copy of an older preset version can be updated.');
+                }
+                return $this->savePolicy($policy, $json['revision'] ?? null, ['settings' => $policy['baseline']]);
+            case 'PUT automatic-updates':
+                $enabled = ($json['enabled'] ?? null) === true;
+                if (($preset['projectId'] ?? null) !== $this->projectId || $policy['automaticUpdates'] === $enabled) {
+                    self::fail(ErrorCodes::POLICY_AUTOMATIC_UPDATES_UNAVAILABLE, null, "Automatic updates can't be switched this way for this policy.");
+                }
+                if (($json['revision'] ?? null) !== $policy['revision']) {
+                    self::fail(ErrorCodes::POLICY_REVISION_CONFLICT, null, 'The policy changed.');
+                }
+                if (($json['presetVersion'] ?? null) !== 1) {
+                    self::fail(ErrorCodes::POLICY_PRESET_VERSION_CONFLICT, null, 'The preset changed.');
+                }
+                return $this->savePolicy($policy, $json['revision'], ['automaticUpdates' => $enabled] + ($enabled
+                    ? ['name' => self::PRESET_NAMES[$preset['id']], 'description' => '', 'settings' => $policy['baseline']] : []));
+        }
+        throw new \LogicException("MockServerClient does not emulate $method /projects/{$this->projectId}/policies/$id/$action; enqueue a response for it");
+    }
+
+    private function assignPolicy(array $json): array
+    {
+        $policy = $this->policy($json['policyId'] ?? null);
+        $this->projectPolicyId = $policy['id'];
+        return $this->toPolicy($policy);
     }
 
     /**
