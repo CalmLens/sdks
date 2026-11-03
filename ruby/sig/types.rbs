@@ -820,7 +820,7 @@ module CalmLens
     # The asset ID or external ID.
     asset_identifier: String,
     # `rendered` is the default. `original` takes no lens or transform; `placeholder` is a small blurred PNG
-    # and takes no lens, transform or age_confirmed.
+    # that takes no lens or transform.
     ?resource: "original" | "rendered" | "placeholder",
     # A lens runs before any additional transforms.
     ?lens: String,

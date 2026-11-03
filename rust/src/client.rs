@@ -1471,9 +1471,9 @@ impl CdnClient<'_> {
                 "Lenses and transforms apply only to the rendered resource",
             ));
         }
-        if resource == "placeholder" && (transformed) {
+        if resource == "placeholder" && transformed {
             return Err(invalid_argument(
-                "A placeholder takes no lens, transform or ageConfirmed",
+                "A placeholder takes no lens or transform",
             ));
         }
         let config = &self.0.inner.config;

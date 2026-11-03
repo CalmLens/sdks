@@ -22,8 +22,8 @@ final class Cdn extends Resource
             Values::invalid('Lenses and transforms apply only to the rendered resource');
         }
         // A placeholder is a small blurred PNG, public for every asset whatever its visibility or moderation.
-        if ($resource === 'placeholder' && ($transformed)) {
-            Values::invalid('A placeholder takes no lens, transform or ageConfirmed');
+        if ($resource === 'placeholder' && $transformed) {
+            Values::invalid('A placeholder takes no lens or transform');
         }
         $url = $this->session->cdnBaseUrl . '/assets/' . Values::segment($this->session->projectId)
             . '/' . Values::segment($options['assetIdentifier'] ?? null) . '/' . $resource;
@@ -35,7 +35,9 @@ final class Cdn extends Resource
         }
         // Opts a public age-restricted asset in to its public URL; only for viewers your app has
         // already decided may see age-restricted content. Without it, use a signed URL or the API key.
-        $query = isset($options['viewerClaims']) ? ['viewerClaims' => json_encode($options['viewerClaims'], JSON_THROW_ON_ERROR)] : [];
+        $query = isset($options['viewerClaims'])
+            ? ['viewerClaims' => json_encode(self::orderedClaims($options['viewerClaims']), JSON_THROW_ON_ERROR)]
+            : [];
         return $query ? $url . '?' . http_build_query($query) : $url;
     }
 
@@ -52,5 +54,20 @@ final class Cdn extends Resource
             Values::invalid('CDN method must be GET or HEAD');
         }
         return $this->session->cdn($method, $this->getAssetUrl($api), $init['headers'] ?? [], $request);
+    }
+
+    /** Viewer claims in the order the other SDKs send them, so equal claims build equal CDN URLs. */
+    private static function orderedClaims(mixed $claims): mixed
+    {
+        if (!is_array($claims)) {
+            return $claims;
+        }
+        $ordered = [];
+        foreach (['region', 'ageConfirmed'] as $key) {
+            if (array_key_exists($key, $claims)) {
+                $ordered[$key] = $claims[$key];
+            }
+        }
+        return $ordered + $claims;
     }
 }

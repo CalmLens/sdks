@@ -223,6 +223,14 @@ def _has_transform(transform: Any) -> bool:
     return transform is not None and transform != ""
 
 
+def _viewer_claims(claims: Any) -> Any:
+    """Viewer claims in the order the other SDKs send them, so equal claims build equal CDN URLs."""
+    if not isinstance(claims, dict):
+        return claims
+    known = {key: claims[key] for key in ("region", "ageConfirmed") if key in claims}
+    return {**known, **{key: value for key, value in claims.items() if key not in known}}
+
+
 def _transform_path(value: Any) -> str:
     """A transform as a URL path: structured steps serialized, strings encoded like JavaScript's
     encodeURI."""
@@ -1546,8 +1554,8 @@ class CDN:
         transformed = merged.get("lens") is not None or merged.get("transform") is not None
         if selected == "original" and transformed:
             raise _invalid("Lenses and transforms apply only to the rendered resource")
-        if selected == "placeholder" and (transformed):
-            raise _invalid("A placeholder takes no lens, transform or ageConfirmed")
+        if selected == "placeholder" and transformed:
+            raise _invalid("A placeholder takes no lens or transform")
         url = (f"{self._c.cdn_base_url}/assets/{_id(self._c.project_id)}/"
                f"{_id(merged.get('assetIdentifier'), 'assetIdentifier')}/{selected}")
         if merged.get("lens"):
@@ -1556,7 +1564,8 @@ class CDN:
             url += "/" + _transform_path(merged["transform"])
         params = []
         if merged.get("viewerClaims") is not None:
-            params.append("viewerClaims=" + quote(json.dumps(merged["viewerClaims"], separators=(",", ":")), safe=""))
+            params.append("viewerClaims=" + quote(json.dumps(_viewer_claims(merged["viewerClaims"]),
+                                                              separators=(",", ":")), safe=""))
         return url + ("?" + "&".join(params) if params else "")
 
     def serve(self, options: ServeOptions | None = None, /, *, asset_identifier: str = _UNSET,

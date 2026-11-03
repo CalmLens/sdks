@@ -358,6 +358,17 @@
       "options": {
         "assetIdentifier": "asset-1",
         "resource": "placeholder",
+        "viewerClaims": {
+          "ageConfirmed": true,
+          "region": "GB"
+        }
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/placeholder?viewerClaims=%7B%22region%22%3A%22GB%22%2C%22ageConfirmed%22%3Atrue%7D"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "placeholder",
         "lens": "thumbnail"
       },
       "error": "sdk/invalid-argument"

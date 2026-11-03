@@ -64,7 +64,7 @@ module CalmLens
 
       transformed = !api['lens'].nil? || !api['transform'].nil?
       raise Internal.invalid('Lenses and transforms apply only to the rendered resource') if resource == 'original' && transformed
-      raise Internal.invalid('A placeholder takes no lens, transform or ageConfirmed') if resource == 'placeholder' && transformed
+      raise Internal.invalid('A placeholder takes no lens or transform') if resource == 'placeholder' && transformed
 
       url = "#{@session.cdn_base_url}/assets/#{Internal.segment(@session.project_id)}/" \
             "#{Internal.segment(api['assetIdentifier'])}/#{resource}"
@@ -78,8 +78,14 @@ module CalmLens
       end
 
       query = []
-      query << "viewerClaims=#{URI.encode_www_form_component(JSON.generate(api['viewerClaims']))}" if api['viewerClaims']
+      query << "viewerClaims=#{URI.encode_www_form_component(JSON.generate(ordered_claims(claims)))}" if claims
       query.empty? ? url : "#{url}?#{query.join('&')}"
+    end
+
+    # Viewer claims in the order the other SDKs send them, so equal claims build equal CDN URLs.
+    def ordered_claims(claims)
+      known = %w[region ageConfirmed].select { |key| claims.key?(key) }.to_h { |key| [key, claims[key]] }
+      known.merge(claims.except(*known.keys))
     end
   end
 end

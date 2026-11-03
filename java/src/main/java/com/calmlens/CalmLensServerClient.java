@@ -1539,10 +1539,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (!List.of("original", "rendered", "placeholder").contains(resource)) throw argument("Resource must be original, rendered or placeholder");
       boolean transformed = o.has("lens") && !o.get("lens").isJsonNull() || transform != null;
       if (resource.equals("original") && transformed) throw argument("Lenses and transforms apply only to the rendered resource");
-      if (resource.equals("placeholder") && (transformed
-         )) {
-        throw argument("A placeholder takes no lens, transform or ageConfirmed");
-      }
+      if (resource.equals("placeholder") && transformed) throw argument("A placeholder takes no lens or transform");
       String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + resource;
       if (o.has("lens") && !o.get("lens").isJsonNull()) url += "/@" + id(o.get("lens").getAsString());
       if (transform instanceof String text) { if (!text.isEmpty()) url += "/" + transformPath(text); }

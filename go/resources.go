@@ -370,7 +370,7 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 		return "", invalid(CodeSDKInvalidArgument, "lenses and transforms apply only to the rendered resource")
 	}
 	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformSteps != nil) {
-		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens, transform or ageConfirmed")
+		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens or transform")
 	}
 	asset, err := segment(options.AssetIdentifier)
 	if err != nil {
