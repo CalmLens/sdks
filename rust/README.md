@@ -92,7 +92,7 @@ let publishable = matches!(
 
 ## Testing
 
-`calmlens::testing::MockServerClient` (feature `testing`) runs your code offline against queued responses or an in-memory CalmLens that simulates moderation outcomes, events and CDN delivery. Against a real project, `generate_test_text_code` and `generate_media_test_code` build signed test inputs, with your project's test input key, that CalmLens decides as a chosen scenario. See [Rust testing](https://calmlens.com/docs/sdk/rust/testing).
+`calmlens::testing::MockServerClient` (feature `testing`) runs your code offline against queued responses or an in-memory CalmLens that simulates moderation outcomes, events and CDN delivery. Against a real project, `generate_test_text_code`, `paint_test_image` and `generate_media_test_code` build signed test inputs, with your project's test input key, that CalmLens decides as a chosen scenario. See [Rust testing](https://calmlens.com/docs/sdk/rust/testing).
 
 ## Links
 

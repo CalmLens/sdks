@@ -8,7 +8,7 @@ use CalmLens\Exception\InvalidArgumentException;
 use CalmLens\SdkErrorCodes;
 
 /**
- * Signed test inputs: text codes and media phrases that a project's test input key
+ * Signed test inputs: text codes, test images and media phrases that a project's test input key
  * authenticates, so CalmLens returns the scenario they describe instead of classifying them. The
  * formats match the JavaScript SDK's `calmlens/test-inputs` byte for byte.
  *
@@ -47,7 +47,7 @@ final class TestInputs
         ]],
     ];
 
-    /** The signals `generateTestTextCode` accepts: the categories and a few named shortcuts. */
+    /** The signals `generateTestTextCode` and `paintTestImage` accept: the categories and a few named shortcuts. */
     public const TEXT_SIGNALS = [...Classification::CATEGORIES, 'sexual.involving-minors', 'harassment.insult', 'sexual.adult', 'hate.regional-symbol', 'violence.graphic'];
 
     /** The signals `generateMediaTestCode` accepts. */
@@ -56,6 +56,11 @@ final class TestInputs
     private const ACTIONS = ['allow', 'limit', 'age-restrict', 'block'];
     private const REGIONS = ['DE', 'AT', 'FR', 'GB', 'EU', 'AU', 'BR'];
     private const REGIONAL_ACTIONS = ['limit', 'age-restrict', 'block'];
+    /** Category colours, carried in a test image's chroma only. */
+    private const COLOURS = [
+        'sexual' => [232, 80, 160], 'violence' => [224, 56, 64], 'self-harm' => [24, 168, 152], 'harassment' => [240, 128, 48],
+        'hate' => [144, 80, 216], 'criminal-activity' => [224, 184, 40], 'personal-information' => [48, 128, 224], 'profanity' => [136, 192, 48],
+    ];
     private const HEX_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot'];
     private function __construct()
     {
@@ -94,6 +99,32 @@ final class TestInputs
     {
         self::checkKey($testInputKey);
         return self::textCode(self::validate(is_string($scenario) ? self::testInputForSignal($scenario) : $scenario), $testInputKey);
+    }
+
+    /**
+     * The test image for a scenario or a signal (one of `TEXT_SIGNALS`), signed with
+     * `$testInputKey`: the project's secret test input key from the portal. The image survives
+     * lossy formats and resizing: upload its `png`, or encode its `rgba` in any format. Throws
+     * `InvalidArgumentException` for a scenario too large for a test image.
+     *
+     * @param TestInput|string $scenario
+     */
+    public static function paintTestImage(array|string $scenario, string $testInputKey): PaintedTestImage
+    {
+        self::checkKey($testInputKey);
+        $checked = self::validate(is_string($scenario) ? self::testInputForSignal($scenario, 'image') : $scenario);
+        $tag = explode(' ', self::textCode($checked, $testInputKey))[1];
+        $content = self::canonical($checked);
+        $palette = [];
+        foreach ($checked['instances'] as $instance) {
+            $palette[$instance['category']] = self::COLOURS[$instance['category']];
+        }
+        $grid = TestImageGrid::paint(pack('n', strlen($content)) . hex2bin($tag) . $content, array_values($palette) ?: [[144, 152, 160]]);
+        if ($grid === null) {
+            throw self::invalid('The test scenario is too large for a test image');
+        }
+        [$width, $rgba] = $grid;
+        return new PaintedTestImage($width, $width, $rgba, TestImageGrid::png($width, $width, $rgba));
     }
 
     /**

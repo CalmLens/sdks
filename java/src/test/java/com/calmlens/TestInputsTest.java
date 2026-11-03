@@ -5,11 +5,16 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -87,6 +92,49 @@ class TestInputsTest {
   Stream<DynamicTest> mediaPhrases() throws Exception {
     return cases("media", "signal", c -> assertEquals(c.get("code").getAsString(),
         TestInputs.generateMediaTestCode(c.get("signal").getAsString(), c.get("key").getAsString())));
+  }
+
+  private static TestInputs.TestImage image(JsonObject c) {
+    String key = c.get("key").getAsString();
+    return c.has("signal") ? TestInputs.paintTestImage(c.get("signal").getAsString(), key) : TestInputs.paintTestImage(input(c.get("input")), key);
+  }
+
+  /** Each cell's level as packages/sdk-contract/testInputs.ts records it: the index of the cell's first red value among the levels, or -1. */
+  private static String fixtureLevels(TestInputs.TestImage image, int cells) {
+    int size = image.width() / cells;
+    StringBuilder levels = new StringBuilder();
+    for (int row = 0; row < cells; row++)
+      for (int column = 0; column < cells; column++) {
+        int red = image.rgba()[(row * size * image.width() + column * size) * 4] & 255;
+        int level = -1;
+        for (int i = 0; i < TestImageGrid.LEVELS.length; i++) if (TestImageGrid.LEVELS[i] == red) level = i;
+        levels.append(level);
+      }
+    return levels.toString();
+  }
+
+  @TestFactory
+  Stream<DynamicTest> images() throws Exception {
+    return cases("images", "name", c -> {
+      TestInputs.TestImage image = image(c);
+      assertEquals(List.of(c.get("width").getAsInt(), c.get("height").getAsInt()), List.of(image.width(), image.height()));
+      assertEquals(c.get("rgbaSha256").getAsString(), HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(image.rgba())));
+      assertEquals(c.get("levels").getAsString(), fixtureLevels(image, c.get("cells").getAsInt()));
+      BufferedImage decoded = ImageIO.read(new ByteArrayInputStream(image.png()));
+      assertEquals(List.of(image.width(), image.height()), List.of(decoded.getWidth(), decoded.getHeight()));
+      int[] samples = decoded.getRaster().getPixels(0, 0, image.width(), image.height(), (int[]) null);
+      byte[] rgba = new byte[samples.length];
+      for (int i = 0; i < samples.length; i++) rgba[i] = (byte) samples[i];
+      assertArrayEquals(image.rgba(), rgba, "PNG pixels");
+    });
+  }
+
+  @TestFactory
+  Stream<DynamicTest> imageRejections() throws Exception {
+    return cases("imageRejections", "name", c -> {
+      CalmLensException error = assertThrows(CalmLensException.class, () -> image(c));
+      assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, error.getCode());
+    });
   }
 
   /** Untyped rejections (unknown fields, wrong value types) cannot be expressed with {@link TestInput}. */

@@ -82,7 +82,7 @@ Treat a status you don't recognise as not allowed. `Assets.Create` queues proces
 
 ## Testing
 
-The `calmlenstest` package runs the real client over an in-memory backend, with simulated moderation decisions, recorded requests and queued failures. To test against a real project, `GenerateTestTextCode` and `GenerateMediaTestCode` sign test inputs with the project's test input key from the portal. See [Go testing](https://calmlens.com/docs/sdk/go/testing).
+The `calmlenstest` package runs the real client over an in-memory backend, with simulated moderation decisions, recorded requests and queued failures. To test against a real project, `GenerateTestTextCode`, `PaintTestImage` and `GenerateMediaTestCode` sign test inputs with the project's test input key from the portal. See [Go testing](https://calmlens.com/docs/sdk/go/testing).
 
 ## Links
 

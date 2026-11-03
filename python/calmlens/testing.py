@@ -6,7 +6,8 @@ handling, errors and retries, and the fake API answers with the real routes' sta
 JSON error bodies and headers (``X-Request-Id``, ``Retry-After``, ``Idempotent-Replayed``).
 Keep this module out of production code paths.
 
-It also generates signed test inputs (``generate_test_text_code`` and ``generate_media_test_code``): content that CalmLens, given the project's test input key, answers
+It also generates signed test inputs (``generate_test_text_code``, ``paint_test_image`` and
+``generate_media_test_code``): content that CalmLens, given the project's test input key, answers
 with the scenario it describes instead of classifying it.
 """
 from __future__ import annotations
@@ -39,9 +40,10 @@ from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAUL
                      CalmLensServerClient,
                      _UNSET, _invalid, _json, _merge, _sign_upload_token)
 from ._signed_test_inputs import (MEDIA_TEST_SIGNALS, TEST_INPUT_PRESETS, TEXT_TEST_SIGNALS, ClassificationTestSignal,
-                                  SignedTestAction, SignedTestInput, SignedTestInstance,
+                                  PaintedTestImage, SignedTestAction, SignedTestInput, SignedTestInstance,
                                   SignedTestRegion, SignedTestRegionalAction, SignedTestRegionalActionName,
-                                  generate_media_test_code, generate_test_text_code, signal_test_input)
+                                  generate_media_test_code, generate_test_text_code, paint_test_image,
+                                  signal_test_input)
 from .errors import CalmLensError
 from .moderation_context import select_moderation_context_items
 from .types import (Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder, HashList, HashListEntry,
@@ -55,7 +57,7 @@ __all__ = ["MockCalmLensServerClient", "MockRequest", "MockOptions", "MockAssetO
            "ClassificationTestSignal", "SignedTestInput", "SignedTestInstance", "SignedTestAction",
            "SignedTestRegionalAction", "SignedTestRegion", "SignedTestRegionalActionName",
            "TEST_INPUT_PRESETS", "TEXT_TEST_SIGNALS", "MEDIA_TEST_SIGNALS", "generate_test_text_code",
-           "generate_media_test_code", "signal_test_input"]
+           "generate_media_test_code", "signal_test_input", "paint_test_image", "PaintedTestImage"]
 
 _MOCK_OPTIONS = {"database_storage", "image_storage", "create_id", "now", "moderate", "signed_url_base_url"}
 _MOCK_OUTCOMES = ("pending", "failed", "allowed", "limited", "age-restricted", "blocked", "purged")

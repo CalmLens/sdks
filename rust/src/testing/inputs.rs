@@ -1,6 +1,7 @@
-//! Signed test inputs: text codes and media phrases that CalmLens decides as the
+//! Signed test inputs: text codes, test images and media phrases that CalmLens decides as the
 //! scenario they carry, for testing a moderation integration end to end without real content.
 use super::classification::{CATEGORIES, INPUT_QUALIFIERS, QUALIFIERS};
+use super::image_grid;
 use crate::error::ErrorCode;
 use crate::{Error, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -83,7 +84,7 @@ impl<'a> From<&'a String> for TestScenario<'a> {
 pub enum TestInputKind {
     /// A text code.
     Text,
-    /// An image.
+    /// An image ([`paint_test_image`]).
     Image,
 }
 
@@ -166,7 +167,7 @@ fn instance(category: &str, qualifiers: &[&str]) -> TestInputInstance {
     }
 }
 
-/// The signals text codes accept: the categories and
+/// The signals text codes and test images accept: the categories and
 /// `sexual.involving-minors`, `harassment.insult`, `sexual.adult`, `hate.regional-symbol` and
 /// `violence.graphic`.
 pub const TEST_INPUT_SIGNALS: &[&str] = &[
@@ -253,18 +254,87 @@ pub fn generate_test_text_code<'a>(
     scenario: impl Into<TestScenario<'a>>,
     test_input_key: &str,
 ) -> Result<String> {
-    let input = match scenario.into() {
-        TestScenario::Input(input) => input.clone(),
-        TestScenario::Signal(signal) => test_input_for_signal(signal, TestInputKind::Text)?,
-    };
-    validate(&input)?;
-    check_key(test_input_key)?;
-    let payload = URL_SAFE_NO_PAD.encode(canonical_json(&input));
-    if payload.len() > 8000 {
-        return Err(invalid_argument("Test scenario is too large"));
+    let input = resolve(scenario.into(), TestInputKind::Text)?;
+    text_code(&input, test_input_key)
+}
+
+/// A painted test image: RGBA bytes, row by row, and the same image as PNG.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct TestImage {
+    /// Width in pixels.
+    pub width: u32,
+    /// Height in pixels.
+    pub height: u32,
+    /// `width * height * 4` bytes of red, green, blue and alpha.
+    pub rgba: Vec<u8>,
+    /// The image as PNG bytes, ready to upload.
+    pub png: Vec<u8>,
+}
+
+/// Category colours, carried in a test image's chroma only.
+const CATEGORY_COLORS: [(&str, [u8; 3]); 8] = [
+    ("sexual", [232, 80, 160]),
+    ("violence", [224, 56, 64]),
+    ("self-harm", [24, 168, 152]),
+    ("harassment", [240, 128, 48]),
+    ("hate", [144, 80, 216]),
+    ("criminal-activity", [224, 184, 40]),
+    ("personal-information", [48, 128, 224]),
+    ("profanity", [136, 192, 48]),
+];
+
+/// Paints a scenario or signal as a test image that CalmLens decides as that scenario. The image
+/// survives lossy formats and resizing: upload its `png` bytes, or encode its `rgba` in any format.
+///
+/// `test_input_key` is the project's secret test input key from the portal. An invalid key or
+/// scenario, or one too large for a test image, is `sdk/invalid-argument`.
+///
+/// ```
+/// use calmlens::testing::paint_test_image;
+/// # let test_input_key = "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d";
+/// let image = paint_test_image("violence", test_input_key)?;
+/// assert!(image.png.starts_with(b"\x89PNG"));
+/// # Ok::<(), calmlens::Error>(())
+/// ```
+pub fn paint_test_image<'a>(
+    scenario: impl Into<TestScenario<'a>>,
+    test_input_key: &str,
+) -> Result<TestImage> {
+    let input = resolve(scenario.into(), TestInputKind::Image)?;
+    let code = text_code(&input, test_input_key)?;
+    let tag = &code.split(' ').nth(1).expect("a text code has a tag");
+    let content = canonical_json(&input);
+    let mut data = vec![(content.len() >> 8) as u8, content.len() as u8];
+    data.extend(
+        (0..tag.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&tag[i..i + 2], 16).expect("the tag is hexadecimal")),
+    );
+    data.extend_from_slice(content.as_bytes());
+    let mut palette: Vec<[u8; 3]> = Vec::new();
+    for instance in &input.instances {
+        let color = CATEGORY_COLORS
+            .iter()
+            .find(|(category, _)| *category == instance.category)
+            .map(|(_, color)| *color)
+            .expect("validated category");
+        if !palette.contains(&color) {
+            palette.push(color);
+        }
     }
-    let tag = tag(test_input_key, &format!("calmlens-test:v1:{payload}"));
-    Ok(format!("<!calmlens-test {tag} {payload}>"))
+    if palette.is_empty() {
+        palette.push([144, 152, 160]);
+    }
+    let (width, rgba) = image_grid::paint(&data, &palette)
+        .ok_or_else(|| invalid_argument("Test scenario is too large for a test image"))?;
+    let png = image_grid::png(width, width, &rgba);
+    Ok(TestImage {
+        width,
+        height: width,
+        rgba,
+        png,
+    })
 }
 
 /// The phrase that makes an audio or video input a test of `signal` (one of
@@ -287,6 +357,25 @@ pub fn generate_media_test_code(signal: &str, test_input_key: &str) -> Result<St
         words.join(" "),
         signal.replace(['.', '-'], " ")
     ))
+}
+
+fn resolve(scenario: TestScenario<'_>, kind: TestInputKind) -> Result<TestInput> {
+    let input = match scenario {
+        TestScenario::Input(input) => input.clone(),
+        TestScenario::Signal(signal) => test_input_for_signal(signal, kind)?,
+    };
+    validate(&input)?;
+    Ok(input)
+}
+
+fn text_code(input: &TestInput, key: &str) -> Result<String> {
+    check_key(key)?;
+    let payload = URL_SAFE_NO_PAD.encode(canonical_json(input));
+    if payload.len() > 8000 {
+        return Err(invalid_argument("Test scenario is too large"));
+    }
+    let tag = tag(key, &format!("calmlens-test:v1:{payload}"));
+    Ok(format!("<!calmlens-test {tag} {payload}>"))
 }
 
 fn check_key(key: &str) -> Result<()> {

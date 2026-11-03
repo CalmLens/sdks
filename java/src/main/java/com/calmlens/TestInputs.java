@@ -5,6 +5,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
@@ -17,12 +18,13 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * Signed test inputs: text codes and media phrases that a project's moderation
+ * Signed test inputs: text codes, test images and media phrases that a project's moderation
  * recognises as a declared scenario when they are signed with its secret test input key (shown in
  * the portal's project settings). The formats match the backend byte for byte.
  *
  * <pre>{@code
  * String text = TestInputs.generateTestTextCode(TestInputs.LIMITED, testInputKey);
+ * byte[] png = TestInputs.paintTestImage("violence", testInputKey).png();
  * String phrase = TestInputs.generateMediaTestCode("violence", testInputKey);
  * }</pre>
  *
@@ -36,9 +38,30 @@ public final class TestInputs {
   public enum Kind {
     /** A text input ({@link #generateTestTextCode(String, String)}). */
     TEXT,
-    /** An image input. */
+    /** An image input ({@link #paintTestImage(String, String)}). */
     IMAGE
   }
+
+  /**
+   * A painted test image: {@code width * height} RGBA pixels, row by row, and the same image as PNG.
+   *
+   * @param width the width in pixels
+   * @param height the height in pixels
+   * @param rgba 4 bytes per pixel (red, green, blue, alpha)
+   * @param png the image as PNG bytes, ready to upload
+   */
+  public record TestImage(int width, int height, byte[] rgba, byte[] png) {}
+
+  /** Category colours, carried in a test image's chroma only. */
+  private static final Map<String, int[]> COLORS = Map.of(
+      "sexual", new int[] {232, 80, 160},
+      "violence", new int[] {224, 56, 64},
+      "self-harm", new int[] {24, 168, 152},
+      "harassment", new int[] {240, 128, 48},
+      "hate", new int[] {144, 80, 216},
+      "criminal-activity", new int[] {224, 184, 40},
+      "personal-information", new int[] {48, 128, 224},
+      "profanity", new int[] {136, 192, 48});
 
   /** No findings. */
   public static final TestInput CLEAN = new TestInput(List.of());
@@ -158,6 +181,46 @@ public final class TestInputs {
     for (char digit : tag(testInputKey, "calmlens-test:media:" + signal).toCharArray())
       phrase.append(' ').append(WORDS[Character.digit(digit, 16)]);
     return phrase.append(' ').append(signal.replace('.', ' ').replace('-', ' ')).append(" end test").toString();
+  }
+
+  /**
+   * Paints a scenario's signed test image: a grid that survives lossy formats and resizing. Upload
+   * its {@link TestImage#png()}, or encode its {@link TestImage#rgba()} in any format.
+   *
+   * @param input the scenario
+   * @param testInputKey the project's secret test input key from the portal
+   * @return the image
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for an invalid key or scenario, or
+   *     one too large for a test image
+   */
+  public static TestImage paintTestImage(TestInput input, String testInputKey) {
+    String tag = generateTestTextCode(input, testInputKey).split(" ")[1];
+    byte[] content = canonical(input).getBytes(StandardCharsets.UTF_8);
+    byte[] data = new byte[18 + content.length];
+    data[0] = (byte) (content.length >> 8);
+    data[1] = (byte) content.length;
+    for (int i = 0; i < 16; i++) data[2 + i] = (byte) Integer.parseInt(tag.substring(2 * i, 2 * i + 2), 16);
+    System.arraycopy(content, 0, data, 18, content.length);
+    List<int[]> palette = new ArrayList<>();
+    Set<String> seen = new HashSet<>();
+    for (TestInput.Instance instance : input.instances())
+      if (seen.add(instance.category())) palette.add(COLORS.get(instance.category()));
+    if (palette.isEmpty()) palette.add(new int[] {144, 152, 160});
+    TestImage image = TestImageGrid.paint(data, palette);
+    if (image == null) throw invalid("Test scenario is too large for a test image");
+    return image;
+  }
+
+  /**
+   * Paints a signal's image scenario ({@link #testInputForSignal(String, Kind)} with {@link Kind#IMAGE}).
+   *
+   * @param signal one of {@link #SIGNALS}
+   * @param testInputKey the project's secret test input key from the portal
+   * @return the image
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for an invalid key or signal
+   */
+  public static TestImage paintTestImage(String signal, String testInputKey) {
+    return paintTestImage(testInputForSignal(signal, Kind.IMAGE), testInputKey);
   }
 
   private static void checkKey(String key) {

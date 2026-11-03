@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
+require 'digest'
 require 'minitest/autorun'
+require 'zlib'
 require 'calmlens'
 require 'calmlens/testing'
 require_relative 'contract_fixtures'
 
-# Replays testdata/test-inputs.json: signed text codes and media phrases must match
+# Replays testdata/test-inputs.json: signed text codes, test images and media phrases must match
 # the backend's formats byte for byte, and every invalid key, signal or scenario is refused with
 # `sdk/invalid-argument`. Each fixture case is its own test.
 class ContractTestInputsTest < Minitest::Test
@@ -75,6 +77,8 @@ class ContractTestInputsTest < Minitest::Test
   each_case('signal_input', FIXTURE['signalInputs']) { |item| "#{item['signal']} #{item['kind']}" }
   each_case('text', FIXTURE['text']) { |item| item['name'] }
   each_case('media', FIXTURE['media']) { |item| item['signal'] }
+  each_case('image', FIXTURE['images']) { |item| item['name'] }
+  each_case('image_rejection', FIXTURE['imageRejections']) { |item| item['name'] }
   each_case('rejection', FIXTURE['rejections']) { |item| "#{item['kind']} #{item['name']}" }
 
   def replay_signal_input(item)
@@ -87,6 +91,52 @@ class ContractTestInputsTest < Minitest::Test
 
   def replay_media(item)
     assert_equal item['code'], TestInputs.generate_media_code(item['signal'], item['key'])
+  end
+
+  def replay_image(item)
+    image = TestInputs.paint_image(input(item), item['key'])
+    assert_equal [item['width'], item['height']], [image.width, image.height]
+    assert_equal item['rgbaSha256'], Digest::SHA256.hexdigest(image.rgba)
+    assert_equal item['levels'], fixture_levels(image, item['cells'])
+    assert_equal [image.width, image.height, image.rgba], decode_png(image.png)
+  end
+
+  def replay_image_rejection(item)
+    error = assert_raises(CalmLens::InvalidArgumentError, item['name']) { TestInputs.paint_image(input(item), item['key']) }
+    assert_equal CalmLens::SdkErrorCodes::INVALID_ARGUMENT, error.code
+  end
+
+  # Each cell's level as packages/sdk-contract/testInputs.ts records it: the index of the cell's
+  # first red value among the data levels, or -1.
+  def fixture_levels(image, cells)
+    levels = TestInputs.const_get(:Grid)::LEVELS
+    size = image.width / cells
+    Array.new(cells * cells) do |cell|
+      row, column = cell.divmod(cells)
+      levels.index(image.rgba.getbyte(((row * size * image.width) + (column * size)) * 4)) || -1
+    end.join
+  end
+
+  # Width, height and RGBA of an unfiltered 8-bit RGBA PNG, checking every chunk's CRC.
+  def decode_png(png)
+    assert_equal "\x89PNG\r\n\x1a\n".b, png.byteslice(0, 8)
+    offset = 8
+    chunks = Hash.new { |hash, key| hash[key] = +''.b }
+    while offset < png.bytesize
+      length = png.byteslice(offset, 4).unpack1('N')
+      type = png.byteslice(offset + 4, 4)
+      body = png.byteslice(offset + 8, length)
+      assert_equal Zlib.crc32(type + body), png.byteslice(offset + 8 + length, 4).unpack1('N')
+      chunks[type] << body
+      offset += 12 + length
+    end
+    width, height, depth, colour = chunks['IHDR'].unpack('NNCC')
+    assert_equal [8, 6], [depth, colour]
+    raw = Zlib::Inflate.inflate(chunks['IDAT'])
+    stride = (width * 4) + 1
+    rows = Array.new(height) { |row| raw.byteslice(row * stride, stride) }
+    assert(rows.all? { |row| row.getbyte(0).zero? })
+    [width, height, rows.map { |row| row.byteslice(1..) }.join]
   end
 
   def replay_rejection(item)

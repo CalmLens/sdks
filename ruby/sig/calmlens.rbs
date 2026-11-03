@@ -417,7 +417,7 @@ module CalmLens
     INPUT_QUALIFIERS: Array[String]
   end
 
-  # Signed test inputs: text codes and media phrases signed with a project's secret
+  # Signed test inputs: text codes, test images and media phrases signed with a project's secret
   # test input key from the portal.
   module TestInputs
     type action = "allow" | "limit" | "age-restrict" | "block"
@@ -433,6 +433,16 @@ module CalmLens
     type media_signal = classification_category | "violence.graphic"
     type input = scenario | Hash[String | Symbol, untyped] | signal
 
+    # A painted test image: width by height pixels of 8-bit RGBA in the binary String `rgba`, and
+    # the same image as binary PNG bytes in `png`.
+    class Image < Struct[untyped]
+      attr_accessor width: Integer
+      attr_accessor height: Integer
+      attr_accessor rgba: String
+      attr_accessor png: String
+      def initialize: (width: Integer, height: Integer, rgba: String, png: String) -> void
+    end
+
     REGIONS: Array[region]
     SIGNALS: Array[signal]
     MEDIA_SIGNALS: Array[media_signal]
@@ -441,6 +451,7 @@ module CalmLens
 
     def self.for_signal: (signal signal, ?("text" | "image") kind) -> scenario
     def self.generate_text_code: (input input, String test_input_key) -> String
+    def self.paint_image: (input input, String test_input_key) -> Image
     def self.generate_media_code: (media_signal signal, String test_input_key) -> String
   end
 end

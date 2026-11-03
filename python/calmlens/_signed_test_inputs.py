@@ -1,4 +1,4 @@
-"""Signed test inputs: text codes and media phrases that a project's test input key
+"""Signed test inputs: text codes, test images and media phrases that a project's test input key
 authenticates, so CalmLens returns the scenario they describe instead of classifying them. The
 formats match the JavaScript SDK's ``calmlens/test-inputs`` byte for byte."""
 from __future__ import annotations
@@ -8,7 +8,10 @@ import hashlib
 import hmac
 import json
 import re
+import struct
+import zlib
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, Literal, TypedDict, Union, cast
 
 from ._mock_classification import CATEGORIES, INPUT_QUALIFIERS, QUALIFIERS
@@ -56,6 +59,15 @@ class SignedTestInput(_SignedTestInputRequired, total=False):
     unassessedCategories: list[ClassificationCategory]
 
 
+@dataclass(frozen=True)
+class PaintedTestImage:
+    """A painted test image: ``width`` by ``height`` pixels of 8-bit RGBA in ``rgba``, row by row,
+    and the same image as ``png`` bytes to upload."""
+    width: int
+    height: int
+    rgba: bytes
+    png: bytes
+
 
 _ACTIONS = ("allow", "limit", "age-restrict", "block")
 _REGIONS = ("DE", "AT", "FR", "GB", "EU", "AU", "BR")
@@ -80,7 +92,7 @@ TEST_INPUT_PRESETS: dict[str, SignedTestInput] = {
         {"category": "harassment", "qualifiers": ["harassment-threat"]}]},
 }
 
-#: The signals ``generate_test_text_code`` accepts.
+#: The signals ``generate_test_text_code`` and ``paint_test_image`` accept.
 TEXT_TEST_SIGNALS: tuple[str, ...] = (*CATEGORIES, "sexual.involving-minors", "harassment.insult", "sexual.adult",
                                       "hate.regional-symbol", "violence.graphic")
 #: The signals ``generate_media_test_code`` accepts.
@@ -127,6 +139,159 @@ def generate_media_test_code(signal: ClassificationTestSignal, test_input_key: s
     tag = _hmac(test_input_key, f"calmlens-test:media:{signal}")
     words = " ".join(_HEX_WORDS[int(digit, 16)] for digit in tag)
     return f"Calm Lens test {words} {re.sub(r'[.-]', ' ', signal)} end test"
+
+
+def paint_test_image(scenario: SignedTestInput | ClassificationTestSignal, test_input_key: str) -> PaintedTestImage:
+    """The test image for a scenario or signal, signed with ``test_input_key``: the project's
+    secret test input key from the portal. Upload its ``png`` bytes (or encode ``rgba`` in any
+    format: the image survives lossy formats and resizing). Raises ``sdk/invalid-argument`` for an
+    invalid key or scenario, or one too large for a test image."""
+    _check_key(test_input_key)
+    checked = _validate(signal_test_input(scenario, "image") if isinstance(scenario, str) else scenario)
+    tag = _text_code(checked, test_input_key).split(" ")[1]
+    content = _canonical(checked).encode()
+    data = bytes([len(content) >> 8, len(content) & 255]) + bytes.fromhex(tag) + content
+    categories = dict.fromkeys(instance["category"] for instance in checked["instances"])
+    palette = [_CATEGORY_COLOURS[category] for category in categories] or [(144, 152, 160)]
+    width, rgba = _paint_grid(data, palette)
+    return PaintedTestImage(width, width, rgba, _png(width, width, rgba))
+
+
+#: Category colours, carried in test images' chroma only.
+_CATEGORY_COLOURS = {"sexual": (232, 80, 160), "violence": (224, 56, 64), "self-harm": (24, 168, 152),
+                     "harassment": (240, 128, 48), "hate": (144, 80, 216), "criminal-activity": (224, 184, 40),
+                     "personal-information": (48, 128, 224), "profanity": (136, 192, 48)}
+#: The four data levels' target luma, in Gray-code order for symbols 0 to 3.
+_GRID_LEVELS = (72, 128, 184, 240)
+_SYMBOL_LEVEL = (0, 1, 3, 2)
+_GRID_PARITY = 32
+_GRID_EXP = [0] * 512
+_GRID_LOG = [0] * 256
+
+
+def _init_gf() -> None:
+    x = 1
+    for i in range(255):
+        _GRID_EXP[i] = x
+        _GRID_LOG[x] = i
+        x <<= 1
+        if x & 256:
+            x ^= 0x11D
+    for i in range(255, 512):
+        _GRID_EXP[i] = _GRID_EXP[i - 255]
+
+
+_init_gf()
+
+
+def _gf_mul(a: int, b: int) -> int:
+    return _GRID_EXP[_GRID_LOG[a] + _GRID_LOG[b]] if a and b else 0
+
+
+def _generator() -> list[int]:
+    g = [1]
+    for i in range(_GRID_PARITY):
+        following = [0] * (len(g) + 1)
+        for j, coefficient in enumerate(g):
+            following[j] ^= coefficient
+            following[j + 1] ^= _gf_mul(coefficient, _GRID_EXP[i])
+        g = following
+    return g
+
+
+_GRID_GENERATOR = _generator()
+
+
+def _rs_parity(block: bytes) -> bytes:
+    parity = [0] * _GRID_PARITY
+    for byte in block:
+        factor = byte ^ parity[0]
+        parity = parity[1:] + [0]
+        if factor:
+            for j in range(_GRID_PARITY):
+                parity[j] ^= _gf_mul(_GRID_GENERATOR[j + 1], factor)
+    return bytes(parity)
+
+
+def _grid_layout(cells: int) -> tuple[int, list[int], int]:
+    capacity = (cells - 2) * (cells - 2) // 4
+    blocks = -(-capacity // 255)
+    lengths = [capacity // blocks + (1 if index < capacity % blocks else 0) for index in range(blocks)]
+    return capacity, lengths, capacity - blocks * _GRID_PARITY
+
+
+def _grid_pixel(colour: Sequence[int], level: int) -> tuple[int, ...]:
+    target = _GRID_LEVELS[level]
+    own = (77 * colour[0] + 150 * colour[1] + 29 * colour[2]) >> 8
+    differences = [channel - own for channel in colour]
+    for scale in range(16, -1, -1):
+        # Truncate each scaled difference toward zero, as JavaScript's sign × (|d| × s >> 4).
+        pixel = tuple(target + (abs(d) * scale >> 4 if d >= 0 else -(abs(d) * scale >> 4)) for d in differences)
+        if all(0 <= channel <= 255 for channel in pixel):
+            return pixel
+    raise AssertionError("unreachable: scale 0 is the level's grey")
+
+
+def _paint_grid(data: bytes, palette: Sequence[Sequence[int]]) -> tuple[int, bytes]:
+    """The grid of packages/shared/src/TestImageGrid.ts: width and RGBA bytes."""
+    cells = next((cells for cells in range(15, 128, 2) if _grid_layout(cells)[2] >= len(data)), None)
+    if cells is None:
+        raise _invalid("The test scenario is too large for a test image")
+    capacity, lengths, data_bytes = _grid_layout(cells)
+    padded = data + bytes(0x11 if i % 2 else 0xEC for i in range(data_bytes - len(data)))
+    codewords = []
+    offset = 0
+    for length in lengths:
+        block = padded[offset:offset + length - _GRID_PARITY]
+        offset += len(block)
+        codewords.append(block + _rs_parity(block))
+    interleaved = (codeword[i] for i in range(max(lengths)) for codeword in codewords if i < len(codeword))
+    # Whitening: a uniform area never reads as the all-zero codeword.
+    stream = bytes(byte ^ ((i * 151 + 77) & 255) for i, byte in enumerate(interleaved))
+    span = cells - 1
+    denominator = span * span
+    pixels = []
+    for y in range(cells):
+        for x in range(cells):
+            if x in (0, span) or y in (0, span):
+                grey = 255 if (x + y) % 2 else 0
+                pixels.append(bytes((grey, grey, grey, 255)))
+                continue
+            symbol = (y - 1) * (cells - 2) + x - 1
+            index = symbol >> 2
+            level = _SYMBOL_LEVEL[(stream[index] >> (6 - 2 * (symbol & 3))) & 3] if index < capacity else 0
+            position = (x * (span - y) + (span - x) * y) * (len(palette) - 1)
+            start = position // denominator
+            remainder = position - start * denominator
+            end = palette[min(start + 1, len(palette) - 1)]
+            colour = [(channel * (denominator - remainder) + end[c] * remainder) // denominator
+                      for c, channel in enumerate(palette[start])]
+            pixels.append(bytes((*_grid_pixel(colour, level), 255)))
+    cell_size = 2 * (512 // 2 // cells)
+    width = cells * cell_size
+    rows = []
+    for y in range(cells):
+        row = b"".join(pixel * cell_size for pixel in pixels[y * cells:(y + 1) * cells])
+        rows.append(row * cell_size)
+    return width, b"".join(rows)
+
+
+def _png(width: int, height: int, rgba: bytes) -> bytes:
+    """8-bit RGBA rows without filtering in stored deflate blocks, so every SDK writes the same
+    bytes."""
+    stride = width * 4
+    raw = b"".join(b"\0" + rgba[row * stride:(row + 1) * stride] for row in range(height))
+    stream = bytearray(b"\x78\x01")
+    for offset in range(0, len(raw), 65535):
+        block = raw[offset:offset + 65535]
+        stream += struct.pack("<BHH", offset + len(block) == len(raw), len(block), ~len(block) & 0xFFFF) + block
+    stream += struct.pack(">I", zlib.adler32(raw))
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+            + chunk(b"IDAT", bytes(stream)) + chunk(b"IEND", b""))
 
 
 def _check_key(key: object) -> None:

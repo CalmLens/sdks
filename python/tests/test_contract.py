@@ -16,8 +16,10 @@ import inspect
 import io
 import json
 import re
+import struct
 import typing
 import unittest
+import zlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -28,7 +30,7 @@ from calmlens import (CalmLensAPIError, CalmLensError, CalmLensServerClient, Cal
                       CalmLensTransportError, CalmLensValidationError, WebhookVerificationError, client as client_module,
                       is_test_webhook_event, parse_webhook_event, testing, to_webhook_event_payload,
                       verify_webhook_signature)
-from calmlens import _mock_classification
+from calmlens import _mock_classification, _signed_test_inputs
 from calmlens.client import _serialize_transform
 from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, sign_upload_token
 from calmlens.types import IMAGE_TRANSFORM_COLOUR_KEYS, ImageTransformOptions
@@ -1022,6 +1024,20 @@ class SignedTestInputTests(unittest.TestCase):
             with self.subTest(case["signal"]):
                 self.assertEqual(testing.generate_media_test_code(case["signal"], case["key"]), case["code"])
 
+    def test_images(self) -> None:
+        for case in self.FIXTURE["images"]:
+            with self.subTest(case["name"]):
+                image = testing.paint_test_image(case.get("input", case.get("signal")), case["key"])
+                self.assertEqual((image.width, image.height), (case["width"], case["height"]))
+                self.assertEqual(hashlib.sha256(image.rgba).hexdigest(), case["rgbaSha256"])
+                self.assertEqual(_fixture_levels(image, case["cells"]), case["levels"])
+                self.assertEqual(_decode_png(image.png), (image.width, image.height, image.rgba))
+        for case in self.FIXTURE["imageRejections"]:
+            with self.subTest(case["name"]):
+                with self.assertRaises(CalmLensValidationError) as raised:
+                    testing.paint_test_image(case.get("input", case.get("signal")), case["key"])
+                self.assertEqual(raised.exception.code, "sdk/invalid-argument")
+
     def test_rejections(self) -> None:
         generators = {"text": testing.generate_test_text_code, "media": testing.generate_media_test_code}
         for case in self.FIXTURE["rejections"]:
@@ -1029,6 +1045,33 @@ class SignedTestInputTests(unittest.TestCase):
                 with self.assertRaises(CalmLensValidationError) as raised:
                     generators[case["kind"]](case.get("input", case.get("signal")), case["key"])
                 self.assertEqual(raised.exception.code, "sdk/invalid-argument")
+
+
+def _fixture_levels(image: testing.PaintedTestImage, cells: int) -> str:
+    """Each cell's level as packages/sdk-contract/testInputs.ts records it: the index of the cell's
+    first red value among the data levels, or -1."""
+    levels = _signed_test_inputs._GRID_LEVELS
+    size = image.width // cells
+    return "".join(str(levels.index(red) if (red := image.rgba[(row * size * image.width + column * size) * 4])
+                       in levels else -1) for row in range(cells) for column in range(cells))
+
+
+def _decode_png(png: bytes) -> tuple[int, int, bytes]:
+    """Width, height and RGBA of an unfiltered 8-bit RGBA PNG, checking every chunk's CRC."""
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    offset, chunks = 8, {}
+    while offset < len(png):
+        (length,) = struct.unpack(">I", png[offset:offset + 4])
+        kind, body = png[offset + 4:offset + 8], png[offset + 8:offset + 8 + length]
+        assert struct.unpack(">I", png[offset + 8 + length:offset + 12 + length])[0] == zlib.crc32(kind + body)
+        chunks[kind] = chunks.get(kind, b"") + body
+        offset += 12 + length
+    width, height, depth, colour, *_ = struct.unpack(">IIBBBBB", chunks[b"IHDR"])
+    assert (depth, colour) == (8, 6)
+    raw = zlib.decompress(chunks[b"IDAT"])
+    stride = width * 4 + 1
+    assert all(raw[row * stride] == 0 for row in range(height))
+    return width, height, b"".join(raw[row * stride + 1:(row + 1) * stride] for row in range(height))
 
 
 if __name__ == "__main__":

@@ -3,9 +3,10 @@
 require 'openssl'
 require_relative 'classification'
 require_relative 'test_input_scenario'
+require_relative 'test_image_grid'
 
 module CalmLens
-  # Signed test inputs: text codes and media phrases that a project's moderation
+  # Signed test inputs: text codes, test images and media phrases that a project's moderation
   # recognises as a declared scenario when they are signed with its secret test input key (shown in
   # the portal's project settings), so CalmLens returns that scenario instead of classifying them.
   # The formats match the JavaScript SDK's `calmlens/test-inputs` byte for byte.
@@ -24,11 +25,16 @@ module CalmLens
   #
   # @example
   #   code = CalmLens::TestInputs.generate_text_code('harassment.insult', test_input_key)
+  #   png = CalmLens::TestInputs.paint_image('violence', test_input_key).png
   #   phrase = CalmLens::TestInputs.generate_media_code('violence', test_input_key)
   module TestInputs
+    # A painted test image: `width` by `height` pixels of 8-bit RGBA, row by row, in the binary
+    # String `rgba`, and the same image as binary PNG bytes in `png`.
+    Image = Struct.new(:width, :height, :rgba, :png, keyword_init: true)
+
     # The regions a regional action can name.
     REGIONS = %w[DE AT FR GB EU AU BR].freeze
-    # The signals {generate_text_code} and {for_signal} accept: the categories and
+    # The signals {generate_text_code}, {paint_image} and {for_signal} accept: the categories and
     # five named shortcuts.
     SIGNALS = (MockClassification::CATEGORIES +
                %w[sexual.involving-minors harassment.insult sexual.adult hate.regional-symbol violence.graphic]).freeze
@@ -62,7 +68,8 @@ module CalmLens
     module_function
 
     # The scenario a signal (one of {SIGNALS}) stands for in a text input (`kind` `'text'`) or an
-    # image (`'image'`), as a new Hash. {generate_text_code} uses the text kind.
+    # image (`'image'`), as a new Hash. {generate_text_code} uses the text kind and {paint_image}
+    # the image kind.
     # @param signal [String]
     # @param kind [String] `'text'` or `'image'`
     # @return [Hash{String => Object}]
@@ -89,12 +96,23 @@ module CalmLens
     # @return [String]
     # @raise [InvalidArgumentError] `sdk/invalid-argument` for an invalid key, scenario or signal
     def generate_text_code(input, test_input_key)
-      check_key(test_input_key)
-      checked = Scenario.validate(input.is_a?(String) ? for_signal(input) : input)
-      payload = [Scenario.canonical_json(checked)].pack('m0').tr('+/', '-_').delete('=')
-      raise Internal.invalid('Test scenario is too large') if payload.bytesize > 8000
+      text_code(scenario(input, 'text', test_input_key), test_input_key)
+    end
 
-      "<!calmlens-test #{tag(test_input_key, "calmlens-test:v1:#{payload}")} #{payload}>"
+    # Paints the signed test image for a scenario or a signal (one of {SIGNALS}): a grid that
+    # survives lossy formats and resizing. Upload its `png`, or encode its `rgba` in any format.
+    # @param input [Hash, String] a scenario or a signal
+    # @param test_input_key [String] the project's secret test input key from the portal
+    # @return [Image]
+    # @raise [InvalidArgumentError] `sdk/invalid-argument` for an invalid key, scenario or signal, or
+    #   a scenario too large for a test image
+    def paint_image(input, test_input_key)
+      checked = scenario(input, 'image', test_input_key)
+      signature = text_code(checked, test_input_key).split[1]
+      content = Scenario.canonical_json(checked).b
+      data = [content.bytesize].pack('n') + [signature].pack('H*') + content
+      width, rgba = Grid.paint(data, checked['instances'].map { |instance| instance['category'] })
+      Image.new(width: width, height: width, rgba: rgba, png: Png.png(width, width, rgba))
     end
 
     # The phrase that triggers a signal (one of {MEDIA_SIGNALS}) in audio or video: read it aloud,
@@ -111,6 +129,19 @@ module CalmLens
       ['Calm Lens test', *words, signal.tr('.-', '  '), 'end test'].join(' ')
     end
 
+    # The checked scenario for an input or signal, in canonical form.
+    def scenario(input, kind, test_input_key)
+      check_key(test_input_key)
+      Scenario.validate(input.is_a?(String) ? for_signal(input, kind) : input)
+    end
+
+    def text_code(checked, test_input_key)
+      payload = [Scenario.canonical_json(checked)].pack('m0').tr('+/', '-_').delete('=')
+      raise Internal.invalid('Test scenario is too large') if payload.bytesize > 8000
+
+      "<!calmlens-test #{tag(test_input_key, "calmlens-test:v1:#{payload}")} #{payload}>"
+    end
+
     def check_key(key)
       return if key.is_a?(String) && key.match?(/\A[a-f0-9]{32}\z/)
 
@@ -120,6 +151,6 @@ module CalmLens
     # The first 32 hex characters of HMAC-SHA256 with the key's ASCII bytes.
     def tag(key, message) = OpenSSL::HMAC.hexdigest('SHA256', key, message)[0, 32]
 
-    private_class_method :check_key, :tag
+    private_class_method :scenario, :text_code, :check_key, :tag
   end
 end

@@ -6,7 +6,7 @@
 //! adds an in-memory API behind the queue: uploads create assets that a `moderate` callback
 //! ([`MockOptions::moderate`]) decides with a [`MockDecision`], and assets, folders, hash lists,
 //! events and CDN downloads behave like the API's. Against a real project, signed test inputs
-//! ([`generate_test_text_code`], [`generate_media_test_code`]) make
+//! ([`generate_test_text_code`], [`paint_test_image`], [`generate_media_test_code`]) make
 //! CalmLens decide an input as a chosen [`TestInput`] scenario. Enable the feature in
 //! `[dev-dependencies]`:
 //!
@@ -18,6 +18,7 @@
 #[rustfmt::skip]
 mod classification;
 mod decision;
+mod image_grid;
 mod inputs;
 mod memory;
 mod placeholder;
@@ -27,9 +28,9 @@ pub use decision::{
     MockModerationTrigger, MockOutcome,
 };
 pub use inputs::{
-    generate_media_test_code, generate_test_text_code, test_input_for_signal, TestInput,
-    TestInputInstance, TestInputKind, TestInputPreset, TestRegionalAction, TestScenario,
-    MEDIA_TEST_SIGNALS, TEST_INPUT_SIGNALS,
+    generate_media_test_code, generate_test_text_code, paint_test_image, test_input_for_signal,
+    TestImage, TestInput, TestInputInstance, TestInputKind, TestInputPreset, TestRegionalAction,
+    TestScenario, MEDIA_TEST_SIGNALS, TEST_INPUT_SIGNALS,
 };
 pub use memory::{
     create_mock_api_key, MockApiKeyGrant, MockFailure, MockFailureOptions, MockOptions,
@@ -410,10 +411,10 @@ impl MockServerClient {
         if let Some(value) = options.max_response_bytes {
             builder = builder.max_response_bytes(value);
         }
-        let transport = Arc::new(MockTransport::new(State {
         if let Some(value) = options.part_size_bytes {
             builder = builder.part_size_bytes(value);
         }
+        let transport = Arc::new(MockTransport::new(State {
             backend: Some(memory::Backend::new(options)),
             base_urls: builder.base_urls(),
             ..State::default()

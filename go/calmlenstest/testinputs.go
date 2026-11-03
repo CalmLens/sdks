@@ -1,6 +1,6 @@
 package calmlenstest
 
-// Signed test inputs: text codes and media phrases that a project's moderation
+// Signed test inputs: text codes, test images and media phrases that a project's moderation
 // recognises as a declared scenario when they are signed with its secret test input key (shown in
 // the portal's project settings). The formats match the backend byte for byte.
 
@@ -56,7 +56,7 @@ type TestInputKind string
 const (
 	// TestInputText is a text input (GenerateTestTextCode).
 	TestInputText TestInputKind = "text"
-	// TestInputImage is an image input.
+	// TestInputImage is an image input (PaintTestImage).
 	TestInputImage TestInputKind = "image"
 )
 

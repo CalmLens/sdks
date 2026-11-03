@@ -74,7 +74,7 @@ Act on `asset.classification().moderation().status()`:
 
 ## Testing
 
-`MockCalmLensServerClient` runs the real client against an in-memory CalmLens, so tests can upload, decide, list events and serve content offline. To test against a real project, `TestInputs.generateTestTextCode` and `TestInputs.generateMediaTestCode` sign test inputs with the project's test input key from the portal. See [Java testing](https://calmlens.com/docs/sdk/java/testing).
+`MockCalmLensServerClient` runs the real client against an in-memory CalmLens, so tests can upload, decide, list events and serve content offline. To test against a real project, `TestInputs.generateTestTextCode`, `TestInputs.paintTestImage` and `TestInputs.generateMediaTestCode` sign test inputs with the project's test input key from the portal. See [Java testing](https://calmlens.com/docs/sdk/java/testing).
 
 ## Links
 
