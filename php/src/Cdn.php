@@ -10,6 +10,19 @@ use Psr\Http\Message\ResponseInterface;
 
 final class Cdn extends Resource
 {
+    protected const OPERATIONS = 'cdn';
+
+    /**
+     * Builds a CDN URL for an asset's content, without a request.
+     *
+     * `viewerClaims` takes `region` and `ageConfirmed`. `ageConfirmed` is your platform's
+     * confirmation that the viewer passed its age check: your platform confirms the viewer's age,
+     * and CalmLens does not verify this claim. Anyone requesting a public asset's URL can set it, so
+     * it doesn't restrict access; to control who loads an age-restricted asset, make it private and
+     * include the claim in a signed URL, whose signature covers it.
+     *
+     * @param array<string, mixed> $options assetIdentifier, resource, lens, transform and viewerClaims
+     */
     public function getAssetUrl(array $options): string
     {
         $resource = $options['resource'] ?? 'rendered';

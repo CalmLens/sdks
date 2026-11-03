@@ -237,7 +237,9 @@ export default class CalmLensServerClient {
       /**
        * Builds a CDN URL for asset content or a preview, without a request. Private assets
        * need a signed URL (`assets.createSignedUrl`) or an authenticated request; public
-       * age-restricted assets additionally require `viewerClaims.ageConfirmed: true`.
+       * age-restricted assets additionally require `viewerClaims.ageConfirmed: true`. Your
+       * platform confirms the viewer's age; CalmLens does not verify this claim, and anyone can
+       * add it to a public URL.
        */
       getAssetUrl: ({ assetIdentifier, ...options }: CdnAssetUrlOptions): string => {
         const { projectId, cdnBaseUrl } = this.#settings;

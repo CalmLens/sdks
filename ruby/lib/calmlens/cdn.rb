@@ -19,7 +19,9 @@ module CalmLens
     # @option options [Hash] :viewer_claims viewer assertions, such as `{age_confirmed: true}`, sent as a JSON
     #   `viewerClaims` query parameter. The CDN serves an asset whose moderation status is `age-restricted` only
     #   with `age_confirmed: true`, even with a signed URL or the API key. Set it only where your app has already
-    #   decided the viewer may see age-restricted content.
+    #   decided the viewer may see age-restricted content. Your platform confirms the viewer's age; CalmLens does
+    #   not verify this claim, and anyone can add it to a public URL. To control who loads an age-restricted
+    #   asset, make it private and include the claim in a signed URL.
     # @return [String]
     def get_asset_url(options)
       call(options) { |api, _request| url(api) }

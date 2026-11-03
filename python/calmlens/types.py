@@ -12,6 +12,15 @@ from typing import Any, BinaryIO, Dict, List, Literal, Optional, TypedDict, Unio
 from .qualifiers import ModerationQualifier
 
 class ViewerClaims(TypedDict, total=False):
+    """Optional customer assertions for CDN delivery.
+
+    ``ageConfirmed`` is your platform's confirmation that the viewer passed its age check, and
+    defaults to false. Your platform confirms the viewer's age; CalmLens does not verify this
+    claim. Anyone requesting a public asset's URL can set it, so it doesn't restrict access: to
+    control who loads an age-restricted asset, make it private and include the claim in a signed
+    URL, whose signature covers it.
+    """
+
     region: str
     ageConfirmed: bool
 

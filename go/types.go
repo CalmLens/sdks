@@ -1320,7 +1320,10 @@ type CDNAssetURLOptions struct {
 	// ViewerClaims with AgeConfirmed pointing to true appends a viewerClaims query parameter
 	// containing {"ageConfirmed":true}. The CDN requires it before it serves an asset whose
 	// moderation status is age-restricted, even with a signed URL or an API key. Set it only
-	// where your app has already decided the viewer may see age-restricted content.
+	// where your app has already decided the viewer may see age-restricted content. Your
+	// platform confirms the viewer's age; CalmLens does not verify this claim, and anyone can add
+	// it to a public URL. To control who loads an age-restricted asset, make it private and sign
+	// the claim into a signed URL.
 }
 
 // CDNServeOptions fetches CDN content with an optional method and extra headers (such as
@@ -1465,6 +1468,12 @@ type FolderPage struct {
 }
 
 // ViewerClaims are optional customer assertions. Age confirmation defaults to false.
+//
+// AgeConfirmed is your platform's confirmation that the viewer passed its age check. Your
+// platform confirms the viewer's age; CalmLens does not verify this claim. Anyone requesting a
+// public asset's URL can set it, so it doesn't restrict access: to control who loads an
+// age-restricted asset, make it private and include the claim in a signed URL, whose signature
+// covers it.
 type ViewerClaims struct {
 	Region       string `json:"region,omitempty"`
 	AgeConfirmed *bool  `json:"ageConfirmed,omitempty"`

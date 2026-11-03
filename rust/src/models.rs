@@ -4042,7 +4042,11 @@ pub struct ViewerClaims {
     /// Viewer country; otherwise inferred from the connection reaching CalmLens.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
-    /// Defaults to false, including authenticated requests.
+    /// Your platform's confirmation that the viewer passed its age check. Defaults to false,
+    /// including authenticated requests. Your platform confirms the viewer's age; CalmLens does
+    /// not verify this claim. Anyone requesting a public asset's URL can set it, so it doesn't
+    /// restrict access: to control who loads an age-restricted asset, make it private and include
+    /// the claim in a signed URL, whose signature covers it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub age_confirmed: Option<bool>,
 }

@@ -380,7 +380,13 @@ export type CdnResource = "original" | "rendered" | "placeholder";
 export interface ViewerClaims {
   /** Defaults to the country of the connection reaching CalmLens. Forward the viewer country through proxies. */
   region?: string;
-  /** Customer assertion, not verified by CalmLens. Defaults to false, including authenticated requests. */
+  /**
+   * Your platform's confirmation that the viewer passed its age check. Defaults to false,
+   * including authenticated requests. Your platform confirms the viewer's age; CalmLens does not
+   * verify this claim. Anyone requesting a public asset's URL can set it, so it doesn't restrict
+   * access: to control who loads an age-restricted asset, make it private and include the claim
+   * in a signed URL, whose signature covers it.
+   */
   ageConfirmed?: boolean;
 }
 

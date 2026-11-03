@@ -1620,7 +1620,8 @@ class CDN:
         ``viewer_claims={"ageConfirmed": True}`` appends a ``viewerClaims`` query parameter, which
         the CDN requires before it serves an asset whose moderation status is ``age-restricted``,
         even with a signed URL or an API key. Set it only where your app has already decided the
-        viewer may see age-restricted content."""
+        viewer may see age-restricted content. Your platform confirms the viewer's age; CalmLens
+        does not verify this claim, and anyone can add it to a public URL."""
         merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens, transform=transform,
                         viewer_claims=viewer_claims)
 

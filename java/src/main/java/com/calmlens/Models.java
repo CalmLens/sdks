@@ -2631,10 +2631,21 @@ public final class Models {
       return "SignedUrl[url=" + (query < 0 ? url : url.substring(0, query) + "?[redacted]") + ", expiresAt=" + expiresAt + "]";
     }
   }
+  /** Optional customer assertions for CDN delivery. */
   public static final class ViewerClaims {
     private String region;
     private Boolean ageConfirmed;
     public ViewerClaims region(String value) { region = value; return this; }
+    /**
+     * Your platform's confirmation that the viewer passed its age check; defaults to false. Your
+     * platform confirms the viewer's age; CalmLens does not verify this claim. Anyone requesting a
+     * public asset's URL can set it, so it doesn't restrict access: to control who loads an
+     * age-restricted asset, make it private and include the claim in a signed URL, whose signature
+     * covers it.
+     *
+     * @param value whether your platform confirmed the viewer's age
+     * @return these claims
+     */
     public ViewerClaims ageConfirmed(Boolean value) { ageConfirmed = value; return this; }
   }
 
