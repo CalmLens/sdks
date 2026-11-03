@@ -198,7 +198,7 @@ class ModerationContext(TypedDict):
 
 
 class OcrFeatureOptions(TypedDict):
-    """Extract image text into a child asset and classify it as text."""
+    """Extract image text onto the image asset and add a text moderation pass to its report."""
     enabled: bool
 
 

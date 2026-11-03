@@ -607,8 +607,8 @@ pub struct ProcessingOptions {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessingFeatures {
-    /// Extract image text into a child asset and classify it as text. Applies to images,
-    /// including those extracted from documents and websites.
+    /// Extract image text onto the image asset and add a text moderation pass to its report.
+    /// Applies to images, including those extracted from documents and websites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ocr: Option<FeatureOptions>,
     /// Preview. Locate people in images, including people whose faces are not visible. Results
