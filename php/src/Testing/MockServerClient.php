@@ -660,13 +660,12 @@ final class MockServerClient
         return $image === null ? null : ['thumbhash' => null, 'averageColor' => null] + $image;
     }
 
-    /** Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB. */
+    /** Like the API: image uploads in parts total at most 20 MiB, at any size below that. */
     private static function imageSizeError(string $type, int $size, bool $final): ?string
     {
         return match (true) {
             $type !== 'image' => null,
             $size > 20 * self::MIB => ErrorCodes::MULTIPART_IMAGE_TOO_LARGE,
-            $final && $size < 10 * self::MIB => ErrorCodes::MULTIPART_IMAGE_TOO_SMALL,
             default => null,
         };
     }

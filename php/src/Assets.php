@@ -256,9 +256,6 @@ final class Assets extends Resource
                 if ($size > 20 * 1024 * 1024) {
                     Values::invalid('Multipart image exceeds 20MiB', 'upload/multipart-image-too-large');
                 }
-                if (($total !== null || ($content['isFinal'] ?? false)) && $size < 10 * 1024 * 1024) {
-                    Values::invalid('Multipart image is below 10MiB', 'upload/multipart-image-too-small');
-                }
             }
             $query += ['partNumber' => 1, 'isFinal' => $content['isFinal'] ?? false, 'totalSizeInBytes' => $total];
         }

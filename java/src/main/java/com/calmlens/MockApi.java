@@ -75,7 +75,7 @@ final class MockApi {
   /** Like the API: 1 to 255 printable ASCII characters, without a space at either end. */
   private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[\\x21-\\x7e](?:[\\x20-\\x7e]{0,253}[\\x21-\\x7e])?");
   private static final long MIB = 1024 * 1024;
-  private static final long MIN_PART_BYTES = 5 * MIB, MIN_MULTIPART_IMAGE_BYTES = 10 * MIB, MAX_IMAGE_BYTES = 20 * MIB;
+  private static final long MIN_PART_BYTES = 5 * MIB, MAX_IMAGE_BYTES = 20 * MIB;
   /** Every API cursor list returns this many items unless {@code pageSize} says otherwise. */
   private static final int DEFAULT_PAGE_SIZE = 50;
   private static final int MAX_PAGE_SIZE = 100, MAX_EVENTS_PAGE_SIZE = 100, MAX_FOLDER_PAGE_SIZE = 100;
@@ -442,11 +442,9 @@ final class MockApi {
         : mime.contains("pdf") || mime.contains("document") || List.of("doc", "docx").contains(mime) ? "multimedia-document" : "file";
   }
 
-  /** Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB. */
+  /** Like the API: image uploads in parts total at most 20 MiB, at any size below that. */
   private static String imageSizeError(String type, long size, boolean last) {
-    if (!type.equals("image")) return null;
-    if (size > MAX_IMAGE_BYTES) return ErrorCodes.MULTIPART_IMAGE_TOO_LARGE;
-    return last && size < MIN_MULTIPART_IMAGE_BYTES ? ErrorCodes.MULTIPART_IMAGE_TOO_SMALL : null;
+    return type.equals("image") && size > MAX_IMAGE_BYTES ? ErrorCodes.MULTIPART_IMAGE_TOO_LARGE : null;
   }
 
   /** Like the API: the parts may not overshoot a declared total, and must reach it at the end. */

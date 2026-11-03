@@ -485,17 +485,9 @@ fn asset_type(mime: &str) -> &'static str {
     }
 }
 const MIB: u64 = 1024 * 1024;
-/// Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB.
-fn image_size_error(kind: &str, size: u64, is_final: bool) -> Option<ErrorCode> {
-    if kind != "image" {
-        None
-    } else if size > 20 * MIB {
-        Some(ErrorCode::MultipartImageTooLarge)
-    } else if is_final && size < 10 * MIB {
-        Some(ErrorCode::MultipartImageTooSmall)
-    } else {
-        None
-    }
+/// Like the API: image uploads in parts total at most 20 MiB, at any size below that.
+fn image_size_error(kind: &str, size: u64, _is_final: bool) -> Option<ErrorCode> {
+    (kind == "image" && size > 20 * MIB).then_some(ErrorCode::MultipartImageTooLarge)
 }
 /// Like the API: the parts may not overshoot a declared total, and must reach it at the end.
 fn total_size_error(total: Option<u64>, received: u64, is_final: bool) -> Option<ErrorCode> {

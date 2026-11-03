@@ -3,10 +3,7 @@ import { Buffer } from "node:buffer";
 import { readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { PUBLIC_ERROR_CODES } from "../src/contract/PublicErrorCodes.js";
-import {
-  MIN_MULTIPART_IMAGE_UPLOAD_BYTES,
-  MIN_MULTIPART_UPLOAD_PART_BYTES,
-} from "../src/contract/SharedConstants.js";
+import { MIN_MULTIPART_UPLOAD_PART_BYTES } from "../src/contract/SharedConstants.js";
 import { CalmLensError, CalmLensServerClient } from "../src/server";
 import {
   createMockApiKey,
@@ -67,11 +64,11 @@ const expectServedBytesToEqual = async (
 };
 
 /**
- * The fixture's bytes, repeated until they reach the 10 MiB the API requires of a multipart
- * image, split into a 5 MiB first part and the rest.
+ * The fixture's bytes, repeated past the 5 MiB a non-final part needs, split into a 5 MiB first
+ * part and the rest.
  */
 const splitForMockMultipart = (fixture: Uint8Array) => {
-  const copies = Math.ceil(MIN_MULTIPART_IMAGE_UPLOAD_BYTES / fixture.byteLength);
+  const copies = Math.ceil((MIN_MULTIPART_UPLOAD_PART_BYTES + 1) / fixture.byteLength);
   const bytes = new Uint8Array(fixture.byteLength * copies);
   for (let copy = 0; copy < copies; copy++) bytes.set(fixture, copy * fixture.byteLength);
   return {

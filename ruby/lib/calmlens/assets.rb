@@ -15,7 +15,6 @@ module CalmLens
 
     SUBMIT_QUERY_KEYS = %w[name description processingOptions visibility metadata authorId context externalId externalUrl
                            folderId uploadPresetId].freeze
-    MIN_MULTIPART_IMAGE_BYTES = 10 * 1024 * 1024
     MAX_MULTIPART_IMAGE_BYTES = 20 * 1024 * 1024
     # The API's limits for one-request uploads: images up to 10 MiB (larger ones are uploaded in
     # parts), audio and video up to 50 MiB and other files up to 5,000 MiB.
@@ -401,7 +400,7 @@ module CalmLens
       end
 
       final = content.fetch('isFinal', false)
-      check_image_size(total || body.size, total || final) if mime.start_with?('image/') && !@session.defer_upload_checks
+      check_image_size(total || body.size) if mime.start_with?('image/') && !@session.defer_upload_checks
       { 'partNumber' => 1, 'isFinal' => final, 'totalSizeInBytes' => total }
     end
 
@@ -442,7 +441,6 @@ module CalmLens
       mime
     end
 
-    # Multipart images total 10MB to 20MB. With a declared total both bounds apply from the start.
     # Refuses one-request content whose known size is over the API's limit for its type, before
     # any of it is sent.
     def check_direct_size(mime, size)
@@ -458,14 +456,12 @@ module CalmLens
       raise Internal.invalid(message, ErrorCodes::FILE_TOO_LARGE) if size > limit
     end
 
-    def check_image_size(size, complete)
-      if size > MAX_MULTIPART_IMAGE_BYTES
-        raise Internal.invalid('Multipart image uploads cannot exceed 20MB.',
-                               ErrorCodes::MULTIPART_IMAGE_TOO_LARGE)
-      end
-      return unless complete && size < MIN_MULTIPART_IMAGE_BYTES
+    # Images in parts total at most 20 MiB, at any size below that; a declared total is checked
+    # from the start.
+    def check_image_size(size)
+      return unless size > MAX_MULTIPART_IMAGE_BYTES
 
-      raise Internal.invalid('Multipart image uploads must total at least 10MB.', ErrorCodes::MULTIPART_IMAGE_TOO_SMALL)
+      raise Internal.invalid('Multipart image uploads cannot exceed 20MB.', ErrorCodes::MULTIPART_IMAGE_TOO_LARGE)
     end
   end
 end

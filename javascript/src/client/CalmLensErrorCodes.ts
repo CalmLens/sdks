@@ -34,7 +34,6 @@ export const API_ERROR_CODES = {
   API_KEY_NOT_ACCEPTED: "auth/api-key-not-accepted",
   PERMISSION_DENIED: "auth/permission-denied",
   FILE_TOO_LARGE: "upload/file-too-large",
-  MULTIPART_IMAGE_TOO_SMALL: "upload/multipart-image-too-small",
   MULTIPART_IMAGE_TOO_LARGE: "upload/multipart-image-too-large",
   IMAGE_INVALID_INPUT: "image/invalid-input",
   IMAGE_UNSUPPORTED_FORMAT: "image/unsupported-format",
@@ -251,10 +250,6 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "upload/file-too-large": {
     status: 400,
     message: "File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.",
-  },
-  "upload/multipart-image-too-small": {
-    status: 400,
-    message: "Multipart image uploads must total at least 10 MiB.",
   },
   "upload/multipart-image-too-large": {
     status: 400,

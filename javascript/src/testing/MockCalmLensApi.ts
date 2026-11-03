@@ -29,7 +29,6 @@ import {
   getRejectedUploadMimeTypeError,
   isRejectedUploadMimeType,
   MAX_IMAGE_UPLOAD_BYTES,
-  MIN_MULTIPART_IMAGE_UPLOAD_BYTES,
 } from "../contract/SharedConstants.js";
 import { isFileAccepted } from "../ui/UploadController";
 import {
@@ -1673,10 +1672,10 @@ export class MockCalmLensApi {
       const sizeError =
         (part.totalSizeInBytes === undefined
           ? undefined
-          : this.multipartImageSizeError(type, part.totalSizeInBytes, true)) ??
+          : this.multipartImageSizeError(type, part.totalSizeInBytes)) ??
         (part.isFinal
           ? (this.multipartTotalSizeError(part.totalSizeInBytes, partSize, true) ??
-            this.multipartImageSizeError(type, partSize, true))
+            this.multipartImageSizeError(type, partSize))
           : undefined);
       if (sizeError) throw fail(sizeError);
       const validation = validateAssetPayload(
@@ -1798,7 +1797,7 @@ export class MockCalmLensApi {
     const received = (asset.content.sizeInBytes ?? 0) + bytes.byteLength;
     const upload = this.openUploads.get(assetId);
     const sizeError =
-      this.multipartImageSizeError(asset.type, received, isFinal) ??
+      this.multipartImageSizeError(asset.type, received) ??
       this.multipartTotalSizeError(upload?.totalSizeInBytes, received, isFinal);
     if (sizeError) throw fail(sizeError);
     const validation = validateAssetPayload({ uint8Array: bytes }, { multipart: true, isFinal });
@@ -1829,17 +1828,10 @@ export class MockCalmLensApi {
     return stored;
   }
 
-  /** Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB. */
-  private multipartImageSizeError(
-    type: string,
-    sizeInBytes: number,
-    isFinal: boolean,
-  ): ApiErrorCode | undefined {
+  /** Like the API: image uploads in parts total at most 20 MiB, at any size below that. */
+  private multipartImageSizeError(type: string, sizeInBytes: number): ApiErrorCode | undefined {
     if (type !== "image") return undefined;
     if (sizeInBytes > MAX_IMAGE_UPLOAD_BYTES) return API_ERROR_CODES.MULTIPART_IMAGE_TOO_LARGE;
-    if (isFinal && sizeInBytes < MIN_MULTIPART_IMAGE_UPLOAD_BYTES) {
-      return API_ERROR_CODES.MULTIPART_IMAGE_TOO_SMALL;
-    }
     return undefined;
   }
 

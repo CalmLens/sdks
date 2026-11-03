@@ -59,7 +59,6 @@ module CalmLens
       MAX_DECISION_NOTE_LENGTH = 1499
       RESOURCES = %w[original rendered placeholder].freeze
       MIN_PART = 5 * 1024 * 1024
-      MIN_MULTIPART_IMAGE = 10 * 1024 * 1024
       MAX_MULTIPART_IMAGE = 20 * 1024 * 1024
       # The ThumbHash the mock gives every classified image, standing in for one computed from its
       # pixels. The `placeholder` resource serves it as a PNG, like the CDN.
@@ -544,12 +543,9 @@ module CalmLens
         }
       end
 
-      # Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB.
-      def image_size_error(type, size, final)
-        return unless type == 'image'
-        return ErrorCodes::MULTIPART_IMAGE_TOO_LARGE if size > MAX_MULTIPART_IMAGE
-
-        ErrorCodes::MULTIPART_IMAGE_TOO_SMALL if final && size < MIN_MULTIPART_IMAGE
+      # Like the API: image uploads in parts total at most 20 MiB, at any size below that.
+      def image_size_error(type, size, _final)
+        ErrorCodes::MULTIPART_IMAGE_TOO_LARGE if type == 'image' && size > MAX_MULTIPART_IMAGE
       end
 
       # Like the API: the parts may not overshoot a declared total, and must reach it at the end.

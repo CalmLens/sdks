@@ -1020,7 +1020,6 @@ const (
 	maxSearchQuery      = 200
 	maxFolderPageSize   = 100
 	minMultipartPart    = 5 * 1024 * 1024
-	minMultipartImage   = 10 * 1024 * 1024
 	maxMultipartImage   = 20 * 1024 * 1024
 	imageCacheLifetime  = 31536000
 	mockThumbHash       = "1QcSHQRnh493V4dIh4eXh1h4kJUI"
@@ -1366,16 +1365,10 @@ func usedContext(value any) (any, error) {
 	return stored, nil
 }
 
-// imageSizeError is the API's rule for image uploads in parts: at most 20 MiB, and (checked at
-// the last part) at least 10 MiB.
+// imageSizeError is the API's rule for image uploads in parts: at most 20 MiB, at any size below.
 func imageSizeError(kind string, size int64, final bool) error {
-	switch {
-	case kind != calmlens.AssetTypeImage:
-		return nil
-	case size > maxMultipartImage:
+	if kind == calmlens.AssetTypeImage && size > maxMultipartImage {
 		return fail(calmlens.CodeMultipartImageTooLarge)
-	case final && size < minMultipartImage:
-		return fail(calmlens.CodeMultipartImageTooSmall)
 	}
 	return nil
 }

@@ -7,7 +7,7 @@ import type {
 import type { AssetBinaryPayloadInput } from "../src/contract/AssetPayload.js";
 import {
   MAX_IMAGE_UPLOAD_BYTES,
-  MIN_MULTIPART_IMAGE_UPLOAD_BYTES,
+  MIN_MULTIPART_UPLOAD_PART_BYTES,
 } from "../src/contract/SharedConstants.js";
 import { CalmLensServerClient } from "../src/server";
 
@@ -336,16 +336,16 @@ describe("multipart binary field names", () => {
       });
     await client.assets.create({
       name: "multipart-accumulated.png",
-      totalSizeInBytes: MIN_MULTIPART_IMAGE_UPLOAD_BYTES - 1,
+      totalSizeInBytes: 2 * MIN_MULTIPART_UPLOAD_PART_BYTES - 1,
       part: {
         data: oneByteStream(),
         type: "image/png",
         isFinal: false,
-        sizeInBytes: MIN_MULTIPART_IMAGE_UPLOAD_BYTES - 2,
+        sizeInBytes: 2 * MIN_MULTIPART_UPLOAD_PART_BYTES - 2,
       },
     });
     expect(urls[1]!.searchParams.get("totalSizeInBytes")).toBe(
-      String(MIN_MULTIPART_IMAGE_UPLOAD_BYTES - 1),
+      String(2 * MIN_MULTIPART_UPLOAD_PART_BYTES - 1),
     );
     expect(urls[1]!.searchParams.get("queue")).toBe("true");
 

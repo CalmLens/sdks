@@ -91,7 +91,6 @@ final class ClientTest extends TestCase
         yield [['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => 'a', 'sizeInBytes' => 2]], 'upload/invalid-payload'];
         yield [['name' => 'x', 'content' => ['type' => 'text/plain', 'base64' => '!!!']], 'upload/invalid-payload'];
         yield [['name' => 'x', 'part' => ['type' => 'text/plain', 'data' => 'a']], 'upload/invalid-payload'];
-        yield [['name' => 'x', 'part' => ['type' => 'image/png', 'data' => 'a', 'isFinal' => true]], 'upload/multipart-image-too-small'];
         yield [['name' => 'x', 'part' => ['type' => 'image/png', 'data' => 'a', 'isFinal' => true], 'totalSizeInBytes' => 21 * 1024 * 1024], 'upload/multipart-image-too-large'];
         yield [['name' => 'x', 'part' => ['type' => 'text/plain', 'data' => 'a', 'partNumber' => 2, 'isFinal' => true]], 'upload/use-upload-part'];
     }
