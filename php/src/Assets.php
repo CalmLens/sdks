@@ -16,10 +16,10 @@ final class Assets extends Resource
     public const DEFAULT_SIGNED_URL_SECONDS = 900;
     /** Seconds `waitForDecision` polls before `sdk/timeout`; 0 checks once. */
     public const DEFAULT_DECISION_TIMEOUT = 60;
-    /** Seconds before `waitForDecision`'s second check; each later wait is 1.5 times longer, at most 5 seconds. */
+    /** Seconds before `waitForDecision`'s second check; each later wait is 1.5 times longer, at most 2 seconds. */
     public const DECISION_FIRST_INTERVAL = 0.5;
     public const DECISION_INTERVAL_FACTOR = 1.5;
-    public const DECISION_MAX_INTERVAL = 5;
+    public const DECISION_MAX_INTERVAL = 2;
     /** `batch` operation: deletes each asset with its child assets and stored content. */
     public const BATCH_DELETE = 'delete';
     /** `batch` operation: removes each asset's stored content and keeps the record. */
@@ -276,7 +276,7 @@ final class Assets extends Resource
     /**
      * Retrieves an asset until `classification.moderation.status` is no longer `pending`, or its
      * `classification.status` is `failed`, and returns it. Waits 0.5 seconds before the second
-     * check and 1.5 times longer each time, at most 5 seconds. Throws `TimeoutException`
+     * check and 1.5 times longer each time, at most 2 seconds. Throws `TimeoutException`
      * (`sdk/timeout`, with the asset's statuses in `details`) once `timeout` seconds (default 60)
      * pass without a decision; 0 checks once.
      */

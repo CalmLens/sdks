@@ -481,7 +481,7 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 	if len(h.calls) != 4 || fmt.Sprint(h.slept) != "[500ms 750ms 750ms]" {
 		t.Fatal(len(h.calls), h.slept)
 	}
-	// The default timeout is 60s, and waits grow by 1.5 up to 5s.
+	// The default timeout is 60s, and waits grow by 1.5 up to 2s.
 	h.calls, h.slept = nil, nil
 	_, err = c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"})
 	if ErrorCode(err) != CodeSDKTimeout {
@@ -491,7 +491,7 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 	for _, d := range h.slept {
 		total += d
 	}
-	if fmt.Sprint(h.slept[:8]) != "[500ms 750ms 1.125s 1.6875s 2.53125s 3.796875s 5s 5s]" || h.slept[len(h.slept)-1] != 4609375*time.Microsecond || total != 60*time.Second || len(h.calls) != len(h.slept)+1 {
+	if fmt.Sprint(h.slept[:6]) != "[500ms 750ms 1.125s 1.6875s 2s 2s]" || h.slept[len(h.slept)-1] != 1937500*time.Microsecond || total != 60*time.Second || len(h.calls) != len(h.slept)+1 {
 		t.Fatal(h.slept, total, len(h.calls))
 	}
 	h.calls = nil

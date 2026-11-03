@@ -165,7 +165,7 @@ class ServerClientTest < Minitest::Test
                  client.assets.retrieve(asset_id: 'a'))
   end
 
-  def test_wait_for_decision_checks_until_decided_backing_off_up_to_five_seconds
+  def test_wait_for_decision_checks_until_decided_backing_off_up_to_two_seconds
     asset = lambda { |processing, moderation|
       [200,
        '{"id": "asset-1", "upload": {"status": "completed"}, ' \
@@ -178,7 +178,7 @@ class ServerClientTest < Minitest::Test
                    'classification' => { 'status' => 'completed', 'moderation' => { 'status' => 'blocked' } } },
                  client.assets.wait_for_decision(asset_id: 'asset-1'))
     assert_equal(['/v1/assets/asset-1'] * 9, sent.map { |request| URI(request.url).path })
-    assert_equal [0.5, 0.75, 1.125, 1.6875, 2.53125, 3.796875, 5.0, 5.0], delays
+    assert_equal [0.5, 0.75, 1.125, 1.6875, 2.0, 2.0, 2.0, 2.0], delays
   end
 
   def test_asset_pages_are_fetched_only_as_items_are_needed

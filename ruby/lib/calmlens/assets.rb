@@ -22,7 +22,7 @@ module CalmLens
     DECISION_POLL_FIRST_DELAY = 0.5
     # Each wait between decision checks is this many times the one before, up to DECISION_POLL_MAX_DELAY.
     DECISION_POLL_FACTOR = 1.5
-    DECISION_POLL_MAX_DELAY = 5.0
+    DECISION_POLL_MAX_DELAY = 2.0
     DEFAULT_DECISION_TIMEOUT = 60
     # The lifetime of a signed URL when none is given: 15 minutes.
     DEFAULT_SIGNED_URL_SECONDS = 15 * 60
@@ -102,7 +102,7 @@ module CalmLens
     # Waits until an asset's `classification.moderation.status` is no longer `pending` (`allowed`,
     # `limited`, `age-restricted`, `blocked` or `purged`), or its `classification.status` is `failed`, and returns
     # the asset. It retrieves the asset, waiting 0.5 seconds before the second check and 1.5 times
-    # longer each time after that, up to 5 seconds.
+    # longer each time after that, up to 2 seconds.
     # Webhooks report decisions without polling.
     #
     # `timeout:` is the whole wait in seconds; `request_options: {timeout:}` still limits each request.

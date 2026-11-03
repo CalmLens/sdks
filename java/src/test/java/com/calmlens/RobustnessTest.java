@@ -262,7 +262,7 @@ class RobustnessTest {
       assertEquals("/v1/assets/asset", request.uri().getPath());
     }
     assertEquals(List.of(Duration.ofMillis(500), Duration.ofMillis(750), Duration.ofMillis(1125), Duration.ofNanos(1_687_500_000),
-        Duration.ofNanos(2_531_250_000L), Duration.ofNanos(3_796_875_000L), Duration.ofSeconds(5), Duration.ofSeconds(5)), transport.delays);
+        Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2), Duration.ofSeconds(2)), transport.delays);
   }
 
   @Test void waitForDecisionStopsWhenTheThreadIsInterrupted() {

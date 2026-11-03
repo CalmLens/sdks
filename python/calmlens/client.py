@@ -1049,7 +1049,7 @@ class UploadTokens:
 #: ``DECISION_POLL_DELAY_FACTOR`` times longer each time, up to ``DECISION_POLL_MAX_DELAY``.
 DECISION_POLL_FIRST_DELAY = 0.5
 DECISION_POLL_DELAY_FACTOR = 1.5
-DECISION_POLL_MAX_DELAY = 5.0
+DECISION_POLL_MAX_DELAY = 2.0
 #: Seconds ``wait_for_decision`` polls before ``sdk/timeout`` when ``timeout`` is omitted.
 DEFAULT_DECISION_TIMEOUT = 60.0
 #: ``assets.create_signed_url``'s lifetime when ``expires_in_seconds`` is omitted.
@@ -1114,7 +1114,7 @@ class Assets:
         (``allowed``, ``limited``, ``age-restricted``, ``blocked`` or ``purged``), or ``classification.status`` is
         ``failed``, and return that asset.
 
-        Checks again after 0.5 seconds, then waits 1.5 times longer each time, up to 5
+        Checks again after 0.5 seconds, then waits 1.5 times longer each time, up to 2
         seconds between checks. Raises :class:`CalmLensError` with ``sdk/timeout`` and
         ``details`` ``{"assetId", "classificationStatus", "moderationStatus"}`` (the last statuses
         seen) when there is no decision within ``timeout`` seconds (default 60). Webhooks

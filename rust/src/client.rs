@@ -42,7 +42,7 @@ pub const DECISION_POLL_FIRST_INTERVAL: Duration = Duration::from_millis(500);
 /// How much longer each wait between decision checks is than the one before.
 pub const DECISION_POLL_INTERVAL_FACTOR: f64 = 1.5;
 /// The longest wait between decision checks.
-pub const DECISION_POLL_MAX_INTERVAL: Duration = Duration::from_secs(5);
+pub const DECISION_POLL_MAX_INTERVAL: Duration = Duration::from_secs(2);
 
 /// Configures a [`ServerClient`]. Create it with [`ServerClient::builder`].
 ///
@@ -953,7 +953,7 @@ impl AssetsClient<'_> {
     }
     /// Retrieves the asset until it is decided ([`Asset::is_decided`]: moderation status no
     /// longer `pending`, or classification status `failed`) and returns it. It checks again
-    /// after 0.5 seconds, waiting 1.5 times longer each time up to 5 seconds, and fails with
+    /// after 0.5 seconds, waiting 1.5 times longer each time up to 2 seconds, and fails with
     /// `sdk/timeout` and details `{assetId, classificationStatus, moderationStatus}` when
     /// `options.timeout` (60 seconds by default) passes without a decision. Drop the future to
     /// stop waiting. Webhooks report decisions without polling.

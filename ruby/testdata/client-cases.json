@@ -7822,6 +7822,377 @@
       ]
     },
     {
+      "name": "waitForDecision waits at most waitForDecisionMaxIntervalMs between checks",
+      "area": "wait-for-decision",
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "processing",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "processing",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-2",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "processing",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-3",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "processing",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-4",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "processing",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-5",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "processing",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-6",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-7",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.waitForDecision",
+          "args": {
+            "assetId": "asset-1",
+            "timeoutMs": 60000
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored"
+              },
+              "upload": {
+                "status": "completed"
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
+                }
+              }
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ],
+      "sleepsMs": [
+        500,
+        750,
+        1125,
+        [
+          1687,
+          1688
+        ],
+        2000,
+        2000
+      ]
+    },
+    {
       "name": "waitForDecision with timeoutMs 0 checks once and times out with the asset's state",
       "area": "wait-for-decision",
       "responses": [

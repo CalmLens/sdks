@@ -274,7 +274,7 @@ class ClientTests(ClientTestCase):
 
 
 class WaitForDecisionTests(ClientTestCase):
-    def test_backs_off_to_five_seconds_and_times_out_at_the_deadline(self):
+    def test_backs_off_to_two_seconds_and_times_out_at_the_deadline(self):
         self.client._clock = lambda: sum(self.sleeps)
         self.result = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'status': 'pending'}}}
         with self.assertRaises(CalmLensError) as raised:
@@ -282,8 +282,8 @@ class WaitForDecisionTests(ClientTestCase):
         self.assertEqual(raised.exception.code, error_codes.SDK_TIMEOUT)
         self.assertEqual(raised.exception.details,
                          {"assetId": "asset-1", "classificationStatus": "processing", "moderationStatus": "pending"})
-        self.assertEqual(self.sleeps, [0.5, 0.75, 1.125, 1.6875, 2.53125, 3.796875, 5.0, 4.609375])
-        self.assertEqual(len(self.calls), 9)
+        self.assertEqual(self.sleeps, [0.5, 0.75, 1.125, 1.6875] + [2.0] * 7 + [1.9375])
+        self.assertEqual(len(self.calls), 13)
 
     def test_invalid_arguments_are_rejected_before_sending(self):
         for options in ({}, {"assetId": "a", "timeout": -1}, {"assetId": "a", "timeout": float("nan")},

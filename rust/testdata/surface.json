@@ -1995,7 +1995,8 @@
       "unit": "milliseconds",
       "description": "The wait before waitForDecision's second check. Each later wait is 1.5 times longer, at most waitForDecisionMaxIntervalMs, and never past the deadline.",
       "observedBy": [
-        "waitForDecision polls at growing intervals until a decision"
+        "waitForDecision polls at growing intervals until a decision",
+        "waitForDecision waits at most waitForDecisionMaxIntervalMs between checks"
       ]
     },
     {
@@ -2003,15 +2004,18 @@
       "value": 1.5,
       "description": "How much longer each waitForDecision wait is than the one before.",
       "observedBy": [
-        "waitForDecision polls at growing intervals until a decision"
+        "waitForDecision polls at growing intervals until a decision",
+        "waitForDecision waits at most waitForDecisionMaxIntervalMs between checks"
       ]
     },
     {
       "id": "waitForDecisionMaxIntervalMs",
-      "value": 5000,
+      "value": 2000,
       "unit": "milliseconds",
       "description": "The longest wait between waitForDecision checks.",
-      "observedBy": []
+      "observedBy": [
+        "waitForDecision waits at most waitForDecisionMaxIntervalMs between checks"
+      ]
     },
     {
       "id": "ensureLensesBatchSize",

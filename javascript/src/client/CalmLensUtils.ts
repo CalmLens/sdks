@@ -385,12 +385,12 @@ export const isAssetDecided = (asset: Pick<Asset, "classification">): boolean =>
 
 export const DECISION_POLL_FIRST_DELAY_MS = 500;
 export const DECISION_POLL_DELAY_FACTOR = 1.5;
-export const DECISION_POLL_MAX_DELAY_MS = 5_000;
+export const DECISION_POLL_MAX_DELAY_MS = 2_000;
 export const DEFAULT_DECISION_TIMEOUT_MS = 60_000;
 
 /**
  * Retrieves an asset until it has a decision, waiting 0.5s between checks and 1.5 times longer
- * each time, up to 5s. Rejects with `sdk/timeout` once `timeoutMs` passes without one.
+ * each time, up to 2s. Rejects with `sdk/timeout` once `timeoutMs` passes without one.
  */
 export const pollForDecision = async (
   retrieve: () => Promise<Asset>,

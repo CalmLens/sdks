@@ -549,8 +549,8 @@ async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
         requests,
         vec![("GET".to_string(), "/assets/asset-1".to_string()); 8]
     );
-    // 0.5s, then 1.5 times longer each time (0.75, 1.125, 1.6875, 2.53125, 3.796875), capped at 5s.
-    assert_eq!(waited, std::time::Duration::from_secs_f64(15.390625));
+    // 0.5s, then 1.5 times longer each time (0.75, 1.125, 1.6875), capped at 2s (2, 2, 2).
+    assert_eq!(waited, std::time::Duration::from_secs_f64(10.0625));
 }
 
 #[tokio::test]

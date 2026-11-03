@@ -107,13 +107,13 @@ const DefaultDecisionTimeout = 60 * time.Second
 const (
 	decisionPollFirstDelay = 500 * time.Millisecond
 	decisionPollFactor     = 1.5
-	decisionPollMaxDelay   = 5 * time.Second
+	decisionPollMaxDelay   = 2 * time.Second
 )
 
 // WaitForDecision retrieves an asset until it has a moderation decision (Moderation.Status is no
 // longer ModerationStatusPending) or its processing failed
 // (Processing.Status ClassificationStatusFailed), and returns that asset. It waits 0.5s before the
-// second check and 1.5 times longer each time after that, up to 5s. A zero Timeout checks once.
+// second check and 1.5 times longer each time after that, up to 2s. A zero Timeout checks once.
 // When Timeout (default DefaultDecisionTimeout) passes without a decision it returns a *Error with code
 // sdk/timeout and Details {"assetId", "classificationStatus", "moderationStatus"} holding the last
 // statuses seen. Cancelling ctx
