@@ -10,7 +10,9 @@ and changelogs, then merge it. No publishing happens from that PR branch.
 The private application checks merged release plans every 15 minutes (or run its
 Release SDKs workflow manually). It updates its submodule pin, creates immutable
 release tags and dispatches the existing protected registry workflows. Go is tagged
-and validated in this public repo. A failed publish remains visible in Actions;
+and validated in this public repo, and so is the `calmlens` CLI: a release of `@calmlens/sdk`
+tags `cli-v<version>` here and publishes its standalone executables and Homebrew formula
+(release-cli.yml). npm receives the same JavaScript build as `@calmlens/sdk` and `calmlens`. A failed publish remains visible in Actions;
 correct code with a new changeset/version rather than moving a published tag.
 
 Do not hand-edit the proxy package.json versions or release.json. The version command

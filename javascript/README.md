@@ -972,13 +972,20 @@ app.post("/api/webhooks/calmlens", express.raw({ type: "application/json" }), as
 
 ## Command-line tool
 
-Install the standalone [CalmLens CLI](https://calmlens.com/docs/guides/local-development) through Homebrew, a platform download or npm. Webhook connectors must use public HTTPS URLs, so during development use it to forward events to a local handler instead. Each event is sent with the same body, headers and signature as a real delivery:
+This package includes the `calmlens` [CLI](https://calmlens.com/docs/guides/local-development). It is also published on npm as `calmlens`, the same package under an unscoped name, so you can run it without adding a dependency:
 
 ```bash
 npx calmlens listen --forward-to http://localhost:3000/api/webhooks/calmlens --env-file .env.local
 ```
 
-The CLI reads `CALMLENS_API_KEY`, `CALMLENS_PROJECT_ID` and `CALMLENS_WEBHOOK_SECRET` from the environment or `--env-file`; without a secret it prints a generated one for your app. `npx calmlens trigger [harassment|hate|criminal-activity|clean]` moderates a harmless test input so events appear (one upload each). Run `npx calmlens --help` for all options. To install the command globally, use `npm install -g calmlens`. The CLI is released separately from the SDK.
+Install it globally with `npm install -g calmlens`. In a project that depends on `@calmlens/sdk`, `npx calmlens` runs the installed version. Standalone executables for macOS, Linux and Windows, which need no Node.js, are attached to the [CLI releases](https://github.com/CalmLens/sdks/releases?q=cli-v&expanded=true) with a `SHA256SUMS` file, and Homebrew installs them:
+
+```bash
+brew tap calmlens/sdks https://github.com/CalmLens/sdks
+brew install calmlens/sdks/calmlens
+```
+
+Webhook connectors must use public HTTPS URLs, so during development use `listen` to forward events to a local handler instead. Each event is sent with the same body, headers and signature as a real delivery. The CLI reads `CALMLENS_API_KEY`, `CALMLENS_PROJECT_ID` and `CALMLENS_WEBHOOK_SECRET` from the environment or `--env-file`, or uses the key from `calmlens login`; without a secret it prints a generated one for your app. `npx calmlens trigger [harassment|hate|criminal-activity|clean]` moderates a harmless test input so events appear (one upload each). Run `npx calmlens --help` for all options. The CLI's version is the SDK's version.
 
 The same feed is available in code with [`events.list`](#events-feed).
 
@@ -1030,6 +1037,8 @@ Requests send `User-Agent: calmlens-js/<version> (<runtime>/<version>)` from ser
 ## Releasing
 
 Stable releases are published automatically from `main` when packed SDK contents differ from npm `latest` and an SDK Changeset is present. Contributors must run `bun run changeset` to choose the release type and write release notes. CI updates and commits this package's `CHANGELOG.md` automatically. See the repository's [.changeset release guide](../../.changeset/README.md).
+
+Each release is published to npm twice from one build, as `@calmlens/sdk` and as `calmlens`. The CLI's standalone executables and Homebrew formula are released in this repository under `cli-v<version>` by `.github/workflows/release-cli.yml`. `bun run build:cli` builds the npm entry, `bin/calmlens.js` (the package build includes it), and `bun run build:cli:binary` builds a standalone executable in `dist/`; set `CALMLENS_BUILD_TARGET`, such as `bun-linux-x64`, to cross-compile it.
 
 ### Test-input images
 

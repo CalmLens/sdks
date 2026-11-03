@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - run: node scripts/release-go.mjs
+      - run: node scripts/release-tag.mjs go go/v release-go-sdk.yml
         env:
           GH_TOKEN: ${{ github.token }}
   publish:

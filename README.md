@@ -76,7 +76,11 @@ Registry publishing runs in the private application repository with its existing
 publishers and protected environments. Its Release SDKs workflow checks tested public
 release plans every 15 minutes (or on manual dispatch), advances the submodule pin,
 creates immutable release tags and dispatches the existing publishing jobs. Go tags and
-proxy validation run here. Check both repositories' Actions for completion.
+proxy validation run here, as do the `calmlens` CLI's standalone executables: a merged plan
+tags `cli-v<version>` for the JavaScript SDK version, attaches the executables to that GitHub
+release and updates the Homebrew formula in `Formula/`. The JavaScript SDK is published to npm
+as `@calmlens/sdk` and, from the same build, as `calmlens`. Check both repositories' Actions for
+completion.
 
 See [.changeset/README.md](.changeset/README.md) for package identifiers and retry guidance.
 The small native `package.json` files are version records for Changesets, not npm packages.

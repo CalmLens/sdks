@@ -1,0 +1,1 @@
+export declare const CLASSIFICATION_CATEGORIES: readonly ["sexual", "violence", "self-harm", "harassment", "hate", "criminal-activity", "personal-information", "profanity"];

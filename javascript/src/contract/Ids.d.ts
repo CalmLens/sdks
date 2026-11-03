@@ -39,4 +39,6 @@ type Id<P extends IdPrefix = IdPrefix> = `${P}_${string}`;
 export declare const newId: <P extends IdPrefix>(prefix: P) => Id<P>;
 /** Whether `value` is an ID with `prefix` (or with any registered prefix). */
 export declare const isId: <P extends IdPrefix = IdPrefix>(value: unknown, prefix?: P) => value is Id<P>;
+/** Example IDs for docs, OpenAPI and SDK fixtures: fixed, so generated output stays stable. */
+export declare const EXAMPLE_IDS: { [P in IdPrefix]: Id<P>; };
 export type { IdPrefix };

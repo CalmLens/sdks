@@ -1,0 +1,150 @@
+name: Release CLI
+
+# The `calmlens` CLI ships inside the JavaScript SDK package (javascript/src/cli), so npm users get
+# it with `@calmlens/sdk` or its `calmlens` mirror. This workflow publishes the same version as
+# standalone executables: a `cli-v<version>` GitHub release in this repository, with SHA256SUMS,
+# and Formula/calmlens.rb on main, which makes this repository a Homebrew tap.
+#
+# A merged release plan that includes the JavaScript SDK tags `cli-v<version>` and dispatches this
+# workflow on that tag. A manual run on a branch only validates the builds.
+on:
+  push:
+    branches: [main]
+    paths: [".changeset/release.json"]
+  workflow_dispatch: {}
+
+concurrency:
+  group: calmlens-cli-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node scripts/release-tag.mjs javascript cli-v release-cli.yml
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build:
+    if: github.event_name == 'workflow_dispatch'
+    # Every platform's executable is cross-compiled on Linux; the linux-x64 one is also run.
+    strategy:
+      matrix:
+        include:
+          - target: bun-darwin-arm64
+            platform: darwin-arm64
+          - target: bun-darwin-x64
+            platform: darwin-x64
+          - target: bun-linux-x64
+            platform: linux-x64
+          - target: bun-linux-arm64
+            platform: linux-arm64
+          - target: bun-windows-x64
+            platform: windows-x64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Check the tag matches the SDK version
+        run: |
+          VERSION=$(node -p 'require("./javascript/package.json").version')
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "cli-v$VERSION" ]]; then
+            echo "Release tag must be cli-v$VERSION, the version in javascript/package.json" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - run: bun test ./tests/cli/
+        working-directory: javascript
+      - run: bun run --cwd javascript build:cli:binary
+        env:
+          CALMLENS_BUILD_TARGET: ${{ matrix.target }}
+      - name: Smoke test and archive
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          BINARY=javascript/dist/calmlens
+          if [[ "$PLATFORM" == windows-* ]]; then BINARY="$BINARY.exe"; fi
+          if [[ "$PLATFORM" == linux-x64 ]]; then
+            test "$("$BINARY" --version)" = "$VERSION"
+            "$BINARY" --help
+          fi
+          mkdir -p artifacts
+          if [[ "$PLATFORM" == windows-* ]]; then
+            (cd javascript/dist && zip -q "$OLDPWD/artifacts/calmlens-$VERSION-$PLATFORM.zip" calmlens.exe)
+          else
+            tar -czf "artifacts/calmlens-$VERSION-$PLATFORM.tar.gz" -C javascript/dist calmlens
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.platform }}
+          path: artifacts/*
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/cli-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          merge-multiple: true
+          path: artifacts
+      - name: Checksums, Homebrew formula and release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#cli-v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          (cd artifacts && sha256sum *.tar.gz *.zip > SHA256SUMS)
+          bun javascript/scripts/homebrew.ts artifacts
+          # The JavaScript SDK changelog's section for this version, without its heading.
+          awk -v heading="## $VERSION" '$0 == heading { found = 1; next } found && /^## / { exit } found' \
+            javascript/CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          test -s "$RUNNER_TEMP/notes.md"
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "CalmLens CLI $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+          gh release upload "$GITHUB_REF_NAME" artifacts/*.tar.gz artifacts/*.zip artifacts/SHA256SUMS --clobber
+      - name: Update the Homebrew formula on main
+        run: |
+          cp artifacts/calmlens.rb "$RUNNER_TEMP/calmlens.rb"
+          git checkout main
+          git pull --ff-only origin main
+          mkdir -p Formula
+          cp "$RUNNER_TEMP/calmlens.rb" Formula/calmlens.rb
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Formula/calmlens.rb
+          if ! git diff --cached --quiet; then
+            git commit -m "Update the Homebrew formula for CalmLens CLI $VERSION"
+            git push origin HEAD:main
+          fi

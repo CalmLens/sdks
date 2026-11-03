@@ -8,17 +8,6 @@ import * as z from "zod";
 * emails and logs keep English. Only a string literal argument is extracted.
 */
 const msg = (text) => text;
-// packages/shared/src/ModerationCategories.ts
-const CLASSIFICATION_CATEGORIES = [
-	"sexual",
-	"violence",
-	"self-harm",
-	"harassment",
-	"hate",
-	"criminal-activity",
-	"personal-information",
-	"profanity"
-];
 // packages/shared/src/ModerationPolicyDimensions.ts
 const MODERATION_QUALIFIER_INFO = {
 	"sexual-pornographic-media": {
@@ -1019,4 +1008,4 @@ const TEST_REGIONAL_ACTIONS_SCHEMA = z.array(z.object({
 		"block"
 	])
 }).strict()).max(7).refine((entries) => new Set(entries.map((entry) => entry.region)).size === entries.length, "Choose each region once");
-export { msg as a, CLASSIFICATION_CATEGORIES as i, MODERATION_QUALIFIERS as n, getModerationQualifierInfo as r, TEST_REGIONAL_ACTIONS_SCHEMA as t };
+export { msg as i, MODERATION_QUALIFIERS as n, getModerationQualifierInfo as r, TEST_REGIONAL_ACTIONS_SCHEMA as t };

@@ -1,6 +1,6 @@
+import { t as CLASSIFICATION_CATEGORIES } from "./ModerationCategories-CHFRoeWV.js";
 import "./CryptoUtils-B_x8lMIx.js";
-import { i as CLASSIFICATION_CATEGORIES } from "./TestRegionalActions-DfPCKG4S.js";
-import { s as getTestInputTag } from "./TestTriggers-DcArt0Nu.js";
+import { s as getTestInputTag } from "./TestTriggers-DTc_iMJF.js";
 // packages/shared/src/MediaTestTriggers.ts
 const MEDIA_TEST_SIGNALS = [...CLASSIFICATION_CATEGORIES, "violence.graphic"];
 const HEX_WORDS = [
