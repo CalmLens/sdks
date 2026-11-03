@@ -1472,9 +1472,7 @@ impl CdnClient<'_> {
             ));
         }
         if resource == "placeholder" && transformed {
-            return Err(invalid_argument(
-                "A placeholder takes no lens or transform",
-            ));
+            return Err(invalid_argument("A placeholder takes no lens or transform"));
         }
         let config = &self.0.inner.config;
         let mut url = format!(
