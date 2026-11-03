@@ -1,5 +1,11 @@
 # @calmlens/sdk-java
 
+## 0.18.1
+
+### Patch Changes
+
+- 34a8932: CDN URLs write viewer claims as `region` then `ageConfirmed`, whatever order you pass them in, so every SDK builds the same URL for the same claims. A placeholder's error message now says only what it rejects: a lens or a transform.
+
 ## 0.18.0
 
 No changes in this release.
