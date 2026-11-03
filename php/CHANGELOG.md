@@ -1,5 +1,11 @@
 # @calmlens/sdk-php
 
+## 0.18.2
+
+### Patch Changes
+
+- 7065c15: The PHP SDK is available from Packagist: install it with `composer require calmlens/sdk`.
+
 ## 0.18.1
 
 ### Patch Changes
