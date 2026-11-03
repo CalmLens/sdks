@@ -23,6 +23,15 @@ import type { PUBLIC_LENS_SCHEMA } from "../contract/Lens.js";
 import type { ModerationContext } from "../contract/ModerationContext.js";
 import type { CursorPage } from "../contract/Page.js";
 import type {
+  GetPoliciesResponse,
+  PatchPolicyBody,
+  Policy,
+  PostPolicyBody,
+  PostPolicyPresetBody,
+  PutPolicyAutomaticUpdatesBody,
+  PutProjectPolicyBody,
+} from "../contract/Policy.js";
+import type {
   AssetBatchOperation,
   GetAssetChildrenQuery,
   GetAssetsPageQuery,
@@ -526,6 +535,19 @@ export type AddHashListEntryOptions = PostHashListEntryBody & HashListIdOptions;
 export interface HashListEntryIdOptions {
   entryId: string;
 }
+export type { Policy };
+/** `policies.list`: every policy of the project's organisation, and the one the project uses. */
+export type PolicyList = GetPoliciesResponse;
+/** Send `settings` and a `name`, or `presetId` to copy the latest release of a built-in preset. */
+export type CreatePolicyOptions = PostPolicyBody;
+export interface PolicyIdOptions {
+  policyId: string;
+}
+/** Send the policy's current `revision`; a policy changed since is refused. */
+export type UpdatePolicyOptions = PatchPolicyBody & PolicyIdOptions;
+export type ApplyPolicyPresetOptions = PostPolicyPresetBody & PolicyIdOptions;
+export type SetPolicyAutomaticUpdatesOptions = PutPolicyAutomaticUpdatesBody & PolicyIdOptions;
+export type AssignPolicyOptions = PutProjectPolicyBody;
 
 export interface MoveAssetOptions {
   assetId: string;

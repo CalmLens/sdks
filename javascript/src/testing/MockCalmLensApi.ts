@@ -11,6 +11,8 @@ import type {
   HashListEntry,
   HashListEntryPage,
   Lens,
+  Policy,
+  PolicyList,
 } from "../client/CalmLensTypes";
 import { validateAssetPayload } from "../contract/AssetPayload.js";
 import type { TypedEvent } from "../contract/Event.js";
@@ -99,6 +101,14 @@ export type MockCalmLensOperation =
   | "hashLists.listEntries"
   | "hashLists.addEntry"
   | "hashLists.removeEntry"
+  | "policies.list"
+  | "policies.retrieve"
+  | "policies.create"
+  | "policies.update"
+  | "policies.applyPreset"
+  | "policies.setAutomaticUpdates"
+  | "policies.delete"
+  | "policies.assign"
   | "ensureLens"
   | "ensureLenses";
 
@@ -311,6 +321,21 @@ interface MockRequest {
 /** What a handler answers: the success status and the JSON body. */
 type Answer = [status: number, body: unknown];
 
+/** The built-in presets the mock knows, by display name. */
+const MOCK_PRESET_NAMES = {
+  "general-community": "General",
+  "children-platform": "Kids",
+  "education-support": "Learning and support",
+  "wholesome-community": "Teen-safe",
+} as const;
+type MockPresetId = keyof typeof MOCK_PRESET_NAMES;
+
+/** A stored policy: the API's shape without its derived fields, plus its reset baseline. */
+interface MockPolicy extends Omit<Policy, "preset" | "projectIds"> {
+  preset: { id: MockPresetId; version: number; projectId: string | null } | null;
+  baseline: Policy["settings"];
+}
+
 /** The client methods that send a request, the one it is recorded under first. */
 const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
   const { method, segments, query, cdn } = request;
@@ -327,6 +352,10 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
         return method === "GET" ? ["folders.list"] : ["folders.create"];
       case "hash-lists":
         return method === "GET" ? ["hashLists.list"] : ["hashLists.create"];
+      case "policies":
+        return method === "GET" ? ["policies.list"] : ["policies.create"];
+      case "policy":
+        return ["policies.assign"];
       case "assets/search":
         return ["assets.search"];
       case "assets/batch":
@@ -335,6 +364,15 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
         if (method === "GET") return ["assets.list", "assets.iterate"];
         if (query.get("queue") === "true") return ["assets.create"];
         return isTextUpload(request) ? ["assets.classify", "text.classify"] : ["assets.classify"];
+    }
+    if (segments[2] === "policies" && segments[3] !== undefined) {
+      if (segments[4] === "preset") return ["policies.applyPreset"];
+      if (segments[4] === "automatic-updates") return ["policies.setAutomaticUpdates"];
+      return method === "GET"
+        ? ["policies.retrieve"]
+        : method === "PATCH"
+          ? ["policies.update"]
+          : ["policies.delete"];
     }
     return [];
   }
@@ -402,6 +440,7 @@ const isTextUpload = (request: MockRequest) =>
 const SUCCESS_STATUS: Partial<Record<MockCalmLensOperation, number>> = {
   "folders.create": 201,
   "hashLists.create": 201,
+  "policies.create": 201,
   "assets.batch": 202,
 };
 
@@ -899,6 +938,27 @@ export class MockCalmLensApi {
           return [201, this.createHashList(this.json(request))];
         case "PUT lenses":
           return [200, this.ensureLenses(this.json(request))];
+        case "GET policies":
+          return [200, this.listPolicies()];
+        case "POST policies":
+          return [201, this.createPolicy(this.json(request))];
+        case "PUT policy":
+          return [200, this.assignPolicy(this.json(request))];
+      }
+      const [, , collection, policyId, policyAction, ...more] = segments;
+      if (collection === "policies" && policyId !== undefined && more.length === 0) {
+        switch (`${method} ${policyAction ?? ""}`) {
+          case "GET ":
+            return [200, this.toPolicy(this.findPolicy(policyId))];
+          case "PATCH ":
+            return [200, this.updatePolicy(policyId, this.json(request))];
+          case "DELETE ":
+            return [200, this.deletePolicy(policyId)];
+          case "POST preset":
+            return [200, this.applyPolicyPreset(policyId, this.json(request))];
+          case "PUT automatic-updates":
+            return [200, this.setPolicyAutomaticUpdates(policyId, this.json(request))];
+        }
       }
     }
     if (root === "upload-presets" && id !== undefined && action === "assets") {
@@ -963,6 +1023,166 @@ export class MockCalmLensApi {
     throw fail(API_ERROR_CODES.ROUTE_NOT_FOUND, {
       message: `No route for ${method} /${segments.join("/")}`,
     });
+  }
+
+  // ---- Policies ----------------------------------------------------------------------------
+  // The project starts on its General preset policy, following automatic updates. The mock holds
+  // no built-in preset settings: a preset's settings are `{ categorySettings: {} }` at version 1,
+  // and uploads are never decided by a policy.
+
+  private readonly policies = new Map<string, MockPolicy>();
+  private projectPolicyId: string | undefined;
+
+  private ensurePolicies() {
+    if (this.projectPolicyId) return;
+    const now = this.now();
+    const general = this.newPolicy({
+      name: MOCK_PRESET_NAMES["general-community"],
+      settings: { categorySettings: {} },
+      automaticUpdates: true,
+      preset: { id: "general-community", version: 1, projectId: this.projectId },
+      createdAt: now,
+    });
+    this.projectPolicyId = general.id;
+  }
+
+  private newPolicy(values: {
+    name: string;
+    description?: string;
+    settings: Policy["settings"];
+    automaticUpdates?: boolean;
+    preset?: { id: MockPresetId; version: number; projectId: string | null };
+    createdAt: number;
+  }): MockPolicy {
+    const policy: MockPolicy = {
+      id: this.createId("pol"),
+      name: values.name,
+      description: values.description ?? "",
+      settings: values.settings,
+      revision: 1,
+      automaticUpdates: values.automaticUpdates ?? false,
+      preset: values.preset ?? null,
+      baseline: structuredClone(values.settings),
+      createdAt: values.createdAt,
+      updatedAt: values.createdAt,
+    };
+    this.policies.set(policy.id, policy);
+    return policy;
+  }
+
+  private toPolicy(policy: MockPolicy): Policy {
+    const { baseline: _baseline, preset, ...rest } = policy;
+    return {
+      ...structuredClone(rest),
+      preset: preset && { ...preset, latestVersion: 1 },
+      projectIds: policy.id === this.projectPolicyId ? [this.projectId] : [],
+    };
+  }
+
+  private findPolicy(policyId: string): MockPolicy {
+    this.ensurePolicies();
+    const policy = this.policies.get(policyId);
+    if (!policy) throw fail(API_ERROR_CODES.POLICY_NOT_FOUND);
+    return policy;
+  }
+
+  private listPolicies(): PolicyList {
+    this.ensurePolicies();
+    return {
+      policies: [...this.policies.values()].map((policy) => this.toPolicy(policy)),
+      projectPolicyId: this.projectPolicyId!,
+    };
+  }
+
+  private createPolicy(body: Record<string, unknown>): Policy {
+    this.ensurePolicies();
+    const { name, description, settings, presetId } = body;
+    const preset = typeof presetId === "string" ? (presetId as MockPresetId) : undefined;
+    if (
+      (settings === undefined) === (preset === undefined) ||
+      (preset !== undefined && !(preset in MOCK_PRESET_NAMES)) ||
+      (preset === undefined && (typeof name !== "string" || !name.trim()))
+    ) {
+      throw fail(API_ERROR_CODES.INVALID_VALUE, {
+        message: "Send settings with a name, or presetId",
+      });
+    }
+    const policy = this.newPolicy({
+      name: typeof name === "string" && name.trim() ? name.trim() : MOCK_PRESET_NAMES[preset!],
+      ...(typeof description === "string" ? { description } : {}),
+      settings: preset ? { categorySettings: {} } : (settings as Policy["settings"]),
+      ...(preset ? { preset: { id: preset, version: 1, projectId: null } } : {}),
+      createdAt: this.now(),
+    });
+    return this.toPolicy(policy);
+  }
+
+  /** Saves new values under the next revision, once `revision` is the current one. */
+  private savePolicy(policy: MockPolicy, revision: unknown, values: Partial<MockPolicy>) {
+    if (revision !== policy.revision) throw fail(API_ERROR_CODES.POLICY_REVISION_CONFLICT);
+    const saved: MockPolicy = {
+      ...policy,
+      ...values,
+      revision: policy.revision + 1,
+      updatedAt: this.now(),
+    };
+    this.policies.set(policy.id, saved);
+    return this.toPolicy(saved);
+  }
+
+  private updatePolicy(policyId: string, body: Record<string, unknown>): Policy {
+    const policy = this.findPolicy(policyId);
+    return this.savePolicy(policy, body.revision, {
+      ...(typeof body.name === "string" ? { name: body.name.trim() } : {}),
+      ...(typeof body.description === "string" ? { description: body.description } : {}),
+      ...(body.settings !== undefined ? { settings: body.settings as Policy["settings"] } : {}),
+      // Saving a policy that follows its preset pins it as a copy.
+      automaticUpdates: false,
+    });
+  }
+
+  private applyPolicyPreset(policyId: string, body: Record<string, unknown>): Policy {
+    const policy = this.findPolicy(policyId);
+    if (!policy.preset || policy.automaticUpdates) throw fail(API_ERROR_CODES.POLICY_NO_PRESET);
+    if (body.presetVersion !== policy.preset.version) {
+      throw fail(API_ERROR_CODES.POLICY_PRESET_VERSION_CONFLICT);
+    }
+    // The mock's presets have one release, so an update never has a newer one to apply.
+    if (body.operation === "update") throw fail(API_ERROR_CODES.POLICY_PRESET_UPDATE_UNAVAILABLE);
+    return this.savePolicy(policy, body.revision, { settings: structuredClone(policy.baseline) });
+  }
+
+  private setPolicyAutomaticUpdates(policyId: string, body: Record<string, unknown>): Policy {
+    const policy = this.findPolicy(policyId);
+    const enabled = body.enabled === true;
+    if (policy.preset?.projectId !== this.projectId || policy.automaticUpdates === enabled) {
+      throw fail(API_ERROR_CODES.POLICY_AUTOMATIC_UPDATES_UNAVAILABLE);
+    }
+    if (body.revision !== policy.revision) throw fail(API_ERROR_CODES.POLICY_REVISION_CONFLICT);
+    if (body.presetVersion !== 1) throw fail(API_ERROR_CODES.POLICY_PRESET_VERSION_CONFLICT);
+    return this.savePolicy(policy, body.revision, {
+      automaticUpdates: enabled,
+      ...(enabled
+        ? {
+            name: MOCK_PRESET_NAMES[policy.preset.id],
+            description: "",
+            settings: structuredClone(policy.baseline),
+          }
+        : {}),
+    });
+  }
+
+  private deletePolicy(policyId: string): Record<string, never> {
+    const policy = this.findPolicy(policyId);
+    if (policy.id === this.projectPolicyId) throw fail(API_ERROR_CODES.POLICY_IN_USE);
+    this.policies.delete(policy.id);
+    return {};
+  }
+
+  private assignPolicy(body: Record<string, unknown>): Policy {
+    const policy = this.findPolicy(String(body.policyId));
+    this.projectPolicyId = policy.id;
+    return this.toPolicy(policy);
   }
 
   // ---- Hash lists --------------------------------------------------------------------------

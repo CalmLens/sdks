@@ -77,6 +77,15 @@ export const API_ERROR_CODES = {
   HASH_LIST_LIMIT_REACHED: "hash-list/limit-reached",
   HASH_LIST_ENTRY_LIMIT_REACHED: "hash-list/entry-limit-reached",
   HASH_LIST_ASSET_NOT_HASHED: "hash-list/asset-not-hashed",
+  POLICY_NOT_FOUND: "policy/not-found",
+  POLICY_REVISION_CONFLICT: "policy/revision-conflict",
+  POLICY_PROJECTS_CHANGED: "policy/projects-changed",
+  POLICY_IN_USE: "policy/in-use",
+  POLICY_USED_BY_ANOTHER_PROJECT: "policy/used-by-another-project",
+  POLICY_NO_PRESET: "policy/no-preset",
+  POLICY_PRESET_VERSION_CONFLICT: "policy/preset-version-conflict",
+  POLICY_PRESET_UPDATE_UNAVAILABLE: "policy/preset-update-unavailable",
+  POLICY_AUTOMATIC_UPDATES_UNAVAILABLE: "policy/automatic-updates-unavailable",
   UPLOAD_PRESET_NOT_FOUND: "upload-preset/not-found",
   UPLOAD_PRESET_DISABLED: "upload-preset/disabled",
   UPLOAD_PRESET_TOKEN_REQUIRED: "upload-preset/token-required",
@@ -411,6 +420,42 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "hash-list/asset-not-hashed": {
     status: 409,
     message: "This asset has no perceptual hash. Only image assets that finished processing can be added.",
+  },
+  "policy/not-found": {
+    status: 404,
+    message: "Policy not found. Check the policy ID in the portal.",
+  },
+  "policy/revision-conflict": {
+    status: 409,
+    message: "The policy changed. Retrieve it again and retry with its current revision.",
+  },
+  "policy/projects-changed": {
+    status: 409,
+    message: "The projects using this policy changed. Retrieve it again and review the affected projects before saving.",
+  },
+  "policy/in-use": {
+    status: 409,
+    message: "Projects or upload presets still use this policy. Choose another policy for each of them before deleting it.",
+  },
+  "policy/used-by-another-project": {
+    status: 409,
+    message: "Another project uses or owns this policy, so it can only be changed from the portal or that project.",
+  },
+  "policy/no-preset": {
+    status: 400,
+    message: "This policy has no preset baseline.",
+  },
+  "policy/preset-version-conflict": {
+    status: 409,
+    message: "The preset changed. Review the latest differences and retry with its version.",
+  },
+  "policy/preset-update-unavailable": {
+    status: 409,
+    message: "Only an unchanged copy of an older preset version can be updated. Reset or review your changes first.",
+  },
+  "policy/automatic-updates-unavailable": {
+    status: 409,
+    message: "Automatic updates can only be switched on for a saved copy of a project's preset policy, and off for one that has them.",
   },
   "upload-preset/not-found": {
     status: 404,

@@ -17,11 +17,13 @@ import { CalmLensError, invalidArgument, invalidConfig, SDK_ERROR_CODES } from "
 import type { TransportRequest } from "./CalmLensTransport";
 import type {
   AddHashListEntryOptions,
+  ApplyPolicyPresetOptions,
   Asset,
   AssetChildrenPage,
   AssetPage,
   AssetSearchQuery,
   AssetSearchResponse,
+  AssignPolicyOptions,
   BatchAssetsOptions,
   BatchAssetsResponse,
   CalmLensServerClientOptions,
@@ -31,6 +33,7 @@ import type {
   CreateAssetSignedUrlOptions,
   CreateFolderOptions,
   CreateHashListOptions,
+  CreatePolicyOptions,
   DecideAssetOptions,
   DeleteAssetContentOptions,
   DeleteAssetOptions,
@@ -56,15 +59,20 @@ import type {
   ListHashListsOptions,
   MoveAssetOptions,
   MoveFolderOptions,
+  Policy,
+  PolicyIdOptions,
+  PolicyList,
   RequestOptions,
   RetrieveAssetOptions,
   RetryAssetOptions,
+  SetPolicyAutomaticUpdatesOptions,
   SignedUploadToken,
   SignUploadTokenOptions,
   SubmitAssetOptions,
   UpdateAssetOptions,
   UpdateFolderOptions,
   UpdateHashListOptions,
+  UpdatePolicyOptions,
   UploadAssetPartOptions,
   VerifyWebhookSignatureOptions,
   WaitForAssetDecisionOptions,
@@ -627,6 +635,51 @@ export default class CalmLensServerClient {
           `/hash-list-entries/${requireId(entryId, "Hash list entry ID")}`,
         );
       },
+    };
+  }
+
+  /**
+   * Moderation policies belong to the project's organisation and its projects share them. Every
+   * change sends the policy's `revision`, so a policy changed since is refused. Through a
+   * project's key you can change only policies no other project uses or owns.
+   */
+  get policies() {
+    const policyPath = (policyId: string) =>
+      `${this.projectPath}/policies/${requireId(policyId, "Policy ID")}`;
+    return {
+      /** Lists the organisation's policies and the ID of the one the project uses. */
+      list: async (): Promise<PolicyList> => this.request("GET", `${this.projectPath}/policies`),
+
+      retrieve: async ({ policyId }: PolicyIdOptions): Promise<Policy> =>
+        this.request("GET", policyPath(policyId)),
+
+      /** Creates a policy from `settings`, or a copy of a built-in preset with `presetId`. */
+      create: async (options: CreatePolicyOptions): Promise<Policy> =>
+        this.request("POST", `${this.projectPath}/policies`, { body: options }),
+
+      /** Changes the name, description or settings; later moderation uses them. */
+      update: async ({ policyId, ...body }: UpdatePolicyOptions): Promise<Policy> =>
+        this.request("PATCH", policyPath(policyId), { body }),
+
+      /** Resets a preset copy to its pinned version, or updates an unchanged copy to the latest. */
+      applyPreset: async ({ policyId, ...body }: ApplyPolicyPresetOptions): Promise<Policy> =>
+        this.request("POST", `${policyPath(policyId)}/preset`, { body }),
+
+      /** Switches automatic updates on or off for the project's preset policy. */
+      setAutomaticUpdates: async ({
+        policyId,
+        ...body
+      }: SetPolicyAutomaticUpdatesOptions): Promise<Policy> =>
+        this.request("PUT", `${policyPath(policyId)}/automatic-updates`, { body }),
+
+      /** Deletes a policy that no project or upload preset uses. */
+      delete: async ({ policyId }: PolicyIdOptions): Promise<void> => {
+        await this.request("DELETE", policyPath(policyId));
+      },
+
+      /** Chooses the policy the project moderates with. */
+      assign: async (options: AssignPolicyOptions): Promise<Policy> =>
+        this.request("PUT", `${this.projectPath}/policy`, { body: options }),
     };
   }
 
