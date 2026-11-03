@@ -3,7 +3,7 @@ import { version } from "../../package.json";
 import { CLASSIFICATION_CATEGORIES } from "../contract/ModerationCategories.js";
 import { CalmLensError, CalmLensServerClient } from "../server";
 import { generateTestTextCode, TEST_INPUT_KEY_PATTERN } from "../test-inputs";
-import { createLocalSigningSecret, listen } from "./listen";
+import { createLocalSigningSecret, describeEventTypes, listen, unavailableWarning } from "./listen";
 import { credentialsPath, DEFAULT_API_URL, login, logout, readCredentials } from "./login";
 
 const HELP = `CalmLens CLI
@@ -169,18 +169,19 @@ const main = async () => {
         intervalMs: intervalSeconds * 1000,
         signal: controller.signal,
         // Printed only once CalmLens has accepted the key, so a bad key fails without it.
-        onReady: () => {
+        onReady: ({ unavailableTypes }) => {
           process.stdout.write(
             [
               `Forwarding CalmLens events for project ${projectId} to ${forwardTo}`,
               configuredSecret
                 ? "Signing with your CALMLENS_WEBHOOK_SECRET."
                 : `Signing secret: ${secret}\n  Set CALMLENS_WEBHOOK_SECRET to this value in your app, or pass --secret.`,
-              eventTypes?.length ? `Event types: ${eventTypes.join(", ")}` : "Event types: all",
+              describeEventTypes(eventTypes, unavailableTypes),
               "Upload something (or run `calmlens trigger`) to see events. Press Ctrl+C to stop.",
               "",
             ].join("\n"),
           );
+          if (unavailableTypes.length) process.stderr.write(unavailableWarning(unavailableTypes));
         },
       });
     } catch (error) {

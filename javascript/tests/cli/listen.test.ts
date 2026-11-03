@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
   createLocalSigningSecret,
+  describeEventTypes,
   type EventSource,
   formatForwardLine,
   forwardEvent,
   listen,
+  unavailableWarning,
 } from "../../src/cli/listen";
 import { EXAMPLE_IDS, isId, newId } from "../../src/contract/Ids.js";
 import { CalmLensError, verifyWebhookSignature } from "../../src/server";
@@ -86,11 +88,12 @@ describe("calmlens listen", () => {
     const controller = new AbortController();
     const [uploadedId, allowedId] = [newId("evt"), newId("evt")];
     const pages = [
-      { items: [], nextCursor: "c0", hasMore: false },
+      { items: [], nextCursor: "c0", hasMore: false, excludedTypes: [] },
       {
         items: [makeEvent(uploadedId, "asset.uploaded"), makeEvent(allowedId, "asset.allowed")],
         nextCursor: "c1",
         hasMore: false,
+        excludedTypes: [],
       },
     ];
     const client: EventSource = {
@@ -100,7 +103,12 @@ describe("calmlens listen", () => {
           const page = pages.shift();
           if (!page) {
             controller.abort();
-            return { items: [], nextCursor: options.cursor ?? "", hasMore: false };
+            return {
+              items: [],
+              nextCursor: options.cursor ?? "",
+              hasMore: false,
+              excludedTypes: [],
+            };
           }
           return page;
         },
@@ -126,6 +134,58 @@ describe("calmlens listen", () => {
     expect(calls[1]).toEqual({ cursor: "c0", pageSize: 100 });
     expect(calls[2]).toEqual({ cursor: "c1", pageSize: 100 });
     expect(forwarded).toEqual([allowedId]);
+  });
+
+  test("reports the event types the key can't receive instead of silently skipping them", async () => {
+    const excludedTypes = ["asset.review-requested", "api-key.created"] as const;
+    const readyWith = async (eventTypes?: string[]) => {
+      const controller = new AbortController();
+      let ready: { unavailableTypes: string[] } | undefined;
+      await listen({
+        client: {
+          events: {
+            list: async () => {
+              controller.abort();
+              return {
+                items: [],
+                nextCursor: "c0",
+                hasMore: false,
+                excludedTypes: [...excludedTypes],
+              };
+            },
+          },
+        },
+        forwardTo: "http://localhost:3000/hook",
+        secret: "s",
+        eventTypes,
+        signal: controller.signal,
+        log: () => {},
+        onReady: (value) => {
+          ready = value;
+        },
+      });
+      return ready?.unavailableTypes;
+    };
+
+    // Everything requested: every excluded type is reported.
+    expect(await readyWith()).toEqual(["asset.review-requested", "api-key.created"]);
+    // A filter: only the requested types the key can't receive.
+    expect(await readyWith(["asset.uploaded", "asset.review-requested"])).toEqual([
+      "asset.review-requested",
+    ]);
+    expect(await readyWith(["asset.uploaded"])).toEqual([]);
+
+    // The printed event types leave out those the key can't receive.
+    const filtered = describeEventTypes(
+      ["asset.uploaded", "asset.review-requested"],
+      ["asset.review-requested"],
+    );
+    expect(filtered).toContain("asset.uploaded");
+    expect(filtered).not.toContain("asset.review-requested");
+    expect(describeEventTypes(undefined, ["asset.review-requested"])).not.toBe(
+      describeEventTypes(undefined, []),
+    );
+    expect(unavailableWarning(["asset.review-requested"])).toContain("asset.review-requested");
   });
 
   test("stops on authentication errors instead of retrying", async () => {

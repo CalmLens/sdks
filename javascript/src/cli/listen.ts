@@ -24,8 +24,12 @@ export interface ListenOptions {
   intervalMs?: number;
   signal?: AbortSignal;
   log?: (line: string) => void;
-  /** Called once the starting cursor is fetched, i.e. the key and project were accepted. */
-  onReady?: () => void;
+  /**
+   * Called once the starting cursor is fetched, i.e. the key and project were accepted, with the
+   * requested event types (every type when none were requested) the key lacks the permission to
+   * receive, which the feed never includes.
+   */
+  onReady?: (ready: { unavailableTypes: string[] }) => void;
   fetchImpl?: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>;
 }
 
@@ -103,6 +107,35 @@ const sleep = (ms: number, signal?: AbortSignal) =>
     );
   });
 
+/** The requested event types (every type when none are requested) the feed excludes. */
+export const unavailableEventTypes = (
+  excludedTypes: readonly string[],
+  requested: ReadonlySet<string>,
+): string[] =>
+  requested.size ? excludedTypes.filter((type) => requested.has(type)) : [...excludedTypes];
+
+/** The event types line: what is requested, minus what the key can't receive. */
+export const describeEventTypes = (
+  requested: string[] | undefined,
+  unavailableTypes: string[],
+): string => {
+  const unavailable = new Set(unavailableTypes);
+  if (!requested?.length)
+    return unavailable.size
+      ? "Event types: all this key can receive (see the warning below)"
+      : "Event types: all";
+  const receivable = requested.filter((type) => !unavailable.has(type));
+  return `Event types: ${receivable.length ? receivable.join(", ") : "none this key can receive"}`;
+};
+
+export const unavailableWarning = (unavailableTypes: string[]): string =>
+  [
+    `Warning: this API key can't receive ${unavailableTypes.join(", ")}.`,
+    "  The key lacks the permission these events need, so they won't be forwarded. Give the key",
+    "  that permission on the API keys page of the CalmLens portal, or use a key that has it.",
+    "",
+  ].join("\n");
+
 /**
  * Forwards new events until `signal` aborts. Resolves normally on abort; rejects with the
  * underlying error for fatal API errors (bad key, wrong project).
@@ -113,8 +146,9 @@ export const listen = async (options: ListenOptions): Promise<void> => {
   const intervalMs = options.intervalMs ?? 2000;
   const eventTypes = new Set(options.eventTypes ?? []);
 
-  let { nextCursor: cursor } = await client.events.list({});
-  options.onReady?.();
+  const start = await client.events.list({});
+  let cursor = start.nextCursor;
+  options.onReady?.({ unavailableTypes: unavailableEventTypes(start.excludedTypes, eventTypes) });
   let failures = 0;
 
   while (!signal?.aborted) {

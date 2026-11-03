@@ -1933,7 +1933,14 @@ export class MockCalmLensApi {
     if (pageSize < 1) throw invalidField("validation/too-small", "pageSize");
     if (pageSize > MAX_PAGE_SIZE) throw invalidField("validation/too-big", "pageSize");
     const cursor = query.get("cursor");
-    if (!cursor) return { items: [], nextCursor: `mock_${this.eventFeed.length}`, hasMore: false };
+    // The mock's key holds every permission, so no event type is excluded.
+    if (!cursor)
+      return {
+        items: [],
+        nextCursor: `mock_${this.eventFeed.length}`,
+        hasMore: false,
+        excludedTypes: [],
+      };
     const match = /^mock_(\d+)$/.exec(cursor);
     const position = match ? Number(match[1]) : Number.NaN;
     if (!Number.isSafeInteger(position) || position > this.eventFeed.length) {
@@ -1941,7 +1948,12 @@ export class MockCalmLensApi {
     }
     const items = this.eventFeed.slice(position, position + pageSize);
     const next = position + items.length;
-    return { items, nextCursor: `mock_${next}`, hasMore: next < this.eventFeed.length };
+    return {
+      items,
+      nextCursor: `mock_${next}`,
+      hasMore: next < this.eventFeed.length,
+      excludedTypes: [],
+    };
   }
 
   // ---- Folders -----------------------------------------------------------------------------
