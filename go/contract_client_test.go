@@ -790,6 +790,8 @@ func clientOptions(t *testing.T, values map[string]any) (Options, error) {
 			options.Timeout = time.Duration(value.(float64) * float64(time.Millisecond))
 		case "maxResponseBytes":
 			options.MaxResponseBytes = int64(value.(float64))
+		case "partSizeBytes":
+			options.PartSizeBytes = int64(value.(float64))
 		default:
 			t.Fatalf("unknown client option %s", key)
 		}
@@ -1131,6 +1133,7 @@ func TestClientDefaults(t *testing.T) {
 		"waitForDecisionIntervalFactor":  decisionPollFactor,
 		"waitForDecisionMaxIntervalMs":   ms(decisionPollMaxDelay),
 		"ensureLensesBatchSize":          float64(EnsureLensesMaxPerRequest),
+		"partSizeBytes":                  float64(c.options.PartSizeBytes),
 	}
 	for _, d := range surface.Defaults {
 		t.Run(d.ID, func(t *testing.T) {

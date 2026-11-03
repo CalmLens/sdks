@@ -70,7 +70,7 @@ Treat a status you don't recognise as not allowed. `Assets.Create` queues proces
 ## What you can do
 
 - [Moderate text, images, audio, video and websites](https://calmlens.com/docs/sdk/go#moderate-content), and [wait for a decision](https://calmlens.com/docs/sdk/go/reference#queued-uploads-and-decisions) or receive it by [webhook](https://calmlens.com/docs/guides/webhooks).
-- [Stream large uploads](https://calmlens.com/docs/sdk/go/reference#content-sources) from an `io.Reader`, send [multipart uploads](https://calmlens.com/docs/sdk/go/reference#multipart-uploads) and apply [upload presets](https://calmlens.com/docs/sdk/go/reference#upload-tokens).
+- [Stream large uploads](https://calmlens.com/docs/sdk/go/reference#content-sources) from an `io.Reader`, send content over 8 MiB in resumable [multipart uploads](https://calmlens.com/docs/sdk/go/reference#multipart-uploads) automatically and apply [upload presets](https://calmlens.com/docs/sdk/go/reference#upload-tokens).
 - [Read typed classification results](https://calmlens.com/docs/sdk/go/reference#classification-results), including categories, qualifiers and fields added after your SDK version.
 - [Moderate replies in their conversation](https://calmlens.com/docs/sdk/go/reference#conversation-context).
 - Manage assets, [folders](https://calmlens.com/docs/sdk/go/reference#folders), [hash lists](https://calmlens.com/docs/sdk/go/reference#hash-lists) and [lenses](https://calmlens.com/docs/sdk/go/reference#lenses), with [pagination iterators](https://calmlens.com/docs/sdk/go/reference#pagination).

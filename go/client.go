@@ -34,6 +34,12 @@ const (
 	DefaultMaxRetries = 2
 	// DefaultMaxResponseBytes caps how much of an API response body is read.
 	DefaultMaxResponseBytes int64 = 32 << 20
+	// DefaultPartSizeBytes is the part size of uploads the SDK splits (Options.PartSizeBytes).
+	DefaultPartSizeBytes int64 = 8 << 20
+	// MinPartSizeBytes and MaxPartSizeBytes bound Options.PartSizeBytes: every part but the
+	// last is at least 5 MiB.
+	MinPartSizeBytes int64 = 5 << 20
+	MaxPartSizeBytes int64 = 64 << 20
 	// RetryBaseDelay is the backoff before the first retry. Retry n (0-based) waits between half
 	// and all of min(RetryMaxDelay, RetryBaseDelay * 2^n), unless a Retry-After header says
 	// otherwise.
@@ -75,6 +81,12 @@ type Options struct {
 	// MaxResponseBytes caps the API response body size (default DefaultMaxResponseBytes).
 	// CDN.Serve bodies are streamed to the caller and are not capped.
 	MaxResponseBytes int64
+	// PartSizeBytes splits uploads: Content larger than this many bytes whose size is known and
+	// that the SDK can read again (Bytes, Base64, or Data that is an io.ReaderAt or io.Seeker
+	// with SizeInBytes) is uploaded in parts of this size. Each part is retried on its own, and
+	// calling again with the same IdempotencyKey resumes the upload. From MinPartSizeBytes to
+	// MaxPartSizeBytes; zero means DefaultPartSizeBytes.
+	PartSizeBytes int64
 	// HTTPClient sends every request, including uploads and CDN requests. The SDK uses a copy
 	// with redirects disabled. A non-zero HTTPClient.Timeout bounds whole requests,
 	// including upload and download bodies, so leave it zero for large transfers.
@@ -149,6 +161,9 @@ func NewServerClient(options Options) (*ServerClient, error) {
 	if options.MaxRetries != nil && *options.MaxRetries < 0 {
 		return nil, invalid(CodeSDKInvalidConfig, "MaxRetries cannot be negative")
 	}
+	if options.PartSizeBytes != 0 && (options.PartSizeBytes < MinPartSizeBytes || options.PartSizeBytes > MaxPartSizeBytes) {
+		return nil, invalid(CodeSDKInvalidConfig, "PartSizeBytes must be from 5 MiB (5242880) to 64 MiB (67108864)")
+	}
 	for name, value := range map[string]string{"BaseURL": options.BaseURL, "CDNBaseURL": options.CDNBaseURL} {
 		if value == "" {
 			continue
@@ -168,6 +183,9 @@ func NewServerClient(options Options) (*ServerClient, error) {
 	}
 	if options.MaxResponseBytes == 0 {
 		options.MaxResponseBytes = DefaultMaxResponseBytes
+	}
+	if options.PartSizeBytes == 0 {
+		options.PartSizeBytes = DefaultPartSizeBytes
 	}
 	options.BaseURL = strings.TrimRight(options.BaseURL, "/")
 	options.CDNBaseURL = strings.TrimRight(options.CDNBaseURL, "/")

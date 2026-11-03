@@ -70,7 +70,7 @@ type InMemoryDatabaseStorage struct {
 type InMemoryImageStorage struct{ Content map[string]*StoredContent }
 
 // Options mirrors calmlens.Options (APIKey, ProjectID, BaseURL, CDNBaseURL, Timeout,
-// UploadTimeout, MaxRetries, MaxResponseBytes) and adds in-memory storage and deterministic
+// UploadTimeout, MaxRetries, MaxResponseBytes, PartSizeBytes) and adds in-memory storage and deterministic
 // ID, clock and moderation controls.
 type Options struct {
 	APIKey    string
@@ -82,6 +82,9 @@ type Options struct {
 	// UploadTimeout and MaxResponseBytes are validated and applied as by calmlens.NewServerClient.
 	UploadTimeout    time.Duration
 	MaxResponseBytes int64
+	// PartSizeBytes is validated and applied as by calmlens.NewServerClient: larger content the
+	// client can read again is uploaded to the mock in parts.
+	PartSizeBytes int64
 	// MaxRetries defaults to 0 in the mock, so a FailNextRequest failure fails exactly one call.
 	// Set it to test the client's retry behaviour. Waits take no real time: retry backoff and
 	// Assets.WaitForDecision only advance the mock client's clock, so WaitForDecision returns
@@ -566,7 +569,7 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 		images.Content = map[string]*StoredContent{}
 	}
 	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}}
-	client, err := calmlens.NewServerClient(calmlens.Options{APIKey: options.APIKey, ProjectID: options.ProjectID, BaseURL: options.BaseURL, CDNBaseURL: options.CDNBaseURL, Timeout: options.Timeout, UploadTimeout: options.UploadTimeout, MaxRetries: options.MaxRetries, MaxResponseBytes: options.MaxResponseBytes, HTTPClient: &http.Client{Transport: transport{mock}}})
+	client, err := calmlens.NewServerClient(calmlens.Options{APIKey: options.APIKey, ProjectID: options.ProjectID, BaseURL: options.BaseURL, CDNBaseURL: options.CDNBaseURL, Timeout: options.Timeout, UploadTimeout: options.UploadTimeout, MaxRetries: options.MaxRetries, MaxResponseBytes: options.MaxResponseBytes, PartSizeBytes: options.PartSizeBytes, HTTPClient: &http.Client{Transport: transport{mock}}})
 	if err != nil {
 		return nil, err
 	}
@@ -1021,6 +1024,7 @@ const (
 	maxFolderPageSize   = 100
 	minMultipartPart    = 5 * 1024 * 1024
 	maxMultipartImage   = 20 * 1024 * 1024
+	maxUploadParts      = 10_000 // the most parts an upload can have, as in the API
 	imageCacheLifetime  = 31536000
 	mockThumbHash       = "1QcSHQRnh493V4dIh4eXh1h4kJUI"
 	mockAverageColor    = "#7f7f7f"
@@ -1842,7 +1846,7 @@ func (m *MockServerClient) uploadPart(a calmlens.JSON, id string, q url.Values, 
 	}
 	part, _ := strconv.Atoi(q.Get("partNumber"))
 	expected := int(number(progress["partsReceived"])) + 1
-	if part != expected {
+	if part != expected || part > maxUploadParts {
 		failure := fail(calmlens.CodeInvalidUploadPartNumber).(*apiError)
 		failure.details = calmlens.JSON{"expectedPartNumber": expected, "receivedPartNumber": part}
 		return failure

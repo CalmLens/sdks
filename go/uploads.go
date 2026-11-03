@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -114,8 +117,67 @@ func imageSize(size *int64, final bool) error {
 	return nil
 }
 
+// maxSplitIdempotencyKeyLength is the longest IdempotencyKey of an upload sent in parts: each
+// part's key adds ":part-<n>", and the API takes keys of up to 255 characters.
+const maxSplitIdempotencyKeyLength = 240
+
+// source is content the SDK can read again in parts: size bytes of at from base.
+type source struct {
+	at         io.ReaderAt
+	base, size int64
+}
+
+// part returns part n (from 1) of partSize bytes, re-readable for a retry.
+func (src *source) part(n int, partSize int64) *io.SectionReader {
+	offset := int64(n-1) * partSize
+	return io.NewSectionReader(src.at, src.base+offset, min(partSize, src.size-offset))
+}
+
+// seekReaderAt reads an io.ReadSeeker at an offset. The SDK sends parts one at a time, so the
+// seeks never interleave.
+type seekReaderAt struct{ io.ReadSeeker }
+
+func (r seekReaderAt) ReadAt(p []byte, offset int64) (int, error) {
+	if _, err := r.Seek(offset, io.SeekStart); err != nil {
+		return 0, err
+	}
+	n, err := io.ReadFull(r.ReadSeeker, p)
+	if err == io.ErrUnexpectedEOF {
+		err = io.EOF
+	}
+	return n, err
+}
+
+// readAgain returns raw as a source when the SDK can read it again from its current position:
+// an io.ReaderAt or an io.ReadSeeker (bytes and base64 are a bytes.Reader). One-shot streams
+// give nil.
+func readAgain(raw io.Reader, size int64) *source {
+	base := int64(0)
+	seeker, isSeeker := raw.(io.Seeker)
+	if isSeeker {
+		current, err := seeker.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil
+		}
+		base = current
+	}
+	if at, ok := raw.(io.ReaderAt); ok {
+		return &source{at: at, base: base, size: size}
+	}
+	if rs, ok := raw.(io.ReadSeeker); ok {
+		return &source{at: seekReaderAt{rs}, base: base, size: size}
+	}
+	return nil
+}
+
 // Create submits an asset and queues processing: the result is usually pending. Supply
 // exactly one of Content, Part or URL.
+//
+// Content larger than Options.PartSizeBytes whose size is known and that the SDK can read
+// again (Bytes, Base64, or Data that is an io.ReaderAt or io.Seeker with SizeInBytes) is
+// uploaded in parts: part n after the first carries the Idempotency-Key "<key>:part-<n>" and is
+// retried on its own, and calling again with the same IdempotencyKey (at most 240 characters)
+// resumes an interrupted upload. Streams and text go in one request.
 func (s *AssetsService) Create(ctx context.Context, options SubmitAssetOptions) (*Asset, error) {
 	return s.submit(ctx, options, true)
 }
@@ -190,7 +252,22 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	if err != nil {
 		return nil, err
 	}
-	if !multipart && !s.c.deferUploadChecks {
+	// Content the SDK can read again is split into parts when it is larger than one part.
+	var split *source
+	if !multipart && content.PlainText == nil && size != nil && *size > s.c.options.PartSizeBytes {
+		split = readAgain(raw, *size)
+	}
+	if split != nil && len(options.IdempotencyKey) > maxSplitIdempotencyKeyLength {
+		return nil, invalid(CodeSDKInvalidArgument, fmt.Sprintf("IdempotencyKey can have at most %d characters for content uploaded in parts", maxSplitIdempotencyKeyLength))
+	}
+	if split != nil && strings.HasPrefix(mime, "image/") {
+		// Images in parts can be up to 20 MiB rather than one request's 10 MiB.
+		if !s.c.deferUploadChecks {
+			if err = imageSize(size, true); err != nil {
+				return nil, err
+			}
+		}
+	} else if !multipart && !s.c.deferUploadChecks {
 		if err = directSize(mime, size); err != nil {
 			return nil, err
 		}
@@ -211,6 +288,9 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	}
 	params.Set("queue", strconv.FormatBool(queue))
 	params.Set("contentType", content.Type)
+	if split != nil {
+		return s.submitInParts(ctx, params, content.Type, split, key)
+	}
 	headers := http.Header{"Content-Type": {content.Type}, "X-Calmlens-Upload": {"content"}}
 	length := int64(-1)
 	if size != nil {
@@ -229,6 +309,70 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 		return nil, err
 	}
 	return uploaded(&result)
+}
+
+// submitInParts uploads src in parts of Options.PartSizeBytes and returns the final part's
+// asset. Part 1 starts the upload with the upload's query (params) and key; part n after it
+// carries "<key>:part-<n>", so a repeated call with the same key replays the parts the API
+// already has and sends the rest.
+func (s *AssetsService) submitInParts(ctx context.Context, params url.Values, contentType string, src *source, key string) (*Asset, error) {
+	partSize := s.c.options.PartSizeBytes
+	count := int((src.size + partSize - 1) / partSize)
+	first := src.part(1, partSize)
+	params.Set("sizeInBytes", strconv.FormatInt(first.Size(), 10))
+	params.Set("partNumber", "1")
+	params.Set("isFinal", "false")
+	params.Set("totalSizeInBytes", strconv.FormatInt(src.size, 10))
+	headers := http.Header{"Content-Type": {contentType}, "X-Calmlens-Upload": {"part"}}
+	var result Asset
+	if err := s.c.send(ctx, call{method: "POST", path: s.c.project("assets"), params: params, raw: first, size: first.Size(), headers: headers, idempotencyKey: key, binary: true}, &result); err != nil {
+		return nil, err
+	}
+	asset, err := uploaded(&result)
+	if err != nil {
+		return nil, err
+	}
+	for n := 2; n <= count; {
+		final := n == count
+		piece := src.part(n, partSize)
+		size := piece.Size()
+		next, err := s.uploadPart(ctx, UploadAssetPartOptions{AssetID: asset.ID, Part: Content{Data: piece, SizeInBytes: &size, PartNumber: n, IsFinal: final}, IdempotencyKey: fmt.Sprintf("%s:part-%d", key, n)})
+		var apiErr *Error
+		if err != nil && errors.As(err, &apiErr) {
+			// The API already has the parts before the one it expects: their responses were lost.
+			if expected, ok := partNumber(apiErr.Details["expectedPartNumber"]); ok && apiErr.Code == CodeInvalidUploadPartNumber && expected > n && expected <= count {
+				n = expected
+				continue
+			}
+			// The final part already arrived and completed the upload.
+			if final && apiErr.Code == CodeUploadNotOpen {
+				return s.Retrieve(ctx, AssetIDOptions{AssetID: asset.ID})
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+		asset = next
+		n++
+	}
+	return asset, nil
+}
+
+// partNumber reads a whole part number from error details.
+func partNumber(value any) (int, bool) {
+	switch number := value.(type) {
+	case float64:
+		if number == float64(int(number)) {
+			return int(number), true
+		}
+	case int:
+		return number, true
+	case json.Number:
+		if n, err := strconv.Atoi(string(number)); err == nil {
+			return n, true
+		}
+	}
+	return 0, false
 }
 
 // UploadPart sends part 2 or later of a multipart upload. Send parts sequentially. The queue

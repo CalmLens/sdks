@@ -589,8 +589,8 @@ func TestOversizedOneRequestUploadsAreRefusedBeforeSending(t *testing.T) {
 	}
 	for _, tc := range cases {
 		size := tc.size
-		// The stream is never read: the declared size is refused first.
-		_, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "big", Content: &Content{Type: tc.mime, Data: strings.NewReader(""), SizeInBytes: &size}})
+		// The one-shot stream is never read: the declared size is refused first.
+		_, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "big", Content: &Content{Type: tc.mime, Data: io.MultiReader(strings.NewReader("")), SizeInBytes: &size}})
 		if ErrorCode(err) != CodeFileTooLarge {
 			t.Fatal(tc.mime, err)
 		}
@@ -598,10 +598,10 @@ func TestOversizedOneRequestUploadsAreRefusedBeforeSending(t *testing.T) {
 	if len(h.calls) != 0 {
 		t.Fatal("sent", len(h.calls))
 	}
-	// At the limit the upload is sent.
+	// At the limit the upload is sent in one request (a stream is never split into parts).
 	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": "processing", "moderation": JSON{"status": "pending"}}}
 	size := int64(10 * 1024 * 1024)
-	if _, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", Content: &Content{Type: "image/png", Bytes: make([]byte, size)}}); err != nil {
+	if _, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", Content: &Content{Type: "image/png", Data: io.MultiReader(bytes.NewReader(make([]byte, size))), SizeInBytes: &size}}); err != nil {
 		t.Fatal(err)
 	}
 	if len(h.calls) != 1 {
