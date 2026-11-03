@@ -1036,9 +1036,9 @@ Requests send `User-Agent: calmlens-js/<version> (<runtime>/<version>)` from ser
 
 ## Releasing
 
-Stable releases are published automatically from `main` when packed SDK contents differ from npm `latest` and an SDK Changeset is present. Contributors must run `bun run changeset` to choose the release type and write release notes. CI updates and commits this package's `CHANGELOG.md` automatically. See the repository's [.changeset release guide](../../.changeset/README.md).
+Run `bun run changeset` to choose the release type and write release notes. Merging the Version SDKs pull request releases the version and updates this package's `CHANGELOG.md`. See the repository's [.changeset release guide](../.changeset/README.md).
 
-Each release is published to npm twice from one build, as `@calmlens/sdk` and as `calmlens`. The CLI's standalone executables and Homebrew formula are released in this repository under `cli-v<version>` by `.github/workflows/release-cli.yml`. `bun run build:cli` builds the npm entry, `bin/calmlens.js` (the package build includes it), and `bun run build:cli:binary` builds a standalone executable in `dist/`; set `CALMLENS_BUILD_TARGET`, such as `bun-linux-x64`, to cross-compile it.
+Once the release commit's SDK Tests and SDK examples runs pass, `.github/workflows/release-npm.yml` publishes one build to npm with provenance, as `@calmlens/sdk` and as `calmlens`. The CLI's standalone executables and Homebrew formula are released in this repository under `cli-v<version>` by `.github/workflows/release-cli.yml`. `bun run build:cli` builds the npm entry, `bin/calmlens.js` (the package build includes it), and `bun run build:cli:binary` builds a standalone executable in `dist/`; set `CALMLENS_BUILD_TARGET`, such as `bun-linux-x64`, to cross-compile it.
 
 ### Test-input images
 

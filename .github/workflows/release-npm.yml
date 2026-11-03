@@ -1,0 +1,114 @@
+name: Publish JavaScript SDK
+
+# Publishes the JavaScript SDK to npm with provenance, from one packed build, as `@calmlens/sdk`
+# and again as `calmlens` (the same package under an unscoped name, so `npx calmlens` runs the CLI
+# it includes). Both names use npm trusted publishing for this workflow and the `npm` environment.
+#
+# When a merged release plan includes the JavaScript SDK and its commit's SDK Tests and SDK
+# examples runs have passed, the tag job tags `javascript/v<version>` and dispatches this workflow
+# on that tag. It runs again whenever one of those checks completes on main, so it waits while
+# they run, accepts a rerun that passed and skips a release whose checks failed.
+on:
+  push:
+    branches: [main]
+    paths: [".changeset/release.json"]
+    tags: ["javascript/v*"]
+  workflow_run:
+    workflows: ["SDK Tests", "SDK examples"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: calmlens-npm-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node scripts/release-tag.mjs javascript javascript/v release-npm.yml --after-checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  # The tag's commit must have passed its checks, however this run was started.
+  checks:
+    if: startsWith(github.ref, 'refs/tags/javascript/v')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check the tag matches the SDK version
+        run: test "$GITHUB_REF_NAME" = "javascript/v$(node -p 'require("./javascript/package.json").version')"
+      - name: Require passed SDK Tests and SDK examples runs
+        run: node scripts/release-checks.mjs "$GITHUB_SHA"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish:
+    needs: checks
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@11
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Check the tag matches the SDK version
+        run: test "$GITHUB_REF_NAME" = "javascript/v$(node -p 'require("./javascript/package.json").version')"
+      - run: bun run --cwd javascript build
+      - name: Publish @calmlens/sdk and calmlens from one packed build
+        working-directory: javascript
+        run: |
+          VERSION=$(node -p 'require("./package.json").version')
+          # Whether this version of a package is already on npm, so a retried run skips it.
+          published() {
+            if ! npm view "$1@$VERSION" version --json > "$RUNNER_TEMP/npm-view.json" 2> "$RUNNER_TEMP/npm-view.err"; then
+              grep -q E404 "$RUNNER_TEMP/npm-view.err" || { cat "$RUNNER_TEMP/npm-view.err" >&2; exit 1; }
+              return 1
+            fi
+            grep -q "\"$VERSION\"" "$RUNNER_TEMP/npm-view.json"
+          }
+          TARBALL="$RUNNER_TEMP/$(npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" | tail -n 1)"
+          if published @calmlens/sdk; then
+            echo "@calmlens/sdk@$VERSION is already on npm"
+          else
+            npm publish "$TARBALL" --provenance --access public --ignore-scripts
+          fi
+          MIRROR="$RUNNER_TEMP/calmlens"
+          mkdir -p "$MIRROR"
+          tar -xzf "$TARBALL" -C "$MIRROR" --strip-components=1
+          (cd "$MIRROR" && npm pkg set name=calmlens && test "$(node -p 'require("./package.json").version')" = "$VERSION")
+          if published calmlens; then
+            echo "calmlens@$VERSION is already on npm"
+          else
+            npm publish "$MIRROR" --provenance --access public --ignore-scripts
+          fi

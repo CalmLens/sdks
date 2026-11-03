@@ -72,15 +72,18 @@ Add a changeset with `bun run changeset` when an SDK needs a release. Select the
 and bump type; the Version SDKs workflow maintains a release PR containing the native
 version updates and per-SDK changelogs. Merge that PR to release.
 
-Registry publishing runs in the private application repository with its existing trusted
-publishers and protected environments. Its Release SDKs workflow checks tested public
-release plans every 15 minutes (or on manual dispatch), advances the submodule pin,
-creates immutable release tags and dispatches the existing publishing jobs. Go tags and
-proxy validation run here, as do the `calmlens` CLI's standalone executables: a merged plan
-tags `cli-v<version>` for the JavaScript SDK version, attaches the executables to that GitHub
-release and updates the Homebrew formula in `Formula/`. The JavaScript SDK is published to npm
-as `@calmlens/sdk` and, from the same build, as `calmlens`. Check both repositories' Actions for
-completion.
+The JavaScript SDK, Go and the CLI are released from this repository. When a merged plan
+includes the JavaScript SDK and its commit's SDK Tests and SDK examples runs have passed,
+`release-npm.yml` tags `javascript/v<version>` and publishes one packed build to npm with
+provenance, as `@calmlens/sdk` and as `calmlens`. `release-cli.yml` tags `cli-v<version>`,
+attaches the CLI's standalone executables to that GitHub release and updates the Homebrew
+formula in `Formula/`. Go tags and proxy validation run here too.
+
+Python, Ruby, Rust and Java are published by the private application repository with its
+existing trusted publishers and protected environments. Its Release SDKs workflow checks
+tested public release plans every 15 minutes (or on manual dispatch), advances the submodule
+pin, creates immutable release tags and dispatches those publishing jobs. Check both
+repositories' Actions for completion.
 
 See [.changeset/README.md](.changeset/README.md) for package identifiers and retry guidance.
 The small native `package.json` files are version records for Changesets, not npm packages.
