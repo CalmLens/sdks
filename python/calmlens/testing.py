@@ -32,7 +32,8 @@ from urllib.request import Request
 
 from . import error_codes
 from ._mock_classification import CATEGORIES, QUALIFIERS
-from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_TIMEOUT, CalmLensServerClient,
+from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_PART_SIZE_BYTES, DEFAULT_TIMEOUT,
+                     CalmLensServerClient,
                      _invalid, _json, _merge, _sign_upload_token)
 from .errors import CalmLensError
 from .moderation_context import select_moderation_context_items
@@ -199,6 +200,8 @@ def _to_decision(value: object) -> MockDecision:
     raise _invalid("a decision must be a status or a mock_decision(...)")
 
 
+#: Like the API: an upload has at most this many parts.
+_MAX_UPLOAD_PARTS = 10_000
 _INT_QUERY = {"pageSize", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
 _BOOL_QUERY = {"queue", "isFinal"}
 _JSON_QUERY = {"metadata", "processingOptions", "context"}
@@ -682,7 +685,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                  cdn_base_url: str = "https://mock.calmlens.invalid/v1",
                  timeout: float = DEFAULT_TIMEOUT, upload_timeout: float | None = None,
                  connect_timeout: float = DEFAULT_CONNECT_TIMEOUT, max_retries: int = 0,
-                 max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES, mock_options: MockOptions | None = None):
+                 max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES, part_size_bytes: int = DEFAULT_PART_SIZE_BYTES,
+                 mock_options: MockOptions | None = None):
         options: MockOptions = mock_options if mock_options is not None else {}
         unknown = set(options) - _MOCK_OPTIONS
         if unknown:
@@ -690,7 +694,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         super().__init__(api_key=api_key or create_mock_api_key(), project_id=project_id, base_url=base_url,
                          cdn_base_url=cdn_base_url, timeout=timeout, upload_timeout=upload_timeout,
                          connect_timeout=connect_timeout, max_retries=max_retries,
-                         max_response_bytes=max_response_bytes, transport=self._serve)
+                         max_response_bytes=max_response_bytes, part_size_bytes=part_size_bytes,
+                         transport=self._serve)
         # The fake API answers multipart size checks in the API's order.
         self._defer_upload_checks = True
         self._state_lock = threading.RLock()
@@ -1200,8 +1205,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if multipart:
             # Like the API, a declared total is checked before anything is stored, then a single
             # final part is checked as the whole upload.
-            failure = (self._image_size_error(kind, total, True) if total is not None else None) or (
-                (self._total_size_error(total, cast(int, size), True) or self._image_size_error(kind, cast(int, size), True))
+            failure = (self._image_size_error(kind, total) if total is not None else None) or (
+                (self._total_size_error(total, cast(int, size), True) or self._image_size_error(kind, cast(int, size)))
                 if final else self._total_size_error(total, cast(int, size), False))
             if failure:
                 raise _Failure(failure)
@@ -1257,13 +1262,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return asset
 
     @staticmethod
-    def _image_size_error(kind: str, size: int, final: bool) -> str | None:
-        """Like the API: image uploads in parts total 10 MiB (checked at the last part) to 20 MiB."""
-        if kind != "image":
-            return None
-        if size > 20 * _MIB:
-            return error_codes.MULTIPART_IMAGE_TOO_LARGE
-        return error_codes.MULTIPART_IMAGE_TOO_SMALL if final and size < 10 * _MIB else None
+    def _image_size_error(kind: str, size: int) -> str | None:
+        """Like the API: image uploads in parts total at most 20 MiB."""
+        return error_codes.MULTIPART_IMAGE_TOO_LARGE if kind == "image" and size > 20 * _MIB else None
 
     @staticmethod
     def _total_size_error(total: int | None, received: int, final: bool) -> str | None:
@@ -1370,12 +1371,12 @@ class MockCalmLensServerClient(CalmLensServerClient):
             raise _Failure(error_codes.UPLOAD_NOT_OPEN)
         expected = (asset["upload"].get("partsReceived") or 0) + 1
         number = query.get("partNumber")
-        if number != expected:
+        if number != expected or cast(int, number) > _MAX_UPLOAD_PARTS:
             raise _Failure(error_codes.INVALID_UPLOAD_PART_NUMBER, f"Expected part {expected}",
                            details={"expectedPartNumber": expected, "receivedPartNumber": number})
         final = bool(query.get("isFinal"))
         received = (asset["content"].get("sizeInBytes") or 0) + len(raw or b"")
-        failure = (self._image_size_error(asset["type"], received, final)
+        failure = (self._image_size_error(asset["type"], received)
                    or self._total_size_error(upload["total"], received, final))
         if failure:
             raise _Failure(failure)

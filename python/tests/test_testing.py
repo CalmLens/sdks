@@ -207,6 +207,42 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         self.assertEqual([r.headers["Idempotency-key"] for r in c.requests], ["key-1", "key-1"])
         self.assertEqual(len(c.database_storage.assets), 1)
 
+    def test_small_images_complete_as_one_final_part(self):
+        c = MockCalmLensServerClient()
+        asset = c.assets.classify(name="a.png", part={"data": b"png", "isFinal": True, "type": "image/png"})
+        self.assertEqual((asset["type"], asset["upload"]["status"], asset["content"]["sizeInBytes"]),
+                         ("image", "completed", 3))
+
+    def test_large_content_is_uploaded_in_parts_and_resumes_with_the_same_key(self):
+        mib = 1024 * 1024
+        moderated = []
+
+        def moderate(moderation):
+            moderated.append(moderation.content.bytes)
+            return default_moderate(moderation)
+        c = MockCalmLensServerClient(part_size_bytes=5 * mib, mock_options={"moderate": moderate})
+        data = b"a" * (5 * mib) + b"b" * (5 * mib) + b"c" * 7
+        serve, answered = c.transport, []
+
+        def losing_the_second_part(request, timeout):
+            response = serve(request, timeout)
+            answered.append(response.status)
+            if len(answered) == 2:
+                raise ConnectionResetError("the response was lost")
+            return response
+        c.transport = losing_the_second_part
+        with self.assertRaises(CalmLensTransportError):
+            c.assets.classify(name="a.png", content={"data": data, "type": "image/png"}, idempotency_key="K")
+        c.transport = serve
+        asset = c.assets.classify(name="a.png", content={"data": data, "type": "image/png"}, idempotency_key="K")
+        self.assertEqual((asset["type"], asset["upload"]["status"], asset["content"]["sizeInBytes"]),
+                         ("image", "completed", len(data)))
+        self.assertEqual(len(c.database_storage.assets), 1)
+        self.assertEqual(moderated, [data])
+        resumed = c.requests[2:]
+        self.assertEqual([(r.query.get("partNumber"), r.headers["Idempotency-key"], r.status) for r in resumed],
+                         [(1, "K", 200), (2, "K:part-2", 200), (3, "K:part-3", 200)])
+        self.assertEqual(c.assets.retrieve(asset_id=asset["id"]), asset)
 
 if __name__ == "__main__":
     unittest.main()

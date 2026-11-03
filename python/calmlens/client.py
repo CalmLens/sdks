@@ -46,7 +46,8 @@ from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, Ass
 from .webhooks import parse_webhook_event, verify_webhook_signature
 
 __all__ = ["CalmLensServerClient", "CDNResponse", "Transport", "TransportResponse", "DEFAULT_TIMEOUT",
-           "DEFAULT_CONNECT_TIMEOUT", "DEFAULT_MAX_RETRIES", "DEFAULT_MAX_RESPONSE_BYTES", "USER_AGENT"]
+           "DEFAULT_CONNECT_TIMEOUT", "DEFAULT_MAX_RETRIES", "DEFAULT_MAX_RESPONSE_BYTES", "DEFAULT_PART_SIZE_BYTES",
+           "MIN_PART_SIZE_BYTES", "MAX_PART_SIZE_BYTES", "USER_AGENT"]
 
 
 class TransportResponse(Protocol):
@@ -76,6 +77,13 @@ DEFAULT_CONNECT_TIMEOUT = 10.0
 DEFAULT_MAX_RETRIES = 2
 #: Default largest API response body the client reads (CDN downloads are streamed and unlimited).
 DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024
+#: Content larger than ``part_size_bytes`` is uploaded automatically in parts of this many bytes.
+DEFAULT_PART_SIZE_BYTES = 8 * 1024 * 1024
+#: The smallest and largest ``part_size_bytes`` (every part but the last is at least 5 MiB).
+MIN_PART_SIZE_BYTES = 5 * 1024 * 1024
+MAX_PART_SIZE_BYTES = 64 * 1024 * 1024
+#: The longest ``idempotency_key`` of an upload that is split: each part's key adds ``:part-<n>``.
+_MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH = 240
 #: Seconds before the first retry; each later retry waits twice as long, up to ``RETRY_MAX_DELAY``.
 #: Half of each wait is fixed and half random.
 RETRY_BASE_DELAY = 0.5
@@ -554,6 +562,15 @@ class _Body:
     def rewindable(self) -> bool:
         return self.stream is None or self.start is not None
 
+    def slice(self, offset: int, size: int) -> _Body:
+        """``size`` bytes from ``offset``, re-read from the source on every attempt (rewindable
+        bodies only)."""
+        if self.stream is None:
+            return _Body(cast(bytes, self.data)[offset:offset + size], size=size)
+        piece = _Body(size=size)
+        piece.stream, piece.start = self.stream, cast(int, self.start) + offset
+        return piece
+
     def open(self) -> bytes | BinaryIO:
         if self.stream is None:
             return cast(bytes, self.data)
@@ -620,11 +637,9 @@ def _payload(payload: object, multipart: bool = False, part_size: bool = True) -
     return body
 
 
-def _image_size(size: int | None, final: bool) -> None:
+def _image_size(size: int | None) -> None:
     if size is not None and size > 20 * 1024 * 1024:
         raise CalmLensValidationError(error_codes.MULTIPART_IMAGE_TOO_LARGE)
-    if final and size is not None and size < 10 * 1024 * 1024:
-        raise CalmLensValidationError(error_codes.MULTIPART_IMAGE_TOO_SMALL)
 
 
 def _camel(key: str) -> str:
@@ -690,6 +705,13 @@ def _max_retries(value: object) -> int:
     return value
 
 
+def _part_size_bytes(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or not MIN_PART_SIZE_BYTES <= value <= MAX_PART_SIZE_BYTES:
+        raise _invalid(f"part_size_bytes must be an integer from {MIN_PART_SIZE_BYTES} (5 MiB) to "
+                       f"{MAX_PART_SIZE_BYTES} (64 MiB)", error_codes.SDK_INVALID_CONFIG)
+    return value
+
+
 def _max_response_bytes(value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise _invalid("max_response_bytes must be a positive integer", error_codes.SDK_INVALID_CONFIG)
@@ -745,6 +767,10 @@ class CalmLensServerClient:
             ``idempotency/request-in-progress``; 0 disables retries.
         max_response_bytes: The largest API response body the client reads; a larger one fails
             with ``sdk/response-too-large``. CDN downloads are not limited.
+        part_size_bytes: Content larger than this (bytes, base64 or a seekable binary file) is
+            uploaded automatically as a multipart upload in parts of this size, from 5 MiB to
+            64 MiB (default 8 MiB). Each part is retried on its own and an interrupted upload
+            resumes when the call is repeated with the same ``idempotency_key``.
         transport: Optional ``transport(request, timeout)`` callable returning a
             context-managed response with ``status``, ``headers`` and ``read()``.
 
@@ -759,7 +785,7 @@ class CalmLensServerClient:
                  timeout: float = DEFAULT_TIMEOUT, upload_timeout: float | None = None,
                  connect_timeout: float = DEFAULT_CONNECT_TIMEOUT,
                  max_retries: int = DEFAULT_MAX_RETRIES, max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
-                 transport: Transport | None = None):
+                 part_size_bytes: int = DEFAULT_PART_SIZE_BYTES, transport: Transport | None = None):
         # Validate every option before creating any state (connection pools, caches).
         api_key = os.environ.get(_ENV_API_KEY) if api_key is None else api_key
         project_id = os.environ.get(_ENV_PROJECT_ID) if project_id is None else project_id
@@ -775,12 +801,14 @@ class CalmLensServerClient:
                 raise _invalid(f"{name} must be an HTTP(S) URL", error_codes.SDK_INVALID_CONFIG)
         max_retries = _max_retries(max_retries)
         max_response_bytes = _max_response_bytes(max_response_bytes)
+        part_size_bytes = _part_size_bytes(part_size_bytes)
         if transport is not None and not callable(transport):
             raise _invalid("transport must be callable", error_codes.SDK_INVALID_CONFIG)
         self.api_key, self.project_id = api_key, project_id
         self.base_url, self.cdn_base_url = base_url.rstrip("/"), cdn_base_url.rstrip("/")
         self.timeout, self.upload_timeout, self.connect_timeout = timeout, upload, connect_timeout
         self.max_retries, self.max_response_bytes = max_retries, max_response_bytes
+        self.part_size_bytes = part_size_bytes
         self.transport: Transport = transport if transport is not None else _Transport(connect_timeout)
         self._lenses: dict[str, Lens] = {}
         self._lens_lock = threading.RLock()
@@ -1161,6 +1189,11 @@ class Assets:
         ``url``. ``idempotency_key`` makes retries safe; one is generated per call when
         omitted, and reused for the client's own retries.
 
+        ``content`` larger than the client's ``part_size_bytes`` (bytes, base64 or a seekable
+        binary file) is sent as a multipart upload in parts of that size, each retried on its own;
+        calling again with the same ``idempotency_key`` (at most 240 characters) resumes an
+        interrupted upload instead of starting a new one.
+
         ``author_id`` is your label for who wrote the content. ``context`` holds earlier posts in
         the conversation, oldest first (``{"items": [{"text": ..., "authorId": ...}]}``); CalmLens
         moderates only the content and uses them to read it in context. Only the posts CalmLens
@@ -1229,12 +1262,22 @@ class Assets:
         checked = not self._c._defer_upload_checks
         if checked and multipart and normalized.startswith("image/") and total is not None:
             # Like the API, a declared image total is checked before the part itself.
-            _image_size(total, True)
+            _image_size(total)
         body = _payload(payload, multipart, checked)
         if checked and multipart and normalized.startswith("image/"):
-            _image_size(body.size, payload.get("isFinal", False))
+            _image_size(body.size)
         query = {k: options[k] for k in _SUBMIT_QUERY_KEYS if k in options}
         query.update(queue=queue, contentType=mime, sizeInBytes=body.size)
+        # Content the client can read again is split into parts when it is larger than one part.
+        split = (not multipart and "plainText" not in payload and body.rewindable and body.size is not None
+                 and body.size > self._c.part_size_bytes)
+        if split:
+            if len(key) > _MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH:
+                raise _invalid(f"idempotency_key can have at most {_MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH} characters "
+                               "for content uploaded in parts")
+            if checked and normalized.startswith("image/"):
+                _image_size(body.size)
+            return self._upload_in_parts(query, mime, body, key)
         if multipart:
             query.update(partNumber=1, isFinal=payload.get("isFinal", False), totalSizeInBytes=total)
         headers = {"Content-Type": _header_value("type", mime), "X-CalmLens-Upload": "part" if multipart else "content"}
@@ -1246,6 +1289,53 @@ class Assets:
             "POST", self._c._project("assets"), query=query, raw=body, headers=headers, idempotency_key=key,
             timeout=self._c.upload_timeout if binary else None))
 
+    def _upload_in_parts(self, query: dict[str, Any], mime: str, body: _Body, key: str) -> Asset:
+        """Upload ``body`` as a multipart upload of ``part_size_bytes`` parts and return the final
+        part's asset. Part ``n`` after the first carries the key ``<key>:part-<n>``, so repeating
+        the call with the same key replays the parts the API already has and sends the rest."""
+        total, part_size = cast(int, body.size), self._c.part_size_bytes
+        count = -(-total // part_size)
+
+        def piece(number: int) -> _Body:
+            offset = (number - 1) * part_size
+            return body.slice(offset, min(part_size, total - offset))
+
+        first = piece(1)
+        query = {**query, "sizeInBytes": first.size, "partNumber": 1, "isFinal": False, "totalSizeInBytes": total}
+        headers = {"Content-Type": _header_value("type", mime), "X-CalmLens-Upload": "part",
+                   "Content-Length": str(first.size)}
+        asset = _expect_asset(self._c._request("POST", self._c._project("assets"), query=query, raw=first,
+                                               headers=headers, idempotency_key=key, timeout=self._c.upload_timeout))
+        asset_id = asset["id"]
+        number = 2
+        while number <= count:
+            final = number == count
+            try:
+                asset = self._send_part(asset_id, number, final, piece(number), None, f"{key}:part-{number}")
+            except CalmLensAPIError as error:
+                expected = error.details.get("expectedPartNumber")
+                if (error.code == error_codes.INVALID_UPLOAD_PART_NUMBER and type(expected) is int
+                        and number < expected <= count):
+                    # The parts before ``expected`` arrived, but their responses were lost.
+                    number = expected
+                    continue
+                if final and error.code == error_codes.UPLOAD_NOT_OPEN:
+                    # The final part completed the upload, but its response was lost.
+                    return self.retrieve(cast(AssetIdOptions, {"assetId": asset_id}))
+                raise
+            number += 1
+        return asset
+
+    def _send_part(self, asset_id: str, number: int, final: bool, body: _Body, queue: bool | None,
+                   idempotency_key: str) -> Asset:
+        query: dict[str, Any] = {"partNumber": number, "isFinal": final, "sizeInBytes": body.size}
+        if queue is not None:
+            query["queue"] = queue
+        headers = {"X-CalmLens-Upload": "part", "Content-Length": str(body.size)}
+        return _expect_asset(self._c._request(
+            "POST", "/assets/" + _id(asset_id, "assetId") + "/part", raw=body, headers=headers, query=query,
+            idempotency_key=idempotency_key, timeout=self._c.upload_timeout))
+
     def upload_part(self, options: UploadPartOptions | None = None, /, *, asset_id: str = _UNSET,
                     part: PartContent = _UNSET, queue: bool = _UNSET, idempotency_key: str | None = None) -> Asset:
         """Send the next part of a multipart upload (``partNumber`` 2, 3, ...; parts are
@@ -1255,22 +1345,17 @@ class Assets:
         upload started; pass ``queue`` only to override it.
         """
         merged = _merge(options, asset_id=asset_id, part=part, queue=queue)
-        path = "/assets/" + _id(merged.get("assetId"), "assetId") + "/part"
+        asset = merged.get("assetId")
+        _id(asset, "assetId")
         payload = merged.get("part")
         if not isinstance(payload, Mapping):
             raise _invalid("part must be a dict")
         if type(payload.get("partNumber")) is not int or payload["partNumber"] < 1:
             raise CalmLensValidationError(error_codes.INVALID_UPLOAD_PART_NUMBER)
         body = _payload(payload, True, not self._c._defer_upload_checks)
-        query: dict[str, Any] = {"partNumber": payload["partNumber"], "isFinal": payload.get("isFinal", False),
-                                 "sizeInBytes": body.size}
-        if merged.get("queue") is not None:
-            query["queue"] = bool(merged["queue"])
-        headers = {"X-CalmLens-Upload": "part", "Content-Length": str(body.size)}
-        return _expect_asset(self._c._request(
-            "POST", path, raw=body, headers=headers, query=query,
-            idempotency_key=idempotency_key if idempotency_key is not None else str(uuid.uuid4()),
-            timeout=self._c.upload_timeout))
+        return self._send_part(cast(str, asset), payload["partNumber"], bool(payload.get("isFinal", False)), body,
+                               None if merged.get("queue") is None else bool(merged["queue"]),
+                               idempotency_key if idempotency_key is not None else str(uuid.uuid4()))
 
     def create_signed_url(self, options: SignedUrlOptions | None = None, /, *, asset_id: str = _UNSET,
                           resource: Literal["original", "rendered"] = _UNSET, expires_in_seconds: int = _UNSET, lens: str = _UNSET,

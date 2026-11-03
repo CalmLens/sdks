@@ -1,3 +1,4 @@
+import base64
 import io
 import json
 import os
@@ -166,8 +167,6 @@ class ClientTests(ClientTestCase):
              error_codes.INVALID_UPLOAD_PAYLOAD),
             ("upload_part", {"assetId": "a", "part": {"data": b"x" * mib, "partNumber": 2}},
              error_codes.INVALID_UPLOAD_PAYLOAD),
-            ("create", {"name": "x.png", "part": {"data": b"x" * mib, "isFinal": True, "type": "image/png"}},
-             error_codes.MULTIPART_IMAGE_TOO_SMALL),
             ("create", {"name": "x.png", "part": {"data": b"x" * (21 * mib), "type": "image/png"}},
              error_codes.MULTIPART_IMAGE_TOO_LARGE),
         ]
@@ -176,6 +175,9 @@ class ClientTests(ClientTestCase):
                 getattr(self.client.assets, method)(options)
             self.assertEqual((raised.exception.code, raised.exception.status), (code, None))
         self.assertEqual(self.calls, [])
+        # A small image may be sent as one final part.
+        self.client.assets.create({"name": "x.png", "part": {"data": b"x" * mib, "isFinal": True, "type": "image/png"}})
+        self.assertEqual((self.query()["partNumber"], self.query()["isFinal"]), (["1"], ["true"]))
 
     def test_validation_before_network(self):
         cases = [
@@ -313,6 +315,115 @@ class RetryTests(ClientTestCase):
             self.client.assets.retrieve(asset_id="a")
         self.assertEqual(raised.exception.code, error_codes.SDK_TIMEOUT)
         self.assertTrue(raised.exception.is_retryable)
+
+
+MIB = 1024 * 1024
+
+
+class AutomaticMultipartTests(ClientTestCase):
+    """Content larger than ``part_size_bytes`` is uploaded in parts, each retried on its own."""
+
+    def setUp(self):
+        super().setUp()
+        self.client = CalmLensServerClient(api_key="key", project_id="p", part_size_bytes=5 * MIB,
+                                           transport=self.client.transport)
+        self.client._sleep = self.sleeps.append
+        self.result = {**ASSET, "id": "a1"}
+
+    def sent(self):
+        return [(urlsplit(call.full_url).path, {k: v[0] for k, v in self.query(i).items()
+                                                if k in ("partNumber", "isFinal", "sizeInBytes", "totalSizeInBytes",
+                                                         "queue")},
+                 call.get_header("Idempotency-key"), call.get_header("X-calmlens-upload"))
+                for i, call in enumerate(self.calls)]
+
+    def test_content_larger_than_a_part_is_split_into_parts(self):
+        data = bytes(range(256)) * (2 * 5 * MIB // 256) + b"end"
+        stream = io.BytesIO(b"skip" + data)
+        stream.seek(4)  # A file is read from its current position.
+        for content in ({"data": data}, {"base64": base64.b64encode(data).decode()}, {"data": stream}):
+            with self.subTest(source=next(iter(content))):
+                self.calls.clear()
+                self.bodies.clear()
+                stream.seek(4)
+                asset = self.client.assets.classify(name="v.mp4", content={**content, "type": "video/mp4"},
+                                                    idempotency_key="K")
+                self.assertEqual(asset["id"], "a1")
+                part = str(5 * MIB)
+                self.assertEqual(self.sent(), [
+                    ("/v1/projects/p/assets", {"queue": "false", "partNumber": "1", "isFinal": "false",
+                                               "sizeInBytes": part, "totalSizeInBytes": str(len(data))}, "K", "part"),
+                    ("/v1/assets/a1/part", {"partNumber": "2", "isFinal": "false", "sizeInBytes": part},
+                     "K:part-2", "part"),
+                    ("/v1/assets/a1/part", {"partNumber": "3", "isFinal": "true", "sizeInBytes": "3"},
+                     "K:part-3", "part"),
+                ])
+                self.assertEqual(self.calls[0].get_header("Content-type"), "video/mp4")
+                self.assertEqual(b"".join(self.bodies), data)
+
+    def test_content_of_one_part_or_from_a_pipe_is_sent_in_one_request(self):
+        size = 5 * MIB
+        self.client.assets.create(name="v.mp4", content={"data": b"x" * size, "type": "video/mp4"})
+        self.client.assets.create(name="v.mp4", content={"data": Unseekable(b"x" * (size + 1)),
+                                                         "sizeInBytes": size + 1, "type": "video/mp4"})
+        self.client.assets.create(name="t.txt", content={"plainText": "x" * (size + 1), "type": "text/plain"})
+        self.assertEqual([call.get_header("X-calmlens-upload") for call in self.calls], ["content"] * 3)
+
+    def test_a_dropped_part_is_retried_with_the_same_key_and_bytes(self):
+        data = b"a" * (5 * MIB) + b"b" * 10
+        self.script = [(self.result,), ConnectionResetError("reset"), (self.result,)]
+        self.client.assets.create(name="v.mp4", content={"data": io.BytesIO(data), "type": "video/mp4"},
+                                  idempotency_key="K")
+        self.assertEqual([sent[2] for sent in self.sent()], ["K", "K:part-2", "K:part-2"])
+        self.assertEqual(self.bodies[1:], [b"b" * 10, b"b" * 10])
+        self.assertEqual(len(self.sleeps), 1)
+
+    def test_parts_the_api_already_has_are_skipped(self):
+        data = b"x" * (3 * 5 * MIB + 1)
+        wrong = {"code": error_codes.INVALID_UPLOAD_PART_NUMBER, "message": "Expected part 4",
+                 "details": {"expectedPartNumber": 4, "receivedPartNumber": 2}}
+        self.script = [(self.result,), (wrong, 400), (self.result,)]
+        self.client.assets.create(name="v.mp4", content={"data": data, "type": "video/mp4"}, idempotency_key="K")
+        self.assertEqual([sent[1]["partNumber"] for sent in self.sent()], ["1", "2", "4"])
+        self.assertEqual(self.sent()[-1][1]["isFinal"], "true")
+
+    def test_an_expected_part_outside_the_upload_is_raised(self):
+        wrong = {"code": error_codes.INVALID_UPLOAD_PART_NUMBER, "details": {"expectedPartNumber": 3}}
+        self.script = [(self.result,), (wrong, 400)]
+        with self.assertRaises(CalmLensError) as raised:
+            self.client.assets.create(name="v.mp4", content={"data": b"x" * (5 * MIB + 1), "type": "video/mp4"})
+        self.assertEqual((raised.exception.code, len(self.calls)), (error_codes.INVALID_UPLOAD_PART_NUMBER, 2))
+
+    def test_a_completed_upload_is_read_back_when_the_final_part_finds_it_closed(self):
+        completed = {**self.result, "upload": {"status": "completed"}, "name": "done"}
+        self.script = [({**self.result, "upload": {"status": "uploading"}},),
+                       ({"code": error_codes.UPLOAD_NOT_OPEN}, 409), (completed,)]
+        asset = self.client.assets.create(name="v.mp4", content={"data": b"x" * (5 * MIB + 1), "type": "video/mp4"})
+        self.assertEqual(asset, completed)
+        self.assertEqual((self.calls[-1].get_method(), urlsplit(self.calls[-1].full_url).path),
+                         ("GET", "/v1/assets/a1"))
+
+    def test_part_size_must_be_from_5_to_64_mib(self):
+        for value in (5 * MIB - 1, 64 * MIB + 1, 0, True, 8.0 * MIB, "8388608"):
+            with self.subTest(value=value), self.assertRaises(CalmLensValidationError) as raised:
+                CalmLensServerClient(api_key="key", project_id="p", part_size_bytes=value)
+            self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_CONFIG)
+        self.assertEqual(CalmLensServerClient(api_key="key", project_id="p").part_size_bytes, 8 * MIB)
+        self.assertEqual(CalmLensServerClient(api_key="key", project_id="p",
+                                              part_size_bytes=64 * MIB).part_size_bytes, 64 * MIB)
+
+    def test_split_uploads_refuse_keys_without_room_for_part_suffixes(self):
+        content = {"data": b"x" * (5 * MIB + 1), "type": "video/mp4"}
+        with self.assertRaises(CalmLensValidationError) as raised:
+            self.client.assets.create(name="v.mp4", content=content, idempotency_key="k" * 241)
+        self.assertEqual((raised.exception.code, self.calls), (error_codes.SDK_INVALID_ARGUMENT, []))
+        self.client.assets.create(name="v.mp4", content=content, idempotency_key="k" * 240)
+        self.assertEqual(self.calls[-1].get_header("Idempotency-key"), "k" * 240 + ":part-2")
+
+    def test_images_over_20_mib_are_refused_before_sending(self):
+        with self.assertRaises(CalmLensValidationError) as raised:
+            self.client.assets.create(name="x.png", content={"data": b"x" * (20 * MIB + 1), "type": "image/png"})
+        self.assertEqual((raised.exception.code, self.calls), (error_codes.MULTIPART_IMAGE_TOO_LARGE, []))
 
 
 if __name__ == "__main__":

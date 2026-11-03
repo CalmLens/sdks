@@ -107,7 +107,7 @@ def _invoke(client: CalmLensServerClient, operation: str, args: Any) -> Any:
 def _client_options(options: dict[str, Any]) -> dict[str, Any]:
     """JavaScript client options to Python's keyword arguments (milliseconds become seconds)."""
     names = {"apiKey": "api_key", "projectId": "project_id", "baseUrl": "base_url", "cdnBaseUrl": "cdn_base_url",
-             "maxRetries": "max_retries", "maxResponseBytes": "max_response_bytes"}
+             "maxRetries": "max_retries", "maxResponseBytes": "max_response_bytes", "partSizeBytes": "part_size_bytes"}
     converted = {}
     for key, value in options.items():
         if key == "timeoutMs":
@@ -627,7 +627,7 @@ class SurfaceTests(unittest.TestCase):
             "maxRetries": c.max_retries, "retryBaseDelayMs": client_module.RETRY_BASE_DELAY * 1000,
             "retryMaxDelayMs": client_module.RETRY_MAX_DELAY * 1000,
             "retryAfterMaxMs": client_module.MAX_RETRY_AFTER_SECONDS * 1000,
-            "maxResponseBytes": c.max_response_bytes,
+            "maxResponseBytes": c.max_response_bytes, "partSizeBytes": c.part_size_bytes,
             "signedUrlExpiresInSeconds": client_module.DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
             "uploadTokenExpiresInSeconds": client_module.UPLOAD_TOKEN_DEFAULT_EXPIRES_IN_SECONDS,
             "waitForDecisionTimeoutMs": client_module.DEFAULT_DECISION_TIMEOUT * 1000,
@@ -909,7 +909,9 @@ class MockScenarioTests(unittest.TestCase):
             return testing.default_moderate(moderation) if spec is None else _build_decision(spec)
 
         options: dict[str, Any] = {} if moderate is None else {"moderate": recording_moderate}
-        retries = {} if "maxRetries" not in mock else {"max_retries": mock["maxRetries"]}
+        retries: dict[str, Any] = {} if "maxRetries" not in mock else {"max_retries": mock["maxRetries"]}
+        if "partSizeBytes" in mock:
+            retries["part_size_bytes"] = mock["partSizeBytes"]
         client = MockCalmLensServerClient(api_key=create_mock_api_key(mock.get("apiKeyGrants")),
                                           project_id="project-1", mock_options=cast(Any, options), **retries)
         # The status of each response the mock answers, to check a step's final one.
