@@ -2,31 +2,31 @@
   "releases": [
     {
       "sdk": "javascript",
-      "version": "0.18.0"
+      "version": "0.18.1"
     },
     {
       "sdk": "python",
-      "version": "0.18.0"
+      "version": "0.18.1"
     },
     {
       "sdk": "ruby",
-      "version": "0.18.0"
+      "version": "0.18.1"
     },
     {
       "sdk": "rust",
-      "version": "0.18.0"
+      "version": "0.18.1"
     },
     {
       "sdk": "java",
-      "version": "0.18.0"
+      "version": "0.18.1"
     },
     {
       "sdk": "go",
-      "version": "0.18.0"
+      "version": "0.18.1"
     },
     {
       "sdk": "php",
-      "version": "0.18.0"
+      "version": "0.18.1"
     }
   ]
 }
