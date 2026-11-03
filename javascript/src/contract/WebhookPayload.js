@@ -1,11 +1,11 @@
-import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, o as backfill, s as updatedAt, t as EXAMPLE_IDS } from "./Ids-CKifL59z.js";
+import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, o as backfill, s as updatedAt, t as EXAMPLE_IDS } from "./Ids-D2XfVlL6.js";
 import { t as CLASSIFICATION_CATEGORIES } from "./ModerationCategories-CHFRoeWV.js";
 import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
-import "./SharedConstants-CyiUWW66.js";
+import "./SharedConstants-CrqW8Uco.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { i as msg, n as MODERATION_QUALIFIERS, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-ShLrTN7y.js";
-import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-FusEXb4U.js";
-import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-DIup3qyn.js";
+import { i as msg, n as MODERATION_QUALIFIERS, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-6yfnXdpa.js";
+import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-DF7spSE4.js";
+import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-C2KeOlab.js";
 import * as zod from "zod";
 // packages/shared/src/AssetModerationDecision.ts
 /**
@@ -127,16 +127,16 @@ const LINK_SAFETY_SETTINGS_SCHEMA = zod.object({
 	namedType: "LinkSafetySettings"
 })]));
 const LINK_SAFETY_EVIDENCE_SCHEMA = zod.object({
-	check: zod.enum(["domain-categories", "threat-lists"]).describe("Which check this is: the destination domain's categories, or a threat-list lookup of the destination URL"),
+	check: zod.enum(["domain-categories", "threat-lists"]).describe("Which check this is: the domain categories, or a threat-list lookup, of the link, every address it redirects through and its destination"),
 	status: zod.enum(["checked", "failed"]).describe("`failed` when the check could not answer, which makes the link `unresolved`"),
-	labels: zod.array(zod.string()).describe("What the check reported, such as the domain's content categories and security risks or the threat types listed")
+	labels: zod.array(zod.string()).describe("What the check reported for any of the addresses, such as the domains' content categories and security risks or the threat types listed")
 }).strict().meta(metaStore([docPropertyInfo({
-	description: "One reputation check of a link's destination",
+	description: "One reputation check of a link, its redirects and its destination",
 	namedType: "LinkSafetyEvidence"
 })]));
 const CHECKED_LINK_SCHEMA = zod.object({
 	url: zod.string().describe("The link as found, with `https://` added when it was left out"),
-	finalUrl: zod.string().nullable().describe("Where the link leads after following its redirects, or `null` when a short link could not be followed"),
+	finalUrl: zod.string().nullable().describe("Where the link leads after following its redirects, or `null` when a short link or redirect chain could not be followed"),
 	redirects: zod.number().int().nonnegative().describe("How many redirects were followed to reach `finalUrl`"),
 	source: zod.enum(["qr-code", "text"]).describe("Where the link was found: in a QR code, or in the text"),
 	verdict: LINK_SAFETY_VERDICT_SCHEMA,
@@ -236,14 +236,16 @@ const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the cont
 const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action.");
 // packages/shared/src/ProcessingFeatures.ts
 /**
-* Optional analyses a request can turn on with `processingOptions.features.<id>`. The catalog is
-* the single source for the request and result schemas, cache keys and metering. Features are
-* chosen per request only; there is no project-level default.
+* Optional analyses a request can turn on or off with `processingOptions.features.<id>`. The
+* catalog is the single source for the request and result schemas, cache keys and metering. Each
+* feature's `activation` sets what a request that doesn't mention it gets; there is no
+* project-level default.
 */
 /** How mature a feature is. Beta results may change shape. */
 const PROCESSING_FEATURE_STAGES = ["beta", "ga"];
 const createFeatureOptionsSchemas = (booleanSchema) => {
-	const enabled = booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to run the feature. Every feature is off unless this is true." })]));
+	const enabled = booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to run the feature. It runs only when this is true." })]));
+	const enabledUnlessFalse = booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to run the feature. It runs unless this is false, including when the feature is left out." })]));
 	return {
 		ocr: zod.object({ enabled }).strict().meta(metaStore([docPropertyInfo({
 			description: "Extract text onto the image asset and run an additional text moderation pass. Applies to images, including those extracted from multimedia documents and websites.",
@@ -263,8 +265,8 @@ const createFeatureOptionsSchemas = (booleanSchema) => {
 			description: "Preview. Locate faces in images and optionally estimate an age range for each. Faces are not identified or stored as biometric templates. Results are informational and never change the moderation decision.",
 			namedType: "FaceDetectionFeatureOptions"
 		})])),
-		linkDetection: zod.object({ enabled }).strict().meta(metaStore([docPropertyInfo({
-			description: "Find QR codes and web links in images. QR code contents are moderated as text. With OCR on, links in the extracted text are listed too. Free.",
+		linkDetection: zod.object({ enabled: enabledUnlessFalse }).strict().meta(metaStore([docPropertyInfo({
+			description: "Find QR codes and web links in images. On by default: send `enabled: false` to turn it off. QR code contents are moderated as text. With OCR on, links in the extracted text are listed too. Free.",
 			namedType: "LinkDetectionFeatureOptions"
 		})])),
 		aiGeneratedDetection: zod.object({ enabled }).strict().meta(metaStore([docPropertyInfo({
@@ -282,7 +284,7 @@ const createProcessingFeaturesSchema = (booleanSchema) => {
 		linkDetection: options.linkDetection.nullish(),
 		aiGeneratedDetection: options.aiGeneratedDetection.nullish()
 	}).strict().omit({ aiGeneratedDetection: true }).meta(metaStore([docPropertyInfo({
-		description: "Optional analyses to run on this asset, keyed by feature. Unknown features are rejected.",
+		description: "Optional analyses to run on this asset, keyed by feature. Link detection runs unless turned off; the others run only when turned on. Unknown features are rejected.",
 		namedType: "ProcessingFeatures"
 	})]));
 };
@@ -983,11 +985,20 @@ zod.object({
 	childProcessing: CHILD_PROCESSING_SCHEMA.nullish(),
 	manualDecision: MANUAL_DECISION_SCHEMA.nullish()
 });
+// packages/shared/src/AssetConstants.ts
+const ASSET_REJECTION_NOTE_MAX_LENGTH = 1499;
 // packages/shared/src/HumanReview.ts
 const SAMPLE_PERCENT_SCHEMA = zod.number().min(0).max(100);
 zod.object({
 	allowedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
-	restrictedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0)
+	restrictedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
+	/**
+	* Queues decisions with a moderated category whose policy score lies less than this many
+	* percentage points from the policy threshold. 0 turns it off.
+	*/
+	uncertaintyMarginPercent: zod.number().min(0).max(50).default(0),
+	/** Queues decisions whose report has evidence the moderation pipeline couldn't assess. */
+	reviewMissingEvidence: zod.boolean().default(false)
 }).strict();
 /** The decisions a reviewer can make, and the statuses they review. */
 const HUMAN_REVIEW_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA;
@@ -997,11 +1008,21 @@ const HUMAN_REVIEW_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA;
 */
 const HUMAN_REVIEW_SAMPLED_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA.exclude(["purged"]);
 const HUMAN_REVIEW_STATUS_SCHEMA = zod.enum(["pending", "completed"]);
+/**
+* Why an asset joined the queue: drawn by the random sample, or routed because its decision was
+* uncertain. An asset drawn by the sample is `sampled` even when it is also uncertain, so the
+* random sample stays representative.
+*/
+const HUMAN_REVIEW_REASON_SCHEMA = zod.enum(["sampled", "uncertain"]);
+const HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA = zod.array(zod.enum(CLASSIFICATION_CATEGORIES));
 zod.object({
 	id: primaryIdField("rev"),
 	projectId: idField("proj"),
 	assetId: idField("asset"),
 	automatedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA,
+	reason: HUMAN_REVIEW_REASON_SCHEMA,
+	/** The categories whose decision was uncertain when the asset was queued, sampled or not. */
+	uncertainCategories: HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA,
 	status: HUMAN_REVIEW_STATUS_SCHEMA,
 	decision: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
 	/**
@@ -1009,7 +1030,7 @@ zod.object({
 	* the automated outcome when someone decided the asset after sampling. Set once completed.
 	*/
 	reviewedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
-	note: zod.string().max(1e3).nullish(),
+	note: zod.string().max(ASSET_REJECTION_NOTE_MAX_LENGTH).nullish(),
 	reviewerUserId: zod.string().nullish(),
 	/** Whether the decision changed the asset's status (only when it overturned `reviewedOutcome`). */
 	appliedToAsset: zod.boolean().nullish(),
@@ -1019,7 +1040,7 @@ zod.object({
 zod.object({
 	decision: HUMAN_REVIEW_OUTCOME_SCHEMA,
 	confirmPurge: zod.boolean().optional(),
-	note: zod.string().trim().max(1e3).nullish()
+	note: zod.string().trim().max(ASSET_REJECTION_NOTE_MAX_LENGTH).nullish()
 }).strict().superRefine((body, ctx) => {
 	if (body.decision === "purged" && body.confirmPurge !== true) ctx.addIssue({
 		code: "custom",
@@ -1260,7 +1281,7 @@ const ASSET_REGION_RESTRICTED = defineEventType({
 });
 const decidedByField = field(zod.enum(["automated", "reviewer"]), {
 	label: msg("Decided by"),
-	description: "Who made the decision: `automated` moderation or a `reviewer` in the portal, through the API or by resolving an appeal.",
+	description: `Who made the decision: \`automated\` moderation or a \`reviewer\` in the portal or through the API.`,
 	display: "enum",
 	valueLabels: {
 		automated: msg("Automated moderation"),
@@ -1571,12 +1592,29 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 			description: "The asset's status from automated moderation: `allowed`, `limited`, `age-restricted` or `blocked`.",
 			display: "enum",
 			valueLabels: MODERATION_STATUS_LABELS
+		}),
+		reviewReason: field(HUMAN_REVIEW_REASON_SCHEMA, {
+			label: msg("Reason"),
+			description: "Why the asset was queued: `sampled` by the project's random sample, or `uncertain` because a category's policy score was close to the threshold or evidence could not be assessed. An asset the sample draws is `sampled` even when it is also uncertain.",
+			display: "enum",
+			valueLabels: {
+				sampled: msg("Sampled"),
+				uncertain: msg("Uncertain")
+			}
+		}),
+		uncertainCategories: field(HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA, {
+			label: msg("Uncertain categories"),
+			description: "The parent policy categories whose decision was uncertain under the project's review settings, or none.",
+			display: "list",
+			valueLabels: CATEGORY_LABELS
 		})
 	},
 	example: {
 		assetName: "beach.jpg",
 		assetType: "image",
-		automatedOutcome: "allowed"
+		automatedOutcome: "allowed",
+		reviewReason: "uncertain",
+		uncertainCategories: ["harassment"]
 	}
 });
 const ASSET_HASH_MATCHED = defineEventType({
@@ -1835,6 +1873,65 @@ const PROJECT_INVITATION_SENT = defineEventType({
 		invitedByUserId: EXAMPLE_IDS.user
 	}
 });
+const PROJECT_TRANSFERRED = defineEventType({
+	id: "project.transferred",
+	name: msg("Project transferred"),
+	description: msg("The project moved to another organisation, which is billed for its usage from then on."),
+	category: "team",
+	severity: "high",
+	notify: true,
+	permission: "members:read",
+	fields: {
+		previousOrganisationId: field(idField("org"), {
+			label: msg("Previous organisation ID"),
+			description: "ID of the organisation the project left.",
+			display: "code",
+			hidden: true
+		}),
+		previousOrganisationName: field(zod.string(), {
+			label: msg("Previous organisation"),
+			description: "Name of the organisation the project left.",
+			display: "text"
+		}),
+		organisationId: field(idField("org"), {
+			label: msg("Organisation ID"),
+			description: "ID of the organisation that now owns the project.",
+			display: "code",
+			hidden: true
+		}),
+		organisationName: field(zod.string(), {
+			label: msg("Organisation"),
+			description: "Name of the organisation that now owns the project.",
+			display: "text"
+		}),
+		handover: field(zod.boolean(), {
+			label: msg("Handed over"),
+			description: "`true` when an owner of the receiving organisation accepted it from another organisation, `false` when someone who owns both moved it.",
+			display: "enum"
+		}),
+		apiKeysRevoked: field(zod.number().int().nonnegative(), {
+			label: msg("API keys revoked"),
+			description: "Number of the project's API keys revoked by a handover.",
+			display: "number"
+		}),
+		connectorsPaused: field(zod.number().int().nonnegative(), {
+			label: msg("Connectors paused"),
+			description: "Number of the project's webhooks and other connectors paused by a handover.",
+			display: "number"
+		}),
+		transferredByUserId: actorUserIdField("Transferred by ID", "User ID of the person who completed the transfer.")
+	},
+	example: {
+		previousOrganisationId: "org_7Vb3Xk9Lm2Qt4Wp8Nc5R",
+		previousOrganisationName: "Studio North",
+		organisationId: EXAMPLE_IDS.org,
+		organisationName: "Acme",
+		handover: true,
+		apiKeysRevoked: 2,
+		connectorsPaused: 1,
+		transferredByUserId: EXAMPLE_IDS.user
+	}
+});
 const API_KEY_CREATED = defineEventType({
 	id: "api-key.created",
 	name: msg("API key created"),
@@ -1974,6 +2071,7 @@ const EVENT_TYPE_INFO = {
 	"project.member-removed": PROJECT_MEMBER_REMOVED,
 	"project.member-role-changed": PROJECT_MEMBER_ROLE_CHANGED,
 	"project.invitation-sent": PROJECT_INVITATION_SENT,
+	"project.transferred": PROJECT_TRANSFERRED,
 	"api-key.created": API_KEY_CREATED,
 	"api-key.revoked": API_KEY_REVOKED,
 	"connector.failing": CONNECTOR_FAILING,

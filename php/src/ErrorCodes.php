@@ -17,6 +17,8 @@ final class ErrorCodes
     public const INVALID_VIEWER_REGION = 'viewer/invalid-region';
     public const VIEWER_REGION_REQUIRED = 'viewer/region-required';
     public const REGIONAL_EVIDENCE_REQUIRED = 'asset/regional-evidence-required';
+    public const SIGNED_URL_EXPIRED = 'signed-url/expired';
+    public const SIGNED_URL_INVALID = 'signed-url/invalid';
     public const INVALID_TYPE = 'validation/invalid-type';
     public const TOO_SMALL = 'validation/too-small';
     public const TOO_BIG = 'validation/too-big';
@@ -44,12 +46,11 @@ final class ErrorCodes
     public const API_KEY_NOT_ACCEPTED = 'auth/api-key-not-accepted';
     public const PERMISSION_DENIED = 'auth/permission-denied';
     public const FILE_TOO_LARGE = 'upload/file-too-large';
-    public const MULTIPART_IMAGE_TOO_SMALL = 'upload/multipart-image-too-small';
     public const MULTIPART_IMAGE_TOO_LARGE = 'upload/multipart-image-too-large';
+    public const IMAGE_EXCEEDED_MAX_DIMENSIONS = 'upload/image-exceeded-max-dimensions';
     public const IMAGE_INVALID_INPUT = 'image/invalid-input';
     public const IMAGE_UNSUPPORTED_FORMAT = 'image/unsupported-format';
     public const IMAGE_INPUT_LIMIT = 'image/input-limit';
-    public const IMAGE_EXCEEDED_MAX_DIMENSIONS = 'upload/image-exceeded-max-dimensions';
     public const UPLOAD_LIMIT_EXCEEDED = 'upload/limit-exceeded';
     public const SPEND_LIMIT_REACHED = 'upload/spend-limit-reached';
     public const INVALID_UPLOAD_MIME_TYPE = 'upload/invalid-mime-type';
@@ -131,6 +132,8 @@ final class ErrorCodes
         'viewer/invalid-region' => 400,
         'viewer/region-required' => 403,
         'asset/regional-evidence-required' => 403,
+        'signed-url/expired' => 403,
+        'signed-url/invalid' => 403,
         'validation/invalid-type' => 400,
         'validation/too-small' => 400,
         'validation/too-big' => 400,
@@ -158,12 +161,11 @@ final class ErrorCodes
         'auth/api-key-not-accepted' => 403,
         'auth/permission-denied' => 403,
         'upload/file-too-large' => 400,
-        'upload/multipart-image-too-small' => 400,
         'upload/multipart-image-too-large' => 400,
+        'upload/image-exceeded-max-dimensions' => 400,
         'image/invalid-input' => 422,
         'image/unsupported-format' => 422,
         'image/input-limit' => 422,
-        'upload/image-exceeded-max-dimensions' => 400,
         'upload/limit-exceeded' => 403,
         'upload/spend-limit-reached' => 402,
         'upload/invalid-mime-type' => 400,

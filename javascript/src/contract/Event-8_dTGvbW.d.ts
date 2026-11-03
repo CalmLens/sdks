@@ -1,5 +1,5 @@
 import "./Asset-CQt2Rst2.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-qU6bTPD2.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-6aKXD46f.js";
 import "./Page-DNdKkX2B.js";
 import * as zod from "zod";
 declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
@@ -69,6 +69,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
     "project.member-joined": "project.member-joined";
     "project.member-removed": "project.member-removed";
     "project.member-role-changed": "project.member-role-changed";
+    "project.transferred": "project.transferred";
     "upload-preset.daily-limit-reached": "upload-preset.daily-limit-reached";
     "usage.limit-reached": "usage.limit-reached";
     "usage.spend-limit-reached": "usage.spend-limit-reached";
@@ -156,6 +157,7 @@ declare const PUBLIC_EVENT_SCHEMA: zod.ZodObject<{
     "project.member-joined": "project.member-joined";
     "project.member-removed": "project.member-removed";
     "project.member-role-changed": "project.member-role-changed";
+    "project.transferred": "project.transferred";
     "upload-preset.daily-limit-reached": "upload-preset.daily-limit-reached";
     "usage.limit-reached": "usage.limit-reached";
     "usage.spend-limit-reached": "usage.spend-limit-reached";

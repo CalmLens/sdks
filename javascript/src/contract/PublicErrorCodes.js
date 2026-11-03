@@ -310,6 +310,16 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "This asset needs moderation evidence for the newly served jurisdiction.",
 		status: 403
 	}),
+	SIGNED_URL_EXPIRED: new ErrorCode({
+		id: "signed-url/expired",
+		defaultMessage: "The signed URL has expired. Create a new one on your server.",
+		status: 403
+	}),
+	SIGNED_URL_INVALID: new ErrorCode({
+		id: "signed-url/invalid",
+		defaultMessage: "The signed URL's signature doesn't match its asset, resource, lens, transform, expiry or viewer claims. Use the URL exactly as created.",
+		status: 403
+	}),
 	INVALID_TYPE: new ErrorCode({
 		id: "validation/invalid-type",
 		defaultMessage: "A field has the wrong type. details.issues lists each problem.",
@@ -445,14 +455,14 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.",
 		status: 400
 	}),
-	MULTIPART_IMAGE_TOO_SMALL: new ErrorCode({
-		id: "upload/multipart-image-too-small",
-		defaultMessage: "Multipart image uploads must total at least 10 MiB.",
-		status: 400
-	}),
 	MULTIPART_IMAGE_TOO_LARGE: new ErrorCode({
 		id: "upload/multipart-image-too-large",
 		defaultMessage: "Multipart image uploads cannot exceed 20 MiB.",
+		status: 400
+	}),
+	IMAGE_EXCEEDED_MAX_DIMENSIONS: new ErrorCode({
+		id: "upload/image-exceeded-max-dimensions",
+		defaultMessage: "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",
 		status: 400
 	}),
 	IMAGE_INVALID_INPUT: new ErrorCode({
@@ -469,11 +479,6 @@ const PUBLIC_ERROR_CODES = {
 		id: "image/input-limit",
 		defaultMessage: "The image exceeds the processing byte or pixel limit. Reduce its size before uploading.",
 		status: 422
-	}),
-	IMAGE_EXCEEDED_MAX_DIMENSIONS: new ErrorCode({
-		id: "upload/image-exceeded-max-dimensions",
-		defaultMessage: "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",
-		status: 400
 	}),
 	UPLOAD_LIMIT_EXCEEDED: new ErrorCode({
 		id: "upload/limit-exceeded",
@@ -673,6 +678,51 @@ const PUBLIC_ERROR_CODES = {
 	HASH_LIST_ASSET_NOT_HASHED: new ErrorCode({
 		id: "hash-list/asset-not-hashed",
 		defaultMessage: "This asset has no perceptual hash. Only image assets that finished processing can be added.",
+		status: 409
+	}),
+	POLICY_NOT_FOUND: new ErrorCode({
+		id: "policy/not-found",
+		defaultMessage: "Policy not found. Check the policy ID in the portal.",
+		status: 404
+	}),
+	POLICY_REVISION_CONFLICT: new ErrorCode({
+		id: "policy/revision-conflict",
+		defaultMessage: "The policy changed. Retrieve it again and retry with its current revision.",
+		status: 409
+	}),
+	POLICY_PROJECTS_CHANGED: new ErrorCode({
+		id: "policy/projects-changed",
+		defaultMessage: "The projects using this policy changed. Retrieve it again and review the affected projects before saving.",
+		status: 409
+	}),
+	POLICY_IN_USE: new ErrorCode({
+		id: "policy/in-use",
+		defaultMessage: "Projects or upload presets still use this policy. Choose another policy for each of them before deleting it.",
+		status: 409
+	}),
+	POLICY_USED_BY_ANOTHER_PROJECT: new ErrorCode({
+		id: "policy/used-by-another-project",
+		defaultMessage: "Another project uses or owns this policy, so it can only be changed from the portal or that project.",
+		status: 409
+	}),
+	POLICY_NO_PRESET: new ErrorCode({
+		id: "policy/no-preset",
+		defaultMessage: "This policy has no preset baseline.",
+		status: 400
+	}),
+	POLICY_PRESET_VERSION_CONFLICT: new ErrorCode({
+		id: "policy/preset-version-conflict",
+		defaultMessage: "The preset changed. Review the latest differences and retry with its version.",
+		status: 409
+	}),
+	POLICY_PRESET_UPDATE_UNAVAILABLE: new ErrorCode({
+		id: "policy/preset-update-unavailable",
+		defaultMessage: "Only an unchanged copy of an older preset version can be updated. Reset or review your changes first.",
+		status: 409
+	}),
+	POLICY_AUTOMATIC_UPDATES_UNAVAILABLE: new ErrorCode({
+		id: "policy/automatic-updates-unavailable",
+		defaultMessage: "Automatic updates can only be switched on for a saved copy of a project's preset policy, and off for one that has them.",
 		status: 409
 	}),
 	UPLOAD_PRESET_NOT_FOUND: new ErrorCode({

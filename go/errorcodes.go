@@ -15,6 +15,10 @@ const (
 	CodeViewerRegionRequired = "viewer/region-required"
 	// CodeRegionalEvidenceRequired is returned with HTTP 403.
 	CodeRegionalEvidenceRequired = "asset/regional-evidence-required"
+	// CodeSignedURLExpired is returned with HTTP 403.
+	CodeSignedURLExpired = "signed-url/expired"
+	// CodeSignedURLInvalid is returned with HTTP 403.
+	CodeSignedURLInvalid = "signed-url/invalid"
 	// CodeInvalidType is returned with HTTP 400.
 	CodeInvalidType = "validation/invalid-type"
 	// CodeTooSmall is returned with HTTP 400.
@@ -71,14 +75,14 @@ const (
 	CodeFileTooLarge = "upload/file-too-large"
 	// CodeMultipartImageTooLarge is returned with HTTP 400.
 	CodeMultipartImageTooLarge = "upload/multipart-image-too-large"
+	// CodeImageExceededMaxDimensions is returned with HTTP 400.
+	CodeImageExceededMaxDimensions = "upload/image-exceeded-max-dimensions"
 	// CodeImageInvalidInput is returned with HTTP 422.
 	CodeImageInvalidInput = "image/invalid-input"
 	// CodeImageUnsupportedFormat is returned with HTTP 422.
 	CodeImageUnsupportedFormat = "image/unsupported-format"
 	// CodeImageInputLimit is returned with HTTP 422.
 	CodeImageInputLimit = "image/input-limit"
-	// CodeImageExceededMaxDimensions is returned with HTTP 400.
-	CodeImageExceededMaxDimensions = "upload/image-exceeded-max-dimensions"
 	// CodeUploadLimitExceeded is returned with HTTP 403.
 	CodeUploadLimitExceeded = "upload/limit-exceeded"
 	// CodeSpendLimitReached is returned with HTTP 402.
@@ -233,6 +237,8 @@ var publicErrorStatuses = map[string]int{
 	CodeInvalidViewerRegion:               400,
 	CodeViewerRegionRequired:              403,
 	CodeRegionalEvidenceRequired:          403,
+	CodeSignedURLExpired:                  403,
+	CodeSignedURLInvalid:                  403,
 	CodeInvalidType:                       400,
 	CodeTooSmall:                          400,
 	CodeTooBig:                            400,
@@ -261,10 +267,10 @@ var publicErrorStatuses = map[string]int{
 	CodePermissionDenied:                  403,
 	CodeFileTooLarge:                      400,
 	CodeMultipartImageTooLarge:            400,
+	CodeImageExceededMaxDimensions:        400,
 	CodeImageInvalidInput:                 422,
 	CodeImageUnsupportedFormat:            422,
 	CodeImageInputLimit:                   422,
-	CodeImageExceededMaxDimensions:        400,
 	CodeUploadLimitExceeded:               403,
 	CodeSpendLimitReached:                 402,
 	CodeInvalidUploadMimeType:             400,

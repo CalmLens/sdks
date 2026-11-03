@@ -2154,7 +2154,8 @@
     "response": {
       "items": [],
       "nextCursor": "123_abc",
-      "hasMore": false
+      "hasMore": false,
+      "excludedTypes": []
     }
   },
   {
@@ -2217,6 +2218,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -2229,7 +2237,7 @@
       "query": {
         "name": "note.txt",
         "queue": "true",
-        "processingOptions": "{\"features\":{\"ocr\":{\"enabled\":true},\"linkDetection\":{\"enabled\":true}}}",
+        "processingOptions": "{\"features\":{\"ocr\":{\"enabled\":true},\"personDetection\":{\"enabled\":true},\"faceDetection\":{\"enabled\":true,\"ageEstimation\":true},\"linkDetection\":{\"enabled\":true}}}",
         "contentType": "text/plain",
         "sizeInBytes": "5"
       },
@@ -2274,6 +2282,13 @@
         "features": {
           "ocr": {
             "enabled": true
+          },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
           },
           "linkDetection": {
             "enabled": true
@@ -2711,6 +2726,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -2879,6 +2928,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -3315,6 +3371,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -3522,6 +3612,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -3958,6 +4055,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -4152,6 +4283,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -4588,6 +4726,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -4815,6 +4987,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -5254,6 +5433,40 @@
             }
           ]
         },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
+            }
+          ]
+        },
         "linkDetection": {
           "status": "evaluated",
           "stage": "beta",
@@ -5428,6 +5641,13 @@
               "features": {
                 "ocr": {
                   "enabled": true
+                },
+                "personDetection": {
+                  "enabled": true
+                },
+                "faceDetection": {
+                  "enabled": true,
+                  "ageEstimation": true
                 },
                 "linkDetection": {
                   "enabled": true
@@ -5868,6 +6088,40 @@
                   }
                 ]
               },
+              "personDetection": {
+                "status": "evaluated",
+                "stage": "beta",
+                "people": [
+                  {
+                    "box": {
+                      "left": 1.5,
+                      "top": 1.5,
+                      "width": 1.5,
+                      "height": 1.5
+                    },
+                    "confidence": 0.5
+                  }
+                ]
+              },
+              "faceDetection": {
+                "status": "evaluated",
+                "stage": "beta",
+                "faces": [
+                  {
+                    "box": {
+                      "left": 1.5,
+                      "top": 1.5,
+                      "width": 1.5,
+                      "height": 1.5
+                    },
+                    "confidence": 0.5,
+                    "ageRange": {
+                      "low": 1,
+                      "high": 1
+                    }
+                  }
+                ]
+              },
               "linkDetection": {
                 "status": "evaluated",
                 "stage": "beta",
@@ -6048,6 +6302,13 @@
             "features": {
               "ocr": {
                 "enabled": true
+              },
+              "personDetection": {
+                "enabled": true
+              },
+              "faceDetection": {
+                "enabled": true,
+                "ageEstimation": true
               },
               "linkDetection": {
                 "enabled": true
@@ -6485,6 +6746,40 @@
                 {
                   "region": "DE",
                   "action": "limit"
+                }
+              ]
+            },
+            "personDetection": {
+              "status": "evaluated",
+              "stage": "beta",
+              "people": [
+                {
+                  "box": {
+                    "left": 1.5,
+                    "top": 1.5,
+                    "width": 1.5,
+                    "height": 1.5
+                  },
+                  "confidence": 0.5
+                }
+              ]
+            },
+            "faceDetection": {
+              "status": "evaluated",
+              "stage": "beta",
+              "faces": [
+                {
+                  "box": {
+                    "left": 1.5,
+                    "top": 1.5,
+                    "width": 1.5,
+                    "height": 1.5
+                  },
+                  "confidence": 0.5,
+                  "ageRange": {
+                    "low": 1,
+                    "high": 1
+                  }
                 }
               ]
             },
@@ -6675,6 +6970,13 @@
               "ocr": {
                 "enabled": true
               },
+              "personDetection": {
+                "enabled": true
+              },
+              "faceDetection": {
+                "enabled": true,
+                "ageEstimation": true
+              },
               "linkDetection": {
                 "enabled": true
               }
@@ -7114,6 +7416,40 @@
                 }
               ]
             },
+            "personDetection": {
+              "status": "evaluated",
+              "stage": "beta",
+              "people": [
+                {
+                  "box": {
+                    "left": 1.5,
+                    "top": 1.5,
+                    "width": 1.5,
+                    "height": 1.5
+                  },
+                  "confidence": 0.5
+                }
+              ]
+            },
+            "faceDetection": {
+              "status": "evaluated",
+              "stage": "beta",
+              "faces": [
+                {
+                  "box": {
+                    "left": 1.5,
+                    "top": 1.5,
+                    "width": 1.5,
+                    "height": 1.5
+                  },
+                  "confidence": 0.5,
+                  "ageRange": {
+                    "low": 1,
+                    "high": 1
+                  }
+                }
+              ]
+            },
             "linkDetection": {
               "status": "evaluated",
               "stage": "beta",
@@ -7295,6 +7631,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -7731,6 +8074,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -7899,6 +8276,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -8335,6 +8719,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -8503,6 +8921,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -8939,6 +9364,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -9112,6 +9571,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -9548,6 +10014,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -9716,6 +10216,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -10152,6 +10659,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -10323,6 +10864,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -10759,6 +11307,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -10962,6 +11544,13 @@
           "ocr": {
             "enabled": true
           },
+          "personDetection": {
+            "enabled": true
+          },
+          "faceDetection": {
+            "enabled": true,
+            "ageEstimation": true
+          },
           "linkDetection": {
             "enabled": true
           }
@@ -11398,6 +11987,40 @@
             {
               "region": "DE",
               "action": "limit"
+            }
+          ]
+        },
+        "personDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "people": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5
+            }
+          ]
+        },
+        "faceDetection": {
+          "status": "evaluated",
+          "stage": "beta",
+          "faces": [
+            {
+              "box": {
+                "left": 1.5,
+                "top": 1.5,
+                "width": 1.5,
+                "height": 1.5
+              },
+              "confidence": 0.5,
+              "ageRange": {
+                "low": 1,
+                "high": 1
+              }
             }
           ]
         },
@@ -12426,7 +13049,10 @@
         }
       ],
       "nextCursor": "example",
-      "hasMore": true
+      "hasMore": true,
+      "excludedTypes": [
+        "asset.uploaded"
+      ]
     },
     "fullModel": true
   }

@@ -160,6 +160,70 @@
     }
   },
   {
+    "code": "signed-url/expired",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-signed-url-expired"
+      },
+      "body": {
+        "code": "signed-url/expired",
+        "message": "The signed URL has expired. Create a new one on your server.",
+        "requestId": "req-signed-url-expired",
+        "details": {
+          "reason": "signed_url_expired"
+        }
+      }
+    },
+    "expected": {
+      "code": "signed-url/expired",
+      "status": 403,
+      "requestId": "req-signed-url-expired",
+      "retryAfter": null,
+      "details": {
+        "reason": "signed_url_expired"
+      }
+    }
+  },
+  {
+    "code": "signed-url/invalid",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-signed-url-invalid"
+      },
+      "body": {
+        "code": "signed-url/invalid",
+        "message": "The signed URL's signature doesn't match its asset, resource, lens, transform, expiry or viewer claims. Use the URL exactly as created.",
+        "requestId": "req-signed-url-invalid",
+        "details": {
+          "reason": "signed_url_invalid"
+        }
+      }
+    },
+    "expected": {
+      "code": "signed-url/invalid",
+      "status": 403,
+      "requestId": "req-signed-url-invalid",
+      "retryAfter": null,
+      "details": {
+        "reason": "signed_url_invalid"
+      }
+    }
+  },
+  {
     "code": "validation/invalid-type",
     "status": 400,
     "operation": "assets.retrieve",
@@ -1024,38 +1088,6 @@
     }
   },
   {
-    "code": "upload/multipart-image-too-small",
-    "status": 400,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 400,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-upload-multipart-image-too-small"
-      },
-      "body": {
-        "code": "upload/multipart-image-too-small",
-        "message": "Multipart image uploads must total at least 10 MiB.",
-        "requestId": "req-upload-multipart-image-too-small",
-        "details": {
-          "reason": "multipart_image_too_small"
-        }
-      }
-    },
-    "expected": {
-      "code": "upload/multipart-image-too-small",
-      "status": 400,
-      "requestId": "req-upload-multipart-image-too-small",
-      "retryAfter": null,
-      "details": {
-        "reason": "multipart_image_too_small"
-      }
-    }
-  },
-  {
     "code": "upload/multipart-image-too-large",
     "status": 400,
     "operation": "assets.retrieve",
@@ -1084,6 +1116,38 @@
       "retryAfter": null,
       "details": {
         "reason": "multipart_image_too_large"
+      }
+    }
+  },
+  {
+    "code": "upload/image-exceeded-max-dimensions",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-image-exceeded-max-dimensions"
+      },
+      "body": {
+        "code": "upload/image-exceeded-max-dimensions",
+        "message": "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",
+        "requestId": "req-upload-image-exceeded-max-dimensions",
+        "details": {
+          "reason": "image_exceeded_max_dimensions"
+        }
+      }
+    },
+    "expected": {
+      "code": "upload/image-exceeded-max-dimensions",
+      "status": 400,
+      "requestId": "req-upload-image-exceeded-max-dimensions",
+      "retryAfter": null,
+      "details": {
+        "reason": "image_exceeded_max_dimensions"
       }
     }
   },
@@ -1180,38 +1244,6 @@
       "retryAfter": null,
       "details": {
         "reason": "image_input_limit"
-      }
-    }
-  },
-  {
-    "code": "upload/image-exceeded-max-dimensions",
-    "status": 400,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 400,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-upload-image-exceeded-max-dimensions"
-      },
-      "body": {
-        "code": "upload/image-exceeded-max-dimensions",
-        "message": "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",
-        "requestId": "req-upload-image-exceeded-max-dimensions",
-        "details": {
-          "reason": "image_exceeded_max_dimensions"
-        }
-      }
-    },
-    "expected": {
-      "code": "upload/image-exceeded-max-dimensions",
-      "status": 400,
-      "requestId": "req-upload-image-exceeded-max-dimensions",
-      "retryAfter": null,
-      "details": {
-        "reason": "image_exceeded_max_dimensions"
       }
     }
   },

@@ -6,16 +6,19 @@ module CalmLens
   # `policy/revision-conflict`. Through a project's key you can change only policies no other
   # project uses or owns. Reach it through {ServerClient#policies}.
   class Policies < Resource
+    # The prefix of this resource's operations in Internal::OPTION_KEYS.
+    OPERATIONS = 'policies'
+
     # Lists the organisation's policies, oldest first, and the ID of the one the project uses.
     # @return [Hash] `policies` and `projectPolicyId`
     def list(options = {})
-      call(options) { |_api, request| request('GET', project('policies'), request_options: request) }
+      call(options, __method__) { |_api, request| request('GET', project('policies'), request_options: request) }
     end
 
     # @option options [String] :policy_id
     # @return [Hash] the policy
     def retrieve(options)
-      call(options) { |api, request| request('GET', policy_path(api), request_options: request) }
+      call(options, __method__) { |api, request| request('GET', policy_path(api), request_options: request) }
     end
 
     # Creates a policy from `settings` (defining every category) with a `name`, or a copy of the
@@ -28,7 +31,7 @@ module CalmLens
     #   or `wholesome-community`
     # @return [Hash] the policy
     def create(options)
-      call(options) { |api, request| request('POST', project('policies'), body: api, request_options: request) }
+      call(options, __method__) { |api, request| request('POST', project('policies'), body: api, request_options: request) }
     end
 
     # Changes the name, description or settings (complete, defining every category); later
@@ -40,7 +43,7 @@ module CalmLens
     # @option options [Hash] :settings
     # @return [Hash] the policy
     def update(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('PATCH', policy_path(api), body: without(api, 'policyId'), request_options: request)
       end
     end
@@ -53,7 +56,7 @@ module CalmLens
     # @option options [Integer] :preset_version `preset.version` to reset, `preset.latestVersion` to update
     # @return [Hash] the policy
     def apply_preset(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('POST', "#{policy_path(api)}/preset", body: without(api, 'policyId'), request_options: request)
       end
     end
@@ -67,7 +70,7 @@ module CalmLens
     # @option options [Integer] :preset_version the preset's `latestVersion`
     # @return [Hash] the policy
     def set_automatic_updates(options) # rubocop:disable Naming/AccessorMethodName -- the shared SDK surface name
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('PUT', "#{policy_path(api)}/automatic-updates", body: without(api, 'policyId'), request_options: request)
       end
     end
@@ -76,7 +79,7 @@ module CalmLens
     # @option options [String] :policy_id
     # @return [nil]
     def delete(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('DELETE', policy_path(api), request_options: request)
         nil
       end
@@ -87,7 +90,7 @@ module CalmLens
     # @option options [String] :policy_id
     # @return [Hash] the policy
     def assign(options)
-      call(options) { |api, request| request('PUT', project('policy'), body: api, request_options: request) }
+      call(options, __method__) { |api, request| request('PUT', project('policy'), body: api, request_options: request) }
     end
 
     private

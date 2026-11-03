@@ -7,6 +7,8 @@ export const API_ERROR_CODES = {
   INVALID_VIEWER_REGION: "viewer/invalid-region",
   VIEWER_REGION_REQUIRED: "viewer/region-required",
   REGIONAL_EVIDENCE_REQUIRED: "asset/regional-evidence-required",
+  SIGNED_URL_EXPIRED: "signed-url/expired",
+  SIGNED_URL_INVALID: "signed-url/invalid",
   INVALID_TYPE: "validation/invalid-type",
   TOO_SMALL: "validation/too-small",
   TOO_BIG: "validation/too-big",
@@ -35,10 +37,10 @@ export const API_ERROR_CODES = {
   PERMISSION_DENIED: "auth/permission-denied",
   FILE_TOO_LARGE: "upload/file-too-large",
   MULTIPART_IMAGE_TOO_LARGE: "upload/multipart-image-too-large",
+  IMAGE_EXCEEDED_MAX_DIMENSIONS: "upload/image-exceeded-max-dimensions",
   IMAGE_INVALID_INPUT: "image/invalid-input",
   IMAGE_UNSUPPORTED_FORMAT: "image/unsupported-format",
   IMAGE_INPUT_LIMIT: "image/input-limit",
-  IMAGE_EXCEEDED_MAX_DIMENSIONS: "upload/image-exceeded-max-dimensions",
   UPLOAD_LIMIT_EXCEEDED: "upload/limit-exceeded",
   SPEND_LIMIT_REACHED: "upload/spend-limit-reached",
   INVALID_UPLOAD_MIME_TYPE: "upload/invalid-mime-type",
@@ -142,6 +144,14 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "asset/regional-evidence-required": {
     status: 403,
     message: "This asset needs moderation evidence for the newly served jurisdiction.",
+  },
+  "signed-url/expired": {
+    status: 403,
+    message: "The signed URL has expired. Create a new one on your server.",
+  },
+  "signed-url/invalid": {
+    status: 403,
+    message: "The signed URL's signature doesn't match its asset, resource, lens, transform, expiry or viewer claims. Use the URL exactly as created.",
   },
   "validation/invalid-type": {
     status: 400,
@@ -255,6 +265,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 400,
     message: "Multipart image uploads cannot exceed 20 MiB.",
   },
+  "upload/image-exceeded-max-dimensions": {
+    status: 400,
+    message: "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",
+  },
   "image/invalid-input": {
     status: 422,
     message: "The image is corrupt or cannot be decoded. Upload a valid image file.",
@@ -266,10 +280,6 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "image/input-limit": {
     status: 422,
     message: "The image exceeds the processing byte or pixel limit. Reduce its size before uploading.",
-  },
-  "upload/image-exceeded-max-dimensions": {
-    status: 400,
-    message: "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",
   },
   "upload/limit-exceeded": {
     status: 403,

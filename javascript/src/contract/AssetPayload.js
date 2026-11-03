@@ -1,8 +1,4 @@
 // packages/shared/src/AssetPayload.ts
-const uint8ArrayInputToNumbers = (value) => {
-	if (Array.isArray(value)) return value;
-	return Array.from(value);
-};
 const bufferInputToBytes = (value) => {
 	if (value instanceof ArrayBuffer) return new Uint8Array(value);
 	return Uint8Array.from(value);
@@ -30,7 +26,7 @@ const assetToData = (payload) => {
 		if (payload.buffer instanceof ArrayBuffer) return payload.buffer;
 		return bufferInputToBytes(payload.buffer);
 	}
-	if (payload.uint8Array !== void 0) return Uint8Array.from(uint8ArrayInputToNumbers(payload.uint8Array));
+	if (payload.uint8Array !== void 0) return Uint8Array.from(payload.uint8Array);
 	if (payload.base64 === void 0) throw new Error("Invalid asset payload");
 	const raw = getRawBase64(payload.base64);
 	if (typeof Buffer !== "undefined") return Uint8Array.from(Buffer.from(raw, "base64"));

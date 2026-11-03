@@ -55,7 +55,7 @@ declare const IMAGE_TRANSFORM_OPTIONS_SCHEMA: {
         };
         faces?: {
           type: "boolean";
-          description: "Blurs every face that face detection found.";
+          description: "Preview. Blurs every face that face detection found when the image was uploaded.";
         } | undefined;
       };
       required: [];

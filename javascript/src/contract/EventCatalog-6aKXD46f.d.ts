@@ -1,4 +1,4 @@
-import { n as PermissionAction } from "./Permissions-BfEFqPWR.js";
+import { n as PermissionAction } from "./Permissions-DhtiFwEc.js";
 import * as zod from "zod";
 declare const EVENT_SEVERITY_SCHEMA: zod.ZodEnum<{
   high: "high";
@@ -1666,6 +1666,69 @@ declare const EVENT_TYPE_INFO: {
         viewer: "viewer";
       }>;
       invitedByUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, zod.core.$strip>;
+  };
+  readonly "project.transferred": {
+    id: "project.transferred";
+    name: string;
+    description: string;
+    category: EventCategory;
+    severity: EventSeverity;
+    /** Whether the in-app connector (notification bell) subscribes to the type by default. */
+    notify: boolean;
+    /**
+     * The project-wide permission needed to see events of this type (portal feed, public events
+     * feed) and to subscribe a connector to it.
+     */
+    permission: PermissionAction;
+    /** Types of unreleased features are left out of the published contract until enabled. */
+    enabled?: boolean;
+    fields: {
+      previousOrganisationId: EventFieldDefinition<zod.ZodString>;
+      previousOrganisationName: EventFieldDefinition<zod.ZodString>;
+      organisationId: EventFieldDefinition<zod.ZodString>;
+      organisationName: EventFieldDefinition<zod.ZodString>;
+      handover: EventFieldDefinition<zod.ZodBoolean>;
+      apiKeysRevoked: EventFieldDefinition<zod.ZodNumber>;
+      connectorsPaused: EventFieldDefinition<zod.ZodNumber>;
+      transferredByUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+    };
+    /** Example data, used for synthetic test sends (`createSampleEvent`). */
+    example: NoInfer<{
+      previousOrganisationId: string;
+      previousOrganisationName: string;
+      organisationId: string;
+      organisationName: string;
+      handover: boolean;
+      apiKeysRevoked: number;
+      connectorsPaused: number;
+      transferredByUserId?: string | null | undefined;
+    }>;
+    factInfo: {
+      label: string;
+      description: string;
+      display: EventFieldDisplay;
+      /** Kept in the data but left out of rendered messages (usually an ID shown by another field). */
+      hidden?: boolean;
+      /**
+       * Personal or account-level data that stays in the portal. Webhook, Slack and email deliveries,
+       * and the public events feed, leave the fact out and word the title and description without it.
+       */
+      inAppOnly?: boolean;
+      /** Display names for `enum` and `list` values that don't read well humanized. */
+      valueLabels?: Readonly<Record<string, string>>;
+      schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
+      key: string;
+    }[];
+    values: zod.ZodObject<{
+      previousOrganisationId: zod.ZodString;
+      previousOrganisationName: zod.ZodString;
+      organisationId: zod.ZodString;
+      organisationName: zod.ZodString;
+      handover: zod.ZodBoolean;
+      apiKeysRevoked: zod.ZodNumber;
+      connectorsPaused: zod.ZodNumber;
+      transferredByUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
   };
   readonly "api-key.created": {

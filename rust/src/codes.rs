@@ -10,6 +10,10 @@ error_codes! {
     ViewerRegionRequired = "viewer/region-required", 403;
     /// `asset/regional-evidence-required` (HTTP 403): This asset needs moderation evidence for the newly served jurisdiction.
     RegionalEvidenceRequired = "asset/regional-evidence-required", 403;
+    /// `signed-url/expired` (HTTP 403): The signed URL has expired. Create a new one on your server.
+    SignedUrlExpired = "signed-url/expired", 403;
+    /// `signed-url/invalid` (HTTP 403): The signed URL's signature doesn't match its asset, resource, lens, transform, expiry or viewer claims. Use the URL exactly as created.
+    SignedUrlInvalid = "signed-url/invalid", 403;
     /// `validation/invalid-type` (HTTP 400): A field has the wrong type. details.issues lists each problem.
     InvalidType = "validation/invalid-type", 400;
     /// `validation/too-small` (HTTP 400): A value is below its minimum. details.issues lists each problem.
@@ -64,18 +68,16 @@ error_codes! {
     PermissionDenied = "auth/permission-denied", 403;
     /// `upload/file-too-large` (HTTP 400): File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.
     FileTooLarge = "upload/file-too-large", 400;
-    /// `upload/multipart-image-too-small` (HTTP 400): Multipart image uploads must total at least 10 MiB.
-    MultipartImageTooSmall = "upload/multipart-image-too-small", 400;
     /// `upload/multipart-image-too-large` (HTTP 400): Multipart image uploads cannot exceed 20 MiB.
     MultipartImageTooLarge = "upload/multipart-image-too-large", 400;
+    /// `upload/image-exceeded-max-dimensions` (HTTP 400): Image exceeds maximum dimensions. Maximum dimensions are 12,000px.
+    ImageExceededMaxDimensions = "upload/image-exceeded-max-dimensions", 400;
     /// `image/invalid-input` (HTTP 422): The image is corrupt or cannot be decoded. Upload a valid image file.
     ImageInvalidInput = "image/invalid-input", 422;
     /// `image/unsupported-format` (HTTP 422): This image format is not supported. Convert it to PNG, JPEG or WebP before uploading.
     ImageUnsupportedFormat = "image/unsupported-format", 422;
     /// `image/input-limit` (HTTP 422): The image exceeds the processing byte or pixel limit. Reduce its size before uploading.
     ImageInputLimit = "image/input-limit", 422;
-    /// `upload/image-exceeded-max-dimensions` (HTTP 400): Image exceeds maximum dimensions. Maximum dimensions are 12,000px.
-    ImageExceededMaxDimensions = "upload/image-exceeded-max-dimensions", 400;
     /// `upload/limit-exceeded` (HTTP 403): Upload limit exceeded. This project's organisation has used its free uploads. Set up billing to continue uploading.
     UploadLimitExceeded = "upload/limit-exceeded", 403;
     /// `upload/spend-limit-reached` (HTTP 402): Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.

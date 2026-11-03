@@ -1,5 +1,10 @@
-import { n as ClassificationCategory } from "./Classification-94kSYWZw.js";
+import { n as ClassificationCategory } from "./Classification-D3SkprrQ.js";
 import * as z from "zod";
+interface RgbaImage {
+  width: number;
+  height: number;
+  rgba: Uint8Array | Uint8ClampedArray;
+}
 type ClassificationTestSignal = ClassificationCategory | "sexual.involving-minors" | "violence.graphic" | "harassment.insult" | "sexual.adult" | "hate.regional-symbol";
 /** A project's test input key: 32 hexadecimal characters only its members can see. */
 declare const TEST_INPUT_KEY_PATTERN: RegExp;
@@ -245,17 +250,18 @@ declare const TEST_INPUT_PRESETS: {
 };
 declare function generateTestTextCode(scenario: TestInput | ClassificationTestSignal, key: string): Promise<string>;
 declare function detectTestTrigger(text: string, key: string): Promise<TestInput | undefined>;
-/** One byte per 4px cell, stored in the low RGB bits to preserve the category colour. */
+/**
+ * The text code's signed bytes as a grid (TestImageGrid.ts): the scenario JSON's length (two
+ * bytes, big-endian), the 16-byte tag, then the JSON. The reader rebuilds the text code, so images
+ * and text share one verification.
+ */
 declare function paintTestImage(scenario: TestInput | ClassificationTestSignal, key: string): Promise<{
   width: number;
   height: number;
   rgba: Uint8Array<ArrayBuffer>;
 }>;
-declare function detectTestImage(image: {
-  width: number;
-  height: number;
-  rgba: Uint8Array;
-}, key: string): Promise<{
+/** The test input a project's test image carries, also after video encoding and resizing. */
+declare function detectTestImage(image: RgbaImage, key: string): Promise<{
   regionalActions?: {
     region: "AT" | "AU" | "BR" | "DE" | "EU" | "FR" | "GB";
     action: "age-restrict" | "block" | "limit";

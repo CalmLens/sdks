@@ -614,6 +614,58 @@
       "requests": []
     },
     {
+      "name": "a partSizeBytes under 5 MiB is refused before any request",
+      "area": "base-url",
+      "client": {
+        "partSizeBytes": 5242879
+      },
+      "responses": [],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-config",
+              "status": null,
+              "requestId": null,
+              "retryAfter": null,
+              "details": null
+            }
+          }
+        }
+      ],
+      "requests": []
+    },
+    {
+      "name": "a partSizeBytes over 64 MiB is refused before any request",
+      "area": "base-url",
+      "client": {
+        "partSizeBytes": 67108865
+      },
+      "responses": [],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-config",
+              "status": null,
+              "requestId": null,
+              "retryAfter": null,
+              "details": null
+            }
+          }
+        }
+      ],
+      "requests": []
+    },
+    {
       "name": "create sends text content with every optional field in the query",
       "area": "uploads",
       "responses": [
@@ -2130,6 +2182,468 @@
           "bodyBase64": "AAAAGGZ0eXBtcDQyZmluYWwtcGFydA=="
         }
       ]
+    },
+    {
+      "name": "a large upload over partSizeBytes goes in parts with <key>:part-<n> Idempotency-Keys",
+      "area": "uploads",
+      "client": {
+        "partSizeBytes": 5242880
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "uploading"
+            },
+            "classification": {
+              "status": "pending",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "uploading"
+            },
+            "classification": {
+              "status": "pending",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-2",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-3",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "clip.mp4",
+            "content": {
+              "uint8Array": {
+                "$fill": {
+                  "byte": 120,
+                  "length": 11534336
+                }
+              },
+              "type": "video/mp4"
+            },
+            "idempotencyKey": "upload-1"
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored"
+              },
+              "upload": {
+                "status": "completed"
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
+                }
+              }
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets",
+          "rawQuery": "name=clip.mp4&queue=false&contentType=video%2Fmp4&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=11534336",
+          "query": [
+            [
+              "name",
+              "clip.mp4"
+            ],
+            [
+              "queue",
+              "false"
+            ],
+            [
+              "contentType",
+              "video/mp4"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ],
+            [
+              "partNumber",
+              "1"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "totalSizeInBytes",
+              "11534336"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-1",
+            "accept": "application/json",
+            "x-calmlens-upload": "part",
+            "content-type": "video/mp4"
+          },
+          "bodyLength": 5242880,
+          "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+        },
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1/part",
+          "rawQuery": "partNumber=2&isFinal=false&sizeInBytes=5242880",
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-1:part-2",
+            "accept": "application/json",
+            "x-calmlens-upload": "part"
+          },
+          "bodyLength": 5242880,
+          "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+        },
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1/part",
+          "rawQuery": "partNumber=3&isFinal=true&sizeInBytes=1048576",
+          "query": [
+            [
+              "partNumber",
+              "3"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "1048576"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-1:part-3",
+            "accept": "application/json",
+            "x-calmlens-upload": "part"
+          },
+          "bodyLength": 1048576,
+          "bodySha256": "8f990ba0b577b51cf009ea049368c16bbda1b21e1b93be07a824758bb253c39b"
+        }
+      ]
+    },
+    {
+      "name": "a large upload whose final part finds the upload closed reads the asset back",
+      "area": "uploads",
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "uploading"
+            },
+            "classification": {
+              "status": "pending",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 409,
+          "body": {
+            "code": "upload/not-open",
+            "message": "Asset is not accepting additional parts",
+            "requestId": "req-1",
+            "details": {}
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-3",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "clip.mp4",
+            "content": {
+              "uint8Array": {
+                "$fill": {
+                  "byte": 120,
+                  "length": 9437184
+                }
+              },
+              "type": "video/mp4"
+            },
+            "idempotencyKey": "upload-2"
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored"
+              },
+              "upload": {
+                "status": "completed"
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
+                }
+              }
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets",
+          "rawQuery": "name=clip.mp4&queue=true&contentType=video%2Fmp4&sizeInBytes=8388608&partNumber=1&isFinal=false&totalSizeInBytes=9437184",
+          "query": [
+            [
+              "name",
+              "clip.mp4"
+            ],
+            [
+              "queue",
+              "true"
+            ],
+            [
+              "contentType",
+              "video/mp4"
+            ],
+            [
+              "sizeInBytes",
+              "8388608"
+            ],
+            [
+              "partNumber",
+              "1"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "totalSizeInBytes",
+              "9437184"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-2",
+            "accept": "application/json",
+            "x-calmlens-upload": "part",
+            "content-type": "video/mp4"
+          },
+          "bodyLength": 8388608,
+          "bodySha256": "0c77bc0a0795a93612d45256897456d0fcb24f151c44c150d07ecd03f4ef5168"
+        },
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1/part",
+          "rawQuery": "partNumber=2&isFinal=true&sizeInBytes=1048576",
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "1048576"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-2:part-2",
+            "accept": "application/json",
+            "x-calmlens-upload": "part"
+          },
+          "bodyLength": 1048576,
+          "bodySha256": "8f990ba0b577b51cf009ea049368c16bbda1b21e1b93be07a824758bb253c39b"
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ]
+    },
+    {
+      "name": "a large upload with an idempotencyKey over 240 characters is refused before any request",
+      "area": "uploads",
+      "responses": [],
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "clip.mp4",
+            "content": {
+              "uint8Array": {
+                "$fill": {
+                  "byte": 120,
+                  "length": 9437184
+                }
+              },
+              "type": "video/mp4"
+            },
+            "idempotencyKey": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null,
+              "requestId": null,
+              "retryAfter": null,
+              "details": null
+            }
+          }
+        }
+      ],
+      "requests": []
     },
     {
       "name": "text.classify sends the text as text/plain with a custom name and options",
@@ -4021,6 +4535,315 @@
       ],
       "sleepsMs": [
         0,
+        0
+      ]
+    },
+    {
+      "name": "a large upload retries a failed part with its own key and skips parts the API already has",
+      "area": "retries",
+      "client": {
+        "partSizeBytes": 5242880,
+        "maxRetries": 1
+      },
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "uploading"
+            },
+            "classification": {
+              "status": "pending",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 503,
+          "bodyText": "<html><body>503</body></html>",
+          "headers": {
+            "x-request-id": "req-2",
+            "content-type": "text/html",
+            "retry-after": "0"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "uploading"
+            },
+            "classification": {
+              "status": "pending",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-3",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 409,
+          "body": {
+            "code": "upload/invalid-part-number",
+            "message": "Multipart upload part number is invalid.",
+            "requestId": "req-1",
+            "details": {
+              "expectedPartNumber": 4,
+              "receivedPartNumber": 3
+            }
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-5",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "archive.zip",
+            "content": {
+              "uint8Array": {
+                "$fill": {
+                  "byte": 120,
+                  "length": 16777216
+                }
+              },
+              "type": "application/zip"
+            },
+            "idempotencyKey": "upload-3"
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored"
+              },
+              "upload": {
+                "status": "completed"
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
+                }
+              }
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets",
+          "rawQuery": "name=archive.zip&queue=true&contentType=application%2Fzip&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=16777216",
+          "query": [
+            [
+              "name",
+              "archive.zip"
+            ],
+            [
+              "queue",
+              "true"
+            ],
+            [
+              "contentType",
+              "application/zip"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ],
+            [
+              "partNumber",
+              "1"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "totalSizeInBytes",
+              "16777216"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-3",
+            "accept": "application/json",
+            "x-calmlens-upload": "part",
+            "content-type": "application/zip"
+          },
+          "bodyLength": 5242880,
+          "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+        },
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1/part",
+          "rawQuery": "partNumber=2&isFinal=false&sizeInBytes=5242880",
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-3:part-2",
+            "accept": "application/json",
+            "x-calmlens-upload": "part"
+          },
+          "bodyLength": 5242880,
+          "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+        },
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1/part",
+          "rawQuery": "partNumber=2&isFinal=false&sizeInBytes=5242880",
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-3:part-2",
+            "accept": "application/json",
+            "x-calmlens-upload": "part"
+          },
+          "bodyLength": 5242880,
+          "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+        },
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1/part",
+          "rawQuery": "partNumber=3&isFinal=false&sizeInBytes=5242880",
+          "query": [
+            [
+              "partNumber",
+              "3"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-3:part-3",
+            "accept": "application/json",
+            "x-calmlens-upload": "part"
+          },
+          "bodyLength": 5242880,
+          "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+        },
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1/part",
+          "rawQuery": "partNumber=4&isFinal=true&sizeInBytes=1048576",
+          "query": [
+            [
+              "partNumber",
+              "4"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "1048576"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-3:part-4",
+            "accept": "application/json",
+            "x-calmlens-upload": "part"
+          },
+          "bodyLength": 1048576,
+          "bodySha256": "8f990ba0b577b51cf009ea049368c16bbda1b21e1b93be07a824758bb253c39b"
+        }
+      ],
+      "sleepsMs": [
         0
       ]
     },

@@ -49,6 +49,14 @@ module CalmLens
       'hashLists.removeEntry' => %w[entryId].freeze,
       'hashLists.retrieve' => %w[hashListId].freeze,
       'hashLists.update' => %w[action description hashListId name].freeze,
+      'policies.applyPreset' => %w[operation policyId presetVersion revision].freeze,
+      'policies.assign' => %w[policyId].freeze,
+      'policies.create' => %w[description name presetId settings].freeze,
+      'policies.delete' => %w[policyId].freeze,
+      'policies.list' => %w[].freeze,
+      'policies.retrieve' => %w[policyId].freeze,
+      'policies.setAutomaticUpdates' => %w[enabled policyId presetVersion revision].freeze,
+      'policies.update' => %w[description name policyId revision settings].freeze,
       'text.classify' => %w[
         authorId context description externalId externalUrl folderId metadata name processingOptions text
         uploadPresetId visibility

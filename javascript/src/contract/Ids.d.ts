@@ -21,6 +21,7 @@ declare const ID_PREFIXES: {
   readonly user: "user";
   readonly member: "mem";
   readonly invitation: "inv";
+  readonly transfer: "xfer";
   readonly supportTicket: "tkt";
   readonly supportTicketMessage: "msg";
   readonly humanReview: "rev";

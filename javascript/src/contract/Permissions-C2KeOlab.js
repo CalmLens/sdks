@@ -1,4 +1,4 @@
-import { n as idField } from "./Ids-CKifL59z.js";
+import { n as idField } from "./Ids-D2XfVlL6.js";
 import * as zod from "zod";
 // packages/shared/src/Permissions.ts
 const ACTION_SCHEMA = zod.enum([
@@ -28,6 +28,8 @@ const ACTION_SCHEMA = zod.enum([
 	"upload-presets:write",
 	"hash-lists:read",
 	"hash-lists:write",
+	"policies:read",
+	"policies:write",
 	"reviews:read",
 	"reviews:write",
 	"project:manage"
@@ -41,6 +43,7 @@ const PROJECT_ACTIONS = [...[
 	"lenses",
 	"upload-presets",
 	"hash-lists",
+	"policies",
 	"reviews"
 ].flatMap((feature) => [`${feature}:read`, `${feature}:write`]), "project:manage"];
 const isProjectAction = (action) => PROJECT_ACTIONS.includes(action);

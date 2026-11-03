@@ -51,6 +51,14 @@ final class OptionKeys
         'hashLists.removeEntry' => ['entryId'],
         'hashLists.retrieve' => ['hashListId'],
         'hashLists.update' => ['action', 'description', 'hashListId', 'name'],
+        'policies.applyPreset' => ['operation', 'policyId', 'presetVersion', 'revision'],
+        'policies.assign' => ['policyId'],
+        'policies.create' => ['description', 'name', 'presetId', 'settings'],
+        'policies.delete' => ['policyId'],
+        'policies.list' => [],
+        'policies.retrieve' => ['policyId'],
+        'policies.setAutomaticUpdates' => ['enabled', 'policyId', 'presetVersion', 'revision'],
+        'policies.update' => ['description', 'name', 'policyId', 'revision', 'settings'],
         'text.classify' => ['authorId', 'context', 'description', 'externalId', 'externalUrl', 'folderId', 'metadata', 'name', 'processingOptions', 'text', 'uploadPresetId', 'visibility'],
     ];
 }

@@ -7921,6 +7921,7 @@ const ID_PREFIXES = {
 	user: "user",
 	member: "mem",
 	invitation: "inv",
+	transfer: "xfer",
 	supportTicket: "tkt",
 	supportTicketMessage: "msg",
 	humanReview: "rev",
@@ -7981,6 +7982,7 @@ const EXAMPLE_IDS = {
 	user: "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
 	mem: "mem_9Xm4Rk7Lq2Vt8Wb3Np5C",
 	inv: "inv_3Qk8Xm2Rt9Lv4Wb7Np6C",
+	xfer: "xfer_6Lq2Xm8Rk4Vt9Wb3Np7C",
 	tkt: "tkt_6Xm2Rk9Lq4Vt7Wb3Np8C",
 	msg: "msg_2Rk7Xm4Lq9Vt3Wb8Np5C",
 	rev: "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -7997,7 +7999,7 @@ const EXAMPLE_IDS = {
 * every stored model's IDs by prefix is a separate change (it surfaces about a thousand call sites
 * across the packages that build records from plain strings).
 */
-const idField = (prefix) => zod.string().regex(idPattern(prefix), { message: `Must be a valid ID starting with "${prefix}_"` }).meta({ examples: [EXAMPLE_IDS[prefix]] });
+const idField = (prefix) => zod.string().regex(idPattern(prefix), { message: `Must be a valid ID: "${prefix}_" followed by 20 letters or digits` }).meta({ examples: [EXAMPLE_IDS[prefix]] });
 /** The primary key of a table whose rows have IDs with `prefix`. */
 const primaryIdField = (prefix) => idField(prefix).meta({
 	...metaStore([primaryKey()]),

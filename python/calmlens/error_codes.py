@@ -5,6 +5,8 @@ AGE_CONFIRMATION_REQUIRED = "viewer/age-confirmation-required"
 INVALID_VIEWER_REGION = "viewer/invalid-region"
 VIEWER_REGION_REQUIRED = "viewer/region-required"
 REGIONAL_EVIDENCE_REQUIRED = "asset/regional-evidence-required"
+SIGNED_URL_EXPIRED = "signed-url/expired"
+SIGNED_URL_INVALID = "signed-url/invalid"
 INVALID_TYPE = "validation/invalid-type"
 TOO_SMALL = "validation/too-small"
 TOO_BIG = "validation/too-big"
@@ -32,12 +34,11 @@ API_KEY_PROJECT_MISMATCH = "auth/project-mismatch"
 API_KEY_NOT_ACCEPTED = "auth/api-key-not-accepted"
 PERMISSION_DENIED = "auth/permission-denied"
 FILE_TOO_LARGE = "upload/file-too-large"
-MULTIPART_IMAGE_TOO_SMALL = "upload/multipart-image-too-small"
 MULTIPART_IMAGE_TOO_LARGE = "upload/multipart-image-too-large"
+IMAGE_EXCEEDED_MAX_DIMENSIONS = "upload/image-exceeded-max-dimensions"
 IMAGE_INVALID_INPUT = "image/invalid-input"
 IMAGE_UNSUPPORTED_FORMAT = "image/unsupported-format"
 IMAGE_INPUT_LIMIT = "image/input-limit"
-IMAGE_EXCEEDED_MAX_DIMENSIONS = "upload/image-exceeded-max-dimensions"
 UPLOAD_LIMIT_EXCEEDED = "upload/limit-exceeded"
 SPEND_LIMIT_REACHED = "upload/spend-limit-reached"
 INVALID_UPLOAD_MIME_TYPE = "upload/invalid-mime-type"
@@ -130,6 +131,8 @@ STATUS_BY_CODE: dict[str, int] = {
     "viewer/invalid-region": 400,
     "viewer/region-required": 403,
     "asset/regional-evidence-required": 403,
+    "signed-url/expired": 403,
+    "signed-url/invalid": 403,
     "validation/invalid-type": 400,
     "validation/too-small": 400,
     "validation/too-big": 400,
@@ -157,12 +160,11 @@ STATUS_BY_CODE: dict[str, int] = {
     "auth/api-key-not-accepted": 403,
     "auth/permission-denied": 403,
     "upload/file-too-large": 400,
-    "upload/multipart-image-too-small": 400,
     "upload/multipart-image-too-large": 400,
+    "upload/image-exceeded-max-dimensions": 400,
     "image/invalid-input": 422,
     "image/unsupported-format": 422,
     "image/input-limit": 422,
-    "upload/image-exceeded-max-dimensions": 400,
     "upload/limit-exceeded": 403,
     "upload/spend-limit-reached": 402,
     "upload/invalid-mime-type": 400,

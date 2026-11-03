@@ -1,4 +1,4 @@
-import "./Permissions-BfEFqPWR.js";
+import "./Permissions-DhtiFwEc.js";
 import "zod";
 interface RequestErrorCode {
   getId(): string;
@@ -12,6 +12,8 @@ declare const PUBLIC_ERROR_CODES: {
   readonly INVALID_VIEWER_REGION: RequestErrorCode;
   readonly VIEWER_REGION_REQUIRED: RequestErrorCode;
   readonly REGIONAL_EVIDENCE_REQUIRED: RequestErrorCode;
+  readonly SIGNED_URL_EXPIRED: RequestErrorCode;
+  readonly SIGNED_URL_INVALID: RequestErrorCode;
   readonly INVALID_TYPE: RequestErrorCode;
   readonly TOO_SMALL: RequestErrorCode;
   readonly TOO_BIG: RequestErrorCode;
@@ -39,12 +41,11 @@ declare const PUBLIC_ERROR_CODES: {
   readonly API_KEY_NOT_ACCEPTED: RequestErrorCode;
   readonly PERMISSION_DENIED: RequestErrorCode;
   readonly FILE_TOO_LARGE: RequestErrorCode;
-  readonly MULTIPART_IMAGE_TOO_SMALL: RequestErrorCode;
   readonly MULTIPART_IMAGE_TOO_LARGE: RequestErrorCode;
+  readonly IMAGE_EXCEEDED_MAX_DIMENSIONS: RequestErrorCode;
   readonly IMAGE_INVALID_INPUT: RequestErrorCode;
   readonly IMAGE_UNSUPPORTED_FORMAT: RequestErrorCode;
   readonly IMAGE_INPUT_LIMIT: RequestErrorCode;
-  readonly IMAGE_EXCEEDED_MAX_DIMENSIONS: RequestErrorCode;
   readonly UPLOAD_LIMIT_EXCEEDED: RequestErrorCode;
   readonly SPEND_LIMIT_REACHED: RequestErrorCode;
   readonly INVALID_UPLOAD_MIME_TYPE: RequestErrorCode;
@@ -85,6 +86,15 @@ declare const PUBLIC_ERROR_CODES: {
   readonly HASH_LIST_LIMIT_REACHED: RequestErrorCode;
   readonly HASH_LIST_ENTRY_LIMIT_REACHED: RequestErrorCode;
   readonly HASH_LIST_ASSET_NOT_HASHED: RequestErrorCode;
+  readonly POLICY_NOT_FOUND: RequestErrorCode;
+  readonly POLICY_REVISION_CONFLICT: RequestErrorCode;
+  readonly POLICY_PROJECTS_CHANGED: RequestErrorCode;
+  readonly POLICY_IN_USE: RequestErrorCode;
+  readonly POLICY_USED_BY_ANOTHER_PROJECT: RequestErrorCode;
+  readonly POLICY_NO_PRESET: RequestErrorCode;
+  readonly POLICY_PRESET_VERSION_CONFLICT: RequestErrorCode;
+  readonly POLICY_PRESET_UPDATE_UNAVAILABLE: RequestErrorCode;
+  readonly POLICY_AUTOMATIC_UPDATES_UNAVAILABLE: RequestErrorCode;
   readonly UPLOAD_PRESET_NOT_FOUND: RequestErrorCode;
   readonly UPLOAD_PRESET_DISABLED: RequestErrorCode;
   readonly UPLOAD_PRESET_TOKEN_REQUIRED: RequestErrorCode;

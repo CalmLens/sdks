@@ -23,6 +23,8 @@ declare const ACTION_SCHEMA: zod.ZodEnum<{
   "members:write": "members:write";
   "metadata:read": "metadata:read";
   "metadata:write": "metadata:write";
+  "policies:read": "policies:read";
+  "policies:write": "policies:write";
   "project:manage": "project:manage";
   "reviews:read": "reviews:read";
   "reviews:write": "reviews:write";
@@ -56,6 +58,8 @@ declare const GRANT_SCHEMA: zod.ZodObject<{
     "members:write": "members:write";
     "metadata:read": "metadata:read";
     "metadata:write": "metadata:write";
+    "policies:read": "policies:read";
+    "policies:write": "policies:write";
     "project:manage": "project:manage";
     "reviews:read": "reviews:read";
     "reviews:write": "reviews:write";
@@ -91,6 +95,8 @@ declare const GRANTS_SCHEMA: zod.ZodArray<zod.ZodObject<{
     "members:write": "members:write";
     "metadata:read": "metadata:read";
     "metadata:write": "metadata:write";
+    "policies:read": "policies:read";
+    "policies:write": "policies:write";
     "project:manage": "project:manage";
     "reviews:read": "reviews:read";
     "reviews:write": "reviews:write";

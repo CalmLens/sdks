@@ -1,8 +1,9 @@
 import * as zod from "zod";
 /**
- * Optional analyses a request can turn on with `processingOptions.features.<id>`. The catalog is
- * the single source for the request and result schemas, cache keys and metering. Features are
- * chosen per request only; there is no project-level default.
+ * Optional analyses a request can turn on or off with `processingOptions.features.<id>`. The
+ * catalog is the single source for the request and result schemas, cache keys and metering. Each
+ * feature's `activation` sets what a request that doesn't mention it gets; there is no
+ * project-level default.
  */
 /** How mature a feature is. Beta results may change shape. */
 declare const PROCESSING_FEATURE_STAGES: readonly ["beta", "ga"];

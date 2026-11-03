@@ -156,6 +156,10 @@ public final class ErrorCodes {
   public static final String VIEWER_REGION_REQUIRED = "viewer/region-required";
   /** {@code asset/regional-evidence-required} (HTTP 403). */
   public static final String REGIONAL_EVIDENCE_REQUIRED = "asset/regional-evidence-required";
+  /** {@code signed-url/expired} (HTTP 403). */
+  public static final String SIGNED_URL_EXPIRED = "signed-url/expired";
+  /** {@code signed-url/invalid} (HTTP 403). */
+  public static final String SIGNED_URL_INVALID = "signed-url/invalid";
   /** {@code hash-list/not-found} (HTTP 404). */
   public static final String HASH_LIST_NOT_FOUND = "hash-list/not-found";
   /** {@code hash-list/entry-not-found} (HTTP 404). */
@@ -329,6 +333,8 @@ public final class ErrorCodes {
       Map.entry(INVALID_VIEWER_REGION, 400),
       Map.entry(VIEWER_REGION_REQUIRED, 403),
       Map.entry(REGIONAL_EVIDENCE_REQUIRED, 403),
+      Map.entry(SIGNED_URL_EXPIRED, 403),
+      Map.entry(SIGNED_URL_INVALID, 403),
       Map.entry(HASH_LIST_NOT_FOUND, 404),
       Map.entry(HASH_LIST_ENTRY_NOT_FOUND, 404),
       Map.entry(HASH_LIST_LIMIT_REACHED, 409),

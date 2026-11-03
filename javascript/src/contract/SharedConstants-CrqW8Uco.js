@@ -197,7 +197,6 @@ const THIRD_PARTY_COOKIES = {
 [...Object.values(FIRST_PARTY_COOKIES), ...Object.values(THIRD_PARTY_COOKIES)];
 const MAX_IMAGE_UPLOAD_BYTES = /* @__PURE__ */ (() => 20971520)();
 const MAX_DIRECT_IMAGE_UPLOAD_BYTES = /* @__PURE__ */ (() => 10485760)();
-const MIN_MULTIPART_IMAGE_UPLOAD_BYTES = MAX_DIRECT_IMAGE_UPLOAD_BYTES;
 const MAX_NON_IMAGE_UPLOAD_MB = 5e3;
 const MAX_NON_IMAGE_UPLOAD_BYTES = /* @__PURE__ */ (() => MAX_NON_IMAGE_UPLOAD_MB * 1024 * 1024)();
 const MIN_MULTIPART_UPLOAD_PART_BYTES = /* @__PURE__ */ (() => 5242880)();
@@ -214,4 +213,4 @@ const normalizeUploadMimeType = (mimeType) => mimeType.toLowerCase().split(";")[
 const isRejectedUploadMimeType = (mimeType) => REJECTED_UPLOAD_MIME_TYPE_SET.has(normalizeUploadMimeType(mimeType));
 const getRejectedUploadMimeTypeError = (mimeType) => `${normalizeUploadMimeType(mimeType)} is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.`;
 const DOMAIN = "calmlens.com";
-export { MIN_MULTIPART_IMAGE_UPLOAD_BYTES as a, isRejectedUploadMimeType as c, MAX_NON_IMAGE_UPLOAD_BYTES as i, MAX_DIRECT_IMAGE_UPLOAD_BYTES as n, MIN_MULTIPART_UPLOAD_PART_BYTES as o, MAX_IMAGE_UPLOAD_BYTES as r, getRejectedUploadMimeTypeError as s, DOMAIN as t };
+export { MIN_MULTIPART_UPLOAD_PART_BYTES as a, MAX_NON_IMAGE_UPLOAD_BYTES as i, MAX_DIRECT_IMAGE_UPLOAD_BYTES as n, getRejectedUploadMimeTypeError as o, MAX_IMAGE_UPLOAD_BYTES as r, isRejectedUploadMimeType as s, DOMAIN as t };

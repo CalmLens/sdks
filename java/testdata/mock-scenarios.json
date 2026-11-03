@@ -5644,28 +5644,9 @@
       ]
     },
     {
-      "name": "multipart image totals must be 10 to 20 MiB, and parts must add up to a declared total",
+      "name": "images in parts can be any size up to 20 MiB, and parts must add up to a declared total",
       "mock": {},
       "steps": [
-        {
-          "operation": "assets.create",
-          "args": {
-            "name": "small.png",
-            "part": {
-              "base64": "aGVsbG8=",
-              "type": "image/png",
-              "partNumber": 1,
-              "isFinal": false
-            },
-            "totalSizeInBytes": 1048576
-          },
-          "expect": {
-            "error": {
-              "code": "upload/multipart-image-too-small",
-              "status": 400
-            }
-          }
-        },
         {
           "operation": "assets.create",
           "args": {
@@ -5697,10 +5678,12 @@
             }
           },
           "expect": {
-            "error": {
-              "code": "upload/multipart-image-too-small",
-              "status": 400
-            }
+            "result": {
+              "type": "image",
+              "upload.status": "completed",
+              "content.sizeInBytes": 5
+            },
+            "httpStatus": 200
           }
         },
         {
@@ -5741,24 +5724,9 @@
             }
           },
           "expect": {
-            "error": {
-              "code": "upload/multipart-image-too-small",
-              "status": 400
-            }
-          }
-        },
-        {
-          "operation": "assets.retrieve",
-          "args": {
-            "assetId": {
-              "$ref": "short.id"
-            }
-          },
-          "expect": {
             "result": {
-              "upload.status": "uploading",
-              "upload.partsReceived": 1,
-              "content.sizeInBytes": 5242880
+              "upload.status": "completed",
+              "content.sizeInBytes": 5242885
             },
             "httpStatus": 200
           }
@@ -5802,6 +5770,22 @@
               "code": "upload/size-mismatch",
               "status": 400
             }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "declared.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "upload.status": "uploading",
+              "upload.partsReceived": 1,
+              "content.sizeInBytes": 5242880
+            },
+            "httpStatus": 200
           }
         },
         {
