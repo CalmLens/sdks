@@ -60,6 +60,8 @@ module CalmLens
       RESOURCES = %w[original rendered placeholder].freeze
       MIN_PART = 5 * 1024 * 1024
       MAX_MULTIPART_IMAGE = 20 * 1024 * 1024
+      # Like the API: an upload has at most this many parts.
+      MAX_PARTS = 10_000
       # The ThumbHash the mock gives every classified image, standing in for one computed from its
       # pixels. The `placeholder` resource serves it as a PNG, like the CDN.
       THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI'
@@ -800,7 +802,7 @@ module CalmLens
         fail!(ErrorCodes::UPLOAD_NOT_OPEN) unless item['upload']['status'] == 'uploading'
         number = query['partNumber']
         expected = item['upload']['partsReceived'].to_i + 1
-        unless number == expected
+        unless number == expected && number <= MAX_PARTS
           fail!(ErrorCodes::INVALID_UPLOAD_PART_NUMBER, "Expected part #{expected}",
                 details: { 'expectedPartNumber' => expected, 'receivedPartNumber' => number })
         end

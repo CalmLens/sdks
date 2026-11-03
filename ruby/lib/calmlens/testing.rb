@@ -146,7 +146,8 @@ module CalmLens
     #   runs while the mock handles a request, so it must not call the mock.
     # @param max_retries [Integer] retries after a retryable failure; 0 by default, so a simulated
     #   failure reaches the caller.
-    # @param options [Hash] other {ServerClient#initialize} settings, except `api_key` and `transport`.
+    # @param options [Hash] other {ServerClient#initialize} settings, such as `part_size_bytes`, except
+    #   `api_key` and `transport`.
     #   Retries and decision checks wait no real time.
     def initialize(project_id: 'project-1', api_key: MockServerClient.create_api_key, base_url: 'https://api.calmlens.invalid/v1',
                    cdn_base_url: 'https://cdn.calmlens.invalid/v1', now: MockServerClient.monotonic_clock,
@@ -340,6 +341,8 @@ module CalmLens
       path, query = Internal.split_url(request.url).last.split('?', 2)
       base = request.url.start_with?("#{cdn_base_url}/") ? URI(cdn_base_url).path : URI(base_url).path
       call = Thread.current[@call_key]
+      # The later parts of a content upload sent in parts count as assets.uploadPart.
+      call = { operation: 'assets.uploadPart' } if request.method == 'POST' && path.delete_prefix(base).match?(%r{\A/assets/[^/]+/part\z})
       @mock_lock.synchronize do
         record = Request.new(method: request.method, url: request.url, path: decode_path(path.delete_prefix(base)),
                              query: URI.decode_www_form(query.to_s).to_h, headers: request.headers.dup, body: body)

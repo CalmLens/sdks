@@ -25,13 +25,16 @@ module CalmLens
     end
 
     attr_reader :project_id, :base_url, :cdn_base_url
+    # Content larger than this many bytes that can be read again is uploaded in parts of this size.
+    attr_reader :part_size_bytes
     # Leaves the upload size checks the API also makes (part and image sizes) to the API, so an
     # offline stand-in answers them like the API does. {MockServerClient} sets it.
     attr_accessor :defer_upload_checks
 
     def initialize(api_key:, project_id:, base_url:, cdn_base_url:, timeout:, open_timeout:, max_retries:,
-                   retry_base_delay:, max_response_bytes:, upload_timeout:, transport:)
+                   retry_base_delay:, max_response_bytes:, upload_timeout:, part_size_bytes:, transport:)
       @api_key = api_key
+      @part_size_bytes = part_size_bytes
       @project_id = project_id
       @base_url = base_url
       @cdn_base_url = cdn_base_url

@@ -90,6 +90,14 @@ module CalmLens
       @source.rewind unless @source.is_a?(String)
     end
 
+    # `length` bytes from `offset` as a body of their own, read again from the source for each
+    # attempt. Only for a {#replayable?} body of known size: an IO is positioned at the slice.
+    def slice(offset, length)
+      return UploadBody.new(@source.byteslice(offset, length)) if @source.is_a?(String)
+
+      UploadBody.new(@source.slice(offset, length))
+    end
+
     # The bytes, read fully. Used only by the offline mock.
     def read_all
       return @source if @source.is_a?(String)
@@ -113,6 +121,12 @@ module CalmLens
       end
 
       def rewindable? = !@start.nil?
+
+      # A reader of `length` bytes from `offset` of this rewindable stream, positioned there.
+      def slice(offset, length)
+        @io.seek(@start + offset)
+        IOReader.new(@io, length)
+      end
 
       def rewind
         @io.seek(@start)

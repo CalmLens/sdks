@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'securerandom'
+
 module CalmLens
   # Uploads, moderation and management of assets. Reach it through {ServerClient#assets}.
   #
@@ -21,6 +23,8 @@ module CalmLens
     MAX_DIRECT_IMAGE_BYTES = 10 * 1024 * 1024
     MAX_MEDIA_BYTES = 50 * 1024 * 1024
     MAX_FILE_BYTES = 5000 * 1024 * 1024
+    # The longest `idempotency_key` of an upload sent in parts: each part's key adds `:part-<n>`.
+    MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH = 240
     # The moderation status before a decision; {#wait_for_decision} returns once an asset has any
     # other, or once its classification status is in {FINISHED_PROCESSING_STATUSES}.
     PENDING_MODERATION_STATUS = 'pending'
@@ -265,6 +269,13 @@ module CalmLens
     #
     # The request carries an `Idempotency-Key` (generated unless you pass
     # `request_options: {idempotency_key:}`), so a retried upload never creates a second asset.
+    #
+    # `content:` larger than the client's `part_size_bytes` (8 MiB by default) whose size is known and
+    # that can be read again (a binary String, base64, or a File, StringIO or other seekable IO) is
+    # sent as a multipart upload in parts of that size. Each part carries the key
+    # `<idempotency_key>:part-<n>` and is retried on its own; calling again with the same
+    # `idempotency_key` (at most 240 characters) resumes an interrupted upload. Pipes, sockets and
+    # text are sent in one request.
     # @option options [String] :name
     # @option options [Hash] :content
     # @option options [Hash] :part `{type:, data:, is_final:}` for the first multipart part
@@ -304,7 +315,7 @@ module CalmLens
     # @return [Hash] the asset; `classification.status` stays `uploading` until the final part.
     def upload_part(options)
       call(options, __method__) do |api, request|
-        path = "/assets/#{Internal.segment(api['assetId'])}/part"
+        Internal.segment(api['assetId'])
         part = api['part']
         raise Internal.invalid('part is required') unless part.is_a?(Hash)
 
@@ -315,10 +326,7 @@ module CalmLens
         end
 
         body = UploadBody.from(part, multipart: true, part_size: !@session.defer_upload_checks)
-        query = { 'partNumber' => number, 'isFinal' => part.fetch('isFinal', false), 'sizeInBytes' => body.size }
-        query['queue'] = api['queue'] if api.key?('queue')
-        expect_asset(request('POST', path, query: query, raw: body, idempotent: true, request_options: request, upload: true,
-                                           headers: { 'Content-Type' => 'application/octet-stream', 'X-CalmLens-Upload' => 'part' }))
+        send_part(api['assetId'], number, part.fetch('isFinal', false), body, api.fetch('queue', nil), request)
       end
     end
 
@@ -372,6 +380,8 @@ module CalmLens
       end
 
       body = UploadBody.from(content, multipart: multipart, part_size: !@session.defer_upload_checks)
+      return upload_in_parts(options, request_options, queue, mime, body) if !multipart && splits?(content, body)
+
       check_direct_size(mime, body.size) unless multipart || @session.defer_upload_checks
       query = options.slice(*SUBMIT_QUERY_KEYS).merge('queue' => queue, 'contentType' => content['type'],
                                                       'sizeInBytes' => body.size)
@@ -380,6 +390,75 @@ module CalmLens
                            query: query, raw: body, idempotent: true, request_options: request_options,
                            upload: !content.key?('plainText'),
                            headers: { 'Content-Type' => content['type'], 'X-CalmLens-Upload' => multipart ? 'part' : 'content' }))
+    end
+
+    # Whether content goes in parts: not text, of known size, readable again and larger than a part.
+    def splits?(content, body)
+      !content.key?('plainText') && !body.size.nil? && body.replayable? && body.size > @session.part_size_bytes
+    end
+
+    # Uploads `body` as a multipart upload of `part_size_bytes` parts and returns the final part's
+    # asset. Part `n` after the first carries the key `<key>:part-<n>`, so repeating the call with
+    # the same key replays the parts the API already has and sends the rest.
+    def upload_in_parts(options, request_options, queue, mime, body)
+      key = request_options[:idempotency_key] || SecureRandom.uuid
+      if key.length > MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH
+        raise Internal.invalid("idempotency_key can have at most #{MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH} characters " \
+                               'for content uploaded in parts')
+      end
+      unless @session.defer_upload_checks
+        mime.start_with?('image/') ? check_image_size(body.size) : check_direct_size(mime, body.size)
+      end
+
+      total = body.size
+      part_size = @session.part_size_bytes
+      count = (total + part_size - 1) / part_size
+      piece = ->(number) { body.slice((number - 1) * part_size, [part_size, total - ((number - 1) * part_size)].min) }
+      first = piece.call(1)
+      type = options.dig('content', 'type')
+      query = options.slice(*SUBMIT_QUERY_KEYS).merge('queue' => queue, 'contentType' => type, 'sizeInBytes' => first.size,
+                                                      'partNumber' => 1, 'isFinal' => false, 'totalSizeInBytes' => total)
+      asset = expect_asset(request('POST', project('assets'),
+                                   query: query, raw: first, idempotent: true, upload: true,
+                                   request_options: request_options.merge(idempotency_key: key),
+                                   headers: { 'Content-Type' => type, 'X-CalmLens-Upload' => 'part' }))
+      send_remaining_parts(asset, count, piece, key, request_options)
+    end
+
+    # Sends parts 2 to `count`. A part the API already has (its response was lost) is skipped, and a
+    # final part that finds the upload completed reads the asset back.
+    def send_remaining_parts(asset, count, piece, key, request_options)
+      id = asset['id']
+      number = 2
+      while number <= count
+        final = number == count
+        begin
+          asset = send_part(id, number, final, piece.call(number), nil,
+                            request_options.merge(idempotency_key: "#{key}:part-#{number}"))
+        rescue Error => e
+          expected = e.details.is_a?(Hash) ? e.details['expectedPartNumber'] : nil
+          if e.code == ErrorCodes::INVALID_UPLOAD_PART_NUMBER && expected.is_a?(Integer) && expected > number && expected <= count
+            number = expected
+            next
+          end
+          if final && e.code == ErrorCodes::UPLOAD_NOT_OPEN
+            return retrieve('assetId' => id, 'request_options' => request_options.except(:idempotency_key))
+          end
+
+          raise
+        end
+        number += 1
+      end
+      asset
+    end
+
+    def send_part(asset_id, number, final, body, queue, request_options)
+      query = { 'partNumber' => number, 'isFinal' => final, 'sizeInBytes' => body.size }
+      query['queue'] = queue unless queue.nil?
+      headers = { 'Content-Type' => 'application/octet-stream', 'X-CalmLens-Upload' => 'part' }
+      expect_asset(request('POST', "/assets/#{Internal.segment(asset_id)}/part", query: query, raw: body, idempotent: true,
+                                                                                 request_options: request_options, upload: true,
+                                                                                 headers: headers))
     end
 
     # Keeps only the earlier posts CalmLens uses, which keeps a raw upload's query short.

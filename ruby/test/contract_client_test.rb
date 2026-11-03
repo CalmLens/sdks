@@ -209,7 +209,7 @@ class ContractClientTest < Minitest::Test
   UUID_V4 = /\A\h{8}-\h{4}-4\h{3}-[89ab]\h{3}-\h{12}\z/i
   CLIENT_OPTIONS = { 'apiKey' => :api_key, 'projectId' => :project_id, 'baseUrl' => :base_url,
                      'cdnBaseUrl' => :cdn_base_url, 'maxRetries' => :max_retries,
-                     'maxResponseBytes' => :max_response_bytes }.freeze
+                     'maxResponseBytes' => :max_response_bytes, 'partSizeBytes' => :part_size_bytes }.freeze
 
   def client_options(options)
     options.to_h do |name, value|
@@ -405,7 +405,8 @@ class ContractClientTest < Minitest::Test
       'waitForDecisionFirstIntervalMs' => CalmLens::Assets::DECISION_POLL_FIRST_DELAY * 1000,
       'waitForDecisionIntervalFactor' => CalmLens::Assets::DECISION_POLL_FACTOR,
       'waitForDecisionMaxIntervalMs' => CalmLens::Assets::DECISION_POLL_MAX_DELAY * 1000,
-      'ensureLensesBatchSize' => CalmLens::ServerClient::ENSURE_LENSES_MAX_PER_REQUEST
+      'ensureLensesBatchSize' => CalmLens::ServerClient::ENSURE_LENSES_MAX_PER_REQUEST,
+      'partSizeBytes' => session.part_size_bytes
     }
     names = CLIENT_CASES['cases'].map { |clientcase| clientcase['name'] }
     SURFACE['defaults'].each do |default|

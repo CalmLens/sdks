@@ -25,6 +25,11 @@ module CalmLens
     RETRY_AFTER_MAX = 60
     # The largest response body read, in bytes (32 MiB).
     DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024
+    # Content larger than this many bytes is uploaded in parts of this size (8 MiB).
+    DEFAULT_PART_SIZE_BYTES = 8 * 1024 * 1024
+    # The smallest and largest `part_size_bytes`: every part but the last is at least 5 MiB.
+    MIN_PART_SIZE_BYTES = 5 * 1024 * 1024
+    MAX_PART_SIZE_BYTES = 64 * 1024 * 1024
     # The most lens definitions {#ensure_lenses} sends in one request.
     ENSURE_LENSES_MAX_PER_REQUEST = 100
 
@@ -64,14 +69,18 @@ module CalmLens
     #   `Retry-After`. Other writes are never retried. 0 disables retries.
     # @param retry_base_delay [Numeric] seconds before the first retry when the API gives no
     #   `Retry-After`; later retries wait up to twice as long each time, at most 8 seconds.
+    # @param part_size_bytes [Integer] content larger than this many bytes whose size the client knows
+    #   and can read again (a binary String, base64, or a File, StringIO or other seekable IO) is
+    #   uploaded in parts of this size: each part is retried on its own, and calling again with the
+    #   same `idempotency_key` resumes an interrupted upload. From 5 MiB to 64 MiB; default 8 MiB.
     # @param transport [#call, nil] a custom {Transport}; defaults to {Transport::NetHTTP}.
     # @raise [ConfigurationError] `sdk/invalid-config` for a missing or malformed setting.
     def initialize(api_key:, project_id:, base_url: DEFAULT_BASE_URL, cdn_base_url: DEFAULT_CDN_BASE_URL,
                    timeout: DEFAULT_TIMEOUT, open_timeout: DEFAULT_OPEN_TIMEOUT, upload_timeout: nil,
                    max_retries: DEFAULT_MAX_RETRIES, retry_base_delay: DEFAULT_RETRY_BASE_DELAY,
-                   max_response_bytes: DEFAULT_MAX_RESPONSE_BYTES, transport: nil)
+                   max_response_bytes: DEFAULT_MAX_RESPONSE_BYTES, part_size_bytes: DEFAULT_PART_SIZE_BYTES, transport: nil)
       check_config(api_key, project_id, timeout, open_timeout, max_retries, retry_base_delay, transport)
-      check_limits(upload_timeout, max_response_bytes)
+      check_limits(upload_timeout, max_response_bytes, part_size_bytes)
       @project_id = project_id
       @base_url = ServerClient.check_url(base_url, 'base_url')
       @cdn_base_url = ServerClient.check_url(cdn_base_url, 'cdn_base_url')
@@ -79,7 +88,7 @@ module CalmLens
                              cdn_base_url: @cdn_base_url, timeout: timeout, open_timeout: open_timeout,
                              max_retries: max_retries, retry_base_delay: retry_base_delay,
                              max_response_bytes: max_response_bytes, upload_timeout: upload_timeout,
-                             transport: transport || Transport::NetHTTP.new)
+                             part_size_bytes: part_size_bytes, transport: transport || Transport::NetHTTP.new)
       @assets = Assets.new(@session)
       @folders = Folders.new(@session)
       @hash_lists = HashLists.new(@session)
@@ -138,9 +147,14 @@ module CalmLens
 
     private
 
-    def check_limits(upload_timeout, max_response_bytes)
+    def check_limits(upload_timeout, max_response_bytes, part_size_bytes)
       unless upload_timeout.nil? || Internal.positive?(upload_timeout)
         raise ConfigurationError.new(SdkErrorCodes::INVALID_CONFIG, 'upload_timeout must be nil or a positive number of seconds')
+      end
+      unless part_size_bytes.is_a?(Integer) && part_size_bytes.between?(MIN_PART_SIZE_BYTES, MAX_PART_SIZE_BYTES)
+        raise ConfigurationError.new(SdkErrorCodes::INVALID_CONFIG,
+                                     "part_size_bytes must be an Integer from #{MIN_PART_SIZE_BYTES} (5 MiB) to " \
+                                     "#{MAX_PART_SIZE_BYTES} (64 MiB)")
       end
       return if max_response_bytes.is_a?(Integer) && max_response_bytes.positive?
 

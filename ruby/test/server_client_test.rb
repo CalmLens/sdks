@@ -9,7 +9,7 @@ class ServerClientTest < Minitest::Test
   OK = '{"id":"asset","upload":{"status":"completed"},"classification":{"status":"completed","moderation":{"status":"allowed"}}}'
 
   # A transport that answers with a scripted sequence and records each request.
-  def scripted(*answers)
+  def scripted(*answers, **options)
     sent = []
     transport = lambda do |request|
       sent << request
@@ -19,7 +19,7 @@ class ServerClientTest < Minitest::Test
       status, body, headers = answer
       CalmLens::Response.new(status: status, body: body, headers: headers || {})
     end
-    [CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport, retry_base_delay: 0), sent]
+    [CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport, retry_base_delay: 0, **options), sent]
   end
 
   def busy(status = 503, code = 'server/unavailable') = [status, %({"code":"#{code}"}), { 'retry-after' => '0' }]
@@ -158,7 +158,8 @@ class ServerClientTest < Minitest::Test
   end
 
   def test_oversized_one_request_uploads_are_refused_before_sending
-    client, sent = scripted([200, OK])
+    # With the largest part size, none of these is split into parts.
+    client, sent = scripted([200, OK], part_size_bytes: 64 * 1024 * 1024)
     mib = 1024 * 1024
     { 'image/png' => (10 * mib) + 1, 'video/mp4' => (50 * mib) + 1, 'application/pdf' => (5000 * mib) + 1 }.each do |type, size|
       error = assert_raises(CalmLens::InvalidArgumentError, type) do

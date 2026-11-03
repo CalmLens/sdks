@@ -215,6 +215,7 @@ class ContractTest < Minitest::Test
     moderate_calls = []
     settings = { api_key: CalmLens::MockServerClient.create_api_key(options.fetch('apiKeyGrants', [])) }
     settings[:max_retries] = options['maxRetries'] if options.key?('maxRetries')
+    settings[:part_size_bytes] = options['partSizeBytes'] if options.key?('partSizeBytes')
     settings[:moderate] = recording_moderate(options['moderate'], moderate_calls) if options.key?('moderate')
     mock = CalmLens::MockServerClient.new(**settings)
     saved = {}

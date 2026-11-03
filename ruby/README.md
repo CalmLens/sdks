@@ -60,7 +60,7 @@ New statuses and fields may appear in later API versions. The SDK returns them u
 
 - [Moderate text, images, documents, audio, video and websites](https://calmlens.com/docs/sdk/ruby#moderate-content), and [read classification results](https://calmlens.com/docs/guides/classification-results).
 - [Wait for a queued decision](https://calmlens.com/docs/sdk/ruby#waiting-for-a-decision) or [receive it by webhook](https://calmlens.com/docs/guides/webhooks).
-- [Stream uploads from any IO](https://calmlens.com/docs/sdk/ruby/reference#upload-content) and send [multipart uploads](https://calmlens.com/docs/guides/multipart-uploads).
+- [Stream uploads from any IO](https://calmlens.com/docs/sdk/ruby/reference#upload-content). Content larger than `part_size_bytes:` (8 MiB) that can be read again, such as a String or a File, goes in [parts](https://calmlens.com/docs/guides/multipart-uploads) automatically, each retried on its own and resumable with the same idempotency key.
 - [Moderate replies with their conversation](https://calmlens.com/docs/sdk/ruby/reference#conversation-context).
 - [Sign upload tokens for browser uploads](https://calmlens.com/docs/sdk/ruby/reference#upload-tokens) through [upload presets](https://calmlens.com/docs/guides/upload-presets).
 - [Record reviewer decisions](https://calmlens.com/docs/sdk/ruby/reference#reviewer-decisions) and [explain a decision](https://calmlens.com/docs/sdk/ruby#methods).
