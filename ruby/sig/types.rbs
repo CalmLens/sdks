@@ -450,7 +450,8 @@ module CalmLens
     ?blur: number,
     ?redact: {
       ?text: bool,
-      ?personalInformation: bool
+      ?personalInformation: bool,
+      ?faces: bool
     },
     ?border: {
       ?color: String,
@@ -496,7 +497,8 @@ module CalmLens
     ?"blur" => number,
     ?"redact" => {
       ?"text" => bool,
-      ?"personalInformation" => bool
+      ?"personalInformation" => bool,
+      ?"faces" => bool
     },
     ?"border" => {
       ?"color" => String,

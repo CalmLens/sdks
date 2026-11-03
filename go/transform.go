@@ -180,11 +180,13 @@ type ImageBorder struct {
 }
 
 // ImageRedaction blurs regions found when the image was processed. Text blurs text regions
-// (the upload needs OCR) and PersonalInformation blurs regions holding personal information.
+// (the upload needs OCR), PersonalInformation blurs regions holding personal information, and
+// Faces (preview) blurs the faces face detection found (the upload needs face detection).
 // Pointers keep an explicit false in the selector.
 type ImageRedaction struct {
 	Text                *bool `json:"text,omitempty"`
 	PersonalInformation *bool `json:"personalInformation,omitempty"`
+	Faces               *bool `json:"faces,omitempty"`
 }
 
 // ImageGravity chooses the focal point when cropping. Set Side for a named position ("face",

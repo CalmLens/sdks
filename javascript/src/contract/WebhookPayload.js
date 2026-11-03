@@ -281,11 +281,7 @@ const createProcessingFeaturesSchema = (booleanSchema) => {
 		faceDetection: options.faceDetection.nullish(),
 		linkDetection: options.linkDetection.nullish(),
 		aiGeneratedDetection: options.aiGeneratedDetection.nullish()
-	}).strict().omit({
-		personDetection: true,
-		faceDetection: true,
-		aiGeneratedDetection: true
-	}).meta(metaStore([docPropertyInfo({
+	}).strict().omit({ aiGeneratedDetection: true }).meta(metaStore([docPropertyInfo({
 		description: "Optional analyses to run on this asset, keyed by feature. Unknown features are rejected.",
 		namedType: "ProcessingFeatures"
 	})]));
@@ -873,11 +869,7 @@ const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 	aiGeneratedDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.aiGeneratedDetection,
 	textRegions: CLASSIFICATION_REPORT_SCHEMA.shape.textRegions,
 	labels: CLASSIFICATION_REPORT_SCHEMA.shape.labels
-}).omit({
-	personDetection: true,
-	faceDetection: true,
-	aiGeneratedDetection: true
-}).meta(metaStore([docPropertyInfo({
+}).omit({ aiGeneratedDetection: true }).meta(metaStore([docPropertyInfo({
 	description: "Classification results",
 	namedType: "AssetClassification"
 })]));

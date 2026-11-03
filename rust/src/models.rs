@@ -3350,6 +3350,9 @@ pub struct ImageRedaction {
     /// Blur regions holding personal information.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub personal_information: Option<bool>,
+    /// Preview. Blur the faces face detection found. Face boxes need face detection on the upload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faces: Option<bool>,
 }
 
 string_enum! {

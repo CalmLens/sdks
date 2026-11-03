@@ -686,16 +686,20 @@ public final class Models {
    *
    * @param text blur every text region (needs OCR on the upload)
    * @param personalInformation blur text regions holding personal information
+   * @param faces (preview) blur the faces face detection found (needs face detection on the upload)
    */
-  public record Redaction(Boolean text, Boolean personalInformation) {
+  public record Redaction(Boolean text, Boolean personalInformation, Boolean faces) {
     /** No redaction settings. */
-    public Redaction() { this(null, null); }
+    public Redaction() { this(null, null, null); }
 
     /** @param value whether to blur every text region @return a copy with this setting */
-    public Redaction text(Boolean value) { return new Redaction(value, personalInformation); }
+    public Redaction text(Boolean value) { return new Redaction(value, personalInformation, faces); }
 
     /** @param value whether to blur text regions holding personal information @return a copy with this setting */
-    public Redaction personalInformation(Boolean value) { return new Redaction(text, value); }
+    public Redaction personalInformation(Boolean value) { return new Redaction(text, value, faces); }
+
+    /** @param value (preview) whether to blur the faces face detection found @return a copy with this setting */
+    public Redaction faces(Boolean value) { return new Redaction(text, personalInformation, value); }
   }
 
   /** What an image transform trims: a uniform border ({@link #border()}) or edges ({@link #edges(TrimEdges)}). */

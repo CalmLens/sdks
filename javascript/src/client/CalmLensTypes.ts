@@ -160,6 +160,8 @@ export interface ImageTransformOptions {
     text?: boolean;
     /** Blurs the email addresses, phone numbers, card numbers, IBANs and social security numbers OCR found. */
     personalInformation?: boolean;
+    /** Preview. Blurs every face that face detection found when the image was uploaded. */
+    faces?: boolean;
   };
   /** A border drawn around the image. */
   border?: {

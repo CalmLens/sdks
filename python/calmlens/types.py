@@ -934,6 +934,8 @@ class ImageTransformRedaction(TypedDict, total=False):
     text: bool
     #: Blurs the email addresses, phone numbers, card numbers, IBANs and social security numbers OCR found.
     personalInformation: bool
+    #: Preview. Blurs every face that face detection found when the image was uploaded.
+    faces: bool
 
 
 class ImageTransformBorder(TypedDict, total=False):
