@@ -57,6 +57,9 @@ fn builder(defaults: &Value, overrides: &Map<String, Value>) -> calmlens::Server
     if let Some(limit) = option("maxResponseBytes").and_then(Value::as_u64) {
         builder = builder.max_response_bytes(limit as usize);
     }
+    if let Some(size) = option("partSizeBytes").and_then(Value::as_u64) {
+        builder = builder.part_size_bytes(size);
+    }
     builder
 }
 
@@ -607,6 +610,7 @@ fn defaults_match_javascript() {
             "ensureLensesBatchSize",
             json!(calmlens::ENSURE_LENSES_MAX_PER_REQUEST),
         ),
+        ("partSizeBytes", json!(calmlens::DEFAULT_PART_SIZE_BYTES)),
     ]);
     let cases: BTreeSet<String> = fixture("client-cases")["cases"]
         .as_array()

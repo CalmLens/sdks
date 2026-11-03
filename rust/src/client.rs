@@ -2,8 +2,8 @@
 use crate::error::{invalid_argument, invalid_config, invalid_payload, ErrorCode};
 use crate::models::*;
 use crate::transport::{
-    decode, execute, stream_error, upload_body, uuid, CallOptions, Deadline, Exchange, Prepared,
-    Transport, DEFAULT_MAX_RESPONSE_BYTES,
+    decode, execute, read_file_range, stream_error, upload_body, uuid, CallOptions, Deadline,
+    Exchange, Prepared, RequestBody, Transport, DEFAULT_MAX_RESPONSE_BYTES,
 };
 use crate::{Error, Result};
 use bytes::Bytes;
@@ -35,6 +35,14 @@ pub const DEFAULT_MAX_RETRIES: u32 = 2;
 pub const DEFAULT_SIGNED_URL_SECONDS: u64 = 15 * 60;
 /// An upload token's lifetime in seconds when the options give none: 10 minutes.
 pub const DEFAULT_UPLOAD_TOKEN_SECONDS: u32 = 10 * 60;
+/// Content larger than this many bytes is uploaded in parts of this size by default: 8 MiB.
+pub const DEFAULT_PART_SIZE_BYTES: u64 = 8 * 1024 * 1024;
+/// The smallest `part_size_bytes`: every part but the last is at least 5 MiB.
+pub const MIN_PART_SIZE_BYTES: u64 = 5 * 1024 * 1024;
+/// The largest `part_size_bytes`: 64 MiB.
+pub const MAX_PART_SIZE_BYTES: u64 = 64 * 1024 * 1024;
+/// The longest `idempotency_key` of an upload sent in parts: each part's key adds `:part-<n>`.
+const MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH: usize = 240;
 /// How long [`AssetsClient::wait_for_decision`] waits by default.
 pub const DEFAULT_DECISION_TIMEOUT: Duration = Duration::from_secs(60);
 /// The wait before [`AssetsClient::wait_for_decision`]'s second check.
@@ -48,8 +56,8 @@ pub const DECISION_POLL_MAX_INTERVAL: Duration = Duration::from_secs(2);
 ///
 /// Defaults: a 120-second `timeout` for API calls (and for the response headers of CDN
 /// downloads), no `upload_timeout` for binary uploads, a 10-second `connect_timeout`, a
-/// 120-second `read_timeout` between response bytes, 2 retries of repeatable requests and a
-/// 32 MiB `max_response_bytes`.
+/// 120-second `read_timeout` between response bytes, 2 retries of repeatable requests, a
+/// 32 MiB `max_response_bytes` and an 8 MiB `part_size_bytes`.
 #[derive(Clone)]
 pub struct ServerClientBuilder {
     api_key: String,
@@ -62,6 +70,7 @@ pub struct ServerClientBuilder {
     read_timeout: Duration,
     max_retries: u32,
     max_response_bytes: usize,
+    part_size_bytes: u64,
     http_client: Option<reqwest::Client>,
 }
 
@@ -78,6 +87,7 @@ impl fmt::Debug for ServerClientBuilder {
             .field("read_timeout", &self.read_timeout)
             .field("max_retries", &self.max_retries)
             .field("max_response_bytes", &self.max_response_bytes)
+            .field("part_size_bytes", &self.part_size_bytes)
             .field("http_client", &self.http_client.is_some())
             .finish()
     }
@@ -96,6 +106,7 @@ impl ServerClientBuilder {
             read_timeout: Duration::from_secs(120),
             max_retries: DEFAULT_MAX_RETRIES,
             max_response_bytes: DEFAULT_MAX_RESPONSE_BYTES,
+            part_size_bytes: DEFAULT_PART_SIZE_BYTES,
             http_client: None,
         }
     }
@@ -128,6 +139,17 @@ impl ServerClientBuilder {
     /// it is read. CDN downloads stream and have no limit.
     pub fn max_response_bytes(mut self, value: usize) -> Self {
         self.max_response_bytes = value;
+        self
+    }
+    /// Content larger than this many bytes that the client holds in memory ([`Payload::Bytes`]
+    /// and [`Payload::Base64`]) is uploaded by [`AssetsClient::create`] and
+    /// [`AssetsClient::classify`] as a multipart upload in parts of this size (8 MiB by default,
+    /// from 5 MiB to 64 MiB; anything else fails [`build`](Self::build) with
+    /// `sdk/invalid-config`). Each part is retried on its own, and calling again with the same
+    /// `idempotency_key` resumes an interrupted upload. Readers, streams and text go in one
+    /// request.
+    pub fn part_size_bytes(mut self, value: u64) -> Self {
+        self.part_size_bytes = value;
         self
     }
     /// The timeout for establishing a connection (10 seconds by default).
@@ -205,6 +227,11 @@ impl ServerClientBuilder {
         if self.max_response_bytes == 0 {
             return Err(invalid_config("max_response_bytes must be positive"));
         }
+        if !(MIN_PART_SIZE_BYTES..=MAX_PART_SIZE_BYTES).contains(&self.part_size_bytes) {
+            return Err(invalid_config(format!(
+                "part_size_bytes must be from {MIN_PART_SIZE_BYTES} (5 MiB) to {MAX_PART_SIZE_BYTES} (64 MiB)"
+            )));
+        }
         if self.api_key.is_empty() || self.project_id.is_empty() {
             return Err(invalid_config("API key and project ID are required"));
         }
@@ -236,6 +263,7 @@ impl ServerClientBuilder {
             upload_timeout: self.upload_timeout,
             max_retries: self.max_retries,
             max_response_bytes: self.max_response_bytes,
+            part_size_bytes: self.part_size_bytes,
         })
     }
 }
@@ -249,6 +277,7 @@ struct Config {
     upload_timeout: Option<Duration>,
     max_retries: u32,
     max_response_bytes: usize,
+    part_size_bytes: u64,
 }
 
 struct Inner {
@@ -646,7 +675,51 @@ impl ServerClient {
         }
         let is_final = content.is_final.unwrap_or(false);
         let deadline = upload_deadline(&content.payload);
-        let (body, size) = upload_body(content.payload, multipart, content.size_in_bytes)?;
+        // Bytes in memory and files can be cut into parts and read again; readers and streams
+        // cannot, and text stays one request.
+        let part_size = self.inner.config.part_size_bytes;
+        let (source, body, size) = match content.payload {
+            Payload::File { path, size } if !multipart && size > part_size => {
+                if content
+                    .size_in_bytes
+                    .is_some_and(|declared| declared != size)
+                {
+                    return Err(invalid_payload(
+                        "sizeInBytes must match the payload byte length",
+                    ));
+                }
+                (Some(PartSource::File(path)), RequestBody::Empty, Some(size))
+            }
+            payload => {
+                let splittable =
+                    !multipart && matches!(payload, Payload::Bytes(_) | Payload::Base64(_));
+                match upload_body(payload, multipart, content.size_in_bytes)? {
+                    (RequestBody::Bytes(bytes), size)
+                        if splittable && bytes.len() as u64 > part_size =>
+                    {
+                        (Some(PartSource::Bytes(bytes)), RequestBody::Empty, size)
+                    }
+                    (body, size) => (None, body, size),
+                }
+            }
+        };
+        if let (Some(source), Some(total)) = (source, size) {
+            if idempotency_key.chars().count() > MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH {
+                return Err(invalid_argument(format!(
+                    "idempotency_key can be at most {MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH} characters for an upload sent in parts"
+                )));
+            }
+            if !self.inner.transport.defers_upload_checks() {
+                if mime.starts_with("image/") {
+                    check_image_size(size, false)?;
+                } else {
+                    check_direct_size(&mime, size)?;
+                }
+            }
+            return self
+                .submit_in_parts(query, &content.mime_type, (source, total), idempotency_key)
+                .await;
+        }
         if multipart && !self.inner.transport.defers_upload_checks() {
             if mime.starts_with("image/") {
                 check_image_size(size, is_final)?;
@@ -691,20 +764,123 @@ impl ServerClient {
         if !self.inner.transport.defers_upload_checks() {
             check_part_size(size, is_final)?;
         }
+        let idempotency_key = options.idempotency_key.unwrap_or_else(uuid);
+        self.send_part(
+            &path,
+            (part_number, is_final),
+            (body, size),
+            options.queue,
+            &idempotency_key,
+            deadline,
+        )
+        .await
+    }
+
+    /// Sends part `number` of a multipart upload to `path` (`/assets/{id}/part`).
+    async fn send_part(
+        &self,
+        path: &str,
+        (part_number, is_final): (u32, bool),
+        (body, size): (RequestBody, Option<u64>),
+        queue: Option<bool>,
+        idempotency_key: &str,
+        deadline: Deadline,
+    ) -> Result<Asset> {
         let mut query = Query::default();
         query.push("partNumber", part_number);
         query.push("isFinal", is_final);
-        query.opt("queue", options.queue);
+        query.opt("queue", queue);
         query.opt("sizeInBytes", size);
-        let idempotency_key = options.idempotency_key.unwrap_or_else(uuid);
         // Later parts carry no Content-Type: the API reads the upload's saved type.
         let mut request = self
-            .prepare(Method::POST, &path, &query.0)?
+            .prepare(Method::POST, path, &query.0)?
             .header("x-calmlens-upload", "part")?
-            .header("idempotency-key", &idempotency_key)?;
+            .header("idempotency-key", idempotency_key)?;
         request.body = body;
         request.deadline = deadline;
         self.call_upload(request).await
+    }
+
+    /// Uploads `bytes` as a multipart upload in `part_size_bytes` parts and returns the final
+    /// part's asset. The first part goes with the upload's fields in `query`; part `n` after it
+    /// carries the key `<key>:part-<n>`, so each is retried safely and repeating the call with
+    /// the same key replays the parts the API already has and sends the rest. A part the API
+    /// already has is skipped, and a final part that finds the upload completed reads it back.
+    async fn submit_in_parts(
+        &self,
+        mut query: Query,
+        mime_type: &str,
+        (source, total): (PartSource, u64),
+        key: String,
+    ) -> Result<Asset> {
+        let part_size = self.inner.config.part_size_bytes;
+        let count = u32::try_from(total.div_ceil(part_size))
+            .map_err(|_| invalid_payload("The content has too many parts"))?;
+        let piece = |number: u32| {
+            let start = u64::from(number - 1) * part_size;
+            let end = (u64::from(number) * part_size).min(total);
+            source.read(start, (end - start) as usize)
+        };
+        let first = piece(1).await?;
+        query.push("contentType", mime_type);
+        query.push("sizeInBytes", first.len());
+        query.push("partNumber", 1);
+        query.push("isFinal", false);
+        query.push("totalSizeInBytes", total);
+        let mut request = self
+            .prepare(Method::POST, &self.project_path("assets")?, &query.0)?
+            .header("content-type", mime_type)?
+            .header("x-calmlens-upload", "part")?
+            .header("idempotency-key", &key)?;
+        request.body = RequestBody::Bytes(first);
+        request.deadline = Deadline::Upload;
+        let mut asset = self.call_upload(request).await?;
+        let path = format!("/assets/{}/part", id(&asset.id)?);
+        let mut number = 2;
+        while number <= count {
+            let is_final = number == count;
+            let part = piece(number).await?;
+            let size = part.len() as u64;
+            let sent = self
+                .send_part(
+                    &path,
+                    (number, is_final),
+                    (RequestBody::Bytes(part), Some(size)),
+                    None,
+                    &format!("{key}:part-{number}"),
+                    Deadline::Upload,
+                )
+                .await;
+            match sent {
+                Ok(next) => {
+                    asset = next;
+                    number += 1;
+                }
+                Err(error) => {
+                    let expected = error
+                        .details()
+                        .get("expectedPartNumber")
+                        .and_then(serde_json::Value::as_u64);
+                    if *error.code() == ErrorCode::InvalidUploadPartNumber {
+                        // The parts before `expected` arrived, but their responses were lost.
+                        if let Some(expected) = expected
+                            .filter(|expected| *expected > u64::from(number))
+                            .and_then(|expected| u32::try_from(expected).ok())
+                            .filter(|expected| *expected <= count)
+                        {
+                            number = expected;
+                            continue;
+                        }
+                    }
+                    if is_final && *error.code() == ErrorCode::UploadNotOpen {
+                        // The final part completed the upload, but its response was lost.
+                        return AssetsClient(self).retrieve(AssetId::new(asset.id)).await;
+                    }
+                    return Err(error);
+                }
+            }
+        }
+        Ok(asset)
     }
 
     async fn list_page(&self, options: &ListAssets) -> Result<AssetPage> {
@@ -732,6 +908,21 @@ impl ServerClient {
         query.opt("pageSize", options.page_size);
         self.call(self.prepare(Method::GET, &self.project_path("events")?, &query.0)?)
             .await
+    }
+}
+
+/// Content an upload in parts reads each part from, so a part can be sent again.
+enum PartSource {
+    Bytes(Bytes),
+    File(std::path::PathBuf),
+}
+impl PartSource {
+    /// `length` bytes from `offset`.
+    async fn read(&self, offset: u64, length: usize) -> Result<Bytes> {
+        match self {
+            Self::Bytes(bytes) => Ok(bytes.slice(offset as usize..offset as usize + length)),
+            Self::File(path) => read_file_range(path.clone(), offset, length).await,
+        }
     }
 }
 

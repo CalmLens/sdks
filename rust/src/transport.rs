@@ -625,6 +625,16 @@ pub(crate) fn upload_body(
             RequestBody::Stream(Some(reader_stream(reader)), Some(size)),
             size,
         ),
+        Payload::File { path, size } => {
+            let file = std::fs::File::open(&path).map_err(|cause| {
+                crate::error::invalid_payload(format!("Could not open {}: {cause}", path.display()))
+                    .with_source(cause)
+            })?;
+            (
+                RequestBody::Stream(Some(reader_stream(Box::new(file))), Some(size)),
+                size,
+            )
+        }
         Payload::Stream { stream, size } => (RequestBody::Stream(Some(stream), Some(size)), size),
         Payload::UnsizedStream(stream) => {
             return Ok((
@@ -639,6 +649,29 @@ pub(crate) fn upload_body(
         ));
     }
     Ok((body, Some(size)))
+}
+
+/// Reads `length` bytes of the file at `path` from `offset`, on Tokio's blocking thread pool.
+pub(crate) async fn read_file_range(
+    path: std::path::PathBuf,
+    offset: u64,
+    length: usize,
+) -> Result<Bytes> {
+    tokio::task::spawn_blocking(move || {
+        use std::io::{Read, Seek, SeekFrom};
+        let mut file = std::fs::File::open(&path)?;
+        file.seek(SeekFrom::Start(offset))?;
+        let mut buffer = vec![0; length];
+        file.read_exact(&mut buffer)?;
+        Ok::<_, std::io::Error>(Bytes::from(buffer))
+    })
+    .await
+    .map_err(std::io::Error::other)
+    .and_then(|read| read)
+    .map_err(|cause| {
+        crate::error::invalid_payload(format!("Could not read the file being uploaded: {cause}"))
+            .with_source(cause)
+    })
 }
 
 /// Reads a blocking reader in 64 KiB chunks on Tokio's blocking thread pool.

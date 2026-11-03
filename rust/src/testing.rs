@@ -411,6 +411,9 @@ impl MockServerClient {
             builder = builder.max_response_bytes(value);
         }
         let transport = Arc::new(MockTransport::new(State {
+        if let Some(value) = options.part_size_bytes {
+            builder = builder.part_size_bytes(value);
+        }
             backend: Some(memory::Backend::new(options)),
             base_urls: builder.base_urls(),
             ..State::default()

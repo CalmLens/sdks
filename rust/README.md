@@ -78,7 +78,7 @@ let publishable = matches!(
 
 - Classify text and files, and read the decision: [Rust SDK](https://calmlens.com/docs/sdk/rust#moderate-content), [Reading classification results](https://calmlens.com/docs/guides/classification-results)
 - Wait for queued decisions: [Waiting for a decision](https://calmlens.com/docs/sdk/rust#waiting-for-a-decision)
-- Stream uploads from bytes, readers, streams and files, and upload in parts: [Uploads](https://calmlens.com/docs/sdk/rust/reference#uploads), [Multipart uploads](https://calmlens.com/docs/guides/multipart-uploads)
+- Stream uploads from bytes, readers, streams and files, with content over 8 MiB sent in resumable parts automatically: [Uploads](https://calmlens.com/docs/sdk/rust/reference#uploads), [Multipart uploads](https://calmlens.com/docs/guides/multipart-uploads)
 - Turn on OCR and other optional analyses: [Processing features](https://calmlens.com/docs/sdk/rust/reference#processing-features)
 - Moderate replies with their conversation: [Conversations](https://calmlens.com/docs/sdk/rust/reference#conversations)
 - Sign upload tokens for browser uploads through a preset: [Upload tokens](https://calmlens.com/docs/sdk/rust/reference#upload-tokens), [Upload presets](https://calmlens.com/docs/guides/upload-presets)

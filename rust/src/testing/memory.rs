@@ -178,6 +178,7 @@ pub struct MockOptions {
     pub(super) cdn_base_url: String,
     pub(super) upload_timeout: Option<Duration>,
     pub(super) max_response_bytes: Option<usize>,
+    pub(super) part_size_bytes: Option<u64>,
     moderate: Option<Moderate>,
     create_id: CreateId,
     now: Now,
@@ -193,6 +194,7 @@ impl Default for MockOptions {
             cdn_base_url: CDN_BASE_URL.into(),
             upload_timeout: None,
             max_response_bytes: None,
+            part_size_bytes: None,
             moderate: None,
             create_id: Arc::new(crate::transport::new_id),
             now: monotonic_clock(),
@@ -222,6 +224,7 @@ impl fmt::Debug for MockOptions {
             .field("cdn_base_url", &self.cdn_base_url)
             .field("upload_timeout", &self.upload_timeout)
             .field("max_response_bytes", &self.max_response_bytes)
+            .field("part_size_bytes", &self.part_size_bytes)
             .field("signed_url_base_url", &self.signed_url_base_url)
             .finish_non_exhaustive()
     }
@@ -267,6 +270,13 @@ impl MockOptions {
     /// [`ServerClientBuilder::max_response_bytes`](crate::ServerClientBuilder::max_response_bytes).
     pub fn max_response_bytes(mut self, value: usize) -> Self {
         self.max_response_bytes = Some(value);
+        self
+    }
+    /// The mock client's part size, as
+    /// [`ServerClientBuilder::part_size_bytes`](crate::ServerClientBuilder::part_size_bytes):
+    /// content larger than it is uploaded in parts to the in-memory API.
+    pub fn part_size_bytes(mut self, value: u64) -> Self {
+        self.part_size_bytes = Some(value);
         self
     }
     /// Decides each asset the mock moderates: when an upload completes (`assets().create`,
@@ -494,6 +504,8 @@ fn total_size_error(total: Option<u64>, received: u64, is_final: bool) -> Option
     let total = total?;
     (received > total || (is_final && received != total)).then_some(ErrorCode::UploadSizeMismatch)
 }
+/// Like the API: an upload has at most this many parts.
+const MAX_UPLOAD_PARTS: u64 = 10_000;
 /// Like the API: every part but the last is at least 5 MiB.
 fn check_part_size(size: u64, is_final: bool) -> Outcome<()> {
     if !is_final && size < 5 * MIB {
@@ -2098,7 +2110,8 @@ impl Backend {
         }
         let expected = asset["upload"]["partsReceived"].as_u64().unwrap_or(0) + 1;
         let received_number = q.get("partNumber").and_then(|n| n.parse::<u64>().ok());
-        if received_number != Some(expected) {
+        // Like the API: an upload has at most 10,000 parts.
+        if received_number != Some(expected) || expected > MAX_UPLOAD_PARTS {
             let mut failure = fail(
                 ErrorCode::InvalidUploadPartNumber,
                 &format!("Expected part {expected}"),

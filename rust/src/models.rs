@@ -681,6 +681,13 @@ impl FaceDetectionOptions {
 /// `Text` and `Bytes` are sent as they are and can be retried. `Reader`, `Stream` and
 /// `UnsizedStream` are read once while the request is sent, so the whole file never needs to be
 /// in memory; the SDK does not retry them. `Reader` and `Stream` need the exact `size`.
+///
+/// `Bytes`, `Base64` and `File` can be read again, so [`AssetsClient::create`] and
+/// [`AssetsClient::classify`] upload them in parts when they are larger than the client's
+/// [`part_size_bytes`](crate::ServerClientBuilder::part_size_bytes).
+///
+/// [`AssetsClient::create`]: crate::AssetsClient::create
+/// [`AssetsClient::classify`]: crate::AssetsClient::classify
 #[non_exhaustive]
 pub enum Payload {
     /// UTF-8 text.
@@ -695,6 +702,16 @@ pub enum Payload {
         /// The source, e.g. a [`std::fs::File`].
         reader: Box<dyn std::io::Read + Send + 'static>,
         /// The exact number of bytes the reader yields.
+        size: u64,
+    },
+    /// A file on disk with its length, read while it is uploaded. Content larger than one
+    /// part is read again part by part, so each part can be retried. Create it with
+    /// [`Content::file`].
+    #[cfg(feature = "async")]
+    File {
+        /// The file's path.
+        path: std::path::PathBuf,
+        /// The file's length in bytes.
         size: u64,
     },
     /// An async byte stream with its exact length.
@@ -723,6 +740,12 @@ impl fmt::Debug for Payload {
             Self::Base64(text) => f.debug_struct("Base64").field("len", &text.len()).finish(),
             #[cfg(feature = "async")]
             Self::Reader { size, .. } => f.debug_struct("Reader").field("size", size).finish(),
+            #[cfg(feature = "async")]
+            Self::File { path, size } => f
+                .debug_struct("File")
+                .field("path", path)
+                .field("size", size)
+                .finish(),
             #[cfg(feature = "async")]
             Self::Stream { size, .. } => f.debug_struct("Stream").field("size", size).finish(),
             #[cfg(feature = "async")]
@@ -801,15 +824,23 @@ impl Content {
             mime_type,
         )
     }
-    /// Streams the file at `path` without reading it into memory.
+    /// Streams the file at `path` without reading it into memory. A file larger than the
+    /// client's [`part_size_bytes`](crate::ServerClientBuilder::part_size_bytes) is uploaded in
+    /// parts, so it must stay unchanged until the upload finishes.
     #[cfg(feature = "async")]
     pub fn file(
         path: impl AsRef<std::path::Path>,
         mime_type: impl Into<String>,
     ) -> std::io::Result<Self> {
-        let file = std::fs::File::open(path)?;
-        let size = file.metadata()?.len();
-        Ok(Self::reader(file, size, mime_type))
+        let path = path.as_ref();
+        let size = std::fs::File::open(path)?.metadata()?.len();
+        Ok(Self::new(
+            Payload::File {
+                path: path.to_owned(),
+                size,
+            },
+            mime_type,
+        ))
     }
     fn new(payload: Payload, mime_type: impl Into<String>) -> Self {
         Self {
