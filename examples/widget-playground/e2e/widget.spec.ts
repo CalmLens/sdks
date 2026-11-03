@@ -59,17 +59,47 @@ for (const tab of TABS) {
 
     test("shows the bytes sent while a large photo uploads", async ({ page }) => {
       const panel = await open(page, tab.hash);
-      await sample(page, "Large photo (6 MB)");
-
-      // The mock reads the upload slowly, so the bar passes through partial values.
-      await page.waitForFunction(() =>
-        [...document.querySelectorAll("[role=tabpanel] [role=progressbar][aria-valuenow]")].some(
-          (bar) => {
+      // Record every value the bar takes, however briefly it shows.
+      await page.evaluate(() => {
+        const state = window as unknown as { partialProgress?: number };
+        new MutationObserver(() => {
+          for (const bar of document.querySelectorAll(
+            "[role=tabpanel] [role=progressbar][aria-valuenow]",
+          )) {
             const value = Number(bar.getAttribute("aria-valuenow"));
-            return value > 0 && value < 100;
-          },
-        ),
+            if (value > 0 && value < 100) state.partialProgress = value;
+          }
+        }).observe(document.body, {
+          subtree: true,
+          childList: true,
+          attributes: true,
+          attributeFilter: ["aria-valuenow"],
+        });
+      });
+
+      // The mock reads uploads slowly, but the browser and the server's socket can buffer up to
+      // about 10 MB between them, so a 6 MB photo can be sent at once and skip every partial
+      // value. 18 MB (the photo, padded after its end marker) has to wait for the slow reads.
+      const photo = await readFile(
+        new URL("../../../javascript/test-files/large.jpg", import.meta.url),
       );
+      const chooser = page.waitForEvent("filechooser");
+      await panel.getByRole("button", { name: /^Select files?$/ }).click();
+      await (await chooser).setFiles({
+        name: "large-photo.jpg",
+        mimeType: "image/jpeg",
+        buffer: Buffer.concat([photo, Buffer.alloc(18_000_000 - photo.length)]),
+      });
+
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () => (window as unknown as { partialProgress?: number }).partialProgress,
+            ),
+          { timeout: 15_000 },
+        )
+        .toBeGreaterThan(0);
       await expect(
         galleryItem(panel, "large-photo.jpg").getByText("allowed", { exact: true }),
       ).toBeVisible({

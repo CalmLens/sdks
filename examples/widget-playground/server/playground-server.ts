@@ -81,12 +81,22 @@ const json = (response: ServerResponse, status: number, body: unknown) => {
   response.end(JSON.stringify(body));
 };
 
-/** Reads the body slowly, so the upload's progress bar moves even on localhost. */
+/** How fast uploads are read: slow enough that the progress bar moves even on localhost. */
+const UPLOAD_BYTES_PER_SECOND = 8_000_000;
+
+/**
+ * Reads the body at a steady byte rate, so an upload takes the same time however the connection
+ * chunks it.
+ */
 const readSlowly = async (request: IncomingMessage) => {
   const chunks: Buffer[] = [];
+  const started = Date.now();
+  let received = 0;
   for await (const chunk of request) {
     chunks.push(chunk as Buffer);
-    await new Promise((resolve) => setTimeout(resolve, 12));
+    received += (chunk as Buffer).length;
+    const due = started + (received / UPLOAD_BYTES_PER_SECOND) * 1000;
+    if (due > Date.now()) await new Promise((resolve) => setTimeout(resolve, due - Date.now()));
   }
   return Buffer.concat(chunks);
 };
