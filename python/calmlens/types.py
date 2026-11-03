@@ -467,8 +467,9 @@ AiGeneratedDetectionResult = Union[EvaluatedAiGeneratedDetectionResult, NotEvalu
 
 #: Preview. What a link's destination is: ``safe`` when every reputation check passed, ``adult`` or
 #: ``gambling`` from its domain's content categories, ``phishing`` or ``malware`` from a threat list
-#: or the domain's security risks, and ``unresolved`` when a short link could not be followed or a
-#: check failed. New verdicts may be added.
+#: or the domain's security risks, and ``unresolved`` when a short link or redirect chain could not
+#: be followed or a check failed. Every address on a link's way is checked, and the most severe
+#: verdict is the link's. New verdicts may be added.
 LinkSafetyVerdict = Union[Literal["safe", "adult", "gambling", "phishing", "malware", "unresolved"], str]
 #: Preview. What a link does to its asset under the policy's link-safety settings. Purging content
 #: over a link is never offered. New actions may be added.
@@ -476,15 +477,16 @@ LinkSafetyAction = Union[Literal["allow", "limit", "age-restrict", "block"], str
 
 
 class LinkSafetyEvidence(TypedDict):
-    """Preview. One reputation check of a link's destination."""
-    #: ``domain-categories`` (the destination domain's categories) or ``threat-lists`` (a threat-list
-    #: lookup of the destination URL). New checks may be added.
+    """Preview. One reputation check of a link, every address it redirects through and its
+    destination."""
+    #: ``domain-categories`` (the domain categories of every address on the way) or
+    #: ``threat-lists`` (a threat-list lookup of every URL on the way). New checks may be added.
     check: Union[Literal["domain-categories", "threat-lists"], str]
     #: ``checked``, or ``failed`` when the check could not answer, which makes the link
     #: ``unresolved``. New statuses may be added.
     status: Union[Literal["checked", "failed"], str]
-    #: What the check reported, such as the domain's content categories and security risks or the
-    #: threat types listed.
+    #: What the check reported for any of the addresses, such as the domains' content categories and
+    #: security risks or the threat types listed.
     labels: list[str]
 
 
@@ -492,8 +494,8 @@ class CheckedLink(TypedDict):
     """Preview. A link in the asset and what its destination is."""
     #: The link as found, with ``https://`` added when it was left out.
     url: str
-    #: Where the link leads after following its redirects, or ``None`` when a short link could not
-    #: be followed.
+    #: Where the link leads after following its redirects, or ``None`` when a short link or redirect
+    #: chain could not be followed.
     finalUrl: Optional[str]
     #: How many redirects were followed to reach ``finalUrl``.
     redirects: int

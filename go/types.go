@@ -577,8 +577,9 @@ type DetectedLink struct {
 // Link safety verdicts of CheckedLink.Verdict (preview): LinkVerdictSafe when every reputation
 // check passed, LinkVerdictAdult or LinkVerdictGambling from the domain's content categories,
 // LinkVerdictPhishing or LinkVerdictMalware from a threat list or the domain's security risks,
-// and LinkVerdictUnresolved when a short link could not be followed or a check failed. Verdict is
-// a plain string so verdicts added later still decode.
+// and LinkVerdictUnresolved when a short link or redirect chain could not be followed or a check
+// failed. Every address on a link's way is checked, and the most severe verdict is the link's.
+// Verdict is a plain string so verdicts added later still decode.
 const (
 	LinkVerdictSafe       = "safe"
 	LinkVerdictAdult      = "adult"
@@ -591,9 +592,9 @@ const (
 // Link safety checks of LinkSafetyEvidence.Check (preview). Check is a plain string so checks
 // added later still decode.
 const (
-	// LinkCheckDomainCategories looks up the destination domain's categories.
+	// LinkCheckDomainCategories looks up the domain categories of every address on the way.
 	LinkCheckDomainCategories = "domain-categories"
-	// LinkCheckThreatLists looks up the destination URL in threat lists.
+	// LinkCheckThreatLists looks up every URL on the way in threat lists.
 	LinkCheckThreatLists = "threat-lists"
 )
 
@@ -622,7 +623,7 @@ type CheckedLink struct {
 	// URL is the link as found, with https:// added when it was left out.
 	URL string `json:"url"`
 	// FinalURL is where the link leads after following its redirects; nil when a short link
-	// could not be followed.
+	// or redirect chain could not be followed.
 	FinalURL *string `json:"finalUrl"`
 	// Redirects is how many redirects were followed to reach FinalURL.
 	Redirects int `json:"redirects"`
@@ -633,14 +634,15 @@ type CheckedLink struct {
 	Evidence []LinkSafetyEvidence `json:"evidence"`
 }
 
-// LinkSafetyEvidence (preview) is one reputation check of a link's destination.
+// LinkSafetyEvidence (preview) is one reputation check of a link, every address it redirects
+// through and its destination.
 type LinkSafetyEvidence struct {
 	// Check is LinkCheckDomainCategories or LinkCheckThreatLists.
 	Check string `json:"check"`
 	// Status is LinkCheckStatusChecked or LinkCheckStatusFailed.
 	Status string `json:"status"`
-	// Labels are what the check reported, such as the domain's content categories and security
-	// risks or the threat types listed.
+	// Labels are what the check reported for any of the addresses, such as the domains' content
+	// categories and security risks or the threat types listed.
 	Labels []string `json:"labels"`
 }
 

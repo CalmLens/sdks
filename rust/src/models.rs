@@ -2161,7 +2161,7 @@ string_enum! {
         Phishing = "phishing",
         /// A threat list or the domain's security risks mark it as malware.
         Malware = "malware",
-        /// A short link could not be followed or a check failed.
+        /// A short link or redirect chain could not be followed, or a check failed.
         Unresolved = "unresolved",
     }
 }
@@ -2183,11 +2183,12 @@ string_enum! {
 }
 
 string_enum! {
-    /// Preview. A reputation check of a link's destination.
+    /// Preview. A reputation check of a link, every address it redirects through and its
+    /// destination.
     LinkSafetyCheck {
-        /// The destination domain's content categories and security risks.
+        /// The content categories and security risks of every domain on the way.
         DomainCategories = "domain-categories",
-        /// A threat-list lookup of the destination URL.
+        /// A threat-list lookup of every URL on the way.
         ThreatLists = "threat-lists",
     }
 }
@@ -2210,8 +2211,8 @@ pub struct CheckedLink {
     /// The link as found, with `https://` added when it was left out.
     #[serde(default)]
     pub url: String,
-    /// Where the link leads after following its redirects; `None` when a short link could not
-    /// be followed.
+    /// Where the link leads after following its redirects; `None` when a short link or
+    /// redirect chain could not be followed.
     #[serde(default)]
     pub final_url: Option<String>,
     /// How many redirects were followed to reach `final_url`.
@@ -2220,10 +2221,10 @@ pub struct CheckedLink {
     /// Where it was found.
     #[serde(default)]
     pub source: LinkSource,
-    /// What its destination is; the most severe finding when there are several.
+    /// What its destination is: the most severe finding of any address on the way.
     #[serde(default)]
     pub verdict: LinkSafetyVerdict,
-    /// The reputation checks of its destination.
+    /// The reputation checks of the link, its redirects and its destination.
     #[serde(default)]
     pub evidence: Vec<LinkSafetyEvidence>,
     /// Fields this SDK version does not know.
@@ -2231,7 +2232,8 @@ pub struct CheckedLink {
     pub extra: HashMap<String, Value>,
 }
 
-/// Preview. One reputation check of a link's destination.
+/// Preview. One reputation check of a link, every address it redirects through and its
+/// destination.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2242,8 +2244,8 @@ pub struct LinkSafetyEvidence {
     /// Whether the check answered.
     #[serde(default)]
     pub status: LinkSafetyCheckStatus,
-    /// What the check reported, such as the domain's content categories and security risks or
-    /// the threat types listed.
+    /// What the check reported for any of the addresses, such as the domains' content categories
+    /// and security risks or the threat types listed.
     #[serde(default)]
     pub labels: Vec<String>,
     /// Fields this SDK version does not know.

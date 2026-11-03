@@ -308,21 +308,25 @@ module CalmLens
   # Link safety (preview, LinkSafety.ts).
   # What a link's destination is: `safe` when every reputation check passed, `adult` or `gambling`
   # from its domain's content categories, `phishing` or `malware` from a threat list or the domain's
-  # security risks, and `unresolved` when a short link could not be followed or a check failed.
+  # security risks, and `unresolved` when a short link or redirect chain could not be followed or a
+  # check failed. Every address on a link's way is checked, and the most severe verdict is the
+  # link's.
   type link_safety_verdict = "safe" | "adult" | "gambling" | "phishing" | "malware" | "unresolved"
   # The verdicts a policy can act on.
   type flagged_link_verdict = "phishing" | "malware" | "adult" | "gambling" | "unresolved"
   # What a link does to its asset, weakest first. Purging content over a link is never offered.
   type link_safety_action = "allow" | "limit" | "age-restrict" | "block"
-  # One reputation check of a link's destination: its domain's categories, or a threat-list lookup
-  # of the destination URL. `failed` makes the link `unresolved`; `labels` is what the check reported.
+  # One reputation check of a link, every address it redirects through and its destination: their
+  # domain categories, or a threat-list lookup of their URLs. `failed` makes the link `unresolved`;
+  # `labels` is what the check reported for any of the addresses.
   type link_safety_evidence = {
     "check" => "domain-categories" | "threat-lists",
     "status" => "checked" | "failed",
     "labels" => Array[String]
   }
   # A link in the asset and what its destination is. `finalUrl` is where it leads after `redirects`
-  # redirects, or `null` when a short link could not be followed.
+  # redirects, or `null` when a short link or redirect chain could not be
+  # followed.
   type checked_link = {
     "url" => String,
     "finalUrl" => String?,

@@ -1780,12 +1780,12 @@ public final class Models {
    *
    * @param url the link as found, with {@code https://} added when it was left out
    * @param finalUrl where the link leads after following its redirects; null when a short link
-   *     could not be followed
+   *     or redirect chain could not be followed
    * @param redirects how many redirects were followed to reach {@code finalUrl}
    * @param source where it was found: {@code qr-code} or {@code text}
    * @param verdict {@code safe}, {@code adult}, {@code gambling}, {@code phishing}, {@code
-   *     malware} or {@code unresolved}
-   * @param evidence the reputation checks of the destination
+   *     malware} or {@code unresolved}: the most severe finding of any address on the way
+   * @param evidence the reputation checks of the link, its redirects and its destination
    */
   public record CheckedLink(String url, String finalUrl, Integer redirects, String source, String verdict,
       List<LinkSafetyEvidence> evidence) {
@@ -1794,13 +1794,14 @@ public final class Models {
   }
 
   /**
-   * One reputation check of a link's destination (preview).
+   * One reputation check of a link, every address it redirects through and its destination
+   * (preview).
    *
    * @param check {@code domain-categories} or {@code threat-lists}
    * @param status {@code checked}, or {@code failed} when the check could not answer, which makes
    *     the link {@code unresolved}
-   * @param labels what the check reported, such as the domain's content categories and security
-   *     risks or the threat types listed
+   * @param labels what the check reported for any of the addresses, such as the domains' content
+   *     categories and security risks or the threat types listed
    */
   public record LinkSafetyEvidence(String check, String status, List<String> labels) {
     /** Copies collections so the record stays immutable. */
