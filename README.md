@@ -2,34 +2,34 @@
 
 Official SDKs for [CalmLens](https://calmlens.com): content moderation, storage and CDN delivery.
 
-| Language | SDK | Install |
-| --- | --- | --- |
+| Language                | SDK                      | Install                                                    |
+| ----------------------- | ------------------------ | ---------------------------------------------------------- |
 | JavaScript / TypeScript | [javascript](javascript) | `npm install calmlens` (also published as `@calmlens/sdk`) |
-| Python | [python](python) | `pip install calmlens` |
-| Ruby | [ruby](ruby) | `gem install calmlens` |
-| Rust | [rust](rust) | `cargo add calmlens` |
-| Java | [java](java) | `com.calmlens:calmlens-sdk` |
-| PHP | [php](php) | Composer path package (pre-release; see PHP README) |
-| Go | [go](go) | `go get github.com/CalmLens/sdks/go` |
+| Python                  | [python](python)         | `pip install calmlens`                                     |
+| Ruby                    | [ruby](ruby)             | `gem install calmlens`                                     |
+| Rust                    | [rust](rust)             | `cargo add calmlens`                                       |
+| Java                    | [java](java)             | `com.calmlens:calmlens-sdk`                                |
+| PHP                     | [php](php)               | Composer path package (pre-release; see PHP README)        |
+| Go                      | [go](go)                 | `go get github.com/CalmLens/sdks/go`                       |
 
 The six existing SDKs are published; PHP is available from this checkout pending registry setup. See the [SDK documentation](https://calmlens.com/docs/sdk) for usage and API coverage.
 
 ## Examples
 
-| Example | Language |
-| --- | --- |
-| [Calmgram: photo sharing](examples/calmgram) | JavaScript / TypeScript |
-| [Calmform: static feedback form](examples/feedback-form-static) | JavaScript |
-| [UI components](examples/ui-components) | React, Vue, Svelte, JavaScript |
-| [Widget playground](examples/widget-playground) | React, Vue, Svelte, web components |
-| [Calmsnap: mobile photo uploads](examples/mobile-uploads-expo) | TypeScript / Expo |
-| [Link board](examples/link-board-python) | Python |
-| [Comment board](examples/comment-board-laravel) | PHP / Laravel |
-| [Chirp: short posts with images](examples/chirp-php) | PHP |
-| [Comment thread](examples/comment-thread-ruby) | Ruby |
-| [Media library](examples/media-library-rust) | Rust |
-| [Marketplace listings](examples/marketplace-listing-java) | Java |
-| [Voice clips](examples/voice-clips-go) | Go |
+| Example                                                         | Language                           |
+| --------------------------------------------------------------- | ---------------------------------- |
+| [Calmgram: photo sharing](examples/calmgram)                    | JavaScript / TypeScript            |
+| [Calmform: static feedback form](examples/feedback-form-static) | JavaScript                         |
+| [UI components](examples/ui-components)                         | React, Vue, Svelte, JavaScript     |
+| [Widget playground](examples/widget-playground)                 | React, Vue, Svelte, web components |
+| [Calmsnap: mobile photo uploads](examples/mobile-uploads-expo)  | TypeScript / Expo                  |
+| [Link board](examples/link-board-python)                        | Python                             |
+| [Comment board](examples/comment-board-laravel)                 | PHP / Laravel                      |
+| [Chirp: short posts with images](examples/chirp-php)            | PHP                                |
+| [Comment thread](examples/comment-thread-ruby)                  | Ruby                               |
+| [Media library](examples/media-library-rust)                    | Rust                               |
+| [Marketplace listings](examples/marketplace-listing-java)       | Java                               |
+| [Voice clips](examples/voice-clips-go)                          | Go                                 |
 
 ## Development
 
@@ -52,7 +52,23 @@ The JavaScript SDK's React, Vue, Svelte and web component bindings are tested in
 (cd javascript/ui-tests && bun install --frozen-lockfile && bun run check && bun run test)
 ```
 
-Each native SDK includes its own tests and development instructions. JavaScript examples use
+Each native SDK has its own checks; run them from its directory. CI runs every one.
+
+| SDK    | Checks                                                                                                                                                                        |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Python | `PYTHONPATH=. python -m unittest discover -s tests -v` and `python -m mypy` (CI runs Python 3.10 and 3.14)                                                                    |
+| Go     | `go vet ./...` and `go test -race ./...`                                                                                                                                      |
+| Rust   | `cargo test --locked`, `cargo clippy --locked --all-targets -- -D warnings` and `cargo check --no-default-features` (CI runs Rust 1.88 and stable)                            |
+| Ruby   | `bundle install`, `bundle exec ruby -Ilib -e 'Dir["test/*_test.rb"].each { \|file\| require_relative file }'`, `bundle exec rubocop`, `steep check` and `rbs -I sig validate` |
+| Java   | `mvn verify` (tests and Javadoc with doclint)                                                                                                                                 |
+| PHP    | `composer install`, `composer check` and `composer test` (CI runs PHP 8.2 and 8.5)                                                                                            |
+
+Every SDK replays the shared contract fixtures in its `testdata/` (PHP reads Ruby's) and checks its
+generated error-code list. `bun run build:cli` in `javascript/` builds the CLI's npm entry, and
+`bun run build:cli:binary` a standalone executable in `dist/`; set `CALMLENS_BUILD_TARGET`, such as
+`bun-linux-x64`, to cross-compile it.
+
+JavaScript examples use
 the local JavaScript SDK; build it before installing an example's dependencies. Calmgram's fixed
 examples are illustrative snapshots; its live mode uses the API.
 
