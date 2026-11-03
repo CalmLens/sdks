@@ -64,6 +64,8 @@ final class MockServerClient
     /** The ThumbHash the mock gives every classified image, standing in for one computed from its pixels. */
     public const THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI';
     private const MIB = 1024 * 1024;
+    /** Like the API: an upload has at most this many parts. */
+    private const MAX_UPLOAD_PARTS = 10000;
     /** An asset ID as the API's schema accepts it: `asset_` and 20 base62 characters. */
     private const ASSET_ID_PATTERN = '/^asset_[0-9A-Za-z]{20}$/D';
     /** The client methods `failNextRequest` can target. */
@@ -132,6 +134,7 @@ final class MockServerClient
      * @param int $maxRetries retries for the mock's client; 0 by default so enqueued failures surface.
      * @param int $maxResponseBytes the largest response body the mock's client reads, as for `ServerClient`.
      * @param int|float|null $uploadTimeout the mock's client's binary upload timeout, as for `ServerClient`.
+     * @param int $partSizeBytes content larger than this is uploaded in parts, as for `ServerClient`.
      */
     public function __construct(
         public readonly string $projectId = 'project-1',
@@ -144,6 +147,7 @@ final class MockServerClient
         int $maxRetries = 0,
         int|float $maxResponseBytes = ServerClient::DEFAULT_MAX_RESPONSE_BYTES,
         int|float|null $uploadTimeout = ServerClient::DEFAULT_UPLOAD_TIMEOUT,
+        int|float $partSizeBytes = ServerClient::DEFAULT_PART_SIZE_BYTES,
     ) {
         $this->moderate = \Closure::fromCallable($moderate
             ?? fn (MockModerationInput $input): string => $input->queued && $input->trigger !== MockModerationInput::COMPLETE ? 'pending' : 'allowed');
@@ -158,7 +162,7 @@ final class MockServerClient
         $stack = HandlerStack::create(fn (RequestInterface $request, array $options) => $this->handle($request));
         $this->client = new ServerClient($apiKey ?? 'mock-key', $projectId, $baseUrl, $cdnBaseUrl, maxRetries: $maxRetries,
             httpClient: new Client(['handler' => $stack]), maxResponseBytes: $maxResponseBytes,
-            uploadTimeout: $uploadTimeout);
+            uploadTimeout: $uploadTimeout, partSizeBytes: $partSizeBytes);
         $session = (fn (): Session => $this->session)->call($this->client);
         $session->sleep = function (float $seconds): void { $this->elapsed += $seconds; };
         $session->clock = fn (): float => $this->elapsed;
@@ -833,7 +837,8 @@ final class MockServerClient
         }
         $expected = ($asset['upload']['partsReceived'] ?? 0) + 1;
         $number = (int) ($query['partNumber'] ?? 0);
-        if ($number !== $expected) {
+        // Like the API, an upload has at most 10,000 parts.
+        if ($number !== $expected || $number > self::MAX_UPLOAD_PARTS) {
             self::fail(ErrorCodes::INVALID_UPLOAD_PART_NUMBER, null, "Expected part $expected", ['expectedPartNumber' => $expected, 'receivedPartNumber' => $number]);
         }
         $final = self::flag($query['isFinal'] ?? null);

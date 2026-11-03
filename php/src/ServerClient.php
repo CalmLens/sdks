@@ -19,6 +19,11 @@ final class ServerClient
     public const DEFAULT_MAX_RETRIES = 2;
     /** The largest API response body the client reads (32 MiB). */
     public const DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
+    /** Content larger than this many bytes that the client can read again is uploaded in parts of this size (8 MiB). */
+    public const DEFAULT_PART_SIZE_BYTES = 8 * 1024 * 1024;
+    /** The smallest and largest `partSizeBytes`: every part but the last is at least 5 MiB. */
+    public const MIN_PART_SIZE_BYTES = 5 * 1024 * 1024;
+    public const MAX_PART_SIZE_BYTES = 64 * 1024 * 1024;
     /** ensureLenses sends new definitions in consecutive requests of at most this many. */
     public const ENSURE_LENSES_BATCH_SIZE = 100;
 
@@ -40,6 +45,11 @@ final class ServerClient
      * @param int $maxRetries retries after a retryable failure, for reads and for requests carrying
      *   an Idempotency-Key, unless their body is a one-shot stream.
      * @param int $maxResponseBytes the largest API response body the client reads.
+     * @param int $partSizeBytes content larger than this (bytes, base64 or a seekable stream or
+     *   file with a known size) is uploaded by `assets->create` and `assets->classify` as a
+     *   multipart upload in parts of this size, from 5 MiB to 64 MiB (default 8 MiB). Each part is
+     *   retried on its own, and repeating the call with the same `idempotencyKey` resumes an
+     *   interrupted upload. One-shot streams and text go in one request.
      */
     public function __construct(
         #[\SensitiveParameter] string $apiKey,
@@ -52,12 +62,17 @@ final class ServerClient
         ?ClientInterface $httpClient = null,
         int|float $maxResponseBytes = self::DEFAULT_MAX_RESPONSE_BYTES,
         int|float|null $uploadTimeout = self::DEFAULT_UPLOAD_TIMEOUT,
+        int|float $partSizeBytes = self::DEFAULT_PART_SIZE_BYTES,
     ) {
         if (!preg_match('/^[\x21-\x7e]+$/D', $apiKey) || $projectId === '' || in_array($projectId, ['.', '..'], true)) {
             Values::invalid('Invalid API key or project ID', 'sdk/invalid-config');
         }
         $this->session = new Session($apiKey, $projectId, Values::url($baseUrl), Values::url($cdnBaseUrl),
             compact('timeout', 'connectTimeout', 'maxRetries', 'maxResponseBytes', 'uploadTimeout'), $httpClient);
+        if (!is_int($partSizeBytes) || $partSizeBytes < self::MIN_PART_SIZE_BYTES || $partSizeBytes > self::MAX_PART_SIZE_BYTES) {
+            Values::invalid('partSizeBytes must be an integer from 5 MiB (5242880) to 64 MiB (67108864)', 'sdk/invalid-config');
+        }
+        $this->session->partSizeBytes = $partSizeBytes;
         $this->assets = new Assets($this->session);
         $this->folders = new Folders($this->session);
         $this->hashLists = new HashLists($this->session);

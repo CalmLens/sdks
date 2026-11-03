@@ -30,6 +30,8 @@ final class Session
     public \Closure $clock;
     /** Leaves multipart size checks to the API; set by the mock so its stand-in answers them in the API's order. */
     public bool $deferUploadChecks = false;
+    /** Content larger than this that the client can read again is uploaded in parts of this size. */
+    public int $partSizeBytes = 8 * 1024 * 1024;
 
     public function __construct(
         #[\SensitiveParameter] private string $apiKey,

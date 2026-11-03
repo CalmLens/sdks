@@ -306,7 +306,7 @@ final class ContractTest extends TestCase
     private static function clientOptions(array $options): array
     {
         $named = ['apiKey' => $options['apiKey'], 'projectId' => $options['projectId']];
-        foreach (['baseUrl', 'cdnBaseUrl', 'maxRetries', 'maxResponseBytes'] as $key) {
+        foreach (['baseUrl', 'cdnBaseUrl', 'maxRetries', 'maxResponseBytes', 'partSizeBytes'] as $key) {
             if (array_key_exists($key, $options)) {
                 $named[$key] = $options[$key];
             }
@@ -674,6 +674,7 @@ final class ContractTest extends TestCase
             'waitForDecisionIntervalFactor' => Assets::DECISION_INTERVAL_FACTOR,
             'waitForDecisionMaxIntervalMs' => Assets::DECISION_MAX_INTERVAL * 1000,
             'ensureLensesBatchSize' => ServerClient::ENSURE_LENSES_BATCH_SIZE,
+            'partSizeBytes' => $session->partSizeBytes,
         ];
         self::assertArrayHasKey($entry['id'], $values, 'unknown default');
         self::assertEquals($entry['value'], $values[$entry['id']]);
@@ -870,6 +871,7 @@ final class ContractTest extends TestCase
             moderate: isset($options['moderate']) ? self::recordingModerate($options['moderate'], $moderateCalls) : null,
             apiKey: MockServerClient::createApiKey($options['apiKeyGrants'] ?? []),
             maxRetries: $options['maxRetries'] ?? 0,
+            partSizeBytes: $options['partSizeBytes'] ?? ServerClient::DEFAULT_PART_SIZE_BYTES,
         );
         $saved = [];
         $started = microtime(true);

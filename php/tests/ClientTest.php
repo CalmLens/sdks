@@ -39,12 +39,14 @@ final class ClientTest extends TestCase
         $client = $mock->client();
         $mib = 1024 * 1024;
         foreach (['image/png' => 10 * $mib + 1, 'video/mp4' => 50 * $mib + 1, 'application/pdf' => 5000 * $mib + 1] as $type => $size) {
-            $stream = fopen('php://memory', 'r');
+            // A one-shot stream goes in one request; an image the client can read again goes in parts.
+            $stream = new \GuzzleHttp\Psr7\NoSeekStream(Utils::streamFor(fopen('php://memory', 'r')));
             $this->error('upload/file-too-large', fn () => $client->assets->create(['name' => 'big', 'content' => ['type' => $type, 'data' => $stream, 'sizeInBytes' => $size]]));
         }
         self::assertSame([], $mock->requests());
         $mock->enqueueJson(self::ASSET);
-        $client->assets->create(['name' => 'x.png', 'content' => ['type' => 'image/png', 'data' => str_repeat('x', 10 * $mib)]]);
+        $client->assets->create(['name' => 'x.png', 'content' => ['type' => 'image/png', 'sizeInBytes' => 10 * $mib,
+            'data' => new \GuzzleHttp\Psr7\NoSeekStream(Utils::streamFor(str_repeat('x', 10 * $mib)))]]);
         self::assertCount(1, $mock->requests());
     }
 

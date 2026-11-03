@@ -50,7 +50,9 @@ A failed classification (`classification.status` is `failed`) is not a decision 
 
 - [Classify text and upload files](https://calmlens.com/docs/sdk/php#moderate-content), from strings,
   PHP stream resources or PSR-7 streams, including
-  [multipart uploads](https://calmlens.com/docs/sdk/php/reference#multipart-uploads) and
+  [multipart uploads](https://calmlens.com/docs/sdk/php/reference#multipart-uploads), which the
+  SDK sends for you in parts for content larger than `partSizeBytes` (8 MiB) and resumes with the same
+  `idempotencyKey`, and
   [conversation context](https://calmlens.com/docs/sdk/php/reference#conversation-context).
 - [Wait for queued decisions](https://calmlens.com/docs/sdk/php#waiting-for-a-decision) and
   [read classification results](https://calmlens.com/docs/guides/classification-results).

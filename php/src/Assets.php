@@ -7,6 +7,8 @@ namespace CalmLens;
 use CalmLens\Internal\Transforms;
 use CalmLens\Internal\UploadBody;
 use CalmLens\Internal\Values;
+use GuzzleHttp\Psr7\LimitStream;
+use Psr\Http\Message\StreamInterface;
 
 final class Assets extends Resource
 {
@@ -34,6 +36,10 @@ final class Assets extends Resource
     public const MAX_DIRECT_IMAGE_BYTES = 10 * 1024 * 1024;
     public const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
     public const MAX_FILE_BYTES = 5000 * 1024 * 1024;
+    /** The largest image uploaded in parts, in bytes. */
+    public const MAX_MULTIPART_IMAGE_BYTES = 20 * 1024 * 1024;
+    /** The longest `idempotencyKey` of an upload sent in parts: each part's key adds `:part-<n>`. */
+    public const MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH = 240;
 
     public function search(array $options): array
     {
@@ -235,16 +241,31 @@ final class Assets extends Resource
             Values::invalid('Use uploadPart for subsequent parts', 'upload/use-upload-part');
         }
         $direct = !$multipart && !$this->session->deferUploadChecks;
-        if ($direct && is_int($content['sizeInBytes'] ?? null)) {
-            // A declared size is refused before the stream is read or measured.
+        $image = str_starts_with($baseMime, 'image/');
+        if ($direct && !$image && is_int($content['sizeInBytes'] ?? null)) {
+            // A declared size is refused before the stream is read or measured. Images are checked
+            // below, once it is known whether they go in parts.
             self::checkDirectSize($baseMime, $content['sizeInBytes']);
         }
         $body = UploadBody::from($content, $multipart, !$this->session->deferUploadChecks);
-        if ($direct) {
+        // Content the client can read again is sent in parts when it is larger than one part.
+        $split = !$multipart && !array_key_exists('plainText', $content) && $body->isSeekable()
+            && $body->getSize() !== null && $body->getSize() > $this->session->partSizeBytes;
+        if ($split && strlen((string) ($request['idempotencyKey'] ?? '')) > self::MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH) {
+            Values::invalid('idempotencyKey can be at most ' . self::MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH . ' characters for an upload sent in parts');
+        }
+        if ($direct && $split && $image) {
+            if ($body->getSize() > self::MAX_MULTIPART_IMAGE_BYTES) {
+                Values::invalid('Multipart image uploads cannot exceed 20 MiB', ErrorCodes::MULTIPART_IMAGE_TOO_LARGE);
+            }
+        } elseif ($direct) {
             self::checkDirectSize($baseMime, $body->getSize());
         }
         $query = array_intersect_key($api, array_flip(['name', 'description', 'processingOptions', 'visibility', 'metadata', 'authorId', 'context', 'externalId', 'externalUrl', 'folderId', 'uploadPresetId']));
         $query += ['queue' => $queue, 'contentType' => $mime, 'sizeInBytes' => $body->getSize()];
+        if ($split) {
+            return $this->submitInParts($query, $mime, $body, $request);
+        }
         if ($multipart) {
             $total = $api['totalSizeInBytes'] ?? null;
             if ($total !== null && (!is_int($total) || $total <= 0
@@ -262,6 +283,58 @@ final class Assets extends Resource
         return self::asset($this->session->request('POST', $this->session->project('assets'), query: $query, raw: $body,
             headers: ['Content-Type' => $mime, 'X-CalmLens-Upload' => $multipart ? 'part' : 'content'], idempotent: true, options: $request,
             upload: !array_key_exists('plainText', $content)));
+    }
+
+    /**
+     * Uploads `$body` in parts of `partSizeBytes` and returns the final part's asset. Part 1 goes
+     * with the upload's fields; part n after it carries the Idempotency-Key `<key>:part-<n>`, so
+     * each part is retried on its own and repeating the call with the same key replays the parts
+     * the API already has and sends the rest. A part the API already has is skipped, and a final
+     * part that finds the upload completed reads the asset back.
+     */
+    private function submitInParts(array $query, string $mime, StreamInterface $body, array $request): array
+    {
+        $total = (int) $body->getSize();
+        $partSize = $this->session->partSizeBytes;
+        $count = intdiv($total + $partSize - 1, $partSize);
+        $key = $request['idempotencyKey'] ?? Values::uuid();
+        // Each part is a window on the source, so a retry rewinds to the part's own start.
+        $piece = static function (int $number) use ($body, $partSize, $total): LimitStream {
+            $offset = ($number - 1) * $partSize;
+            return new LimitStream($body, min($partSize, $total - $offset), $offset);
+        };
+        $first = $piece(1);
+        $query['sizeInBytes'] = $first->getSize();
+        $query += ['partNumber' => 1, 'isFinal' => false, 'totalSizeInBytes' => $total];
+        $asset = self::asset($this->session->request('POST', $this->session->project('assets'), query: $query, raw: $first,
+            headers: ['Content-Type' => $mime, 'X-CalmLens-Upload' => 'part'], idempotent: true,
+            options: ['idempotencyKey' => $key] + $request, upload: true));
+        $path = '/assets/' . Values::segment($asset['id']) . '/part';
+        for ($number = 2; $number <= $count;) {
+            $final = $number === $count;
+            $part = $piece($number);
+            try {
+                $asset = self::asset($this->session->request('POST', $path,
+                    query: ['partNumber' => $number, 'isFinal' => $final, 'sizeInBytes' => $part->getSize()], raw: $part,
+                    headers: ['X-CalmLens-Upload' => 'part'], idempotent: true,
+                    options: ['idempotencyKey' => "$key:part-$number"] + $request, upload: true));
+            } catch (CalmLensException $error) {
+                $expected = $error->details['expectedPartNumber'] ?? null;
+                if ($error->errorCode === ErrorCodes::INVALID_UPLOAD_PART_NUMBER && is_int($expected) && $expected > $number && $expected <= $count) {
+                    // The parts before `expected` arrived, but their responses were lost.
+                    $number = $expected;
+                    continue;
+                }
+                if ($final && $error->errorCode === ErrorCodes::UPLOAD_NOT_OPEN) {
+                    // The final part completed the upload, but its response was lost.
+                    unset($request['idempotencyKey']);
+                    return self::asset($this->retrieve(['assetId' => $asset['id'], 'requestOptions' => $request]));
+                }
+                throw $error;
+            }
+            $number++;
+        }
+        return $asset;
     }
 
     public function uploadPart(array $options): array
