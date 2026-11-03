@@ -73,7 +73,9 @@ A failed classification (`classification.status` is `failed`) is not a decision 
 ## Testing
 
 `CalmLens\Testing\MockServerClient` runs the real client against an in-memory CalmLens, and
-`MockTransport` replays queued responses. See [PHP testing](https://calmlens.com/docs/sdk/php/testing).
+`MockTransport` replays queued responses. `CalmLens\Testing\TestInputs` signs text codes and media
+phrases with your project's test input key, so the real API returns a chosen scenario.
+See [PHP testing](https://calmlens.com/docs/sdk/php/testing).
 
 ## Links
 

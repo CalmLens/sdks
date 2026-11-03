@@ -1,0 +1,284 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CalmLens\Testing;
+
+use CalmLens\Exception\InvalidArgumentException;
+use CalmLens\SdkErrorCodes;
+
+/**
+ * Signed test inputs: text codes and media phrases that a project's test input key
+ * authenticates, so CalmLens returns the scenario they describe instead of classifying them. The
+ * formats match the JavaScript SDK's `calmlens/test-inputs` byte for byte.
+ *
+ * A scenario is an array with the API's keys: up to 128 `instances` (each a `category`, the
+ * category's content `qualifiers` that apply, and optionally a `score` from 0 to 1 and an
+ * `action`, set on every instance or on none), the `unassessedCategories` CalmLens reports as not
+ * assessed (none may have instances), and up to one of the `regionalActions` per region.
+ * Input-type qualifiers such as `sexual-text` are automatic. Every method checks its scenario and
+ * key and throws `InvalidArgumentException` (`sdk/invalid-argument`) for one the API would reject.
+ *
+ * @phpstan-type TestInstance array{category: string, score?: int|float, action?: string, qualifiers: list<string>}
+ * @phpstan-type TestRegionalAction array{region: string, action: string}
+ * @phpstan-type TestInput array{regionalActions?: list<TestRegionalAction>, unassessedCategories?: list<string>, instances: list<TestInstance>}
+ */
+final class TestInputs
+{
+    /**
+     * Ready-made scenarios: a clean input, a limited one, adult images and text, regional
+     * delivery, content restricted in Germany, and mixed instances in one category.
+     *
+     * @var array<string, TestInput>
+     */
+    public const PRESETS = [
+        'clean' => ['instances' => []],
+        'limited' => ['instances' => [['category' => 'harassment', 'qualifiers' => ['harassment-abuse']]]],
+        'adultImage' => ['instances' => [['category' => 'sexual', 'qualifiers' => ['sexual-pornographic-media']]]],
+        'adultText' => ['instances' => [['category' => 'sexual', 'qualifiers' => ['sexual-explicit-language']]]],
+        'regionalDelivery' => ['regionalActions' => [
+            ['region' => 'DE', 'action' => 'block'], ['region' => 'GB', 'action' => 'age-restrict'],
+            ['region' => 'FR', 'action' => 'limit'],
+        ], 'instances' => []],
+        'germany' => ['instances' => [['category' => 'hate', 'qualifiers' => ['hate-symbol', 'hate-nazi-symbols-public-display']]]],
+        'mixed' => ['instances' => [
+            ['category' => 'harassment', 'qualifiers' => ['harassment-abuse', 'harassment-documentary']],
+            ['category' => 'harassment', 'qualifiers' => ['harassment-threat']],
+        ]],
+    ];
+
+    /** The signals `generateTestTextCode` accepts: the categories and a few named shortcuts. */
+    public const TEXT_SIGNALS = [...Classification::CATEGORIES, 'sexual.involving-minors', 'harassment.insult', 'sexual.adult', 'hate.regional-symbol', 'violence.graphic'];
+
+    /** The signals `generateMediaTestCode` accepts. */
+    public const MEDIA_SIGNALS = [...Classification::CATEGORIES, 'violence.graphic'];
+
+    private const ACTIONS = ['allow', 'limit', 'age-restrict', 'block'];
+    private const REGIONS = ['DE', 'AT', 'FR', 'GB', 'EU', 'AU', 'BR'];
+    private const REGIONAL_ACTIONS = ['limit', 'age-restrict', 'block'];
+    private const HEX_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot'];
+    private function __construct()
+    {
+    }
+
+    /**
+     * The scenario a signal (one of `TEXT_SIGNALS`) stands for in a text code (`$kind = 'text'`)
+     * or an image (`'image'`).
+     *
+     * @return TestInput
+     */
+    public static function testInputForSignal(string $signal, string $kind = 'text'): array
+    {
+        if (!in_array($kind, ['text', 'image'], true)) {
+            throw self::invalid('kind must be text or image');
+        }
+        return match (true) {
+            $signal === 'harassment.insult' => self::PRESETS['limited'],
+            $signal === 'sexual.adult' => self::PRESETS[$kind === 'image' ? 'adultImage' : 'adultText'],
+            $signal === 'hate.regional-symbol' => self::PRESETS['germany'],
+            $signal === 'sexual.involving-minors' => ['instances' => [['category' => 'sexual', 'qualifiers' => ['sexual-minors']]]],
+            $signal === 'violence.graphic' => ['instances' => [['category' => 'violence', 'qualifiers' => ['violence-graphic']]]],
+            in_array($signal, Classification::CATEGORIES, true) => ['instances' => [['category' => $signal, 'qualifiers' => []]]],
+            default => throw self::invalid("Unknown test signal: $signal"),
+        };
+    }
+
+    /**
+     * A text code for a scenario or a signal (one of `TEXT_SIGNALS`), signed with
+     * `$testInputKey`: the project's secret test input key from the portal. Put it anywhere in
+     * text content.
+     *
+     * @param TestInput|string $scenario
+     */
+    public static function generateTestTextCode(array|string $scenario, string $testInputKey): string
+    {
+        self::checkKey($testInputKey);
+        return self::textCode(self::validate(is_string($scenario) ? self::testInputForSignal($scenario) : $scenario), $testInputKey);
+    }
+
+    /**
+     * A phrase to read aloud in audio, or show as large, high-contrast text in a video frame, for
+     * one of `MEDIA_SIGNALS`, signed with `$testInputKey`: the project's secret test input key
+     * from the portal.
+     */
+    public static function generateMediaTestCode(string $signal, string $testInputKey): string
+    {
+        if (!in_array($signal, self::MEDIA_SIGNALS, true)) {
+            throw self::invalid("Unsupported media test signal: $signal");
+        }
+        self::checkKey($testInputKey);
+        $words = array_map(static fn (string $digit): string => self::HEX_WORDS[hexdec($digit)], str_split(self::tag($testInputKey, "calmlens-test:media:$signal")));
+        return 'Calm Lens test ' . implode(' ', $words) . ' ' . str_replace(['.', '-'], ' ', $signal) . ' end test';
+    }
+
+    private static function checkKey(string $key): void
+    {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $key)) {
+            throw self::invalid('The test input key must be 32 lowercase hexadecimal characters');
+        }
+    }
+
+    private static function tag(string $key, string $message): string
+    {
+        return substr(hash_hmac('sha256', $message, $key), 0, 32);
+    }
+
+    /** @param TestInput $scenario */
+    private static function textCode(array $scenario, string $key): string
+    {
+        $payload = rtrim(strtr(base64_encode(self::canonical($scenario)), '+/', '-_'), '=');
+        if (strlen($payload) > 8000) {
+            throw self::invalid('The test scenario is too large');
+        }
+        return '<!calmlens-test ' . self::tag($key, "calmlens-test:v1:$payload") . " $payload>";
+    }
+
+    /**
+     * JSON without whitespace, with numbers as JavaScript prints them; validated scenarios are
+     * already in the canonical key order and hold only ASCII tokens.
+     */
+    private static function canonical(mixed $value): string
+    {
+        return match (true) {
+            is_array($value) && array_is_list($value) => '[' . implode(',', array_map(self::canonical(...), $value)) . ']',
+            is_array($value) => '{' . implode(',', array_map(static fn (string $key, mixed $item): string => "\"$key\":" . self::canonical($item), array_keys($value), $value)) . '}',
+            is_string($value) => "\"$value\"",
+            default => self::jsNumber((float) $value),
+        };
+    }
+
+    /** A score (0 to 1) as JavaScript's `JSON.stringify` prints it. */
+    private static function jsNumber(float $value): string
+    {
+        if ($value === floor($value)) {
+            return (string) (int) $value;
+        }
+        for ($precision = 0; (float) ($text = sprintf("%.{$precision}e", $value)) !== $value; $precision++) {
+        }
+        [$mantissa, $exponent] = explode('e', $text);
+        $digits = rtrim(str_replace('.', '', $mantissa), '0');
+        $power = (int) $exponent;
+        if ($value < 1e-6) {
+            return $digits[0] . (strlen($digits) > 1 ? '.' . substr($digits, 1) : '') . "e$power";
+        }
+        return '0.' . str_repeat('0', -$power - 1) . $digits;
+    }
+
+    /** @return list<mixed> */
+    private static function list(mixed $value, string $name, int $limit): array
+    {
+        if (!is_array($value) || !array_is_list($value)) {
+            throw self::invalid("$name must be a list");
+        }
+        if (count($value) > $limit) {
+            throw self::invalid("$name may have at most $limit items");
+        }
+        return $value;
+    }
+
+    /**
+     * @param list<string> $required
+     * @param list<string> $optional
+     * @return array<string, mixed>
+     */
+    private static function fields(mixed $value, string $name, array $required, array $optional = []): array
+    {
+        if (!is_array($value)) {
+            throw self::invalid("$name must be an array");
+        }
+        $unknown = array_diff(array_map(strval(...), array_keys($value)), $required, $optional);
+        if ($unknown) {
+            throw self::invalid("$name has unknown fields: " . implode(', ', $unknown));
+        }
+        $missing = array_diff($required, array_keys($value));
+        if ($missing) {
+            throw self::invalid("$name is missing " . implode(', ', $missing));
+        }
+        return $value;
+    }
+
+    /** @param list<mixed> $values */
+    private static function unique(array $values): bool
+    {
+        return count(array_unique($values)) === count($values);
+    }
+
+    /**
+     * Checks a scenario like the API and copies it in canonical key order.
+     *
+     * @return TestInput
+     */
+    private static function validate(mixed $scenario): array
+    {
+        $fields = self::fields($scenario, 'The test scenario', ['instances'], ['regionalActions', 'unassessedCategories']);
+        $result = [];
+        if (array_key_exists('regionalActions', $fields)) {
+            $result['regionalActions'] = [];
+            foreach (self::list($fields['regionalActions'], 'regionalActions', count(self::REGIONS)) as $item) {
+                $entry = self::fields($item, 'A regional action', ['region', 'action']);
+                if (!in_array($entry['region'], self::REGIONS, true) || !in_array($entry['action'], self::REGIONAL_ACTIONS, true)) {
+                    throw self::invalid('Regional actions need a region of ' . implode(', ', self::REGIONS) . ' and an action of ' . implode(', ', self::REGIONAL_ACTIONS));
+                }
+                $result['regionalActions'][] = ['region' => $entry['region'], 'action' => $entry['action']];
+            }
+            if (!self::unique(array_column($result['regionalActions'], 'region'))) {
+                throw self::invalid('Each region may have one regional action');
+            }
+        }
+        $instances = [];
+        foreach (self::list($fields['instances'], 'instances', 128) as $item) {
+            $entry = self::fields($item, 'An instance', ['category', 'qualifiers'], ['score', 'action']);
+            $category = $entry['category'];
+            if (!in_array($category, Classification::CATEGORIES, true)) {
+                throw self::invalid('An instance needs a category of ' . implode(', ', Classification::CATEGORIES));
+            }
+            $instance = ['category' => $category];
+            if (array_key_exists('score', $entry)) {
+                $score = $entry['score'];
+                if (!(is_int($score) || is_float($score)) || !($score >= 0 && $score <= 1)) {
+                    throw self::invalid("An instance's score must be a number from 0 to 1");
+                }
+                $instance['score'] = $score;
+            }
+            if (array_key_exists('action', $entry)) {
+                if (!in_array($entry['action'], self::ACTIONS, true)) {
+                    throw self::invalid("An instance's action must be one of " . implode(', ', self::ACTIONS));
+                }
+                $instance['action'] = $entry['action'];
+            }
+            $qualifiers = self::list($entry['qualifiers'], 'qualifiers', 64);
+            foreach ($qualifiers as $qualifier) {
+                if (!in_array($qualifier, Classification::QUALIFIERS[$category], true) || in_array($qualifier, Classification::INPUT_QUALIFIERS, true)) {
+                    throw self::invalid("Choose content qualifiers of $category; input-type qualifiers are automatic");
+                }
+            }
+            if (!self::unique($qualifiers)) {
+                throw self::invalid('Each qualifier may be listed once');
+            }
+            $instance['qualifiers'] = $qualifiers;
+            $instances[] = $instance;
+        }
+        if (count(array_unique(array_map(static fn (array $instance): bool => isset($instance['action']), $instances))) > 1) {
+            throw self::invalid('Set an action on every instance or on none');
+        }
+        if (array_key_exists('unassessedCategories', $fields)) {
+            $unassessed = self::list($fields['unassessedCategories'], 'unassessedCategories', count(Classification::CATEGORIES));
+            foreach ($unassessed as $category) {
+                if (!in_array($category, Classification::CATEGORIES, true) || in_array($category, array_column($instances, 'category'), true)) {
+                    throw self::invalid('Unassessed categories must be unique categories without instances');
+                }
+            }
+            if (!self::unique($unassessed)) {
+                throw self::invalid('Unassessed categories must be unique categories without instances');
+            }
+            $result['unassessedCategories'] = $unassessed;
+        }
+        $result['instances'] = $instances;
+        return $result;
+    }
+
+    private static function invalid(string $message): InvalidArgumentException
+    {
+        return new InvalidArgumentException(SdkErrorCodes::INVALID_ARGUMENT, $message);
+    }
+}

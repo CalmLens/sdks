@@ -10,6 +10,8 @@ class SignatureTest < Minitest::Test
   PUBLIC_CLASSES = %w[ServerClient Assets Folders HashLists Text Events CDN Response Error WebhookEvent MockServerClient
                       MockServerClient::Request MockDecision MockModerationInput MockModerationInput::Content Transport::Request
                       Transport::NetHTTP].freeze
+  # Modules whose public API is their module functions.
+  PUBLIC_MODULES = %w[TestInputs].freeze
 
   def self.environment
     @environment ||= begin
@@ -32,6 +34,10 @@ class SignatureTest < Minitest::Test
     end
     declared = builder.build_singleton(RBS::TypeName.parse('::CalmLens')).methods.keys
     assert_empty CalmLens.singleton_methods - declared, 'CalmLens module functions without a signature'
+    PUBLIC_MODULES.each do |name|
+      declared = builder.build_singleton(type_name(name)).methods.keys
+      assert_empty CalmLens.const_get(name).singleton_methods - declared, "#{name} module functions without a signature"
+    end
   end
 
   def test_signatures_resolve_every_type_they_name

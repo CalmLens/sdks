@@ -5,7 +5,10 @@
 //! only the network is replaced, and no HTTP client is created. [`MockServerClient::in_memory`]
 //! adds an in-memory API behind the queue: uploads create assets that a `moderate` callback
 //! ([`MockOptions::moderate`]) decides with a [`MockDecision`], and assets, folders, hash lists,
-//! events and CDN downloads behave like the API's. Enable the feature in `[dev-dependencies]`:
+//! events and CDN downloads behave like the API's. Against a real project, signed test inputs
+//! ([`generate_test_text_code`], [`generate_media_test_code`]) make
+//! CalmLens decide an input as a chosen [`TestInput`] scenario. Enable the feature in
+//! `[dev-dependencies]`:
 //!
 //! ```toml
 //! [dev-dependencies]
@@ -15,12 +18,18 @@
 #[rustfmt::skip]
 mod classification;
 mod decision;
+mod inputs;
 mod memory;
 mod placeholder;
 
 pub use decision::{
     IntoMockDecision, MockDecision, MockModerationContent, MockModerationInput,
     MockModerationTrigger, MockOutcome,
+};
+pub use inputs::{
+    generate_media_test_code, generate_test_text_code, test_input_for_signal, TestInput,
+    TestInputInstance, TestInputKind, TestInputPreset, TestRegionalAction, TestScenario,
+    MEDIA_TEST_SIGNALS, TEST_INPUT_SIGNALS,
 };
 pub use memory::{
     create_mock_api_key, MockApiKeyGrant, MockFailure, MockFailureOptions, MockOptions,

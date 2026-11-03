@@ -980,5 +980,56 @@ class MockScenarioTests(unittest.TestCase):
             self.assertEqual(result["bytes"][:len(prefix)], prefix, f"{label}: body prefix")
 
 
+class SignedTestInputTests(unittest.TestCase):
+    """The signed test inputs in test-inputs.json, byte for byte."""
+    FIXTURE = _fixture("test-inputs.json")
+
+    def test_presets(self) -> None:
+        presets = {re.sub(r"_([a-z])", lambda match: match[1].upper(), name): preset
+                   for name, preset in testing.TEST_INPUT_PRESETS.items()}
+        self.assertEqual(presets, self.FIXTURE["presets"])
+
+    def test_signals(self) -> None:
+        self.assertEqual(list(testing.TEXT_TEST_SIGNALS), self.FIXTURE["signals"]["text"])
+        self.assertEqual(list(testing.MEDIA_TEST_SIGNALS), self.FIXTURE["signals"]["media"])
+        for case in self.FIXTURE["signalInputs"]:
+            with self.subTest(signal=case["signal"], kind=case["kind"]):
+                self.assertEqual(testing.signal_test_input(case["signal"], case["kind"]), case["input"])
+
+    def test_accepts_exactly_the_fixture_qualifiers(self) -> None:
+        key = self.FIXTURE["text"][0]["key"]
+        for category, qualifiers in self.FIXTURE["qualifiers"].items():
+            with self.subTest(category=category):
+                accepted = []
+                for qualifier in _mock_classification.QUALIFIERS[category]:
+                    try:
+                        testing.generate_test_text_code(
+                            {"instances": [{"category": category, "qualifiers": [qualifier]}]}, key)
+                    except CalmLensValidationError as error:
+                        self.assertEqual(error.code, "sdk/invalid-argument")
+                    else:
+                        accepted.append(qualifier)
+                self.assertEqual(accepted, qualifiers)
+
+    def test_text_codes(self) -> None:
+        for case in self.FIXTURE["text"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(testing.generate_test_text_code(case.get("input", case.get("signal")), case["key"]),
+                                 case["code"])
+
+    def test_media_phrases(self) -> None:
+        for case in self.FIXTURE["media"]:
+            with self.subTest(case["signal"]):
+                self.assertEqual(testing.generate_media_test_code(case["signal"], case["key"]), case["code"])
+
+    def test_rejections(self) -> None:
+        generators = {"text": testing.generate_test_text_code, "media": testing.generate_media_test_code}
+        for case in self.FIXTURE["rejections"]:
+            with self.subTest(case["name"], kind=case["kind"]):
+                with self.assertRaises(CalmLensValidationError) as raised:
+                    generators[case["kind"]](case.get("input", case.get("signal")), case["key"])
+                self.assertEqual(raised.exception.code, "sdk/invalid-argument")
+
+
 if __name__ == "__main__":
     unittest.main()

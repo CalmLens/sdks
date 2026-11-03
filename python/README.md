@@ -74,7 +74,8 @@ Treat a status you don't recognise, and a failed request, as not allowed.
 ## Testing
 
 `MockCalmLensServerClient` from `calmlens.testing` is the real client with an in-memory API behind it,
-for offline tests. See [Python testing](https://calmlens.com/docs/sdk/python/testing).
+for offline tests. Its `generate_test_text_code` and `generate_media_test_code` make signed test inputs that the real API answers with the scenario you choose, using your project's test
+input key. See [Python testing](https://calmlens.com/docs/sdk/python/testing).
 
 ## Command-line tool
 

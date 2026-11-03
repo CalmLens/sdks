@@ -129,5 +129,11 @@ mock.state.assets.each_value { |item| item['classification']['moderation']['stat
 mock.enqueue(status: 503, body: { code: 'server/unavailable' }).requests.map(&:path)
 answered = mock.clear_requests.requests.map(&:status)
 
+test_input_key = ENV.fetch('CALMLENS_TEST_INPUT_KEY')
+mixed = CalmLens::TestInputs::PRESETS.fetch(:mixed)
+signed = CalmLens::TestInputs.generate_text_code(mixed, test_input_key)
+scored = CalmLens::TestInputs.generate_text_code({ instances: [{ category: 'violence', score: 0.9, qualifiers: [] }] }, test_input_key)
+phrase = CalmLens::TestInputs.generate_media_code('violence', test_input_key)
+
 [status, processing, failure, reviews, removal, format, camera, score, ages, names, more, children, matched, expires, lens_width, url,
- bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered]
+ bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered, signed, scored, phrase]

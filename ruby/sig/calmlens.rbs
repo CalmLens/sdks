@@ -398,5 +398,34 @@ module CalmLens
   module MockClassification
     CATEGORIES: Array[String]
     QUALIFIERS: Hash[String, Array[String]]
+    # Qualifiers the input type sets, which a TestInputs scenario cannot list.
+    INPUT_QUALIFIERS: Array[String]
+  end
+
+  # Signed test inputs: text codes and media phrases signed with a project's secret
+  # test input key from the portal.
+  module TestInputs
+    type action = "allow" | "limit" | "age-restrict" | "block"
+    type region = "DE" | "AT" | "FR" | "GB" | "EU" | "AU" | "BR"
+    type regional_action = { "region" => region, "action" => "limit" | "age-restrict" | "block" }
+    # One qualifying instance; set an action on every instance or on none.
+    type test_instance = { "category" => classification_category, ?"score" => number, ?"action" => action, "qualifiers" => Array[String] }
+    # A scenario with String keys; Symbol and snake_case keys are accepted as a plain Hash.
+    type scenario = { ?"regionalActions" => Array[regional_action], ?"unassessedCategories" => Array[classification_category],
+                      "instances" => Array[test_instance] }
+    type signal = classification_category | "sexual.involving-minors" | "harassment.insult" | "sexual.adult"
+                | "hate.regional-symbol" | "violence.graphic"
+    type media_signal = classification_category | "violence.graphic"
+    type input = scenario | Hash[String | Symbol, untyped] | signal
+
+    REGIONS: Array[region]
+    SIGNALS: Array[signal]
+    MEDIA_SIGNALS: Array[media_signal]
+    # clean, limited, adult_image, adult_text, regional_delivery, germany and mixed (deeply frozen).
+    PRESETS: Hash[Symbol, scenario]
+
+    def self.for_signal: (signal signal, ?("text" | "image") kind) -> scenario
+    def self.generate_text_code: (input input, String test_input_key) -> String
+    def self.generate_media_code: (media_signal signal, String test_input_key) -> String
   end
 end

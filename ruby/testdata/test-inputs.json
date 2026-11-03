@@ -1,0 +1,3684 @@
+{
+  "presets": {
+    "clean": {
+      "instances": []
+    },
+    "limited": {
+      "instances": [
+        {
+          "category": "harassment",
+          "qualifiers": [
+            "harassment-abuse"
+          ]
+        }
+      ]
+    },
+    "adultImage": {
+      "instances": [
+        {
+          "category": "sexual",
+          "qualifiers": [
+            "sexual-pornographic-media"
+          ]
+        }
+      ]
+    },
+    "adultText": {
+      "instances": [
+        {
+          "category": "sexual",
+          "qualifiers": [
+            "sexual-explicit-language"
+          ]
+        }
+      ]
+    },
+    "regionalDelivery": {
+      "instances": [],
+      "regionalActions": [
+        {
+          "region": "DE",
+          "action": "block"
+        },
+        {
+          "region": "GB",
+          "action": "age-restrict"
+        },
+        {
+          "region": "FR",
+          "action": "limit"
+        }
+      ]
+    },
+    "germany": {
+      "instances": [
+        {
+          "category": "hate",
+          "qualifiers": [
+            "hate-symbol",
+            "hate-nazi-symbols-public-display"
+          ]
+        }
+      ]
+    },
+    "mixed": {
+      "instances": [
+        {
+          "category": "harassment",
+          "qualifiers": [
+            "harassment-abuse",
+            "harassment-documentary"
+          ]
+        },
+        {
+          "category": "harassment",
+          "qualifiers": [
+            "harassment-threat"
+          ]
+        }
+      ]
+    }
+  },
+  "signals": {
+    "text": [
+      "sexual",
+      "violence",
+      "self-harm",
+      "harassment",
+      "hate",
+      "criminal-activity",
+      "personal-information",
+      "profanity",
+      "sexual.involving-minors",
+      "harassment.insult",
+      "sexual.adult",
+      "hate.regional-symbol",
+      "violence.graphic"
+    ],
+    "media": [
+      "sexual",
+      "violence",
+      "self-harm",
+      "harassment",
+      "hate",
+      "criminal-activity",
+      "personal-information",
+      "profanity",
+      "violence.graphic"
+    ]
+  },
+  "signalInputs": [
+    {
+      "signal": "sexual",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "sexual",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "sexual",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "sexual",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "violence",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "violence",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "violence",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "violence",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "self-harm",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "self-harm",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "self-harm",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "self-harm",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "harassment",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "harassment",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "hate",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "hate",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "hate",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "hate",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "criminal-activity",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "criminal-activity",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "criminal-activity",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "criminal-activity",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "personal-information",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "personal-information",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "personal-information",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "personal-information",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "profanity",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "profanity",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "profanity",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "profanity",
+            "qualifiers": []
+          }
+        ]
+      }
+    },
+    {
+      "signal": "sexual.involving-minors",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "sexual",
+            "qualifiers": [
+              "sexual-minors"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "signal": "sexual.involving-minors",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "sexual",
+            "qualifiers": [
+              "sexual-minors"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "signal": "harassment.insult",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "signal": "harassment.insult",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "signal": "sexual.adult",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "sexual",
+            "qualifiers": [
+              "sexual-explicit-language"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "signal": "sexual.adult",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "sexual",
+            "qualifiers": [
+              "sexual-pornographic-media"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "signal": "hate.regional-symbol",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "hate",
+            "qualifiers": [
+              "hate-symbol",
+              "hate-nazi-symbols-public-display"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "signal": "hate.regional-symbol",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "hate",
+            "qualifiers": [
+              "hate-symbol",
+              "hate-nazi-symbols-public-display"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "signal": "violence.graphic",
+      "kind": "text",
+      "input": {
+        "instances": [
+          {
+            "category": "violence",
+            "qualifiers": [
+              "violence-graphic"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "signal": "violence.graphic",
+      "kind": "image",
+      "input": {
+        "instances": [
+          {
+            "category": "violence",
+            "qualifiers": [
+              "violence-graphic"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "qualifiers": {
+    "sexual": [
+      "sexual-pornographic-media",
+      "sexual-nudity",
+      "sexual-activity",
+      "sexual-explicit-language",
+      "sexual-assault-media",
+      "sexual-non-consensual",
+      "sexual-intimate-image-abuse",
+      "sexual-extreme",
+      "sexual-minors",
+      "sexual-solicitation",
+      "sexual-paid",
+      "sexual-adult-promotion",
+      "sexual-revealing-clothing",
+      "sexual-suggestive",
+      "sexual-non-erotic-nudity",
+      "sexual-historical",
+      "sexual-documentary",
+      "sexual-educational",
+      "sexual-discussion",
+      "sexual-fictional",
+      "sexual-support-prevention"
+    ],
+    "violence": [
+      "violence-high-impact",
+      "violence-attack",
+      "violence-threat",
+      "violence-preparation",
+      "violence-encouragement",
+      "violence-wish",
+      "violence-coded-incitement",
+      "violence-extremism",
+      "violence-injury",
+      "violence-violent-death",
+      "violence-natural-death",
+      "violence-graphic",
+      "violence-decapitation-act",
+      "violence-gore",
+      "violence-weapon",
+      "violence-sport",
+      "violence-historical",
+      "violence-documentary",
+      "violence-educational",
+      "violence-discussion",
+      "violence-fictional",
+      "violence-fantasy",
+      "violence-support-prevention"
+    ],
+    "self-harm": [
+      "self-harm-age-restricted",
+      "self-harm-thoughts",
+      "self-harm-preparation",
+      "self-harm-act",
+      "self-harm-methods",
+      "self-harm-encouragement",
+      "self-harm-historical",
+      "self-harm-documentary",
+      "self-harm-educational",
+      "self-harm-fictional",
+      "self-harm-support-prevention"
+    ],
+    "harassment": [
+      "harassment-abuse",
+      "harassment-mild",
+      "harassment-bullying",
+      "harassment-public-target",
+      "harassment-threat",
+      "harassment-sexual",
+      "harassment-encouragement",
+      "harassment-historical",
+      "harassment-documentary",
+      "harassment-educational",
+      "harassment-fictional",
+      "harassment-support-prevention"
+    ],
+    "hate": [
+      "hate-nazi-symbols-public-display",
+      "hate-nazi-insignia-public-display",
+      "hate-nazi-genocide-public-peace",
+      "hate-nazi-genocide-denial-or-approval",
+      "hate-adjudicated-nazi-crimes-denial",
+      "hate-abuse",
+      "hate-slurs",
+      "hate-dehumanization",
+      "hate-inferiority",
+      "hate-exclusion",
+      "hate-symbol",
+      "hate-hostility",
+      "hate-threat",
+      "hate-personal",
+      "hate-historical",
+      "hate-documentary",
+      "hate-educational",
+      "hate-fictional",
+      "hate-counterspeech",
+      "hate-support-prevention"
+    ],
+    "criminal-activity": [
+      "criminal-activity-demonstration",
+      "criminal-activity-preparation",
+      "criminal-activity-request",
+      "criminal-activity-instructions",
+      "criminal-activity-promotion",
+      "criminal-activity-coded-incitement",
+      "criminal-activity-substances",
+      "criminal-activity-grooming",
+      "criminal-activity-csam",
+      "criminal-activity-alcohol",
+      "criminal-activity-tobacco",
+      "criminal-activity-gambling",
+      "criminal-activity-fraud",
+      "criminal-activity-sexual-solicitation",
+      "criminal-activity-graffiti",
+      "criminal-activity-historical",
+      "criminal-activity-documentary",
+      "criminal-activity-educational",
+      "criminal-activity-discussion",
+      "criminal-activity-fictional",
+      "criminal-activity-support-prevention"
+    ],
+    "personal-information": [
+      "personal-information-contact",
+      "personal-information-email",
+      "personal-information-phone",
+      "personal-information-government-id",
+      "personal-information-financial",
+      "personal-information-location",
+      "personal-information-identifiers",
+      "personal-information-credentials",
+      "personal-information-request",
+      "personal-information-self-disclosure",
+      "personal-information-third-party",
+      "personal-information-historical",
+      "personal-information-documentary",
+      "personal-information-educational",
+      "personal-information-fictional",
+      "personal-information-support-prevention"
+    ],
+    "profanity": [
+      "profanity-mild",
+      "profanity-strong",
+      "profanity-slurs",
+      "profanity-obfuscated",
+      "profanity-historical",
+      "profanity-documentary",
+      "profanity-educational",
+      "profanity-fictional",
+      "profanity-support-prevention"
+    ]
+  },
+  "text": [
+    {
+      "name": "signal sexual",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "sexual",
+      "code": "<!calmlens-test 3b0a905c14c27c705bd38480f550352c eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5Ijoic2V4dWFsIiwicXVhbGlmaWVycyI6W119XX0>"
+    },
+    {
+      "name": "signal violence",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "violence",
+      "code": "<!calmlens-test 29d279a4ea627121cb053f6899aa3bd3 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoidmlvbGVuY2UiLCJxdWFsaWZpZXJzIjpbXX1dfQ>"
+    },
+    {
+      "name": "signal self-harm",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "self-harm",
+      "code": "<!calmlens-test 6d88b9e099d6b8af8ea864513695b650 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5Ijoic2VsZi1oYXJtIiwicXVhbGlmaWVycyI6W119XX0>"
+    },
+    {
+      "name": "signal harassment",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "harassment",
+      "code": "<!calmlens-test c938895cfce1a79e370a4c23e53cf706 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGFyYXNzbWVudCIsInF1YWxpZmllcnMiOltdfV19>"
+    },
+    {
+      "name": "signal hate",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "hate",
+      "code": "<!calmlens-test c8d8b699588c603aaf89fdc11be524ef eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGF0ZSIsInF1YWxpZmllcnMiOltdfV19>"
+    },
+    {
+      "name": "signal criminal-activity",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "criminal-activity",
+      "code": "<!calmlens-test 6331a08d777ac746b08f25a1f2a3a6d5 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiY3JpbWluYWwtYWN0aXZpdHkiLCJxdWFsaWZpZXJzIjpbXX1dfQ>"
+    },
+    {
+      "name": "signal personal-information",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "personal-information",
+      "code": "<!calmlens-test 212ad4d11d4de2d16966c5962140e678 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoicGVyc29uYWwtaW5mb3JtYXRpb24iLCJxdWFsaWZpZXJzIjpbXX1dfQ>"
+    },
+    {
+      "name": "signal profanity",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "profanity",
+      "code": "<!calmlens-test acafb6c94856fa43d56f8faac7953ae4 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119XX0>"
+    },
+    {
+      "name": "signal sexual.involving-minors",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "sexual.involving-minors",
+      "code": "<!calmlens-test ab0145cbb48bd15446272f5bc27a413d eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5Ijoic2V4dWFsIiwicXVhbGlmaWVycyI6WyJzZXh1YWwtbWlub3JzIl19XX0>"
+    },
+    {
+      "name": "signal harassment.insult",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "harassment.insult",
+      "code": "<!calmlens-test be6682cc2f7e5a1c1696424305710922 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGFyYXNzbWVudCIsInF1YWxpZmllcnMiOlsiaGFyYXNzbWVudC1hYnVzZSJdfV19>"
+    },
+    {
+      "name": "signal sexual.adult",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "sexual.adult",
+      "code": "<!calmlens-test a270c41b5f3213955fc164838f12c45b eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5Ijoic2V4dWFsIiwicXVhbGlmaWVycyI6WyJzZXh1YWwtZXhwbGljaXQtbGFuZ3VhZ2UiXX1dfQ>"
+    },
+    {
+      "name": "signal hate.regional-symbol",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "hate.regional-symbol",
+      "code": "<!calmlens-test 11890d07ae38dd282e52c0777240dae4 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGF0ZSIsInF1YWxpZmllcnMiOlsiaGF0ZS1zeW1ib2wiLCJoYXRlLW5hemktc3ltYm9scy1wdWJsaWMtZGlzcGxheSJdfV19>"
+    },
+    {
+      "name": "signal violence.graphic",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "violence.graphic",
+      "code": "<!calmlens-test 18c088e1f15dcc2390e0ffd11042121f eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoidmlvbGVuY2UiLCJxdWFsaWZpZXJzIjpbInZpb2xlbmNlLWdyYXBoaWMiXX1dfQ>"
+    },
+    {
+      "name": "preset clean",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": []
+      },
+      "code": "<!calmlens-test cbf6ec99067c96f01aefabd10cce4cbd eyJpbnN0YW5jZXMiOltdfQ>"
+    },
+    {
+      "name": "preset limited",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          }
+        ]
+      },
+      "code": "<!calmlens-test be6682cc2f7e5a1c1696424305710922 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGFyYXNzbWVudCIsInF1YWxpZmllcnMiOlsiaGFyYXNzbWVudC1hYnVzZSJdfV19>"
+    },
+    {
+      "name": "preset adultImage",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "sexual",
+            "qualifiers": [
+              "sexual-pornographic-media"
+            ]
+          }
+        ]
+      },
+      "code": "<!calmlens-test dce086f69411cfaeebed1a81cc225127 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5Ijoic2V4dWFsIiwicXVhbGlmaWVycyI6WyJzZXh1YWwtcG9ybm9ncmFwaGljLW1lZGlhIl19XX0>"
+    },
+    {
+      "name": "preset adultText",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "sexual",
+            "qualifiers": [
+              "sexual-explicit-language"
+            ]
+          }
+        ]
+      },
+      "code": "<!calmlens-test a270c41b5f3213955fc164838f12c45b eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5Ijoic2V4dWFsIiwicXVhbGlmaWVycyI6WyJzZXh1YWwtZXhwbGljaXQtbGFuZ3VhZ2UiXX1dfQ>"
+    },
+    {
+      "name": "preset regionalDelivery",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "regionalActions": [
+          {
+            "region": "DE",
+            "action": "block"
+          },
+          {
+            "region": "GB",
+            "action": "age-restrict"
+          },
+          {
+            "region": "FR",
+            "action": "limit"
+          }
+        ]
+      },
+      "code": "<!calmlens-test 2260da656e2fb118064034d472ad3bf1 eyJyZWdpb25hbEFjdGlvbnMiOlt7InJlZ2lvbiI6IkRFIiwiYWN0aW9uIjoiYmxvY2sifSx7InJlZ2lvbiI6IkdCIiwiYWN0aW9uIjoiYWdlLXJlc3RyaWN0In0seyJyZWdpb24iOiJGUiIsImFjdGlvbiI6ImxpbWl0In1dLCJpbnN0YW5jZXMiOltdfQ>"
+    },
+    {
+      "name": "preset germany",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "hate",
+            "qualifiers": [
+              "hate-symbol",
+              "hate-nazi-symbols-public-display"
+            ]
+          }
+        ]
+      },
+      "code": "<!calmlens-test 11890d07ae38dd282e52c0777240dae4 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGF0ZSIsInF1YWxpZmllcnMiOlsiaGF0ZS1zeW1ib2wiLCJoYXRlLW5hemktc3ltYm9scy1wdWJsaWMtZGlzcGxheSJdfV19>"
+    },
+    {
+      "name": "preset mixed",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-documentary"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-threat"
+            ]
+          }
+        ]
+      },
+      "code": "<!calmlens-test bfd9a7f2760c0ce411e307d5cdecc97a eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGFyYXNzbWVudCIsInF1YWxpZmllcnMiOlsiaGFyYXNzbWVudC1hYnVzZSIsImhhcmFzc21lbnQtZG9jdW1lbnRhcnkiXX0seyJjYXRlZ29yeSI6ImhhcmFzc21lbnQiLCJxdWFsaWZpZXJzIjpbImhhcmFzc21lbnQtdGhyZWF0Il19XX0>"
+    },
+    {
+      "name": "explicitActions",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-documentary"
+            ],
+            "action": "limit"
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-threat"
+            ],
+            "action": "limit"
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ],
+            "action": "block"
+          }
+        ]
+      },
+      "code": "<!calmlens-test a4b7c7956fb7479a639af469574b031e eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGFyYXNzbWVudCIsImFjdGlvbiI6ImxpbWl0IiwicXVhbGlmaWVycyI6WyJoYXJhc3NtZW50LWFidXNlIiwiaGFyYXNzbWVudC1kb2N1bWVudGFyeSJdfSx7ImNhdGVnb3J5IjoiaGFyYXNzbWVudCIsImFjdGlvbiI6ImxpbWl0IiwicXVhbGlmaWVycyI6WyJoYXJhc3NtZW50LXRocmVhdCJdfSx7ImNhdGVnb3J5IjoiaGFyYXNzbWVudCIsImFjdGlvbiI6ImJsb2NrIiwicXVhbGlmaWVycyI6WyJoYXJhc3NtZW50LWFidXNlIl19XX0>"
+    },
+    {
+      "name": "scores",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "violence",
+            "score": 0,
+            "qualifiers": []
+          },
+          {
+            "category": "violence",
+            "score": 1,
+            "qualifiers": []
+          },
+          {
+            "category": "sexual",
+            "score": 0.5,
+            "qualifiers": []
+          },
+          {
+            "category": "hate",
+            "score": 0.30000000000000004,
+            "qualifiers": []
+          },
+          {
+            "category": "self-harm",
+            "score": 0.000001,
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "score": 1e-7,
+            "qualifiers": []
+          },
+          {
+            "category": "criminal-activity",
+            "score": 1.5e-7,
+            "qualifiers": []
+          },
+          {
+            "category": "personal-information",
+            "score": 0.123456789012345,
+            "qualifiers": []
+          },
+          {
+            "category": "harassment",
+            "score": 0.95,
+            "qualifiers": []
+          }
+        ]
+      },
+      "code": "<!calmlens-test 15c2aeaba9b5a922466aad0ff15fdc10 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoidmlvbGVuY2UiLCJzY29yZSI6MCwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJ2aW9sZW5jZSIsInNjb3JlIjoxLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InNleHVhbCIsInNjb3JlIjowLjUsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoiaGF0ZSIsInNjb3JlIjowLjMwMDAwMDAwMDAwMDAwMDA0LCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InNlbGYtaGFybSIsInNjb3JlIjowLjAwMDAwMSwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJzY29yZSI6MWUtNywicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJjcmltaW5hbC1hY3Rpdml0eSIsInNjb3JlIjoxLjVlLTcsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicGVyc29uYWwtaW5mb3JtYXRpb24iLCJzY29yZSI6MC4xMjM0NTY3ODkwMTIzNDUsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoiaGFyYXNzbWVudCIsInNjb3JlIjowLjk1LCJxdWFsaWZpZXJzIjpbXX1dfQ>"
+    },
+    {
+      "name": "keyOrder",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "qualifiers": [
+              "hate-symbol"
+            ],
+            "action": "age-restrict",
+            "score": 0.8,
+            "category": "hate"
+          }
+        ],
+        "unassessedCategories": [
+          "sexual",
+          "violence"
+        ],
+        "regionalActions": [
+          {
+            "action": "limit",
+            "region": "AU"
+          }
+        ]
+      },
+      "code": "<!calmlens-test bfcc0301ad7aef34e0962075f1fafa3f eyJyZWdpb25hbEFjdGlvbnMiOlt7InJlZ2lvbiI6IkFVIiwiYWN0aW9uIjoibGltaXQifV0sInVuYXNzZXNzZWRDYXRlZ29yaWVzIjpbInNleHVhbCIsInZpb2xlbmNlIl0sImluc3RhbmNlcyI6W3siY2F0ZWdvcnkiOiJoYXRlIiwic2NvcmUiOjAuOCwiYWN0aW9uIjoiYWdlLXJlc3RyaWN0IiwicXVhbGlmaWVycyI6WyJoYXRlLXN5bWJvbCJdfV19>"
+    },
+    {
+      "name": "emptyLists",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "regionalActions": [],
+        "unassessedCategories": [],
+        "instances": []
+      },
+      "code": "<!calmlens-test 945e768175100dfc10ab9c80cb8ed894 eyJyZWdpb25hbEFjdGlvbnMiOltdLCJ1bmFzc2Vzc2VkQ2F0ZWdvcmllcyI6W10sImluc3RhbmNlcyI6W119>"
+    },
+    {
+      "name": "everyRegion",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "regionalActions": [
+          {
+            "region": "DE",
+            "action": "block"
+          },
+          {
+            "region": "AT",
+            "action": "block"
+          },
+          {
+            "region": "FR",
+            "action": "limit"
+          },
+          {
+            "region": "GB",
+            "action": "age-restrict"
+          },
+          {
+            "region": "EU",
+            "action": "age-restrict"
+          },
+          {
+            "region": "AU",
+            "action": "limit"
+          },
+          {
+            "region": "BR",
+            "action": "block"
+          }
+        ]
+      },
+      "code": "<!calmlens-test 65f0a40821570979163f8a1620fa73e1 eyJyZWdpb25hbEFjdGlvbnMiOlt7InJlZ2lvbiI6IkRFIiwiYWN0aW9uIjoiYmxvY2sifSx7InJlZ2lvbiI6IkFUIiwiYWN0aW9uIjoiYmxvY2sifSx7InJlZ2lvbiI6IkZSIiwiYWN0aW9uIjoibGltaXQifSx7InJlZ2lvbiI6IkdCIiwiYWN0aW9uIjoiYWdlLXJlc3RyaWN0In0seyJyZWdpb24iOiJFVSIsImFjdGlvbiI6ImFnZS1yZXN0cmljdCJ9LHsicmVnaW9uIjoiQVUiLCJhY3Rpb24iOiJsaW1pdCJ9LHsicmVnaW9uIjoiQlIiLCJhY3Rpb24iOiJibG9jayJ9XSwiaW5zdGFuY2VzIjpbXX0>"
+    },
+    {
+      "name": "threeCategories",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "self-harm",
+            "qualifiers": []
+          },
+          {
+            "category": "criminal-activity",
+            "qualifiers": []
+          },
+          {
+            "category": "personal-information",
+            "qualifiers": []
+          }
+        ]
+      },
+      "code": "<!calmlens-test 90494dc6760f607f9442c65e45c33876 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5Ijoic2VsZi1oYXJtIiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJjcmltaW5hbC1hY3Rpdml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicGVyc29uYWwtaW5mb3JtYXRpb24iLCJxdWFsaWZpZXJzIjpbXX1dfQ>"
+    },
+    {
+      "name": "everyCategory",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "sexual",
+            "qualifiers": []
+          },
+          {
+            "category": "violence",
+            "qualifiers": []
+          },
+          {
+            "category": "self-harm",
+            "qualifiers": []
+          },
+          {
+            "category": "harassment",
+            "qualifiers": []
+          },
+          {
+            "category": "hate",
+            "qualifiers": []
+          },
+          {
+            "category": "criminal-activity",
+            "qualifiers": []
+          },
+          {
+            "category": "personal-information",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          }
+        ]
+      },
+      "code": "<!calmlens-test 4bf3dcfd3fed7ae686e932c6fec1830a eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5Ijoic2V4dWFsIiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJ2aW9sZW5jZSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5Ijoic2VsZi1oYXJtIiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJoYXJhc3NtZW50IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJoYXRlIiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJjcmltaW5hbC1hY3Rpdml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicGVyc29uYWwtaW5mb3JtYXRpb24iLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfV19>"
+    },
+    {
+      "name": "largest",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          },
+          {
+            "category": "profanity",
+            "qualifiers": []
+          }
+        ]
+      },
+      "code": "<!calmlens-test 8bec9b665d195aa72dc9445b8991c06d eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX1dfQ>"
+    },
+    {
+      "name": "other key",
+      "key": "0123456789abcdef0123456789abcdef",
+      "signal": "harassment",
+      "code": "<!calmlens-test 5968f0dc625d2a015d9776a5e78f41b0 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGFyYXNzbWVudCIsInF1YWxpZmllcnMiOltdfV19>"
+    }
+  ],
+  "media": [
+    {
+      "signal": "sexual",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "code": "Calm Lens test alpha zero bravo two seven six six alpha zero seven zero bravo four five foxtrot eight foxtrot six charlie echo alpha two delta five charlie delta seven five four nine nine four sexual end test"
+    },
+    {
+      "signal": "violence",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "code": "Calm Lens test five one three bravo delta seven zero echo three five three nine eight five two foxtrot delta alpha two five echo nine charlie two four charlie echo one seven delta four one violence end test"
+    },
+    {
+      "signal": "self-harm",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "code": "Calm Lens test delta foxtrot zero bravo charlie alpha nine alpha bravo eight delta alpha alpha nine foxtrot four two six one eight echo alpha echo delta two two delta two six charlie zero two self harm end test"
+    },
+    {
+      "signal": "harassment",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "code": "Calm Lens test alpha charlie five four five nine zero eight delta four bravo echo four two alpha one one bravo one delta foxtrot delta bravo delta delta foxtrot six charlie five two two seven harassment end test"
+    },
+    {
+      "signal": "hate",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "code": "Calm Lens test two five two charlie charlie alpha echo three three two bravo seven four nine three echo foxtrot three five six two alpha one echo two six foxtrot nine charlie five nine echo hate end test"
+    },
+    {
+      "signal": "criminal-activity",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "code": "Calm Lens test seven eight nine two eight nine eight two six seven delta two four one six zero four one four three three echo charlie six echo zero charlie eight eight five six zero criminal activity end test"
+    },
+    {
+      "signal": "personal-information",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "code": "Calm Lens test one four six echo foxtrot bravo eight zero four echo charlie six one zero nine one eight charlie four nine five nine foxtrot four charlie echo foxtrot one delta six six four personal information end test"
+    },
+    {
+      "signal": "profanity",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "code": "Calm Lens test zero delta bravo charlie two charlie charlie six charlie five six two zero zero three charlie one two zero foxtrot seven charlie echo charlie two seven four echo bravo charlie nine foxtrot profanity end test"
+    },
+    {
+      "signal": "violence.graphic",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "code": "Calm Lens test zero five eight one eight echo one four six delta echo four bravo zero echo three nine echo seven alpha one one echo nine bravo echo four bravo bravo seven two delta violence graphic end test"
+    },
+    {
+      "signal": "violence",
+      "key": "0123456789abcdef0123456789abcdef",
+      "code": "Calm Lens test seven seven three bravo four zero eight six zero one zero alpha seven bravo four nine delta zero nine one zero foxtrot nine six six bravo zero three delta alpha four bravo violence end test"
+    }
+  ],
+  "rejections": [
+    {
+      "name": "uppercase key",
+      "key": "1A2B3C4D1A2B3C4D1A2B3C4D1A2B3C4D",
+      "signal": "harassment",
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "short key",
+      "key": "a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "harassment",
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "unknown signal",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "spam",
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "unknown category",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "spam",
+            "qualifiers": []
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "qualifier from another category",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "violence",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "input-type qualifier",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "sexual",
+            "qualifiers": [
+              "sexual-text"
+            ]
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "unknown qualifier",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-spam"
+            ]
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "duplicate qualifier",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-abuse"
+            ]
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "score above 1",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ],
+            "score": 1.5
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "negative score",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ],
+            "score": -0.1
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "unknown action",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ],
+            "action": "hide"
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "actions on only some instances",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ],
+            "action": "block"
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "unassessed category with instances",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "unassessedCategories": [
+          "harassment"
+        ],
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "duplicate unassessed category",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "unassessedCategories": [
+          "sexual",
+          "sexual"
+        ],
+        "instances": []
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "unknown unassessed category",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "unassessedCategories": [
+          "spam"
+        ],
+        "instances": []
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "global region",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "regionalActions": [
+          {
+            "region": "global",
+            "action": "block"
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "unknown region",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "regionalActions": [
+          {
+            "region": "US",
+            "action": "block"
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "allow regional action",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "regionalActions": [
+          {
+            "region": "DE",
+            "action": "allow"
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "duplicate region",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "regionalActions": [
+          {
+            "region": "DE",
+            "action": "block"
+          },
+          {
+            "region": "DE",
+            "action": "limit"
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "too many instances",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ]
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "too large",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          },
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse",
+              "harassment-threat"
+            ]
+          }
+        ]
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "missing instances",
+      "input": {},
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "unknown field",
+      "input": {
+        "instances": [],
+        "extra": true
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "unknown instance field",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ],
+            "note": "x"
+          }
+        ]
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "missing qualifiers",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment"
+          }
+        ]
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "text score",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ],
+            "score": "0.5"
+          }
+        ]
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "boolean score",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ],
+            "score": true
+          }
+        ]
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "null action",
+      "input": {
+        "instances": [
+          {
+            "category": "harassment",
+            "qualifiers": [
+              "harassment-abuse"
+            ],
+            "action": null
+          }
+        ]
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "media uppercase key",
+      "key": "1A2B3C4D1A2B3C4D1A2B3C4D1A2B3C4D",
+      "signal": "violence",
+      "kind": "media",
+      "typed": true
+    },
+    {
+      "name": "media text-only signal",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "sexual.adult",
+      "kind": "media",
+      "typed": true
+    },
+    {
+      "name": "media unknown signal",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "signal": "spam",
+      "kind": "media",
+      "typed": true
+    }
+  ]
+}

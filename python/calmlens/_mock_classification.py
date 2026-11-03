@@ -14,3 +14,6 @@ QUALIFIERS = {
     "personal-information": ("personal-information-contact", "personal-information-email", "personal-information-phone", "personal-information-government-id", "personal-information-financial", "personal-information-location", "personal-information-identifiers", "personal-information-credentials", "personal-information-request", "personal-information-self-disclosure", "personal-information-third-party", "personal-information-historical", "personal-information-documentary", "personal-information-educational", "personal-information-fictional", "personal-information-support-prevention",),
     "profanity": ("profanity-mild", "profanity-strong", "profanity-slurs", "profanity-obfuscated", "profanity-historical", "profanity-documentary", "profanity-educational", "profanity-fictional", "profanity-support-prevention",),
 }
+
+#: Qualifiers the input type sets, which a test input scenario cannot list.
+INPUT_QUALIFIERS = ("sexual-text", "violence-text",)

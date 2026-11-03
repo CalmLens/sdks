@@ -1,0 +1,271 @@
+package com.calmlens;
+
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.util.Base64;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+/**
+ * Signed test inputs: text codes and media phrases that a project's moderation
+ * recognises as a declared scenario when they are signed with its secret test input key (shown in
+ * the portal's project settings). The formats match the backend byte for byte.
+ *
+ * <pre>{@code
+ * String text = TestInputs.generateTestTextCode(TestInputs.LIMITED, testInputKey);
+ * String phrase = TestInputs.generateMediaTestCode("violence", testInputKey);
+ * }</pre>
+ *
+ * <p>An invalid key, scenario or signal throws {@link CalmLensException} with {@link
+ * ErrorCodes#SDK_INVALID_ARGUMENT}.
+ */
+public final class TestInputs {
+  private TestInputs() {}
+
+  /** The kind of input a signal shortcut stands for. */
+  public enum Kind {
+    /** A text input ({@link #generateTestTextCode(String, String)}). */
+    TEXT,
+    /** An image input. */
+    IMAGE
+  }
+
+  /** No findings. */
+  public static final TestInput CLEAN = new TestInput(List.of());
+  /** Harassment abuse, which the built-in policies limit. */
+  public static final TestInput LIMITED = one("harassment", "harassment-abuse");
+  /** Pornographic media, for an image. */
+  public static final TestInput ADULT_IMAGE = one("sexual", "sexual-pornographic-media");
+  /** Explicit sexual language, for text. */
+  public static final TestInput ADULT_TEXT = one("sexual", "sexual-explicit-language");
+  /** No findings, but blocked in DE, age-restricted in GB and limited in FR. */
+  public static final TestInput REGIONAL_DELIVERY = new TestInput(List.of(
+      new TestInput.RegionalAction("DE", "block"), new TestInput.RegionalAction("GB", "age-restrict"), new TestInput.RegionalAction("FR", "limit")), null, List.of());
+  /** A Nazi symbol on public display, which German law restricts. */
+  public static final TestInput GERMANY = one("hate", "hate-symbol", "hate-nazi-symbols-public-display");
+  /** Documentary harassment abuse alongside a harassment threat. */
+  public static final TestInput MIXED = new TestInput(List.of(
+      new TestInput.Instance("harassment", List.of("harassment-abuse", "harassment-documentary")),
+      new TestInput.Instance("harassment", List.of("harassment-threat"))));
+
+  /**
+   * The signals {@link #testInputForSignal(String, Kind)} accepts: the 8 categories and {@code
+   * sexual.involving-minors}, {@code harassment.insult}, {@code sexual.adult}, {@code
+   * hate.regional-symbol} and {@code violence.graphic}.
+   */
+  public static final List<String> SIGNALS = Stream.concat(MockClassification.CATEGORIES.stream(),
+      Stream.of("sexual.involving-minors", "harassment.insult", "sexual.adult", "hate.regional-symbol", "violence.graphic")).toList();
+
+  /** The signals {@link #generateMediaTestCode(String, String)} accepts: the 8 categories and {@code violence.graphic}. */
+  public static final List<String> MEDIA_SIGNALS = Stream.concat(MockClassification.CATEGORIES.stream(), Stream.of("violence.graphic")).toList();
+
+  /**
+   * The qualifiers a scenario may list for each category: all but those the input type sets, such
+   * as {@code sexual-text}.
+   */
+  public static final Map<String, List<String>> QUALIFIERS = MockClassification.QUALIFIERS.entrySet().stream()
+      .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey,
+          entry -> entry.getValue().stream().filter(q -> !MockClassification.INPUT_QUALIFIERS.contains(q)).toList()));
+
+  private static final List<String> ACTIONS = List.of("allow", "limit", "age-restrict", "block");
+  private static final List<String> REGIONS = List.of("DE", "AT", "FR", "GB", "EU", "AU", "BR");
+  private static final List<String> REGIONAL_ACTIONS = List.of("limit", "age-restrict", "block");
+  private static final Pattern KEY = Pattern.compile("[a-f0-9]{32}");
+  private static final String[] WORDS = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "alpha", "bravo", "charlie", "delta", "echo", "foxtrot"};
+  private static TestInput one(String category, String... qualifiers) {
+    return new TestInput(List.of(new TestInput.Instance(category, List.of(qualifiers))));
+  }
+
+  /**
+   * @param signal one of {@link #SIGNALS}
+   * @param kind the kind of input
+   * @return the scenario the signal stands for in an input of that kind
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for another signal or a null kind
+   */
+  public static TestInput testInputForSignal(String signal, Kind kind) {
+    if (kind == null) throw invalid("Test input kind must be text or image");
+    if (signal == null) throw invalid("A test signal is required");
+    switch (signal) {
+      case "harassment.insult": return LIMITED;
+      case "sexual.adult": return kind == Kind.IMAGE ? ADULT_IMAGE : ADULT_TEXT;
+      case "hate.regional-symbol": return GERMANY;
+      case "sexual.involving-minors": return one("sexual", "sexual-minors");
+      case "violence.graphic": return one("violence", "violence-graphic");
+      default:
+        if (!MockClassification.CATEGORIES.contains(signal)) throw invalid("Unknown test signal " + signal);
+        return one(signal);
+    }
+  }
+
+  /**
+   * @param signal one of {@link #SIGNALS}
+   * @return the scenario the signal stands for in a text input
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for another signal
+   */
+  public static TestInput testInputForSignal(String signal) { return testInputForSignal(signal, Kind.TEXT); }
+
+  /**
+   * Returns the signed text code for a scenario. Put it anywhere in a text input.
+   *
+   * @param input the scenario
+   * @param testInputKey the project's secret test input key from the portal
+   * @return the code, {@code <!calmlens-test ...>}
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for an invalid key or scenario
+   */
+  public static String generateTestTextCode(TestInput input, String testInputKey) {
+    checkKey(testInputKey);
+    validate(input);
+    String payload = Base64.getUrlEncoder().withoutPadding().encodeToString(canonical(input).getBytes(StandardCharsets.UTF_8));
+    if (payload.length() > 8000) throw invalid("Test scenario is too large");
+    return "<!calmlens-test " + tag(testInputKey, "calmlens-test:v1:" + payload) + " " + payload + ">";
+  }
+
+  /**
+   * Returns the signed text code for a signal's text scenario ({@link #testInputForSignal(String)}).
+   *
+   * @param signal one of {@link #SIGNALS}
+   * @param testInputKey the project's secret test input key from the portal
+   * @return the code
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for an invalid key or signal
+   */
+  public static String generateTestTextCode(String signal, String testInputKey) {
+    return generateTestTextCode(testInputForSignal(signal, Kind.TEXT), testInputKey);
+  }
+
+  /**
+   * Returns the phrase that triggers a signal in audio or video: read it aloud, or show it as
+   * large, high-contrast text in a frame.
+   *
+   * @param signal one of {@link #MEDIA_SIGNALS}
+   * @param testInputKey the project's secret test input key from the portal
+   * @return the phrase
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for an invalid key or signal
+   */
+  public static String generateMediaTestCode(String signal, String testInputKey) {
+    if (!in(MEDIA_SIGNALS, signal)) throw invalid("Unsupported media test signal " + signal);
+    checkKey(testInputKey);
+    StringBuilder phrase = new StringBuilder("Calm Lens test");
+    for (char digit : tag(testInputKey, "calmlens-test:media:" + signal).toCharArray())
+      phrase.append(' ').append(WORDS[Character.digit(digit, 16)]);
+    return phrase.append(' ').append(signal.replace('.', ' ').replace('-', ' ')).append(" end test").toString();
+  }
+
+  private static void checkKey(String key) {
+    if (key == null || !KEY.matcher(key).matches()) throw invalid("The test input key must be 32 lowercase hexadecimal characters");
+  }
+
+  private static void validate(TestInput input) {
+    if (input == null || input.instances() == null) throw invalid("A test scenario needs instances");
+    if (input.instances().size() > 128) throw invalid("A test scenario has at most 128 instances");
+    int withAction = 0;
+    for (TestInput.Instance instance : input.instances()) {
+      if (instance == null || !in(MockClassification.CATEGORIES, instance.category())) throw invalid("Each instance needs a CalmLens category");
+      if (instance.score() != null && !(Double.isFinite(instance.score()) && instance.score() >= 0 && instance.score() <= 1))
+        throw invalid("Score must be a number from 0 to 1");
+      if (instance.action() != null && !in(ACTIONS, instance.action())) throw invalid("Action must be one of " + String.join(", ", ACTIONS));
+      if (instance.qualifiers() == null || instance.qualifiers().size() > 64) throw invalid("An instance needs at most 64 qualifiers");
+      List<String> allowed = QUALIFIERS.get(instance.category());
+      if (!instance.qualifiers().stream().allMatch(qualifier -> in(allowed, qualifier)) || new HashSet<>(instance.qualifiers()).size() != instance.qualifiers().size())
+        throw invalid("Choose unique " + instance.category() + " qualifiers; input-type qualifiers are automatic");
+      if (instance.action() != null) withAction++;
+    }
+    if (withAction != 0 && withAction != input.instances().size()) throw invalid("Set an action for every instance or omit all actions");
+    List<String> unassessed = input.unassessedCategories();
+    if (unassessed != null) {
+      if (unassessed.size() > MockClassification.CATEGORIES.size()) throw invalid("A test scenario has at most 8 unassessed categories");
+      Set<String> seen = new HashSet<>();
+      for (String category : unassessed)
+        if (!in(MockClassification.CATEGORIES, category) || !seen.add(category)
+            || input.instances().stream().anyMatch(instance -> instance.category().equals(category)))
+          throw invalid("Unassessed categories must be unique categories without instances");
+    }
+    List<TestInput.RegionalAction> regional = input.regionalActions();
+    if (regional != null) {
+      if (regional.size() > REGIONS.size()) throw invalid("A test scenario has at most 7 regional actions");
+      Set<String> seen = new HashSet<>();
+      for (TestInput.RegionalAction action : regional) {
+        if (action == null || !in(REGIONS, action.region()) || !seen.add(action.region()))
+          throw invalid("Regional actions need unique regions from " + String.join(", ", REGIONS));
+        if (!in(REGIONAL_ACTIONS, action.action())) throw invalid("Regional action must be one of " + String.join(", ", REGIONAL_ACTIONS));
+      }
+    }
+  }
+
+  /** The scenario's JSON in the backend's key order. Every string is a validated ASCII token, so none needs escaping. */
+  private static String canonical(TestInput input) {
+    StringBuilder json = new StringBuilder("{");
+    if (input.regionalActions() != null)
+      json.append("\"regionalActions\":[").append(input.regionalActions().stream()
+          .map(action -> "{\"region\":\"" + action.region() + "\",\"action\":\"" + action.action() + "\"}").collect(Collectors.joining(","))).append("],");
+    if (input.unassessedCategories() != null) json.append("\"unassessedCategories\":").append(strings(input.unassessedCategories())).append(',');
+    json.append("\"instances\":[");
+    for (int i = 0; i < input.instances().size(); i++) {
+      TestInput.Instance instance = input.instances().get(i);
+      if (i > 0) json.append(',');
+      json.append("{\"category\":\"").append(instance.category()).append("\",");
+      if (instance.score() != null) json.append("\"score\":").append(jsNumber(instance.score())).append(',');
+      if (instance.action() != null) json.append("\"action\":\"").append(instance.action()).append("\",");
+      json.append("\"qualifiers\":").append(strings(instance.qualifiers())).append('}');
+    }
+    return json.append("]}").toString();
+  }
+
+  private static String strings(List<String> values) {
+    return values.stream().map(value -> "\"" + value + "\"").collect(Collectors.joining(",", "[", "]"));
+  }
+
+  /**
+   * A finite number as JavaScript's {@code JSON.stringify} prints it: the shortest digits that
+   * round-trip, in plain decimal from 1e-6 to below 1e21 and in exponent form otherwise.
+   */
+  static String jsNumber(double value) {
+    if (value == 0) return "0";
+    String sign = value < 0 ? "-" : "";
+    BigDecimal exact = new BigDecimal(Math.abs(value));
+    BigDecimal shortest = exact;
+    for (int precision = 1; precision <= 17; precision++) {
+      shortest = exact.round(new MathContext(precision, RoundingMode.HALF_EVEN));
+      if (shortest.doubleValue() == Math.abs(value)) break;
+    }
+    shortest = shortest.stripTrailingZeros();
+    String digits = shortest.unscaledValue().toString();
+    int k = digits.length();
+    int n = k - shortest.scale(); // value = 0.digits * 10^n
+    String body;
+    if (k <= n && n <= 21) body = digits + "0".repeat(n - k);
+    else if (0 < n && n <= 21) body = digits.substring(0, n) + "." + digits.substring(n);
+    else if (-6 < n && n <= 0) body = "0." + "0".repeat(-n) + digits;
+    else {
+      int e = n - 1;
+      body = (k == 1 ? digits : digits.charAt(0) + "." + digits.substring(1)) + "e" + (e < 0 ? "-" : "+") + Math.abs(e);
+    }
+    return sign + body;
+  }
+
+  private static String tag(String key, String message) {
+    try {
+      Mac mac = Mac.getInstance("HmacSHA256");
+      mac.init(new SecretKeySpec(key.getBytes(StandardCharsets.US_ASCII), "HmacSHA256"));
+      StringBuilder hex = new StringBuilder();
+      for (byte b : mac.doFinal(message.getBytes(StandardCharsets.UTF_8))) hex.append(String.format("%02x", b));
+      return hex.substring(0, 32);
+    } catch (GeneralSecurityException unavailable) {
+      throw new IllegalStateException("HmacSHA256 is unavailable", unavailable);
+    }
+  }
+
+  /** Whether {@code value} is non-null and in {@code values}, which rejects null lookups. */
+  private static boolean in(List<String> values, String value) { return value != null && values.contains(value); }
+
+  private static CalmLensException invalid(String message) { return new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, message); }
+}

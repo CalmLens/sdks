@@ -5,6 +5,7 @@ require 'securerandom'
 require 'uri'
 require_relative '../calmlens'
 require_relative 'testing/fake_api'
+require_relative 'testing/test_inputs'
 
 module CalmLens
   # An offline client for tests. Calls run the real client's validation, encoding, retries and
