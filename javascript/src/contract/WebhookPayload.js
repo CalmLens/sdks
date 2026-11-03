@@ -1677,7 +1677,7 @@ const ASSET_LINK_FLAGGED = defineEventType({
 		assetType: assetTypeField,
 		linkVerdict: field(LINK_SAFETY_VERDICT_SCHEMA, {
 			label: msg("Verdict"),
-			description: "What the link's destination is: `adult`, `gambling`, `phishing`, `malware`, `unresolved` when a short link could not be followed or a check failed, or `safe` when only the off-platform setting acted.",
+			description: "What the link's destination is: `adult`, `gambling`, `phishing`, `malware`, `unresolved` when a short link or redirect chain could not be followed or a check failed, or `safe` when only the off-platform setting acted. The most severe verdict of any address on the way decides.",
 			display: "enum",
 			valueLabels: LINK_SAFETY_VERDICT_LABELS
 		}),
@@ -1688,7 +1688,7 @@ const ASSET_LINK_FLAGGED = defineEventType({
 		}),
 		linkFinalUrl: field(zod.string().nullish(), {
 			label: msg("Destination"),
-			description: "Where the link leads after its redirects. Absent when a short link could not be followed.",
+			description: "Where the link leads after its redirects. Absent when a short link or redirect chain could not be followed.",
 			display: "text"
 		}),
 		linkAction: field(LINK_SAFETY_ACTION_SCHEMA.exclude(["allow"]), {

@@ -3387,7 +3387,8 @@
           "save": "feed",
           "expect": {
             "result": {
-              "items.length": 0
+              "items.length": 0,
+              "excludedTypes.length": 0
             },
             "httpStatus": 200
           }
@@ -3447,7 +3448,8 @@
                   "key": "automated-outcome",
                   "value": "allowed"
                 }
-              }
+              },
+              "excludedTypes.length": 0
             },
             "httpStatus": 200
           }

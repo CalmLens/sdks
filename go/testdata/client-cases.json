@@ -3272,7 +3272,7 @@
       ]
     },
     {
-      "name": "events.list without options asks for a cursor for now",
+      "name": "events.list without options asks for a cursor for now, with the types the key can't receive",
       "area": "options",
       "responses": [
         {
@@ -3280,7 +3280,11 @@
           "body": {
             "items": [],
             "nextCursor": "now-cursor",
-            "hasMore": false
+            "hasMore": false,
+            "excludedTypes": [
+              "asset.review-requested",
+              "api-key.created"
+            ]
           },
           "headers": {
             "x-request-id": "req-1",
@@ -3295,7 +3299,11 @@
             "result": {
               "items": [],
               "nextCursor": "now-cursor",
-              "hasMore": false
+              "hasMore": false,
+              "excludedTypes": [
+                "asset.review-requested",
+                "api-key.created"
+              ]
             }
           }
         }
@@ -10351,7 +10359,8 @@
               }
             ],
             "nextCursor": "cursor-2",
-            "hasMore": true
+            "hasMore": true,
+            "excludedTypes": []
           },
           "headers": {
             "x-request-id": "req-1",
@@ -10381,7 +10390,8 @@
               }
             ],
             "nextCursor": "cursor-3",
-            "hasMore": false
+            "hasMore": false,
+            "excludedTypes": []
           },
           "headers": {
             "x-request-id": "req-2",
@@ -10436,7 +10446,8 @@
                   }
                 ],
                 "nextCursor": "cursor-2",
-                "hasMore": true
+                "hasMore": true,
+                "excludedTypes": []
               },
               {
                 "items": [
@@ -10459,7 +10470,8 @@
                   }
                 ],
                 "nextCursor": "cursor-3",
-                "hasMore": false
+                "hasMore": false,
+                "excludedTypes": []
               }
             ]
           }
@@ -10535,7 +10547,8 @@
           "body": {
             "items": [],
             "nextCursor": "now-cursor",
-            "hasMore": false
+            "hasMore": false,
+            "excludedTypes": []
           },
           "headers": {
             "x-request-id": "req-1",
@@ -10551,7 +10564,8 @@
               {
                 "items": [],
                 "nextCursor": "now-cursor",
-                "hasMore": false
+                "hasMore": false,
+                "excludedTypes": []
               }
             ]
           }
@@ -10607,7 +10621,8 @@
               }
             ],
             "nextCursor": "cursor-1",
-            "hasMore": true
+            "hasMore": true,
+            "excludedTypes": []
           },
           "headers": {
             "x-request-id": "req-1",
@@ -10619,7 +10634,8 @@
           "body": {
             "items": [],
             "nextCursor": "cursor-1",
-            "hasMore": true
+            "hasMore": true,
+            "excludedTypes": []
           },
           "headers": {
             "x-request-id": "req-2",
@@ -10665,7 +10681,8 @@
                   }
                 ],
                 "nextCursor": "cursor-1",
-                "hasMore": true
+                "hasMore": true,
+                "excludedTypes": []
               }
             ]
           }
