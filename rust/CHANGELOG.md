@@ -1,5 +1,11 @@
 # @calmlens/sdk-rust
 
+## 0.18.3
+
+### Patch Changes
+
+- 136292e: Assets carry link safety (preview) results in their types: `classification.linkSafety` lists each link CalmLens checked, where it leads and its verdict, and `classification.moderation.linkSafety` gives the action your policy took on those links.
+
 ## 0.18.2
 
 No changes in this release.
