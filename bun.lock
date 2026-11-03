@@ -12,15 +12,15 @@
     },
     "go": {
       "name": "@calmlens/sdk-go",
-      "version": "0.18.2",
+      "version": "0.18.3",
     },
     "java": {
       "name": "@calmlens/sdk-java",
-      "version": "0.18.2",
+      "version": "0.18.3",
     },
     "javascript": {
       "name": "@calmlens/sdk",
-      "version": "0.18.2",
+      "version": "0.18.3",
       "bin": {
         "calmlens": "bin/calmlens.js",
       },
@@ -57,19 +57,19 @@
     },
     "php": {
       "name": "@calmlens/sdk-php",
-      "version": "0.18.2",
+      "version": "0.18.3",
     },
     "python": {
       "name": "@calmlens/sdk-python",
-      "version": "0.18.2",
+      "version": "0.18.3",
     },
     "ruby": {
       "name": "@calmlens/sdk-ruby",
-      "version": "0.18.2",
+      "version": "0.18.3",
     },
     "rust": {
       "name": "@calmlens/sdk-rust",
-      "version": "0.18.2",
+      "version": "0.18.3",
     },
   },
   "packages": {
