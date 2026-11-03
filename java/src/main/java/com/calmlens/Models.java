@@ -476,7 +476,7 @@ public final class Models {
   }
 
   /**
-   * Options for face detection (beta). Faces are located, never identified.
+   * Options for face detection (preview). Faces are located, never identified.
    *
    * @param enabled whether face detection runs
    * @param ageEstimation whether an age range is also estimated for each face
@@ -498,10 +498,10 @@ public final class Models {
    * AssetClassification}; OCR stores extracted text on the image asset.
    *
    * @param ocr extract text onto the image asset and add text moderation
-   * @param personDetection (beta) locate people in images
-   * @param faceDetection (beta) locate faces in images and optionally estimate ages
+   * @param personDetection (preview) locate people in images
+   * @param faceDetection (preview) locate faces in images and optionally estimate ages
    * @param linkDetection find QR codes and web links in images
-   * @param aiGeneratedDetection (beta) read the AI provenance metadata images carry
+   * @param aiGeneratedDetection (preview) read the AI provenance metadata images carry
    */
   public record ProcessingFeatures(FeatureOptions ocr, FeatureOptions personDetection, FaceDetectionOptions faceDetection,
       FeatureOptions linkDetection, FeatureOptions aiGeneratedDetection) {
@@ -2018,10 +2018,10 @@ public final class Models {
    * Results of the optional features requested in {@code processingOptions.features}. A feature
    * that was not requested is null. Results are informational and never change the decision.
    *
-   * @param personDetection person detection result (beta)
-   * @param faceDetection face detection result (beta)
+   * @param personDetection person detection result (preview)
+   * @param faceDetection face detection result (preview)
    * @param linkDetection QR codes and links found in the image
-   * @param aiGeneratedDetection AI provenance read from the image's metadata (beta)
+   * @param aiGeneratedDetection AI provenance read from the image's metadata (preview)
    */
   public record ProcessingFeatureResults(PersonDetectionResult personDetection, FaceDetectionResult faceDetection,
       LinkDetectionResult linkDetection, AiGeneratedDetectionResult aiGeneratedDetection) {}

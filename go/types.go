@@ -439,9 +439,9 @@ type ProcessingOptions struct {
 type ProcessingFeatures struct {
 	// OCR stores extracted text on the image asset and adds text moderation.
 	OCR *OCRFeatureOptions `json:"ocr,omitempty"`
-	// PersonDetection (beta) locates people; results are in Report.Features.
+	// PersonDetection (preview) locates people; results are in Report.Features.
 	PersonDetection *PersonDetectionFeatureOptions `json:"personDetection,omitempty"`
-	// FaceDetection (beta) locates faces; results are in Report.Features.
+	// FaceDetection (preview) locates faces; results are in Report.Features.
 	FaceDetection *FaceDetectionFeatureOptions `json:"faceDetection,omitempty"`
 	// LinkDetection finds QR codes and web links in images (free); results are in
 	// AssetClassification.LinkDetection. With OCR on, links in the extracted text are listed too.
@@ -453,7 +453,7 @@ type OCRFeatureOptions struct {
 	Enabled bool `json:"enabled"`
 }
 
-// PersonDetectionFeatureOptions configures person detection (beta).
+// PersonDetectionFeatureOptions configures person detection (preview).
 type PersonDetectionFeatureOptions struct {
 	Enabled bool `json:"enabled"`
 }
@@ -463,7 +463,7 @@ type LinkDetectionFeatureOptions struct {
 	Enabled bool `json:"enabled"`
 }
 
-// FaceDetectionFeatureOptions configures face detection (beta).
+// FaceDetectionFeatureOptions configures face detection (preview).
 type FaceDetectionFeatureOptions struct {
 	Enabled bool `json:"enabled"`
 	// AgeEstimation also estimates an age range for each face (default false).
@@ -672,7 +672,7 @@ type TextRegion struct {
 	PersonalInformation bool `json:"personalInformation"`
 }
 
-// PersonDetectionResult is the result of person detection (beta).
+// PersonDetectionResult is the result of person detection (preview).
 type PersonDetectionResult struct {
 	// Status is ResultEvaluated or ResultNotEvaluated; other values may be added.
 	Status string `json:"status"`
@@ -683,7 +683,7 @@ type PersonDetectionResult struct {
 	People []DetectedPerson `json:"people,omitempty"`
 }
 
-// FaceDetectionResult is the result of face detection (beta).
+// FaceDetectionResult is the result of face detection (preview).
 type FaceDetectionResult struct {
 	// Status is ResultEvaluated or ResultNotEvaluated; other values may be added.
 	Status string `json:"status"`

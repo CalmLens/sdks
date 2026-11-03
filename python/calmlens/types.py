@@ -203,7 +203,7 @@ class OcrFeatureOptions(TypedDict):
 
 
 class PersonDetectionFeatureOptions(TypedDict):
-    """Beta. Locate people in images; results never change the moderation decision."""
+    """Preview. Locate people in images; results never change the moderation decision."""
     enabled: bool
 
 
@@ -212,17 +212,17 @@ class _FaceDetectionFeatureRequired(TypedDict):
 
 
 class FaceDetectionFeatureOptions(_FaceDetectionFeatureRequired, total=False):
-    """Beta. Locate faces in images, optionally estimating an age range for each."""
+    """Preview. Locate faces in images, optionally estimating an age range for each."""
     ageEstimation: bool
 
 
 class LinkDetectionFeatureOptions(TypedDict):
-    """Beta. Find web links in images, in QR codes and in OCR text."""
+    """Find web links in images, in QR codes and in OCR text."""
     enabled: bool
 
 
 class AiGeneratedDetectionFeatureOptions(TypedDict):
-    """Beta. Read AI provenance metadata (C2PA, IPTC, generator settings) from image files."""
+    """Preview. Read AI provenance metadata (C2PA, IPTC, generator settings) from image files."""
     enabled: bool
 
 

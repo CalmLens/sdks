@@ -611,19 +611,19 @@ pub struct ProcessingFeatures {
     /// including those extracted from documents and websites.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ocr: Option<FeatureOptions>,
-    /// Beta. Locate people in images, including people whose faces are not visible. Results
+    /// Preview. Locate people in images, including people whose faces are not visible. Results
     /// are informational and never change the moderation decision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub person_detection: Option<FeatureOptions>,
-    /// Beta. Locate faces in images and optionally estimate an age range for each. Faces are
+    /// Preview. Locate faces in images and optionally estimate an age range for each. Faces are
     /// not identified. Results are informational and never change the moderation decision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub face_detection: Option<FaceDetectionOptions>,
-    /// Beta. Find links in image text and QR codes. Results are informational and never change
+    /// Find links in image text and QR codes. Results are informational and never change
     /// the moderation decision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub link_detection: Option<FeatureOptions>,
-    /// Beta. Read provenance metadata, such as C2PA, that marks an image as AI-generated or
+    /// Preview. Read provenance metadata, such as C2PA, that marks an image as AI-generated or
     /// AI-edited. Results are informational and never change the moderation decision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_generated_detection: Option<FeatureOptions>,
