@@ -1014,12 +1014,28 @@ declare const EVENT_TYPE_INFO: {
         blocked: "blocked";
         limited: "limited";
       }>>;
+      reviewReason: EventFieldDefinition<zod.ZodEnum<{
+        sampled: "sampled";
+        uncertain: "uncertain";
+      }>>;
+      uncertainCategories: EventFieldDefinition<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       automatedOutcome: "age-restricted" | "allowed" | "blocked" | "limited";
+      reviewReason: "sampled" | "uncertain";
+      uncertainCategories: ("criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence")[];
     }>;
     factInfo: {
       label: string;
@@ -1054,6 +1070,20 @@ declare const EVENT_TYPE_INFO: {
         blocked: "blocked";
         limited: "limited";
       }>;
+      reviewReason: zod.ZodEnum<{
+        sampled: "sampled";
+        uncertain: "uncertain";
+      }>;
+      uncertainCategories: zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>;
     }, zod.core.$strip>;
   };
   readonly "asset.hash-matched": {

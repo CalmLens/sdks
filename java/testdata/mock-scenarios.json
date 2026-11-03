@@ -3107,6 +3107,16 @@
               {
                 "key": "automated-outcome",
                 "value": "allowed"
+              },
+              {
+                "key": "review-reason",
+                "value": "uncertain"
+              },
+              {
+                "key": "uncertain-categories",
+                "value": [
+                  "harassment"
+                ]
               }
             ]
           },
