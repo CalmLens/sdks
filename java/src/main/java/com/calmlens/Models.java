@@ -1968,7 +1968,11 @@ public final class Models {
     public CategoryPolicySource { indexes = list(indexes); }
   }
 
-  /** A named rule as it was configured when the asset was decided. */
+  /**
+   * A named allowance or restriction of a category: what it is about ({@code when}), whether
+   * {@code all} or {@code some} of the content must match, the qualifiers that exclude it ({@code
+   * unless}, restrictions only) and its action. A decision keeps its rules as configured then.
+   */
   public record PolicyRuleSnapshot(String name, List<String> when, String action, String match, List<String> unless) {
     public PolicyRuleSnapshot { when = list(when); unless = list(unless); }
   }
@@ -2457,6 +2461,179 @@ public final class Models {
     /** @param value an image asset whose perceptual hash to add @return these options */
     public AddHashListEntry assetId(String value) { assetId = value; return this; }
     public AddHashListEntry label(String value) { label = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  // ------------------------------------------------------------------ Policies
+
+  /**
+   * A moderation policy. Policies belong to the project's organisation and its projects share them.
+   *
+   * @param id policy ID
+   * @param name display name
+   * @param description what the policy is for
+   * @param settings what the policy does with each category
+   * @param revision changes with every saved change; send it with each change
+   * @param automaticUpdates whether the policy follows its preset, always having the latest preset
+   *     settings until its first saved edit pins a copy
+   * @param preset the built-in preset it started from, or null
+   * @param projectIds projects this policy moderates, as their policy or through an upload preset
+   * @param createdAt creation time
+   * @param updatedAt last change
+   */
+  public record Policy(String id, String name, String description, PolicySettings settings, int revision,
+      boolean automaticUpdates, PolicyPreset preset, List<String> projectIds,
+      @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
+      @JsonAdapter(Json.EpochMillis.class) Instant updatedAt) {
+    /** Copies collections; a missing project list becomes empty. */
+    public Policy { projectIds = listOrEmpty(projectIds); }
+  }
+
+  /**
+   * Where a policy started from a built-in preset.
+   *
+   * @param id the preset, such as {@code general-community} or {@code children-platform}
+   * @param version the preset release the policy is pinned to; resetting restores it
+   * @param latestVersion the newest release, which {@code update} applies
+   * @param projectId the project whose preset policy this is, or null for a copy; only a project's
+   *     preset policy can follow automatic updates
+   */
+  public record PolicyPreset(String id, int version, int latestVersion, String projectId) {}
+
+  /**
+   * A policy's settings.
+   *
+   * @param categorySettings the settings of each category, by category; a new or replaced policy
+   *     defines every category
+   * @param linkSafety what happens to assets that link to unsafe destinations (preview), or null
+   */
+  public record PolicySettings(Map<String, PolicyCategorySettings> categorySettings, LinkSafetySettings linkSafety) {
+    /** Copies collections so the record stays immutable. */
+    public PolicySettings { categorySettings = map(categorySettings); }
+  }
+
+  /**
+   * What a policy does with one category.
+   *
+   * @param action the action when the category's policy score reaches 0.5: {@code allow}, {@code
+   *     limit}, {@code age-restrict}, {@code block} or {@code purge}
+   * @param allowances contexts that let content through, or act on it more softly
+   * @param restrictions conditions that act on matching content; they outweigh allowances
+   */
+  public record PolicyCategorySettings(String action, List<PolicyRuleSnapshot> allowances, List<PolicyRuleSnapshot> restrictions) {
+    /** Copies collections so the record stays immutable. */
+    public PolicyCategorySettings { allowances = list(allowances); restrictions = list(restrictions); }
+  }
+
+  /**
+   * {@code policies.list}: every policy of the project's organisation, oldest first.
+   *
+   * @param policies the policies
+   * @param projectPolicyId the policy the project moderates with
+   */
+  public record PolicyList(List<Policy> policies, String projectPolicyId) {
+    /** Copies collections; a missing list becomes empty. */
+    public PolicyList { policies = listOrEmpty(policies); }
+  }
+
+  /** Identifies one policy, for {@code policies.retrieve}, {@code policies.delete} and {@code policies.assign}. */
+  public static final class PolicyId {
+    private String policyId;
+    public PolicyId() {}
+    /** @param policyId the policy ID */
+    public PolicyId(String policyId) { this.policyId = policyId; }
+    public PolicyId policyId(String value) { policyId = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /**
+   * Options for {@code policies.create}: {@code settings} with a {@code name}, or {@code presetId}
+   * to copy the latest release of a built-in preset.
+   */
+  public static final class CreatePolicy {
+    private String name;
+    private String description;
+    private PolicySettings settings;
+    private String presetId;
+    public CreatePolicy() {}
+    /** @param value display name; a copy of a preset defaults to its name @return these options */
+    public CreatePolicy name(String value) { name = value; return this; }
+    public CreatePolicy description(String value) { description = value; return this; }
+    /** @param value settings defining every category @return these options */
+    public CreatePolicy settings(PolicySettings value) { settings = value; return this; }
+    /** @param value a built-in preset, such as {@code children-platform} @return these options */
+    public CreatePolicy presetId(String value) { presetId = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Options for {@code policies.update}; unset fields keep their value. A policy changed since {@code revision} is refused. */
+  public static final class UpdatePolicy {
+    private String policyId;
+    private Integer revision;
+    private String name;
+    private String description;
+    private PolicySettings settings;
+    public UpdatePolicy() {}
+    /** @param policyId the policy @param revision its current revision */
+    public UpdatePolicy(String policyId, int revision) { this.policyId = policyId; this.revision = revision; }
+    public UpdatePolicy policyId(String value) { policyId = value; return this; }
+    public UpdatePolicy revision(Integer value) { revision = value; return this; }
+    public UpdatePolicy name(String value) { name = value; return this; }
+    public UpdatePolicy description(String value) { description = value; return this; }
+    /** @param value the complete new settings, defining every category @return these options */
+    public UpdatePolicy settings(PolicySettings value) { settings = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /**
+   * Options for {@code policies.applyPreset}: {@code reset} restores the pinned preset version's
+   * settings; {@code update} moves an unchanged copy to the latest release.
+   */
+  public static final class ApplyPolicyPreset {
+    private String policyId;
+    private String operation;
+    private Integer revision;
+    private Integer presetVersion;
+    public ApplyPolicyPreset() {}
+    /**
+     * @param policyId the policy
+     * @param operation {@code reset} or {@code update}
+     * @param revision its current revision
+     * @param presetVersion {@code preset.version} to reset, {@code preset.latestVersion} to update
+     */
+    public ApplyPolicyPreset(String policyId, String operation, int revision, int presetVersion) {
+      this.policyId = policyId; this.operation = operation; this.revision = revision; this.presetVersion = presetVersion;
+    }
+    public ApplyPolicyPreset policyId(String value) { policyId = value; return this; }
+    public ApplyPolicyPreset operation(String value) { operation = value; return this; }
+    public ApplyPolicyPreset revision(Integer value) { revision = value; return this; }
+    public ApplyPolicyPreset presetVersion(Integer value) { presetVersion = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /**
+   * Options for {@code policies.setAutomaticUpdates}. Switching on replaces a saved copy with the
+   * latest preset, discarding its changes; switching off pins the current version as a copy.
+   */
+  public static final class SetPolicyAutomaticUpdates {
+    private String policyId;
+    private Boolean enabled;
+    private Integer revision;
+    private Integer presetVersion;
+    public SetPolicyAutomaticUpdates() {}
+    /**
+     * @param policyId the project's preset policy
+     * @param enabled whether it follows the preset
+     * @param revision its current revision
+     * @param presetVersion the preset's {@code latestVersion} you reviewed
+     */
+    public SetPolicyAutomaticUpdates(String policyId, boolean enabled, int revision, int presetVersion) {
+      this.policyId = policyId; this.enabled = enabled; this.revision = revision; this.presetVersion = presetVersion;
+    }
+    public SetPolicyAutomaticUpdates policyId(String value) { policyId = value; return this; }
+    public SetPolicyAutomaticUpdates enabled(Boolean value) { enabled = value; return this; }
+    public SetPolicyAutomaticUpdates revision(Integer value) { revision = value; return this; }
+    public SetPolicyAutomaticUpdates presetVersion(Integer value) { presetVersion = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 

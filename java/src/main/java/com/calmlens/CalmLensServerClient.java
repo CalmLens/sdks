@@ -114,6 +114,8 @@ public final class CalmLensServerClient implements AutoCloseable {
   public final Folders folders = new Folders();
   /** Hash lists that image uploads are compared with. */
   public final HashLists hashLists = new HashLists();
+  /** Moderation policies, shared by the project's organisation. */
+  public final Policies policies = new Policies();
   /** Signs upload tokens for upload presets, locally. */
   public final UploadTokens uploadTokens = new UploadTokens();
   /** The events feed. */
@@ -1474,6 +1476,83 @@ public final class CalmLensServerClient implements AutoCloseable {
     /** Removes a hash from its list; later uploads no longer match it. @param options the entry */
     public void removeEntry(Models.HashListEntryId options) {
       success(json("DELETE", "/hash-list-entries/" + id(str(Models.encode(options), "entryId", null)), null, null));
+    }
+  }
+
+  /**
+   * Moderation policies belong to the project's organisation and its projects share them. Every
+   * change sends the policy's {@code revision}, so a policy changed since is refused with {@code
+   * policy/revision-conflict}. Through a project's key you can change only policies no other
+   * project uses or owns.
+   */
+  public final class Policies {
+    private Policies() {}
+
+    private String policyPath(JsonObject o) { return project("policies/" + id(str(o, "policyId", null))); }
+
+    /** @return the organisation's policies and the ID of the one the project uses */
+    public Models.PolicyList list() {
+      return decode(json("GET", project("policies"), null, null), Models.PolicyList.class);
+    }
+
+    /** @param options the policy @return the policy */
+    public Models.Policy retrieve(Models.PolicyId options) {
+      return decode(json("GET", policyPath(Models.encode(options)), null, null), Models.Policy.class);
+    }
+
+    /**
+     * Creates a policy from {@code settings}, or a copy of a built-in preset with {@code presetId}.
+     * It moderates nothing until it is assigned to a project or named on an upload preset.
+     *
+     * @param options settings and a name, or a preset
+     * @return the new policy
+     */
+    public Models.Policy create(Models.CreatePolicy options) {
+      return decode(json("POST", project("policies"), null, Models.encode(options)), Models.Policy.class);
+    }
+
+    /**
+     * Changes the name, description or settings; later moderation uses them. Saving a policy that
+     * follows automatic updates pins it as a copy under the same ID.
+     *
+     * @param options the policy, its revision and the fields to change
+     * @return the saved policy
+     */
+    public Models.Policy update(Models.UpdatePolicy options) {
+      JsonObject o = Models.encode(options);
+      return decode(json("PATCH", policyPath(o), null, without(o, "policyId")), Models.Policy.class);
+    }
+
+    /**
+     * Resets a preset copy to its pinned version, or updates an unchanged copy to the latest.
+     *
+     * @param options the policy, operation, revision and preset version
+     * @return the saved policy
+     */
+    public Models.Policy applyPreset(Models.ApplyPolicyPreset options) {
+      JsonObject o = Models.encode(options);
+      return decode(json("POST", policyPath(o) + "/preset", null, without(o, "policyId")), Models.Policy.class);
+    }
+
+    /**
+     * Switches automatic updates on or off for the project's preset policy.
+     *
+     * @param options the policy, whether it follows the preset, its revision and the preset version
+     * @return the saved policy
+     */
+    public Models.Policy setAutomaticUpdates(Models.SetPolicyAutomaticUpdates options) {
+      JsonObject o = Models.encode(options);
+      return decode(json("PUT", policyPath(o) + "/automatic-updates", null, without(o, "policyId")), Models.Policy.class);
+    }
+
+    /** Deletes a policy that no project or upload preset uses. @param options the policy */
+    public void delete(Models.PolicyId options) {
+      success(json("DELETE", policyPath(Models.encode(options)), null, null));
+    }
+
+    /** Chooses the policy the project moderates with. @param options the policy @return the policy */
+    public Models.Policy assign(Models.PolicyId options) {
+      return decode(json("PUT", project("policy"), null, Models.encode(options)), Models.Policy.class);
     }
   }
 

@@ -25,6 +25,7 @@ final class ServerClient
     public readonly Assets $assets;
     public readonly Folders $folders;
     public readonly HashLists $hashLists;
+    public readonly Policies $policies;
     public readonly Events $events;
     public readonly Text $text;
     public readonly Cdn $cdn;
@@ -60,6 +61,7 @@ final class ServerClient
         $this->assets = new Assets($this->session);
         $this->folders = new Folders($this->session);
         $this->hashLists = new HashLists($this->session);
+        $this->policies = new Policies($this->session);
         $this->events = new Events($this->session);
         $this->text = new Text($this->assets);
         $this->cdn = new Cdn($this->session);
