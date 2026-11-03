@@ -140,6 +140,17 @@ final class Session
         return (int) round($delay / 2 + mt_rand() / mt_getrandmax() * ($delay / 2));
     }
 
+    /** Guzzle 8 names transport timeouts by class; Guzzle 7 reports cURL's CURLE_OPERATION_TIMEDOUT (28). */
+    private static function isTimeout(TransferException $error): bool
+    {
+        foreach (['ConnectTimeoutException', 'NetworkTimeoutException', 'ResponseTimeoutException'] as $class) {
+            if (is_a($error, "GuzzleHttp\\Exception\\$class")) {
+                return true;
+            }
+        }
+        return method_exists($error, 'getHandlerContext') && ($error->getHandlerContext()['errno'] ?? null) === 28;
+    }
+
     private function execute(string $method, string $url, array $headers, ?StreamInterface $body, array $settings, bool $cdn = false): ResponseInterface
     {
         foreach ($headers as $key => $_) {
@@ -163,8 +174,7 @@ final class Session
             } catch (\InvalidArgumentException $error) {
                 throw CalmLensException::create('sdk/invalid-argument', $error->getMessage(), previous: $error);
             } catch (TransferException $error) {
-                $context = method_exists($error, 'getHandlerContext') ? $error->getHandlerContext() : [];
-                $timeout = ($context['errno'] ?? null) === 28;
+                $timeout = self::isTimeout($error);
                 $failure = CalmLensException::create($timeout ? 'sdk/timeout' : 'sdk/transport-error',
                     $timeout ? 'Request timed out' : 'Request failed', previous: $error);
                 if (!$again) {

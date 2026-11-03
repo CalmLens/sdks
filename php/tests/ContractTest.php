@@ -16,6 +16,7 @@ use CalmLens\UploadTokens;
 use CalmLens\Webhooks;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\ConnectTimeoutException;
 use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Psr7\NoSeekStream;
 use GuzzleHttp\Psr7\Response;
@@ -371,10 +372,12 @@ final class ContractTest extends TestCase
                     throw new \LogicException('a hanging request needs a deadline');
                 }
                 usleep((int) ($timeout * 1_000_000));
-                return Create::rejectionFor(new ConnectException('Operation timed out', $request, null, ['errno' => 28]));
+                return Create::rejectionFor(class_exists(ConnectTimeoutException::class)
+                    ? new ConnectTimeoutException('Operation timed out', $request)
+                    : new ConnectException('Operation timed out', $request, null, ['errno' => 28]));
             }
             if (!empty($scripted['transportError'])) {
-                return Create::rejectionFor(new ConnectException('Connection reset by peer', $request, null, ['errno' => 56]));
+                return Create::rejectionFor(new ConnectException('Connection reset by peer', $request));
             }
             $status = $scripted['status'] ?? 200;
             $body = match (true) {

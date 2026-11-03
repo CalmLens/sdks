@@ -14,6 +14,7 @@ use CalmLens\SdkErrorCodes;
 use CalmLens\ServerClient;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\ConnectTimeoutException;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Promise\Create;
 use GuzzleHttp\Promise\PromiseInterface;
@@ -482,8 +483,13 @@ final class MockServerClient
         if (isset(ErrorCodes::STATUSES[$failure])) {
             return $this->error($failure, "Simulated $failure", null, $details, $retryAfter === null ? [] : ['Retry-After' => (string) $retryAfter]);
         }
-        return new ConnectException($failure === 'timeout' ? 'Simulated timeout' : 'Simulated network failure',
-            $request, null, $failure === 'timeout' ? ['errno' => 28] : []);
+        if ($failure !== 'timeout') {
+            return new ConnectException('Simulated network failure', $request);
+        }
+        // Guzzle 8 throws a timeout class; Guzzle 7 a ConnectException carrying cURL's timeout errno.
+        return class_exists(ConnectTimeoutException::class)
+            ? new ConnectTimeoutException('Simulated timeout', $request)
+            : new ConnectException('Simulated timeout', $request, null, ['errno' => 28]);
     }
 
     /** Fails the request being answered with an API error; the status defaults to the code's. */

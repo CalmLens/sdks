@@ -180,6 +180,8 @@ jobs:
       matrix:
         # Patched for PHP2Shell (CVE-2026-109618, CVE-2026-109619).
         php: ["8.2.35", "8.5.12"]
+        # Laravel 13 installs Guzzle 8; older applications are on Guzzle 7.
+        guzzle: ["7", "8"]
     defaults:
       run:
         working-directory: php
@@ -192,7 +194,9 @@ jobs:
           extensions: curl, mbstring, dom, xml, xmlwriter
           coverage: none
       - run: composer validate --strict && composer validate --strict ../composer.json
-      - run: composer install --no-interaction --prefer-dist
+      - run: |
+          composer update --no-interaction --prefer-dist --with-all-dependencies --with "guzzlehttp/guzzle:^${{ matrix.guzzle }}.0"
+          composer show guzzlehttp/guzzle | grep -E '^versions +: \* ${{ matrix.guzzle }}\.'
       - run: composer check
       - run: composer test
       - run: composer archive --format=zip --dir=/tmp/calmlens-php-dist
