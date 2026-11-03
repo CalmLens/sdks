@@ -191,7 +191,7 @@ jobs:
           tools: composer:v2
           extensions: curl, mbstring, dom, xml, xmlwriter
           coverage: none
-      - run: composer validate --strict
+      - run: composer validate --strict && composer validate --strict ../composer.json
       - run: composer install --no-interaction --prefer-dist
       - run: composer check
       - run: composer test

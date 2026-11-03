@@ -20,6 +20,6 @@
     "changeset": "changeset",
     "release:version": "node scripts/version-sdks.mjs",
     "release:check": "node scripts/version-sdks.mjs --check",
-    "release:test": "node --test scripts/version-sdks.test.mjs scripts/changesets.test.mjs scripts/release-checks.test.mjs"
+    "release:test": "node --test scripts/version-sdks.test.mjs scripts/changesets.test.mjs scripts/release-checks.test.mjs scripts/check-sdk-release-tag.test.mjs"
   }
 }

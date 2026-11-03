@@ -5,25 +5,13 @@ delivery, built on Guzzle 7 and PSR-7 streams.
 
 PHP 8.2.35, 8.3.36, 8.4.27, 8.5.12 or later is required because of PHP2Shell (CVE-2026-109618, CVE-2026-109619).
 
-## Install from this checkout
+## Installation
 
-This SDK is pre-release and has not been published to Packagist. In your application's
-`composer.json`, add a path repository pointing at this checkout's `php` directory:
-
-```json
-{
-  "repositories": [
-    {
-      "type": "path",
-      "url": "/path/to/sdks/php",
-      "options": { "versions": { "calmlens/sdk": "dev-main" } }
-    }
-  ],
-  "require": { "calmlens/sdk": "dev-main" }
-}
+```bash
+composer require calmlens/sdk
 ```
 
-Run `composer install`. The
+The
 [Laravel comment board](https://github.com/CalmLens/sdks/tree/main/examples/comment-board-laravel)
 and [Chirp](https://github.com/CalmLens/sdks/tree/main/examples/chirp-php), a short-post app with
 images, age-restricted media and webhooks, run directly from this repository and include tests.

@@ -16,6 +16,8 @@ export const SDK_MANIFESTS = {
   php: {
     path: "php/src/Version.php",
     version: /^\s*public const VERSION = '([^']+)'/m,
+    // Packagist reads only version tags, so PHP releases are the repository's plain `v` tags.
+    tagPrefix: "v",
   },
   go: {
     path: "go/version.go",
@@ -90,7 +92,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       tag,
       readFileSync(join(root, SDK_MANIFESTS[sdk].path), "utf8"),
     );
-    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
+    if (process.env.GITHUB_OUTPUT)
+      appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
     console.log(version);
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);

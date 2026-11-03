@@ -1,0 +1,27 @@
+# Packagist installs the PHP SDK (calmlens/sdk) from this repository's archives, so they contain
+# only the PHP package: the root composer.json, php/src and the documents. Git clones and Go
+# module zips (Go ignores export-ignore) are unaffected. php/scripts-check.php checks the archive.
+/.changeset export-ignore
+/.github export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/Formula export-ignore
+/assets export-ignore
+/biome.json export-ignore
+/bun.lock export-ignore
+/dev-pad.config.ts export-ignore
+/examples export-ignore
+/go export-ignore
+/java export-ignore
+/javascript export-ignore
+/package.json export-ignore
+/python export-ignore
+/ruby export-ignore
+/rust export-ignore
+/scripts export-ignore
+/php/.gitignore export-ignore
+/php/composer.json export-ignore
+/php/package.json export-ignore
+/php/phpunit.xml export-ignore
+/php/scripts-check.php export-ignore
+/php/tests export-ignore

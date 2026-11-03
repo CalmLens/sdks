@@ -1,0 +1,72 @@
+name: Publish PHP SDK
+
+# Packagist installs the PHP SDK (calmlens/sdk) from this repository: the root composer.json
+# describes it and .gitattributes keeps its archives to php/src. Packagist reads only version
+# tags, so a PHP release is the plain `v<version>` tag, and Packagist's GitHub hook picks it up.
+#
+# When a merged release plan includes PHP and its commit's SDK Tests and SDK examples runs have
+# passed, the tag job tags `v<version>` and dispatches this workflow on that tag, which waits for
+# Packagist to list the version. It runs again whenever one of those checks completes on main.
+on:
+  push:
+    branches: [main]
+    paths: [".changeset/release.json"]
+  workflow_run:
+    workflows: ["SDK Tests", "SDK examples"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: calmlens-php-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node scripts/release-tag.mjs php v release-php.yml --after-checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Check the tag matches the SDK version
+        id: version
+        run: node scripts/check-sdk-release-tag.mjs php "$GITHUB_REF_NAME"
+      - name: Require passed SDK Tests and SDK examples runs
+        run: node scripts/release-checks.mjs "$GITHUB_SHA"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Wait for Packagist to list the release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS https://repo.packagist.org/p2/calmlens/sdk.json |
+              node -e 'const v=process.env.VERSION;let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.exit(JSON.parse(s).packages["calmlens/sdk"].some(p=>p.version==="v"+v)?0:1))'; then
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::Packagist does not list calmlens/sdk $VERSION; check the package's GitHub hook"
+          exit 1

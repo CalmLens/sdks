@@ -41,6 +41,13 @@ test("Go releases use the module subdirectory tag and the reported SDK version",
   assert.throws(() => checkReleaseTag("go", "go/v0.2.0", source), /declares 0\.1\.0/);
 });
 
+test("PHP releases use the plain version tags Packagist reads", () => {
+  const source = "<?php\nfinal class Version\n{\n    public const VERSION = '0.1.0';\n}\n";
+  assert.equal(checkReleaseTag("php", "v0.1.0", source), "0.1.0");
+  assert.throws(() => checkReleaseTag("php", "php-sdk/v0.1.0", source), /expected v/);
+  assert.throws(() => checkReleaseTag("php", "v0.2.0", source), /declares 0\.1\.0/);
+});
+
 test("the command fails a mismatched tag and prints the version of a matching one", () => {
   const version = readManifestVersion(
     "python",

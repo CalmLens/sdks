@@ -9,10 +9,10 @@ Official SDKs for [CalmLens](https://calmlens.com): content moderation, storage 
 | Ruby                    | [ruby](ruby)             | `gem install calmlens`                                     |
 | Rust                    | [rust](rust)             | `cargo add calmlens`                                       |
 | Java                    | [java](java)             | `com.calmlens:calmlens-sdk`                                |
-| PHP                     | [php](php)               | Composer path package (pre-release; see PHP README)        |
+| PHP                     | [php](php)               | `composer require calmlens/sdk`                            |
 | Go                      | [go](go)                 | `go get github.com/CalmLens/sdks/go`                       |
 
-The six existing SDKs are published; PHP is available from this checkout pending registry setup. See the [SDK documentation](https://calmlens.com/docs/sdk) for usage and API coverage.
+See the [SDK documentation](https://calmlens.com/docs/sdk) for usage and API coverage.
 
 ## Examples
 
@@ -88,12 +88,14 @@ Add a changeset with `bun run changeset` when an SDK needs a release. Select the
 and bump type; the Version SDKs workflow maintains a release PR containing the native
 version updates and per-SDK changelogs. Merge that PR to release.
 
-The JavaScript SDK, Go and the CLI are released from this repository. When a merged plan
+The JavaScript SDK, Go, PHP and the CLI are released from this repository. When a merged plan
 includes the JavaScript SDK and its commit's SDK Tests and SDK examples runs have passed,
 `release-npm.yml` tags `javascript/v<version>` and publishes one packed build to npm with
 provenance, as `calmlens` and as `@calmlens/sdk`. `release-cli.yml` tags `cli-v<version>`,
 attaches the CLI's standalone executables to that GitHub release and updates the Homebrew
-formula in `Formula/`. Go tags and proxy validation run here too.
+formula in `Formula/`. Go tags and proxy validation run here too. `release-php.yml` tags PHP
+releases `v<version>`; Packagist installs `calmlens/sdk` from those tags, through the root
+`composer.json`, with `.gitattributes` keeping the archive to the PHP package.
 
 Python, Ruby, Rust and Java are published by the private application repository with its
 existing trusted publishers and protected environments. Its Release SDKs workflow checks
