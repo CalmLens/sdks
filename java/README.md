@@ -60,7 +60,7 @@ Act on `asset.classification().moderation().status()`:
 ## What you can do
 
 - [Classify text, images, audio, video and websites](https://calmlens.com/docs/guides/classifying-assets), synchronously or queued, and [read the results](https://calmlens.com/docs/guides/classification-results).
-- [Upload files and streams](https://calmlens.com/docs/sdk/java/reference#uploads) without holding them in memory, including [multipart uploads](https://calmlens.com/docs/sdk/java/reference#multipart-uploads) and [idempotent retries](https://calmlens.com/docs/sdk/java/reference#idempotency-keys).
+- [Upload files and streams](https://calmlens.com/docs/sdk/java/reference#uploads) without holding them in memory. Content larger than `partSizeBytes` (8 MiB by default) goes in [parts](https://calmlens.com/docs/sdk/java/reference#multipart-uploads) automatically, each retried on its own and resumable with the same idempotency key, and every upload uses [idempotent retries](https://calmlens.com/docs/sdk/java/reference#idempotency-keys).
 - [Moderate replies in context](https://calmlens.com/docs/sdk/java/reference#conversation-context) with the earlier posts of a conversation.
 - Turn on [optional analyses](https://calmlens.com/docs/sdk/java/reference#optional-analyses) such as [OCR](https://calmlens.com/docs/guides/ocr).
 - [Manage assets](https://calmlens.com/docs/sdk/java/reference#assets): update, move, retry, explain, record reviewer decisions, remove content, delete and [batch operations](https://calmlens.com/docs/sdk/java/reference#batch-operations).

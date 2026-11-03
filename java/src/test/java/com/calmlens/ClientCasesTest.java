@@ -82,6 +82,7 @@ class ClientCasesTest {
     values.put("waitForDecisionIntervalFactor", CalmLensServerClient.DECISION_POLL_DELAY_FACTOR);
     values.put("waitForDecisionMaxIntervalMs", CalmLensServerClient.DECISION_POLL_MAX_DELAY.toMillis());
     values.put("ensureLensesBatchSize", (long) CalmLensServerClient.ENSURE_LENSES_MAX_PER_REQUEST);
+    values.put("partSizeBytes", client.partSizeBytes());
     List<DynamicTest> tests = new ArrayList<>();
     for (JsonElement element : surface.getAsJsonArray("defaults")) {
       JsonObject entry = element.getAsJsonObject();
@@ -174,6 +175,7 @@ class ClientCasesTest {
       if (options.has("maxRetries")) builder.maxRetries(options.get("maxRetries").getAsInt());
       if (options.has("timeoutMs")) builder.timeout(Duration.ofMillis(options.get("timeoutMs").getAsLong()));
       if (options.has("maxResponseBytes")) builder.maxResponseBytes(options.get("maxResponseBytes").getAsLong());
+      if (options.has("partSizeBytes")) builder.partSizeBytes(options.get("partSizeBytes").getAsLong());
       // Waits are recorded and skipped; the client's clock moves on by each one.
       client = builder.build(transport, delay -> { sleeps.add(delay.toMillis()); slept[0] += delay.toNanos(); }, () -> System.nanoTime() + slept[0]);
     } catch (CalmLensException refused) {

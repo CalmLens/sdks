@@ -87,6 +87,14 @@ public final class CalmLensServerClient implements AutoCloseable {
   public static final int DEFAULT_MAX_RETRIES = 2;
   /** The largest API response body read when {@link Builder#maxResponseBytes(long)} is not set: 32 MiB. */
   public static final long DEFAULT_MAX_RESPONSE_BYTES = 32L * 1024 * 1024;
+  /** Content larger than this is uploaded in parts of this size when {@link Builder#partSizeBytes(long)} is not set: 8 MiB. */
+  public static final long DEFAULT_PART_SIZE_BYTES = 8L * 1024 * 1024;
+  /** The smallest {@link Builder#partSizeBytes(long)}: every part but the last is at least 5 MiB. */
+  public static final long MIN_PART_SIZE_BYTES = 5L * 1024 * 1024;
+  /** The largest {@link Builder#partSizeBytes(long)}: 64 MiB. */
+  public static final long MAX_PART_SIZE_BYTES = 64L * 1024 * 1024;
+  /** The longest idempotency key of an upload sent in parts: each part's key adds {@code :part-<n>}. */
+  static final int MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH = 240;
   /** The backoff before the first retry is up to this long; it doubles per retry. */
   public static final Duration RETRY_BASE_DELAY = Duration.ofMillis(500);
   /** The longest backoff before a retry. */
@@ -127,6 +135,7 @@ public final class CalmLensServerClient implements AutoCloseable {
   private final Duration timeout, uploadTimeout;
   private final int maxRetries;
   private final long maxResponseBytes;
+  private final long partSizeBytes;
   private final Transport transport;
   private final HttpClient ownedHttpClient;
   private final Sleeper sleeper;
@@ -166,6 +175,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     this.uploadTimeout = uploadTimeout;
     this.maxRetries = maxRetries;
     this.maxResponseBytes = base.maxResponseBytes;
+    this.partSizeBytes = base.partSizeBytes;
     this.transport = base.transport;
     this.ownedHttpClient = null;
     this.sleeper = base.sleeper;
@@ -186,6 +196,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     positive("uploadTimeout", options.uploadTimeout, true);
     if (retries < 0 || retries > 10) throw config("maxRetries must be between 0 and 10");
     if (options.maxResponseBytes < 1) throw config("maxResponseBytes must be a positive number of bytes");
+    if (options.partSizeBytes < MIN_PART_SIZE_BYTES || options.partSizeBytes > MAX_PART_SIZE_BYTES)
+      throw config("partSizeBytes must be from 5 MiB (5242880) to 64 MiB (67108864)");
     this.closed = new AtomicBoolean();
     this.lenses = new LensCache();
     this.baseUrl = baseUrl("baseUrl", options.baseUrl);
@@ -196,6 +208,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     this.uploadTimeout = options.uploadTimeout;
     this.maxRetries = retries;
     this.maxResponseBytes = options.maxResponseBytes;
+    this.partSizeBytes = options.partSizeBytes;
     this.userAgent = "calmlens-java/" + VERSION + " (java/" + Runtime.version() + ")";
     this.sleeper = sleeper != null ? sleeper : delay -> Thread.sleep(delay.toMillis());
     this.nanoTime = nanoTime != null ? nanoTime : System::nanoTime;
@@ -272,6 +285,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     /** Null until set, so the mock can default to none. */
     private Integer maxRetries;
     private long maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES;
+    private long partSizeBytes = DEFAULT_PART_SIZE_BYTES;
     private Transport transport;
     private HttpClient httpClient;
 
@@ -325,6 +339,17 @@ public final class CalmLensServerClient implements AutoCloseable {
      * @return this builder
      */
     public Builder maxResponseBytes(long value) { maxResponseBytes = value; return this; }
+
+    /**
+     * Content larger than this many bytes, whose size the client knows and can read again (bytes,
+     * base64 and files, not streams or text), is uploaded in parts of this size (8 MiB by default).
+     * Each part is retried on its own, and calling {@code assets.create} or {@code assets.classify}
+     * again with the same idempotency key resumes an interrupted upload.
+     *
+     * @param value 5 MiB (5242880) to 64 MiB (67108864)
+     * @return this builder
+     */
+    public Builder partSizeBytes(long value) { partSizeBytes = value; return this; }
 
     /**
      * Sends requests through {@code value} instead of the built-in {@link HttpClient}.
@@ -423,6 +448,7 @@ public final class CalmLensServerClient implements AutoCloseable {
   Duration uploadTimeout() { return uploadTimeout; }
   int maxRetries() { return maxRetries; }
   long maxResponseBytes() { return maxResponseBytes; }
+  long partSizeBytes() { return partSizeBytes; }
 
   // ------------------------------------------------------------------ Encoding helpers
 
@@ -955,18 +981,72 @@ public final class CalmLensServerClient implements AutoCloseable {
     String type = str(encoded, "type", "");
     checkMimeType(type);
     Transport.Body body = payload(content, encoded, multipart);
-    if (multipart) checkPartSize(body.length(), flag(encoded, "isFinal"), type.strip().toLowerCase(Locale.ROOT).startsWith("image/"));
-    else checkDirectSize(body.length(), type.strip().toLowerCase(Locale.ROOT));
+    boolean text = encoded.has("plainText") && !encoded.get("plainText").isJsonNull();
+    String mime = type.strip().toLowerCase(Locale.ROOT);
+    // Content the client can read again is sent in parts when it is larger than one part.
+    boolean split = !multipart && !text && body.replayable() && body.length() > partSizeBytes;
+    if (split) {
+      if (key != null && key.length() > MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH)
+        throw argument("An idempotency key can be at most " + MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH + " characters for an upload sent in parts");
+      if (!mime.startsWith("image/")) checkDirectSize(body.length(), mime);
+      else if (!deferUploadChecks && body.length() > 20L * 1024 * 1024)
+        throw new CalmLensException(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, "Multipart image uploads cannot exceed 20MB.");
+    } else if (multipart) checkPartSize(body.length(), flag(encoded, "isFinal"), mime.startsWith("image/"));
+    else checkDirectSize(body.length(), mime);
     for (String k : List.of("name", "description", "processingOptions", "visibility", "metadata", "authorId", "context", "externalId", "externalUrl", "folderId", "uploadPresetId", "totalSizeInBytes"))
       if (o.has(k)) query.add(k, o.get(k));
     query.addProperty("contentType", type);
+    if (split) return uploadInParts(query, body, type, key);
     if (body.length() >= 0) query.addProperty("sizeInBytes", body.length());
     if (multipart) {
       query.addProperty("partNumber", 1);
       query.addProperty("isFinal", flag(encoded, "isFinal"));
     }
-    boolean text = encoded.has("plainText") && !encoded.get("plainText").isJsonNull();
     return decode(upload(project("assets"), query, body, type, multipart ? "part" : "content", key, text), Models.Asset.class);
+  }
+
+  /**
+   * Uploads {@code body} as a multipart upload of {@code partSizeBytes} parts and returns the final
+   * part's asset. Part 1 carries the upload's fields and {@code key}; part {@code n} after it
+   * carries {@code <key>:part-<n>}, so each is retried on its own and repeating the call with the
+   * same key replays the parts the API already has and sends the rest.
+   */
+  private Models.Asset uploadInParts(JsonObject query, Transport.Body body, String type, String key) {
+    String base = idempotencyKey(key);
+    long total = body.length();
+    long count = (total + partSizeBytes - 1) / partSizeBytes;
+    Transport.Body first = body.slice(0, partSizeBytes);
+    query.addProperty("sizeInBytes", first.length());
+    query.addProperty("partNumber", 1);
+    query.addProperty("isFinal", false);
+    query.addProperty("totalSizeInBytes", total);
+    Models.Asset asset = decode(upload(project("assets"), query, first, type, "part", base, false), Models.Asset.class);
+    String path = "/assets/" + id(asset.id()) + "/part";
+    for (long number = 2; number <= count; ) {
+      boolean last = number == count;
+      long offset = (number - 1) * partSizeBytes;
+      Transport.Body part = body.slice(offset, Math.min(partSizeBytes, total - offset));
+      JsonObject partQuery = new JsonObject();
+      partQuery.addProperty("partNumber", number);
+      partQuery.addProperty("isFinal", last);
+      partQuery.addProperty("sizeInBytes", part.length());
+      try {
+        asset = decode(upload(path, partQuery, part, null, "part", base + ":part-" + number, false), Models.Asset.class);
+      } catch (ApiException error) {
+        Object expected = error.getDetails().get("expectedPartNumber");
+        if (ErrorCodes.INVALID_UPLOAD_PART_NUMBER.equals(error.getCode()) && expected instanceof Number n
+            && n.doubleValue() == Math.rint(n.doubleValue()) && n.longValue() > number && n.longValue() <= count) {
+          // The parts before the expected one arrived, but their responses were lost.
+          number = n.longValue();
+          continue;
+        }
+        // The final part completed the upload, but its response was lost.
+        if (last && ErrorCodes.UPLOAD_NOT_OPEN.equals(error.getCode())) return assets.retrieve(new Models.AssetId(asset.id()));
+        throw error;
+      }
+      number++;
+    }
+    return asset;
   }
 
   // ------------------------------------------------------------------ Resources
@@ -1009,6 +1089,11 @@ public final class CalmLensServerClient implements AutoCloseable {
      * Uploads an asset and queues it for processing; it returns while its {@code classification.status}
      * is {@code processing} ({@code uploading} for the first part of a multipart upload). The
      * upload carries an {@code Idempotency-Key}, so it is retried safely.
+     *
+     * <p>Content larger than {@link Builder#partSizeBytes(long)} (bytes, base64 or a file) is sent
+     * as a multipart upload in parts of that size, each retried on its own; calling again with the
+     * same idempotency key (at most 240 characters) resumes an interrupted upload. The same applies
+     * to {@code classify}.
      *
      * @param options name and content, part or url
      * @return the new asset

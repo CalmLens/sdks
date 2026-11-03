@@ -110,10 +110,14 @@ public interface Transport {
     private final byte[] bytes;
     private final Path file;
     private final Supplier<InputStream> stream;
+    /** A stream body that opens a new stream for every attempt, such as a range of a file. */
+    private final boolean reopenable;
     private boolean consumed;
 
-    private Body(long length, byte[] bytes, Path file, Supplier<InputStream> stream) {
-      this.length = length; this.bytes = bytes; this.file = file; this.stream = stream;
+    private Body(long length, byte[] bytes, Path file, Supplier<InputStream> stream) { this(length, bytes, file, stream, false); }
+
+    private Body(long length, byte[] bytes, Path file, Supplier<InputStream> stream, boolean reopenable) {
+      this.length = length; this.bytes = bytes; this.file = file; this.stream = stream; this.reopenable = reopenable;
     }
 
     /**
@@ -143,7 +147,44 @@ public interface Transport {
     public long length() { return length; }
 
     /** @return whether {@link #open()} can be called more than once */
-    public boolean replayable() { return stream == null; }
+    public boolean replayable() { return stream == null || reopenable; }
+
+    /**
+     * The {@code length} bytes from {@code offset} of a replayable body, read again from its source
+     * on every attempt: a part of an upload sent in parts.
+     */
+    Body slice(long offset, long length) {
+      if (bytes != null) return ofBytes(java.util.Arrays.copyOfRange(bytes, (int) offset, (int) (offset + length)));
+      if (file == null) throw new IllegalStateException("Only byte and file bodies can be split");
+      Path source = file;
+      return new Body(length, null, null, () -> {
+        try {
+          InputStream in = Files.newInputStream(source);
+          in.skipNBytes(offset);
+          return new java.io.FilterInputStream(in) {
+            private long left = length;
+            @Override public int read() throws IOException {
+              if (left <= 0) return -1;
+              int b = super.read();
+              if (b >= 0) left--;
+              return b;
+            }
+            @Override public int read(byte[] buffer, int from, int count) throws IOException {
+              if (left <= 0) return -1;
+              int read = super.read(buffer, from, (int) Math.min(count, left));
+              if (read > 0) left -= read;
+              return read;
+            }
+            @Override public long skip(long count) throws IOException {
+              long skipped = super.skip(Math.min(count, left));
+              left -= skipped;
+              return skipped;
+            }
+            @Override public int available() throws IOException { return (int) Math.min(super.available(), left); }
+          };
+        } catch (IOException e) { throw new java.io.UncheckedIOException(e); }
+      }, true);
+    }
 
     /** @return the bytes for an in-memory body, or null for a file or stream body */
     public byte[] bytes() { return bytes; }
@@ -160,6 +201,9 @@ public interface Transport {
     public synchronized InputStream open() throws IOException {
       if (bytes != null) return new ByteArrayInputStream(bytes);
       if (file != null) return Files.newInputStream(file);
+      if (reopenable) {
+        try { return stream.get(); } catch (java.io.UncheckedIOException e) { throw e.getCause(); }
+      }
       if (consumed) throw new IOException("A stream request body can be sent only once");
       consumed = true;
       return stream.get();

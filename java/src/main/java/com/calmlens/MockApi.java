@@ -76,6 +76,8 @@ final class MockApi {
   private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[\\x21-\\x7e](?:[\\x20-\\x7e]{0,253}[\\x21-\\x7e])?");
   private static final long MIB = 1024 * 1024;
   private static final long MIN_PART_BYTES = 5 * MIB, MAX_IMAGE_BYTES = 20 * MIB;
+  /** Like the API: an upload has at most this many parts. */
+  private static final long MAX_UPLOAD_PARTS = 10_000;
   /** Every API cursor list returns this many items unless {@code pageSize} says otherwise. */
   private static final int DEFAULT_PAGE_SIZE = 50;
   private static final int MAX_PAGE_SIZE = 100, MAX_EVENTS_PAGE_SIZE = 100, MAX_FOLDER_PAGE_SIZE = 100;
@@ -722,7 +724,7 @@ final class MockApi {
     if (open == null || stored == null || !"uploading".equals(str(upload, "status"))) throw new Failure(ErrorCodes.UPLOAD_NOT_OPEN);
     long expected = (upload.get("partsReceived").isJsonNull() ? 0 : upload.get("partsReceived").getAsLong()) + 1;
     long number = q.has("partNumber") && q.get("partNumber").getAsJsonPrimitive().isNumber() ? q.get("partNumber").getAsLong() : -1;
-    if (number != expected) {
+    if (number != expected || number > MAX_UPLOAD_PARTS) {
       Map<String, Object> details = new LinkedHashMap<>();
       details.put("expectedPartNumber", expected);
       details.put("receivedPartNumber", number);
