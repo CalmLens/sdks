@@ -594,7 +594,8 @@ pub struct ProcessingOptions {
     /// uploaded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub store_sensitive_metadata: Option<bool>,
-    /// Optional analyses to run, keyed by feature. Every feature is off unless enabled.
+    /// Optional analyses to run, keyed by feature. Link detection runs unless turned off; every
+    /// other feature is off unless enabled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub features: Option<ProcessingFeatures>,
     /// Fields this SDK version does not know.
@@ -619,8 +620,8 @@ pub struct ProcessingFeatures {
     /// not identified. Results are informational and never change the moderation decision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub face_detection: Option<FaceDetectionOptions>,
-    /// Find links in image text and QR codes. Results are informational and never change
-    /// the moderation decision.
+    /// Find QR codes and web links in images, and moderate QR code text with the image. Runs
+    /// unless `enabled` is false. With OCR on, links in the extracted text are listed too.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub link_detection: Option<FeatureOptions>,
     /// Preview. Read provenance metadata, such as C2PA, that marks an image as AI-generated or

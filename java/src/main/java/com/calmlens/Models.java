@@ -463,7 +463,8 @@ public final class Models {
   }
 
   /**
-   * Turns one optional feature on or off. Features are off unless {@code enabled} is true.
+   * Turns one optional feature on or off. Link detection runs unless {@code enabled} is false; the
+   * other features are off unless it is true.
    *
    * @param enabled whether the feature runs
    */
@@ -493,14 +494,15 @@ public final class Models {
   }
 
   /**
-   * Optional analyses to run on an asset, keyed by feature. Each feature is off unless its {@code
-   * enabled} is true. Results of person, face, link and AI-generated detection appear on {@link
+   * Optional analyses to run on an asset, keyed by feature. Link detection runs unless its {@code
+   * enabled} is false; every other feature is off unless its {@code enabled} is true. Results of person, face, link and AI-generated detection appear on {@link
    * AssetClassification}; OCR stores extracted text on the image asset.
    *
    * @param ocr extract text onto the image asset and add text moderation
    * @param personDetection (preview) locate people in images
    * @param faceDetection (preview) locate faces in images and optionally estimate ages
-   * @param linkDetection find QR codes and web links in images
+   * @param linkDetection find QR codes and web links in images and moderate QR code text; on by
+   *     default
    * @param aiGeneratedDetection (preview) read the AI provenance metadata images carry
    */
   public record ProcessingFeatures(FeatureOptions ocr, FeatureOptions personDetection, FaceDetectionOptions faceDetection,

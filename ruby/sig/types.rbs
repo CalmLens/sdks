@@ -60,8 +60,8 @@ module CalmLens
   # Earlier posts to send, oldest first; only the posts CalmLens uses are sent.
   type moderation_context_input = { items: Array[moderation_context_item_input] }
 
-  # ProcessingFeatures.ts: optional analyses to run, keyed by feature. Every feature is off unless
-  # `enabled` is true.
+  # ProcessingFeatures.ts: optional analyses to run, keyed by feature. Link detection runs unless
+  # `enabled` is false; every other feature is off unless `enabled` is true.
   type processing_features_input = {
     ?ocr: { enabled: bool }?,
     ?person_detection: { enabled: bool }?,

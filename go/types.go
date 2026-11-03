@@ -430,12 +430,13 @@ type ProcessingOptions struct {
 	// before it is stored, and FileMetadata leaves out the creator and location. When true, the
 	// image is stored as uploaded.
 	StoreSensitiveMetadata *bool `json:"storeSensitiveMetadata,omitempty"`
-	// Features turns on optional analyses. Every feature is off unless enabled here.
+	// Features chooses optional analyses. Link detection runs unless turned off here; every other
+	// feature is off unless enabled here.
 	Features *ProcessingFeatures `json:"features,omitempty"`
 }
 
 // ProcessingFeatures holds the optional analyses to run, keyed by feature. A nil feature is
-// not sent and stays off.
+// not sent and keeps its default: link detection runs, the others stay off.
 type ProcessingFeatures struct {
 	// OCR stores extracted text on the image asset and adds text moderation.
 	OCR *OCRFeatureOptions `json:"ocr,omitempty"`
@@ -443,8 +444,9 @@ type ProcessingFeatures struct {
 	PersonDetection *PersonDetectionFeatureOptions `json:"personDetection,omitempty"`
 	// FaceDetection (preview) locates faces; results are in Report.Features.
 	FaceDetection *FaceDetectionFeatureOptions `json:"faceDetection,omitempty"`
-	// LinkDetection finds QR codes and web links in images (free); results are in
-	// AssetClassification.LinkDetection. With OCR on, links in the extracted text are listed too.
+	// LinkDetection finds QR codes and web links in images (free), and moderates QR code text.
+	// It runs unless set with Enabled false; results are in AssetClassification.LinkDetection.
+	// With OCR on, links in the extracted text are listed too.
 	LinkDetection *LinkDetectionFeatureOptions `json:"linkDetection,omitempty"`
 }
 

@@ -227,8 +227,9 @@ class AiGeneratedDetectionFeatureOptions(TypedDict):
 
 
 class ProcessingFeatures(TypedDict, total=False):
-    """Optional analyses to run on an asset, keyed by feature. Every feature is off unless
-    its ``enabled`` is true; unknown features are rejected."""
+    """Optional analyses to run on an asset, keyed by feature. ``linkDetection`` runs unless
+    its ``enabled`` is false; every other feature is off unless its ``enabled`` is true.
+    Unknown features are rejected."""
     ocr: Optional[OcrFeatureOptions]
     personDetection: Optional[PersonDetectionFeatureOptions]
     faceDetection: Optional[FaceDetectionFeatureOptions]
