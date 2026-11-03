@@ -150,6 +150,7 @@ type MockServerClient struct {
 	basePath        string
 	cdnPath         string
 	lenses          map[string]calmlens.JSON
+	policies        policyStore
 	uploads         map[string]*upload
 	events          []calmlens.JSON
 	replays         map[string]replay
@@ -794,6 +795,22 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 			return []string{"hashLists.list"}
 		case route == "hash-lists":
 			return []string{"hashLists.create"}
+		case route == "policies" && method == "GET":
+			return []string{"policies.list"}
+		case route == "policies":
+			return []string{"policies.create"}
+		case route == "policy":
+			return []string{"policies.assign"}
+		case parts[2] == "policies" && strings.HasSuffix(route, "/preset"):
+			return []string{"policies.applyPreset"}
+		case parts[2] == "policies" && strings.HasSuffix(route, "/automatic-updates"):
+			return []string{"policies.setAutomaticUpdates"}
+		case parts[2] == "policies" && method == "GET":
+			return []string{"policies.retrieve"}
+		case parts[2] == "policies" && method == "PATCH":
+			return []string{"policies.update"}
+		case parts[2] == "policies":
+			return []string{"policies.delete"}
 		case route == "assets" && method == "GET":
 			return []string{"assets.list", "assets.iterate"}
 		case route == "assets/search":
@@ -870,7 +887,9 @@ var mockOperations = []string{
 	"text.classify", "cdn.serve", "events.list", "events.pages", "folders.list", "folders.retrieve",
 	"folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
 	"hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete",
-	"hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "ensureLens", "ensureLenses",
+	"hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "policies.list",
+	"policies.retrieve", "policies.create", "policies.update", "policies.applyPreset",
+	"policies.setAutomaticUpdates", "policies.delete", "policies.assign", "ensureLens", "ensureLenses",
 }
 
 // jsonResponse encodes result, or err as the API's error body and status.
@@ -895,11 +914,11 @@ func (m *MockServerClient) jsonResponse(req *http.Request, header http.Header, r
 }
 
 // successStatus is the status the API answers a successful request with: 201 Created for a new
-// folder or hash list, 202 Accepted for a queued batch, otherwise 200 OK. Adding a hash list
+// folder, hash list or policy, 202 Accepted for a queued batch, otherwise 200 OK. Adding a hash list
 // entry sets its own status.
 func successStatus(operations []string) int {
 	switch {
-	case contains(operations, "folders.create"), contains(operations, "hashLists.create"):
+	case contains(operations, "folders.create"), contains(operations, "hashLists.create"), contains(operations, "policies.create"):
 		return http.StatusCreated
 	case contains(operations, "assets.batch"):
 		return http.StatusAccepted
@@ -1048,6 +1067,8 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 			return m.batchAssets(body, now)
 		case route == "assets" && method == "POST":
 			return m.createAsset(headers.Get("X-CalmLens-Upload"), body, q, raw, now)
+		case parts[2] == "policies", parts[2] == "policy":
+			return m.policyRoute(method, parts[2:], body)
 		}
 		return nil, errUnknownRoute
 	}

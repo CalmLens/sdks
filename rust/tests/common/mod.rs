@@ -63,6 +63,19 @@ pub async fn invoke(
         "hashLists.listEntries" => output(client.hash_lists().list_entries(input(options)?).await),
         "hashLists.addEntry" => output(client.hash_lists().add_entry(input(options)?).await),
         "hashLists.removeEntry" => output(client.hash_lists().remove_entry(input(options)?).await),
+        "policies.list" => output(client.policies().list().await),
+        "policies.retrieve" => output(client.policies().retrieve(input(options)?).await),
+        "policies.create" => output(client.policies().create(input(options)?).await),
+        "policies.update" => output(client.policies().update(input(options)?).await),
+        "policies.applyPreset" => output(client.policies().apply_preset(input(options)?).await),
+        "policies.setAutomaticUpdates" => output(
+            client
+                .policies()
+                .set_automatic_updates(input(options)?)
+                .await,
+        ),
+        "policies.delete" => output(client.policies().delete(input(options)?).await),
+        "policies.assign" => output(client.policies().assign(input(options)?).await),
         "events.list" => output(client.events().list(input(options)?).await),
         "ensureLenses" => output(client.ensure_lenses(input(options)?).await),
         "cdn.serve" => {

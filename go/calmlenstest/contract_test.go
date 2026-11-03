@@ -710,6 +710,22 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		result, err = m.HashLists.AddEntry(ctx, decode[calmlens.AddHashListEntryOptions](t, args))
 	case "hashLists.removeEntry":
 		err = m.HashLists.RemoveEntry(ctx, decode[calmlens.HashListEntryIDOptions](t, args))
+	case "policies.list":
+		result, err = m.Policies.List(ctx)
+	case "policies.retrieve":
+		result, err = m.Policies.Retrieve(ctx, decode[calmlens.PolicyIDOptions](t, args))
+	case "policies.create":
+		result, err = m.Policies.Create(ctx, decode[calmlens.CreatePolicyOptions](t, args))
+	case "policies.update":
+		result, err = m.Policies.Update(ctx, decode[calmlens.UpdatePolicyOptions](t, args))
+	case "policies.applyPreset":
+		result, err = m.Policies.ApplyPreset(ctx, decode[calmlens.ApplyPolicyPresetOptions](t, args))
+	case "policies.setAutomaticUpdates":
+		result, err = m.Policies.SetAutomaticUpdates(ctx, decode[calmlens.SetPolicyAutomaticUpdatesOptions](t, args))
+	case "policies.delete":
+		err = m.Policies.Delete(ctx, decode[calmlens.PolicyIDOptions](t, args))
+	case "policies.assign":
+		result, err = m.Policies.Assign(ctx, decode[calmlens.AssignPolicyOptions](t, args))
 	case "ensureLens":
 		result, err = m.EnsureLens(ctx, decode[calmlens.EnsureLensOptions](t, args))
 	case "ensureLenses":

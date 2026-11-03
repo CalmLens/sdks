@@ -367,6 +367,22 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		return one(c.HashLists.AddEntry(ctx, into[AddHashListEntryOptions](t, args)))
 	case "hashLists.removeEntry":
 		return fixtureCall{}, c.HashLists.RemoveEntry(ctx, into[HashListEntryIDOptions](t, args))
+	case "policies.list":
+		return one(c.Policies.List(ctx))
+	case "policies.retrieve":
+		return one(c.Policies.Retrieve(ctx, into[PolicyIDOptions](t, args)))
+	case "policies.create":
+		return one(c.Policies.Create(ctx, into[CreatePolicyOptions](t, args)))
+	case "policies.update":
+		return one(c.Policies.Update(ctx, into[UpdatePolicyOptions](t, args)))
+	case "policies.applyPreset":
+		return one(c.Policies.ApplyPreset(ctx, into[ApplyPolicyPresetOptions](t, args)))
+	case "policies.setAutomaticUpdates":
+		return one(c.Policies.SetAutomaticUpdates(ctx, into[SetPolicyAutomaticUpdatesOptions](t, args)))
+	case "policies.delete":
+		return fixtureCall{}, c.Policies.Delete(ctx, into[PolicyIDOptions](t, args))
+	case "policies.assign":
+		return one(c.Policies.Assign(ctx, into[AssignPolicyOptions](t, args)))
 	case "ensureLens":
 		return one(c.EnsureLens(ctx, into[EnsureLensOptions](t, args)))
 	case "ensureLenses":

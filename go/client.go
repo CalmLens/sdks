@@ -103,6 +103,8 @@ type ServerClient struct {
 	Folders *FoldersService
 	// HashLists manages hash lists of images the project blocks or flags.
 	HashLists *HashListsService
+	// Policies manages the moderation policies of the project's organisation.
+	Policies *PoliciesService
 	// Events reads the project event feed.
 	Events *EventsService
 	// CDN builds CDN URLs and fetches content.
@@ -190,7 +192,7 @@ func NewServerClient(options Options) (*ServerClient, error) {
 func (c *ServerClient) services() {
 	c.Assets, c.Text = &AssetsService{c}, &TextService{c}
 	c.Folders, c.Events, c.CDN = &FoldersService{c}, &EventsService{c}, &CDNService{c}
-	c.UploadTokens, c.HashLists = &UploadTokensService{c}, &HashListsService{c}
+	c.UploadTokens, c.HashLists, c.Policies = &UploadTokensService{c}, &HashListsService{c}, &PoliciesService{c}
 }
 
 // RequestOptions changes the deadlines and retries of the calls made through the client

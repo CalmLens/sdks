@@ -161,6 +161,24 @@ const (
 	CodeHashListEntryLimitReached = "hash-list/entry-limit-reached"
 	// CodeHashListAssetNotHashed is returned with HTTP 409.
 	CodeHashListAssetNotHashed = "hash-list/asset-not-hashed"
+	// CodePolicyNotFound is returned with HTTP 404.
+	CodePolicyNotFound = "policy/not-found"
+	// CodePolicyRevisionConflict is returned with HTTP 409.
+	CodePolicyRevisionConflict = "policy/revision-conflict"
+	// CodePolicyProjectsChanged is returned with HTTP 409.
+	CodePolicyProjectsChanged = "policy/projects-changed"
+	// CodePolicyInUse is returned with HTTP 409.
+	CodePolicyInUse = "policy/in-use"
+	// CodePolicyUsedByAnotherProject is returned with HTTP 409.
+	CodePolicyUsedByAnotherProject = "policy/used-by-another-project"
+	// CodePolicyNoPreset is returned with HTTP 400.
+	CodePolicyNoPreset = "policy/no-preset"
+	// CodePolicyPresetVersionConflict is returned with HTTP 409.
+	CodePolicyPresetVersionConflict = "policy/preset-version-conflict"
+	// CodePolicyPresetUpdateUnavailable is returned with HTTP 409.
+	CodePolicyPresetUpdateUnavailable = "policy/preset-update-unavailable"
+	// CodePolicyAutomaticUpdatesUnavailable is returned with HTTP 409.
+	CodePolicyAutomaticUpdatesUnavailable = "policy/automatic-updates-unavailable"
 	// CodeUploadPresetNotFound is returned with HTTP 404.
 	CodeUploadPresetNotFound = "upload-preset/not-found"
 	// CodeUploadPresetDisabled is returned with HTTP 403.
@@ -290,6 +308,15 @@ var publicErrorStatuses = map[string]int{
 	CodeHashListLimitReached:              409,
 	CodeHashListEntryLimitReached:         409,
 	CodeHashListAssetNotHashed:            409,
+	CodePolicyNotFound:                    404,
+	CodePolicyRevisionConflict:            409,
+	CodePolicyProjectsChanged:             409,
+	CodePolicyInUse:                       409,
+	CodePolicyUsedByAnotherProject:        409,
+	CodePolicyNoPreset:                    400,
+	CodePolicyPresetVersionConflict:       409,
+	CodePolicyPresetUpdateUnavailable:     409,
+	CodePolicyAutomaticUpdatesUnavailable: 409,
 	CodeUploadPresetNotFound:              404,
 	CodeUploadPresetDisabled:              403,
 	CodeUploadPresetTokenRequired:         401,

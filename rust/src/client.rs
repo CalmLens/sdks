@@ -348,6 +348,10 @@ impl ServerClient {
     pub fn hash_lists(&self) -> HashListsClient<'_> {
         HashListsClient(self)
     }
+    /// Moderation policy operations.
+    pub fn policies(&self) -> PoliciesClient<'_> {
+        PoliciesClient(self)
+    }
     /// The project's events feed.
     pub fn events(&self) -> EventsClient<'_> {
         EventsClient(self)
@@ -1315,6 +1319,73 @@ impl HashListsClient<'_> {
         self.0
             .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
             .await
+    }
+}
+
+/// Moderation policy operations. Get it from [`ServerClient::policies`].
+///
+/// Policies belong to the project's organisation and its projects share them. Every change sends
+/// the policy's `revision`, so a policy changed since is refused. Through a project's key you can
+/// change only policies no other project uses or owns.
+#[derive(Debug, Clone, Copy)]
+pub struct PoliciesClient<'a>(&'a ServerClient);
+impl PoliciesClient<'_> {
+    fn path(&self, policy_id: &str, suffix: &str) -> Result<String> {
+        self.0
+            .project_path(&format!("policies/{}{suffix}", id(policy_id)?))
+    }
+    /// Lists the organisation's policies and the ID of the one the project uses.
+    pub async fn list(&self) -> Result<PolicyList> {
+        let path = self.0.project_path("policies")?;
+        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+    }
+    /// Retrieves a policy.
+    pub async fn retrieve(&self, options: PolicyId) -> Result<Policy> {
+        let path = self.path(&options.policy_id, "")?;
+        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+    }
+    /// Creates a policy from settings, or a copy of a built-in preset. It moderates nothing until
+    /// you assign it to a project or name it on an upload preset.
+    pub async fn create(&self, options: CreatePolicy) -> Result<Policy> {
+        let path = self.0.project_path("policies")?;
+        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
+    /// Changes a policy's name, description or settings; later moderation uses them. Saving a
+    /// policy that follows automatic updates pins it as a copy under the same ID.
+    pub async fn update(&self, options: UpdatePolicy) -> Result<Policy> {
+        let path = self.path(&options.policy_id, "")?;
+        let request = self.0.prepare(Method::PATCH, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
+    /// Resets a preset copy to its pinned version, or updates an unchanged copy to the latest
+    /// preset release.
+    pub async fn apply_preset(&self, options: ApplyPolicyPreset) -> Result<Policy> {
+        let path = self.path(&options.policy_id, "/preset")?;
+        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
+    /// Switches automatic updates on or off for the project's preset policy.
+    pub async fn set_automatic_updates(
+        &self,
+        options: SetPolicyAutomaticUpdates,
+    ) -> Result<Policy> {
+        let path = self.path(&options.policy_id, "/automatic-updates")?;
+        let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
+    /// Deletes a policy that no project or upload preset uses.
+    pub async fn delete(&self, options: PolicyId) -> Result<()> {
+        let path = self.path(&options.policy_id, "")?;
+        self.0
+            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .await
+    }
+    /// Chooses the policy the project moderates with.
+    pub async fn assign(&self, options: AssignPolicy) -> Result<Policy> {
+        let path = self.0.project_path("policy")?;
+        let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
+        self.0.call(request).await
     }
 }
 

@@ -4053,3 +4053,347 @@ pub struct ViewerClaims {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub age_confirmed: Option<bool>,
 }
+
+string_enum! {
+    /// A built-in moderation policy preset.
+    PolicyPresetId {
+        /// General.
+        General = "general-community",
+        /// Kids.
+        Kids = "children-platform",
+        /// Learning and support.
+        LearningAndSupport = "education-support",
+        /// Teen-safe.
+        TeenSafe = "wholesome-community",
+    }
+}
+
+string_enum! {
+    /// How a policy rule's qualifiers combine.
+    PolicyRuleMatch {
+        /// Every qualifier applies to the same qualifying instance.
+        All = "all",
+    }
+}
+
+string_enum! {
+    /// What `policies().apply_preset` does.
+    PolicyPresetOperation {
+        /// Restores the settings of the pinned preset version, discarding edits.
+        Reset = "reset",
+        /// Moves an unchanged copy to the latest preset release.
+        Update = "update",
+    }
+}
+
+/// A moderation policy. Policies belong to the project's organisation and its projects share
+/// them; each project moderates with one, and an upload preset can name another for its own
+/// uploads. `revision` counts saved changes and guards every change, separately from the preset
+/// release in `preset.version`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct Policy {
+    /// The policy ID.
+    pub id: String,
+    /// The display name.
+    #[serde(default)]
+    pub name: String,
+    /// What the policy is for.
+    #[serde(default)]
+    pub description: String,
+    /// What the policy does with each category, its allowances and restrictions.
+    #[serde(default)]
+    pub settings: PolicySettings,
+    /// Changes with every saved change. Send it with each change; a policy changed since is
+    /// refused with `policy/revision-conflict`.
+    #[serde(default)]
+    pub revision: u64,
+    /// Whether the policy follows its preset: it has the latest preset settings until its first
+    /// saved change pins a copy.
+    #[serde(default)]
+    pub automatic_updates: bool,
+    /// Where the policy started from a built-in preset, or `None`.
+    #[serde(default)]
+    pub preset: Option<PolicyPresetOrigin>,
+    /// Projects this policy moderates, as their policy or through one of their upload presets.
+    #[serde(default)]
+    pub project_ids: Vec<String>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub created_at: u64,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub updated_at: u64,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<Policy, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// The built-in preset a policy started from.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct PolicyPresetOrigin {
+    /// The preset.
+    #[serde(default)]
+    pub id: PolicyPresetId,
+    /// The preset release the policy is pinned to; resetting restores its settings.
+    #[serde(default)]
+    pub version: u64,
+    /// The newest release of the preset. A newer one than `version` can be applied with
+    /// [`PolicyPresetOperation::Update`].
+    #[serde(default)]
+    pub latest_version: u64,
+    /// The project whose preset policy this is, or `None` for a copy. Only a project's preset
+    /// policy can follow automatic updates.
+    #[serde(default)]
+    pub project_id: Option<String>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<PolicyPresetOrigin, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// What a policy does with each moderation category. Settings you send must define every
+/// category.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct PolicySettings {
+    /// Each category's settings.
+    #[serde(default)]
+    pub category_settings: HashMap<ClassificationCategory, CategoryPolicySettings>,
+    /// Preview. What happens to assets that link to unsafe destinations; `None` when off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_safety: Option<LinkSafetySettings>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<PolicySettings, _>")]
+    pub extra: HashMap<String, Value>,
+}
+impl PolicySettings {
+    /// These settings with `category` set to `settings`.
+    pub fn category(
+        mut self,
+        category: ClassificationCategory,
+        settings: CategoryPolicySettings,
+    ) -> Self {
+        self.category_settings.insert(category, settings);
+        self
+    }
+}
+
+/// One category's action, allowances and restrictions.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct CategoryPolicySettings {
+    /// What happens when the category's policy score reaches 0.5; `None` leaves the API's
+    /// default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<FlaggedContentAction>,
+    /// Contexts that let content through, or act on it more softly, when all of the category's
+    /// content is one of their qualifiers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allowances: Option<Vec<PolicyRule>>,
+    /// Conditions that act on at least one matching qualifying instance. They outweigh
+    /// allowances.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restrictions: Option<Vec<PolicyRule>>,
+    /// Fields this SDK version does not know.
+    #[serde(
+        flatten,
+        deserialize_with = "extra_fields::<CategoryPolicySettings, _>"
+    )]
+    pub extra: HashMap<String, Value>,
+}
+impl CategoryPolicySettings {
+    /// Settings that take `action`, with no allowances or restrictions.
+    pub fn new(action: FlaggedContentAction) -> Self {
+        Self {
+            action: Some(action),
+            ..Self::default()
+        }
+    }
+}
+
+/// An allowance or restriction: its `when` qualifiers apply to the same instance, excluding
+/// instances that also have an `unless` qualifier (restrictions only).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct PolicyRule {
+    /// A name for the rule.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// The qualifiers that must all apply.
+    #[serde(default)]
+    pub when: Vec<ModerationQualifier>,
+    /// How the qualifiers combine.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#match: Option<PolicyRuleMatch>,
+    /// Qualifiers that exclude an instance (restrictions only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unless: Option<Vec<ModerationQualifier>>,
+    /// What happens to matching content.
+    #[serde(default)]
+    pub action: FlaggedContentAction,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<PolicyRule, _>")]
+    pub extra: HashMap<String, Value>,
+}
+impl PolicyRule {
+    /// A rule taking `action` when every `when` qualifier applies.
+    pub fn new(when: Vec<ModerationQualifier>, action: FlaggedContentAction) -> Self {
+        Self {
+            when,
+            action,
+            ..Self::default()
+        }
+    }
+}
+
+/// Every policy of the project's organisation, oldest first, and the one the project uses.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct PolicyList {
+    /// The organisation's policies.
+    #[serde(default)]
+    pub policies: Vec<Policy>,
+    /// The ID of the policy the project moderates with.
+    #[serde(default)]
+    pub project_policy_id: String,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<PolicyList, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Identifies a policy.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyId {
+    /// The policy ID.
+    pub policy_id: String,
+}
+impl PolicyId {
+    /// Identifies policy `policy_id`.
+    pub fn new(policy_id: impl Into<String>) -> Self {
+        Self {
+            policy_id: policy_id.into(),
+        }
+    }
+}
+
+/// Creates a policy from `settings` with a `name`, or a copy of the latest release of a built-in
+/// preset with `preset_id` (whose name defaults to the preset's).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatePolicy {
+    /// The display name; required with `settings`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// What the policy is for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// The settings, defining every category. Send this or `preset_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings: Option<PolicySettings>,
+    /// The built-in preset to copy. Send this or `settings`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preset_id: Option<PolicyPresetId>,
+}
+impl CreatePolicy {
+    /// A copy of the latest release of `preset`.
+    pub fn from_preset(preset: PolicyPresetId) -> Self {
+        Self {
+            preset_id: Some(preset),
+            ..Self::default()
+        }
+    }
+    /// A policy named `name` with `settings`.
+    pub fn with_settings(name: impl Into<String>, settings: PolicySettings) -> Self {
+        Self {
+            name: Some(name.into()),
+            settings: Some(settings),
+            ..Self::default()
+        }
+    }
+}
+
+/// Changes to a policy's name, description or settings; `None` fields are unchanged.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdatePolicy {
+    /// The policy ID.
+    #[serde(skip_serializing)]
+    pub policy_id: String,
+    /// The policy's current revision.
+    pub revision: u64,
+    /// The new name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// The new description.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// The complete new settings, defining every category.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings: Option<PolicySettings>,
+}
+impl UpdatePolicy {
+    /// Changes nothing yet to policy `policy_id` at `revision`.
+    pub fn new(policy_id: impl Into<String>, revision: u64) -> Self {
+        Self {
+            policy_id: policy_id.into(),
+            revision,
+            ..Self::default()
+        }
+    }
+}
+
+/// Resets a preset copy to its pinned version (`Reset` with `preset_version` = `preset.version`)
+/// or updates an unchanged copy to the latest release (`Update` with `preset.latest_version`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplyPolicyPreset {
+    /// The policy ID.
+    #[serde(skip_serializing)]
+    pub policy_id: String,
+    /// What to do.
+    pub operation: PolicyPresetOperation,
+    /// The policy's current revision.
+    pub revision: u64,
+    /// The preset release you reviewed.
+    pub preset_version: u64,
+}
+
+/// Switches automatic updates for the project's preset policy. `enabled` replaces the saved copy
+/// with the latest preset, discarding its changes; `false` pins the current preset version.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPolicyAutomaticUpdates {
+    /// The policy ID.
+    #[serde(skip_serializing)]
+    pub policy_id: String,
+    /// Whether the policy follows its preset.
+    pub enabled: bool,
+    /// The policy's current revision.
+    pub revision: u64,
+    /// The policy's `preset.latest_version`.
+    pub preset_version: u64,
+}
+
+/// Chooses the policy the project moderates with.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssignPolicy {
+    /// One of the organisation's policies.
+    pub policy_id: String,
+}
+impl AssignPolicy {
+    /// Assigns policy `policy_id`.
+    pub fn new(policy_id: impl Into<String>) -> Self {
+        Self {
+            policy_id: policy_id.into(),
+        }
+    }
+}

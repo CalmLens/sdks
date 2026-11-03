@@ -172,6 +172,10 @@ impl ServerClient {
     pub fn hash_lists(&self) -> HashListsClient<'_> {
         HashListsClient(self)
     }
+    /// Moderation policy operations.
+    pub fn policies(&self) -> PoliciesClient<'_> {
+        PoliciesClient(self)
+    }
     /// The project's events feed.
     pub fn events(&self) -> EventsClient<'_> {
         EventsClient(self)
@@ -318,6 +322,28 @@ blocking_methods!(HashListsClient => hash_lists {
     fn add_entry(options: AddHashListEntry) -> Result<HashListEntry>;
     /// See [`crate::HashListsClient::remove_entry`].
     fn remove_entry(options: HashListEntryId) -> Result<()>;
+});
+
+/// Moderation policy operations. See [`crate::PoliciesClient`].
+#[derive(Debug, Clone, Copy)]
+pub struct PoliciesClient<'a>(&'a ServerClient);
+blocking_methods!(PoliciesClient => policies {
+    /// See [`crate::PoliciesClient::list`].
+    fn list() -> Result<PolicyList>;
+    /// See [`crate::PoliciesClient::retrieve`].
+    fn retrieve(options: PolicyId) -> Result<Policy>;
+    /// See [`crate::PoliciesClient::create`].
+    fn create(options: CreatePolicy) -> Result<Policy>;
+    /// See [`crate::PoliciesClient::update`].
+    fn update(options: UpdatePolicy) -> Result<Policy>;
+    /// See [`crate::PoliciesClient::apply_preset`].
+    fn apply_preset(options: ApplyPolicyPreset) -> Result<Policy>;
+    /// See [`crate::PoliciesClient::set_automatic_updates`].
+    fn set_automatic_updates(options: SetPolicyAutomaticUpdates) -> Result<Policy>;
+    /// See [`crate::PoliciesClient::delete`].
+    fn delete(options: PolicyId) -> Result<()>;
+    /// See [`crate::PoliciesClient::assign`].
+    fn assign(options: AssignPolicy) -> Result<Policy>;
 });
 
 /// The events feed. See [`crate::EventsClient`].

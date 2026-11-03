@@ -11,8 +11,8 @@ use calmlens::testing::{
     MockResponse, MockServerClient,
 };
 use calmlens::{
-    AssetsClient, CdnClient, ErrorCode, EventsClient, FoldersClient, HashListsClient, ServerClient,
-    TextClient, UploadTokensClient,
+    AssetsClient, CdnClient, ErrorCode, EventsClient, FoldersClient, HashListsClient,
+    PoliciesClient, ServerClient, TextClient, UploadTokensClient,
 };
 use common::{compare_typed, fixture, input, invoke, typed, whole_numbers};
 use futures_util::FutureExt;
@@ -1357,6 +1357,14 @@ fn references() -> BTreeSet<&'static str> {
         "hash_lists().list_entries" => ServerClient::hash_lists, HashListsClient::list_entries;
         "hash_lists().add_entry" => ServerClient::hash_lists, HashListsClient::add_entry;
         "hash_lists().remove_entry" => ServerClient::hash_lists, HashListsClient::remove_entry;
+        "policies().list" => ServerClient::policies, PoliciesClient::list;
+        "policies().retrieve" => ServerClient::policies, PoliciesClient::retrieve;
+        "policies().create" => ServerClient::policies, PoliciesClient::create;
+        "policies().update" => ServerClient::policies, PoliciesClient::update;
+        "policies().apply_preset" => ServerClient::policies, PoliciesClient::apply_preset;
+        "policies().set_automatic_updates" => ServerClient::policies, PoliciesClient::set_automatic_updates;
+        "policies().delete" => ServerClient::policies, PoliciesClient::delete;
+        "policies().assign" => ServerClient::policies, PoliciesClient::assign;
         "assets().create" => ServerClient::assets, AssetsClient::create;
         "assets().upload_part" => ServerClient::assets, AssetsClient::upload_part;
         "assets().list" => ServerClient::assets, AssetsClient::list;

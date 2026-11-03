@@ -17,6 +17,8 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+mod policies;
+
 pub(super) const API_BASE_URL: &str = "https://api.calmlens.invalid/v1";
 pub(super) const CDN_BASE_URL: &str = "https://cdn.calmlens.invalid/v1";
 
@@ -111,7 +113,7 @@ pub(super) struct QueuedFailure {
 
 /// The operation names [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
 /// takes: the JavaScript SDK's method paths.
-pub(super) const OPERATIONS: [&str; 39] = [
+pub(super) const OPERATIONS: [&str; 47] = [
     "assets.create",
     "assets.classify",
     "text.classify",
@@ -146,6 +148,14 @@ pub(super) const OPERATIONS: [&str; 39] = [
     "hashLists.listEntries",
     "hashLists.addEntry",
     "hashLists.removeEntry",
+    "policies.list",
+    "policies.retrieve",
+    "policies.create",
+    "policies.update",
+    "policies.applyPreset",
+    "policies.setAutomaticUpdates",
+    "policies.delete",
+    "policies.assign",
     "events.list",
     "events.pages",
     "ensureLens",
@@ -512,6 +522,7 @@ pub(super) struct Backend {
     uploads: HashMap<String, Upload>,
     lenses: HashMap<String, Value>,
     replays: HashMap<String, (String, MockResponse)>,
+    policies: policies::Policies,
 }
 
 fn text(value: &Value) -> &str {
@@ -703,6 +714,7 @@ impl Backend {
             uploads: HashMap::new(),
             lenses: HashMap::new(),
             replays: HashMap::new(),
+            policies: policies::Policies::default(),
         }
     }
     pub(super) fn create_id(&self, prefix: &str) -> String {
@@ -1020,13 +1032,13 @@ impl Backend {
         } else {
             Map::new()
         };
-        // Like the API: a new folder, hash list or entry is 201 Created, a queued batch 202
+        // Like the API: a new folder, hash list, entry or policy is 201 Created, a queued batch 202
         // Accepted. Adding a hash a list already holds returns the entry with 200.
         let operation = self.operation(method, url);
         let entries = self.storage.hash_list_entries.len();
         let outcome = self.dispatch(method, &parts, &query, body, raw, headers);
         let status = match operation {
-            Some("folders.create" | "hashLists.create") => 201,
+            Some("folders.create" | "hashLists.create" | "policies.create") => 201,
             Some("hashLists.addEntry") if self.storage.hash_list_entries.len() > entries => 201,
             Some("assets.batch") => 202,
             _ => 200,
@@ -1094,6 +1106,10 @@ impl Backend {
                     }
                     ("GET", "assets/search") => self.search(q),
                     ("POST", "assets/batch") => self.batch(body, now),
+                    (_, "policy") => self.policy_route(method, route, body),
+                    (_, path) if path.split('/').next() == Some("policies") => {
+                        self.policy_route(method, route, body)
+                    }
                     ("POST", "assets") => {
                         self.create_asset(header(headers, "x-calmlens-upload"), body, q, raw, now)
                     }
@@ -2440,6 +2456,16 @@ impl Backend {
             ("GET", ["hash-lists", _, "entries"]) => "hashLists.listEntries",
             ("POST", ["hash-lists", _, "entries"]) => "hashLists.addEntry",
             ("DELETE", ["hash-list-entries", _]) => "hashLists.removeEntry",
+            ("GET", ["projects", _, "policies"]) => "policies.list",
+            ("POST", ["projects", _, "policies"]) => "policies.create",
+            ("GET", ["projects", _, "policies", _]) => "policies.retrieve",
+            ("PATCH", ["projects", _, "policies", _]) => "policies.update",
+            ("DELETE", ["projects", _, "policies", _]) => "policies.delete",
+            ("POST", ["projects", _, "policies", _, "preset"]) => "policies.applyPreset",
+            ("PUT", ["projects", _, "policies", _, "automatic-updates"]) => {
+                "policies.setAutomaticUpdates"
+            }
+            ("PUT", ["projects", _, "policy"]) => "policies.assign",
             _ => return None,
         })
     }
