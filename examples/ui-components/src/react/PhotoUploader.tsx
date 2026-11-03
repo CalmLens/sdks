@@ -1,4 +1,4 @@
-import { type CalmLensUpload, CalmLensUploader } from "@calmlens/sdk/react";
+import { type CalmLensUpload, CalmLensUploader } from "calmlens/react";
 
 export function PhotoUploader({ onUploaded }: { onUploaded: (upload: CalmLensUpload) => void }) {
   return (

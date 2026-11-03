@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { toWebhookEventPayload } from "@calmlens/sdk/testing";
+import { toWebhookEventPayload } from "calmlens/testing";
 import { readWebhookDelivery } from "../src/webhooks";
 
 // Deliveries are built by the SDK, so the test follows the real webhook payload shape.

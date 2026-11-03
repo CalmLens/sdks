@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type CalmLensUpload, CalmLensUploader } from "@calmlens/sdk/vue";
+import { type CalmLensUpload, CalmLensUploader } from "calmlens/vue";
 
 const emit = defineEmits<{ uploaded: [upload: CalmLensUpload] }>();
 </script>

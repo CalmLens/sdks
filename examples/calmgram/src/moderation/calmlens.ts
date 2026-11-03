@@ -1,5 +1,5 @@
-import type { Asset, EnsureLensOptions } from "@calmlens/sdk";
-import { CalmLensError, CalmLensServerClient, verifyWebhookSignature } from "@calmlens/sdk/server";
+import type { Asset, EnsureLensOptions } from "calmlens";
+import { CalmLensError, CalmLensServerClient, verifyWebhookSignature } from "calmlens/server";
 import type { ModerationOutcome, ModerationProvider, ModerationStatus } from "./types";
 
 // Lenses are named, versioned CDN transformations (think "image presets"). Bump `version`

@@ -1,4 +1,4 @@
-import { detectTestTrigger } from "@calmlens/sdk/test-inputs";
+import { detectTestTrigger } from "calmlens/test-inputs";
 
 export {
   detectTestImage,
@@ -7,7 +7,7 @@ export {
   paintTestImage,
   TEST_INPUT_KEY_PATTERN,
   testInputForSignal,
-} from "@calmlens/sdk/test-inputs";
+} from "calmlens/test-inputs";
 
 /** The key demo mode's simulator recognises. Real projects each have their own. */
 export const DEMO_TEST_INPUT_KEY = "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d";

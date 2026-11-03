@@ -4,7 +4,7 @@ Official SDKs for [CalmLens](https://calmlens.com): content moderation, storage 
 
 | Language | SDK | Install |
 | --- | --- | --- |
-| JavaScript / TypeScript | [javascript](javascript) | `npm install @calmlens/sdk` |
+| JavaScript / TypeScript | [javascript](javascript) | `npm install calmlens` (also published as `@calmlens/sdk`) |
 | Python | [python](python) | `pip install calmlens` |
 | Ruby | [ruby](ruby) | `gem install calmlens` |
 | Rust | [rust](rust) | `cargo add calmlens` |
@@ -75,7 +75,7 @@ version updates and per-SDK changelogs. Merge that PR to release.
 The JavaScript SDK, Go and the CLI are released from this repository. When a merged plan
 includes the JavaScript SDK and its commit's SDK Tests and SDK examples runs have passed,
 `release-npm.yml` tags `javascript/v<version>` and publishes one packed build to npm with
-provenance, as `@calmlens/sdk` and as `calmlens`. `release-cli.yml` tags `cli-v<version>`,
+provenance, as `calmlens` and as `@calmlens/sdk`. `release-cli.yml` tags `cli-v<version>`,
 attaches the CLI's standalone executables to that GitHub release and updates the Homebrew
 formula in `Formula/`. Go tags and proxy validation run here too.
 

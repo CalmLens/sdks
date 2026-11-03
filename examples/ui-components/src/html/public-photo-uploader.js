@@ -1,6 +1,6 @@
 // Defines <calmlens-uploader>. In plain HTML, write the element in your markup instead:
 // <calmlens-uploader upload-preset-id="…" accept="image/*">.
-import "@calmlens/sdk/elements";
+import "calmlens/elements";
 
 export function mountPublicPhotoUploader(container, { onUploaded }) {
   const uploader = document.createElement("calmlens-uploader");

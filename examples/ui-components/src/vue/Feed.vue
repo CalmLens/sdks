@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AssetModerationStatus } from "@calmlens/sdk/app";
+import type { AssetModerationStatus } from "calmlens/app";
 import { computed } from "vue";
 import SensitiveImage from "./SensitiveImage.vue";
 

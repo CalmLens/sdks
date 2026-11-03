@@ -4,12 +4,12 @@
 import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
-import { CalmLensError, CalmLensServerClient, type UploadedAsset } from "@calmlens/sdk/server";
+import { CalmLensError, CalmLensServerClient, type UploadedAsset } from "calmlens/server";
 import {
   createMockApiKey,
   MockCalmLensAppClient,
   MockCalmLensServerClient,
-} from "@calmlens/sdk/testing";
+} from "calmlens/testing";
 import type { Plugin } from "vite";
 
 const env = {

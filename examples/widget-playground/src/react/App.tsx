@@ -1,4 +1,4 @@
-import { CalmLensMedia, CalmLensUploader } from "@calmlens/sdk/react";
+import { CalmLensMedia, CalmLensUploader } from "calmlens/react";
 import { useSyncExternalStore } from "react";
 import { ACCEPT, GALLERY_SIZES, GALLERY_WIDTHS, MAX_FILE_SIZE, playground } from "../playground";
 

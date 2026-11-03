@@ -1,4 +1,4 @@
-import { getAssetUrl } from "@calmlens/sdk/app";
+import { getAssetUrl } from "calmlens/app";
 
 type SensitiveImageProps = {
   projectId: string;

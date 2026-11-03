@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CalmLensAppClient, CalmLensError } from "@calmlens/sdk/app";
+  import { CalmLensAppClient, CalmLensError } from "calmlens/app";
 
   let { onUploaded }: { onUploaded: (upload: { assetId: string; status: string }) => void } = $props();
   let stage = $state<string | null>(null);

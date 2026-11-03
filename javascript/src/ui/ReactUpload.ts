@@ -1,4 +1,4 @@
-// The upload hooks shared by `@calmlens/sdk/react` and `@calmlens/sdk/react-native`. They hold no
+// The upload hooks shared by `calmlens/react` and `calmlens/react-native`. They hold no
 // DOM or native code, so both libraries render the same queue the same way.
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";

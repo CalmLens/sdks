@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CalmLensMedia, CalmLensUploader } from "@calmlens/sdk/svelte";
+  import { CalmLensMedia, CalmLensUploader } from "calmlens/svelte";
   import { ACCEPT, GALLERY_SIZES, GALLERY_WIDTHS, MAX_FILE_SIZE, playground } from "../playground";
 </script>
 

@@ -1,6 +1,6 @@
 // State the framework demos share, so switching tabs keeps the gallery and settings.
-import type { AssetModerationStatus } from "@calmlens/sdk/app";
-import type { CalmLensUpload } from "@calmlens/sdk/ui";
+import type { AssetModerationStatus } from "calmlens/app";
+import type { CalmLensUpload } from "calmlens/ui";
 
 export type PlaygroundConfig = {
   mode: "mock" | "live";

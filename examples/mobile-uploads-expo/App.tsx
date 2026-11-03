@@ -1,4 +1,4 @@
-import { type UploadItem, useCalmLensUpload } from "@calmlens/sdk/react-native";
+import { type UploadItem, useCalmLensUpload } from "calmlens/react-native";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {

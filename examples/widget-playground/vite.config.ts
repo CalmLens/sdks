@@ -9,7 +9,7 @@ export default defineConfig({
   // The SDK is linked from ../../javascript, which has its own copies of these for its build.
   resolve: { dedupe: ["react", "react-dom", "vue", "svelte"] },
   // The SDK's Svelte components ship as source, so Vite compiles them instead of pre-bundling.
-  optimizeDeps: { exclude: ["@calmlens/sdk"] },
+  optimizeDeps: { exclude: ["calmlens"] },
   build: { target: "es2022" },
   esbuild: { target: "es2022" },
 });

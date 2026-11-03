@@ -1,4 +1,4 @@
-import { getAssetUrl } from "@calmlens/sdk/app";
+import { getAssetUrl } from "calmlens/app";
 import { useState } from "react";
 
 type AvatarProps = { projectId: string; assetId?: string; status?: string; name: string };

@@ -1,4 +1,4 @@
-import { createProgressFetch } from "@calmlens/sdk/elements";
+import { createProgressFetch } from "calmlens/elements";
 
 // Your server stores the file with CalmLensServerClient and answers with the asset.
 async function uploadPhoto(file, { signal, onProgress }) {

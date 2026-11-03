@@ -1,4 +1,4 @@
-import { CalmLensError } from "@calmlens/sdk";
+import { CalmLensError } from "calmlens";
 import { type Context, Hono } from "hono";
 import { raw } from "hono/html";
 import type { Child } from "hono/jsx";

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { UploadItem } from "@calmlens/sdk/react-native";
+import type { UploadItem } from "calmlens/react-native";
 import { getOutcome, isBusy, type PickedPhoto } from "./uploads";
 
 const item = (changes: Partial<UploadItem<PickedPhoto>>): UploadItem<PickedPhoto> => ({

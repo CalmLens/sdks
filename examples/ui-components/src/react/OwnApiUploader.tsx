@@ -3,7 +3,7 @@ import {
   CalmLensUploader,
   type CustomUploadContext,
   createProgressFetch,
-} from "@calmlens/sdk/react";
+} from "calmlens/react";
 
 // Your server stores the file with CalmLensServerClient and answers with the asset.
 async function uploadPhoto(file: File, { signal, onProgress }: CustomUploadContext) {

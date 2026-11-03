@@ -23,7 +23,7 @@ never holds an API key: a tiny token server signs a single-use upload token for 
   `POST /upload-token`. A real app checks who is signed in before signing, and can pass an
   `externalId` (such as a post ID) that the uploaded asset gets.
 - [`App.tsx`](App.tsx) runs the uploads with `useCalmLensUpload` from
-  `@calmlens/sdk/react-native`, the same upload queue the SDK's `CalmLensUploader` is built on,
+  `calmlens/react-native`, the same upload queue the SDK's `CalmLensUploader` is built on,
   and draws its own screens from the queue's items. The queue fetches a new token for each
   upload, sends the photo, and checks it with the same token until CalmLens decides. Photos are
   checked after they're stored, so the first answer is usually `pending`; the app shows
@@ -47,7 +47,7 @@ never holds an API key: a tiny token server signs a single-use upload token for 
   the upload never finished; otherwise the queue checks the existing upload.
 
 For a ready-made pick button and file list instead of your own screens, render
-`CalmLensUploader` from `@calmlens/sdk/react-native` with the same settings and a `pick`
+`CalmLensUploader` from `calmlens/react-native` with the same settings and a `pick`
 function, such as `pickPhoto` here.
 
 ## Age-restricted photos
@@ -112,8 +112,8 @@ Then create an API key in **Developer → API Keys** that can create assets in t
 You need [Bun](https://bun.sh), Xcode with an iOS Simulator (or the Expo Go app on a phone) and
 this repo.
 
-This example links to `@calmlens/sdk` in the repo: the React Native support it needs isn't in a
-published release yet. Once it is, depend on the published `@calmlens/sdk` instead of
+This example links to `calmlens` in the repo: the React Native support it needs isn't in a
+published release yet. Once it is, depend on the published `calmlens` instead of
 `file:../../javascript`. From the repo root:
 
 ```bash

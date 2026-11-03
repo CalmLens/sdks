@@ -11,7 +11,7 @@
     "dev": "vite"
   },
   "dependencies": {
-    "@calmlens/sdk": "file:../../javascript",
+    "calmlens": "file:../../javascript",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "svelte": "5.41.0",

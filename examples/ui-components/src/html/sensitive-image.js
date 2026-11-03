@@ -1,4 +1,4 @@
-import { getAssetUrl } from "@calmlens/sdk/app";
+import { getAssetUrl } from "calmlens/app";
 
 // aspectRatio is width divided by height, which you store when the image is uploaded.
 export function renderSensitiveImage(

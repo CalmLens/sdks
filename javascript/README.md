@@ -1,23 +1,23 @@
-# @calmlens/sdk
+# CalmLens JavaScript SDK
 
-Official JavaScript/TypeScript SDK for CalmLens API
-
-CalmLens provides content moderation and classification for text, images, documents and websites, plus optional storage and CDN delivery. This SDK makes it easy to integrate CalmLens into your JavaScript/TypeScript applications.
+The official JavaScript and TypeScript SDK for [CalmLens](https://calmlens.com): content moderation and classification for text, images, documents and websites, plus optional storage and CDN delivery.
 
 ## Installation
 
 ```bash
-npm install @calmlens/sdk
+npm install calmlens
 ```
+
+The same package is also published as `@calmlens/sdk`, at the same version. Import from the name you installed: `calmlens/server` with `calmlens`, or `@calmlens/sdk/server` with `@calmlens/sdk`.
 
 The package has two clients, each with its own import:
 
-| Import                 | Client                 | Runs                                                               | Authenticates with                                                                                               |
-| ---------------------- | ---------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `@calmlens/sdk/server` | `CalmLensServerClient` | On your server: Node.js 22 or later, Bun, Deno, Cloudflare Workers | A project API key                                                                                                |
-| `@calmlens/sdk/app`    | `CalmLensAppClient`    | In browsers and React Native apps                                  | An [upload preset](#browser-and-app-uploads-with-upload-presets), with an optional upload token from your server |
+| Import            | Client                 | Runs                                                               | Authenticates with                                                                                               |
+| ----------------- | ---------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `calmlens/server` | `CalmLensServerClient` | On your server: Node.js 22 or later, Bun, Deno, Cloudflare Workers | A project API key                                                                                                |
+| `calmlens/app`    | `CalmLensAppClient`    | In browsers and React Native apps                                  | An [upload preset](#browser-and-app-uploads-with-upload-presets), with an optional upload token from your server |
 
-`@calmlens/sdk` itself exports the shared types, `CalmLensError`, the error codes and `SDK_VERSION`. The package ships ES modules and CommonJS with type declarations and loads no other packages at runtime: importing only `verifyWebhookSignature` adds about 5 KB (minified) to a bundle, `CalmLensAppClient` about 19 KB and `CalmLensServerClient` about 28 KB.
+`calmlens` itself exports the shared types, `CalmLensError`, the error codes and `SDK_VERSION`. The package ships ES modules and CommonJS with type declarations and loads no other packages at runtime: importing only `verifyWebhookSignature` adds about 5 KB (minified) to a bundle, `CalmLensAppClient` about 19 KB and `CalmLensServerClient` about 28 KB.
 
 API keys are secret, so `CalmLensServerClient` refuses to start in a web page or app. Upload from browsers and apps with `CalmLensAppClient`, and serve private content to them with [signed URLs](#assetscreatesignedurloptions).
 
@@ -28,7 +28,7 @@ Every public SDK operation accepts one options object. This keeps call sites sta
 Create an API key under **Developer → API Keys** in the CalmLens portal. The same page shows your **Project ID**. Keep both on your server.
 
 ```typescript
-import { CalmLensServerClient } from "@calmlens/sdk/server";
+import { CalmLensServerClient } from "calmlens/server";
 
 const client = new CalmLensServerClient({
   apiKey: process.env.CALMLENS_API_KEY!,
@@ -72,7 +72,7 @@ See [How CalmLens works](https://calmlens.com/docs/how-it-works) and [Testing yo
 
 ### CalmLensServerClient
 
-The client for your server, with every API method. Import it from `@calmlens/sdk/server`.
+The client for your server, with every API method. Import it from `calmlens/server`.
 
 #### Constructor
 
@@ -510,11 +510,11 @@ age-restricted image. It takes no `lens` or `transform`; passing one throws `sdk
 
 ##### Building CDN URLs in the browser
 
-`getAssetUrl`, exported from `@calmlens/sdk/app` and `@calmlens/sdk`, builds the same URLs as `cdn.getAssetUrl` from
+`getAssetUrl`, exported from `calmlens/app` and `calmlens`, builds the same URLs as `cdn.getAssetUrl` from
 the project ID alone. It takes no API key and sends no request.
 
 ```typescript
-import { getAssetUrl } from "@calmlens/sdk/app";
+import { getAssetUrl } from "calmlens/app";
 
 const placeholder = getAssetUrl({ projectId, assetIdentifier: assetId, resource: "placeholder" });
 const thumbnail = getAssetUrl({ projectId, assetIdentifier: assetId, lens: "thumbnail" });
@@ -607,7 +607,7 @@ It returns `true` only when the `x-calmlens-signature` header contains a `v1=` H
 `CalmLensAppClient` uploads from a browser or app through an upload preset, without an API key. Create presets in the portal under Developer → Upload presets.
 
 ```ts
-import { CalmLensAppClient } from "@calmlens/sdk/app";
+import { CalmLensAppClient } from "calmlens/app";
 
 // In the browser: no API key
 const client = new CalmLensAppClient({
@@ -648,20 +648,20 @@ Server uploads can also pass `uploadPresetId` to `assets.create` or `assets.clas
 
 Ready-made front-end components for each UI library. They share one core, so they behave the same everywhere:
 
-| Import                   | Components                                                                                                                   |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `@calmlens/sdk/react`    | `CalmLensUploader`, `CalmLensMedia`, `useCalmLensUpload` (also works in Preact through `preact/compat`)                      |
-| `@calmlens/sdk/vue`      | `CalmLensUploader`, `CalmLensMedia`, `useCalmLensUpload`                                                                     |
-| `@calmlens/sdk/svelte`   | `CalmLensUploader`, `CalmLensMedia` (Svelte 5)                                                                               |
-| `@calmlens/sdk/elements` | `<calmlens-uploader>`, `<calmlens-media>` for plain HTML, Angular, Solid, Lit and anything else that renders custom elements |
-| `@calmlens/sdk/ui`       | The framework-free core: `createUploadController`, `getMediaState`, messages and styles                                      |
+| Import              | Components                                                                                                                   |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `calmlens/react`    | `CalmLensUploader`, `CalmLensMedia`, `useCalmLensUpload` (also works in Preact through `preact/compat`)                      |
+| `calmlens/vue`      | `CalmLensUploader`, `CalmLensMedia`, `useCalmLensUpload`                                                                     |
+| `calmlens/svelte`   | `CalmLensUploader`, `CalmLensMedia` (Svelte 5)                                                                               |
+| `calmlens/elements` | `<calmlens-uploader>`, `<calmlens-media>` for plain HTML, Angular, Solid, Lit and anything else that renders custom elements |
+| `calmlens/ui`       | The framework-free core: `createUploadController`, `getMediaState`, messages and styles                                      |
 
 `react`, `vue` and `svelte` are optional peer dependencies: install the one you use.
 
 **The uploader** is a drop zone with a file list. It uploads each file through `CalmLensAppClient`, shows byte progress, checks the upload until it has a moderation decision (for about 15 seconds; anything still pending is your webhook's to settle), and shows the decision or a message for each error code.
 
 ```tsx
-import { CalmLensUploader } from "@calmlens/sdk/react";
+import { CalmLensUploader } from "calmlens/react";
 
 <CalmLensUploader
   uploadPresetId="preset_4Lk8Qw2Xm9Rt5Vb3Nc7P"
@@ -680,7 +680,7 @@ To upload through your own API instead of a preset, pass `upload(file, { signal,
 **The media component** shows an asset from the CDN's `rendered` resource in a single `<img>`, so the CDN picks the best format the browser accepts. It adds `srcset` widths when you pass `widths` and `sizes`, shows the blurred placeholder while the image loads, and fades the image in. Video and audio play the `original` file, with a rendered poster for video. Age-restricted assets stay behind the placeholder and a notice with a reveal button until you pass `viewerClaims: { ageConfirmed: true }`. Blocked and purged assets, and images that fail to load, show an unavailable notice.
 
 ```tsx
-import { CalmLensMedia } from "@calmlens/sdk/react";
+import { CalmLensMedia } from "calmlens/react";
 
 <CalmLensMedia
   projectId="proj_8fK2mQx7Lp4NvB3tRz9Y"
@@ -699,7 +699,7 @@ Instead of `projectId` and `assetId`, you can pass an asset from the API as `ass
 
 It also takes `type` (`image`, `video` or `audio`), `resource`, `lens`, `transform`, `url` (a signed URL from your server), `placeholderHash` (the asset's `content.image.thumbhash`, drawn in the browser so no placeholder request is needed), `placeholderUrl`, `averageColor`, `fit`, `position`, `lazy`, `fetchPriority` and `controls`.
 
-The React components render their stylesheet with them: React places it in the page's head once, on the server too. With Vue, Svelte or the web components, import `@calmlens/sdk/styles.css` once (or link it). Nothing is added to the page at runtime. Theme the components with `--calmlens-accent`, `--calmlens-radius` and the other `--calmlens-*` properties, which take precedence on any element. To style the `calmlens-*` classes yourself, pass `unstyled` to the React components, or leave out the stylesheet import. All text can be replaced or translated with `messages`, keyed by message name or error code.
+The React components render their stylesheet with them: React places it in the page's head once, on the server too. With Vue, Svelte or the web components, import `calmlens/styles.css` once (or link it). Nothing is added to the page at runtime. Theme the components with `--calmlens-accent`, `--calmlens-radius` and the other `--calmlens-*` properties, which take precedence on any element. To style the `calmlens-*` classes yourself, pass `unstyled` to the React components, or leave out the stylesheet import. All text can be replaced or translated with `messages`, keyed by message name or error code.
 
 The [widget playground](https://github.com/CalmLens/sdks/tree/main/examples/widget-playground) runs every component against a mock API.
 
@@ -748,7 +748,7 @@ See the [classification results guide](https://calmlens.com/docs/guides/classifi
 Every failure is a `CalmLensError`, whether the API returned an error or the request never completed. Branch on its stable `code`:
 
 ```typescript
-import { CALMLENS_ERROR_CODES, CalmLensError } from "@calmlens/sdk";
+import { CALMLENS_ERROR_CODES, CalmLensError } from "calmlens";
 
 try {
   await client.assets.retrieve({ assetId });
@@ -810,12 +810,12 @@ The SDK does not validate responses against its types, so fields and values adde
 
 ## Testing
 
-`@calmlens/sdk/testing` exports `MockCalmLensServerClient` and `MockCalmLensAppClient`, which run the real clients against an in-memory CalmLens API and CDN, in-memory storage implementations, mock API key helpers, webhook delivery builders and `generateMediaTestCode`, for testing without network requests. `generateMediaTestCode(signal, testInputKey)` asynchronously returns the spoken or on-screen test phrase authenticated with your project's secret test input key, shown under **Assets → Try it → Test inputs** in the portal; a phrase with another project's key is moderated normally.
+`calmlens/testing` exports `MockCalmLensServerClient` and `MockCalmLensAppClient`, which run the real clients against an in-memory CalmLens API and CDN, in-memory storage implementations, mock API key helpers, webhook delivery builders and `generateMediaTestCode`, for testing without network requests. `generateMediaTestCode(signal, testInputKey)` asynchronously returns the spoken or on-screen test phrase authenticated with your project's secret test input key, shown under **Assets → Try it → Test inputs** in the portal; a phrase with another project's key is moderated normally.
 
-The `@calmlens/sdk`, `/server` and `/app` entry points do not load or export testing helpers, to keep production bundles small. Keep `/testing` imports in test files.
+The `calmlens`, `/server` and `/app` entry points do not load or export testing helpers, to keep production bundles small. Keep `/testing` imports in test files.
 
 ```typescript
-import { MockCalmLensServerClient, createMockApiKey } from "@calmlens/sdk/testing";
+import { MockCalmLensServerClient, createMockApiKey } from "calmlens/testing";
 
 const client = new MockCalmLensServerClient({
   apiKey: createMockApiKey(),
@@ -832,7 +832,7 @@ The in-memory API behaves like CalmLens where tests depend on it: `assets.list` 
 `mockOptions.moderate` decides each asset the mock moderates. It receives the stored `asset`, its `content` (`bytes`, and `text` for a plain-text upload), the `trigger` (`upload`, `retry`, `rerun` or `complete`) and whether the API would `queued` the work, and returns a status (`pending`, `failed`, `allowed`, `limited`, `age-restricted`, `blocked` or `purged`) or a decision built with `mockDecision`. A decision fills the asset's report as CalmLens does: every category (unflagged ones evaluated with score 0), the policy's actions and `flaggedCategories`. Without `moderate`, queued uploads, retries and reruns stay `pending` and everything else is `allowed`. `client.completeProcessing(assetId, decision?)` finishes a pending asset as the pipeline would, with the decision given or the one `moderate` returns for `complete`:
 
 ```typescript
-import { MockCalmLensServerClient, createMockApiKey, mockDecision } from "@calmlens/sdk/testing";
+import { MockCalmLensServerClient, createMockApiKey, mockDecision } from "calmlens/testing";
 
 const client = new MockCalmLensServerClient({
   apiKey: createMockApiKey(),
@@ -878,7 +878,7 @@ expect(client.callsTo("text.classify").at(-1)).toMatchObject({ body: "hello", st
 To test a webhook handler, build a signed delivery the way CalmLens sends it:
 
 ```typescript
-import { createWebhookHeaders, toWebhookEventPayload } from "@calmlens/sdk/testing";
+import { createWebhookHeaders, toWebhookEventPayload } from "calmlens/testing";
 
 const event = await client.enqueueEvent({ type: "asset.allowed", assetId: asset.id });
 const body = JSON.stringify(toWebhookEventPayload(event));
@@ -928,7 +928,7 @@ The result is typed as an extensible `WebhookEventPayload`. Event types and fact
 **Fetch API** (Next.js route handlers, Remix, Cloudflare Workers, Bun, Deno):
 
 ```typescript
-import { CalmLensError, parseWebhookEvent } from "@calmlens/sdk/server";
+import { CalmLensError, parseWebhookEvent } from "calmlens/server";
 
 export async function POST(request: Request) {
   let event;
@@ -972,13 +972,13 @@ app.post("/api/webhooks/calmlens", express.raw({ type: "application/json" }), as
 
 ## Command-line tool
 
-This package includes the `calmlens` [CLI](https://calmlens.com/docs/guides/local-development). It is also published on npm as `calmlens`, the same package under an unscoped name, so you can run it without adding a dependency:
+This package includes the `calmlens` [CLI](https://calmlens.com/docs/guides/local-development). Because the package is named `calmlens`, you can run it without adding a dependency:
 
 ```bash
 npx calmlens listen --forward-to http://localhost:3000/api/webhooks/calmlens --env-file .env.local
 ```
 
-Install it globally with `npm install -g calmlens`. In a project that depends on `@calmlens/sdk`, `npx calmlens` runs the installed version. Standalone executables for macOS, Linux and Windows, which need no Node.js, are attached to the [CLI releases](https://github.com/CalmLens/sdks/releases?q=cli-v&expanded=true) with a `SHA256SUMS` file, and Homebrew installs them:
+Install it globally with `npm install -g calmlens`. In a project that depends on the SDK, `npx calmlens` runs the installed version. Standalone executables for macOS, Linux and Windows, which need no Node.js, are attached to the [CLI releases](https://github.com/CalmLens/sdks/releases?q=cli-v&expanded=true) with a `SHA256SUMS` file, and Homebrew installs them:
 
 ```bash
 brew tap calmlens/sdks https://github.com/CalmLens/sdks
@@ -1038,11 +1038,11 @@ Requests send `User-Agent: calmlens-js/<version> (<runtime>/<version>)` from ser
 
 Run `bun run changeset` to choose the release type and write release notes. Merging the Version SDKs pull request releases the version and updates this package's `CHANGELOG.md`. See the repository's [.changeset release guide](../.changeset/README.md).
 
-Once the release commit's SDK Tests and SDK examples runs pass, `.github/workflows/release-npm.yml` publishes one build to npm with provenance, as `@calmlens/sdk` and as `calmlens`. The CLI's standalone executables and Homebrew formula are released in this repository under `cli-v<version>` by `.github/workflows/release-cli.yml`. `bun run build:cli` builds the npm entry, `bin/calmlens.js` (the package build includes it), and `bun run build:cli:binary` builds a standalone executable in `dist/`; set `CALMLENS_BUILD_TARGET`, such as `bun-linux-x64`, to cross-compile it.
+Once the release commit's SDK Tests and SDK examples runs pass, `.github/workflows/release-npm.yml` publishes one build to npm with provenance, as `calmlens` and as `@calmlens/sdk`. The CLI's standalone executables and Homebrew formula are released in this repository under `cli-v<version>` by `.github/workflows/release-cli.yml`. `bun run build:cli` builds the npm entry, `bin/calmlens.js` (the package build includes it), and `bun run build:cli:binary` builds a standalone executable in `dist/`; set `CALMLENS_BUILD_TARGET`, such as `bun-linux-x64`, to cross-compile it.
 
 ### Test-input images
 
-The optional `@calmlens/sdk/test-inputs` entry generates and recognises the same
+The optional `calmlens/test-inputs` entry generates and recognises the same
 project-specific colour grids used by the CalmLens portal:
 
 ```ts
@@ -1051,7 +1051,7 @@ import {
   detectTestImage,
   generateTestTextCode,
   TEST_INPUT_PRESETS,
-} from "@calmlens/sdk/test-inputs";
+} from "calmlens/test-inputs";
 
 const input = TEST_INPUT_PRESETS.mixed;
 const image = await paintTestImage(input, projectTestInputKey);

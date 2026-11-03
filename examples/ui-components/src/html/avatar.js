@@ -1,4 +1,4 @@
-import { getAssetUrl } from "@calmlens/sdk/app";
+import { getAssetUrl } from "calmlens/app";
 
 export function renderAvatar(container, { projectId, assetId, status, name }) {
   const fallback = () => {

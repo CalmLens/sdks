@@ -21,7 +21,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@calmlens/sdk": "file:../../javascript",
+    "calmlens": "file:../../javascript",
     "hono": "^4.13.13"
   },
   "devDependencies": {

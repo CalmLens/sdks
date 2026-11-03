@@ -1,5 +1,5 @@
-import type { AssetModerationStatus } from "@calmlens/sdk/app";
-import { CalmLensMedia } from "@calmlens/sdk/react";
+import type { AssetModerationStatus } from "calmlens/app";
+import { CalmLensMedia } from "calmlens/react";
 
 type PostPhotoProps = {
   projectId: string;

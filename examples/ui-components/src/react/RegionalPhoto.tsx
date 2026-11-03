@@ -1,5 +1,5 @@
-import type { Asset } from "@calmlens/sdk/app";
-import { CalmLensMedia } from "@calmlens/sdk/react";
+import type { Asset } from "calmlens/app";
+import { CalmLensMedia } from "calmlens/react";
 
 // Claims are optional customer assertions evaluated by the CDN.
 // ageConfirmed stays false until your app completes the required age check.

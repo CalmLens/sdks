@@ -41,9 +41,9 @@ also only serves `localhost` unless you set `CALMLENS_DEMO_ALLOW_REMOTE=1`.
 
 ## Quick start (demo mode)
 
-This example links to `@calmlens/sdk` in the repo, and the browser upload script is bundled from
+This example links to `calmlens` in the repo, and the browser upload script is bundled from
 that build: no published release includes `CalmLensAppClient` yet. Once one does, depend on
-the published `@calmlens/sdk` instead of `link:@calmlens/sdk`. From the repo root, install
+the published `calmlens` instead of `file:../../javascript`. From the repo root, install
 dependencies, build the SDK and register it with `bun link` first:
 
 ```bash
@@ -287,7 +287,7 @@ a template for your own deployment; replace the KV namespace placeholder before 
 MIT
 
 The test-input presets, grid encoding and authenticated decoding come
-from `@calmlens/sdk/test-inputs`, also used by CalmLens itself. Calmgram only
+from `calmlens/test-inputs`, also used by CalmLens itself. Calmgram only
 encodes/decodes PNG files and supplies the simulator's demo key. When developing
 against this repository, rebuild `javascript` after changing the shared
 test-input helpers.

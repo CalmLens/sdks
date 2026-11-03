@@ -1,4 +1,4 @@
-import "@calmlens/sdk/elements";
+import "calmlens/elements";
 
 // aspectRatio is width divided by height, which you store when the image is uploaded.
 export function renderPostPhoto(

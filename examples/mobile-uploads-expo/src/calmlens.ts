@@ -1,5 +1,5 @@
-import { CALMLENS_ERROR_CODES, CalmLensError } from "@calmlens/sdk/app";
-import type { UploadControllerOptions } from "@calmlens/sdk/react-native";
+import { CALMLENS_ERROR_CODES, CalmLensError } from "calmlens/app";
+import type { UploadControllerOptions } from "calmlens/react-native";
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import type { PickedPhoto } from "./uploads";

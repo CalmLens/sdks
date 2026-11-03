@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { AssetModerationStatus } from "@calmlens/sdk/app";
-  import { CalmLensMedia } from "@calmlens/sdk/svelte";
+  import type { AssetModerationStatus } from "calmlens/app";
+  import { CalmLensMedia } from "calmlens/svelte";
 
   type Props = {
     projectId: string;

@@ -1,4 +1,4 @@
-import { CalmLensServerClient } from "@calmlens/sdk/server";
+import { CalmLensServerClient } from "calmlens/server";
 
 const apiKey = process.env.CALMLENS_API_KEY;
 const projectId = process.env.CALMLENS_PROJECT_ID;

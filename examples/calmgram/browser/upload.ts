@@ -8,7 +8,7 @@
 //
 // Without JavaScript the form posts the photo to the Worker, which forwards it to CalmLens.
 
-import { CalmLensAppClient, CalmLensError } from "@calmlens/sdk/app";
+import { CalmLensAppClient, CalmLensError } from "calmlens/app";
 
 const form = document.querySelector<HTMLFormElement>("#new-post");
 const input = document.querySelector<HTMLInputElement>("#image");

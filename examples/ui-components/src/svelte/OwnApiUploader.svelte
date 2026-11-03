@@ -4,7 +4,7 @@
     CalmLensUploader,
     type CustomUploadContext,
     createProgressFetch,
-  } from "@calmlens/sdk/svelte";
+  } from "calmlens/svelte";
 
   let { onUploaded }: { onUploaded: (upload: CalmLensUpload) => void } = $props();
 

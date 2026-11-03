@@ -5,7 +5,7 @@
     "": {
       "name": "calmgram",
       "dependencies": {
-        "@calmlens/sdk": "file:../../javascript",
+        "calmlens": "file:../../javascript",
         "hono": "^4.13.13",
       },
       "devDependencies": {
@@ -40,7 +40,7 @@
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.15", "", { "os": "win32", "cpu": "x64" }, "sha512-yAzh4UqEImV6Hcy0zjUqNfJAsUhoD64FBQCdTG8Md/Z2wQeVP/ZmJ3XRYAs1g8J9fjTFyl2fCtc5FB5til47+g=="],
 
-    "@calmlens/sdk": ["@calmlens/sdk@file:../../javascript", { "dependencies": { "json-schema-to-ts": "^3.1.1", "zod": "^4.6.5" }, "devDependencies": { "@biomejs/biome": "^2.5.15", "@oxc-project/runtime": "0.148.0", "@types/bun": "^1.4.2", "@types/node": "26.6.1", "rimraf": "6.1.3", "rolldown": "1.2.13", "rolldown-plugin-dts": "0.28.7", "typescript": "7.0.2" } }],
+    "calmlens": ["calmlens@file:../../javascript", { "dependencies": { "json-schema-to-ts": "^3.1.1", "zod": "^4.6.5" }, "devDependencies": { "@biomejs/biome": "^2.5.15", "@oxc-project/runtime": "0.148.0", "@types/bun": "^1.4.2", "@types/node": "26.6.1", "rimraf": "6.1.3", "rolldown": "1.2.13", "rolldown-plugin-dts": "0.28.7", "typescript": "7.0.2" } }],
 
     "@cloudflare/kv-asset-handler": ["@cloudflare/kv-asset-handler@0.5.0", "", {}, "sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg=="],
 
@@ -506,7 +506,7 @@
 
     "zod": ["zod@4.6.7", "", {}, "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="],
 
-    "@calmlens/sdk/@types/node": ["@types/node@26.6.1", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-VqGJBMCtdhqkBUCcBLvywI0NJ+KLuVzgNnlBUNFOQjqVxzo2lxLUNg1DSey8+u2u6ktswSAxg+s68QLzWHNOuA=="],
+    "calmlens/@types/node": ["@types/node@26.6.1", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-VqGJBMCtdhqkBUCcBLvywI0NJ+KLuVzgNnlBUNFOQjqVxzo2lxLUNg1DSey8+u2u6ktswSAxg+s68QLzWHNOuA=="],
 
     "@cspotcode/source-map-support/@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.9", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.0.3", "@jridgewell/sourcemap-codec": "^1.4.10" } }, "sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ=="],
 

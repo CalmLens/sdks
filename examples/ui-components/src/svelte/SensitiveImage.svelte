@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAssetUrl } from "@calmlens/sdk/app";
+  import { getAssetUrl } from "calmlens/app";
 
   type Props = {
     projectId: string;

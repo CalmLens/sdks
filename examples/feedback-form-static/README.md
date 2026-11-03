@@ -7,7 +7,7 @@ the moderation decision in the form. There's no backend and no API key: the page
 preset ID.
 
 The attachment is the JavaScript SDK's upload widget, `<calmlens-uploader>` from
-`@calmlens/sdk/elements`, which shows the preview, upload progress, the check and the decision.
+`calmlens/elements`, which shows the preview, upload progress, the check and the decision.
 [`app.js`](app.js) gives it an upload queue that waits for the form (`autoUpload: false`) and
 uploads with the feedback as the description:
 
@@ -65,7 +65,7 @@ Copy the preset ID and paste it into `UPLOAD_PRESET_ID` in [`config.js`](config.
 
 ## 2. Run it
 
-No published `@calmlens/sdk` release includes `CalmLensAppClient` yet, so this example
+No published `calmlens` release includes `CalmLensAppClient` yet, so this example
 uses the SDK built from this repo. From the repo root, build it once:
 
 ```bash
@@ -90,7 +90,7 @@ from **Assets → Try test inputs** in your project.
 ### Demo mode
 
 While `config.js` still holds the example preset ID, the page runs in demo mode: uploads go to
-the SDK's in-memory `MockCalmLensAppClient` from `@calmlens/sdk/testing`, and nothing leaves the
+the SDK's in-memory `MockCalmLensAppClient` from `calmlens/testing`, and nothing leaves the
 page. Screenshots with `blocked` in the file name are refused; everything else is accepted.
 
 To try a preset without editing `config.js`, set `CALMLENS_UPLOAD_PRESET_ID` (and
@@ -101,10 +101,10 @@ Run the tests for the form's logic with `bun test`.
 
 ### Using a published SDK release
 
-Once a published `@calmlens/sdk` release includes `CalmLensAppClient`, point the
+Once a published `calmlens` release includes `CalmLensAppClient`, point the
 import map in [`index.html`](index.html) at it instead of `./sdk/`, for example
-`https://esm.sh/@calmlens/sdk@<version>/app` and `.../elements`, link
-`https://esm.sh/@calmlens/sdk@<version>/styles.css`, and drop the bundling step.
+`https://esm.sh/calmlens@<version>/app` and `.../elements`, link
+`https://esm.sh/calmlens@<version>/styles.css`, and drop the bundling step.
 
 Uploads appear in the preset's folder in the portal. To hear about them without a server,
 connect Slack or email in

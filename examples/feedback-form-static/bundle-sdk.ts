@@ -1,7 +1,7 @@
 // Bundles the repo's JavaScript SDK build (javascript/esm) into browser modules in sdk/: the app
 // client (`app.js`), the upload widget (`elements.js`), the mocks the demo mode uploads to
 // (`testing.js`) and the widget's stylesheet. Run `npm run build` in javascript first. Once a
-// published @calmlens/sdk release includes CalmLensAppClient, load that instead (see README).
+// published calmlens release includes CalmLensAppClient, load that instead (see README).
 const esm = `${import.meta.dir}/../../javascript/esm`;
 const result = await Bun.build({
   entrypoints: ["app.js", "elements.js", "testing.js"].map((entry) => `${esm}/${entry}`),

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getAssetUrl } from "@calmlens/sdk/app";
+  import { getAssetUrl } from "calmlens/app";
 
   let { projectId, assetId, status, name }: { projectId: string; assetId?: string; status?: string; name: string } = $props();
   let failed = $state(false);

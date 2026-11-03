@@ -130,7 +130,7 @@ export interface UploadControllerOptions<F extends UploadFile = UploadFile> {
   baseUrl?: string;
   /**
    * Creates the client for each upload. Defaults to `CalmLensAppClient`; tests can return a
-   * `MockCalmLensAppClient` from `@calmlens/sdk/testing` instead.
+   * `MockCalmLensAppClient` from `calmlens/testing` instead.
    */
   createClient?: (options: CalmLensAppClientOptions) => UploadClient;
   /**

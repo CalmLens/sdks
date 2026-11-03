@@ -1,4 +1,4 @@
-import "@calmlens/sdk/elements";
+import "calmlens/elements";
 
 // Your app supplies optional viewer context to the CDN.
 export function renderRegionalPhoto(container, { asset, region, ageConfirmed }) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Asset } from "@calmlens/sdk/app";
-import { CalmLensMedia } from "@calmlens/sdk/vue";
+import type { Asset } from "calmlens/app";
+import { CalmLensMedia } from "calmlens/vue";
 
 // Your app supplies optional viewer context to the CDN.
 defineProps<{ asset: Asset; region: string; ageConfirmed: boolean }>();

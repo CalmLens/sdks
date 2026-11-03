@@ -1,6 +1,6 @@
-import { CalmLensAppClient } from "@calmlens/sdk/app";
+import { CalmLensAppClient } from "calmlens/app";
 // Defines <calmlens-uploader>, the SDK's upload widget, and exports its upload queue.
-import { createProgressFetch, createUploadController } from "@calmlens/sdk/elements";
+import { createProgressFetch, createUploadController } from "calmlens/elements";
 import { API_BASE_URL, UPLOAD_PRESET_ID } from "./config.js";
 import { CATEGORIES, composeDescription, getSubmissionState } from "./feedback.js";
 
@@ -185,7 +185,7 @@ function showStatus(message, tone) {
  * Screenshots whose file name contains "blocked" break the policy; everything else is accepted.
  */
 async function createDemoClient() {
-  const { MockCalmLensAppClient } = await import("@calmlens/sdk/testing");
+  const { MockCalmLensAppClient } = await import("calmlens/testing");
   const client = new MockCalmLensAppClient({
     uploadPresetId: "demo-preset",
     mockOptions: {

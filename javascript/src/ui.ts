@@ -1,6 +1,6 @@
-// The framework-agnostic core of the upload widget and media component. `@calmlens/sdk/react`,
-// `@calmlens/sdk/react-native`, `@calmlens/sdk/vue`, `@calmlens/sdk/svelte` and
-// `@calmlens/sdk/elements` render it; import it directly to build your own UI on the same upload queue and URLs.
+// The framework-agnostic core of the upload widget and media component. `calmlens/react`,
+// `calmlens/react-native`, `calmlens/vue`, `calmlens/svelte` and
+// `calmlens/elements` render it; import it directly to build your own UI on the same upload queue and URLs.
 
 export type { IconName } from "./ui/Icons";
 export { ICON_ATTRIBUTES, ICONS } from "./ui/Icons";

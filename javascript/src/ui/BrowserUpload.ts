@@ -1,5 +1,5 @@
 // The upload queue as the browser components use it: their files are browser `File`s, so these
-// default to `File` where the shared core defaults to any `UploadFile`. `@calmlens/sdk/react`,
+// default to `File` where the shared core defaults to any `UploadFile`. `calmlens/react`,
 // `/vue`, `/svelte` and `/elements` export these in place of the core's.
 
 import type { UploaderProps as CoreUploaderProps } from "./Props";

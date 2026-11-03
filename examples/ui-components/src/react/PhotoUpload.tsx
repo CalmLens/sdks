@@ -1,4 +1,4 @@
-import { CalmLensAppClient, CalmLensError } from "@calmlens/sdk/app";
+import { CalmLensAppClient, CalmLensError } from "calmlens/app";
 import { type ChangeEvent, useState } from "react";
 
 const MESSAGES: Record<string, string> = {

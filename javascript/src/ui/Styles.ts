@@ -1,9 +1,9 @@
 import { CALMLENS_THEME } from "./Theme";
 
 /**
- * The components' stylesheet, also shipped as `@calmlens/sdk/styles.css`. The React components
+ * The components' stylesheet, also shipped as `calmlens/styles.css`. The React components
  * render it themselves (React hoists it into the head, on the server too); with Vue, Svelte or
- * the web components, import or link `@calmlens/sdk/styles.css` once. Nothing is added to the page
+ * the web components, import or link `calmlens/styles.css` once. Nothing is added to the page
  * at runtime. Theme it with the `--calmlens-*` custom properties, or leave it out and style the
  * `calmlens-*` classes yourself.
  */

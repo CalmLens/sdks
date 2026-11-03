@@ -14,7 +14,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@calmlens/sdk": "file:../../javascript",
+    "calmlens": "file:../../javascript",
     "expo": "~57.0.29",
     "expo-age-range": "~57.0.5",
     "expo-file-system": "~57.0.7",

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { type CalmLensUpload, CalmLensUploader } from "@calmlens/sdk/svelte";
+  import { type CalmLensUpload, CalmLensUploader } from "calmlens/svelte";
 
   let { onUploaded }: { onUploaded: (upload: CalmLensUpload) => void } = $props();
 </script>

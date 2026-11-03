@@ -6,8 +6,8 @@
 // The widget's `upload` hook runs this page's own flow (the server handshake and multipart
 // parts) while the widget shows the file, its progress and any error.
 //
-// /sdk/ is the workspace build of @calmlens/sdk. Once a published release includes the widget,
-// import `@calmlens/sdk/app` and `@calmlens/sdk/elements` from your bundler or CDN instead.
+// /sdk/ is the workspace build of calmlens. Once a published release includes the widget,
+// import `calmlens/app` and `calmlens/elements` from your bundler or CDN instead.
 import { CalmLensAppClient, CalmLensError } from "/sdk/app.js";
 import { createProgressFetch } from "/sdk/elements.js";
 

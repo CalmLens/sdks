@@ -45,13 +45,13 @@ who is asking and passes the ID of the record being created as `externalId`; see
 
 ## What to look at
 
-| File                                                         | What it shows                                                              |
-| ------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| [`src/react/App.tsx`](src/react/App.tsx)                     | `@calmlens/sdk/react`                                                      |
-| [`src/vue/App.vue`](src/vue/App.vue)                         | `@calmlens/sdk/vue`                                                        |
-| [`src/svelte/App.svelte`](src/svelte/App.svelte)             | `@calmlens/sdk/svelte`                                                     |
-| [`src/elements.ts`](src/elements.ts)                         | `<calmlens-uploader>` and `<calmlens-media>` from `@calmlens/sdk/elements` |
-| [`server/playground-server.ts`](server/playground-server.ts) | Token signing and the mock API and CDN                                     |
+| File                                                         | What it shows                                                         |
+| ------------------------------------------------------------ | --------------------------------------------------------------------- |
+| [`src/react/App.tsx`](src/react/App.tsx)                     | `calmlens/react`                                                      |
+| [`src/vue/App.vue`](src/vue/App.vue)                         | `calmlens/vue`                                                        |
+| [`src/svelte/App.svelte`](src/svelte/App.svelte)             | `calmlens/svelte`                                                     |
+| [`src/elements.ts`](src/elements.ts)                         | `<calmlens-uploader>` and `<calmlens-media>` from `calmlens/elements` |
+| [`server/playground-server.ts`](server/playground-server.ts) | Token signing and the mock API and CDN                                |
 
 "Viewer may see sensitive media" stands in for your app's own age check: off, age-restricted
 images stay behind the blurred placeholder; on, they load with the `ageConfirmed` opt-in.

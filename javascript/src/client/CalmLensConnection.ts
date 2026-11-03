@@ -32,7 +32,7 @@ import { randomUuid, stringifyQuery } from "./CalmLensUtils";
 export const DEFAULT_TIMEOUT_MS = 120_000;
 
 /**
- * Where `@calmlens/sdk/testing` puts its hooks in client options. Not part of the public API:
+ * Where `calmlens/testing` puts its hooks in client options. Not part of the public API:
  * the mock clients run the real clients against their in-memory API with these.
  */
 export const MOCK_HOOKS = Symbol.for("@calmlens/sdk.mockHooks");

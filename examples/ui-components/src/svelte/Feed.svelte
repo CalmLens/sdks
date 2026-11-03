@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { AssetModerationStatus } from "@calmlens/sdk/app";
+  import type { AssetModerationStatus } from "calmlens/app";
   import SensitiveImage from "./SensitiveImage.svelte";
 
   type Post = { id: string; assetId: string; status: AssetModerationStatus; alt: string; aspectRatio: number };

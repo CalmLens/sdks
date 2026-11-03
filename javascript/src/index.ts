@@ -1,5 +1,5 @@
 // Types, error codes and the SDK version, shared by both clients. Import a client from
-// `@calmlens/sdk/server` (with an API key, on your server) or `@calmlens/sdk/app` (in browsers
+// `calmlens/server` (with an API key, on your server) or `calmlens/app` (in browsers
 // and React Native apps, through an upload preset).
 
 export type {

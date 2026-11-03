@@ -1,6 +1,6 @@
 // The web components, as plain HTML would use them (and Angular, Solid or Lit, which use
 // custom elements the same way).
-import "@calmlens/sdk/elements";
+import "calmlens/elements";
 import { ACCEPT, GALLERY_SIZES, GALLERY_WIDTHS, MAX_FILE_SIZE, playground } from "./playground";
 
 export const mount = (target: HTMLElement) => {

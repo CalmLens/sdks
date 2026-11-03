@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getAssetUrl } from "@calmlens/sdk/app";
+import { getAssetUrl } from "calmlens/app";
 import { computed, ref } from "vue";
 
 const props = defineProps<{ projectId: string; assetId?: string; status?: string; name: string }>();

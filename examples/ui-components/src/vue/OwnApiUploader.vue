@@ -4,7 +4,7 @@ import {
   CalmLensUploader,
   type CustomUploadContext,
   createProgressFetch,
-} from "@calmlens/sdk/vue";
+} from "calmlens/vue";
 
 const emit = defineEmits<{ uploaded: [upload: CalmLensUpload] }>();
 

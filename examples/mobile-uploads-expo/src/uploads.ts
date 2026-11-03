@@ -1,4 +1,4 @@
-import type { UploadFile, UploadItem } from "@calmlens/sdk/react-native";
+import type { UploadFile, UploadItem } from "calmlens/react-native";
 
 /** A photo picked from the library, as the upload queue uploads it. */
 export interface PickedPhoto extends UploadFile {

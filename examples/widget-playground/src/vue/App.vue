@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalmLensMedia, CalmLensUploader } from "@calmlens/sdk/vue";
+import { CalmLensMedia, CalmLensUploader } from "calmlens/vue";
 import { onScopeDispose, shallowRef } from "vue";
 import { ACCEPT, GALLERY_SIZES, GALLERY_WIDTHS, MAX_FILE_SIZE, playground } from "../playground";
 

@@ -1,4 +1,4 @@
-import type { AssetModerationStatus } from "@calmlens/sdk/app";
+import type { AssetModerationStatus } from "calmlens/app";
 import { SensitiveImage } from "./SensitiveImage";
 
 type Post = {

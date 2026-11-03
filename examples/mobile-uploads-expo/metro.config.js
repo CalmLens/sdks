@@ -4,9 +4,9 @@ const { getDefaultConfig } = require("expo/metro-config");
 
 const config = getDefaultConfig(__dirname);
 
-// `@calmlens/sdk` is linked from javascript in this repo (see the README). Metro only
+// `calmlens` is linked from javascript in this repo (see the README). Metro only
 // bundles files it watches, so watch the SDK's real folder too.
-const sdk = fs.realpathSync(path.join(__dirname, "node_modules/@calmlens/sdk"));
+const sdk = fs.realpathSync(path.join(__dirname, "node_modules/calmlens"));
 if (!sdk.startsWith(__dirname)) {
   config.watchFolders = [...(config.watchFolders ?? []), sdk];
   config.resolver.nodeModulesPaths = [

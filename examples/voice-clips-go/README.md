@@ -70,13 +70,13 @@ folder, because upload tokens act for the key that signed them.
 ### 2. JavaScript SDK
 
 The page uploads with the JavaScript SDK's `CalmLensAppClient`. No published
-`@calmlens/sdk` release includes it yet, so the server serves the workspace build from
+`calmlens` release includes it yet, so the server serves the workspace build from
 `javascript/esm` at `/sdk/`. From the repository root:
 
 The JavaScript SDK is already built in this checkout.
 
 Set `CALMLENS_JS_SDK_DIR` to serve the build from another folder. Once a published release
-includes `CalmLensAppClient`, import `@calmlens/sdk/app` from your bundler or CDN instead of
+includes `CalmLensAppClient`, import `calmlens/app` from your bundler or CDN instead of
 `/sdk/app.js` in [upload.js](upload.js) and drop the `/sdk/` route.
 
 ### 3. Run

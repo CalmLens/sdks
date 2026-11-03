@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalmLensAppClient, CalmLensError } from "@calmlens/sdk/app";
+import { CalmLensAppClient, CalmLensError } from "calmlens/app";
 import { computed, ref } from "vue";
 
 type Upload = { assetId: string; status: string };
