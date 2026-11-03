@@ -146,10 +146,10 @@ func TestMultipartLeavesQueueModeToTheServer(t *testing.T) {
 	if h2.last().URL.Query().Get("queue") != "false" {
 		t.Fatal("queue override not sent", h2.last().URL)
 	}
-	// A declared image total below the minimum is rejected before any byte is sent.
-	small := int64(6 * 1024 * 1024)
-	_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", TotalSizeInBytes: &small, Part: &Content{Type: "image/png", Bytes: make([]byte, 5*1024*1024)}})
-	if ErrorCode(err) != CodeMultipartImageTooSmall || len(h.calls) != 1 {
+	// A declared image total above the maximum is rejected before any byte is sent.
+	huge := int64(21 * 1024 * 1024)
+	_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", TotalSizeInBytes: &huge, Part: &Content{Type: "image/png", Bytes: make([]byte, 5*1024*1024)}})
+	if ErrorCode(err) != CodeMultipartImageTooLarge || len(h.calls) != 1 {
 		t.Fatal(err)
 	}
 	// A refusal raised before sending has no HTTP status.
@@ -157,15 +157,15 @@ func TestMultipartLeavesQueueModeToTheServer(t *testing.T) {
 	if !errors.As(err, &refused) || refused.Status != 0 {
 		t.Fatal("local refusal status", err)
 	}
-	// A part under 5 MiB that is not the last is refused before sending, as is a final image
-	// part that is the whole upload but under 10 MiB.
+	// A part under 5 MiB that is not the last is refused before sending; a small final image part
+	// that is the whole upload is sent.
 	_, err = other.Assets.UploadPart(ctx, UploadAssetPartOptions{AssetID: "a", Part: Content{PartNumber: 2, Bytes: make([]byte, 1024)}})
 	if ErrorCode(err) != CodeInvalidUploadPayload || len(h2.calls) != 2 {
 		t.Fatal(err)
 	}
 	_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", Part: &Content{Type: "image/png", IsFinal: true, Bytes: make([]byte, 1024)}})
-	if ErrorCode(err) != CodeMultipartImageTooSmall || len(h.calls) != 1 {
-		t.Fatal(err)
+	if err != nil || len(h.calls) != 2 || h.last().URL.Query().Get("isFinal") != "true" {
+		t.Fatal(err, len(h.calls))
 	}
 }
 
@@ -573,5 +573,38 @@ func TestUploadTimeoutBoundsBinaryUploadsOnly(t *testing.T) {
 	}
 	if _, err = NewServerClient(Options{APIKey: "key", ProjectID: "p", UploadTimeout: -time.Second}); ErrorCode(err) != CodeSDKInvalidConfig {
 		t.Fatal(err)
+	}
+}
+
+func TestOversizedOneRequestUploadsAreRefusedBeforeSending(t *testing.T) {
+	c, h := setup(t)
+	ctx := context.Background()
+	cases := []struct {
+		mime string
+		size int64
+	}{
+		{"image/png", 10*1024*1024 + 1},
+		{"video/mp4", 50*1024*1024 + 1},
+		{"application/pdf", 5000*1024*1024 + 1},
+	}
+	for _, tc := range cases {
+		size := tc.size
+		// The stream is never read: the declared size is refused first.
+		_, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "big", Content: &Content{Type: tc.mime, Data: strings.NewReader(""), SizeInBytes: &size}})
+		if ErrorCode(err) != CodeFileTooLarge {
+			t.Fatal(tc.mime, err)
+		}
+	}
+	if len(h.calls) != 0 {
+		t.Fatal("sent", len(h.calls))
+	}
+	// At the limit the upload is sent.
+	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": "processing", "moderation": JSON{"status": "pending"}}}
+	size := int64(10 * 1024 * 1024)
+	if _, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", Content: &Content{Type: "image/png", Bytes: make([]byte, size)}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.calls) != 1 {
+		t.Fatal("not sent", len(h.calls))
 	}
 }

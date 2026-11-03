@@ -68,6 +68,12 @@ error_codes! {
     MultipartImageTooSmall = "upload/multipart-image-too-small", 400;
     /// `upload/multipart-image-too-large` (HTTP 400): Multipart image uploads cannot exceed 20 MiB.
     MultipartImageTooLarge = "upload/multipart-image-too-large", 400;
+    /// `image/invalid-input` (HTTP 422): The image is corrupt or cannot be decoded. Upload a valid image file.
+    ImageInvalidInput = "image/invalid-input", 422;
+    /// `image/unsupported-format` (HTTP 422): This image format is not supported. Convert it to PNG, JPEG or WebP before uploading.
+    ImageUnsupportedFormat = "image/unsupported-format", 422;
+    /// `image/input-limit` (HTTP 422): The image exceeds the processing byte or pixel limit. Reduce its size before uploading.
+    ImageInputLimit = "image/input-limit", 422;
     /// `upload/image-exceeded-max-dimensions` (HTTP 400): Image exceeds maximum dimensions. Maximum dimensions are 12,000px.
     ImageExceededMaxDimensions = "upload/image-exceeded-max-dimensions", 400;
     /// `upload/limit-exceeded` (HTTP 403): Upload limit exceeded. This project's organisation has used its free uploads. Set up billing to continue uploading.

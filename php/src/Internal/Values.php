@@ -9,6 +9,25 @@ use CalmLens\CalmLensException;
 /** @internal */
 final class Values
 {
+    /** Option keys of methods that send no request of their own, or take keys of their own beside one. */
+    private const LOCAL_OPTION_KEYS = [
+        'assets.waitForDecision' => ['assetId', 'timeout'],
+        'cdn.getAssetUrl' => ['assetIdentifier', 'lens', 'resource', 'transform', 'viewerClaims'],
+        'cdn.serve' => ['assetIdentifier', 'init', 'lens', 'resource', 'transform', 'viewerClaims'],
+        'uploadTokens.sign' => ['expiresInSeconds', 'externalId', 'uploadPresetId'],
+    ];
+
+    /** Fails with `sdk/invalid-argument` for an option `$operation` doesn't take, such as a misspelt key. */
+    public static function knownOptions(array $options, string $operation): void
+    {
+        $allowed = self::LOCAL_OPTION_KEYS[$operation] ?? OptionKeys::KEYS[$operation]
+            ?? throw new \LogicException("No option keys for $operation");
+        $unknown = array_diff(array_map('strval', array_keys($options)), [...$allowed, 'requestOptions']);
+        if ($unknown !== []) {
+            self::invalid('Unknown option' . (count($unknown) > 1 ? 's' : '') . " for $operation: " . implode(', ', $unknown));
+        }
+    }
+
     public static function invalid(string $message, string $code = 'sdk/invalid-argument'): never
     {
         throw CalmLensException::create($code, $message);

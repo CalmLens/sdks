@@ -36,6 +36,9 @@ export const API_ERROR_CODES = {
   FILE_TOO_LARGE: "upload/file-too-large",
   MULTIPART_IMAGE_TOO_SMALL: "upload/multipart-image-too-small",
   MULTIPART_IMAGE_TOO_LARGE: "upload/multipart-image-too-large",
+  IMAGE_INVALID_INPUT: "image/invalid-input",
+  IMAGE_UNSUPPORTED_FORMAT: "image/unsupported-format",
+  IMAGE_INPUT_LIMIT: "image/input-limit",
   IMAGE_EXCEEDED_MAX_DIMENSIONS: "upload/image-exceeded-max-dimensions",
   UPLOAD_LIMIT_EXCEEDED: "upload/limit-exceeded",
   SPEND_LIMIT_REACHED: "upload/spend-limit-reached",
@@ -256,6 +259,18 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "upload/multipart-image-too-large": {
     status: 400,
     message: "Multipart image uploads cannot exceed 20 MiB.",
+  },
+  "image/invalid-input": {
+    status: 422,
+    message: "The image is corrupt or cannot be decoded. Upload a valid image file.",
+  },
+  "image/unsupported-format": {
+    status: 422,
+    message: "This image format is not supported. Convert it to PNG, JPEG or WebP before uploading.",
+  },
+  "image/input-limit": {
+    status: 422,
+    message: "The image exceeds the processing byte or pixel limit. Reduce its size before uploading.",
   },
   "upload/image-exceeded-max-dimensions": {
     status: 400,

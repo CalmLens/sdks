@@ -70,12 +70,16 @@ public final class ErrorCodes {
   public static final String PERMISSION_DENIED = "auth/permission-denied";
   /** {@code upload/file-too-large} (HTTP 400). */
   public static final String FILE_TOO_LARGE = "upload/file-too-large";
-  /** {@code upload/multipart-image-too-small} (HTTP 400). */
-  public static final String MULTIPART_IMAGE_TOO_SMALL = "upload/multipart-image-too-small";
   /** {@code upload/multipart-image-too-large} (HTTP 400). */
   public static final String MULTIPART_IMAGE_TOO_LARGE = "upload/multipart-image-too-large";
   /** {@code upload/image-exceeded-max-dimensions} (HTTP 400). */
   public static final String IMAGE_EXCEEDED_MAX_DIMENSIONS = "upload/image-exceeded-max-dimensions";
+  /** {@code image/invalid-input} (HTTP 422). */
+  public static final String IMAGE_INVALID_INPUT = "image/invalid-input";
+  /** {@code image/unsupported-format} (HTTP 422). */
+  public static final String IMAGE_UNSUPPORTED_FORMAT = "image/unsupported-format";
+  /** {@code image/input-limit} (HTTP 422). */
+  public static final String IMAGE_INPUT_LIMIT = "image/input-limit";
   /** {@code upload/limit-exceeded} (HTTP 403). */
   public static final String UPLOAD_LIMIT_EXCEEDED = "upload/limit-exceeded";
   /** {@code upload/spend-limit-reached} (HTTP 402). */
@@ -282,9 +286,11 @@ public final class ErrorCodes {
       Map.entry(API_KEY_NOT_ACCEPTED, 403),
       Map.entry(PERMISSION_DENIED, 403),
       Map.entry(FILE_TOO_LARGE, 400),
-      Map.entry(MULTIPART_IMAGE_TOO_SMALL, 400),
       Map.entry(MULTIPART_IMAGE_TOO_LARGE, 400),
       Map.entry(IMAGE_EXCEEDED_MAX_DIMENSIONS, 400),
+      Map.entry(IMAGE_INVALID_INPUT, 422),
+      Map.entry(IMAGE_UNSUPPORTED_FORMAT, 422),
+      Map.entry(IMAGE_INPUT_LIMIT, 422),
       Map.entry(UPLOAD_LIMIT_EXCEEDED, 403),
       Map.entry(SPEND_LIMIT_REACHED, 402),
       Map.entry(INVALID_UPLOAD_MIME_TYPE, 400),

@@ -4,13 +4,15 @@ import {
   getAssetPayloadByteLength,
   validateAssetPayload,
 } from "../contract/AssetPayload.js";
+import { MAX_MEDIA_UPLOAD_BYTES } from "../contract/Media.js";
 import { selectModerationContextItems } from "../contract/ModerationContextLimits.js";
 import {
   DOMAIN,
   getRejectedUploadMimeTypeError,
   isRejectedUploadMimeType,
+  MAX_DIRECT_IMAGE_UPLOAD_BYTES,
   MAX_IMAGE_UPLOAD_BYTES,
-  MIN_MULTIPART_IMAGE_UPLOAD_BYTES,
+  MAX_NON_IMAGE_UPLOAD_BYTES,
 } from "../contract/SharedConstants.js";
 import { CalmLensError, invalidArgument, SDK_ERROR_CODES } from "./CalmLensError";
 import { API_ERROR_CODES } from "./CalmLensErrorCodes";
@@ -122,6 +124,28 @@ export const assertDeclaredPayloadSize = (
   }
 };
 
+/**
+ * Refuses one-request content whose known size is over the API's limit for its type: images up
+ * to 10 MiB (larger ones are uploaded in parts), audio and video up to 50 MiB, other files up to
+ * 5,000 MiB. Nothing is sent, so an oversized file fails at once instead of after its upload.
+ */
+const assertDirectUploadSize = (
+  content: AssetBinaryPayloadInput & { type: string; sizeInBytes?: number },
+) => {
+  const size = content.sizeInBytes ?? getAssetPayloadByteLength(content);
+  if (size === undefined) return;
+  const type = content.type.toLowerCase();
+  const [limit, message] = type.startsWith("image/")
+    ? [
+        MAX_DIRECT_IMAGE_UPLOAD_BYTES,
+        "Images uploaded in one request can be at most 10 MiB; upload larger images in parts",
+      ]
+    : type.startsWith("audio/") || type.startsWith("video/")
+      ? [MAX_MEDIA_UPLOAD_BYTES, "Audio and video files can be at most 50 MiB"]
+      : [MAX_NON_IMAGE_UPLOAD_BYTES, "Files can be at most 5,000 MiB"];
+  if (size > limit) throw new CalmLensError(API_ERROR_CODES.FILE_TOO_LARGE, { message });
+};
+
 /** Checks upload options before anything is sent. */
 export const prepareSubmitAssetOptions = (
   options: SubmitAssetOptions,
@@ -147,6 +171,7 @@ export const prepareSubmitAssetOptions = (
   if ("content" in options) {
     assertDeclaredPayloadSize(options.content);
     assertValidUploadMimeType(options.content.type);
+    if (!deferUploadChecks) assertDirectUploadSize(options.content);
     if (!("plainText" in options.content)) {
       const validation = validateAssetPayload(options.content);
       if (!validation.ok) throw invalidPayload(validation.error);
@@ -160,11 +185,6 @@ export const prepareSubmitAssetOptions = (
       if (partSizeInBytes > MAX_IMAGE_UPLOAD_BYTES) {
         throw new CalmLensError(API_ERROR_CODES.MULTIPART_IMAGE_TOO_LARGE, {
           message: "Multipart image uploads cannot exceed 20MB.",
-        });
-      }
-      if (options.part.isFinal && partSizeInBytes < MIN_MULTIPART_IMAGE_UPLOAD_BYTES) {
-        throw new CalmLensError(API_ERROR_CODES.MULTIPART_IMAGE_TOO_SMALL, {
-          message: "Multipart image uploads must total at least 10MB.",
         });
       }
     }

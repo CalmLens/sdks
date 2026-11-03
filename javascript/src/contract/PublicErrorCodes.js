@@ -455,6 +455,21 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "Multipart image uploads cannot exceed 20 MiB.",
 		status: 400
 	}),
+	IMAGE_INVALID_INPUT: new ErrorCode({
+		id: "image/invalid-input",
+		defaultMessage: "The image is corrupt or cannot be decoded. Upload a valid image file.",
+		status: 422
+	}),
+	IMAGE_UNSUPPORTED_FORMAT: new ErrorCode({
+		id: "image/unsupported-format",
+		defaultMessage: "This image format is not supported. Convert it to PNG, JPEG or WebP before uploading.",
+		status: 422
+	}),
+	IMAGE_INPUT_LIMIT: new ErrorCode({
+		id: "image/input-limit",
+		defaultMessage: "The image exceeds the processing byte or pixel limit. Reduce its size before uploading.",
+		status: 422
+	}),
 	IMAGE_EXCEEDED_MAX_DIMENSIONS: new ErrorCode({
 		id: "upload/image-exceeded-max-dimensions",
 		defaultMessage: "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",

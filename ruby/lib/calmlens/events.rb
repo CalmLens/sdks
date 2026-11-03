@@ -3,13 +3,16 @@
 module CalmLens
   # The project's events feed. Reach it through {ServerClient#events}.
   class Events < Resource
+    # The prefix of this resource's operations in Internal::OPTION_KEYS.
+    OPERATIONS = 'events'
+
     # Lists events after a cursor, oldest first. Without `cursor`, returns no events and a
     # `nextCursor` for the current time: save it, then pass each response's `nextCursor` as `cursor`.
     # @option options [String] :cursor the `nextCursor` of a previous response
     # @option options [Integer] :page_size 1 to 100, default 50
     # @return [Hash] `{'items', 'nextCursor', 'hasMore'}`; `nextCursor` is never nil
     def list(options = {})
-      call(options) { |api, request| request('GET', project('events'), query: api, request_options: request) }
+      call(options, __method__) { |api, request| request('GET', project('events'), query: api, request_options: request) }
     end
 
     # Iterates pages from `cursor` until `hasMore` is false. Persist each page's `nextCursor` once its
@@ -20,7 +23,7 @@ module CalmLens
     def each_page(options = {})
       return enum_for(:each_page, options) unless block_given?
 
-      api, request = call(options) { |*split| split }
+      api, request = call(options, __method__) { |*split| split }
       sent = api.key?('cursor') ? [api['cursor']] : []
       loop do
         page = list(api.merge('request_options' => request))

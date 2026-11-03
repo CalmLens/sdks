@@ -1,10 +1,6 @@
-import type {
-  AssetModerationStatus,
-  CdnTransform,
-  ViewerClaims,
-} from "../client/CalmLensTypes";
+import type { AssetModerationStatus, CdnTransform, ViewerClaims } from "../client/CalmLensTypes";
 import { getAssetUrl, serializeTransform, transformSelector } from "../client/CalmLensUtils";
-import { EU_COUNTRIES } from "../contract/Jurisdiction.js";
+import { EU_COUNTRIES } from "../client/CalmLensViewerClaims";
 import { placeholderHashToDataURL } from "../contract/PlaceholderHashDecode.js";
 
 /**

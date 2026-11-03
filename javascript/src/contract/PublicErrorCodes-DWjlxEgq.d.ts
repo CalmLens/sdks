@@ -41,6 +41,9 @@ declare const PUBLIC_ERROR_CODES: {
   readonly FILE_TOO_LARGE: RequestErrorCode;
   readonly MULTIPART_IMAGE_TOO_SMALL: RequestErrorCode;
   readonly MULTIPART_IMAGE_TOO_LARGE: RequestErrorCode;
+  readonly IMAGE_INVALID_INPUT: RequestErrorCode;
+  readonly IMAGE_UNSUPPORTED_FORMAT: RequestErrorCode;
+  readonly IMAGE_INPUT_LIMIT: RequestErrorCode;
   readonly IMAGE_EXCEEDED_MAX_DIMENSIONS: RequestErrorCode;
   readonly UPLOAD_LIMIT_EXCEEDED: RequestErrorCode;
   readonly SPEND_LIMIT_REACHED: RequestErrorCode;

@@ -179,6 +179,34 @@ class ClientTests(ClientTestCase):
         self.client.assets.create({"name": "x.png", "part": {"data": b"x" * mib, "isFinal": True, "type": "image/png"}})
         self.assertEqual((self.query()["partNumber"], self.query()["isFinal"]), (["1"], ["true"]))
 
+    def test_oversized_one_request_uploads_are_refused_before_sending(self):
+        mib = 1024 * 1024
+        for mime, size in [("image/png", 10 * mib + 1), ("video/mp4", 50 * mib + 1),
+                           ("application/pdf", 5000 * mib + 1)]:
+            # A stream that can't be read again goes in one request; its declared size is refused first.
+            content = {"data": Unseekable(b""), "sizeInBytes": size, "type": mime}
+            with self.subTest(mime=mime), self.assertRaises(CalmLensValidationError) as raised:
+                self.client.assets.create(name="big", content=content)
+            self.assertEqual((raised.exception.code, raised.exception.status), (error_codes.FILE_TOO_LARGE, None))
+        self.assertEqual(self.calls, [])
+        self.client.assets.create(name="x.png", content={"data": Unseekable(b"x" * 10 * mib), "sizeInBytes": 10 * mib,
+                                                          "type": "image/png"})
+        self.assertEqual(len(self.calls), 1)
+
+    def test_unknown_option_keys_are_refused_before_sending(self):
+        calls = [
+            lambda: self.client.text.classify({"text": "hi", "extrenalId": "post-1"}),
+            lambda: self.client.assets.retrieve({"assetId": "a", "assetID": "b"}),
+            lambda: self.client.assets.create({"name": "a.txt", "content": {"plainText": "a", "type": "text/plain"},
+                                               "visiblity": "private"}),
+            lambda: self.client.upload_tokens.sign({"uploadPresetId": "preset_1", "external": "x"}),
+        ]
+        for call in calls:
+            with self.assertRaises(CalmLensValidationError) as raised:
+                call()
+            self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
+        self.assertEqual(self.calls, [])
+
     def test_validation_before_network(self):
         cases = [
             {"name": "x"},

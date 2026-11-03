@@ -39,6 +39,9 @@ module CalmLens
     FILE_TOO_LARGE = 'upload/file-too-large'
     MULTIPART_IMAGE_TOO_SMALL = 'upload/multipart-image-too-small'
     MULTIPART_IMAGE_TOO_LARGE = 'upload/multipart-image-too-large'
+    IMAGE_INVALID_INPUT = 'image/invalid-input'
+    IMAGE_UNSUPPORTED_FORMAT = 'image/unsupported-format'
+    IMAGE_INPUT_LIMIT = 'image/input-limit'
     IMAGE_EXCEEDED_MAX_DIMENSIONS = 'upload/image-exceeded-max-dimensions'
     UPLOAD_LIMIT_EXCEEDED = 'upload/limit-exceeded'
     SPEND_LIMIT_REACHED = 'upload/spend-limit-reached'
@@ -150,6 +153,9 @@ module CalmLens
       'upload/file-too-large' => 400,
       'upload/multipart-image-too-small' => 400,
       'upload/multipart-image-too-large' => 400,
+      'image/invalid-input' => 422,
+      'image/unsupported-format' => 422,
+      'image/input-limit' => 422,
       'upload/image-exceeded-max-dimensions' => 400,
       'upload/limit-exceeded' => 403,
       'upload/spend-limit-reached' => 402,

@@ -13,6 +13,11 @@ export const manifests = {
   java: ["java/pom.xml", /(<artifactId>calmlens-sdk<\/artifactId><version>)[^<]+(<\/version>)/],
   go: ["go/version.go", /^(const Version = ")[^"]+(")/m],
 };
+/** The Java README's install snippet, which names the release to depend on. */
+export const javaReadme = [
+  "java/README.md",
+  /(<artifactId>calmlens-sdk<\/artifactId>\n\s*<version>)[^<]+(<\/version>)/,
+];
 export function replaceVersion(source, pattern, version) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`Invalid stable version: ${version}`);
   if (!pattern.test(source)) throw new Error("Missing SDK version field");
@@ -47,6 +52,14 @@ export function syncVersions(directory, check = false) {
       const next = replaceVersion(contents, /^(\s+calmlens \()[^)]+(\))$/gm, version);
       if (check && contents !== next) throw new Error("Ruby lockfile version disagrees with gem");
       if (!check) writeFileSync(lock, next);
+    }
+    if (language === "java") {
+      const readme = resolve(directory, javaReadme[0]);
+      const contents = readFileSync(readme, "utf8");
+      const next = replaceVersion(contents, javaReadme[1], version);
+      if (check && contents !== next)
+        throw new Error("The Java README's install snippet disagrees with the SDK version");
+      if (!check) writeFileSync(readme, next);
     }
     if (language === "java" && !check) {
       const example = resolve(directory, "examples/marketplace-listing-java/pom.xml");

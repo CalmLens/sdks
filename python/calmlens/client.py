@@ -644,6 +644,22 @@ def _image_size(size: int | None) -> None:
         raise CalmLensValidationError(error_codes.MULTIPART_IMAGE_TOO_LARGE)
 
 
+def _direct_size(mime: str, size: int | None) -> None:
+    """Refuse one-request content whose known size is over the API's limit for its type: images
+    up to 10 MiB (larger ones are uploaded in parts), audio and video up to 50 MiB and other files
+    up to 5,000 MiB, before any of it is sent."""
+    if size is None:
+        return
+    if mime.startswith("image/"):
+        limit, message = 10 * 1024 * 1024, "Images uploaded in one request can be at most 10 MiB; upload larger images in parts"
+    elif mime.startswith(("audio/", "video/")):
+        limit, message = 50 * 1024 * 1024, "Audio and video files can be at most 50 MiB"
+    else:
+        limit, message = 5000 * 1024 * 1024, "Files can be at most 5,000 MiB"
+    if size > limit:
+        raise CalmLensValidationError(error_codes.FILE_TOO_LARGE, message)
+
+
 def _camel(key: str) -> str:
     head, *tail = key.split("_")
     return head + "".join(word[:1].upper() + word[1:] for word in tail)
@@ -684,6 +700,11 @@ def _merge(options: Mapping[str, Any] | None, **keywords: Any) -> dict[str, Any]
             raise _invalid("Use keyword arguments or one options dict, not both")
         if not isinstance(options, Mapping):
             raise _invalid(f"options must be a dict, not {type(options).__name__}")
+        # The dict takes the keyword arguments' camelCase names; a misspelt key fails, as a keyword would.
+        allowed = {_camel(name) for name in keywords}
+        unknown = [str(key) for key in options if key not in allowed]
+        if unknown:
+            raise _invalid(f"Unknown option{'s' if len(unknown) > 1 else ''}: {', '.join(unknown)}")
         return dict(options)
     return cast(dict[str, Any], _convert(given))
 
@@ -1281,6 +1302,8 @@ class Assets:
             if checked and normalized.startswith("image/"):
                 _image_size(body.size)
             return self._upload_in_parts(query, mime, body, key)
+        if checked and not multipart:
+            _direct_size(normalized, body.size)
         if multipart:
             query.update(partNumber=1, isFinal=payload.get("isFinal", False), totalSizeInBytes=total)
         headers = {"Content-Type": _header_value("type", mime), "X-CalmLens-Upload": "part" if multipart else "content"}
@@ -1843,7 +1866,7 @@ class Text:
                         metadata=metadata, author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id)
         value = merged.pop("text", None)
         if not isinstance(value, str) or not value.strip():
-            raise _invalid("Text to classify must be a non-empty string", error_codes.INVALID_UPLOAD_PAYLOAD)
+            raise _invalid("Text to classify must be a non-empty string")
         merged.setdefault("name", "text")
         merged["content"] = {"plainText": value, "type": "text/plain"}
         return self._c.assets.classify(cast(SubmitAssetOptions, merged), idempotency_key=idempotency_key)

@@ -8,6 +8,7 @@ end
 require_relative 'calmlens/version'
 require_relative 'calmlens/error_codes'
 require_relative 'calmlens/errors'
+require_relative 'calmlens/option_keys'
 require_relative 'calmlens/internal'
 require_relative 'calmlens/transforms'
 require_relative 'calmlens/response'

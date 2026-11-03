@@ -508,7 +508,7 @@ func (b *cancelOnClose) Close() error {
 // Classify moderates plain text and waits for the decision.
 func (s *TextService) Classify(ctx context.Context, options ClassifyTextOptions) (*Asset, error) {
 	if strings.TrimSpace(options.Text) == "" {
-		return nil, invalid(CodeInvalidUploadPayload, "Text to classify must be a non-empty string")
+		return nil, invalid(CodeSDKInvalidArgument, "Text to classify must be a non-empty string")
 	}
 	if options.Name == "" {
 		options.Name = "text"

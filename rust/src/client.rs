@@ -649,6 +649,9 @@ impl ServerClient {
             }
             check_part_size(size, is_final)?;
         }
+        if !multipart && !self.inner.transport.defers_upload_checks() {
+            check_direct_size(&mime, size)?;
+        }
         query.push("contentType", &content.mime_type);
         query.opt("sizeInBytes", size);
         if multipart {
@@ -738,9 +741,9 @@ fn check_part_size(size: Option<u64>, is_final: bool) -> Result<()> {
     Ok(())
 }
 
-/// Refuses a first multipart image part over 20 MiB, or a final one (the whole image) under
-/// 10 MiB, before it is sent.
-fn check_image_size(size: Option<u64>, is_final: bool) -> Result<()> {
+/// Refuses a first multipart image part over 20 MiB before it is sent. Images in parts can be any
+/// size below that, down to a single final part.
+fn check_image_size(size: Option<u64>, _is_final: bool) -> Result<()> {
     let Some(size) = size else { return Ok(()) };
     if size > 20 * 1024 * 1024 {
         return Err(Error::new(
@@ -748,11 +751,29 @@ fn check_image_size(size: Option<u64>, is_final: bool) -> Result<()> {
             "Multipart image uploads cannot exceed 20MB.",
         ));
     }
-    if is_final && size < 10 * 1024 * 1024 {
-        return Err(Error::new(
-            ErrorCode::MultipartImageTooSmall,
-            "Multipart image uploads must total at least 10MB.",
-        ));
+    Ok(())
+}
+
+/// Refuses one-request content whose known size is over the API's limit for its type, before it
+/// is sent: images up to 10 MiB (larger ones are uploaded in parts), audio and video up to 50 MiB
+/// and other files up to 5,000 MiB.
+fn check_direct_size(mime: &str, size: Option<u64>) -> Result<()> {
+    let Some(size) = size else { return Ok(()) };
+    let (limit, message) = if mime.starts_with("image/") {
+        (
+            10 * 1024 * 1024,
+            "Images uploaded in one request can be at most 10 MiB; upload larger images in parts",
+        )
+    } else if mime.starts_with("audio/") || mime.starts_with("video/") {
+        (
+            50 * 1024 * 1024,
+            "Audio and video files can be at most 50 MiB",
+        )
+    } else {
+        (5000 * 1024 * 1024, "Files can be at most 5,000 MiB")
+    };
+    if size > limit {
+        return Err(Error::new(ErrorCode::FileTooLarge, message));
     }
     Ok(())
 }
@@ -1420,6 +1441,11 @@ pub struct TextClient<'a>(&'a ServerClient);
 impl TextClient<'_> {
     /// Moderates text as a `text/plain` asset named `text` unless `name` is set.
     pub async fn classify(&self, options: ClassifyText) -> Result<Asset> {
+        if options.text.trim().is_empty() {
+            return Err(invalid_argument(
+                "Text to classify must be a non-empty string",
+            ));
+        }
         self.0
             .assets()
             .classify(SubmitAsset {

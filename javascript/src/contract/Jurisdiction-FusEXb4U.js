@@ -42,4 +42,4 @@ const VIEWER_CLAIMS_SCHEMA = z.object({
 	region: VIEWER_REGION_SCHEMA.optional().describe("Viewer country. Defaults to the country of the connection reaching CalmLens; proxies should forward the viewer country explicitly."),
 	ageConfirmed: z.boolean().optional().describe("Customer confirmation that age-restricted content may be delivered. Defaults to false; CalmLens does not verify the assertion.")
 }).strict();
-export { VIEWER_CLAIMS_SCHEMA as i, JURISDICTION_SCHEMA as n, SERVED_JURISDICTIONS_SCHEMA as r, EU_COUNTRIES as t };
+export { VIEWER_REGION_SCHEMA as a, VIEWER_CLAIMS_SCHEMA as i, JURISDICTION_SCHEMA as n, SERVED_JURISDICTIONS_SCHEMA as r, EU_COUNTRIES as t };

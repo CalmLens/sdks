@@ -21,8 +21,11 @@ const createPackage = (files: Record<string, string>, manifest: Record<string, u
   return directory;
 };
 
-const check = (directory: string) =>
-  findPackageProblems(directory, { internalPackageNames: new Set(["shared", "shared-backend"]) });
+const check = (directory: string, selfContainedEntries: string[] = []) =>
+  findPackageProblems(directory, {
+    internalPackageNames: new Set(["shared", "shared-backend"]),
+    selfContainedEntries,
+  });
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
@@ -70,6 +73,21 @@ describe("verify-package", () => {
     expect(check(directory)).toEqual([
       'esm/a.d.ts: imports "zod" but "zod" is not in dependencies or peerDependencies',
       'esm/a.js: imports "sendable-error" but "sendable-error" is not in dependencies or peerDependencies',
+    ]);
+  });
+
+  test("rejects packages a self-contained entry point loads at runtime, through any chunk", () => {
+    const directory = createPackage(
+      {
+        "esm/app.js": 'import { claims } from "./claims.js";\nimport "node:crypto";',
+        "esm/claims.js": 'import * as z from "zod";\nexport const claims = z.object({});',
+        "esm/app.d.ts": 'import type * as z from "zod";',
+        "esm/testing.js": 'import * as z from "zod";',
+      },
+      { dependencies: { zod: "4.0.0" } },
+    );
+    expect(check(directory, ["esm/app.js"])).toEqual([
+      'esm/app.js loads "zod" at runtime (from esm/claims.js); it must load no other package',
     ]);
   });
 

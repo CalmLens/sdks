@@ -5,12 +5,15 @@ module CalmLens
   # project: a `flag` list reports matches, a `block` list also blocks close matches. Reach it through
   # {ServerClient#hash_lists}.
   class HashLists < Resource
+    # The prefix of this resource's operations in Internal::OPTION_KEYS.
+    OPERATIONS = 'hashLists'
+
     # Lists one page of the project's hash lists, newest first.
     # @option options [String] :cursor the previous page's `nextCursor`
     # @option options [Integer] :page_size 1 to 100, default 50
     # @return [Hash] a cursor page: items, nextCursor, hasMore, pageSize and ordering.
     def list(options = {})
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         response = request('GET', project('hash-lists'), query: api, request_options: request)
         valid = response.is_a?(Hash) && response['items'].is_a?(Array)
         raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Invalid hash list page') unless valid
@@ -22,7 +25,7 @@ module CalmLens
     # @option options [String] :hash_list_id
     # @return [Hash] the hash list
     def retrieve(options)
-      call(options) { |api, request| request('GET', list_path(api), request_options: request) }
+      call(options, __method__) { |api, request| request('GET', list_path(api), request_options: request) }
     end
 
     # @option options [String] :name
@@ -30,7 +33,7 @@ module CalmLens
     # @option options [String, nil] :description
     # @return [Hash] the hash list
     def create(options)
-      call(options) { |api, request| request('POST', project('hash-lists'), body: api, request_options: request) }
+      call(options, __method__) { |api, request| request('POST', project('hash-lists'), body: api, request_options: request) }
     end
 
     # Renames a list or changes what its matches do. The new action applies to later uploads.
@@ -40,7 +43,7 @@ module CalmLens
     # @option options [String] :action `flag` or `block`
     # @return [Hash] the hash list
     def update(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('PATCH', list_path(api), body: without(api, 'hashListId'), request_options: request)
       end
     end
@@ -49,7 +52,7 @@ module CalmLens
     # @option options [String] :hash_list_id
     # @return [nil]
     def delete(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('DELETE', list_path(api), request_options: request)
         nil
       end
@@ -61,7 +64,7 @@ module CalmLens
     # @option options [Integer] :page_size 1 to 100, default 50
     # @return [Hash] a cursor page: items, nextCursor, hasMore, pageSize and ordering.
     def list_entries(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('GET', "#{list_path(api)}/entries", query: without(api, 'hashListId'), request_options: request)
       end
     end
@@ -74,7 +77,7 @@ module CalmLens
     # @option options [String] :label
     # @return [Hash] the entry
     def add_entry(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('POST', "#{list_path(api)}/entries", body: without(api, 'hashListId'), request_options: request)
       end
     end
@@ -82,7 +85,7 @@ module CalmLens
     # @option options [String] :entry_id
     # @return [nil]
     def remove_entry(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('DELETE', "/hash-list-entries/#{Internal.segment(api['entryId'])}", request_options: request)
         nil
       end

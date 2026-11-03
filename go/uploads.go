@@ -79,13 +79,37 @@ func partSize(content Content, size *int64) error {
 	return nil
 }
 
-// imageSize checks a multipart image total; final also enforces the minimum.
+// The API's limits for one-request uploads: images up to 10 MiB (larger ones are uploaded in
+// parts), audio and video up to 50 MiB and other files up to 5,000 MiB.
+const (
+	maxDirectImageBytes = 10 * 1024 * 1024
+	maxMediaBytes       = 50 * 1024 * 1024
+	maxFileBytes        = 5000 * 1024 * 1024
+)
+
+// directSize refuses one-request content whose known size is over the API's limit for its
+// type, before any of it is sent.
+func directSize(mime string, size *int64) error {
+	if size == nil {
+		return nil
+	}
+	limit, message := int64(maxFileBytes), "Files can be at most 5,000 MiB"
+	switch {
+	case strings.HasPrefix(mime, "image/"):
+		limit, message = maxDirectImageBytes, "Images uploaded in one request can be at most 10 MiB; upload larger images in parts"
+	case strings.HasPrefix(mime, "audio/") || strings.HasPrefix(mime, "video/"):
+		limit, message = maxMediaBytes, "Audio and video files can be at most 50 MiB"
+	}
+	if *size > limit {
+		return invalid(CodeFileTooLarge, message)
+	}
+	return nil
+}
+
+// imageSize checks a multipart image total: images in parts can be any size up to 20 MiB.
 func imageSize(size *int64, final bool) error {
 	if size != nil && *size > 20*1024*1024 {
 		return invalid(CodeMultipartImageTooLarge, "Multipart image uploads cannot exceed 20MB")
-	}
-	if final && size != nil && *size < 10*1024*1024 {
-		return invalid(CodeMultipartImageTooSmall, "Multipart image uploads must total at least 10MB")
 	}
 	return nil
 }
@@ -165,6 +189,11 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	raw, size, err := payload(*content, multipart)
 	if err != nil {
 		return nil, err
+	}
+	if !multipart && !s.c.deferUploadChecks {
+		if err = directSize(mime, size); err != nil {
+			return nil, err
+		}
 	}
 	if image && options.TotalSizeInBytes == nil {
 		if err = imageSize(size, content.IsFinal); err != nil {

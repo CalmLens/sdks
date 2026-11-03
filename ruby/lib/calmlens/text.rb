@@ -3,6 +3,9 @@
 module CalmLens
   # Text moderation shortcuts. Reach it through {ServerClient#text}.
   class Text < Resource
+    # The prefix of this resource's operations in Internal::OPTION_KEYS.
+    OPERATIONS = 'text'
+
     # @api private
     def initialize(session, assets)
       super(session)
@@ -17,11 +20,9 @@ module CalmLens
     # @return [Hash] the asset; show it to everyone only when `classification.moderation.status` is
     #   `allowed` or `limited` (reduce the reach of `limited` content).
     def classify(options)
-      api, request = call(options) { |*split| split }
+      api, request = call(options, __method__) { |*split| split }
       text = api['text']
-      unless text.is_a?(String) && !text.strip.empty?
-        raise Internal.invalid('Text to classify must be a non-empty string', ErrorCodes::INVALID_UPLOAD_PAYLOAD)
-      end
+      raise Internal.invalid('Text to classify must be a non-empty string') unless text.is_a?(String) && !text.strip.empty?
 
       @assets.classify(without(api, 'text').merge('name' => api.fetch('name', 'text'),
                                                   'content' => { 'plainText' => text, 'type' => 'text/plain' },

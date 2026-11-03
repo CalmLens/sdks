@@ -1088,6 +1088,102 @@
     }
   },
   {
+    "code": "image/invalid-input",
+    "status": 422,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-image-invalid-input"
+      },
+      "body": {
+        "code": "image/invalid-input",
+        "message": "The image is corrupt or cannot be decoded. Upload a valid image file.",
+        "requestId": "req-image-invalid-input",
+        "details": {
+          "reason": "image_invalid_input"
+        }
+      }
+    },
+    "expected": {
+      "code": "image/invalid-input",
+      "status": 422,
+      "requestId": "req-image-invalid-input",
+      "retryAfter": null,
+      "details": {
+        "reason": "image_invalid_input"
+      }
+    }
+  },
+  {
+    "code": "image/unsupported-format",
+    "status": 422,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-image-unsupported-format"
+      },
+      "body": {
+        "code": "image/unsupported-format",
+        "message": "This image format is not supported. Convert it to PNG, JPEG or WebP before uploading.",
+        "requestId": "req-image-unsupported-format",
+        "details": {
+          "reason": "image_unsupported_format"
+        }
+      }
+    },
+    "expected": {
+      "code": "image/unsupported-format",
+      "status": 422,
+      "requestId": "req-image-unsupported-format",
+      "retryAfter": null,
+      "details": {
+        "reason": "image_unsupported_format"
+      }
+    }
+  },
+  {
+    "code": "image/input-limit",
+    "status": 422,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-image-input-limit"
+      },
+      "body": {
+        "code": "image/input-limit",
+        "message": "The image exceeds the processing byte or pixel limit. Reduce its size before uploading.",
+        "requestId": "req-image-input-limit",
+        "details": {
+          "reason": "image_input_limit"
+        }
+      }
+    },
+    "expected": {
+      "code": "image/input-limit",
+      "status": 422,
+      "requestId": "req-image-input-limit",
+      "retryAfter": null,
+      "details": {
+        "reason": "image_input_limit"
+      }
+    }
+  },
+  {
     "code": "upload/image-exceeded-max-dimensions",
     "status": 400,
     "operation": "assets.retrieve",

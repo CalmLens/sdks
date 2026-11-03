@@ -1,1 +1,1 @@
-export { t as DOMAIN, n as MAX_IMAGE_UPLOAD_BYTES, r as MIN_MULTIPART_IMAGE_UPLOAD_BYTES, i as MIN_MULTIPART_UPLOAD_PART_BYTES, a as getRejectedUploadMimeTypeError, o as isRejectedUploadMimeType } from "./SharedConstants-CyiUWW66.js";
+export { t as DOMAIN, n as MAX_DIRECT_IMAGE_UPLOAD_BYTES, r as MAX_IMAGE_UPLOAD_BYTES, i as MAX_NON_IMAGE_UPLOAD_BYTES, a as MIN_MULTIPART_IMAGE_UPLOAD_BYTES, o as MIN_MULTIPART_UPLOAD_PART_BYTES, s as getRejectedUploadMimeTypeError, c as isRejectedUploadMimeType } from "./SharedConstants-CyiUWW66.js";

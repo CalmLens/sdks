@@ -126,14 +126,6 @@ async fn multipart_sizes_are_refused_before_the_transport_without_a_status() {
             })
             .await
             .unwrap_err(),
-        // A final first part is the whole image: under 10 MiB.
-        mock.assets()
-            .create(SubmitAsset::multipart(
-                "small.png",
-                Content::bytes(vec![0; MIB], "image/png").part(1, true),
-            ))
-            .await
-            .unwrap_err(),
         // An image part over 20 MiB.
         mock.assets()
             .create(SubmitAsset::multipart(
@@ -152,7 +144,6 @@ async fn multipart_sizes_are_refused_before_the_transport_without_a_status() {
         [
             (ErrorCode::InvalidUploadPayload, None),
             (ErrorCode::InvalidUploadPayload, None),
-            (ErrorCode::MultipartImageTooSmall, None),
             (ErrorCode::MultipartImageTooLarge, None),
         ]
     );
@@ -598,4 +589,31 @@ async fn dropping_wait_for_decision_stops_retrieving() {
     tokio::task::yield_now().await;
     // Nothing runs after the future is dropped.
     assert_eq!(mock.requests().len(), 1);
+}
+
+#[tokio::test]
+async fn oversized_one_request_uploads_are_refused_before_the_transport() {
+    const MIB: u64 = 1024 * 1024;
+    let mock = MockServerClient::new().unwrap();
+    for (mime, size) in [
+        ("image/png", 10 * MIB + 1),
+        ("video/mp4", 50 * MIB + 1),
+        ("application/pdf", 5000 * MIB + 1),
+    ] {
+        // The reader is never read: its declared size is refused first.
+        let error = mock
+            .assets()
+            .create(SubmitAsset::new(
+                "big",
+                Content::reader(std::io::empty(), size, mime),
+            ))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            (error.code(), error.status()),
+            (&ErrorCode::FileTooLarge, None),
+            "{mime}"
+        );
+    }
+    assert!(mock.requests().is_empty());
 }

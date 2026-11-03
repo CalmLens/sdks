@@ -1,7 +1,5 @@
-import { VIEWER_CLAIMS_SCHEMA } from "../contract/Jurisdiction.js";
 import { DOMAIN } from "../contract/SharedConstants.js";
 import { CalmLensError, invalidArgument, invalidConfig, SDK_ERROR_CODES } from "./CalmLensError";
-import { API_ERROR_CODES } from "./CalmLensErrorCodes";
 import type {
   Asset,
   BatchAssetsOptions,
@@ -16,6 +14,7 @@ import type {
   SubmitAssetOptions,
   WaitForAssetDecisionOptions,
 } from "./CalmLensTypes";
+import { parseViewerClaims } from "./CalmLensViewerClaims";
 
 const assertHttpUrl = (name: string, value: string | undefined) => {
   if (value === undefined) return;
@@ -118,9 +117,7 @@ export const toTextAssetOptions = ({
   ...options
 }: ClassifyTextOptions): SubmitAssetOptions => {
   if (typeof text !== "string" || !text.trim())
-    throw new CalmLensError(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, {
-      message: "Text to classify must be a non-empty string",
-    });
+    throw invalidArgument("Text to classify must be a non-empty string");
   return { ...options, name: name ?? "text", content: { plainText: text, type: "text/plain" } };
 };
 
@@ -328,9 +325,9 @@ export const appendCdnSelector = (
   const path = appendCdnPathSelector(url, options);
   const query = new URLSearchParams();
   if (options.viewerClaims !== undefined) {
-    const claims = VIEWER_CLAIMS_SCHEMA.safeParse(options.viewerClaims);
-    if (!claims.success) throw invalidArgument("Invalid viewerClaims");
-    query.set("viewerClaims", JSON.stringify(claims.data));
+    const claims = parseViewerClaims(options.viewerClaims);
+    if (!claims) throw invalidArgument("Invalid viewerClaims");
+    query.set("viewerClaims", JSON.stringify(claims));
   }
   return query.size ? `${path}?${query}` : path;
 };

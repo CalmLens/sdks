@@ -13,8 +13,16 @@ abstract class Resource
     public function __construct(protected Session $session) {}
     public function __debugInfo(): array { return ['projectId' => $this->session->projectId]; }
 
-    protected function split(array $options): array
+    /** The prefix of this resource's operations in Internal\OptionKeys. */
+    protected const OPERATIONS = '';
+
+    /**
+     * Splits options from `requestOptions`. `$method` names the public method, whose options are
+     * checked against the keys it takes: an unknown key fails with `sdk/invalid-argument`.
+     */
+    protected function split(array $options, string $method): array
     {
+        Values::knownOptions($options, static::OPERATIONS . '.' . $method);
         $request = $options['requestOptions'] ?? [];
         if (!is_array($request)) {
             Values::invalid('requestOptions must be an array');

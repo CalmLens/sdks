@@ -1570,6 +1570,21 @@
       "retryable": false
     },
     {
+      "code": "image/invalid-input",
+      "status": 422,
+      "retryable": false
+    },
+    {
+      "code": "image/unsupported-format",
+      "status": 422,
+      "retryable": false
+    },
+    {
+      "code": "image/input-limit",
+      "status": 422,
+      "retryable": false
+    },
+    {
       "code": "upload/image-exceeded-max-dimensions",
       "status": 400,
       "retryable": false

@@ -33,15 +33,51 @@ final class ClientTest extends TestCase
         }
     }
 
-    public function testPaginationPreservesOpaqueCursorsAndFiltersForChildrenAndEvents(): void
+    public function testOversizedOneRequestUploadsAreRefusedBeforeSending(): void
+    {
+        $mock = new MockTransport();
+        $client = $mock->client();
+        $mib = 1024 * 1024;
+        foreach (['image/png' => 10 * $mib + 1, 'video/mp4' => 50 * $mib + 1, 'application/pdf' => 5000 * $mib + 1] as $type => $size) {
+            $stream = fopen('php://memory', 'r');
+            $this->error('upload/file-too-large', fn () => $client->assets->create(['name' => 'big', 'content' => ['type' => $type, 'data' => $stream, 'sizeInBytes' => $size]]));
+        }
+        self::assertSame([], $mock->requests());
+        $mock->enqueueJson(self::ASSET);
+        $client->assets->create(['name' => 'x.png', 'content' => ['type' => 'image/png', 'data' => str_repeat('x', 10 * $mib)]]);
+        self::assertCount(1, $mock->requests());
+    }
+
+    public function testUnknownOptionsAreRefusedBeforeSending(): void
+    {
+        $mock = new MockTransport();
+        $client = $mock->client();
+        $calls = [
+            'text.classify' => fn () => $client->text->classify(['text' => 'hi', 'extrenalId' => 'post-1']),
+            'assets.create' => fn () => $client->assets->create(['name' => 'a.txt', 'content' => ['plainText' => 'a', 'type' => 'text/plain'], 'visiblity' => 'private']),
+            'assets.retrieve' => fn () => $client->assets->retrieve(['assetId' => 'a', 'assetID' => 'b']),
+            'assets.waitForDecision' => fn () => $client->assets->waitForDecision(['assetId' => 'a', 'timeoutSeconds' => 5]),
+            'assets.listChildren' => fn () => iterator_to_array($client->assets->eachChild(['assetId' => 'a', 'filter' => 'name==a'])),
+            'cdn.getAssetUrl' => fn () => $client->cdn->getAssetUrl(['assetIdentifier' => 'a', 'lenz' => 'thumbnail']),
+            'uploadTokens.sign' => fn () => $client->uploadTokens->sign(['uploadPresetId' => 'preset_1', 'external' => 'x']),
+            'ensureLenses' => fn () => $client->ensureLenses(['lens' => [['identifier' => 'thumbnail']]]),
+        ];
+        foreach ($calls as $operation => $call) {
+            $error = $this->error('sdk/invalid-argument', $call);
+            self::assertStringContainsString($operation, $error->getMessage());
+        }
+        self::assertSame([], $mock->requests());
+    }
+
+    public function testPaginationPreservesOpaqueCursorsAndOptionsForChildrenAndEvents(): void
     {
         $mock = new MockTransport();
         $mock->enqueueJson(['items' => [['id' => 'child-1']], 'hasMore' => true, 'nextCursor' => 'opaque+/=']);
         $mock->enqueueJson(['items' => [['id' => 'child-2']], 'hasMore' => false, 'nextCursor' => null]);
         $client = $mock->client();
-        self::assertSame([['id' => 'child-1'], ['id' => 'child-2']], iterator_to_array($client->assets->eachChild(['assetId' => 'parent', 'filter' => 'name=in=(one,two)']), false));
+        self::assertSame([['id' => 'child-1'], ['id' => 'child-2']], iterator_to_array($client->assets->eachChild(['assetId' => 'parent', 'pageSize' => 2]), false));
         self::assertSame('/assets/parent/children', $mock->requests()[1]->path);
-        self::assertSame('filter=name%3Din%3D%28one%2Ctwo%29&cursor=opaque%2B%2F%3D', $mock->requests()[1]->request->getUri()->getQuery());
+        self::assertSame('pageSize=2&cursor=opaque%2B%2F%3D', $mock->requests()[1]->request->getUri()->getQuery());
         $mock->enqueueJson(['items' => [['id' => 'event-1']], 'hasMore' => true, 'nextCursor' => 'next+/=']);
         $mock->enqueueJson(['items' => [['id' => 'event-2']], 'hasMore' => false, 'nextCursor' => 'end']);
         self::assertSame([['id' => 'event-1'], ['id' => 'event-2']], iterator_to_array($client->events->each(['cursor' => 'start']), false));
@@ -189,7 +225,7 @@ final class ClientTest extends TestCase
         $gateway = $this->error('sdk/http-error', fn () => $client->assets->retrieve(['assetId' => 'a']));
         self::assertInstanceOf(Exception\ServerException::class, $gateway);
         self::assertInstanceOf(Exception\InvalidArgumentException::class, $this->error('sdk/invalid-argument', fn () => $client->assets->retrieve(['assetId' => ''])));
-        self::assertInstanceOf(Exception\InvalidArgumentException::class, $this->error('upload/invalid-payload', fn () => $client->text->classify(['text' => ' '])));
+        self::assertInstanceOf(Exception\InvalidArgumentException::class, $this->error('sdk/invalid-argument', fn () => $client->text->classify(['text' => ' '])));
         self::assertInstanceOf(Exception\ConfigurationException::class, $this->error('sdk/invalid-config', fn () => new ServerClient('key', 'p', timeout: 0)));
     }
 

@@ -3,6 +3,9 @@
 module CalmLens
   # CDN URLs and authenticated content delivery. Reach it through {ServerClient#cdn}.
   class CDN < Resource
+    # The prefix of this resource's operations in Internal::OPTION_KEYS.
+    OPERATIONS = 'cdn'
+
     RESOURCES = %w[original rendered placeholder].freeze
     private_constant :RESOURCES
 
@@ -24,7 +27,7 @@ module CalmLens
     #   asset, make it private and include the claim in a signed URL.
     # @return [String]
     def get_asset_url(options)
-      call(options) { |api, _request| url(api) }
+      call(options, __method__) { |api, _request| url(api) }
     end
 
     # Fetches content from the CDN with the client's API key.
@@ -47,7 +50,7 @@ module CalmLens
     #     end
     #   end
     def serve(options, &)
-      method, url, headers, request = call(options) do |api, request_options|
+      method, url, headers, request = call(options, __method__) do |api, request_options|
         init = api.fetch('init', {})
         raise Internal.invalid('init must be a Hash') unless init.is_a?(Hash)
 

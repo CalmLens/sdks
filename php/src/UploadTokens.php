@@ -34,6 +34,7 @@ final class UploadTokens
      */
     public static function signAt(#[\SensitiveParameter] string $apiKey, array $options, int $now, string $nonce): array
     {
+        Values::knownOptions($options, 'uploadTokens.sign');
         $preset = $options['uploadPresetId'] ?? null;
         Values::segment($preset);
         $ttl = $options['expiresInSeconds'] ?? self::DEFAULT_EXPIRES_IN_SECONDS;

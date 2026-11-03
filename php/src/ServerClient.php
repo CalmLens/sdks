@@ -72,6 +72,7 @@ final class ServerClient
 
     public function ensureLens(array $options): array
     {
+        Values::knownOptions($options, 'ensureLens');
         $request = $options['requestOptions'] ?? [];
         unset($options['requestOptions']);
         return $this->ensureLenses(['lenses' => [$options], 'requestOptions' => $request])[0];
@@ -79,6 +80,7 @@ final class ServerClient
 
     public function ensureLenses(array $options): array
     {
+        Values::knownOptions($options, 'ensureLenses');
         $definitions = $options['lenses'] ?? null;
         if (!is_array($definitions) || !array_is_list($definitions) || $definitions === []) {
             Values::invalid('Supply a non-empty list of lenses');

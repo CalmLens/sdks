@@ -3,6 +3,7 @@
 require 'minitest/autorun'
 require 'calmlens'
 require 'net/http'
+require 'stringio'
 
 class ServerClientTest < Minitest::Test
   OK = '{"id":"asset","upload":{"status":"completed"},"classification":{"status":"completed","moderation":{"status":"allowed"}}}'
@@ -149,11 +150,43 @@ class ServerClientTest < Minitest::Test
     end
   end
 
-  def test_unknown_snake_case_options_are_converted_but_metadata_keys_are_not
+  def test_snake_case_options_are_converted_but_metadata_keys_are_not
     client, sent = scripted([200, OK])
-    client.assets.update(asset_id: 'a', future_option: { nested_key: 1 }, metadata: { 'my_key' => { 'inner_key' => 2 } })
-    assert_equal({ 'futureOption' => { 'nestedKey' => 1 }, 'metadata' => { 'my_key' => { 'inner_key' => 2 } } },
+    client.assets.update(asset_id: 'a', external_url: 'https://example.com/a', metadata: { 'my_key' => { 'inner_key' => 2 } })
+    assert_equal({ 'externalUrl' => 'https://example.com/a', 'metadata' => { 'my_key' => { 'inner_key' => 2 } } },
                  JSON.parse(sent.first.body))
+  end
+
+  def test_oversized_one_request_uploads_are_refused_before_sending
+    client, sent = scripted([200, OK])
+    mib = 1024 * 1024
+    { 'image/png' => (10 * mib) + 1, 'video/mp4' => (50 * mib) + 1, 'application/pdf' => (5000 * mib) + 1 }.each do |type, size|
+      error = assert_raises(CalmLens::InvalidArgumentError, type) do
+        client.assets.create(name: 'big', content: { data: StringIO.new(''), size_in_bytes: size, type: type })
+      end
+      assert_equal CalmLens::ErrorCodes::FILE_TOO_LARGE, error.code
+    end
+    assert_empty sent
+    client.assets.create(name: 'x.png', content: { data: 'x' * (10 * mib), type: 'image/png' })
+    assert_equal 1, sent.size
+  end
+
+  def test_unknown_options_are_refused_before_sending
+    client, sent = scripted
+    calls = {
+      'text.classify' => -> { client.text.classify(text: 'hi', extrenal_id: 'post-1') },
+      'assets.create' => -> { client.assets.create(name: 'a.txt', content: { plain_text: 'a', type: 'text/plain' }, visiblity: 'private') },
+      'assets.retrieve' => -> { client.assets.retrieve(asset_id: 'a', 'assetID' => 'b') },
+      'assets.waitForDecision' => -> { client.assets.wait_for_decision(asset_id: 'a', timeout_seconds: 5) },
+      'cdn.getAssetUrl' => -> { client.cdn.get_asset_url(asset_identifier: 'a', lenz: 'thumbnail') },
+      'uploadTokens.sign' => -> { client.upload_tokens.sign(upload_preset_id: 'preset_1', external: 'x') }
+    }
+    calls.each do |operation, call|
+      error = assert_raises(CalmLens::InvalidArgumentError, operation) { call.call }
+      assert_equal 'sdk/invalid-argument', error.code
+      assert_includes error.message, operation
+    end
+    assert_empty sent
   end
 
   def test_unknown_response_values_are_returned_unchanged

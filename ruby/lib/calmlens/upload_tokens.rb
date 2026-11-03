@@ -9,6 +9,9 @@ module CalmLens
   # Signs upload tokens, which let a browser upload through an upload preset. Reach it through
   # {ServerClient#upload_tokens}. Signing happens locally with the API key; no request is made.
   class UploadTokens < Resource
+    # The prefix of this resource's operations in Internal::OPTION_KEYS.
+    OPERATIONS = 'uploadTokens'
+
     TOKEN_PREFIX = 'clut_'
     SIGNING_CONTEXT = 'calmlens-upload-token:v1:'
     DEFAULT_TTL_SECONDS = 600
@@ -26,7 +29,7 @@ module CalmLens
     # @option options [Integer] :expires_in_seconds lifetime, 1 to 3600 (default 600)
     # @return [Hash] `{'token' => String, 'expiresAt' => Integer}` (milliseconds since the Unix epoch)
     def sign(options)
-      call(options) { UploadTokens.sign_at(@api_key, options, now: (Time.now.to_f * 1000).to_i, nonce: SecureRandom.uuid) }
+      call(options, __method__) { UploadTokens.sign_at(@api_key, options, now: (Time.now.to_f * 1000).to_i, nonce: SecureRandom.uuid) }
     end
 
     # Signs like {#sign} at a fixed time with a fixed nonce. {MockServerClient.sign_upload_token}

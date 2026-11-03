@@ -3,6 +3,9 @@
 module CalmLens
   # Folders organise a project's assets. Reach it through {ServerClient#folders}.
   class Folders < Resource
+    # The prefix of this resource's operations in Internal::OPTION_KEYS.
+    OPERATIONS = 'folders'
+
     # Lists one page of child folders, sorted by name unless `ordering` says otherwise.
     # @option options [String] :parent_id list this folder's children; omit for the project root
     # @option options [String] :cursor the previous page's `nextCursor`
@@ -11,7 +14,7 @@ module CalmLens
     # @option options [String] :search only children whose name contains it
     # @return [Hash] a cursor page (items, nextCursor, hasMore, pageSize, ordering) with ancestors.
     def list(options = {})
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         response = request('GET', project('folders'), query: api, request_options: request)
         valid = response.is_a?(Hash) && response['items'].is_a?(Array) && response['ancestors'].is_a?(Array) &&
                 [true, false].include?(response['hasMore'])
@@ -25,13 +28,13 @@ module CalmLens
     # @option options [String, nil] :parent_id
     # @return [Hash] the folder
     def create(options)
-      call(options) { |api, request| request('POST', project('folders'), body: api, request_options: request) }
+      call(options, __method__) { |api, request| request('POST', project('folders'), body: api, request_options: request) }
     end
 
     # @option options [String] :folder_id
     # @return [Hash] the folder
     def retrieve(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('GET', "/folders/#{Internal.segment(api['folderId'])}", request_options: request)
       end
     end
@@ -40,7 +43,7 @@ module CalmLens
     # @option options [String] :name
     # @return [Hash] the folder
     def update(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('PATCH', "/folders/#{Internal.segment(api['folderId'])}", body: without(api, 'folderId'),
                                                                           request_options: request)
       end
@@ -51,7 +54,7 @@ module CalmLens
     # @option options [String, nil] :parent_id
     # @return [Hash] the folder
     def move(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('POST', "/folders/#{Internal.segment(api['folderId'])}/move",
                 body: { 'parentId' => Internal.required(api, 'parentId') }, request_options: request)
       end
@@ -61,7 +64,7 @@ module CalmLens
     # @option options [String] :folder_id
     # @return [nil]
     def delete(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('DELETE', "/folders/#{Internal.segment(api['folderId'])}", request_options: request)
         nil
       end

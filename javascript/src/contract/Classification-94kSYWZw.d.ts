@@ -2,6 +2,9 @@ import "./AssetModerationDecision-CNE4ddHt.js";
 import "./ModerationContext-9lGm-Mna.js";
 import "./HashList-DQugW0Gh.js";
 import * as z from "zod";
+declare const VIEWER_REGION_SCHEMA: z.ZodEnum<{
+  [x: string]: string;
+}>;
 declare const EU_COUNTRIES: Set<string>;
 /** Customer assertions used only for this CDN request. */
 declare const VIEWER_CLAIMS_SCHEMA: z.ZodObject<{
@@ -5880,4 +5883,4 @@ declare const CLASSIFICATION_LABEL_SCHEMA: z.ZodObject<{
   knowledgeBaseId: z.ZodOptional<z.ZodNullable<z.ZodPipe<z.ZodString, z.ZodTransform<string, string>>>>;
 }, z.core.$strip>;
 type ClassificationLabel = z.infer<typeof CLASSIFICATION_LABEL_SCHEMA>;
-export { ClassificationNotEvaluatedReason as a, PolicyAction as c, VIEWER_CLAIMS_SCHEMA as d, ClassificationLabel as i, ModerationQualifier as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t, EU_COUNTRIES as u };
+export { ClassificationNotEvaluatedReason as a, PolicyAction as c, VIEWER_CLAIMS_SCHEMA as d, VIEWER_REGION_SCHEMA as f, ClassificationLabel as i, ModerationQualifier as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t, EU_COUNTRIES as u };

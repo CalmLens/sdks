@@ -845,17 +845,31 @@ public final class CalmLensServerClient implements AutoCloseable {
 
   /**
    * Refuses, before anything is sent, a multipart part under 5 MiB that is not the last and, for
-   * images, a first part over 20 MiB or a final first part (the whole image) under 10 MiB. A
-   * stream of unknown length is left to the API.
+   * images, a first part over 20 MiB. A stream of unknown length is left to the API.
    */
   private void checkPartSize(long size, boolean last, boolean firstImagePart) {
     if (deferUploadChecks || size < 0) return;
     if (firstImagePart && size > 20L * 1024 * 1024)
       throw new CalmLensException(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, "Multipart image uploads cannot exceed 20MB.");
-    if (firstImagePart && last && size < 10L * 1024 * 1024)
-      throw new CalmLensException(ErrorCodes.MULTIPART_IMAGE_TOO_SMALL, "Multipart image uploads must total at least 10MB.");
     if (!last && size < MULTIPART_MIN_PART_BYTES)
       throw payloadError("Multipart upload parts must be at least 5MiB except the final part.");
+  }
+
+  /**
+   * Refuses, before anything is sent, one-request content whose known size is over the API's
+   * limit for its type: images up to 10 MiB (larger ones are uploaded in parts), audio and video
+   * up to 50 MiB and other files up to 5,000 MiB. A stream of unknown length is left to the API.
+   */
+  private void checkDirectSize(long size, String mime) {
+    if (deferUploadChecks || size < 0) return;
+    if (mime.startsWith("image/")) {
+      if (size > 10L * 1024 * 1024)
+        throw new CalmLensException(ErrorCodes.FILE_TOO_LARGE, "Images uploaded in one request can be at most 10 MiB; upload larger images in parts");
+    } else if (mime.startsWith("audio/") || mime.startsWith("video/")) {
+      if (size > 50L * 1024 * 1024) throw new CalmLensException(ErrorCodes.FILE_TOO_LARGE, "Audio and video files can be at most 50 MiB");
+    } else if (size > 5000L * 1024 * 1024) {
+      throw new CalmLensException(ErrorCodes.FILE_TOO_LARGE, "Files can be at most 5,000 MiB");
+    }
   }
 
   /** The request body for upload content: exactly one source, sent without copying files or streams. */
@@ -942,6 +956,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     checkMimeType(type);
     Transport.Body body = payload(content, encoded, multipart);
     if (multipart) checkPartSize(body.length(), flag(encoded, "isFinal"), type.strip().toLowerCase(Locale.ROOT).startsWith("image/"));
+    else checkDirectSize(body.length(), type.strip().toLowerCase(Locale.ROOT));
     for (String k : List.of("name", "description", "processingOptions", "visibility", "metadata", "authorId", "context", "externalId", "externalUrl", "folderId", "uploadPresetId", "totalSizeInBytes"))
       if (o.has(k)) query.add(k, o.get(k));
     query.addProperty("contentType", type);
@@ -1292,7 +1307,7 @@ public final class CalmLensServerClient implements AutoCloseable {
      */
     public Models.Asset classify(Models.ClassifyText options, RequestOptions requestOptions) {
       if (options == null || options.textValue() == null || options.textValue().isBlank())
-        throw payloadError("Text to classify must be a non-empty string");
+        throw argument("Text to classify must be a non-empty string");
       return assets.classify(options.toSubmitAsset(), requestOptions);
     }
   }

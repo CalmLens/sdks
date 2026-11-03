@@ -73,6 +73,12 @@ const (
 	CodeMultipartImageTooSmall = "upload/multipart-image-too-small"
 	// CodeMultipartImageTooLarge is returned with HTTP 400.
 	CodeMultipartImageTooLarge = "upload/multipart-image-too-large"
+	// CodeImageInvalidInput is returned with HTTP 422.
+	CodeImageInvalidInput = "image/invalid-input"
+	// CodeImageUnsupportedFormat is returned with HTTP 422.
+	CodeImageUnsupportedFormat = "image/unsupported-format"
+	// CodeImageInputLimit is returned with HTTP 422.
+	CodeImageInputLimit = "image/input-limit"
 	// CodeImageExceededMaxDimensions is returned with HTTP 400.
 	CodeImageExceededMaxDimensions = "upload/image-exceeded-max-dimensions"
 	// CodeUploadLimitExceeded is returned with HTTP 403.
@@ -240,6 +246,9 @@ var publicErrorStatuses = map[string]int{
 	CodeFileTooLarge:                      400,
 	CodeMultipartImageTooSmall:            400,
 	CodeMultipartImageTooLarge:            400,
+	CodeImageInvalidInput:                 422,
+	CodeImageUnsupportedFormat:            422,
+	CodeImageInputLimit:                   422,
 	CodeImageExceededMaxDimensions:        400,
 	CodeUploadLimitExceeded:               403,
 	CodeSpendLimitReached:                 402,

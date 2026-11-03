@@ -25,6 +25,7 @@ final class Cdn extends Resource
      */
     public function getAssetUrl(array $options): string
     {
+        Values::knownOptions($options, 'cdn.getAssetUrl');
         $resource = $options['resource'] ?? 'rendered';
         if (!in_array($resource, ['original', 'rendered', 'placeholder'], true)) {
             Values::invalid('Resource must be original, rendered or placeholder');
@@ -62,7 +63,7 @@ final class Cdn extends Resource
     /** Returns a PSR-7 response with a streaming body; HTTP errors are returned, not thrown. */
     public function serve(array $options): ResponseInterface
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $init = $api['init'] ?? [];
         if (!is_array($init) || !is_array($init['headers'] ?? [])) {
             Values::invalid('init and headers must be arrays');
@@ -71,6 +72,7 @@ final class Cdn extends Resource
         if (!in_array($method, ['GET', 'HEAD'], true)) {
             Values::invalid('CDN method must be GET or HEAD');
         }
+        unset($api['init']);
         return $this->session->cdn($method, $this->getAssetUrl($api), $init['headers'] ?? [], $request);
     }
 

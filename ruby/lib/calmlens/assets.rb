@@ -10,10 +10,18 @@ module CalmLens
   # later appear as they are, so compare `classification.moderation.status` and similar values with known strings
   # and treat anything else as not ready.
   class Assets < Resource
+    # The prefix of this resource's operations in Internal::OPTION_KEYS.
+    OPERATIONS = 'assets'
+
     SUBMIT_QUERY_KEYS = %w[name description processingOptions visibility metadata authorId context externalId externalUrl
                            folderId uploadPresetId].freeze
     MIN_MULTIPART_IMAGE_BYTES = 10 * 1024 * 1024
     MAX_MULTIPART_IMAGE_BYTES = 20 * 1024 * 1024
+    # The API's limits for one-request uploads: images up to 10 MiB (larger ones are uploaded in
+    # parts), audio and video up to 50 MiB and other files up to 5,000 MiB.
+    MAX_DIRECT_IMAGE_BYTES = 10 * 1024 * 1024
+    MAX_MEDIA_BYTES = 50 * 1024 * 1024
+    MAX_FILE_BYTES = 5000 * 1024 * 1024
     # The moderation status before a decision; {#wait_for_decision} returns once an asset has any
     # other, or once its classification status is in {FINISHED_PROCESSING_STATUSES}.
     PENDING_MODERATION_STATUS = 'pending'
@@ -40,7 +48,7 @@ module CalmLens
     # @option options [Integer] :limit
     # @return [Hash] `{'query', 'items' => [{'asset', 'score', 'matchedFields'}], 'semanticStatus'}`
     def search(options = {})
-      call(options) { |api, request| request('GET', project('assets/search'), query: api, request_options: request) }
+      call(options, __method__) { |api, request| request('GET', project('assets/search'), query: api, request_options: request) }
     end
 
     # Lists one page of assets.
@@ -50,7 +58,7 @@ module CalmLens
     # @option options [Array<Hash>] :ordering `[{field: 'createdAt', direction: 'desc'}]`
     # @return [Hash] a cursor page: items, nextCursor, hasMore, pageSize and ordering.
     def list(options = {})
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('GET', project('assets'), query: api, request_options: request)
       end
     end
@@ -62,7 +70,7 @@ module CalmLens
     def each(options = {}, &block)
       return enum_for(:each, options) unless block
 
-      api, request = call(options) { |*split| split }
+      api, request = call(options, __method__) { |*split| split }
       listing = pages(api['cursor']) { |index| list(api.merge('cursor' => index, 'request_options' => request)) }
       listing.each { |page| page['items'].each(&block) }
       nil
@@ -72,7 +80,7 @@ module CalmLens
     # @option options [String] :asset_id
     # @return [Hash] a page like {#list}
     def list_children(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         query = without(api, 'assetId')
         request('GET', "/assets/#{Internal.segment(api['assetId'])}/children", query: query, request_options: request)
       end
@@ -85,7 +93,7 @@ module CalmLens
     def each_child(options, &block)
       return enum_for(:each_child, options) unless block
 
-      api, request = call(options) { |*split| split }
+      api, request = call(options, __method__) { |*split| split }
       listing = pages(api['cursor']) { |index| list_children(api.merge('cursor' => index, 'request_options' => request)) }
       listing.each { |page| page['items'].each(&block) }
       nil
@@ -94,7 +102,7 @@ module CalmLens
     # @option options [String] :asset_id
     # @return [Hash] the asset
     def retrieve(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('GET', "/assets/#{Internal.segment(api['assetId'])}", request_options: request)
       end
     end
@@ -113,7 +121,7 @@ module CalmLens
     # @raise [TimeoutError] `sdk/timeout` when no decision arrives in time; `details` holds
     #   `'assetId'` and the last `'classificationStatus'` and `'moderationStatus'`.
     def wait_for_decision(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         timeout = api.fetch('timeout', DEFAULT_DECISION_TIMEOUT)
         unless timeout.is_a?(Numeric) && timeout.real? && timeout.to_f.finite? && !timeout.negative?
           raise Internal.invalid('timeout must be a non-negative number of seconds')
@@ -127,7 +135,7 @@ module CalmLens
     # @option options [String] :asset_id
     # @return [Hash] the updated asset
     def update(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('PATCH', "/assets/#{Internal.segment(api['assetId'])}", body: without(api, 'assetId'),
                                                                         request_options: request)
       end
@@ -137,7 +145,7 @@ module CalmLens
     # @option options [String] :asset_id
     # @return [Hash] the asset
     def retry(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('POST', "/assets/#{Internal.segment(api['assetId'])}/retry", request_options: request)
       end
     end
@@ -154,7 +162,7 @@ module CalmLens
     # @option options [Boolean] :confirm_purge must be true to purge
     # @return [Hash] the asset
     def decide(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('POST', "/assets/#{Internal.segment(api['assetId'])}/decision", body: without(api, 'assetId'),
                                                                                 request_options: request)
       end
@@ -168,7 +176,7 @@ module CalmLens
     # @option options [Boolean] :rerun
     # @return [Hash] the asset
     def explain(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('POST', "/assets/#{Internal.segment(api['assetId'])}/explain",
                 body: api['rerun'] ? { 'rerun' => true } : {}, request_options: request)
       end
@@ -179,7 +187,7 @@ module CalmLens
     # @option options [String] :asset_id
     # @return [Hash] the asset
     def delete_content(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('DELETE', "/assets/#{Internal.segment(api['assetId'])}/content", request_options: request)
       end
     end
@@ -188,7 +196,7 @@ module CalmLens
     # @option options [String] :asset_id
     # @return [nil]
     def delete(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('DELETE', "/assets/#{Internal.segment(api['assetId'])}", request_options: request)
         nil
       end
@@ -203,7 +211,7 @@ module CalmLens
     # @option options [String] :operation one of {BATCH_OPERATIONS}
     # @return [Hash] `{'queued' => true}`
     def batch(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         ids = api['assetIds']
         unless ids.is_a?(Array) && ids.size.between?(1, MAX_BATCH_ASSETS)
           raise Internal.invalid("asset_ids must list 1 to #{MAX_BATCH_ASSETS} asset IDs")
@@ -221,7 +229,7 @@ module CalmLens
     # @option options [String, nil] :folder_id
     # @return [Hash] the asset
     def move(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         request('POST', "/assets/#{Internal.segment(api['assetId'])}/move",
                 body: { 'folderId' => Internal.required(api, 'folderId') }, request_options: request)
       end
@@ -236,7 +244,7 @@ module CalmLens
     #   {CDN#get_asset_url}; they replace the lens's options of the same name
     # @return [Hash] `{'url', 'expiresAt'}`
     def create_signed_url(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         path = "/assets/#{Internal.segment(api['assetId'])}/signed-url"
         body = { 'expiresInSeconds' => DEFAULT_SIGNED_URL_SECONDS }.merge(without(api, 'assetId'))
         check_signed_url(body)
@@ -270,7 +278,7 @@ module CalmLens
     #   {ModerationContext::USED_ITEMS} that fit in {ModerationContext::USED_CHARACTERS} characters.
     # @return [Hash] the asset
     def create(options)
-      call(options) { |api, request| submit(api, request, true) }
+      call(options, __method__) { |api, request| submit(api, request, true) }
     end
 
     # Uploads content and waits for the moderation decision where the content type supports it.
@@ -279,7 +287,7 @@ module CalmLens
     #   `allowed` or `limited` (reduce the reach of `limited` assets). Serve `age-restricted` assets
     #   only behind your own age check, through signed URLs.
     def classify(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         content = api['content']
         if content.is_a?(Hash) && content.key?('plainText') && (!content['plainText'].is_a?(String) || content['plainText'].strip.empty?)
           raise Internal.invalid('Text to classify must be a non-empty string', ErrorCodes::INVALID_UPLOAD_PAYLOAD)
@@ -296,7 +304,7 @@ module CalmLens
     # @option options [Boolean] :queue
     # @return [Hash] the asset; `classification.status` stays `uploading` until the final part.
     def upload_part(options)
-      call(options) do |api, request|
+      call(options, __method__) do |api, request|
         path = "/assets/#{Internal.segment(api['assetId'])}/part"
         part = api['part']
         raise Internal.invalid('part is required') unless part.is_a?(Hash)
@@ -365,6 +373,7 @@ module CalmLens
       end
 
       body = UploadBody.from(content, multipart: multipart, part_size: !@session.defer_upload_checks)
+      check_direct_size(mime, body.size) unless multipart || @session.defer_upload_checks
       query = options.slice(*SUBMIT_QUERY_KEYS).merge('queue' => queue, 'contentType' => content['type'],
                                                       'sizeInBytes' => body.size)
       query.merge!(first_part_query(options, content, mime, body)) if multipart
@@ -434,6 +443,21 @@ module CalmLens
     end
 
     # Multipart images total 10MB to 20MB. With a declared total both bounds apply from the start.
+    # Refuses one-request content whose known size is over the API's limit for its type, before
+    # any of it is sent.
+    def check_direct_size(mime, size)
+      return if size.nil?
+
+      limit, message = if mime.start_with?('image/')
+                         [MAX_DIRECT_IMAGE_BYTES, 'Images uploaded in one request can be at most 10 MiB; upload larger images in parts']
+                       elsif mime.start_with?('audio/', 'video/')
+                         [MAX_MEDIA_BYTES, 'Audio and video files can be at most 50 MiB']
+                       else
+                         [MAX_FILE_BYTES, 'Files can be at most 5,000 MiB']
+                       end
+      raise Internal.invalid(message, ErrorCodes::FILE_TOO_LARGE) if size > limit
+    end
+
     def check_image_size(size, complete)
       if size > MAX_MULTIPART_IMAGE_BYTES
         raise Internal.invalid('Multipart image uploads cannot exceed 20MB.',

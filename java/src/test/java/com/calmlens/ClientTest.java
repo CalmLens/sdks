@@ -121,14 +121,24 @@ class ClientTest {
         new Models.SubmitAsset().name("clip.mp4").part(Models.Content.bytes(new byte[mib], "video/mp4").partNumber(1).isFinal(false))));
     refusals.put(ErrorCodes.INVALID_UPLOAD_PAYLOAD + " later", () -> client.assets.uploadPart(
         new Models.UploadPart("asset-1", Models.Content.bytes(new byte[mib], "video/mp4").partNumber(2).isFinal(false))));
-    refusals.put(ErrorCodes.MULTIPART_IMAGE_TOO_SMALL, () -> client.assets.create(
-        new Models.SubmitAsset().name("small.png").part(Models.Content.bytes(new byte[mib], "image/png").partNumber(1).isFinal(true))));
     refusals.put(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, () -> client.assets.create(
         new Models.SubmitAsset().name("large.png").part(Models.Content.bytes(new byte[21 * mib], "image/png").partNumber(1).isFinal(false))));
     refusals.forEach((name, call) -> {
       CalmLensException error = assertThrows(CalmLensException.class, call, name);
       assertEquals(name.split(" ")[0], error.getCode(), name);
       assertEquals(0, error.getStatus(), name);
+    });
+  }
+
+  @Test void oversizedOneRequestUploadsAreRefusedBeforeSending() {
+    CalmLensServerClient client = client(request -> fail("A refused upload made an HTTP request"));
+    long mib = 1024 * 1024;
+    Map<String, Long> sizes = Map.of("image/png", 10 * mib + 1, "video/mp4", 50 * mib + 1, "application/pdf", 5000 * mib + 1);
+    sizes.forEach((type, size) -> {
+      // The stream is never read: its declared size is refused first.
+      CalmLensException error = assertThrows(CalmLensException.class, () -> client.assets.create(
+          new Models.SubmitAsset("big", Models.Content.stream(new java.io.ByteArrayInputStream(new byte[0]), size, type))), type);
+      assertEquals(ErrorCodes.FILE_TOO_LARGE, error.getCode(), type);
     });
   }
 

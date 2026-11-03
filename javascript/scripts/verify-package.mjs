@@ -85,6 +85,57 @@ const exportTargets = (exportsField) => {
   return Object.values(exportsField).flatMap(exportTargets);
 };
 
+/**
+ * Entry points that load no other package at runtime, so a page can use them through an import
+ * map that points at a hosted copy of the module: the main, `/server` and `/app` entry points.
+ */
+export const SELF_CONTAINED_ENTRIES = [
+  "esm/index.js",
+  "esm/server.js",
+  "esm/app.js",
+  "cjs/index.js",
+  "cjs/server.js",
+  "cjs/app.js",
+];
+
+const specifiersOf = (file) => {
+  const source = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, "");
+  return new Set(
+    SPECIFIER_PATTERNS.flatMap((pattern) => [...source.matchAll(pattern)].map((m) => m[1])),
+  );
+};
+
+const resolveRelativeScript = (fromFile, specifier) => {
+  const target = resolve(dirname(fromFile), specifier);
+  return [target, `${target}.js`, `${target}.cjs`, `${target}/index.js`].find(
+    (candidate) => existsSync(candidate) && statSync(candidate).isFile(),
+  );
+};
+
+/** Problems for packages an entry point's modules import at runtime, other than Node built-ins. */
+const findRuntimeImports = (packageDirectory, entry) => {
+  const problems = [];
+  const pending = [join(packageDirectory, entry)];
+  const visited = new Set();
+  while (pending.length) {
+    const file = pending.pop();
+    if (visited.has(file)) continue;
+    visited.add(file);
+    for (const specifier of specifiersOf(file)) {
+      if (specifier.startsWith(".")) {
+        const target = resolveRelativeScript(file, specifier);
+        if (target) pending.push(target);
+      } else if (!specifier.startsWith("node:") && !BUILTINS.has(specifier)) {
+        problems.push(
+          `${entry} loads "${specifier}" at runtime (from ${relative(packageDirectory, file)}); ` +
+            "it must load no other package",
+        );
+      }
+    }
+  }
+  return problems;
+};
+
 /** Returns a list of problems; empty means the package is safe to publish. */
 export const findPackageProblems = (packageDirectory, options = {}) => {
   const manifest = JSON.parse(readFileSync(join(packageDirectory, "package.json"), "utf8"));
@@ -103,10 +154,7 @@ export const findPackageProblems = (packageDirectory, options = {}) => {
     }
   }
   for (const file of listPublishedFiles(packageDirectory, manifest.files)) {
-    const source = readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, "");
-    const specifiers = new Set(
-      SPECIFIER_PATTERNS.flatMap((pattern) => [...source.matchAll(pattern)].map((m) => m[1])),
-    );
+    const specifiers = specifiersOf(file);
     const where = relative(packageDirectory, file);
     for (const specifier of specifiers) {
       if (specifier.startsWith(".")) {
@@ -129,6 +177,11 @@ export const findPackageProblems = (packageDirectory, options = {}) => {
       }
     }
   }
+  for (const entry of options.selfContainedEntries ?? SELF_CONTAINED_ENTRIES) {
+    if (existsSync(join(packageDirectory, entry))) {
+      problems.push(...findRuntimeImports(packageDirectory, entry));
+    }
+  }
   return problems;
 };
 
@@ -143,5 +196,7 @@ if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
         problems.map((problem) => `  - ${problem}`).join("\n"),
     );
   }
-  process.stdout.write("SDK package verified: no internal or undeclared imports.\n");
+  process.stdout.write(
+    "SDK package verified: no internal or undeclared imports, and no runtime packages in the main, /server and /app entry points.\n",
+  );
 }

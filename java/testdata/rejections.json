@@ -90,7 +90,7 @@
     "options": {
       "text": ""
     },
-    "error": "upload/invalid-payload"
+    "error": "sdk/invalid-argument"
   },
   {
     "name": "retrieve without an asset ID",

@@ -46,6 +46,9 @@ final class ErrorCodes
     public const FILE_TOO_LARGE = 'upload/file-too-large';
     public const MULTIPART_IMAGE_TOO_SMALL = 'upload/multipart-image-too-small';
     public const MULTIPART_IMAGE_TOO_LARGE = 'upload/multipart-image-too-large';
+    public const IMAGE_INVALID_INPUT = 'image/invalid-input';
+    public const IMAGE_UNSUPPORTED_FORMAT = 'image/unsupported-format';
+    public const IMAGE_INPUT_LIMIT = 'image/input-limit';
     public const IMAGE_EXCEEDED_MAX_DIMENSIONS = 'upload/image-exceeded-max-dimensions';
     public const UPLOAD_LIMIT_EXCEEDED = 'upload/limit-exceeded';
     public const SPEND_LIMIT_REACHED = 'upload/spend-limit-reached';
@@ -157,6 +160,9 @@ final class ErrorCodes
         'upload/file-too-large' => 400,
         'upload/multipart-image-too-small' => 400,
         'upload/multipart-image-too-large' => 400,
+        'image/invalid-input' => 422,
+        'image/unsupported-format' => 422,
+        'image/input-limit' => 422,
         'upload/image-exceeded-max-dimensions' => 400,
         'upload/limit-exceeded' => 403,
         'upload/spend-limit-reached' => 402,

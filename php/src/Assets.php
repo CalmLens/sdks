@@ -10,6 +10,8 @@ use CalmLens\Internal\Values;
 
 final class Assets extends Resource
 {
+    protected const OPERATIONS = 'assets';
+
     /** The longest signed URL lifetime the API accepts: 24 hours. */
     public const MAX_SIGNED_URL_SECONDS = 86400;
     /** `createSignedUrl`'s lifetime when none is given, sent explicitly. */
@@ -28,22 +30,26 @@ final class Assets extends Resource
     public const BATCH_OPERATIONS = [self::BATCH_DELETE, self::BATCH_REMOVE_CONTENT];
     /** The most assets one `batch` request takes. */
     public const MAX_BATCH_ASSETS = 500;
+    /** The largest image, audio or video, and other file one request uploads, in bytes. */
+    public const MAX_DIRECT_IMAGE_BYTES = 10 * 1024 * 1024;
+    public const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
+    public const MAX_FILE_BYTES = 5000 * 1024 * 1024;
 
     public function search(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('GET', $this->session->project('assets/search'), query: $api, options: $request);
     }
 
     public function list(array $options = []): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('GET', $this->session->project('assets'), query: $api, options: $request);
     }
 
     public function listChildren(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'assets', 'assetId');
         return $this->session->request('GET', $path . '/children', query: $api, options: $request);
     }
@@ -64,20 +70,20 @@ final class Assets extends Resource
 
     public function retrieve(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('GET', $this->path($api, 'assets', 'assetId'), options: $request);
     }
 
     public function update(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'assets', 'assetId');
         return $this->session->request('PATCH', $path, body: (object) $api, options: $request);
     }
 
     public function retry(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('POST', $this->path($api, 'assets', 'assetId') . '/retry', options: $request);
     }
 
@@ -89,7 +95,7 @@ final class Assets extends Resource
      */
     public function decide(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'assets', 'assetId');
         return $this->session->request('POST', $path . '/decision', body: (object) $api, options: $request);
     }
@@ -102,7 +108,7 @@ final class Assets extends Resource
      */
     public function explain(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'assets', 'assetId');
         $body = !empty($api['rerun']) ? ['rerun' => true] : new \stdClass();
         return $this->session->request('POST', $path . '/explain', body: $body, options: $request);
@@ -110,13 +116,13 @@ final class Assets extends Resource
 
     public function deleteContent(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('DELETE', $this->path($api, 'assets', 'assetId') . '/content', options: $request);
     }
 
     public function delete(array $options): void
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $this->session->request('DELETE', $this->path($api, 'assets', 'assetId'), options: $request);
     }
 
@@ -133,7 +139,7 @@ final class Assets extends Resource
      */
     public function batch(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         self::validateBatch($api);
         $body = ['assetIds' => $api['assetIds'], 'operation' => $api['operation']];
         return $this->session->request('POST', $this->session->project('assets/batch'), body: $body, options: $request);
@@ -158,7 +164,7 @@ final class Assets extends Resource
 
     public function move(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'assets', 'assetId');
         if (!array_key_exists('folderId', $api)) {
             Values::invalid('folderId is required (null moves to root)');
@@ -168,7 +174,7 @@ final class Assets extends Resource
 
     public function createSignedUrl(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'assets', 'assetId');
         // As the API checks: a placeholder needs no signature, and only the rendered resource
         // takes a lens or transform.
@@ -200,7 +206,7 @@ final class Assets extends Resource
 
     private function submit(array $options, bool $queue): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, 'create');
         if (!is_string($api['name'] ?? null) || $api['name'] === ''
             || count(array_intersect(['content', 'part', 'url'], array_keys($api))) !== 1 || array_key_exists('isFinal', $api)) {
             Values::invalid('Supply a name and exactly one of content, part or url', 'upload/invalid-payload');
@@ -228,7 +234,15 @@ final class Assets extends Resource
         if ($multipart && ($content['partNumber'] ?? 1) !== 1) {
             Values::invalid('Use uploadPart for subsequent parts', 'upload/use-upload-part');
         }
+        $direct = !$multipart && !$this->session->deferUploadChecks;
+        if ($direct && is_int($content['sizeInBytes'] ?? null)) {
+            // A declared size is refused before the stream is read or measured.
+            self::checkDirectSize($baseMime, $content['sizeInBytes']);
+        }
         $body = UploadBody::from($content, $multipart, !$this->session->deferUploadChecks);
+        if ($direct) {
+            self::checkDirectSize($baseMime, $body->getSize());
+        }
         $query = array_intersect_key($api, array_flip(['name', 'description', 'processingOptions', 'visibility', 'metadata', 'authorId', 'context', 'externalId', 'externalUrl', 'folderId', 'uploadPresetId']));
         $query += ['queue' => $queue, 'contentType' => $mime, 'sizeInBytes' => $body->getSize()];
         if ($multipart) {
@@ -255,7 +269,7 @@ final class Assets extends Resource
 
     public function uploadPart(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'assets', 'assetId');
         $part = $api['part'] ?? null;
         if (!is_array($part) || !is_int($part['partNumber'] ?? null) || $part['partNumber'] < 1) {
@@ -286,6 +300,7 @@ final class Assets extends Resource
         if ((!is_int($timeout) && !is_float($timeout)) || !is_finite((float) $timeout) || $timeout < 0) {
             Values::invalid('timeout must be a non-negative number');
         }
+        Values::knownOptions($options, 'assets.waitForDecision');
         unset($options['timeout']);
         Values::segment($options['assetId'] ?? null);
         $deadline = ($this->session->clock)() + $timeout;
@@ -306,6 +321,23 @@ final class Assets extends Resource
             ($this->session->sleep)(min($delay, $remaining));
             $delay = min($delay * self::DECISION_INTERVAL_FACTOR, self::DECISION_MAX_INTERVAL);
         } while (true);
+    }
+
+    /**
+     * Refuses one-request content whose known size is over the API's limit for its type, before
+     * any of it is sent: images up to 10 MiB (larger ones are uploaded in parts), audio and video
+     * up to 50 MiB and other files up to 5,000 MiB.
+     */
+    private static function checkDirectSize(string $mime, ?int $size): void
+    {
+        [$limit, $message] = match (true) {
+            str_starts_with($mime, 'image/') => [self::MAX_DIRECT_IMAGE_BYTES, 'Images uploaded in one request can be at most 10 MiB; upload larger images in parts'],
+            str_starts_with($mime, 'audio/'), str_starts_with($mime, 'video/') => [self::MAX_MEDIA_BYTES, 'Audio and video files can be at most 50 MiB'],
+            default => [self::MAX_FILE_BYTES, 'Files can be at most 5,000 MiB'],
+        };
+        if ($size !== null && $size > $limit) {
+            Values::invalid($message, ErrorCodes::FILE_TOO_LARGE);
+        }
     }
 
     /** An upload's response must be an asset with its statuses. */

@@ -15,14 +15,39 @@ module CalmLens
 
     private
 
+    # The option keys of methods that send no request of their own, or take options of their own
+    # beside a request's; Internal::OPTION_KEYS, generated from the API, has the rest.
+    LOCAL_OPTION_KEYS = {
+      'assets.waitForDecision' => %w[assetId timeout].freeze,
+      'cdn.getAssetUrl' => %w[assetIdentifier lens resource transform viewerClaims].freeze,
+      'cdn.serve' => %w[assetIdentifier init lens resource transform viewerClaims].freeze,
+      'uploadTokens.sign' => %w[expiresInSeconds externalId uploadPresetId].freeze
+    }.freeze
+    private_constant :LOCAL_OPTION_KEYS
+
     # Runs a public method: splits options, and raises every argument problem as {InvalidArgumentError}.
-    def call(options)
+    # `method` names the public method: an option it doesn't take, such as a misspelt one, raises
+    # `sdk/invalid-argument` instead of being silently dropped.
+    def call(options, method)
+      check_option_keys(options, [self.class::OPERATIONS, Internal.camelize(method)].compact.join('.'))
       api, request = Internal.options(options)
       yield api, request
     rescue Error
       raise
     rescue KeyError, TypeError, ArgumentError, JSON::GeneratorError, EncodingError, URI::Error, FloatDomainError => e
       raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT, e.message), cause: e
+    end
+
+    def check_option_keys(options, operation)
+      return unless options.is_a?(Hash)
+
+      allowed = LOCAL_OPTION_KEYS.fetch(operation) { Internal::OPTION_KEYS.fetch(operation) }
+      unknown = options.keys.reject do |key|
+        %w[request_options requestOptions].include?(key.to_s) || allowed.include?(Internal.camelize(key))
+      end
+      return if unknown.empty?
+
+      raise Internal.invalid("Unknown option#{'s' if unknown.size > 1} for #{operation}: #{unknown.join(', ')}")
     end
 
     def request(...) = @session.request(...)

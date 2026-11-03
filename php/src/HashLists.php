@@ -10,10 +10,12 @@ namespace CalmLens;
  */
 final class HashLists extends Resource
 {
+    protected const OPERATIONS = 'hashLists';
+
     /** One page of the project's hash lists; pass the page's `nextCursor` as `cursor` and a `pageSize` (1 to 100, 50 by default). */
     public function list(array $options = []): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $page = $this->session->request('GET', $this->session->project('hash-lists'), query: $api, options: $request);
         if (!is_array($page) || !is_array($page['items'] ?? null) || !array_is_list($page['items']) || !is_bool($page['hasMore'] ?? null)) {
             throw CalmLensException::create('sdk/invalid-response', 'Invalid hash list page');
@@ -23,21 +25,21 @@ final class HashLists extends Resource
 
     public function retrieve(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('GET', $this->path($api, 'hash-lists', 'hashListId'), options: $request);
     }
 
     /** Creates a list from `name`, `action` (`flag` or `block`) and an optional `description`. */
     public function create(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('POST', $this->session->project('hash-lists'), body: (object) $api, options: $request);
     }
 
     /** Renames a list or changes its action; the new action applies to later uploads. A null `description` clears it. */
     public function update(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'hash-lists', 'hashListId');
         return $this->session->request('PATCH', $path, body: (object) $api, options: $request);
     }
@@ -45,14 +47,14 @@ final class HashLists extends Resource
     /** Deletes the list and every entry in it. */
     public function delete(array $options): void
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $this->session->request('DELETE', $this->path($api, 'hash-lists', 'hashListId'), options: $request);
     }
 
     /** One page of a list's entries, newest first; pass `cursor` and `pageSize` to page. */
     public function listEntries(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'hash-lists', 'hashListId');
         $page = $this->session->request('GET', $path . '/entries', query: $api, options: $request);
         if (!is_array($page) || !is_array($page['items'] ?? null) || !is_bool($page['hasMore'] ?? null)) {
@@ -67,7 +69,7 @@ final class HashLists extends Resource
      */
     public function addEntry(array $options): array
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'hash-lists', 'hashListId');
         return $this->session->request('POST', $path . '/entries', body: (object) $api, options: $request);
     }
@@ -75,7 +77,7 @@ final class HashLists extends Resource
     /** Removes a hash from its list; later uploads no longer match it. */
     public function removeEntry(array $options): void
     {
-        [$api, $request] = $this->split($options);
+        [$api, $request] = $this->split($options, __FUNCTION__);
         $this->session->request('DELETE', $this->path($api, 'hash-list-entries', 'entryId'), options: $request);
     }
 }

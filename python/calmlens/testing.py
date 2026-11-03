@@ -37,7 +37,7 @@ from . import error_codes
 from ._mock_classification import CATEGORIES, QUALIFIERS
 from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_PART_SIZE_BYTES, DEFAULT_TIMEOUT,
                      CalmLensServerClient,
-                     _invalid, _json, _merge, _sign_upload_token)
+                     _UNSET, _invalid, _json, _merge, _sign_upload_token)
 from ._signed_test_inputs import (MEDIA_TEST_SIGNALS, TEST_INPUT_PRESETS, TEXT_TEST_SIGNALS, ClassificationTestSignal,
                                   SignedTestAction, SignedTestInput, SignedTestInstance,
                                   SignedTestRegion, SignedTestRegionalAction, SignedTestRegionalActionName,
@@ -229,12 +229,15 @@ class MockApiKeyGrant(TypedDict):
 
 
 def sign_upload_token(api_key: str, options: SignUploadTokenOptions | None = None, /, *, now: int, nonce: str,
-                      **keywords: Any) -> SignedUploadToken:
+                      upload_preset_id: str = _UNSET, external_id: str = _UNSET,
+                      expires_in_seconds: int = _UNSET) -> SignedUploadToken:
     """Sign an upload token like ``client.upload_tokens.sign``, with the same validation, at a
     fixed ``now`` (milliseconds since the epoch) with a fixed ``nonce``, so the token is the
     same every time, for comparing with known tokens in tests. Options are an options dict or
     the same keyword arguments as ``upload_tokens.sign``."""
-    return _sign_upload_token(api_key, _merge(options, **keywords), now, nonce)
+    merged = _merge(options, upload_preset_id=upload_preset_id, external_id=external_id,
+                    expires_in_seconds=expires_in_seconds)
+    return _sign_upload_token(api_key, merged, now, nonce)
 
 
 def create_mock_api_key(grants: list[MockApiKeyGrant] | None = None) -> str:
