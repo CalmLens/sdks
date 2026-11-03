@@ -539,8 +539,13 @@ _OPERATIONS = frozenset({
     "assets.deleteContent", "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list",
     "events.pages", "folders.list", "folders.retrieve", "folders.create", "folders.update", "folders.delete",
     "folders.move", "hashLists.list", "hashLists.retrieve", "hashLists.create", "hashLists.update",
-    "hashLists.delete", "hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "ensureLens",
-    "ensureLenses"})
+    "hashLists.delete", "hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "policies.list",
+    "policies.retrieve", "policies.create", "policies.update", "policies.applyPreset", "policies.setAutomaticUpdates",
+    "policies.delete", "policies.assign", "ensureLens", "ensureLenses"})
+
+#: The built-in presets the mock knows, by display name.
+_MOCK_PRESET_NAMES = {"general-community": "General", "children-platform": "Kids",
+                      "education-support": "Learning and support", "wholesome-community": "Teen-safe"}
 
 
 def _thumbhash_png(hash_base64: str) -> bytes:
@@ -717,6 +722,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self._idempotent: dict[str, tuple[str, int, bytes]] = {}
         self._uploads: dict[str, dict[str, Any]] = {}
         self._mock_lenses: dict[str, dict[str, Any]] = {}
+        # Stored policies (the API's shape without ``projectIds`` and ``preset.latestVersion``, plus
+        # their reset ``baseline``) and the one the project moderates with.
+        self._policies: dict[str, dict[str, Any]] = {}
+        self._project_policy_id: str | None = None
         self.database_storage = options.get("database_storage") or InMemoryMockDatabaseStorage()
         if not hasattr(self.database_storage, "events"):
             self.database_storage.events = []
@@ -960,9 +969,17 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return ["events.list", "events.pages"]
             if route == "lenses":
                 return ["ensureLenses", "ensureLens"]
-            if route in ("folders", "hash-lists"):
-                kind = "folders" if route == "folders" else "hashLists"
+            if route in ("folders", "hash-lists", "policies"):
+                kind = {"folders": "folders", "hash-lists": "hashLists", "policies": "policies"}[route]
                 return [f"{kind}.list" if method == "GET" else f"{kind}.create"]
+            if route == "policy":
+                return ["policies.assign"]
+            if len(parts) > 3 and parts[2] == "policies":
+                action = parts[4] if len(parts) > 4 else ""
+                if action:
+                    return {"preset": ["policies.applyPreset"],
+                            "automatic-updates": ["policies.setAutomaticUpdates"]}.get(action, [])
+                return ["policies." + {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}.get(method, "")]
             if route in ("assets/search", "assets/batch"):
                 return ["assets." + parts[3]]
             if route == "assets":
@@ -1077,7 +1094,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._failure_response(failure_response)
             # Like the API: a new folder or hash list is 201 Created, a queued batch 202 Accepted,
             # and deletes answer 200 with an empty object.
-            status = {"folders.create": 201, "hashLists.create": 201, "assets.batch": 202}.get(operation, 200)
+            status = {"folders.create": 201, "hashLists.create": 201, "policies.create": 201,
+                      "assets.batch": 202}.get(operation, 200)
             if isinstance(result, _Answer):
                 status, result = result.status, result.body
             response = self._respond(status, {} if result is None else result)
@@ -1155,6 +1173,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                       "name": body["name"], "createdAt": now, "updatedAt": now}
             self.database_storage.folders[folder["id"]] = cast(Folder, folder)
             return folder
+        if resource in ("policies", "policy"):
+            return self._dispatch_policy(method, parts, body)
         if resource == "hash-lists":
             if method == "GET":
                 lists = [cast(dict[str, Any], h) for h in self.database_storage.hash_lists.values()
@@ -1636,6 +1656,115 @@ class MockCalmLensServerClient(CalmLensServerClient):
                  "sourceAssetId": asset_id, "createdAt": self.now()}
         entries[entry["id"]] = cast(HashListEntry, entry)
         return _Answer(201, entry)
+
+    # Policies: the project starts on its General preset policy, following automatic updates. The
+    # mock holds no built-in preset settings: a preset's settings are ``{"categorySettings": {}}`` at
+    # version 1, and uploads are never decided by a policy.
+
+    def _new_policy(self, name: str, settings: dict[str, Any], *, description: str = "",
+                    automatic_updates: bool = False, preset: dict[str, Any] | None = None) -> dict[str, Any]:
+        now = self.now()
+        policy: dict[str, Any] = {"id": self.create_id("pol"), "name": name, "description": description, "settings": settings,
+                  "revision": 1, "automaticUpdates": automatic_updates, "preset": preset,
+                  "baseline": copy.deepcopy(settings), "createdAt": now, "updatedAt": now}
+        self._policies[policy["id"]] = policy
+        return policy
+
+    def _ensure_policies(self) -> None:
+        if self._project_policy_id is None:
+            general = self._new_policy(_MOCK_PRESET_NAMES["general-community"], {"categorySettings": {}},
+                                       automatic_updates=True,
+                                       preset={"id": "general-community", "version": 1, "projectId": self.project_id})
+            self._project_policy_id = general["id"]
+
+    def _policy_view(self, policy: dict[str, Any]) -> dict[str, Any]:
+        """A stored policy as the API shows it."""
+        shown = {key: value for key, value in policy.items() if key != "baseline"}
+        if policy["preset"] is not None:
+            shown["preset"] = {**policy["preset"], "latestVersion": 1}
+        shown["projectIds"] = [self.project_id] if policy["id"] == self._project_policy_id else []
+        return shown
+
+    def _find_policy(self, policy_id: str) -> dict[str, Any]:
+        self._ensure_policies()
+        policy = self._policies.get(policy_id)
+        if policy is None:
+            raise _Failure(error_codes.POLICY_NOT_FOUND)
+        return policy
+
+    def _save_policy(self, policy: dict[str, Any], revision: Any, values: Mapping[str, Any]) -> dict[str, Any]:
+        """Saves new values under the next revision, once ``revision`` is the current one."""
+        if revision != policy["revision"] or isinstance(revision, bool):
+            raise _Failure(error_codes.POLICY_REVISION_CONFLICT)
+        policy.update(values, revision=policy["revision"] + 1, updatedAt=self.now())
+        return self._policy_view(policy)
+
+    def _dispatch_policy(self, method: str, parts: list[str], body: dict[str, Any]) -> Any:
+        self._ensure_policies()
+        if parts[0] == "policy":
+            policy = self._find_policy(str(body.get("policyId")))
+            self._project_policy_id = policy["id"]
+            return self._policy_view(policy)
+        if len(parts) == 1:
+            if method == "GET":
+                return {"policies": [self._policy_view(p) for p in self._policies.values()],
+                        "projectPolicyId": self._project_policy_id}
+            return self._create_policy(body)
+        policy = self._find_policy(parts[1])
+        action = parts[2] if len(parts) > 2 else ""
+        if action == "preset":
+            preset = policy["preset"]
+            if preset is None or policy["automaticUpdates"]:
+                raise _Failure(error_codes.POLICY_NO_PRESET)
+            if body.get("presetVersion") != preset["version"]:
+                raise _Failure(error_codes.POLICY_PRESET_VERSION_CONFLICT)
+            # The mock's presets have one release, so an update never has a newer one to apply.
+            if body.get("operation") == "update":
+                raise _Failure(error_codes.POLICY_PRESET_UPDATE_UNAVAILABLE)
+            return self._save_policy(policy, body.get("revision"), {"settings": copy.deepcopy(policy["baseline"])})
+        if action == "automatic-updates":
+            enabled = body.get("enabled") is True
+            preset = policy["preset"]
+            if preset is None or preset["projectId"] != self.project_id or policy["automaticUpdates"] == enabled:
+                raise _Failure(error_codes.POLICY_AUTOMATIC_UPDATES_UNAVAILABLE)
+            if body.get("revision") != policy["revision"]:
+                raise _Failure(error_codes.POLICY_REVISION_CONFLICT)
+            if body.get("presetVersion") != 1:
+                raise _Failure(error_codes.POLICY_PRESET_VERSION_CONFLICT)
+            values: dict[str, Any] = {"automaticUpdates": enabled}
+            if enabled:
+                values.update(name=_MOCK_PRESET_NAMES[preset["id"]], description="",
+                              settings=copy.deepcopy(policy["baseline"]))
+            return self._save_policy(policy, body.get("revision"), values)
+        if method == "GET":
+            return self._policy_view(policy)
+        if method == "DELETE":
+            if policy["id"] == self._project_policy_id:
+                raise _Failure(error_codes.POLICY_IN_USE)
+            del self._policies[policy["id"]]
+            return None
+        values = {key: body[key].strip() if key == "name" else body[key]
+                  for key in ("name", "description") if isinstance(body.get(key), str)}
+        if "settings" in body:
+            values["settings"] = body["settings"]
+        # Saving a policy that follows its preset pins it as a copy.
+        values["automaticUpdates"] = False
+        return self._save_policy(policy, body.get("revision"), values)
+
+    def _create_policy(self, body: dict[str, Any]) -> dict[str, Any]:
+        name, preset_id, settings = body.get("name"), body.get("presetId"), body.get("settings")
+        named = isinstance(name, str) and bool(name.strip())
+        if (settings is None) == (preset_id is None) or (preset_id is not None and preset_id not in _MOCK_PRESET_NAMES) \
+                or (preset_id is None and not named):
+            raise _Failure(error_codes.INVALID_VALUE, "Send settings with a name, or presetId")
+        description = body["description"] if isinstance(body.get("description"), str) else ""
+        if preset_id is not None:
+            policy = self._new_policy(cast(str, name).strip() if named else _MOCK_PRESET_NAMES[preset_id],
+                                      {"categorySettings": {}}, description=description,
+                                      preset={"id": preset_id, "version": 1, "projectId": None})
+        else:
+            policy = self._new_policy(cast(str, name).strip(), cast(dict[str, Any], settings), description=description)
+        return self._policy_view(policy)
 
     def _lenses_put(self, body: dict[str, Any], now: int) -> dict[str, Any]:
         # Each definition is saved in turn, so earlier ones stay saved when a later one conflicts.

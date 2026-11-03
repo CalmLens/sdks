@@ -42,6 +42,8 @@ from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, Ass
                     AddHashListEntryOptions, CreateHashListOptions, HashList, HashListAction, HashListEntry,
                     HashListEntryIdOptions, HashListEntryPage, HashListIdOptions, HashListPage,
                     ListHashListEntriesOptions, ListHashListsOptions, DecideAssetOptions, FolderOrdering, UpdateHashListOptions,
+                    ApplyPolicyPresetOptions, AssignPolicyOptions, CreatePolicyOptions, Policy, PolicyIdOptions, PolicyList,
+                    PolicyPresetOperation, PolicySettings, SetPolicyAutomaticUpdatesOptions, UpdatePolicyOptions,
                     ViewerClaims, Visibility, WaitForDecisionOptions)
 from .webhooks import parse_webhook_event, verify_webhook_signature
 
@@ -821,6 +823,7 @@ class CalmLensServerClient:
     def _bind(self) -> None:
         self.assets, self.folders, self.hash_lists = Assets(self), Folders(self), HashLists(self)
         self.upload_tokens = UploadTokens(self)
+        self.policies = Policies(self)
         self.text, self.events, self.cdn = Text(self), Events(self), CDN(self)
 
     def __repr__(self) -> str:
@@ -1562,6 +1565,81 @@ class HashLists:
         """Remove one entry from its list."""
         merged = _merge(options, entry_id=entry_id)
         self._c._request("DELETE", "/hash-list-entries/" + _id(merged.get("entryId"), "entryId"))
+
+
+class Policies:
+    """``client.policies``: moderation policies. Policies belong to the project's organisation and
+    its projects share them. Every change sends the policy's ``revision``, so a policy changed since
+    is refused with ``policy/revision-conflict``. Through a project's key you can change only
+    policies no other project uses or owns."""
+
+    def __init__(self, client: CalmLensServerClient):
+        self._c = client
+
+    def _path(self, policy_id: object) -> str:
+        return self._c._project("policies/" + _id(policy_id, "policyId"))
+
+    def list(self, options: Mapping[str, Any] | None = None, /) -> PolicyList:
+        """The organisation's policies, oldest first, and ``projectPolicyId``, the one the project
+        moderates with. It takes no options."""
+        _merge(options)
+        return cast(PolicyList, self._c._request("GET", self._c._project("policies")))
+
+    def retrieve(self, options: PolicyIdOptions | None = None, /, *, policy_id: str = _UNSET) -> Policy:
+        """Fetch one of the organisation's policies by ID."""
+        merged = _merge(options, policy_id=policy_id)
+        return cast(Policy, self._c._request("GET", self._path(merged.get("policyId"))))
+
+    def create(self, options: CreatePolicyOptions | None = None, /, *, name: str = _UNSET,
+               description: str = _UNSET, settings: PolicySettings = _UNSET, preset_id: str = _UNSET) -> Policy:
+        """Create a policy from ``settings`` (defining every category) with a ``name``, or a copy of
+        the latest release of a built-in preset with ``preset_id``. It moderates nothing until it is
+        assigned to a project or named on an upload preset."""
+        merged = _merge(options, name=name, description=description, settings=settings, preset_id=preset_id)
+        return cast(Policy, self._c._request("POST", self._c._project("policies"), body=merged))
+
+    def update(self, options: UpdatePolicyOptions | None = None, /, *, policy_id: str = _UNSET,
+               revision: int = _UNSET, name: str = _UNSET, description: str = _UNSET,
+               settings: PolicySettings = _UNSET) -> Policy:
+        """Change the name, description or settings (complete, defining every category); later
+        moderation uses them. Saving a policy that follows automatic updates pins it as a copy."""
+        merged = _merge(options, policy_id=policy_id, revision=revision, name=name, description=description,
+                        settings=settings)
+        return cast(Policy, self._c._request("PATCH", self._path(merged.get("policyId")),
+                                             body={k: v for k, v in merged.items() if k != "policyId"}))
+
+    def apply_preset(self, options: ApplyPolicyPresetOptions | None = None, /, *, policy_id: str = _UNSET,
+                     operation: PolicyPresetOperation = _UNSET, revision: int = _UNSET,
+                     preset_version: int = _UNSET) -> Policy:
+        """``operation="reset"`` restores the settings of the pinned preset version (send
+        ``preset.version``); ``"update"`` moves an unchanged copy to the latest release (send
+        ``preset.latestVersion``)."""
+        merged = _merge(options, policy_id=policy_id, operation=operation, revision=revision,
+                        preset_version=preset_version)
+        return cast(Policy, self._c._request("POST", self._path(merged.get("policyId")) + "/preset",
+                                             body={k: v for k, v in merged.items() if k != "policyId"}))
+
+    def set_automatic_updates(self, options: SetPolicyAutomaticUpdatesOptions | None = None, /, *,
+                              policy_id: str = _UNSET, enabled: bool = _UNSET, revision: int = _UNSET,
+                              preset_version: int = _UNSET) -> Policy:
+        """Switch automatic updates on or off for the project's preset policy. Switching on
+        replaces the saved copy with the latest preset settings under the same ID; switching off
+        pins the current preset version as a copy with unchanged settings."""
+        merged = _merge(options, policy_id=policy_id, enabled=enabled, revision=revision,
+                        preset_version=preset_version)
+        return cast(Policy, self._c._request("PUT", self._path(merged.get("policyId")) + "/automatic-updates",
+                                             body={k: v for k, v in merged.items() if k != "policyId"}))
+
+    def delete(self, options: PolicyIdOptions | None = None, /, *, policy_id: str = _UNSET) -> None:
+        """Delete a policy that no project or upload preset uses."""
+        merged = _merge(options, policy_id=policy_id)
+        self._c._request("DELETE", self._path(merged.get("policyId")))
+
+    def assign(self, options: AssignPolicyOptions | None = None, /, *, policy_id: str = _UNSET) -> Policy:
+        """Choose the policy the project moderates with. Later uploads use it, except those through
+        an upload preset that names its own policy."""
+        merged = _merge(options, policy_id=policy_id)
+        return cast(Policy, self._c._request("PUT", self._c._project("policy"), body=merged))
 
 
 class Events:

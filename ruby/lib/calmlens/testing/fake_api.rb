@@ -64,6 +64,9 @@ module CalmLens
       # The ThumbHash the mock gives every classified image, standing in for one computed from its
       # pixels. The `placeholder` resource serves it as a PNG, like the CDN.
       THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI'
+      # The built-in presets the mock knows, by display name.
+      PRESET_NAMES = { 'general-community' => 'General', 'children-platform' => 'Kids',
+                       'education-support' => 'Learning and support', 'wholesome-community' => 'Teen-safe' }.freeze
       # Like the API: 1 to 255 printable ASCII characters, without a space at either end.
       IDEMPOTENCY_KEY = /\A[\x21-\x7e](?:[\x20-\x7e]{0,253}[\x21-\x7e])?\z/
       # Content a browser could run as a document, which the CDN serves as a download.
@@ -83,6 +86,10 @@ module CalmLens
         @grants = grants
         @state = State.new(assets: {}, folders: {}, content: {}, events: [], lenses: {}, uploads: {}, idempotency: {},
                            hash_lists: {}, hash_list_entries: {})
+        # Stored policies (the API's shape without `projectIds` and `preset.latestVersion`, plus their
+        # reset `baseline`) and the one the project moderates with.
+        @policies = {}
+        @project_policy_id = nil
         @request_count = 0
       end
 
@@ -304,6 +311,10 @@ module CalmLens
         in ['POST', ['folders'], _] then create_folder(json)
         in ['GET', ['hash-lists'], _] then page(project_hash_lists, query, JSON.generate([@project_id]))
         in ['POST', ['hash-lists'], _] then create_hash_list(json)
+        in ['GET', ['policies'], _] then policy_list
+        in ['POST', ['policies'], _] then create_policy(json)
+        in ['PUT', ['policy'], _] then show_policy(assign_policy(json))
+        in [_, ['policies', String => policy_id, *rest], _] then policy(method, policy_id, rest, json)
         in ['GET', ['assets'], _] then list(query)
         in ['GET', ['assets', 'search'], _] then search(query)
         in ['POST', ['assets', 'batch'], _] then batch(json)
@@ -875,6 +886,122 @@ module CalmLens
         end
         unique_name(item['name'], parent_id, item['id']) unless parent_id == item['parentId']
         touch(item.merge!('parentId' => parent_id))
+      end
+
+      # Policies: the project starts on its General preset policy, following automatic updates. The
+      # mock holds no built-in preset settings: a preset's settings are `{ 'categorySettings' => {} }`
+      # at version 1, and uploads are never decided by a policy.
+      def new_policy(name, settings, description: '', automatic_updates: false, preset: nil)
+        now = @now.call
+        item = { 'id' => @create_id.call('pol'), 'name' => name, 'description' => description, 'settings' => settings,
+                 'revision' => 1, 'automaticUpdates' => automatic_updates, 'preset' => preset,
+                 'baseline' => deep_copy(settings), 'createdAt' => now, 'updatedAt' => now }
+        @policies[item['id']] = item
+      end
+
+      def ensure_policies
+        return if @project_policy_id
+
+        preset = { 'id' => 'general-community', 'version' => 1, 'projectId' => @project_id }
+        @project_policy_id = new_policy(PRESET_NAMES['general-community'], { 'categorySettings' => {} },
+                                        automatic_updates: true, preset: preset)['id']
+      end
+
+      # A stored policy as the API shows it.
+      def show_policy(item)
+        shown = item.except('baseline')
+        shown['preset'] = item['preset'].merge('latestVersion' => 1) if item['preset']
+        shown.merge('projectIds' => item['id'] == @project_policy_id ? [@project_id] : [])
+      end
+
+      def find_policy(id)
+        ensure_policies
+        @policies[id] || fail!(ErrorCodes::POLICY_NOT_FOUND)
+      end
+
+      def policy_list
+        ensure_policies
+        { 'policies' => @policies.values.map { |item| show_policy(item) }, 'projectPolicyId' => @project_policy_id }
+      end
+
+      def create_policy(json)
+        ensure_policies
+        name, preset_id, settings = json.values_at('name', 'presetId', 'settings')
+        named = name.is_a?(String) && !name.strip.empty?
+        if settings.nil? == preset_id.nil? || (preset_id && !PRESET_NAMES.key?(preset_id)) || (preset_id.nil? && !named)
+          fail!(ErrorCodes::INVALID_VALUE, 'Send settings with a name, or presetId')
+        end
+        description = json['description'].is_a?(String) ? json['description'] : ''
+        item = if preset_id
+                 origin = { 'id' => preset_id, 'version' => 1, 'projectId' => nil }
+                 new_policy(named ? name.strip : PRESET_NAMES[preset_id], { 'categorySettings' => {} },
+                            description: description, preset: origin)
+               else
+                 new_policy(name.strip, settings, description: description)
+               end
+        # Like the API, a new policy is 201 Created.
+        respond(201, deep_copy(show_policy(item)))
+      end
+
+      def assign_policy(json)
+        item = find_policy(json['policyId'].to_s)
+        @project_policy_id = item['id']
+        item
+      end
+
+      # Saves new values under the next revision, once `revision` is the current one.
+      def save_policy(item, revision, values)
+        fail!(ErrorCodes::POLICY_REVISION_CONFLICT) unless revision.is_a?(Integer) && revision == item['revision']
+
+        item.merge!(values, 'revision' => item['revision'] + 1, 'updatedAt' => @now.call)
+        show_policy(item)
+      end
+
+      def policy(method, id, rest, json)
+        item = find_policy(id)
+        case [method, rest]
+        in ['GET', []] then show_policy(item)
+        in ['PATCH', []] then update_policy(item, json)
+        in ['DELETE', []]
+          fail!(ErrorCodes::POLICY_IN_USE) if item['id'] == @project_policy_id
+          @policies.delete(id)
+          {}
+        in ['POST', ['preset']] then apply_policy_preset(item, json)
+        in ['PUT', ['automatic-updates']] then set_policy_automatic_updates(item, json)
+        else route_not_found!(method, ['policies', id, *rest])
+        end
+      end
+
+      def update_policy(item, json)
+        values = %w[name description].select { |key| json[key].is_a?(String) }
+                                     .to_h { |key| [key, key == 'name' ? json[key].strip : json[key]] }
+        values['settings'] = json['settings'] if json.key?('settings')
+        # Saving a policy that follows its preset pins it as a copy.
+        save_policy(item, json['revision'], values.merge('automaticUpdates' => false))
+      end
+
+      def apply_policy_preset(item, json)
+        preset = item['preset']
+        fail!(ErrorCodes::POLICY_NO_PRESET) if preset.nil? || item['automaticUpdates']
+        fail!(ErrorCodes::POLICY_PRESET_VERSION_CONFLICT) unless json['presetVersion'] == preset['version']
+        # The mock's presets have one release, so an update never has a newer one to apply.
+        fail!(ErrorCodes::POLICY_PRESET_UPDATE_UNAVAILABLE) if json['operation'] == 'update'
+
+        save_policy(item, json['revision'], 'settings' => deep_copy(item['baseline']))
+      end
+
+      def set_policy_automatic_updates(item, json)
+        enabled = json['enabled'] == true
+        preset = item['preset']
+        if preset.nil? || preset['projectId'] != @project_id || item['automaticUpdates'] == enabled
+          fail!(ErrorCodes::POLICY_AUTOMATIC_UPDATES_UNAVAILABLE)
+        end
+        fail!(ErrorCodes::POLICY_REVISION_CONFLICT) unless json['revision'] == item['revision']
+        fail!(ErrorCodes::POLICY_PRESET_VERSION_CONFLICT) unless json['presetVersion'] == 1
+
+        values = { 'automaticUpdates' => enabled }
+        values.merge!('name' => PRESET_NAMES[preset['id']], 'description' => '', 'settings' => deep_copy(item['baseline'])) if enabled
+        save_policy(item, json['revision'], values)
       end
 
       # Hash lists and their entries. Uploads are not compared with them.

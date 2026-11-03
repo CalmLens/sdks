@@ -34,6 +34,8 @@ module CalmLens
     attr_reader :folders
     # @return [HashLists]
     attr_reader :hash_lists
+    # @return [Policies]
+    attr_reader :policies
     # @return [Text]
     attr_reader :text
     # @return [UploadTokens]
@@ -81,6 +83,7 @@ module CalmLens
       @assets = Assets.new(@session)
       @folders = Folders.new(@session)
       @hash_lists = HashLists.new(@session)
+      @policies = Policies.new(@session)
       @text = Text.new(@session, @assets)
       @upload_tokens = UploadTokens.new(@session, api_key)
       @events = Events.new(@session)

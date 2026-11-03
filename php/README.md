@@ -57,7 +57,6 @@ A failed classification (`classification.status` is `failed`) is not a decision 
 - [Record reviewer decisions and run batch operations](https://calmlens.com/docs/sdk/php/reference#moderation-results).
 - [Manage assets, folders and hash lists](https://calmlens.com/docs/sdk/php#methods), with
   [hash list details](https://calmlens.com/docs/sdk/php/reference#hash-lists).
-- [Manage moderation policies](https://calmlens.com/docs/sdk/php/reference#policies) and choose the one the project uses.
 - [Page through lists and the events feed](https://calmlens.com/docs/sdk/php/reference#pagination-and-filters),
   with [filters](https://calmlens.com/docs/guides/pagination-and-filtering).
 - [Build CDN URLs, sign URLs and stream content](https://calmlens.com/docs/sdk/php/reference#cdn-urls-and-transforms),

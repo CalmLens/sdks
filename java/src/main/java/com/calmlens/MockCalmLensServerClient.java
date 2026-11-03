@@ -29,11 +29,10 @@ import java.util.function.LongSupplier;
  * encoding, retries, error mapping) whose transport answers from an in-memory API, and records
  * every request it receives.
  *
- * <p>The in-memory API keeps assets, folders, hash lists, policies, events and content: uploads create assets you can
+ * <p>The in-memory API keeps assets, folders, hash lists, events and content: uploads create assets you can
  * retrieve, list (RSQL filters such as {@code classification.moderation.status==blocked},
  * ordering, folder and cursor paging), search, update, move and delete, and the CDN serves their
- * stored bytes. The project starts on its General preset policy; presets have one release and no
- * settings, and policies never decide uploads. It does not classify content: {@link Options#moderate} decides each upload from the
+ * stored bytes. It does not classify content: {@link Options#moderate} decides each upload from the
  * asset, its content and why it is moderated, with a status or a {@link MockDecision}. Without it,
  * queued uploads ({@code assets.create}), retries and reruns stay {@code pending} until {@link
  * #completeProcessing}, and {@code assets.classify} and {@code text.classify} are {@code allowed}.
@@ -227,7 +226,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
 
     /**
      * @param value returns a new ID for an object of the kind the prefix names ({@code asset},
-     *     {@code fldr}, {@code hl}, {@code hle}, {@code pol}, {@code lens}, {@code evt} or {@code rev}); by
+     *     {@code fldr}, {@code hl}, {@code hle}, {@code lens}, {@code evt} or {@code rev}); by
      *     default, like the API, the prefix, {@code _} and 20 random base62 characters, such as
      *     {@code asset_5Gm2Rk8XqT3wLp9VbN4c}
      * @return these options

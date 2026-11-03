@@ -113,6 +113,7 @@ module CalmLens
     attr_reader assets: Assets
     attr_reader folders: Folders
     attr_reader hash_lists: HashLists
+    attr_reader policies: Policies
     attr_reader text: Text
     attr_reader upload_tokens: UploadTokens
     attr_reader events: Events
@@ -198,6 +199,17 @@ module CalmLens
     def list_entries: (list_hash_list_entries_options options) -> hash_list_entry_page
     def add_entry: (add_hash_list_entry_options options) -> hash_list_entry
     def remove_entry: (hash_list_entry_id_options options) -> nil
+  end
+
+  class Policies < Resource
+    def list: (?list_policies_options options) -> policy_list
+    def retrieve: (policy_id_options options) -> policy
+    def create: (create_policy_options options) -> policy
+    def update: (update_policy_options options) -> policy
+    def apply_preset: (apply_policy_preset_options options) -> policy
+    def set_automatic_updates: (set_policy_automatic_updates_options options) -> policy
+    def delete: (policy_id_options options) -> nil
+    def assign: (assign_policy_options options) -> policy
   end
 
   class UploadTokens < Resource

@@ -618,6 +618,47 @@ module CalmLens
     "ordering" => Array[order]
   }
 
+  # ---- Policies (Policy.ts) ---------------------------------------------------------------------
+
+  type policy_preset_id = "general-community" | "children-platform" | "education-support" | "wholesome-community"
+  # What a policy does with one category: `action` when its policy score reaches 0.5 (default
+  # `block`), allowances that let covered content through or act on it more softly, and
+  # restrictions, which outweigh allowances.
+  type category_policy_settings = {
+    ?"action" => flagged_content_action,
+    ?"allowances" => Array[policy_rule_snapshot],
+    ?"restrictions" => Array[policy_rule_snapshot]
+  }
+  # Settings by category (`sexual`, `violence`, ...), and optionally link safety.
+  type policy_settings = {
+    "categorySettings" => Hash[String, category_policy_settings],
+    ?"linkSafety" => link_safety_settings
+  }
+  # Where a policy started from a built-in preset. `version` is the release it is pinned to,
+  # `latestVersion` the newest; `projectId` is the project whose preset policy it is, or nil for a copy.
+  type policy_preset_origin = {
+    "id" => policy_preset_id,
+    "version" => Integer,
+    "latestVersion" => Integer,
+    "projectId" => String?
+  }
+  # A moderation policy. Policies belong to the project's organisation and its projects share them.
+  # Send `revision` with each change; a policy changed since is refused with `policy/revision-conflict`.
+  type policy = {
+    "id" => String,
+    "name" => String,
+    "description" => String,
+    "settings" => policy_settings,
+    "revision" => Integer,
+    "automaticUpdates" => bool,
+    "preset" => policy_preset_origin?,
+    "projectIds" => Array[String],
+    "createdAt" => Integer,
+    "updatedAt" => Integer
+  }
+  # Every policy of the project's organisation, oldest first, and the one the project moderates with.
+  type policy_list = { "policies" => Array[policy], "projectPolicyId" => String }
+
   # ---- Events and webhooks (Event.ts, EventCatalog.ts, WebhookPayload.ts) ----------------------
 
   # EVENT_TYPES in EventCatalog.ts. Ignore types your code does not handle. Webhook, Slack and email
@@ -857,6 +898,37 @@ module CalmLens
   type add_hash_list_entry_options = { hash_list_id: String, ?hash: String, ?quality: number, ?asset_id: String, ?label: String,
                                        ?request_options: request_options }
   type hash_list_entry_id_options = { entry_id: String, ?request_options: request_options }
+
+  # Policy settings as options: snake_case Symbol keys, or a policy's `settings` as the API returned it.
+  type policy_rule_input = { when: Array[String], action: flagged_content_action, ?name: String, ?match: "all", ?unless: Array[String] }
+  type category_policy_settings_input = {
+    ?action: flagged_content_action,
+    ?allowances: Array[policy_rule_input],
+    ?restrictions: Array[policy_rule_input]
+  }
+  type link_safety_settings_input = {
+    verdict_actions: Hash[String | Symbol, link_safety_action],
+    ?off_platform_links: { action: "limit" | "age-restrict" | "block", allowed_domains: Array[String] }
+  }
+  type policy_settings_input = policy_settings | {
+    category_settings: Hash[String | Symbol, category_policy_settings_input],
+    ?link_safety: link_safety_settings_input
+  }
+  type list_policies_options = { ?request_options: request_options }
+  type policy_id_options = { policy_id: String, ?request_options: request_options }
+  # Send `settings` (defining every category) with a `name`, or `preset_id` to copy the latest
+  # release of a built-in preset, named after it unless you give a `name`.
+  type create_policy_options = { ?name: String, ?description: String, ?settings: policy_settings_input,
+                                 ?preset_id: policy_preset_id, ?request_options: request_options }
+  type update_policy_options = { policy_id: String, revision: Integer, ?name: String, ?description: String,
+                                 ?settings: policy_settings_input, ?request_options: request_options }
+  # `reset` restores the pinned preset version (send `preset.version`); `update` moves an unchanged
+  # copy to the latest release (send `preset.latestVersion`).
+  type apply_policy_preset_options = { policy_id: String, operation: "reset" | "update", revision: Integer,
+                                       preset_version: Integer, ?request_options: request_options }
+  type set_policy_automatic_updates_options = { policy_id: String, enabled: bool, revision: Integer,
+                                                preset_version: Integer, ?request_options: request_options }
+  type assign_policy_options = { policy_id: String, ?request_options: request_options }
 
   # `page_size` is 1 to 100, default 50.
   type list_events_options = { ?cursor: String, ?page_size: Integer, ?request_options: request_options }

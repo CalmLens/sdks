@@ -59,6 +59,9 @@ __all__ = [
     "LinkSafetySettings", "LinkSafetyDecision", "HashMatch", "HashListAction", "HashList",
     "HashListEntry", "HashListPage", "ListHashListsOptions", "HashListEntryPage", "HashListIdOptions",
     "HashListEntryIdOptions", "DecideAssetOptions", "FolderOrdering", "CreateHashListOptions", "UpdateHashListOptions", "ListHashListEntriesOptions", "AddHashListEntryOptions",
+    "PolicyPresetId", "CategoryPolicySettings", "PolicySettings", "PolicyPresetOrigin", "Policy", "PolicyList",
+    "PolicyIdOptions", "CreatePolicyOptions", "UpdatePolicyOptions", "PolicyPresetOperation", "ApplyPolicyPresetOptions",
+    "SetPolicyAutomaticUpdatesOptions", "AssignPolicyOptions",
 ]
 
 # ---- Enum-like values -----------------------------------------------------------------------
@@ -923,6 +926,69 @@ class HashListEntryPage(TypedDict):
     ordering: List[Ordering]
 
 
+# ---- Policies ---------------------------------------------------------------------------------
+
+#: A built-in policy preset. New presets may be added.
+PolicyPresetId = Union[Literal["general-community", "children-platform", "education-support",
+                               "wholesome-community"], str]
+
+
+class CategoryPolicySettings(TypedDict, total=False):
+    """What a policy does with one category: ``action`` when its policy score reaches 0.5 (default
+    ``block``), ``allowances`` that let covered content through or act on it more softly, and
+    ``restrictions``, which outweigh allowances."""
+    action: ModerationAction
+    allowances: List[PolicyRuleSnapshot]
+    restrictions: List[PolicyRuleSnapshot]
+
+
+class _PolicySettingsRequired(TypedDict):
+    #: Settings by category (``sexual``, ``violence``, ...).
+    categorySettings: Dict[str, CategoryPolicySettings]
+
+
+class PolicySettings(_PolicySettingsRequired, total=False):
+    """What a policy does with each category, its allowances and restrictions."""
+    linkSafety: LinkSafetySettings
+
+
+class PolicyPresetOrigin(TypedDict):
+    """Where a policy started from a built-in preset."""
+    id: PolicyPresetId
+    #: The preset release the policy is pinned to. Resetting restores this version's settings.
+    version: int
+    #: The newest release of the preset; a newer one than ``version`` can be applied with ``update``.
+    latestVersion: int
+    #: The project whose preset policy this is, or ``None`` for a copy. Only a project's preset
+    #: policy can follow automatic updates.
+    projectId: Optional[str]
+
+
+class Policy(TypedDict):
+    """A moderation policy. Policies belong to the project's organisation and its projects share them."""
+    id: str
+    name: str
+    description: str
+    settings: PolicySettings
+    #: Changes with every saved change. Send it with each change; a policy changed since is refused
+    #: with ``policy/revision-conflict``.
+    revision: int
+    #: Whether the policy follows its preset, always having the latest preset settings.
+    automaticUpdates: bool
+    preset: Optional[PolicyPresetOrigin]
+    #: Projects this policy moderates, as their default policy or through an upload preset.
+    projectIds: List[str]
+    createdAt: int
+    updatedAt: int
+
+
+class PolicyList(TypedDict):
+    """``policies.list``: every policy of the project's organisation, oldest first, and the one
+    the project moderates with."""
+    policies: List[Policy]
+    projectPolicyId: str
+
+
 # ---- Lenses and CDN transforms ----------------------------------------------------------------
 
 # <generated: image-transform-options>
@@ -1229,6 +1295,54 @@ class AddHashListEntryOptions(HashListIdOptions, total=False):
     quality: Optional[int]
     assetId: str
     label: Optional[str]
+
+
+class PolicyIdOptions(TypedDict):
+    policyId: str
+
+
+class CreatePolicyOptions(TypedDict, total=False):
+    """Send ``settings`` (defining every category) with a ``name``, or ``presetId`` to copy the
+    latest release of a built-in preset, which defaults to the preset's name."""
+    name: str
+    description: str
+    settings: PolicySettings
+    presetId: Literal["general-community", "children-platform", "education-support", "wholesome-community"]
+
+
+class _UpdatePolicyRequired(PolicyIdOptions):
+    #: The policy's current ``revision``; a policy changed since is refused.
+    revision: int
+
+
+class UpdatePolicyOptions(_UpdatePolicyRequired, total=False):
+    name: str
+    description: str
+    #: The complete new settings, defining every category.
+    settings: PolicySettings
+
+
+#: ``reset`` restores the pinned preset version's settings; ``update`` moves an unchanged copy to
+#: the latest preset release.
+PolicyPresetOperation = Literal["reset", "update"]
+
+
+class ApplyPolicyPresetOptions(PolicyIdOptions):
+    operation: PolicyPresetOperation
+    revision: int
+    #: The preset release you reviewed: ``preset.version`` to reset, ``preset.latestVersion`` to update.
+    presetVersion: int
+
+
+class SetPolicyAutomaticUpdatesOptions(PolicyIdOptions):
+    enabled: bool
+    revision: int
+    #: The preset's ``latestVersion`` you reviewed.
+    presetVersion: int
+
+
+class AssignPolicyOptions(TypedDict):
+    policyId: str
 
 
 class _UploadPartRequired(AssetIdOptions):

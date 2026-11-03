@@ -162,24 +162,6 @@ public final class ErrorCodes {
   public static final String HASH_LIST_ENTRY_LIMIT_REACHED = "hash-list/entry-limit-reached";
   /** {@code hash-list/asset-not-hashed} (HTTP 409). */
   public static final String HASH_LIST_ASSET_NOT_HASHED = "hash-list/asset-not-hashed";
-  /** {@code policy/not-found} (HTTP 404). */
-  public static final String POLICY_NOT_FOUND = "policy/not-found";
-  /** {@code policy/revision-conflict} (HTTP 409). */
-  public static final String POLICY_REVISION_CONFLICT = "policy/revision-conflict";
-  /** {@code policy/projects-changed} (HTTP 409). */
-  public static final String POLICY_PROJECTS_CHANGED = "policy/projects-changed";
-  /** {@code policy/in-use} (HTTP 409). */
-  public static final String POLICY_IN_USE = "policy/in-use";
-  /** {@code policy/used-by-another-project} (HTTP 409). */
-  public static final String POLICY_USED_BY_ANOTHER_PROJECT = "policy/used-by-another-project";
-  /** {@code policy/no-preset} (HTTP 400). */
-  public static final String POLICY_NO_PRESET = "policy/no-preset";
-  /** {@code policy/preset-version-conflict} (HTTP 409). */
-  public static final String POLICY_PRESET_VERSION_CONFLICT = "policy/preset-version-conflict";
-  /** {@code policy/preset-update-unavailable} (HTTP 409). */
-  public static final String POLICY_PRESET_UPDATE_UNAVAILABLE = "policy/preset-update-unavailable";
-  /** {@code policy/automatic-updates-unavailable} (HTTP 409). */
-  public static final String POLICY_AUTOMATIC_UPDATES_UNAVAILABLE = "policy/automatic-updates-unavailable";
   /** {@code upload-preset/not-found} (HTTP 404). */
   public static final String UPLOAD_PRESET_NOT_FOUND = "upload-preset/not-found";
   /** {@code upload-preset/disabled} (HTTP 403). */
@@ -328,15 +310,6 @@ public final class ErrorCodes {
       Map.entry(HASH_LIST_LIMIT_REACHED, 409),
       Map.entry(HASH_LIST_ENTRY_LIMIT_REACHED, 409),
       Map.entry(HASH_LIST_ASSET_NOT_HASHED, 409),
-      Map.entry(POLICY_NOT_FOUND, 404),
-      Map.entry(POLICY_REVISION_CONFLICT, 409),
-      Map.entry(POLICY_PROJECTS_CHANGED, 409),
-      Map.entry(POLICY_IN_USE, 409),
-      Map.entry(POLICY_USED_BY_ANOTHER_PROJECT, 409),
-      Map.entry(POLICY_NO_PRESET, 400),
-      Map.entry(POLICY_PRESET_VERSION_CONFLICT, 409),
-      Map.entry(POLICY_PRESET_UPDATE_UNAVAILABLE, 409),
-      Map.entry(POLICY_AUTOMATIC_UPDATES_UNAVAILABLE, 409),
       Map.entry(UPLOAD_PRESET_NOT_FOUND, 404),
       Map.entry(UPLOAD_PRESET_DISABLED, 403),
       Map.entry(UPLOAD_PRESET_TOKEN_REQUIRED, 401),
