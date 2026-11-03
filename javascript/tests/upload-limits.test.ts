@@ -24,7 +24,8 @@ describe("one-request upload size limits", () => {
   test("refuse content over its type's limit before sending any of it", async () => {
     const sent: string[] = [];
     const uploads = [
-      { type: "image/png", uint8Array: new Uint8Array(10 * MIB + 1) },
+      // A stream can't be split into parts, so it goes in one request.
+      { type: "image/png", data: new ReadableStream(), sizeInBytes: 10 * MIB + 1 },
       { type: "video/mp4", data: new ReadableStream(), sizeInBytes: 50 * MIB + 1 },
       { type: "application/pdf", data: new ReadableStream(), sizeInBytes: 5000 * MIB + 1 },
     ];
@@ -43,8 +44,21 @@ describe("one-request upload size limits", () => {
     const sent: string[] = [];
     await client(sent).assets.create({
       name: "x.png",
-      content: { type: "image/png", uint8Array: new Uint8Array(10 * MIB) },
+      content: {
+        type: "image/png",
+        data: new Response(new Uint8Array(10 * MIB)).body!,
+        sizeInBytes: 10 * MIB,
+      },
     });
     expect(sent).toHaveLength(1);
+  });
+
+  test("send larger bytes in parts", async () => {
+    const sent: string[] = [];
+    await client(sent).assets.create({
+      name: "x.png",
+      content: { type: "image/png", uint8Array: new Uint8Array(10 * MIB + 1) },
+    });
+    expect(sent.map((url) => new URL(url).searchParams.get("partNumber"))).toEqual(["1", "2"]);
   });
 });

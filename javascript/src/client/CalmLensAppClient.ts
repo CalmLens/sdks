@@ -3,6 +3,7 @@ import {
   expectUploadedAsset,
   prepareSubmitAssetOptions,
   resolveConnectionOptions,
+  splitsIntoParts,
 } from "./CalmLensConnection";
 import { invalidArgument, invalidConfig } from "./CalmLensError";
 import type {
@@ -76,8 +77,23 @@ export default class CalmLensAppClient {
     if (!("content" in options) && !("part" in options)) {
       throw invalidArgument("Uploads through an upload preset need content or a part");
     }
-    prepareSubmitAssetOptions(options, { deferUploadChecks: this.#connection.deferUploadChecks });
+    prepareSubmitAssetOptions(options, {
+      deferUploadChecks: this.#connection.deferUploadChecks,
+      partSizeBytes: this.#connection.partSizeBytes,
+    });
     const token = await this.newUploadToken();
+    if ("content" in options && splitsIntoParts(options.content, this.#connection.partSizeBytes)) {
+      // The token that started the upload authorizes its later parts.
+      const data = await this.#connection.submitInParts(this.uploadsPath, options, queue, {
+        authHeaders: token ? { Authorization: `Bearer ${token}` } : {},
+        partPath: (assetId) => `${this.uploadsPath}/${encodeURIComponent(assetId)}/part`,
+        onStarted: (assetId) => {
+          if (token) this.#uploadTokens.set(assetId, token);
+        },
+        retrieve: (assetId) => this.assets.retrieve({ assetId }),
+      });
+      return expectUploadedAsset(data);
+    }
     const data = await this.#connection.submitRawUpload(
       this.uploadsPath,
       options,

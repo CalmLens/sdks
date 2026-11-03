@@ -12,6 +12,7 @@ import {
   newIdempotencyKey,
   prepareSubmitAssetOptions,
   resolveConnectionOptions,
+  splitsIntoParts,
 } from "./CalmLensConnection";
 import { CalmLensError, invalidArgument, invalidConfig, SDK_ERROR_CODES } from "./CalmLensError";
 import type { TransportRequest } from "./CalmLensTransport";
@@ -226,8 +227,17 @@ export default class CalmLensServerClient {
   private async submitAsset(options: SubmitAssetOptions, queue: boolean): Promise<Asset> {
     const body = prepareSubmitAssetOptions(options, {
       deferUploadChecks: this.#connection.deferUploadChecks,
+      partSizeBytes: this.#connection.partSizeBytes,
     });
     const uploadsPath = `${this.projectPath}/assets`;
+    if ("content" in body && splitsIntoParts(body.content, this.#connection.partSizeBytes)) {
+      return expectAsset(
+        await this.#connection.submitInParts(uploadsPath, body, queue, {
+          partPath: (assetId) => `/assets/${encodeURIComponent(assetId)}/part`,
+          retrieve: (assetId) => this.buildAssets().retrieve({ assetId }),
+        }),
+      );
+    }
     if ("content" in body || "part" in body) {
       return expectAsset(await this.#connection.submitRawUpload(uploadsPath, body, queue));
     }

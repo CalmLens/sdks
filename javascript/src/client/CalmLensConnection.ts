@@ -57,6 +57,52 @@ export interface MockHooks {
 export const getMockHooks = (options: object): MockHooks | undefined =>
   (options as { [MOCK_HOOKS]?: MockHooks })[MOCK_HOOKS];
 export const DEFAULT_MAX_RETRIES = 2;
+/** Content larger than this is uploaded in parts of this size (`partSizeBytes`). */
+export const DEFAULT_PART_SIZE_BYTES = 8 * 1024 * 1024;
+/** `partSizeBytes` bounds: every part but the last is at least 5 MiB. */
+export const MIN_PART_SIZE_BYTES = 5 * 1024 * 1024;
+export const MAX_PART_SIZE_BYTES = 64 * 1024 * 1024;
+/** The longest `idempotencyKey` of an upload sent in parts: each part's key adds `:part-<n>`. */
+export const MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH = 240;
+
+/** Content the client can cut into parts and read again for a retry, with its size. */
+interface SplittableContent {
+  size: number;
+  /** The bytes from `start` to `end` as a part payload. */
+  slice(start: number, end: number): AssetBinaryPayloadInput;
+}
+
+/**
+ * The size of content the client can split, read again and resend: bytes, base64 and Blobs.
+ * Streams and Responses can be read only once, and text stays one request.
+ */
+const getSplittableContent = (content: AssetBinaryPayloadInput): SplittableContent | undefined => {
+  if ("plainText" in content && content.plainText !== undefined) return undefined;
+  if ("data" in content && content.data !== undefined) {
+    const { data } = content;
+    if (!(data instanceof Blob)) return undefined;
+    return { size: data.size, slice: (start, end) => ({ data: data.slice(start, end) }) };
+  }
+  const size = getAssetPayloadByteLength(content);
+  if (size === undefined) return undefined;
+  let bytes: Uint8Array | undefined;
+  return {
+    size,
+    slice: (start, end) => {
+      if (!bytes) {
+        const data = assetToData(content);
+        bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : (data as Uint8Array);
+      }
+      return { uint8Array: bytes.subarray(start, end) };
+    },
+  };
+};
+
+/** Whether `content` goes in parts: its size is known, it can be resent, and it's over a part. */
+export const splitsIntoParts = (content: AssetBinaryPayloadInput, partSizeBytes: number) => {
+  const splittable = getSplittableContent(content);
+  return splittable !== undefined && splittable.size > partSizeBytes;
+};
 export const DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 
 /**
@@ -149,7 +195,10 @@ const assertDirectUploadSize = (
 /** Checks upload options before anything is sent. */
 export const prepareSubmitAssetOptions = (
   options: SubmitAssetOptions,
-  { deferUploadChecks = false }: { deferUploadChecks?: boolean } = {},
+  {
+    deferUploadChecks = false,
+    partSizeBytes = DEFAULT_PART_SIZE_BYTES,
+  }: { deferUploadChecks?: boolean; partSizeBytes?: number } = {},
 ): SubmitAssetOptions => {
   if (!options || typeof options !== "object") {
     throw invalidArgument("Asset options are required");
@@ -171,7 +220,19 @@ export const prepareSubmitAssetOptions = (
   if ("content" in options) {
     assertDeclaredPayloadSize(options.content);
     assertValidUploadMimeType(options.content.type);
-    if (!deferUploadChecks) assertDirectUploadSize(options.content);
+    const inParts = splitsIntoParts(options.content, partSizeBytes);
+    if (inParts && (options.idempotencyKey?.length ?? 0) > MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH) {
+      throw invalidArgument(
+        `idempotencyKey can be at most ${MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH} characters for an upload sent in parts`,
+      );
+    }
+    if (!deferUploadChecks && inParts && isImageMimeType(options.content.type)) {
+      if ((getAssetPayloadByteLength(options.content) ?? 0) > MAX_IMAGE_UPLOAD_BYTES) {
+        throw new CalmLensError(API_ERROR_CODES.MULTIPART_IMAGE_TOO_LARGE, {
+          message: "Multipart image uploads cannot exceed 20MB.",
+        });
+      }
+    } else if (!deferUploadChecks) assertDirectUploadSize(options.content);
     if (!("plainText" in options.content)) {
       const validation = validateAssetPayload(options.content);
       if (!validation.ok) throw invalidPayload(validation.error);
@@ -409,6 +470,88 @@ export class CalmLensConnection {
       },
       options.idempotencyKey ?? newIdempotencyKey(),
     );
+  }
+
+  /** Content larger than this is uploaded in parts. */
+  get partSizeBytes(): number {
+    return this.options.partSizeBytes ?? DEFAULT_PART_SIZE_BYTES;
+  }
+
+  /**
+   * Uploads content larger than `partSizeBytes` in parts: the first to `uploadsPath` with the
+   * upload's fields, the rest to `partPath(assetId)`. Each part carries its own Idempotency-Key
+   * (`<key>:part-<n>`), so it is retried safely and a repeated call with the same key resumes the
+   * upload. A part the API already has is skipped, and a final part that finds the upload already
+   * completed reads it back with `retrieve`.
+   */
+  async submitInParts(
+    uploadsPath: string,
+    options: Extract<SubmitAssetOptions, { content: unknown }>,
+    queue: boolean,
+    {
+      authHeaders = {},
+      partPath,
+      onStarted,
+      retrieve,
+    }: {
+      authHeaders?: Record<string, string>;
+      partPath: (assetId: string) => string;
+      onStarted?: (assetId: string) => void;
+      retrieve: (assetId: string) => Promise<unknown>;
+    },
+  ): Promise<unknown> {
+    const { content, idempotencyKey, ...fields } = options;
+    const source = getSplittableContent(content)!;
+    const partSize = this.partSizeBytes;
+    const count = Math.ceil(source.size / partSize);
+    const key = idempotencyKey ?? newIdempotencyKey();
+    const part = (partNumber: number) =>
+      source.slice((partNumber - 1) * partSize, Math.min(partNumber * partSize, source.size));
+    const first = (await this.submitRawUpload(
+      uploadsPath,
+      {
+        ...fields,
+        part: { ...part(1), type: content.type, partNumber: 1, isFinal: false },
+        totalSizeInBytes: source.size,
+        idempotencyKey: key,
+      } as SubmitAssetOptions as Exclude<SubmitAssetOptions, { url: string }>,
+      queue,
+      authHeaders,
+    )) as { id?: unknown };
+    const assetId = expectUploadedAsset(first).id;
+    onStarted?.(assetId);
+    let result: unknown = first;
+    for (let partNumber = 2; partNumber <= count; ) {
+      const isFinal = partNumber === count;
+      try {
+        result = await this.uploadPart(
+          partPath(assetId),
+          {
+            part: { ...part(partNumber), partNumber, isFinal } as MultipartUploadPartOptions,
+            idempotencyKey: `${key}:part-${partNumber}`,
+          },
+          authHeaders,
+        );
+        partNumber++;
+      } catch (error) {
+        if (!(error instanceof CalmLensError)) throw error;
+        const expected = error.details?.expectedPartNumber;
+        // The API already has the parts before `expected`: their responses were lost.
+        if (
+          error.code === API_ERROR_CODES.INVALID_UPLOAD_PART_NUMBER &&
+          typeof expected === "number" &&
+          expected > partNumber &&
+          expected <= count
+        ) {
+          partNumber = expected;
+          continue;
+        }
+        // The final part already arrived and completed the upload.
+        if (isFinal && error.code === API_ERROR_CODES.UPLOAD_NOT_OPEN) return retrieve(assetId);
+        throw error;
+      }
+    }
+    return result;
   }
 
   /** Uploads the next part of a multipart upload to `partPath` (`.../assets/{id}/part`). */

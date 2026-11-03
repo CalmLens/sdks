@@ -54,6 +54,17 @@ const validateConnectionOptions = (options: ConnectionOptions) => {
   }
   validateRequestOptions(options);
   assertInteger("maxResponseBytes", options.maxResponseBytes, 1);
+  const { partSizeBytes } = options;
+  if (
+    partSizeBytes !== undefined &&
+    (!Number.isSafeInteger(partSizeBytes) ||
+      partSizeBytes < 5 * 1024 * 1024 ||
+      partSizeBytes > 64 * 1024 * 1024)
+  ) {
+    throw invalidConfig(
+      "partSizeBytes must be an integer from 5 MiB (5242880) to 64 MiB (67108864)",
+    );
+  }
   for (const name of ["fetch", "uploadFetch"] as const) {
     if (options[name] !== undefined && typeof options[name] !== "function") {
       throw invalidConfig(`${name} must be a function`);

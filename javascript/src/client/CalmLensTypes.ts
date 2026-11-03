@@ -295,6 +295,13 @@ export interface ConnectionOptions extends RequestOptions {
   uploadFetch?: typeof fetch;
   /** Largest JSON response body the client reads, in bytes. Defaults to 32 MiB. */
   maxResponseBytes?: number;
+  /**
+   * Content larger than this many bytes, whose size the client knows and can read again (bytes,
+   * base64, Blobs and Files), is uploaded in parts of this size: each part is retried on its own,
+   * and calling again with the same `idempotencyKey` resumes the upload. From 5 MiB to 64 MiB;
+   * defaults to 8 MiB.
+   */
+  partSizeBytes?: number;
 }
 
 /** Options for `CalmLensServerClient`, which runs on your server with a project API key. */
