@@ -45,7 +45,9 @@ __all__ = [
     "WebhookEventPayload",
     "ImageTransformRedaction", "TextRegion", "DetectedQrCode", "DetectedLink", "EvaluatedLinkDetectionResult",
     "LinkDetectionResult", "ProvenanceSignal", "EvaluatedAiGeneratedDetectionResult", "AiGeneratedDetectionResult",
-    "LinkDetectionFeatureOptions", "AiGeneratedDetectionFeatureOptions", "HashMatch", "HashListAction", "HashList",
+    "LinkDetectionFeatureOptions", "AiGeneratedDetectionFeatureOptions", "LinkSafetyVerdict", "LinkSafetyAction",
+    "LinkSafetyEvidence", "CheckedLink", "EvaluatedLinkSafetyResult", "LinkSafetyResult", "OffPlatformLinkSettings",
+    "LinkSafetySettings", "LinkSafetyDecision", "HashMatch", "HashListAction", "HashList",
     "HashListEntry", "HashListPage", "ListHashListsOptions", "HashListEntryPage", "HashListIdOptions",
     "HashListEntryIdOptions", "DecideAssetOptions", "FolderOrdering", "CreateHashListOptions", "UpdateHashListOptions", "ListHashListEntriesOptions", "AddHashListEntryOptions",
 ]
@@ -111,7 +113,7 @@ SemanticStatus = Union[Literal["disabled", "ready", "indexing", "unavailable"], 
 #: Event types. New types may be added; ignore ones you don't handle.
 EventType = Union[Literal["asset.uploaded", "asset.classified", "asset.allowed", "asset.limited",
                           "asset.age-restricted", "asset.blocked", "asset.purged", "asset.failed", "asset.deleted", "asset.content-removed",
-                          "asset.retried", "usage.limit-reached", "usage.spend-limit-reached",
+                          "asset.retried", "asset.link-flagged", "usage.limit-reached", "usage.spend-limit-reached",
                           "upload-preset.daily-limit-reached", "project.member-joined",
                           "project.member-removed", "project.member-role-changed",
                           "project.invitation-sent", "api-key.created", "api-key.revoked",
@@ -127,7 +129,8 @@ EventFactKey = Union[Literal[
     "member-user-id", "member-name", "role", "invited-by-user-id", "connector-id", "connector-name",
     "connector-type", "consecutive-failures", "last-error", "resumes-on", "reason", "failure-reason", "preset-id", "preset-name",
     "daily-limit", "left", "removed-by-user-id", "previous-role", "changed-by-user-id", "key-id",
-    "key-name", "action", "created-by-user-id", "revoked-by-user-id", "test",
+    "key-name", "action", "created-by-user-id", "revoked-by-user-id", "link-verdict", "link-url",
+    "link-final-url", "link-action", "test",
 ], str]
 #: A registered fact value: text, an integer count, a boolean, a list of values (such as
 #: ``flagged-categories``) or ``None``.
@@ -447,11 +450,97 @@ LinkDetectionResult = Union[EvaluatedLinkDetectionResult, NotEvaluatedFeatureRes
 AiGeneratedDetectionResult = Union[EvaluatedAiGeneratedDetectionResult, NotEvaluatedFeatureResult]
 
 
+# ---- Link safety (preview) ------------------------------------------------------------------
+
+#: Preview. What a link's destination is: ``safe`` when every reputation check passed, ``adult`` or
+#: ``gambling`` from its domain's content categories, ``phishing`` or ``malware`` from a threat list
+#: or the domain's security risks, and ``unresolved`` when a short link could not be followed or a
+#: check failed. New verdicts may be added.
+LinkSafetyVerdict = Union[Literal["safe", "adult", "gambling", "phishing", "malware", "unresolved"], str]
+#: Preview. What a link does to its asset under the policy's link-safety settings. Purging content
+#: over a link is never offered. New actions may be added.
+LinkSafetyAction = Union[Literal["allow", "limit", "age-restrict", "block"], str]
+
+
+class LinkSafetyEvidence(TypedDict):
+    """Preview. One reputation check of a link's destination."""
+    #: ``domain-categories`` (the destination domain's categories) or ``threat-lists`` (a threat-list
+    #: lookup of the destination URL). New checks may be added.
+    check: Union[Literal["domain-categories", "threat-lists"], str]
+    #: ``checked``, or ``failed`` when the check could not answer, which makes the link
+    #: ``unresolved``. New statuses may be added.
+    status: Union[Literal["checked", "failed"], str]
+    #: What the check reported, such as the domain's content categories and security risks or the
+    #: threat types listed.
+    labels: list[str]
+
+
+class CheckedLink(TypedDict):
+    """Preview. A link in the asset and what its destination is."""
+    #: The link as found, with ``https://`` added when it was left out.
+    url: str
+    #: Where the link leads after following its redirects, or ``None`` when a short link could not
+    #: be followed.
+    finalUrl: Optional[str]
+    #: How many redirects were followed to reach ``finalUrl``.
+    redirects: int
+    #: ``qr-code`` or ``text``. New sources may be added.
+    source: Union[Literal["qr-code", "text"], str]
+    verdict: LinkSafetyVerdict
+    evidence: list[LinkSafetyEvidence]
+
+
+class EvaluatedLinkSafetyResult(TypedDict):
+    status: Literal["evaluated"]
+    stage: ProcessingFeatureStage
+    links: list[CheckedLink]
+
+
+#: Preview. Link safety result: where each link in the asset leads and its verdict. It runs when the
+#: project's policy acts on links, not through ``processingOptions.features``. Narrow on
+#: ``result["status"]`` before reading ``links``.
+LinkSafetyResult = Union[EvaluatedLinkSafetyResult, NotEvaluatedFeatureResult]
+
+
+class OffPlatformLinkSettings(TypedDict):
+    """Preview. Acts on every link whose destination is outside ``allowedDomains``, whatever its
+    verdict."""
+    #: ``limit``, ``age-restrict`` or ``block``.
+    action: LinkSafetyAction
+    #: Bare lowercase domains such as ``example.com``. A domain also covers its subdomains.
+    allowedDomains: list[str]
+
+
+class _LinkSafetySettingsRequired(TypedDict):
+    #: What happens to an asset with a link of each verdict (``phishing``, ``malware``, ``adult``,
+    #: ``gambling``, ``unresolved``). A verdict left out is allowed.
+    verdictActions: Dict[str, LinkSafetyAction]
+
+
+class LinkSafetySettings(_LinkSafetySettingsRequired, total=False):
+    """Preview. What happens to assets that link to unsafe destinations. Link checks never change a
+    moderation category's score."""
+    offPlatformLinks: OffPlatformLinkSettings
+
+
+class LinkSafetyDecision(TypedDict):
+    """Preview. What the policy's link-safety section made of the asset's links."""
+    #: The strongest action the asset's links take under the policy's link-safety settings.
+    action: LinkSafetyAction
+    #: Indexes into ``classification.linkSafety["links"]`` of the links that take that action.
+    links: list[int]
+    #: The link-safety settings in force at decision time.
+    settings: LinkSafetySettings
+
+
 class ProcessingFeatureResults(TypedDict, total=False):
     """Results of the features requested in ``processingOptions.features``."""
     personDetection: PersonDetectionResult
     faceDetection: FaceDetectionResult
     linkDetection: LinkDetectionResult
+    #: Preview. Where each link in the asset leads and its verdict, when the project's policy acts
+    #: on links.
+    linkSafety: LinkSafetyResult
     aiGeneratedDetection: AiGeneratedDetectionResult
 
 
@@ -651,6 +740,9 @@ class AssetModeration(_AssetModerationRequired, total=False):
     explanationComplete: bool
     categories: Dict[str, CategoryPolicyScore]
     raw: ModerationRaw
+    #: Preview. What the policy's link-safety section made of the asset's links. Absent when the
+    #: policy doesn't act on links.
+    linkSafety: LinkSafetyDecision
 
 
 class _AssetClassificationRequired(TypedDict):
@@ -666,6 +758,9 @@ class AssetClassification(_AssetClassificationRequired, total=False):
     personDetection: PersonDetectionResult
     faceDetection: FaceDetectionResult
     linkDetection: LinkDetectionResult
+    #: Preview. Where each link in the asset leads and its verdict, when the project's policy acts
+    #: on links.
+    linkSafety: LinkSafetyResult
     aiGeneratedDetection: AiGeneratedDetectionResult
     #: Where OCR found text, and personal information within it, in an image. Redaction
     #: transforms blur these regions.

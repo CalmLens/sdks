@@ -1750,6 +1750,8 @@ public final class Models {
    * @param personDetection person detection result
    * @param faceDetection face detection result
    * @param linkDetection link detection result
+   * @param linkSafety (preview) where the asset's links lead and their verdicts; set when the
+   *     project's policy acts on links
    * @param aiGeneratedDetection generated-content detection result
    * @param textRegions text found in the image
    * @param labels labels describing the content
@@ -1759,6 +1761,7 @@ public final class Models {
       @JsonAdapter(Json.EpochMillis.class) Instant completedAt,
       AssetModeration moderation, PersonDetectionResult personDetection,
       FaceDetectionResult faceDetection, LinkDetectionResult linkDetection,
+      LinkSafetyResult linkSafety,
       AiGeneratedDetectionResult aiGeneratedDetection, List<TextRegion> textRegions,
       List<ClassificationLabel> labels) {
     public AssetClassification { labels = list(labels); textRegions = list(textRegions); }
@@ -1794,6 +1797,53 @@ public final class Models {
    * @param source where it was found: {@code qr-code} or {@code text}
    */
   public record DetectedLink(String url, String source) {}
+
+  /**
+   * A link safety result (preview). {@code links} is set only for {@code evaluated}; {@code reason}
+   * only for {@code not-evaluated}. It runs when the project's policy acts on links, not through
+   * {@code processingOptions.features}.
+   *
+   * @param status {@code evaluated} or {@code not-evaluated}
+   * @param stage feature maturity, {@code beta} or {@code ga}; beta results may change shape
+   * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
+   * @param links every link found in the asset, with where it leads and its verdict
+   */
+  public record LinkSafetyResult(String status, String stage, String reason, List<CheckedLink> links) {
+    /** Copies collections so the record stays immutable. */
+    public LinkSafetyResult { links = list(links); }
+  }
+
+  /**
+   * A link in an asset and what its destination is (preview).
+   *
+   * @param url the link as found, with {@code https://} added when it was left out
+   * @param finalUrl where the link leads after following its redirects; null when a short link
+   *     could not be followed
+   * @param redirects how many redirects were followed to reach {@code finalUrl}
+   * @param source where it was found: {@code qr-code} or {@code text}
+   * @param verdict {@code safe}, {@code adult}, {@code gambling}, {@code phishing}, {@code
+   *     malware} or {@code unresolved}
+   * @param evidence the reputation checks of the destination
+   */
+  public record CheckedLink(String url, String finalUrl, Integer redirects, String source, String verdict,
+      List<LinkSafetyEvidence> evidence) {
+    /** Copies collections so the record stays immutable. */
+    public CheckedLink { evidence = list(evidence); }
+  }
+
+  /**
+   * One reputation check of a link's destination (preview).
+   *
+   * @param check {@code domain-categories} or {@code threat-lists}
+   * @param status {@code checked}, or {@code failed} when the check could not answer, which makes
+   *     the link {@code unresolved}
+   * @param labels what the check reported, such as the domain's content categories and security
+   *     risks or the threat types listed
+   */
+  public record LinkSafetyEvidence(String check, String status, List<String> labels) {
+    /** Copies collections so the record stays immutable. */
+    public LinkSafetyEvidence { labels = list(labels); }
+  }
 
   /**
    * An AI-generated content detection result from provenance metadata. {@code provenance} and
@@ -1858,13 +1908,57 @@ public final class Models {
    * Content-safety findings, policy assessment and reviewer decision.
    *
    * @param status the moderation decision in force, which also decides delivery
+   * @param linkSafety (preview) what the policy's link safety settings made of the asset's links;
+   *     null when the policy doesn't act on links
    */
   public record AssetModeration(AssetModerationStatus status, List<AssetReview> manualReviews,
       String automatedAction, String source, String rule, List<String> flaggedCategories,
+      LinkSafetyDecision linkSafety,
       List<RegionalDecision> regions, Boolean explanationComplete,
       Map<String, CategoryPolicyScore> categories, ModerationRaw raw,
       Map<String, String> testCategoryActions, List<TestRegionalAction> testRegionalActions) {
     public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); flaggedCategories = listOrEmpty(flaggedCategories); regions = listOrEmpty(regions); testCategoryActions = map(testCategoryActions); testRegionalActions = list(testRegionalActions); }
+  }
+
+  /**
+   * What the policy's link safety settings made of an asset's links (preview).
+   *
+   * @param action the strongest action the asset's links take: {@code allow}, {@code limit},
+   *     {@code age-restrict} or {@code block}
+   * @param links indexes into {@code classification.linkSafety.links} of the links that take that
+   *     action
+   * @param settings the link safety settings the decision used
+   */
+  public record LinkSafetyDecision(String action, List<Integer> links, LinkSafetySettings settings) {
+    /** Copies collections so the record stays immutable. */
+    public LinkSafetyDecision { links = list(links); }
+  }
+
+  /**
+   * What happens to assets that link to unsafe destinations (preview). Link checks never change a
+   * moderation category's score.
+   *
+   * @param verdictActions the action for an asset with a link of each verdict ({@code phishing},
+   *     {@code malware}, {@code adult}, {@code gambling} or {@code unresolved}); a verdict left out
+   *     is allowed
+   * @param offPlatformLinks acts on every link whose destination is outside its allowed domains,
+   *     whatever its verdict; null when off
+   */
+  public record LinkSafetySettings(Map<String, String> verdictActions, OffPlatformLinks offPlatformLinks) {
+    /** Copies collections so the record stays immutable. */
+    public LinkSafetySettings { verdictActions = map(verdictActions); }
+  }
+
+  /**
+   * The action for links outside a list of domains (preview).
+   *
+   * @param action {@code limit}, {@code age-restrict} or {@code block}
+   * @param allowedDomains bare lowercase domains whose links are on-platform; a domain also covers
+   *     its subdomains
+   */
+  public record OffPlatformLinks(String action, List<String> allowedDomains) {
+    /** Copies collections so the record stays immutable. */
+    public OffPlatformLinks { allowedDomains = list(allowedDomains); }
   }
 
   /** Detection findings before policy evaluation. */

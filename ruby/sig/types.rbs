@@ -139,6 +139,8 @@ module CalmLens
     ?"personDetection" => person_detection_result,
     ?"faceDetection" => face_detection_result,
     ?"linkDetection" => link_detection_result,
+    # Preview. Where the asset's links lead; present when the project's policy acts on links.
+    ?"linkSafety" => link_safety_result,
     ?"aiGeneratedDetection" => ai_generated_detection_result,
     # Where OCR found text, and personal information within it; redaction transforms blur these regions.
     ?"textRegions" => Array[text_region],
@@ -165,6 +167,9 @@ module CalmLens
     "flaggedCategories" => Array[String], "regions" => Array[regional_decision],
     ?"explanationComplete" => bool,
     ?"categories" => Hash[String, category_policy_score],
+    # Preview. What the policy's link-safety section made of the asset's links; absent when the
+    # policy doesn't act on links.
+    ?"linkSafety" => link_safety_decision,
     ?"raw" => moderation_raw
   }
   # ASSET_CONTENT_SCHEMA. `format` is the MIME type.
@@ -300,6 +305,59 @@ module CalmLens
     ?"links" => Array[detected_link],
     ?"reason" => not_evaluated_reason
   }
+  # Link safety (preview, LinkSafety.ts).
+  # What a link's destination is: `safe` when every reputation check passed, `adult` or `gambling`
+  # from its domain's content categories, `phishing` or `malware` from a threat list or the domain's
+  # security risks, and `unresolved` when a short link could not be followed or a check failed.
+  type link_safety_verdict = "safe" | "adult" | "gambling" | "phishing" | "malware" | "unresolved"
+  # The verdicts a policy can act on.
+  type flagged_link_verdict = "phishing" | "malware" | "adult" | "gambling" | "unresolved"
+  # What a link does to its asset, weakest first. Purging content over a link is never offered.
+  type link_safety_action = "allow" | "limit" | "age-restrict" | "block"
+  # One reputation check of a link's destination: its domain's categories, or a threat-list lookup
+  # of the destination URL. `failed` makes the link `unresolved`; `labels` is what the check reported.
+  type link_safety_evidence = {
+    "check" => "domain-categories" | "threat-lists",
+    "status" => "checked" | "failed",
+    "labels" => Array[String]
+  }
+  # A link in the asset and what its destination is. `finalUrl` is where it leads after `redirects`
+  # redirects, or `null` when a short link could not be followed.
+  type checked_link = {
+    "url" => String,
+    "finalUrl" => String?,
+    "redirects" => Integer,
+    "source" => "qr-code" | "text",
+    "verdict" => link_safety_verdict,
+    "evidence" => Array[link_safety_evidence]
+  }
+  # Preview. `status: "evaluated"` carries `links`; `"not-evaluated"` carries `reason`.
+  type link_safety_result = {
+    "status" => "evaluated" | "not-evaluated",
+    "stage" => processing_feature_stage,
+    ?"links" => Array[checked_link],
+    ?"reason" => not_evaluated_reason
+  }
+  # Preview. LINK_SAFETY_SETTINGS_SCHEMA: the action for an asset with a link of each verdict (a
+  # verdict left out is allowed), and optionally an action for every link whose destination is
+  # outside `allowedDomains` (bare lowercase domains, which also cover their subdomains).
+  type link_safety_settings = {
+    "verdictActions" => {
+      ?"phishing" => link_safety_action,
+      ?"malware" => link_safety_action,
+      ?"adult" => link_safety_action,
+      ?"gambling" => link_safety_action,
+      ?"unresolved" => link_safety_action
+    },
+    ?"offPlatformLinks" => { "action" => "limit" | "age-restrict" | "block", "allowedDomains" => Array[String] }
+  }
+  # Preview. The strongest action the asset's links take, the indexes into
+  # `classification.linkSafety.links` of the links that take it, and the settings in force.
+  type link_safety_decision = {
+    "action" => link_safety_action,
+    "links" => Array[Integer],
+    "settings" => link_safety_settings
+  }
   type provenance_signal = { "kind" => "c2pa" | "iptc-digital-source-type" | "generator-metadata", "value" => String }
   # `status: "evaluated"` carries `provenance` and `signals`; `"not-evaluated"` carries `reason`.
   type ai_generated_detection_result = {
@@ -317,6 +375,7 @@ module CalmLens
     ?"personDetection" => person_detection_result,
     ?"faceDetection" => face_detection_result,
     ?"linkDetection" => link_detection_result,
+    ?"linkSafety" => link_safety_result,
     ?"aiGeneratedDetection" => ai_generated_detection_result
   }
 

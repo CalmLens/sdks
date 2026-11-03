@@ -4,7 +4,7 @@ use serde_json::json;
 
 #[test]
 fn asset_nested_fields_decode_into_typed_models() {
-    let wire = json!({"id":"asset-1","type":"image","processingOptions":{"keepContentAfterProcessing":true},"content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"image":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000","perceptualHash":"ph","perceptualHashQuality":87},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","reviewedAt":7,"appliedToAsset":true}],"status":"age-restricted","flaggedCategories":[],"regions":[],"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"timeline":{"durationSeconds":3,"sampledFrames":1,"audioTranscribed":false,"segments":[{"source":"frame-text","startSeconds":0,"endSeconds":1,"categories":{"hate":{"status":"partial","likelihood":"unlikely","score":0.1}}}]},"hashMatches":[{"source":"hash-list","listId":"list-1","entryId":"entry-1","distance":4,"action":"block"}]}},"completedAt":8,"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"labels":[{"description":"beach","score":0.7,"likelihood":"very-likely"}]}});
+    let wire = json!({"id":"asset-1","type":"image","processingOptions":{"keepContentAfterProcessing":true},"content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"image":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000","perceptualHash":"ph","perceptualHashQuality":87},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","reviewedAt":7,"appliedToAsset":true}],"status":"age-restricted","flaggedCategories":[],"regions":[],"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"timeline":{"durationSeconds":3,"sampledFrames":1,"audioTranscribed":false,"segments":[{"source":"frame-text","startSeconds":0,"endSeconds":1,"categories":{"hate":{"status":"partial","likelihood":"unlikely","score":0.1}}}]},"hashMatches":[{"source":"hash-list","listId":"list-1","entryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[1],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","stage":"beta","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"labels":[{"description":"beach","score":0.7,"likelihood":"very-likely"}]}});
     let asset: Asset = serde_json::from_value(wire).unwrap();
 
     assert_eq!(asset.asset_type, Some(AssetType::Image));
@@ -129,6 +129,66 @@ fn asset_nested_fields_decode_into_typed_models() {
     let links = asset.classification.link_detection.as_ref().unwrap();
     assert_eq!(links.qr_codes.as_ref().unwrap()[0].bounding_box.top, 0.2);
     assert_eq!(links.links.as_ref().unwrap()[0].source, LinkSource::QrCode);
+    let checked = asset.classification.link_safety.as_ref().unwrap();
+    let checked_links = checked.links.as_ref().unwrap();
+    assert_eq!(
+        (
+            checked_links[0].final_url.as_deref(),
+            &checked_links[0].verdict,
+            checked_links[1].final_url.as_deref(),
+            checked_links[1].redirects,
+            &checked_links[1].source,
+            &checked_links[1].verdict
+        ),
+        (
+            Some("https://example.com/"),
+            &LinkSafetyVerdict::Safe,
+            None,
+            2,
+            &LinkSource::Text,
+            &LinkSafetyVerdict::Unresolved
+        )
+    );
+    let evidence = &checked_links[1].evidence;
+    assert_eq!(
+        (
+            &evidence[0].check,
+            &evidence[0].status,
+            &evidence[1].check,
+            &evidence[1].status,
+            evidence[1].labels.as_slice()
+        ),
+        (
+            &LinkSafetyCheck::ThreatLists,
+            &LinkSafetyCheckStatus::Failed,
+            &LinkSafetyCheck::DomainCategories,
+            &LinkSafetyCheckStatus::Checked,
+            ["gambling".to_owned()].as_slice()
+        )
+    );
+    let link_decision = moderation.link_safety.as_ref().unwrap();
+    assert_eq!(
+        (&link_decision.action, link_decision.links.as_slice()),
+        (&LinkSafetyAction::AgeRestrict, [1].as_slice())
+    );
+    assert_eq!(
+        (
+            &link_decision.settings.verdict_actions[&LinkSafetyVerdict::Gambling],
+            &link_decision.settings.verdict_actions[&LinkSafetyVerdict::Phishing]
+        ),
+        (&LinkSafetyAction::AgeRestrict, &LinkSafetyAction::Block)
+    );
+    let off_platform = link_decision.settings.off_platform_links.as_ref().unwrap();
+    assert_eq!(
+        (
+            &off_platform.action,
+            off_platform.allowed_domains.as_slice()
+        ),
+        (
+            &LinkSafetyAction::Limit,
+            ["example.com".to_owned()].as_slice()
+        )
+    );
     let provenance = asset
         .classification
         .ai_generated_detection

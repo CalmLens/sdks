@@ -1606,6 +1606,11 @@ pub struct AssetClassification {
     /// Links and QR codes found when requested.
     #[serde(default)]
     pub link_detection: Option<LinkDetectionResult>,
+    /// Preview. Every link found in the asset, where it leads and its verdict. Present when the
+    /// project's policy acts on links; it is not requested through
+    /// [`ProcessingOptions::features`].
+    #[serde(default)]
+    pub link_safety: Option<LinkSafetyResult>,
     /// AI-generation provenance when requested.
     #[serde(default)]
     pub ai_generated_detection: Option<AiGeneratedDetectionResult>,
@@ -1685,6 +1690,10 @@ pub struct AssetModeration {
     /// Detection findings before policy evaluation.
     #[serde(default)]
     pub raw: Option<ModerationRaw>,
+    /// Preview. What the policy's link-safety section made of the asset's links; `None` when
+    /// the policy doesn't act on links.
+    #[serde(default)]
+    pub link_safety: Option<LinkSafetyDecision>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetModeration, _>")]
     pub extra: HashMap<String, Value>,
@@ -2081,6 +2090,187 @@ pub struct DetectedLink {
     pub source: LinkSource,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<DetectedLink, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Preview. Link safety's result. `links` is present when `status` is `Evaluated`, and `reason`
+/// when it is `NotEvaluated`. Link checks never change a moderation category's score.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LinkSafetyResult {
+    /// Whether the feature ran.
+    #[serde(default)]
+    pub status: Option<FeatureResultStatus>,
+    /// The feature's stage.
+    #[serde(default)]
+    pub stage: Option<FeatureStage>,
+    /// Why the feature did not run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<FeatureNotEvaluatedReason>,
+    /// Every link found in the asset and what its destination is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub links: Option<Vec<CheckedLink>>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<LinkSafetyResult, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+string_enum! {
+    /// Preview. What a link's destination is.
+    LinkSafetyVerdict {
+        /// Every reputation check passed.
+        Safe = "safe",
+        /// The domain's content categories mark it as adult.
+        Adult = "adult",
+        /// The domain's content categories mark it as gambling.
+        Gambling = "gambling",
+        /// A threat list or the domain's security risks mark it as phishing.
+        Phishing = "phishing",
+        /// A threat list or the domain's security risks mark it as malware.
+        Malware = "malware",
+        /// A short link could not be followed or a check failed.
+        Unresolved = "unresolved",
+    }
+}
+
+string_enum! {
+    /// Preview. What happens to an asset over its links. Purging content over a link is never
+    /// offered.
+    LinkSafetyAction {
+        /// Take no action.
+        Allow = "allow",
+        /// Deliver normally, but mark the asset `limited` so your app can reduce its reach.
+        Limit = "limit",
+        /// Deliver only through signed URLs or with an API key, so your backend can limit it to
+        /// adults.
+        AgeRestrict = "age-restrict",
+        /// Block delivery while keeping the content.
+        Block = "block",
+    }
+}
+
+string_enum! {
+    /// Preview. A reputation check of a link's destination.
+    LinkSafetyCheck {
+        /// The destination domain's content categories and security risks.
+        DomainCategories = "domain-categories",
+        /// A threat-list lookup of the destination URL.
+        ThreatLists = "threat-lists",
+    }
+}
+
+string_enum! {
+    /// Preview. Whether a link check answered.
+    LinkSafetyCheckStatus {
+        /// The check answered.
+        Checked = "checked",
+        /// The check could not answer, which makes the link `unresolved`.
+        Failed = "failed",
+    }
+}
+
+/// Preview. A link in the asset and what its destination is.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct CheckedLink {
+    /// The link as found, with `https://` added when it was left out.
+    #[serde(default)]
+    pub url: String,
+    /// Where the link leads after following its redirects; `None` when a short link could not
+    /// be followed.
+    #[serde(default)]
+    pub final_url: Option<String>,
+    /// How many redirects were followed to reach `final_url`.
+    #[serde(default)]
+    pub redirects: u32,
+    /// Where it was found.
+    #[serde(default)]
+    pub source: LinkSource,
+    /// What its destination is; the most severe finding when there are several.
+    #[serde(default)]
+    pub verdict: LinkSafetyVerdict,
+    /// The reputation checks of its destination.
+    #[serde(default)]
+    pub evidence: Vec<LinkSafetyEvidence>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<CheckedLink, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Preview. One reputation check of a link's destination.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LinkSafetyEvidence {
+    /// Which check this is.
+    #[serde(default)]
+    pub check: LinkSafetyCheck,
+    /// Whether the check answered.
+    #[serde(default)]
+    pub status: LinkSafetyCheckStatus,
+    /// What the check reported, such as the domain's content categories and security risks or
+    /// the threat types listed.
+    #[serde(default)]
+    pub labels: Vec<String>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<LinkSafetyEvidence, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Preview. What a policy's link-safety section made of an asset's links.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LinkSafetyDecision {
+    /// The strongest action the asset's links take under the policy's link-safety settings.
+    #[serde(default)]
+    pub action: LinkSafetyAction,
+    /// Indexes into [`LinkSafetyResult::links`] of the links that take that action.
+    #[serde(default)]
+    pub links: Vec<u32>,
+    /// The link-safety settings in force at decision time.
+    #[serde(default)]
+    pub settings: LinkSafetySettings,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<LinkSafetyDecision, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Preview. What happens to assets that link to unsafe destinations. Link checks never change a
+/// moderation category's score.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LinkSafetySettings {
+    /// What happens to an asset with a link of each verdict. A verdict left out is allowed;
+    /// `safe` is never a key.
+    #[serde(default)]
+    pub verdict_actions: HashMap<LinkSafetyVerdict, LinkSafetyAction>,
+    /// Acts on every link whose destination is outside the allowed domains, whatever its
+    /// verdict.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub off_platform_links: Option<OffPlatformLinks>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<LinkSafetySettings, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Preview. The action for links that lead outside the allowed domains.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct OffPlatformLinks {
+    /// What happens to an asset with such a link; never `Allow`.
+    #[serde(default)]
+    pub action: LinkSafetyAction,
+    /// Bare lowercase domains, such as `example.com`, whose links are on platform. A domain
+    /// also covers its subdomains.
+    #[serde(default)]
+    pub allowed_domains: Vec<String>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<OffPlatformLinks, _>")]
     pub extra: HashMap<String, Value>,
 }
 

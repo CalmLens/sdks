@@ -120,7 +120,7 @@ const LINK_SAFETY_SETTINGS_SCHEMA = zod.object({
 	verdictActions: zod.partialRecord(zod.enum(FLAGGED_LINK_VERDICTS), LINK_SAFETY_ACTION_SCHEMA).meta({ description: "What happens to an asset with a link of each verdict. A verdict left out is allowed." }),
 	offPlatformLinks: zod.object({
 		action: LINK_SAFETY_ACTION_SCHEMA.exclude(["allow"]),
-		allowedDomains: zod.array(zod.string().regex(/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/, { message: msg("Use a bare lowercase domain such as example.com") })).max(100).refine((domains) => new Set(domains).size === domains.length, { message: msg("Domains must be unique") })
+		allowedDomains: zod.array(zod.string().regex(/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/, { message: msg("Use a bare lowercase domain such as example.com") }).meta({ examples: ["example.com"] })).max(100).refine((domains) => new Set(domains).size === domains.length, { message: msg("Domains must be unique") })
 	}).strict().optional().meta({ description: "Acts on every link whose destination is outside `allowedDomains`, whatever its verdict. A domain also covers its subdomains." })
 }).strict().meta(metaStore([docPropertyInfo({
 	description: "Preview. What happens to assets that link to unsafe destinations. Link checks never change a moderation category's score.",

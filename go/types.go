@@ -188,6 +188,9 @@ type AssetClassification struct {
 	FaceDetection   *FaceDetectionResult   `json:"faceDetection,omitempty"`
 	// LinkDetection holds QR codes and web links found in the image.
 	LinkDetection *LinkDetectionResult `json:"linkDetection,omitempty"`
+	// LinkSafety (preview) holds every link found in the asset, where it leads and its verdict.
+	// It runs when the project's policy acts on links, not through ProcessingFeatures.
+	LinkSafety *LinkSafetyResult `json:"linkSafety,omitempty"`
 	// AIGeneratedDetection holds what the image's provenance metadata says about AI use.
 	AIGeneratedDetection *AIGeneratedDetectionResult `json:"aiGeneratedDetection,omitempty"`
 	// TextRegions are where OCR found text, and personal information within it, in an image.
@@ -230,7 +233,42 @@ type AssetModeration struct {
 	ExplanationComplete *bool                          `json:"explanationComplete,omitempty"`
 	Categories          map[string]CategoryPolicyScore `json:"categories,omitempty"`
 	Raw                 *ModerationRaw                 `json:"raw,omitempty"`
-	Extra               JSON                           `json:"-"`
+	// LinkSafety (preview) is what the policy's link-safety settings made of the asset's links;
+	// nil when the policy doesn't act on links.
+	LinkSafety *LinkSafetyDecision `json:"linkSafety,omitempty"`
+	Extra      JSON                `json:"-"`
+}
+
+// LinkSafetyDecision (preview) is what the policy's link-safety settings made of an asset's links.
+type LinkSafetyDecision struct {
+	// Action is the strongest action the asset's links take: ModerationActionAllow,
+	// ModerationActionLimit, ModerationActionAgeRestrict or ModerationActionBlock.
+	Action string `json:"action"`
+	// Links are indexes into AssetClassification.LinkSafety.Links of the links that take Action.
+	Links []int `json:"links"`
+	// Settings are the policy's link-safety settings in force at decision time.
+	Settings LinkSafetySettings `json:"settings"`
+}
+
+// LinkSafetySettings (preview) says what happens to assets that link to unsafe destinations.
+// Link checks never change a moderation category's score.
+type LinkSafetySettings struct {
+	// VerdictActions maps a flagged verdict (LinkVerdictPhishing, LinkVerdictMalware,
+	// LinkVerdictAdult, LinkVerdictGambling or LinkVerdictUnresolved) to the action taken on an
+	// asset with a link of that verdict. A verdict left out is allowed.
+	VerdictActions map[string]string `json:"verdictActions"`
+	// OffPlatformLinks acts on every link whose destination is outside its AllowedDomains,
+	// whatever its verdict; nil when off.
+	OffPlatformLinks *LinkSafetyOffPlatformLinks `json:"offPlatformLinks,omitempty"`
+}
+
+// LinkSafetyOffPlatformLinks (preview) acts on links that lead outside the allowed domains.
+type LinkSafetyOffPlatformLinks struct {
+	// Action is ModerationActionLimit, ModerationActionAgeRestrict or ModerationActionBlock.
+	Action string `json:"action"`
+	// AllowedDomains are bare lowercase domains such as example.com; each also covers its
+	// subdomains.
+	AllowedDomains []string `json:"allowedDomains"`
 }
 
 // ModerationRaw contains detection findings before policy evaluation.
@@ -479,6 +517,8 @@ const (
 	// DecisionSourceHashList is a block from a hash list match.
 	DecisionSourceHashList      = "hash-list"
 	DecisionSourceMandatoryRule = "mandatory-rule"
+	// DecisionSourceLinkSafety (preview) is a decision made by the policy's link-safety settings.
+	DecisionSourceLinkSafety = "link-safety"
 )
 
 // RegionalDecision records a stricter outcome in a served jurisdiction.
@@ -501,6 +541,7 @@ type ProcessingFeatureResults struct {
 	PersonDetection      *PersonDetectionResult      `json:"personDetection,omitempty"`
 	FaceDetection        *FaceDetectionResult        `json:"faceDetection,omitempty"`
 	LinkDetection        *LinkDetectionResult        `json:"linkDetection,omitempty"`
+	LinkSafety           *LinkSafetyResult           `json:"linkSafety,omitempty"`
 	AIGeneratedDetection *AIGeneratedDetectionResult `json:"aiGeneratedDetection,omitempty"`
 }
 
@@ -529,6 +570,76 @@ type DetectedLink struct {
 	URL string `json:"url"`
 	// Source is "qr-code" or "text" (found in the text OCR extracted).
 	Source string `json:"source"`
+}
+
+// Link safety verdicts of CheckedLink.Verdict (preview): LinkVerdictSafe when every reputation
+// check passed, LinkVerdictAdult or LinkVerdictGambling from the domain's content categories,
+// LinkVerdictPhishing or LinkVerdictMalware from a threat list or the domain's security risks,
+// and LinkVerdictUnresolved when a short link could not be followed or a check failed. Verdict is
+// a plain string so verdicts added later still decode.
+const (
+	LinkVerdictSafe       = "safe"
+	LinkVerdictAdult      = "adult"
+	LinkVerdictGambling   = "gambling"
+	LinkVerdictPhishing   = "phishing"
+	LinkVerdictMalware    = "malware"
+	LinkVerdictUnresolved = "unresolved"
+)
+
+// Link safety checks of LinkSafetyEvidence.Check (preview). Check is a plain string so checks
+// added later still decode.
+const (
+	// LinkCheckDomainCategories looks up the destination domain's categories.
+	LinkCheckDomainCategories = "domain-categories"
+	// LinkCheckThreatLists looks up the destination URL in threat lists.
+	LinkCheckThreatLists = "threat-lists"
+)
+
+// Values of LinkSafetyEvidence.Status (preview).
+const (
+	LinkCheckStatusChecked = "checked"
+	// LinkCheckStatusFailed is a check that could not answer, which makes the link
+	// LinkVerdictUnresolved.
+	LinkCheckStatusFailed = "failed"
+)
+
+// LinkSafetyResult (preview) is the result of link safety: every link found in the asset, where
+// it leads and its verdict.
+type LinkSafetyResult struct {
+	// Status is ResultEvaluated or ResultNotEvaluated; other values may be added.
+	Status string `json:"status"`
+	// Stage is FeatureStageBeta or FeatureStageGA.
+	Stage string `json:"stage"`
+	// Reason explains a ResultNotEvaluated result: ReasonNotSupported or ReasonUnavailable.
+	Reason string        `json:"reason,omitempty"`
+	Links  []CheckedLink `json:"links,omitempty"`
+}
+
+// CheckedLink (preview) is a link in the asset and what its destination is.
+type CheckedLink struct {
+	// URL is the link as found, with https:// added when it was left out.
+	URL string `json:"url"`
+	// FinalURL is where the link leads after following its redirects; nil when a short link
+	// could not be followed.
+	FinalURL *string `json:"finalUrl"`
+	// Redirects is how many redirects were followed to reach FinalURL.
+	Redirects int `json:"redirects"`
+	// Source is "qr-code" or "text".
+	Source string `json:"source"`
+	// Verdict is one of the LinkVerdict constants.
+	Verdict  string               `json:"verdict"`
+	Evidence []LinkSafetyEvidence `json:"evidence"`
+}
+
+// LinkSafetyEvidence (preview) is one reputation check of a link's destination.
+type LinkSafetyEvidence struct {
+	// Check is LinkCheckDomainCategories or LinkCheckThreatLists.
+	Check string `json:"check"`
+	// Status is LinkCheckStatusChecked or LinkCheckStatusFailed.
+	Status string `json:"status"`
+	// Labels are what the check reported, such as the domain's content categories and security
+	// risks or the threat types listed.
+	Labels []string `json:"labels"`
 }
 
 // AIGeneratedDetectionResult is what an image's provenance metadata says about AI use.

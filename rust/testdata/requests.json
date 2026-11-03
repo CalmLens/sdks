@@ -1968,6 +1968,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -2328,6 +2345,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -2533,6 +2572,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -2893,6 +2949,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -3137,6 +3215,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -3497,6 +3592,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -3728,6 +3845,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -4088,6 +4222,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -4352,6 +4508,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -4715,6 +4888,28 @@
             }
           ]
         },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
         "textRegions": [
           {
             "box": {
@@ -4927,6 +5122,23 @@
                 "flaggedCategories": [
                   "sexual"
                 ],
+                "linkSafety": {
+                  "action": "allow",
+                  "links": [
+                    1
+                  ],
+                  "settings": {
+                    "verdictActions": {
+                      "phishing": "allow"
+                    },
+                    "offPlatformLinks": {
+                      "action": "limit",
+                      "allowedDomains": [
+                        "example.com"
+                      ]
+                    }
+                  }
+                },
                 "raw": {
                   "categories": {
                     "sexual": {
@@ -5290,6 +5502,28 @@
                   }
                 ]
               },
+              "linkSafety": {
+                "status": "evaluated",
+                "stage": "beta",
+                "links": [
+                  {
+                    "url": "example",
+                    "finalUrl": "example",
+                    "redirects": 1,
+                    "source": "qr-code",
+                    "verdict": "safe",
+                    "evidence": [
+                      {
+                        "check": "domain-categories",
+                        "status": "checked",
+                        "labels": [
+                          "example"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
               "textRegions": [
                 {
                   "box": {
@@ -5508,6 +5742,23 @@
               "flaggedCategories": [
                 "sexual"
               ],
+              "linkSafety": {
+                "action": "allow",
+                "links": [
+                  1
+                ],
+                "settings": {
+                  "verdictActions": {
+                    "phishing": "allow"
+                  },
+                  "offPlatformLinks": {
+                    "action": "limit",
+                    "allowedDomains": [
+                      "example.com"
+                    ]
+                  }
+                }
+              },
               "raw": {
                 "categories": {
                   "sexual": {
@@ -5868,6 +6119,28 @@
                 {
                   "url": "example",
                   "source": "qr-code"
+                }
+              ]
+            },
+            "linkSafety": {
+              "status": "evaluated",
+              "stage": "beta",
+              "links": [
+                {
+                  "url": "example",
+                  "finalUrl": "example",
+                  "redirects": 1,
+                  "source": "qr-code",
+                  "verdict": "safe",
+                  "evidence": [
+                    {
+                      "check": "domain-categories",
+                      "status": "checked",
+                      "labels": [
+                        "example"
+                      ]
+                    }
+                  ]
                 }
               ]
             },
@@ -6095,6 +6368,23 @@
               "flaggedCategories": [
                 "sexual"
               ],
+              "linkSafety": {
+                "action": "allow",
+                "links": [
+                  1
+                ],
+                "settings": {
+                  "verdictActions": {
+                    "phishing": "allow"
+                  },
+                  "offPlatformLinks": {
+                    "action": "limit",
+                    "allowedDomains": [
+                      "example.com"
+                    ]
+                  }
+                }
+              },
               "raw": {
                 "categories": {
                   "sexual": {
@@ -6458,6 +6748,28 @@
                 }
               ]
             },
+            "linkSafety": {
+              "status": "evaluated",
+              "stage": "beta",
+              "links": [
+                {
+                  "url": "example",
+                  "finalUrl": "example",
+                  "redirects": 1,
+                  "source": "qr-code",
+                  "verdict": "safe",
+                  "evidence": [
+                    {
+                      "check": "domain-categories",
+                      "status": "checked",
+                      "labels": [
+                        "example"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
             "textRegions": [
               {
                 "box": {
@@ -6676,6 +6988,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -7036,6 +7365,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -7241,6 +7592,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -7601,6 +7969,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -7806,6 +8196,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -8166,6 +8573,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -8376,6 +8805,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -8736,6 +9182,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -8941,6 +9409,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -9301,6 +9786,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -9509,6 +10016,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -9869,6 +10393,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -10109,6 +10655,23 @@
           "flaggedCategories": [
             "sexual"
           ],
+          "linkSafety": {
+            "action": "allow",
+            "links": [
+              1
+            ],
+            "settings": {
+              "verdictActions": {
+                "phishing": "allow"
+              },
+              "offPlatformLinks": {
+                "action": "limit",
+                "allowedDomains": [
+                  "example.com"
+                ]
+              }
+            }
+          },
           "raw": {
             "categories": {
               "sexual": {
@@ -10469,6 +11032,28 @@
             {
               "url": "example",
               "source": "qr-code"
+            }
+          ]
+        },
+        "linkSafety": {
+          "status": "evaluated",
+          "stage": "beta",
+          "links": [
+            {
+              "url": "example",
+              "finalUrl": "example",
+              "redirects": 1,
+              "source": "qr-code",
+              "verdict": "safe",
+              "evidence": [
+                {
+                  "check": "domain-categories",
+                  "status": "checked",
+                  "labels": [
+                    "example"
+                  ]
+                }
+              ]
             }
           ]
         },
