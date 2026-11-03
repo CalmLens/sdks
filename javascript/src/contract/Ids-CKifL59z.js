@@ -7997,7 +7997,7 @@ const EXAMPLE_IDS = {
 * every stored model's IDs by prefix is a separate change (it surfaces about a thousand call sites
 * across the packages that build records from plain strings).
 */
-const idField = (prefix) => zod.string().regex(idPattern(prefix), { message: `Must be an ID starting with "${prefix}_"` }).meta({ examples: [EXAMPLE_IDS[prefix]] });
+const idField = (prefix) => zod.string().regex(idPattern(prefix), { message: `Must be a valid ID starting with "${prefix}_"` }).meta({ examples: [EXAMPLE_IDS[prefix]] });
 /** The primary key of a table whose rows have IDs with `prefix`. */
 const primaryIdField = (prefix) => idField(prefix).meta({
 	...metaStore([primaryKey()]),
