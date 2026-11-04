@@ -345,6 +345,8 @@ type mockScenario struct {
 		}
 		APIKeyGrants []Grant `json:"apiKeyGrants"`
 		MaxRetries   *int    `json:"maxRetries"`
+		// DefaultProject builds the mock without a project ID, so it uses its default.
+		DefaultProject bool `json:"defaultProject"`
 	}
 	Steps []struct {
 		Operation string
@@ -584,8 +586,8 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 				query[key] = values[0]
 			}
 			var status any
-			if request.Status != 0 {
-				status = request.Status
+			if request.Status != nil {
+				status = *request.Status
 			}
 			requests = append(requests, map[string]any{"method": request.Method, "path": request.Path, "query": query, "status": status})
 		}
@@ -800,7 +802,10 @@ func TestSharedMockScenarios(t *testing.T) {
 			if scenario.UntypedArgs != "" {
 				t.Skip(scenario.UntypedArgs)
 			}
-			options := Options{ProjectID: "project-1", APIKey: CreateMockAPIKey(scenario.Mock.APIKeyGrants), MaxRetries: scenario.Mock.MaxRetries}
+			options := Options{APIKey: CreateMockAPIKey(scenario.Mock.APIKeyGrants), MaxRetries: scenario.Mock.MaxRetries}
+			if !scenario.Mock.DefaultProject {
+				options.ProjectID = "project-1"
+			}
 			// Records what Moderate was given, and answers by name, then by queue mode for uploads.
 			moderateCalls := []map[string]any{}
 			if moderate := scenario.Mock.Moderate; moderate != nil {

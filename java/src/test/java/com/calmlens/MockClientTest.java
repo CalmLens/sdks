@@ -68,9 +68,16 @@ class MockClientTest {
     assertEquals(java.util.Arrays.asList(409, 200), mock.requests().stream().map(MockCalmLensServerClient.Request::status).toList());
   }
 
+  @Test void theOptionsProjectIsUsedWithoutABuilderAndRefusedWithOne() {
+    var mock = new MockCalmLensServerClient(new MockCalmLensServerClient.Options().projectId("project-7"));
+    mock.client.assets.list(new Models.ListAssets());
+    assertEquals("/projects/project-7/assets", mock.requests().get(0).path());
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> new MockCalmLensServerClient(
+        CalmLensServerClient.builder("key", "project-2"), new MockCalmLensServerClient.Options().projectId("project-7"))).getCode());
+  }
+
   @Test void failuresMustNameAnOperationThatSendsARequest() {
     var options = new MockCalmLensServerClient.FailureOptions();
-    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> options.operation("assets.fetch")).getCode());
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> options.operation("uploadTokens.sign")).getCode());
     MockCalmLensServerClient mock = new MockCalmLensServerClient();
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.failNextRequest("made/up")).getCode());

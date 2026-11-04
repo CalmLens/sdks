@@ -37,7 +37,7 @@ final class ChirpTest extends TestCase
             if ($input->queued) {
                 return 'pending';
             }
-            $text = (string) $input->text;
+            $text = (string) $input->content->text;
             return match (true) {
                 str_contains($text, 'rude') => MockDecision::of('blocked')->flag('harassment', 0.92),
                 str_contains($text, 'spicy') => MockDecision::of('age-restricted')->flag('sexual', 0.92),

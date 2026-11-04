@@ -78,7 +78,7 @@ final class AutomaticMultipartTest extends TestCase
     {
         $moderated = [];
         $mock = new MockServerClient(partSizeBytes: 5 * self::MIB, moderate: function (MockModerationInput $input) use (&$moderated) {
-            $moderated[] = $input->bytes;
+            $moderated[] = $input->content->bytes;
             return 'allowed';
         });
         $file = self::fileOf(11 * self::MIB);
@@ -116,7 +116,7 @@ final class AutomaticMultipartTest extends TestCase
     {
         $moderated = [];
         $mock = new MockServerClient(partSizeBytes: 5 * self::MIB, moderate: function (MockModerationInput $input) use (&$moderated) {
-            $moderated[] = strlen((string) $input->bytes);
+            $moderated[] = strlen((string) $input->content->bytes);
             return 'allowed';
         });
         $options = ['name' => 'report.pdf', 'content' => ['bytes' => self::fileOf(12 * self::MIB), 'type' => 'application/pdf'],

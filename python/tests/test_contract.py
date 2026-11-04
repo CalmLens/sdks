@@ -963,8 +963,10 @@ class MockScenarioTests(unittest.TestCase):
         retries: dict[str, Any] = {} if "maxRetries" not in mock else {"max_retries": mock["maxRetries"]}
         if "partSizeBytes" in mock:
             retries["part_size_bytes"] = mock["partSizeBytes"]
+        if not mock.get("defaultProject"):
+            retries["project_id"] = "project-1"
         client = MockCalmLensServerClient(api_key=create_mock_api_key(mock.get("apiKeyGrants")),
-                                          project_id="project-1", mock_options=cast(Any, options), **retries)
+                                          mock_options=cast(Any, options), **retries)
         # The status of each response the mock answers, to check a step's final one.
         statuses: list[int] = []
         serve = client.transport

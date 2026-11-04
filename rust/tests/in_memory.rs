@@ -381,7 +381,7 @@ async fn enqueued_events_carry_the_asset_snapshot() {
     let mut event = Event::new("", EventType::AssetUploaded);
     event.asset_id = Some(asset.id.clone());
     let event = mock.enqueue_event(event);
-    assert_eq!(event.project_id.as_deref(), Some("mock-project"));
+    assert_eq!(event.project_id.as_deref(), Some("project-1"));
     assert_eq!(
         event.asset.as_ref().unwrap().classification_status(),
         Some(AssetClassificationStatus::Processing)
@@ -430,9 +430,9 @@ async fn mock_options_set_the_base_urls() {
     assert_eq!(response.status().as_u16(), 403);
     // Recorded paths are relative to the base URL each request went to.
     let paths: Vec<_> = mock.requests().into_iter().map(|r| r.path).collect();
-    assert_eq!(paths[0], "/projects/mock-project/assets");
+    assert_eq!(paths[0], "/projects/project-1/assets");
     assert!(
-        paths[1].starts_with(&format!("/assets/mock-project/{}/", asset.id)),
+        paths[1].starts_with(&format!("/assets/project-1/{}/", asset.id)),
         "{paths:?}"
     );
     let urls: Vec<_> = mock
@@ -441,12 +441,12 @@ async fn mock_options_set_the_base_urls() {
         .map(|request| request.url)
         .collect();
     assert!(
-        urls[0].starts_with("http://localhost:8787/api/v1/projects/mock-project/assets?"),
+        urls[0].starts_with("http://localhost:8787/api/v1/projects/project-1/assets?"),
         "{urls:?}"
     );
     assert!(
         urls[1].starts_with(&format!(
-            "http://localhost:8788/cdn/v1/assets/mock-project/{}/",
+            "http://localhost:8788/cdn/v1/assets/project-1/{}/",
             asset.id
         )),
         "{urls:?}"
@@ -577,19 +577,4 @@ async fn an_undecodable_stored_asset_never_reaches_moderate() {
     let error = mock.complete_processing(&asset.id, None).unwrap_err();
     assert_eq!(error.code(), &ErrorCode::InvalidResponse);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
-}
-
-/// An unknown operation is refused rather than queued, so the next request reaches the API.
-#[tokio::test]
-async fn fail_next_request_refuses_an_unknown_operation() {
-    let mock = MockServerClient::in_memory(options()).unwrap();
-    let error = mock
-        .fail_next_request(
-            MockFailure::TransportError,
-            MockFailureOptions::new().operation("assets.upload"),
-        )
-        .unwrap_err();
-    assert_eq!(error.code(), &ErrorCode::InvalidArgument);
-    mock.assets().create(named("x")).await.unwrap();
-    assert_eq!(mock.requests()[0].response_status, Some(200));
 }

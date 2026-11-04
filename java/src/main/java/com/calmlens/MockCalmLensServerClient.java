@@ -32,7 +32,7 @@ import java.util.function.LongSupplier;
  * <p>The in-memory API keeps assets, folders, hash lists, policies, events and content: uploads create assets you can
  * retrieve, list (RSQL filters such as {@code classification.moderation.status==blocked},
  * ordering, folder and cursor paging), search, update, move and delete, and the CDN serves their
- * stored bytes. The project starts on its General preset policy; presets have one release and no
+ * stored bytes. The project starts on the organisation's own General preset policy; presets have one release and no
  * settings, and policies never decide uploads. It does not classify content: {@link Options#moderate} decides each upload from the
  * asset, its content and why it is moderated, with a status or a {@link MockDecision}. Without it,
  * queued uploads ({@code assets.create}), retries and reruns stay {@code pending} until {@link
@@ -203,6 +203,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     java.util.function.Function<String, String> createId = MockApi::newId;
     LongSupplier now = monotonicClock();
     String signedUrlBaseUrl = "https://mock.calmlens.invalid";
+    String projectId;
 
     /** Defaults: queued work stays pending until {@link MockCalmLensServerClient#completeProcessing(String)}, everything else is allowed. */
     public Options() {}
@@ -244,13 +245,23 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     /** @param value base URL of returned signed URLs (not production URLs) @return these options */
     public Options signedUrlBaseUrl(String value) { signedUrlBaseUrl = Objects.requireNonNull(value, "signedUrlBaseUrl").replaceAll("/+$", ""); return this; }
 
+    /**
+     * The project of a mock built without a client builder; a builder sets its own project ID.
+     *
+     * @param value the project ID; by default {@link #MOCK_PROJECT_ID}
+     * @return these options
+     */
+    public Options projectId(String value) { projectId = Objects.requireNonNull(value, "projectId"); return this; }
+
     private static LongSupplier monotonicClock() {
       java.util.concurrent.atomic.AtomicLong last = new java.util.concurrent.atomic.AtomicLong(Long.MIN_VALUE);
       return () -> last.updateAndGet(previous -> Math.max(previous + 1, System.currentTimeMillis()));
     }
 
     private Options copy() {
-      return new Options().moderate(moderate).createId(createId).now(now).signedUrlBaseUrl(signedUrlBaseUrl);
+      Options copy = new Options().moderate(moderate).createId(createId).now(now).signedUrlBaseUrl(signedUrlBaseUrl);
+      copy.projectId = projectId;
+      return copy;
     }
   }
 
@@ -447,16 +458,21 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   /** The client under test. */
   public final CalmLensServerClient client;
 
-  /** A mock for project {@code project-1} with unreachable base URLs and default {@link Options}. */
+  /** The project of a mock built without a project ID. */
+  public static final String MOCK_PROJECT_ID = "project-1";
+
+  /** A mock for project {@link #MOCK_PROJECT_ID} with unreachable base URLs and default {@link Options}. */
   public MockCalmLensServerClient() { this(new Options()); }
 
   /**
-   * A mock for project {@code project-1} with unreachable base URLs.
+   * A mock with unreachable base URLs, for the options' project ({@link #MOCK_PROJECT_ID} unless
+   * {@link Options#projectId(String)} sets one).
    *
-   * @param options outcome, ID and clock controls (copied)
+   * @param options project, outcome, ID and clock controls (copied)
    */
   public MockCalmLensServerClient(Options options) {
-    this(CalmLensServerClient.builder("mock-key", "project-1").baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1"), options);
+    this(CalmLensServerClient.builder("mock-key", Objects.requireNonNull(options, "options").projectId == null ? MOCK_PROJECT_ID : options.projectId)
+        .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1"), options, true);
   }
 
   /**
@@ -469,10 +485,16 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   public MockCalmLensServerClient(CalmLensServerClient.Builder builder) { this(builder, new Options()); }
 
   /**
-   * @param builder client options
+   * @param builder client options, including the project ID
    * @param options outcome, ID and clock controls (copied)
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} when the options also set a
+   *     project ID
    */
-  public MockCalmLensServerClient(CalmLensServerClient.Builder builder, Options options) {
+  public MockCalmLensServerClient(CalmLensServerClient.Builder builder, Options options) { this(builder, options, false); }
+
+  private MockCalmLensServerClient(CalmLensServerClient.Builder builder, Options options, boolean projectFromOptions) {
+    if (!projectFromOptions && Objects.requireNonNull(options, "options").projectId != null)
+      throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "The builder sets the project ID; leave Options.projectId unset");
     // Unless the builder sets maxRetries, each queued failure or response answers one call.
     client = builder.build(this::send, delay -> skippedNanos.addAndGet(delay.toNanos()), () -> System.nanoTime() + skippedNanos.get(), 0);
     // The in-memory API answers multipart size checks in the API's order.

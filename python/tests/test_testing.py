@@ -85,10 +85,12 @@ class MockTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
         self.assertEqual((c.database_storage.assets, c.database_storage.events), ({}, []))
 
-    def test_fail_next_request_refuses_unknown_operations_and_fractional_retry_after(self):
-        for options in ({"operation": "assets.nope"}, {"retry_after": 1.5}):
+    def test_fail_next_request_refuses_fractional_retry_after_and_details_for_an_exception(self):
+        for failure, options in (("asset/not-found", {"retry_after": 1.5}),
+                                 (ConnectionResetError(), {"details": {"reason": "reset"}}),
+                                 (ConnectionResetError(), {"retry_after": 1})):
             with self.assertRaises(CalmLensError) as raised:
-                self.client.fail_next_request("asset/not-found", **options)
+                self.client.fail_next_request(failure, **options)
             self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
         # Nothing was queued, so the next request reaches the API.
         self.assertEqual(self.client.events.list()["items"], [])

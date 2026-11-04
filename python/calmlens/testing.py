@@ -50,8 +50,8 @@ from .moderation_context import select_moderation_context_items
 from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder,
                     HashList, HashListEntry, SignedUploadToken, SignUploadTokenOptions)
 
-__all__ = ["MockCalmLensServerClient", "MockRequest", "MockOptions", "MockAssetOutcome", "MockDecision",
-           "MockModerationContent", "MockModerationInput", "MockModerationTrigger", "MockModerate",
+__all__ = ["MockCalmLensServerClient", "MOCK_PROJECT_ID", "MockRequest", "MockOptions", "MockAssetOutcome",
+           "MockDecision", "MockModerationContent", "MockModerationInput", "MockModerationTrigger", "MockModerate",
            "MockApiKeyGrant", "MockFailure", "StoredContent",
            "InMemoryMockDatabaseStorage", "InMemoryMockImageStorage", "create_mock_api_key", "default_moderate",
            "mock_decision", "sign_upload_token",
@@ -532,6 +532,9 @@ _HASH_LIST_ACTIONS = ("flag", "block")
 #: Content a browser could run as a document, which the CDN serves as a download.
 _ACTIVE_CONTENT_TYPES = {"image/svg+xml", "application/xhtml+xml", "text/html", "application/xml", "text/xml"}
 
+#: The project ID a :class:`MockCalmLensServerClient` uses without ``project_id``.
+MOCK_PROJECT_ID = "project-1"
+
 #: What :meth:`MockCalmLensServerClient.fail_next_request` makes a request fail with:
 #: ``transport-error`` (``sdk/transport-error``), ``timeout`` (``sdk/timeout``), an API error code
 #: such as ``upload/limit-exceeded`` (that error with its HTTP status) or an exception to raise.
@@ -788,7 +791,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
     ``( … )`` groups, with ``;`` binding tighter than ``,``, and list cursors resume after the last
     item returned and only continue the query they came from."""
 
-    def __init__(self, *, api_key: str | None = None, project_id: str = "mock-project",
+    def __init__(self, *, api_key: str | None = None, project_id: str = MOCK_PROJECT_ID,
                  base_url: str = "https://api.calmlens.invalid/v1",
                  cdn_base_url: str = "https://mock.calmlens.invalid/v1",
                  timeout: float = DEFAULT_TIMEOUT, upload_timeout: float | None = None,
@@ -881,12 +884,16 @@ class MockCalmLensServerClient(CalmLensServerClient):
         A request counts for every method that sends it: ``text.classify`` uploads also count as
         ``assets.classify``, ``ensureLens`` as ``ensureLenses``, ``assets.waitForDecision`` polls
         as ``assets.retrieve`` and ``assets.iterate`` pages as ``assets.list``. An unknown
-        operation raises ``sdk/invalid-argument``."""
+        operation, or ``details`` or ``retry_after`` with a transport error, timeout or exception,
+        raises ``sdk/invalid-argument``."""
         if isinstance(failure, str) and failure not in ("transport-error", "timeout") \
                 and failure not in error_codes.STATUS_BY_CODE:
             raise _invalid(f"Unknown failure {failure!r}: use transport-error, timeout or an API error code")
         if operation is not None and operation not in _OPERATIONS:
             raise _invalid(f"Unknown operation {operation!r}: use a client method path such as assets.create")
+        if not (isinstance(failure, str) and failure in error_codes.STATUS_BY_CODE) \
+                and (details is not None or retry_after is not None):
+            raise _invalid("details and retry_after apply only to an API error code")
         if retry_after is not None and (isinstance(retry_after, bool) or not isinstance(retry_after, int)
                                         or retry_after < 0):
             raise _invalid("retry_after must be a whole number of seconds")

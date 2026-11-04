@@ -166,7 +166,7 @@ func TestMultipartAboveThreshold(t *testing.T) {
 	a := demoApp(t)
 	small := mustUpload(t, a, upload{data: bytes.Repeat([]byte{1}, multipartThreshold)})
 	requests := a.demo.Mock.Requests()
-	if small.Parts != 1 || len(requests) != 1 || requests[0].Path != "/projects/mock-project/assets" || requests[0].Header.Get("X-CalmLens-Upload") != "content" {
+	if small.Parts != 1 || len(requests) != 1 || requests[0].Path != "/projects/project-1/assets" || requests[0].Header.Get("X-CalmLens-Upload") != "content" {
 		t.Fatalf("clip at the threshold should be one request: %d %+v", small.Parts, requests)
 	}
 	a.demo.Mock.ClearRequests()
@@ -179,7 +179,7 @@ func TestMultipartAboveThreshold(t *testing.T) {
 		t.Fatal(item.Parts, item.Status)
 	}
 	requests = a.demo.Mock.Requests()
-	if len(requests) != 3 || requests[0].Path != "/projects/mock-project/assets" || requests[0].Header.Get("X-CalmLens-Upload") != "part" {
+	if len(requests) != 3 || requests[0].Path != "/projects/project-1/assets" || requests[0].Header.Get("X-CalmLens-Upload") != "part" {
 		t.Fatalf("unexpected requests: %+v", requests)
 	}
 	first := requests[0].Query

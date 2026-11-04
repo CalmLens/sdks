@@ -828,7 +828,7 @@ final class ContractTest extends TestCase
     {
         return function (MockModerationInput $input) use ($spec, &$calls): string|MockDecision {
             $calls[] = ['trigger' => $input->trigger, 'queued' => $input->queued, 'assetId' => $input->asset['id'], 'name' => $input->asset['name'],
-                'text' => $input->text, 'bytesBase64' => $input->bytes === null ? null : base64_encode($input->bytes)];
+                'text' => $input->content->text, 'bytesBase64' => $input->content->bytes === null ? null : base64_encode($input->content->bytes)];
             $answer = $spec['byName'][$input->asset['name'] ?? ''] ?? ($input->trigger === 'upload' ? $spec[$input->queued ? 'queued' : 'analyzed'] ?? null : null);
             if ($answer !== null) {
                 return self::buildDecision($answer);
@@ -910,7 +910,9 @@ final class ContractTest extends TestCase
     {
         $options = $scenario['mock'];
         $moderateCalls = [];
+        // Every other scenario names its project, so only `defaultProject` relies on the default.
         $mock = new MockServerClient(
+            ...(($options['defaultProject'] ?? false) ? [] : ['projectId' => 'project-1']),
             moderate: isset($options['moderate']) ? self::recordingModerate($options['moderate'], $moderateCalls) : null,
             apiKey: MockServerClient::createApiKey($options['apiKeyGrants'] ?? []),
             maxRetries: $options['maxRetries'] ?? 0,

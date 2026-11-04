@@ -82,7 +82,7 @@ pub struct MockFailureOptions {
     /// Fail the next request of this operation rather than the next request.
     pub operation: Option<String>,
     /// The API error's `details`.
-    pub details: Map<String, Value>,
+    pub details: Option<Map<String, Value>>,
     /// The API error's `Retry-After` header, in seconds.
     pub retry_after: Option<u32>,
 }
@@ -99,7 +99,7 @@ impl MockFailureOptions {
     }
     /// The API error's `details`, such as `{"reason": "spend-limit"}`.
     pub fn details(mut self, details: Map<String, Value>) -> Self {
-        self.details = details;
+        self.details = Some(details);
         self
     }
     /// Sends the API error with a `Retry-After` header of `seconds`.
@@ -169,7 +169,7 @@ pub(super) const OPERATIONS: [&str; 47] = [
 
 /// Options for [`MockServerClient::in_memory`](super::MockServerClient::in_memory).
 ///
-/// Defaults: project `mock-project`, `create_mock_api_key(&[])`, no retries, random IDs, the
+/// Defaults: project `project-1`, `create_mock_api_key(&[])`, no retries, random IDs, the
 /// system clock, the default moderation ([`MockModerationInput::default_decision`]) and the base
 /// URLs `https://api.calmlens.invalid/v1` and
 /// `https://cdn.calmlens.invalid/v1`.
@@ -192,7 +192,7 @@ impl Default for MockOptions {
     fn default() -> Self {
         Self {
             api_key: create_mock_api_key(&[]),
-            project_id: "mock-project".into(),
+            project_id: "project-1".into(),
             max_retries: 0,
             api_base_url: API_BASE_URL.into(),
             cdn_base_url: CDN_BASE_URL.into(),

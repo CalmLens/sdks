@@ -1,5 +1,7 @@
 package com.calmlens;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
@@ -130,19 +132,36 @@ final class Fixtures {
   }
 
   /** {@code value} without object members whose value is null, at every level. */
-  static JsonElement withoutNulls(JsonElement value) {
-    if (value == null) return JsonNull.INSTANCE;
-    if (value.isJsonObject()) {
-      JsonObject copy = new JsonObject();
-      value.getAsJsonObject().entrySet().forEach(entry -> { if (!entry.getValue().isJsonNull()) copy.add(entry.getKey(), withoutNulls(entry.getValue())); });
-      return copy;
+  /** Writes typed results with every declared field, null ones as null. */
+  static final Gson WITH_NULLS = Json.GSON.newBuilder().serializeNulls().create();
+
+  /**
+   * Compares a fixture's expected JSON with what the SDK returned ({@code actual} is Java null when
+   * absent). An expected null needs the field present and null; a field the result has but the
+   * fixture doesn't list must be null (a declared field the response left unset).
+   */
+  static void assertMatches(JsonElement expected, JsonElement actual, String label) {
+    if (expected == null || expected.isJsonNull()) {
+      assertNotNull(actual, label + " is missing (expected null)");
+      assertTrue(actual.isJsonNull(), label + ": expected null, got " + actual);
+      return;
     }
-    if (value.isJsonArray()) {
-      com.google.gson.JsonArray copy = new com.google.gson.JsonArray();
-      value.getAsJsonArray().forEach(item -> copy.add(withoutNulls(item)));
-      return copy;
+    assertNotNull(actual, label + " is missing (expected " + expected + ")");
+    if (expected.isJsonObject()) {
+      assertTrue(actual.isJsonObject(), label + ": expected " + expected + ", got " + actual);
+      JsonObject want = expected.getAsJsonObject(), got = actual.getAsJsonObject();
+      want.entrySet().forEach(entry -> assertMatches(entry.getValue(), got.get(entry.getKey()), label + "." + entry.getKey()));
+      got.entrySet().forEach(entry -> {
+        if (!want.has(entry.getKey())) assertTrue(entry.getValue().isJsonNull(), label + "." + entry.getKey() + ": unexpected " + entry.getValue());
+      });
+    } else if (expected.isJsonArray()) {
+      assertTrue(actual.isJsonArray(), label + ": expected " + expected + ", got " + actual);
+      com.google.gson.JsonArray want = expected.getAsJsonArray(), got = actual.getAsJsonArray();
+      assertEquals(want.size(), got.size(), label + ": length of " + got);
+      for (int i = 0; i < want.size(); i++) assertMatches(want.get(i), got.get(i), label + "." + i);
+    } else {
+      assertEquals(expected, actual, label);
     }
-    return value;
   }
 
   static Transport.Response json(int status, String body) {

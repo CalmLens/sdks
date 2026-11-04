@@ -128,7 +128,7 @@ module CalmLens
       -> { lock.synchronize { last = [(Time.now.to_f * 1000).to_i, last + 1].max } }
     end
 
-    # @param project_id [String]
+    # @param project_id [String] `project-1` by default.
     # @param api_key [String] a key from {.create_api_key}; the default has no grants.
     # @param now [#call] returns the current time in epoch milliseconds. The default clock reads the
     #   system time but advances at least 1 ms per reading, so records made in a row have strictly
@@ -228,6 +228,9 @@ module CalmLens
         raise Internal.invalid('retry_after must be a whole number of seconds')
       end
       raise Internal.invalid('details must be a Hash') unless details.nil? || details.is_a?(Hash)
+      if !(failure.is_a?(String) && ErrorCodes::STATUSES.key?(failure)) && !(details.nil? && retry_after.nil?)
+        raise Internal.invalid('details and retry_after apply only to an API error code')
+      end
 
       name = operation && operation.to_s.split('.').map { |part| Internal.camelize(part) }.join('.')
       if name && !OPERATION_NAMES.include?(name)

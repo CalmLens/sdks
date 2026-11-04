@@ -212,7 +212,7 @@ class ClientCasesTest {
             actual.remove("retryAfter");
           }
           assertEquals(want, actual, label);
-          if (expect.has("partialResult")) assertEquals(Fixtures.withoutNulls(expect.get("partialResult")), Fixtures.withoutNulls(partial), label + ": yielded");
+          if (expect.has("partialResult")) Fixtures.assertMatches(expect.get("partialResult"), partial, label + ": yielded");
           break;
         }
         if (error != null) throw new AssertionError(label + ": " + error, error);
@@ -233,8 +233,7 @@ class ClientCasesTest {
         } else {
           JsonElement want = expect.has("result") ? expect.get("result") : JsonNull.INSTANCE;
           JsonElement actual = result instanceof JsonElement json ? json : ContractTest.tree(result);
-          // Typed results omit unset fields, so null members are compared as absent.
-          assertEquals(Fixtures.withoutNulls(want), Fixtures.withoutNulls(actual), label);
+          Fixtures.assertMatches(want, actual, label);
         }
       }
     } finally {

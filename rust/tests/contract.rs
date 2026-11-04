@@ -1450,9 +1450,12 @@ async fn mock_scenarios() {
             let options = &scenario["mock"];
             let grants: Vec<testing::MockApiKeyGrant> =
                 typed(options.get("apiKeyGrants").cloned().unwrap_or(json!([])));
-            let mut mock_options = MockOptions::new()
-                .project_id("project-1")
-                .api_key(testing::create_mock_api_key(&grants));
+            let mut mock_options =
+                MockOptions::new().api_key(testing::create_mock_api_key(&grants));
+            // Without `defaultProject`, pass the project the mock would otherwise default to.
+            if options["defaultProject"] != json!(true) {
+                mock_options = mock_options.project_id("project-1");
+            }
             if let Some(retries) = options["maxRetries"].as_u64() {
                 mock_options = mock_options.max_retries(retries as u32);
             }

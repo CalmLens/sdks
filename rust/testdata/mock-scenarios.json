@@ -9313,6 +9313,170 @@
           }
         }
       ]
+    },
+    {
+      "name": "moderate gets a multipart upload's parts joined in order, and no content for a website",
+      "mock": {
+        "moderate": {}
+      },
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "long.txt",
+            "part": {
+              "base64": {
+                "$base64Repeat": {
+                  "text": "a",
+                  "count": 5242880
+                }
+              },
+              "type": "text/plain",
+              "partNumber": 1,
+              "isFinal": false
+            }
+          },
+          "save": "long",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.uploadPart",
+          "args": {
+            "assetId": {
+              "$ref": "long.id"
+            },
+            "part": {
+              "base64": {
+                "$base64Repeat": {
+                  "text": "a",
+                  "count": 3
+                }
+              },
+              "partNumber": 2,
+              "isFinal": true
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "post",
+            "url": "https://example.com/posts/9"
+          },
+          "save": "post",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.moderateCalls",
+          "expect": {
+            "result": {
+              "length": 2,
+              "0.trigger": "upload",
+              "0.assetId": {
+                "$ref": "long.id"
+              },
+              "0.bytesBase64": {
+                "$base64Repeat": {
+                  "text": "a",
+                  "count": 5242883
+                }
+              },
+              "1.trigger": "upload",
+              "1.assetId": {
+                "$ref": "post.id"
+              },
+              "1.text": null,
+              "1.bytesBase64": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a transport error or timeout takes no details or Retry-After, and failures name a real operation",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "retryAfter": 1
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "timeout",
+            "details": {
+              "reason": "slow"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.fly"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "a mock built without a project ID uses project-1",
+      "mock": {
+        "defaultProject": true
+      },
+      "steps": [
+        {
+          "operation": "assets.list",
+          "args": {},
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.requests",
+          "expect": {
+            "result": {
+              "length": 1,
+              "0.path": "/projects/project-1/assets",
+              "0.status": 200
+            }
+          }
+        }
+      ]
     }
   ]
 }

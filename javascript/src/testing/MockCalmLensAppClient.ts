@@ -26,8 +26,6 @@ export interface MockCalmLensAppClientOptions extends CalmLensAppClientOptions {
   };
 }
 
-const MOCK_PROJECT_ID = "proj_0000000000000000c1a5";
-
 /**
  * The real `CalmLensAppClient`, answered by the in-memory API of a `MockCalmLensServerClient`.
  * The API applies `mockOptions.preset` to this client's uploads like CalmLens applies an upload
@@ -53,7 +51,6 @@ export class MockCalmLensAppClient extends CalmLensAppClient {
             includeSubfolders: true,
           },
         ]),
-        projectId: MOCK_PROJECT_ID,
         mockOptions: { moderate: mockOptions.moderate },
       });
     let endpoints: MockEndpoints | undefined;

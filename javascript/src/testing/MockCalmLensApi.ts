@@ -66,54 +66,57 @@ const REVIEW_DECISIONS: readonly MockReviewDecision[] = [
  * method that sends it; `callsTo` and `failNextRequest` also match the others (see
  * `MockCalmLensCall`).
  */
-export type MockCalmLensOperation =
-  | "assets.list"
-  | "assets.iterate"
-  | "assets.search"
-  | "assets.retrieve"
-  | "assets.waitForDecision"
-  | "assets.update"
-  | "assets.listChildren"
-  | "assets.iterateChildren"
-  | "assets.create"
-  | "assets.classify"
-  | "assets.uploadPart"
-  | "assets.createSignedUrl"
-  | "assets.move"
-  | "assets.retry"
-  | "assets.explain"
-  | "assets.decide"
-  | "assets.deleteContent"
-  | "assets.delete"
-  | "assets.batch"
-  | "text.classify"
-  | "cdn.serve"
-  | "events.list"
-  | "events.pages"
-  | "folders.list"
-  | "folders.retrieve"
-  | "folders.create"
-  | "folders.update"
-  | "folders.delete"
-  | "folders.move"
-  | "hashLists.list"
-  | "hashLists.retrieve"
-  | "hashLists.create"
-  | "hashLists.update"
-  | "hashLists.delete"
-  | "hashLists.listEntries"
-  | "hashLists.addEntry"
-  | "hashLists.removeEntry"
-  | "policies.list"
-  | "policies.retrieve"
-  | "policies.create"
-  | "policies.update"
-  | "policies.applyPreset"
-  | "policies.setAutomaticUpdates"
-  | "policies.delete"
-  | "policies.assign"
-  | "ensureLens"
-  | "ensureLenses";
+const MOCK_OPERATIONS = [
+  "assets.list",
+  "assets.iterate",
+  "assets.search",
+  "assets.retrieve",
+  "assets.waitForDecision",
+  "assets.update",
+  "assets.listChildren",
+  "assets.iterateChildren",
+  "assets.create",
+  "assets.classify",
+  "assets.uploadPart",
+  "assets.createSignedUrl",
+  "assets.move",
+  "assets.retry",
+  "assets.explain",
+  "assets.decide",
+  "assets.deleteContent",
+  "assets.delete",
+  "assets.batch",
+  "text.classify",
+  "cdn.serve",
+  "events.list",
+  "events.pages",
+  "folders.list",
+  "folders.retrieve",
+  "folders.create",
+  "folders.update",
+  "folders.delete",
+  "folders.move",
+  "hashLists.list",
+  "hashLists.retrieve",
+  "hashLists.create",
+  "hashLists.update",
+  "hashLists.delete",
+  "hashLists.listEntries",
+  "hashLists.addEntry",
+  "hashLists.removeEntry",
+  "policies.list",
+  "policies.retrieve",
+  "policies.create",
+  "policies.update",
+  "policies.applyPreset",
+  "policies.setAutomaticUpdates",
+  "policies.delete",
+  "policies.assign",
+  "ensureLens",
+  "ensureLenses",
+] as const;
+
+export type MockCalmLensOperation = (typeof MOCK_OPERATIONS)[number];
 
 /**
  * One request a mock client sent, as the in-memory API received it. `operation` is the client
@@ -548,6 +551,16 @@ export class MockCalmLensApi {
 
   /** Queues a failure for the next request, or the next one `operation` sends. */
   failNextRequest(failure: MockRequestFailure, options: MockFailureOptions = {}): void {
+    if (
+      options.operation !== undefined &&
+      !(MOCK_OPERATIONS as readonly string[]).includes(options.operation)
+    ) {
+      throw invalidArgument(`${options.operation} is not a client method that sends requests`);
+    }
+    const isApiError = typeof failure === "string" && failure in API_ERROR_DEFINITIONS;
+    if (!isApiError && (options.details !== undefined || options.retryAfter !== undefined)) {
+      throw invalidArgument("details and retryAfter apply only to an API error code");
+    }
     if (
       options.retryAfter !== undefined &&
       !(Number.isInteger(options.retryAfter) && options.retryAfter >= 0)

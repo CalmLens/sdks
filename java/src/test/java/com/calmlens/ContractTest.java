@@ -63,8 +63,8 @@ class ContractTest {
 
   /**
    * Each request fixture sends the recorded request and returns the response: nothing for deletes,
-   * the lenses for {@code ensureLenses}, the typed body otherwise. Typed results omit unset fields,
-   * so both sides are compared without null members.
+   * the lenses for {@code ensureLenses}, the typed body otherwise, compared with {@link
+   * Fixtures#assertMatches}.
    */
   @TestFactory Stream<DynamicTest> requestContracts() throws Exception {
     return cases(array("requests.json"), f -> f.get("operation").getAsString(), fixture -> {
@@ -80,7 +80,7 @@ class ContractTest {
       JsonElement response = fixture.get("response");
       JsonElement expected = operation.endsWith(".delete") || operation.equals("hashLists.removeEntry") ? JsonNull.INSTANCE
           : operation.equals("ensureLenses") ? response.getAsJsonObject().get("lenses") : response;
-      assertEquals(Fixtures.withoutNulls(expected), Fixtures.withoutNulls(tree(result)), "result");
+      Fixtures.assertMatches(expected, tree(result), "result");
     });
   }
 
@@ -498,20 +498,25 @@ class ContractTest {
 
   // mock-scenarios.json: replayed against MockCalmLensServerClient.
 
-  /** Follows a dotted path: numeric segments index arrays, {@code length} is an array's length. */
+  /**
+   * Follows a dotted path: numeric segments index arrays, {@code length} is an array's length.
+   * Returns Java null when the path is absent, so an expected null needs a present null.
+   */
   private static JsonElement at(JsonElement value, String path) {
     for (String segment : path.split("\\.")) {
-      if (value == null || value.isJsonNull()) return JsonNull.INSTANCE;
+      if (value == null || !(value.isJsonArray() || value.isJsonObject())) return null;
       if (value.isJsonArray()) {
         JsonArray items = value.getAsJsonArray();
-        value = segment.equals("length") ? new JsonPrimitive(items.size()) : items.get(Integer.parseInt(segment));
-      } else if (value.isJsonObject()) {
-        value = value.getAsJsonObject().get(segment);
+        if (segment.equals("length")) value = new JsonPrimitive(items.size());
+        else {
+          int index = Integer.parseInt(segment);
+          value = index < items.size() ? items.get(index) : null;
+        }
       } else {
-        return JsonNull.INSTANCE;
+        value = value.getAsJsonObject().get(segment);
       }
     }
-    return value == null ? JsonNull.INSTANCE : value;
+    return value;
   }
 
   /** Resolves {@code $ref}, {@code $concat} and {@code $base64Repeat} markers (packages/sdk-contract/README.md). */
@@ -521,7 +526,7 @@ class ContractTest {
       if (object.has("$ref")) {
         String[] reference = object.get("$ref").getAsString().split("\\.", 2);
         JsonElement root = saved.get(reference[0]);
-        return reference.length == 1 ? normalize(root) : at(root, reference[1]);
+        return normalize(reference.length == 1 ? root : at(root, reference[1]));
       }
       if (object.has("$concat")) {
         StringBuilder joined = new StringBuilder();
@@ -591,7 +596,8 @@ class ContractTest {
     };
   }
 
-  static JsonElement tree(Object result) { return result == null ? JsonNull.INSTANCE : Json.GSON.toJsonTree(result); }
+  /** Typed results as JSON, with each declared field that is null written as null. */
+  static JsonElement tree(Object result) { return result == null ? JsonNull.INSTANCE : Fixtures.WITH_NULLS.toJsonTree(result); }
 
   /** Every item an iterable yields, as JSON. */
   static JsonArray collect(Iterable<?> items) {
@@ -758,7 +764,7 @@ class ContractTest {
         JsonElement raw = entry.getValue(), actual = at(result, entry.getKey());
         if (raw.isJsonObject() && raw.getAsJsonObject().has("$contains")) {
           JsonElement member = normalize(resolve(raw.getAsJsonObject().get("$contains"), saved));
-          assertTrue(actual.isJsonArray(), label + ": " + entry.getKey() + " is not an array");
+          assertTrue(actual != null && actual.isJsonArray(), label + ": " + entry.getKey() + " is not an array");
           boolean found = false;
           for (JsonElement item : actual.getAsJsonArray()) found |= normalize(item).equals(member);
           assertTrue(found, label + ": " + entry.getKey() + " " + actual + " lacks " + member);
@@ -767,8 +773,7 @@ class ContractTest {
           assertTrue(actual != null && actual.isJsonPrimitive() && actual.getAsString().matches(prefix + "_[0-9A-Za-z]{20}"),
               label + ": " + entry.getKey() + " " + actual + " is not a " + prefix + "_ ID");
         } else {
-          // Typed results omit unset fields, so a nested null compares as absent.
-          assertEquals(Fixtures.withoutNulls(normalize(resolve(raw, saved))), Fixtures.withoutNulls(normalize(actual)), label + ": " + entry.getKey());
+          Fixtures.assertMatches(resolve(raw, saved), actual, label + ": " + entry.getKey());
         }
       }
     if (step.has("save")) saved.put(step.get("save").getAsString(), result);
@@ -785,13 +790,21 @@ class ContractTest {
       }
       JsonObject options = scenario.getAsJsonObject("mock");
       Grant[] grants = options.has("apiKeyGrants") ? grants(options.getAsJsonArray("apiKeyGrants")) : new Grant[0];
-      CalmLensServerClient.Builder builder = CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(grants), "project-1")
-          .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1");
-      if (options.has("maxRetries")) builder.maxRetries(options.get("maxRetries").getAsInt());
       JsonArray moderateCalls = new JsonArray();
       Options mockOptions = new Options();
       if (options.has("moderate")) mockOptions.moderate(recordingModerate(options.getAsJsonObject("moderate"), moderateCalls));
-      MockCalmLensServerClient mock = new MockCalmLensServerClient(builder, mockOptions);
+      MockCalmLensServerClient mock;
+      if (options.has("defaultProject")) {
+        // Built without a client builder, so without a project ID; retries stay off.
+        assertFalse(options.has("maxRetries"), name + ": maxRetries needs a client builder");
+        mock = new MockCalmLensServerClient(mockOptions);
+        mock.setApiKeyGrants(grants);
+      } else {
+        CalmLensServerClient.Builder builder = CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(grants), "project-1")
+            .baseUrl("https://api.calmlens.invalid/v1").cdnBaseUrl("https://cdn.calmlens.invalid/v1");
+        if (options.has("maxRetries")) builder.maxRetries(options.get("maxRetries").getAsInt());
+        mock = new MockCalmLensServerClient(builder, mockOptions);
+      }
       Map<String, JsonElement> saved = new HashMap<>();
       long started = System.nanoTime();
       for (JsonElement step : scenario.getAsJsonArray("steps")) {

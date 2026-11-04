@@ -18,17 +18,15 @@ final class MockModerationInput
 
     /**
      * @param array $asset the asset as stored, still processing.
-     * @param ?string $bytes the uploaded bytes (parts joined in order), or null without stored
-     *   content, such as a website or removed content.
-     * @param ?string $text the bytes as UTF-8 text for a `plaintext-document`, otherwise null.
+     * @param MockModerationContent $content the stored content: its bytes and, for a
+     *   `plaintext-document`, its text, both null without stored content, such as a website.
      * @param string $trigger why the asset is moderated: `upload`, `retry`, `rerun` or `complete`.
      * @param bool $queued true when the API would queue the work rather than answer with the
      *   decision: queued uploads, retries, reruns and `completeProcessing`.
      */
     public function __construct(
         public readonly array $asset,
-        public readonly ?string $bytes,
-        public readonly ?string $text,
+        public readonly MockModerationContent $content,
         public readonly string $trigger,
         public readonly bool $queued,
     ) {

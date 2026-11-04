@@ -140,7 +140,7 @@ func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
 	if upload.Path != "/projects/my project/assets" || upload.Header.Get("X-CalmLens-Upload") != "content" || upload.Query.Get("queue") != "true" || upload.Query.Get("folderId") != folder.ID || string(upload.RawBody) != "hi" || upload.Body != nil {
 		t.Fatalf("%+v", upload)
 	}
-	if requests[2].Method != "GET" || requests[2].Path != "/assets/"+a.ID || create.Status != http.StatusCreated || requests[2].Status != http.StatusOK {
+	if requests[2].Method != "GET" || requests[2].Path != "/assets/"+a.ID || !reflect.DeepEqual(create.Status, calmlens.Ptr(http.StatusCreated)) || !reflect.DeepEqual(requests[2].Status, calmlens.Ptr(http.StatusOK)) {
 		t.Fatalf("%+v", requests[2])
 	}
 	c.ClearRequests()
@@ -193,7 +193,7 @@ func TestMockSimulatesTransportFailures(t *testing.T) {
 		t.Fatalf("failure queue not drained: %v", err)
 	}
 	requests := c.Requests()
-	if len(requests) != 3 || requests[0].Status != 0 || requests[2].Status != http.StatusOK {
+	if len(requests) != 3 || requests[0].Status != nil || requests[1].Status != nil || !reflect.DeepEqual(requests[2].Status, calmlens.Ptr(http.StatusOK)) {
 		t.Fatalf("failed requests should be captured without a status: %+v", requests)
 	}
 }
@@ -201,12 +201,13 @@ func TestMockSimulatesTransportFailures(t *testing.T) {
 func TestMockRefusesFailuresItCannotInject(t *testing.T) {
 	c, _ := NewServerClient(Options{})
 	for name, failure := range map[string]RequestFailure{
-		"misspelt operation":       {Code: FailureTimeout, Operation: "assets.creat"},
-		"unknown code":             {Code: "upload/no-such-error"},
-		"no code or error":         {Operation: "assets.create"},
-		"code and error":           {Code: FailureTimeout, Err: errors.New("offline")},
-		"Retry-After on a timeout": {Code: FailureTimeout, RetryAfter: calmlens.Ptr(time.Second)},
-		"fractional Retry-After":   {Code: calmlens.CodeUploadLimitExceeded, RetryAfter: calmlens.Ptr(1500 * time.Millisecond)},
+		// The shared scenarios cover a misspelt operation and details or Retry-After on a timeout.
+		"unknown code":                     {Code: "upload/no-such-error"},
+		"no code or error":                 {Operation: "assets.create"},
+		"code and error":                   {Code: FailureTimeout, Err: errors.New("offline")},
+		"details on a transport error":     {Err: errors.New("offline"), Details: calmlens.JSON{"reason": "slow"}},
+		"Retry-After on a transport error": {Err: errors.New("offline"), RetryAfter: calmlens.Ptr(time.Second)},
+		"fractional Retry-After":           {Code: calmlens.CodeUploadLimitExceeded, RetryAfter: calmlens.Ptr(1500 * time.Millisecond)},
 	} {
 		if err := c.FailNextRequest(RequestFailure{Code: FailureTimeout}, failure); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
 			t.Errorf("%s: got %v, want sdk/invalid-argument", name, err)
@@ -492,7 +493,7 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 		return http.Header{"X-Calmlens-Upload": {mode}, "Content-Type": {"text/plain"}}
 	}
 	jsonHeader := http.Header{"Content-Type": {"application/json"}}
-	assets := "/projects/mock-project/assets"
+	assets := "/projects/project-1/assets"
 	cases := []struct {
 		name, method, path, query string
 		header                    http.Header

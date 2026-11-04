@@ -51,7 +51,7 @@ final class MockServerClientTest extends TestCase
 
     public function testClassifyDecidesByTextAndRemovesTemporaryContent(): void
     {
-        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => str_contains((string) $input->text, 'away') ? 'blocked' : 'allowed');
+        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => str_contains((string) $input->content->text, 'away') ? 'blocked' : 'allowed');
         $client = $mock->client();
         $kind = $client->text->classify(['name' => 'kind', 'text' => 'hello']);
         $rude = $client->text->classify(['name' => 'rude', 'text' => 'go away']);
@@ -59,24 +59,6 @@ final class MockServerClientTest extends TestCase
         self::assertSame('blocked', $rude['classification']['moderation']['status']);
         self::assertSame(['removed', 'retention'], [$kind['content']['status'], $kind['content']['removalReason']]);
         self::assertSame([], $mock->content);
-    }
-
-    public function testModerateGetsJoinedMultipartBytesAndNoBytesForAWebsite(): void
-    {
-        $inputs = [];
-        $mock = new MockServerClient(moderate: function (MockModerationInput $input) use (&$inputs) {
-            $inputs[] = $input;
-            return 'allowed';
-        });
-        $client = $mock->client();
-        $first = str_repeat('a', 5 * 1024 * 1024);
-        $started = $client->assets->create(['name' => 'clip.mp4', 'part' => ['data' => $first, 'type' => 'video/mp4', 'isFinal' => false]]);
-        self::assertSame([], $inputs);
-        $client->assets->uploadPart(['assetId' => $started['id'], 'part' => ['data' => 'end', 'partNumber' => 2, 'isFinal' => true]]);
-        $client->assets->classify(['name' => 'site', 'url' => 'https://example.com/']);
-        self::assertSame([[$started['id'], hash('sha256', $first . 'end'), null], ['website', null, null]],
-            array_map(fn (MockModerationInput $input) => [$input->asset['type'] === 'website' ? 'website' : $input->asset['id'],
-                $input->bytes === null ? null : hash('sha256', $input->bytes), $input->text], $inputs));
     }
 
     public function testRetryRecordsItThenSettlesWithTheModerateAnswer(): void
@@ -199,8 +181,9 @@ final class MockServerClientTest extends TestCase
     public function testFailNextRequestRefusesWhatItCannotSimulate(): void
     {
         $mock = new MockServerClient();
-        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest('timeout', 'assets.upload')));
-        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest('timeout', retryAfter: 5)));
+        // The shared scenarios cover unknown operations and transport errors with details or retryAfter.
+        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest('disconnect')));
+        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest(new \RuntimeException('down'), details: ['reason' => 'x'])));
         self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest('upload/limit-exceeded', retryAfter: -1)));
         self::assertSame(0, $mock->pending());
     }

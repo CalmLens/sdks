@@ -247,7 +247,7 @@ impl MockTransport {
                     MockFailure::Api(code) => {
                         let message = format!("Injected {code} failure");
                         let status = code.http_status().unwrap_or(400);
-                        let details = Value::Object(queued.options.details);
+                        let details = Value::Object(queued.options.details.unwrap_or_default());
                         let mut response =
                             MockResponse::api_error_body(status, code.as_str(), message, details);
                         if let Some(seconds) = queued.options.retry_after {
@@ -503,7 +503,8 @@ impl MockServerClient {
     /// `assets.uploadPart` or `cdn.serve`; a convenience fails with the request it sends
     /// (`assets.waitForDecision` with `assets.retrieve`, `text.classify` with
     /// `assets.classify`, `ensureLens` with `ensureLenses`, iterators with their list). Fails
-    /// with `sdk/invalid-argument` for an unknown operation.
+    /// with `sdk/invalid-argument`, queueing nothing, for an unknown operation or for `details`
+    /// or `retry_after` with a transport error or timeout.
     ///
     /// # Panics
     ///
@@ -517,9 +518,17 @@ impl MockServerClient {
             if !memory::OPERATIONS.contains(&operation.as_str()) {
                 return Err(Error::new(
                     ErrorCode::InvalidArgument,
-                    format!("unknown operation {operation:?}"),
+                    format!("{operation:?} is not a client method that sends requests"),
                 ));
             }
+        }
+        if !matches!(failure, MockFailure::Api(_))
+            && (options.details.is_some() || options.retry_after.is_some())
+        {
+            return Err(Error::new(
+                ErrorCode::InvalidArgument,
+                "details and retry_after apply only to an API error code",
+            ));
         }
         self.backend(|backend| {
             backend.queue_failure(memory::QueuedFailure { failure, options });

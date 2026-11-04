@@ -40,8 +40,8 @@ use Psr\Http\Message\ResponseInterface;
  * ThumbHash for its placeholder, which goes with its content. Like the API, a completed upload adds
  * `asset.uploaded`, then `asset.classified` and the automated `asset.<status>` once decided, or
  * `asset.failed`; deleting an asset, removing its content and retrying it add `asset.deleted`,
- * `asset.content-removed` and `asset.retried`. The project starts on its General preset policy;
- * the mock's presets have one release (version 1) and no settings, and policies never decide uploads.
+ * `asset.content-removed` and `asset.retried`. The project starts on the organisation's own
+ * General preset policy; the mock's presets have one release (version 1) and no settings, and policies never decide uploads.
  *
  * Like the CDN, it checks delivery first: blocked, purged and failed assets, and assets whose
  * content was removed or is still uploading, return 403 `asset/not-available` whatever the key.
@@ -816,7 +816,7 @@ final class MockServerClient
     {
         $bytes = $asset['content']['status'] === 'removed' ? null : ($this->content[$asset['id']]['bytes'] ?? null);
         $text = $bytes !== null && $asset['type'] === 'plaintext-document' ? mb_scrub($bytes, 'UTF-8') : null;
-        return MockDecision::from(($this->moderate)(new MockModerationInput($asset, $bytes, $text, $trigger, $queued)));
+        return MockDecision::from(($this->moderate)(new MockModerationInput($asset, new MockModerationContent($bytes, $text), $trigger, $queued)));
     }
 
     /** Stores `$asset` decided as `$decision` says, with its report. */
@@ -1611,9 +1611,9 @@ final class MockServerClient
         return ['items' => $taken, 'nextCursor' => 'mock_' . $next, 'hasMore' => $next < count($this->events), 'excludedTypes' => []];
     }
 
-    // Policies: the project starts on its General preset policy, following automatic updates. The
-    // mock holds no built-in preset settings: a preset's settings are `{"categorySettings": {}}` at
-    // version 1, and uploads are never decided by a policy.
+    // Policies: the project starts on the organisation's own General preset policy, following
+    // automatic updates. The mock holds no built-in preset settings: a preset's settings are
+    // `{"categorySettings": {}}` at version 1, and uploads are never decided by a policy.
 
     /** The built-in presets the mock knows, by display name. */
     private const PRESET_NAMES = ['general-community' => 'General', 'children-platform' => 'Kids',
@@ -1626,18 +1626,18 @@ final class MockServerClient
     private function ensurePolicies(): void
     {
         if ($this->projectPolicyId === null) {
-            $this->projectPolicyId = $this->newPolicy('General', '', self::emptySettings(), true, 'general-community', $this->projectId)['id'];
+            $this->projectPolicyId = $this->newPolicy('General', '', self::emptySettings(), true, 'general-community', true)['id'];
         }
     }
 
     private static function emptySettings(): array { return ['categorySettings' => new \stdClass()]; }
 
-    private function newPolicy(string $name, string $description, array $settings, bool $automaticUpdates, ?string $preset, ?string $presetProjectId): array
+    private function newPolicy(string $name, string $description, array $settings, bool $automaticUpdates, ?string $preset, bool $presetOwn): array
     {
         $now = ($this->now)();
         $policy = ['id' => ($this->createId)('pol'), 'name' => $name, 'description' => $description, 'settings' => $settings,
             'revision' => 1, 'automaticUpdates' => $automaticUpdates,
-            'preset' => $preset === null ? null : ['id' => $preset, 'version' => 1, 'projectId' => $presetProjectId],
+            'preset' => $preset === null ? null : ['id' => $preset, 'version' => 1, 'own' => $presetOwn],
             'createdAt' => $now, 'updatedAt' => $now, 'baseline' => $settings];
         return $this->policies[$policy['id']] = $policy;
     }
@@ -1678,7 +1678,7 @@ final class MockServerClient
         }
         $policy = $this->newPolicy(is_string($name) && trim($name) !== '' ? trim($name) : self::PRESET_NAMES[$preset],
             is_string($json['description'] ?? null) ? $json['description'] : '', $preset !== null ? self::emptySettings() : $settings,
-            false, $preset, null);
+            false, $preset, false);
         // Like the API, a new policy is 201 Created.
         $this->status = 201;
         return $this->toPolicy($policy);
@@ -1731,7 +1731,7 @@ final class MockServerClient
                 return $this->savePolicy($policy, $json['revision'] ?? null, ['settings' => $policy['baseline']]);
             case 'PUT automatic-updates':
                 $enabled = ($json['enabled'] ?? null) === true;
-                if (($preset['projectId'] ?? null) !== $this->projectId || $policy['automaticUpdates'] === $enabled) {
+                if (!($preset['own'] ?? false) || $policy['automaticUpdates'] === $enabled) {
                     self::fail(ErrorCodes::POLICY_AUTOMATIC_UPDATES_UNAVAILABLE, null, "Automatic updates can't be switched this way for this policy.");
                 }
                 if (($json['revision'] ?? null) !== $policy['revision']) {

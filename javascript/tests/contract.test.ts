@@ -135,6 +135,7 @@ type Scenario = {
     };
     apiKeyGrants?: unknown[];
     maxRetries?: number;
+    defaultProject?: true;
   };
   steps: ScenarioStep[];
 };
@@ -317,7 +318,7 @@ describe("shared mock scenarios", () => {
       const moderateCalls: unknown[] = [];
       const client = new MockCalmLensServerClient({
         apiKey: createMockApiKey((scenario.mock.apiKeyGrants ?? []) as never),
-        projectId: "project-1",
+        ...(!scenario.mock.defaultProject && { projectId: "project-1" }),
         ...(scenario.mock.maxRetries !== undefined && { maxRetries: scenario.mock.maxRetries }),
         mockOptions: moderate && {
           moderate: (input) => {

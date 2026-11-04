@@ -74,7 +74,8 @@ type InMemoryImageStorage struct{ Content map[string]*StoredContent }
 // UploadTimeout, MaxRetries, MaxResponseBytes, PartSizeBytes) and adds in-memory storage and deterministic
 // ID, clock and moderation controls.
 type Options struct {
-	APIKey    string
+	APIKey string
+	// ProjectID defaults to DefaultProjectID.
 	ProjectID string
 	// BaseURL and Timeout are validated and applied exactly as by calmlens.NewServerClient; requests
 	// never leave the process.
@@ -127,9 +128,9 @@ type CapturedRequest struct {
 	// RawBody holds the exact bytes sent, including upload content.
 	RawBody []byte
 	CDN     bool
-	// Status is the HTTP status the mock answered with, or 0 when the request failed without a
+	// Status is the HTTP status the mock answered with, or nil when the request failed without a
 	// response.
-	Status int
+	Status *int
 }
 
 type upload struct {
@@ -511,10 +512,14 @@ func snapshot(a calmlens.JSON) calmlens.JSON {
 	}
 }
 
-// NewServerClient returns a mock client. Invalid options are rejected like calmlens.NewServerClient.
+// DefaultProjectID is the project ID of a mock built without one.
+const DefaultProjectID = "project-1"
+
+// NewServerClient returns a mock client, with project ID DefaultProjectID unless Options.ProjectID
+// is set. Invalid options are rejected like calmlens.NewServerClient.
 func NewServerClient(options Options) (*MockServerClient, error) {
 	if options.ProjectID == "" {
-		options.ProjectID = "mock-project"
+		options.ProjectID = DefaultProjectID
 	}
 	if options.APIKey == "" {
 		options.APIKey = CreateMockAPIKey(nil)
@@ -671,7 +676,8 @@ func (m *MockServerClient) roundTrip(req *http.Request, raw []byte) (*http.Respo
 	if res != nil {
 		m.lastStatus = res.StatusCode
 		if len(m.requests) > sent {
-			m.requests[len(m.requests)-1].Status = res.StatusCode
+			status := res.StatusCode
+			m.requests[len(m.requests)-1].Status = &status
 		}
 	}
 	return res, err

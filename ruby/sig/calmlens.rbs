@@ -357,7 +357,8 @@ module CalmLens
     # Replaces the mock API key's grants for later requests; the key stays the same.
     def api_key_grants=: (Array[Hash[Symbol | String, untyped]] grants) -> Array[Hash[Symbol | String, untyped]]
     # Fails the next request (or the next one `operation` sends) with `transport-error`, `timeout`, an
-    # API error code (with optional `details` and `Retry-After` seconds) or an exception.
+    # API error code (with optional `details` and `Retry-After` seconds, which only an API error takes) or
+    # an exception.
     def fail_next_request: (?(String | Exception) failure, ?operation: String?, ?details: Hash[String | Symbol, untyped]?,
                             ?retry_after: Integer?) -> self
     def state: () -> Testing::State

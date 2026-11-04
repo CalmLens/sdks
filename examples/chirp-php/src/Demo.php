@@ -66,7 +66,7 @@ final class Demo
             return 'pending';
         }
         foreach (self::TEXT_RULES as [$pattern, $category, $score]) {
-            if (preg_match($pattern, (string) $input->text)) {
+            if (preg_match($pattern, (string) $input->content->text)) {
                 $status = $score < 0.8 ? 'allowed' : ($category === 'sexual' ? 'age-restricted' : 'blocked');
                 return MockDecision::of($status)->flag($category, $score);
             }

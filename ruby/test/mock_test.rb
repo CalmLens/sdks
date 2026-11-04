@@ -166,9 +166,10 @@ class MockTest < Minitest::Test
     end
   end
 
-  def test_fail_next_request_refuses_unknown_operations_and_partial_seconds
+  def test_fail_next_request_refuses_partial_seconds_and_details_for_an_exception
     mock = CalmLens::MockServerClient.new
-    [-> { mock.fail_next_request('timeout', operation: 'assets.frobnicate') },
+    [-> { mock.fail_next_request(Errno::ECONNRESET.new, details: { 'reason' => 'reset' }) },
+     -> { mock.fail_next_request(Errno::ECONNRESET.new, retry_after: 1) },
      -> { mock.fail_next_request('upload/website-rate-limit-exceeded', retry_after: 1.5) },
      -> { mock.fail_next_request('upload/website-rate-limit-exceeded', retry_after: -1) }].each do |queue|
       assert_equal 'sdk/invalid-argument', assert_raises(CalmLens::InvalidArgumentError) { queue.call }.code

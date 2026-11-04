@@ -155,7 +155,7 @@ class DemoFlowTests(unittest.TestCase):
         self.assertEqual(board.submit("https://example.com/", "Hello there, unique note", "note-blocked"), "note-not-allowed")
         self.assertEqual(board.links[0]["note_found"], [("harassment", 0.91)])
         self.assertNotIn(b"Hello there, unique note", board.render())
-        self.assertEqual([request.path for request in board.moderator.client.requests], ["/projects/mock-project/assets"])
+        self.assertEqual([request.path for request in board.moderator.client.requests], ["/projects/project-1/assets"])
         link = board.links[0]
         self.assertEqual((link["status"], link["asset_id"]), ("note-not-allowed", None))
         self.assertEqual(clickable(board), [])
@@ -164,7 +164,7 @@ class DemoFlowTests(unittest.TestCase):
         board, _ = demo_board()
         board.submit("https://example.com/page", "Hello")
         request = board.moderator.client.requests[-1]
-        self.assertEqual((request.method, request.path, request.query["queue"]), ("POST", "/projects/mock-project/assets", True))
+        self.assertEqual((request.method, request.path, request.query["queue"]), ("POST", "/projects/project-1/assets", True))
         self.assertEqual(request.body["url"], "https://example.com/page")
         self.assertEqual(request.body["processingOptions"], {"keepContentAfterProcessing": False})
         self.assertEqual(board.moderator.client.database_storage.assets[board.links[0]["asset_id"]]["type"], "website")

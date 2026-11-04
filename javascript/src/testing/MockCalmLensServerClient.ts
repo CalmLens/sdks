@@ -42,7 +42,10 @@ export type {
   MockReviewDecision,
 } from "./MockCalmLensApi";
 
-export interface MockCalmLensServerClientOptions extends CalmLensServerClientOptions {
+export interface MockCalmLensServerClientOptions
+  extends Omit<CalmLensServerClientOptions, "projectId"> {
+  /** Defaults to `project-1`. */
+  projectId?: string;
   mockOptions?: {
     databaseStorage?: MockDatabaseStorage;
     imageStorage?: MockImageStorage;
@@ -69,6 +72,9 @@ export interface MockCalmLensServerClientOptions extends CalmLensServerClientOpt
     signedUrlBaseUrl?: string;
   };
 }
+
+/** The project a mock uses without a `projectId`. */
+export const MOCK_PROJECT_ID = "project-1";
 
 const apis = new WeakMap<object, MockCalmLensApi>();
 
@@ -120,7 +126,8 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
    * `mockOptions`. `maxRetries` defaults to 0, so a failed request fails once; retry backoff and
    * `assets.waitForDecision` take no real time.
    */
-  constructor(options: MockCalmLensServerClientOptions) {
+  constructor(input: MockCalmLensServerClientOptions) {
+    const options = { ...input, projectId: input.projectId ?? MOCK_PROJECT_ID };
     validateServerClientOptions(options);
     const { mockOptions = {}, ...clientOptions } = options;
     const api = new MockCalmLensApi({

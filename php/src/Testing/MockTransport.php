@@ -34,7 +34,7 @@ final class MockTransport
         return $this;
     }
 
-    public function client(string $projectId = 'project-test'): ServerClient
+    public function client(string $projectId = 'project-1'): ServerClient
     {
         $stack = HandlerStack::create($this->handler);
         $stack->push(Middleware::mapRequest(function ($request) {
