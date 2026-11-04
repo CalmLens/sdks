@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { javaReadme, manifests, replaceVersion, syncVersions } from "./version-sdks.mjs";
+import { companions, manifests, replaceVersion, syncVersions } from "./version-sdks.mjs";
 
 test("version synchronization updates every native SDK without changing dependency versions", () => {
   const root = mkdtempSync(join(tmpdir(), "calmlens-version-test-"));
@@ -16,7 +16,7 @@ test("version synchronization updates every native SDK without changing dependen
       writeFileSync(join(root, language, "package.json"), JSON.stringify({ version: "1.2.3" }));
     }
     cpSync(join(source, "rust/Cargo.lock"), join(root, "rust/Cargo.lock"));
-    cpSync(join(source, javaReadme[0]), join(root, javaReadme[0]));
+    cpSync(join(source, companions.java[0][0]), join(root, companions.java[0][0]));
     mkdirSync(join(root, "examples/comment-thread-ruby"), { recursive: true });
     cpSync(
       join(source, "examples/comment-thread-ruby/Gemfile.lock"),
@@ -46,7 +46,7 @@ test("version synchronization updates every native SDK without changing dependen
     assert.equal(gemLock.match(/^\s+calmlens \(1\.2\.3\)$/gm)?.length, 2);
     assert.doesNotMatch(gemLock, /calmlens \(0\./);
     assert.match(
-      readFileSync(join(root, javaReadme[0]), "utf8"),
+      readFileSync(join(root, companions.java[0][0]), "utf8"),
       /<artifactId>calmlens-sdk<\/artifactId>\n {2}<version>1\.2\.3<\/version>/,
     );
     const example = readFileSync(join(root, "examples/marketplace-listing-java/pom.xml"), "utf8");

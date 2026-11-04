@@ -13,10 +13,42 @@ export const manifests = {
   java: ["java/pom.xml", /(<artifactId>calmlens-sdk<\/artifactId><version>)[^<]+(<\/version>)/],
   go: ["go/version.go", /^(const Version = ")[^"]+(")/m],
 };
-/** The Java README's install snippet, which names the release to depend on. */
-export const javaReadme = [
-  "java/README.md",
-  /(<artifactId>calmlens-sdk<\/artifactId>\n\s*<version>)[^<]+(<\/version>)/,
+const cargoLock = /(\[\[package\]\]\nname = "calmlens"\nversion = ")[^"]+(")/;
+/**
+ * Other files that name each SDK's release. Each one with a message must already agree with the
+ * SDK version before versioning, and `--check` reports the message when it does not.
+ */
+export const companions = {
+  rust: [
+    ["rust/Cargo.lock", cargoLock, "Rust lockfile version disagrees with manifest"],
+    [
+      "examples/media-library-rust/Cargo.lock",
+      cargoLock,
+      "Rust lockfile version disagrees with manifest",
+    ],
+  ],
+  ruby: [
+    [
+      "examples/comment-thread-ruby/Gemfile.lock",
+      /^(\s+calmlens \()[^)]+(\))$/gm,
+      "Ruby lockfile version disagrees with gem",
+    ],
+  ],
+  java: [
+    [
+      "java/README.md",
+      /(<artifactId>calmlens-sdk<\/artifactId>\n\s*<version>)[^<]+(<\/version>)/,
+      "The Java README's install snippet disagrees with the SDK version",
+    ],
+    ["examples/marketplace-listing-java/pom.xml", manifests.java[1]],
+  ],
+};
+/** Every file the version synchronization reads or rewrites, besides each SDK's package.json. */
+export const versionedFiles = [
+  ...Object.values(manifests).map(([file]) => file),
+  ...Object.values(companions)
+    .flat()
+    .map(([file]) => file),
 ];
 export function replaceVersion(source, pattern, version) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`Invalid stable version: ${version}`);
@@ -32,38 +64,13 @@ export function syncVersions(directory, check = false) {
     if (check && updated !== source)
       throw new Error(`${file} disagrees with Changesets version ${version}`);
     if (!check) writeFileSync(path, updated);
-    if (language === "rust") {
-      for (const lockfile of ["rust/Cargo.lock", "examples/media-library-rust/Cargo.lock"]) {
-        const lock = resolve(directory, lockfile);
-        const contents = readFileSync(lock, "utf8");
-        const next = replaceVersion(
-          contents,
-          /(\[\[package\]\]\nname = "calmlens"\nversion = ")[^"]+(")/,
-          version,
-        );
-        if (check && contents !== next)
-          throw new Error("Rust lockfile version disagrees with manifest");
-        if (!check) writeFileSync(lock, next);
-      }
-    }
-    if (language === "ruby") {
-      const lock = resolve(directory, "examples/comment-thread-ruby/Gemfile.lock");
-      const contents = readFileSync(lock, "utf8");
-      const next = replaceVersion(contents, /^(\s+calmlens \()[^)]+(\))$/gm, version);
-      if (check && contents !== next) throw new Error("Ruby lockfile version disagrees with gem");
-      if (!check) writeFileSync(lock, next);
-    }
-    if (language === "java") {
-      const readme = resolve(directory, javaReadme[0]);
-      const contents = readFileSync(readme, "utf8");
-      const next = replaceVersion(contents, javaReadme[1], version);
-      if (check && contents !== next)
-        throw new Error("The Java README's install snippet disagrees with the SDK version");
-      if (!check) writeFileSync(readme, next);
-    }
-    if (language === "java" && !check) {
-      const example = resolve(directory, "examples/marketplace-listing-java/pom.xml");
-      writeFileSync(example, replaceVersion(readFileSync(example, "utf8"), pattern, version));
+    for (const [companion, companionPattern, disagreement] of companions[language] ?? []) {
+      if (check && !disagreement) continue;
+      const companionPath = resolve(directory, companion);
+      const contents = readFileSync(companionPath, "utf8");
+      const next = replaceVersion(contents, companionPattern, version);
+      if (check && contents !== next) throw new Error(disagreement);
+      if (!check) writeFileSync(companionPath, next);
     }
   }
 }

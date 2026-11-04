@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { versionedFiles } from "./version-sdks.mjs";
 
 test("Changesets versions all seven SDKs and generates native changelogs and a release plan", () => {
   const original = fileURLToPath(new URL("../", import.meta.url));
@@ -32,18 +33,7 @@ test("Changesets versions all seven SDKs and generates native changelogs and a r
       mkdirSync(join(root, lang), { recursive: true });
       cpSync(join(original, lang, "package.json"), join(root, lang, "package.json"));
     }
-    for (const file of [
-      "php/src/Version.php",
-      "python/pyproject.toml",
-      "ruby/lib/calmlens/version.rb",
-      "rust/Cargo.toml",
-      "rust/Cargo.lock",
-      "java/pom.xml",
-      "go/version.go",
-      "examples/marketplace-listing-java/pom.xml",
-      "examples/media-library-rust/Cargo.lock",
-      "examples/comment-thread-ruby/Gemfile.lock",
-    ]) {
+    for (const file of versionedFiles) {
       mkdirSync(join(root, file, ".."), { recursive: true });
       cpSync(join(original, file), join(root, file));
     }
