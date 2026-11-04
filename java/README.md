@@ -8,7 +8,7 @@ A synchronous, thread-safe Java 17+ client for [CalmLens](https://calmlens.com) 
 <dependency>
   <groupId>com.calmlens</groupId>
   <artifactId>calmlens-sdk</artifactId>
-  <version>0.18.3</version>
+  <version>0.19.0</version>
 </dependency>
 ```
 
