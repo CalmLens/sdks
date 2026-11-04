@@ -654,17 +654,10 @@ impl ServerClient {
             (Some(content), _) | (None, Some(content)) => content,
             (None, None) => return Err(invalid_payload("Content is required")),
         };
-        let mime = content
-            .mime_type
-            .split(';')
-            .next()
-            .unwrap_or("")
-            .trim()
-            .to_lowercase();
-        if REJECTED_UPLOAD_MIME_TYPES.contains(&mime.as_str()) {
-            return Err(Error::new(
-                ErrorCode::InvalidUploadMimeType,
-                format!("{mime} is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain."),
+        let mime = crate::contract_checks::normalize_upload_mime_type(&content.mime_type);
+        if !crate::contract_checks::is_accepted_upload_mime_type(&content.mime_type) {
+            return Err(crate::contract_checks::invalid_upload_mime_type(
+                &content.mime_type,
             ));
         }
         if multipart && content.part_number.is_some_and(|number| number != 1) {
@@ -972,17 +965,6 @@ fn check_direct_size(mime: &str, size: Option<u64>) -> Result<()> {
     }
     Ok(())
 }
-
-/// MIME types an upload cannot use: they name no concrete file type.
-const REJECTED_UPLOAD_MIME_TYPES: [&str; 7] = [
-    "application/octet-stream",
-    "multipart/form-data",
-    "multipart/mixed",
-    "multipart/alternative",
-    "multipart/related",
-    "multipart/signed",
-    "multipart/encrypted",
-];
 
 /// Text is small, so it keeps the API timeout; binary files may be arbitrarily large.
 fn upload_deadline(payload: &Payload) -> Deadline {

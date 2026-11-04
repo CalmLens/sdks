@@ -367,6 +367,23 @@ final class MockApi {
 
   private static JsonElement nullable(String value) { return value == null ? JsonNull.INSTANCE : new JsonPrimitive(value); }
 
+  /**
+   * Refuses {@code metadata} the API's schema refuses: it is null or a list of {@code {id, value}}
+   * objects with a string {@code id} and any JSON {@code value}.
+   */
+  private static void checkMetadata(JsonElement metadata) throws Failure {
+    if (metadata == null || metadata.isJsonNull()) return;
+    if (!metadata.isJsonArray()) throw Failure.validation("validation/invalid-type", "metadata");
+    JsonArray items = metadata.getAsJsonArray();
+    for (int index = 0; index < items.size(); index++) {
+      JsonElement item = items.get(index);
+      if (!item.isJsonObject()) throw Failure.validation("validation/invalid-type", "metadata." + index);
+      JsonElement id = item.getAsJsonObject().get("id");
+      if (id == null || !id.isJsonPrimitive() || !id.getAsJsonPrimitive().isString()) throw Failure.validation("validation/invalid-type", "metadata." + index + ".id");
+      if (!item.getAsJsonObject().has("value")) throw Failure.validation("validation/invalid-value", "metadata." + index + ".value");
+    }
+  }
+
   // ------------------------------------------------------------------ Routes
 
   private JsonElement dispatch(String method, List<String> parts, JsonObject q, JsonObject body, byte[] raw, String upload)
@@ -461,7 +478,11 @@ final class MockApi {
     // "part" the raw first part of a multipart upload.
     boolean rawUpload = upload.equals("content") || upload.equals("part"), multipart = upload.equals("part");
     JsonObject o = rawUpload ? q : body;
+    checkMetadata(o.get("metadata"));
     String mime = Objects.requireNonNullElse(str(o, "contentType"), "");
+    // Like the API: content and a first part must have a type it can moderate; a URL is exempt.
+    if (rawUpload && !CalmLensServerClient.isAcceptedUploadMimeType(mime))
+      throw new Failure(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, 400, CalmLensServerClient.rejectedUploadMimeTypeMessage(mime), Map.of("mimeType", mime));
     String url = rawUpload ? null : str(o, "url");
     String kind = url != null ? "website" : assetType(mime.toLowerCase(Locale.ROOT));
     boolean queue = bool(q, "queue"), last = !multipart || bool(q, "isFinal");
@@ -918,6 +939,15 @@ final class MockApi {
 
   private JsonElement assetRoute(String method, String id, String suffix, JsonObject q, JsonObject body, byte[] raw, long now)
       throws Failure, IOException {
+    // Like the API's schemas, which are checked before the asset is looked up.
+    if (method.equals("PATCH") && suffix.isEmpty()) {
+      checkMetadata(body.get("metadata"));
+      if (body.has("name") && body.get("name").isJsonNull()) throw Failure.validation("validation/invalid-type", "name");
+    }
+    if (method.equals("POST") && suffix.equals("signed-url"))
+      for (String key : List.of("viewerClaims", "resource", "lens", "transform", "expiresInSeconds"))
+        if (body.has(key) && body.get(key).isJsonNull())
+          throw Failure.validation(key.equals("resource") ? "validation/invalid-value" : "validation/invalid-type", key);
     JsonObject asset = asset(id);
     switch (method + " " + suffix) {
       case "GET ": return asset;
@@ -1802,6 +1832,18 @@ final class MockApi {
 
   private Transport.Response cdn(MockCalmLensServerClient.Request request, List<String> parts) {
     String identifier = parts.get(2), resource = parts.get(3);
+    // Like the CDN, the selector after the resource is read first, as sent (still percent-encoded),
+    // and lenses and transforms apply only to the rendered resource.
+    List<String> raw = new ArrayList<>();
+    for (String part : request.url().split("\\?", 2)[0].substring(cdnBase.length()).split("/")) if (!part.isEmpty()) raw.add(part);
+    Failure invalidTransform = new Failure("asset/invalid-transform", 400, "Invalid transform selector");
+    CalmLensServerClient.TransformSelector selector;
+    try {
+      selector = CalmLensServerClient.parseTransformSelector(String.join("/", raw.subList(4, raw.size())));
+    } catch (IllegalArgumentException invalid) {
+      return error(invalidTransform);
+    }
+    if (resource.equals("original") && (selector.lens() != null || selector.options() != null)) return error(invalidTransform);
     JsonObject asset = parts.get(1).equals(projectId) ? projectAssets().stream()
         .filter(a -> identifier.equals(str(a, "id")) || identifier.equals(str(a, "externalId"))).findFirst().orElse(null) : null;
     if (asset == null) return error(new Failure(ErrorCodes.ASSET_NOT_FOUND, 404, "Asset not found"));
@@ -1833,6 +1875,15 @@ final class MockApi {
     boolean isPrivate = !isPublic;
     if (isPrivate && !canDownload(str(asset, "folderId"), apiKey))
       return error(new Failure("asset/api-key-missing-permission", 403, "This API key needs assets:download permission for this asset’s folder."));
+    // Then the options, checked against the transform schema once the asset may be served.
+    if (selector.options() != null) {
+      CalmLensServerClient.TransformProblems problems = CalmLensServerClient.checkTransformOptions(selector.options());
+      if (!problems.isEmpty()) {
+        List<String> keys = new ArrayList<>(problems.unknownKeys());
+        keys.addAll(problems.invalidKeys());
+        return error(new Failure("asset/invalid-transform-options", 400, "Invalid transform options: " + String.join(", ", keys)));
+      }
+    }
     String type = stored.type() == null || stored.type().isEmpty() ? "application/octet-stream" : stored.type();
     boolean image = "image".equals(str(asset, "type"));
     List<String> headers = new ArrayList<>(List.of(

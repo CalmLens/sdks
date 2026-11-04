@@ -1317,7 +1317,7 @@ public final class Models {
   /** Options for {@code assets.update}; unset fields keep their value. */
   public static final class UpdateAsset {
     private String assetId;
-    private Patch<String> name;
+    private String name;
     private Patch<String> description;
     private Patch<List<String>> tags;
     private Patch<List<MetadataItem>> metadata;
@@ -1330,7 +1330,8 @@ public final class Models {
     /** @param assetId the asset to update */
     public UpdateAsset(String assetId) { this.assetId = assetId; }
     public UpdateAsset assetId(String value) { assetId = value; return this; }
-    public UpdateAsset name(Patch<String> value) { name = value; return this; }
+    /** @param value the new name; an asset always has one, so it can't be cleared @return these options */
+    public UpdateAsset name(String value) { name = value; return this; }
     public UpdateAsset description(Patch<String> value) { description = value; return this; }
     public UpdateAsset tags(Patch<List<String>> value) { tags = value; return this; }
     public UpdateAsset metadata(Patch<List<MetadataItem>> value) { metadata = value; return this; }

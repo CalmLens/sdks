@@ -56,7 +56,7 @@ func TestMockResumesAnUploadWithTheSameKeyAfterAPartFails(t *testing.T) {
 	}
 	ctx := context.Background()
 	file := distinctBytes(12 * mib)
-	options := calmlens.SubmitAssetOptions{Name: "archive.zip", Content: &calmlens.Content{Type: "application/zip", Bytes: file}, ProcessingOptions: keep, IdempotencyKey: "upload-3"}
+	options := calmlens.SubmitAssetOptions{Name: "report.pdf", Content: &calmlens.Content{Type: "application/pdf", Bytes: file}, ProcessingOptions: keep, IdempotencyKey: "upload-3"}
 	if err = c.FailNextRequest(RequestFailure{Code: FailureTransportError, Operation: "assets.uploadPart"}); err != nil {
 		t.Fatal(err)
 	}

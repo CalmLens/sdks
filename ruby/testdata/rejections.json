@@ -85,6 +85,68 @@
     "error": "sdk/invalid-argument"
   },
   {
+    "name": "structured transform in the earlier { type, options } shape",
+    "operation": "cdn.serve",
+    "options": {
+      "assetIdentifier": "asset-1",
+      "transform": {
+        "type": "imageTransform",
+        "options": {
+          "format": "webp",
+          "width": 640
+        }
+      }
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL with an unknown transform option",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "transform": {
+        "width": 640,
+        "bogus": 1
+      }
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL with a transform option out of range",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "transform": {
+        "width": 0
+      }
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "upload of a type CalmLens can't moderate",
+    "operation": "assets.create",
+    "options": {
+      "name": "archive.zip",
+      "content": {
+        "base64": "aGVsbG8=",
+        "type": "application/zip"
+      }
+    },
+    "error": "upload/invalid-mime-type"
+  },
+  {
+    "name": "classification of an unknown type",
+    "operation": "assets.classify",
+    "options": {
+      "name": "x.bin",
+      "content": {
+        "base64": "aGVsbG8=",
+        "type": "application/x-made-up"
+      }
+    },
+    "error": "upload/invalid-mime-type"
+  },
+  {
     "name": "empty text",
     "operation": "text.classify",
     "options": {

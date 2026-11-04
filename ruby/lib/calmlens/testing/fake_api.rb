@@ -240,6 +240,47 @@ module CalmLens
       # A request the API's schema refuses: `validation/<issue>` with HTTP 400 and the field.
       def invalid!(code, path) = raise(Failure.new(code, "Invalid #{path}", details: { 'path' => path }, status: 400))
 
+      # Like the API's schema (METADATA_ITEM_SCHEMA): metadata is nil or a list of `{id, value}`
+      # Hashes with a String `id` and any JSON `value`.
+      def check_metadata(metadata)
+        return if metadata.nil?
+
+        invalid!('validation/invalid-type', 'metadata') unless metadata.is_a?(Array)
+        metadata.each_with_index do |item, index|
+          invalid!('validation/invalid-type', "metadata.#{index}") unless item.is_a?(Hash)
+          invalid!('validation/invalid-type', "metadata.#{index}.id") unless item['id'].is_a?(String)
+          invalid!('validation/invalid-value', "metadata.#{index}.value") unless item.key?('value')
+        end
+      end
+
+      # Like the API's schema, checked before the asset is looked up: asset updates take no null
+      # name, and signed URLs no null field.
+      def check_asset_body(method, action, json)
+        case [method, action]
+        in ['PATCH', nil]
+          check_metadata(json['metadata'])
+          invalid!('validation/invalid-type', 'name') if json.key?('name') && json['name'].nil?
+        in ['POST', 'signed-url']
+          %w[viewerClaims resource lens transform expiresInSeconds].each do |key|
+            next unless json.key?(key) && json[key].nil?
+
+            invalid!(key == 'resource' ? 'validation/invalid-value' : 'validation/invalid-type', key)
+          end
+        else nil
+        end
+      end
+
+      # Like the API: an upload's metadata is checked, then its MIME type, which must be one the
+      # API can moderate (`upload/invalid-mime-type` with `details.mimeType`).
+      def check_upload(options)
+        check_metadata(options['metadata'])
+        type = options['contentType']
+        return if type.nil? || Internal.accepted_upload_mime_type?(type)
+
+        fail!(ErrorCodes::INVALID_UPLOAD_MIME_TYPE, "#{type} is not a valid upload file type",
+              details: { 'mimeType' => type })
+      end
+
       # Like the API's query schema: an integer from 1 to `max`.
       def check_range(value, path, max)
         invalid!('validation/too-small', path) if !value.is_a?(Numeric) || value < 1
@@ -253,10 +294,11 @@ module CalmLens
         parts = uri.path.split('/').reject(&:empty?).map { |part| URI.decode_www_form_component(part) }
         query = URI.decode_www_form(uri.query.to_s).to_h.to_h { |key, value| [key, query_value(key, value)] }
         content_type = header(headers, 'Content-Type')
-        json = content_type == 'application/json' && body ? JSON.parse(body) : {}
+        upload = header(headers, 'X-CalmLens-Upload')
+        # A raw upload's body is the file itself, whatever its type.
+        json = content_type == 'application/json' && body && upload.nil? ? JSON.parse(body) : {}
         # HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
         key = header(headers, 'Idempotency-Key')&.to_s&.gsub(/\A[ \t\r\n]+|[ \t\r\n]+\z/, '')
-        upload = header(headers, 'X-CalmLens-Upload')
         return dispatch(method, parts, query, json, body, upload) unless key && method == 'POST'
 
         fail!(ErrorCodes::INVALID_IDEMPOTENCY_KEY) unless key.match?(IDEMPOTENCY_KEY)
@@ -507,6 +549,7 @@ module CalmLens
       end
 
       def create_asset(options, queue, url: nil, data: nil, open: false)
+        check_upload(options)
         check_folder(options['folderId']) if options['folderId']
         if options['externalId'] && project_assets.any? { |item| item['externalId'] == options['externalId'] }
           fail!(ErrorCodes::DUPLICATE_EXTERNAL_ID)
@@ -567,6 +610,7 @@ module CalmLens
       # In the API's order: a declared total, then a single final part as the whole upload, then the
       # part itself. The queue mode and declared total are saved with an open upload.
       def start_multipart(query, data)
+        check_upload(query)
         total = query['totalSizeInBytes']
         type = kind(query['contentType'].to_s, nil)
         final = query['isFinal'] == true
@@ -705,6 +749,7 @@ module CalmLens
 
       def asset(method, parts, query, json, body)
         id = parts[1]
+        check_asset_body(method, parts[2], json)
         item = @state.assets[id]
         fail!(ErrorCodes::ASSET_NOT_FOUND) unless item && item['projectId'] == @project_id
         case [method, parts[2]]
@@ -1168,13 +1213,27 @@ module CalmLens
       # private asset needs an API key with `assets:download` for its folder.
       def serve(method, relative)
         path, query = relative.split('#', 2).first.split('?', 2)
-        segments = path.split('/').reject(&:empty?).map { |part| URI.decode_www_form_component(part) }
-        _, project, identifier, resource = segments
+        raw_segments = path.split('/').reject(&:empty?)
+        _, project, identifier, resource = raw_segments.map { |part| URI.decode_www_form_component(part) }
+        # Like the CDN, the selector after the resource is read first, and lenses and transforms
+        # apply only to the rendered resource.
+        begin
+          lens, options = TransformRules.parse_selector(raw_segments.drop(4).join('/'))
+        rescue ArgumentError
+          return invalid_transform
+        end
+        return invalid_transform if resource == 'original' && (lens || options)
+
         item = project == @project_id && project_assets.find { |asset| [asset['id'], asset['externalId']].include?(identifier) }
         return error('asset/not-found', 'Asset not found', status: 404) unless item && RESOURCES.include?(resource)
-
         return placeholder(method, item) if resource == 'placeholder'
 
+        deliver(method, item, URI.decode_www_form(query.to_s).to_h, options)
+      end
+
+      # Serves a found asset's content after the delivery, age and access checks, then the
+      # transform options' schema check.
+      def deliver(method, item, params, options)
         moderation = item['classification']['moderation']['status']
         stored = @state.content[item['id']]
         if stored.nil? || item['upload']['status'] == 'uploading' || %w[blocked purged].include?(moderation) ||
@@ -1182,9 +1241,7 @@ module CalmLens
           return not_available
         end
 
-        params = URI.decode_www_form(query.to_s).to_h
-        opted_in = viewer_age_confirmed?(params)
-        if moderation == 'age-restricted' && !opted_in
+        if moderation == 'age-restricted' && !viewer_age_confirmed?(params)
           return error('viewer/age-confirmation-required', 'Age confirmation required',
                        status: 403)
         end
@@ -1194,6 +1251,9 @@ module CalmLens
           return error('asset/api-key-missing-permission',
                        'This API key needs assets:download permission for this asset’s folder.', status: 403)
         end
+
+        refused = options ? TransformRules.check(options).flatten : []
+        return error('asset/invalid-transform-options', "Invalid transform options: #{refused.join(', ')}", status: 400) if refused.any?
 
         type = stored['type'].to_s.empty? ? 'application/octet-stream' : stored['type']
         cdn_response(method, stored['parts'].sort.map(&:last).join.b,
@@ -1209,6 +1269,8 @@ module CalmLens
         headers['Cache-Control'] = 'private, no-store' if params.key?('viewerClaims')
         headers
       end
+
+      def invalid_transform = error('asset/invalid-transform', 'Invalid transform selector', status: 400)
 
       def not_available = error('asset/not-available', 'Asset is not available', status: 403)
 

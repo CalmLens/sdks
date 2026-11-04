@@ -45,6 +45,46 @@ describe("transform options", () => {
       expect(serializeTransform(options)).toBe(selector);
     });
   }
+  const {
+    invalid,
+  }: {
+    invalid: { options: Record<string, unknown>; unknownKeys: string[]; invalidKeys: string[] }[];
+  } = testdata("transform-options.json");
+  for (const { options, unknownKeys, invalidKeys } of invalid) {
+    test(`refuses ${JSON.stringify(options)}, naming the keys the CDN refuses`, () => {
+      const client = new server.CalmLensServerClient({ apiKey: "key", projectId: "project-1" });
+      let error: unknown;
+      try {
+        client.cdn.getAssetUrl({ assetIdentifier: "asset-1", transform: options as never });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(CalmLensError);
+      expect((error as CalmLensError).code).toBe("sdk/invalid-argument");
+      expect((error as CalmLensError).details).toEqual({ unknownKeys, invalidKeys });
+      for (const key of [...unknownKeys, ...invalidKeys]) {
+        expect((error as CalmLensError).message).toContain(key);
+      }
+    });
+  }
+});
+
+describe("upload MIME types", () => {
+  const { refused }: { refused: string[] } = testdata("upload-mime-types.json");
+  for (const type of refused) {
+    test(`refuses an upload of ${type} before sending it`, async () => {
+      const client = new server.CalmLensServerClient({
+        apiKey: "key",
+        projectId: "project-1",
+        fetch: async () => {
+          throw new Error("sent a request");
+        },
+      });
+      await expect(
+        client.assets.create({ name: "x", content: { base64: "aGVsbG8=", type } }),
+      ).rejects.toMatchObject({ code: "upload/invalid-mime-type", details: { mimeType: type } });
+    });
+  }
 });
 
 // ---- Shared mock behaviour scenarios ------------------------------------------------------

@@ -1293,6 +1293,65 @@
     "operation": "assets.createSignedUrl",
     "options": {
       "assetId": "asset-1",
+      "viewerClaims": null,
+      "resource": null,
+      "lens": null,
+      "transform": null,
+      "expiresInSeconds": null
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/signed-url",
+      "query": {},
+      "body": {
+        "expiresInSeconds": 900
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/signed",
+      "expiresAt": 1760000900000
+    }
+  },
+  {
+    "operation": "assets.update",
+    "options": {
+      "assetId": "asset-1",
+      "name": null,
+      "description": null,
+      "visibility": null
+    },
+    "request": {
+      "method": "PATCH",
+      "path": "/v1/assets/asset-1",
+      "query": {},
+      "body": {
+        "description": null,
+        "visibility": null
+      }
+    },
+    "response": {
+      "id": "asset-1",
+      "content": {
+        "status": "removed",
+        "removalReason": "retention"
+      },
+      "upload": {
+        "status": "completed"
+      },
+      "classification": {
+        "status": "completed",
+        "moderation": {
+          "status": "allowed",
+          "flaggedCategories": [],
+          "regions": []
+        }
+      }
+    }
+  },
+  {
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
       "transform": {
         "width": 640,
         "border": {

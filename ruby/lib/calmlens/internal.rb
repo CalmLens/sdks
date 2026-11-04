@@ -79,6 +79,16 @@ module CalmLens
       value.is_a?(Numeric) && value.real? && value.to_f.finite? && value.positive?
     end
 
+    # Whether the API accepts an upload of this MIME type: an image, audio, video, text, document or
+    # website type, not a container such as `application/octet-stream`. It refuses any other type
+    # with `upload/invalid-mime-type`.
+    def accepted_upload_mime_type?(type)
+      mime = type.to_s.split(';', 2).first.to_s.strip.downcase
+      return false if UPLOAD_MIME_REJECTED.include?(mime)
+
+      mime.start_with?(*UPLOAD_MIME_PREFIXES) || mime.end_with?(*UPLOAD_MIME_SUFFIXES) || UPLOAD_MIME_TYPES.include?(mime)
+    end
+
     # Fetches a required option.
     def required(options, key, code = SdkErrorCodes::INVALID_ARGUMENT)
       raise invalid("#{key} is required", code) unless options.key?(key)

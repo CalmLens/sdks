@@ -510,10 +510,11 @@ module CalmLens
 
     def check_mime(type)
       mime = type.to_s.split(';').first.to_s.strip.downcase
-      if mime.empty? || mime == 'application/octet-stream' || mime.start_with?('multipart/')
-        raise Internal.invalid("#{mime} is not a valid upload file type. Uploads must use a concrete file MIME type " \
-                               'that CalmLens can store and process, such as image/png, image/jpeg, ' \
-                               'application/pdf, or text/plain.', ErrorCodes::INVALID_UPLOAD_MIME_TYPE)
+      unless Internal.accepted_upload_mime_type?(mime)
+        raise InvalidArgumentError.new(ErrorCodes::INVALID_UPLOAD_MIME_TYPE,
+                                       "#{mime} is not a valid upload file type. Uploads must use a concrete file MIME " \
+                                       'type that CalmLens can store and process, such as image/png, image/jpeg, ' \
+                                       'application/pdf, or text/plain.', details: { 'mimeType' => type })
       end
       raise Internal.invalid('Content type cannot contain line breaks') unless type.match?(Internal::HEADER_VALUE)
 

@@ -62,5 +62,28 @@ module CalmLens
         uploadPresetId visibility
       ].freeze
     }.freeze
+
+    # The option keys each method sends as null when given nil; any other option given as nil
+    # is left out, as the API refuses null for it.
+    NULLABLE_OPTION_KEYS = {
+      'assets.classify' => %w[
+        authorId context description externalId folderId metadata processingOptions uploadPresetId visibility
+      ].freeze,
+      'assets.create' => %w[
+        authorId context description externalId folderId metadata processingOptions uploadPresetId visibility
+      ].freeze,
+      'assets.each' => %w[filter folderId].freeze,
+      'assets.list' => %w[filter folderId].freeze,
+      'assets.move' => %w[folderId].freeze,
+      'assets.update' => %w[description externalId externalUrl metadata tags visibility].freeze,
+      'folders.create' => %w[parentId].freeze,
+      'folders.move' => %w[parentId].freeze,
+      'hashLists.addEntry' => %w[label quality].freeze,
+      'hashLists.create' => %w[description].freeze,
+      'hashLists.update' => %w[description].freeze,
+      'text.classify' => %w[
+        authorId context description externalId folderId metadata processingOptions uploadPresetId visibility
+      ].freeze
+    }.freeze
   end
 end

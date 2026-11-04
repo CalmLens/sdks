@@ -57,3 +57,22 @@ export const APP_OPTION_KEYS: Readonly<Record<string, readonly string[]>> = {
   "assets.retrieve": ["assetId"],
   "assets.uploadPart": ["assetId", "part", "queue"],
 };
+
+/**
+ * The option keys each `CalmLensServerClient` method sends as `null` when given `null`; any
+ * other option given as `null` is left out, as the API refuses `null` for it.
+ */
+export const NULLABLE_OPTION_KEYS: Readonly<Record<string, readonly string[]>> = {
+  "assets.classify": ["authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "uploadPresetId", "visibility"],
+  "assets.create": ["authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "uploadPresetId", "visibility"],
+  "assets.iterate": ["filter", "folderId"],
+  "assets.list": ["filter", "folderId"],
+  "assets.move": ["folderId"],
+  "assets.update": ["description", "externalId", "externalUrl", "metadata", "tags", "visibility"],
+  "folders.create": ["parentId"],
+  "folders.move": ["parentId"],
+  "hashLists.addEntry": ["label", "quality"],
+  "hashLists.create": ["description"],
+  "hashLists.update": ["description"],
+  "text.classify": ["authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "uploadPresetId", "visibility"],
+};

@@ -96,14 +96,14 @@ describe("automatic multipart uploads", () => {
     const client = new CalmLensServerClient({ apiKey: "key", projectId, fetch });
     await client.assets.create({
       name: "exact.bin",
-      content: { uint8Array: fileOf(8 * MiB), type: "application/zip" },
+      content: { uint8Array: fileOf(8 * MiB), type: "application/pdf" },
     });
     const bytes = fileOf(9 * MiB);
     await client.assets.create({
       name: "stream.bin",
       content: {
         data: new Response(bytes).body!,
-        type: "application/zip",
+        type: "application/pdf",
         sizeInBytes: bytes.byteLength,
       },
     });
@@ -131,8 +131,8 @@ describe("automatic multipart uploads", () => {
       maxRetries: 1,
     });
     const result = await client.assets.create({
-      name: "archive.zip",
-      content: { data: new Blob([fileOf(16 * MiB)]), type: "application/zip" },
+      name: "report.pdf",
+      content: { data: new Blob([fileOf(16 * MiB)]), type: "application/pdf" },
       idempotencyKey: "upload-2",
     });
     expect(result.upload.status).toBe("completed");
@@ -232,8 +232,8 @@ describe("automatic multipart uploads", () => {
       },
     });
     const options = {
-      name: "archive.zip",
-      content: { uint8Array: fileOf(12 * MiB), type: "application/zip" },
+      name: "report.pdf",
+      content: { uint8Array: fileOf(12 * MiB), type: "application/pdf" },
       idempotencyKey: "upload-3",
     };
     client.failNextRequest("transport-error", { operation: "assets.uploadPart" });

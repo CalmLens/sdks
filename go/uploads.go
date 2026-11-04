@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/CalmLens/sdks/go/internal/contract"
 )
 
 // payload validates content and returns its reader and size (nil when unknown).
@@ -230,9 +232,13 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	if multipart {
 		content = options.Part
 	}
-	mime := strings.ToLower(strings.TrimSpace(strings.Split(content.Type, ";")[0]))
-	if mime == "" || mime == "application/octet-stream" || strings.HasPrefix(mime, "multipart/") {
-		return nil, invalid(CodeInvalidUploadMimeType, mime+" is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.")
+	mime := normalizeUploadMimeType(content.Type)
+	if !acceptedUploadMimeType(content.Type) {
+		return nil, &Error{
+			Code:    CodeInvalidUploadMimeType,
+			Message: mime + " is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.",
+			Details: JSON{"mimeType": content.Type},
+		}
 	}
 	if multipart && content.PartNumber > 1 {
 		return nil, invalid(CodeUseUploadPart, "Use uploadPart for multipart upload parts after the first part")
@@ -419,3 +425,38 @@ func uploaded(asset *Asset) (*Asset, error) {
 	}
 	return asset, nil
 }
+
+// normalizeUploadMimeType lower-cases a MIME type and drops its parameters, as the API compares it.
+func normalizeUploadMimeType(mimeType string) string {
+	return strings.ToLower(strings.TrimSpace(strings.Split(mimeType, ";")[0]))
+}
+
+// acceptedUploadMimeType reports whether the API accepts an upload of this MIME type: an image,
+// audio, video, text, document or website type, not a container such as
+// application/octet-stream. The API refuses any other type with upload/invalid-mime-type.
+func acceptedUploadMimeType(mimeType string) bool {
+	mime := normalizeUploadMimeType(mimeType)
+	for _, rejected := range uploadMimeRejected {
+		if mime == rejected {
+			return false
+		}
+	}
+	for _, prefix := range uploadMimePrefixes {
+		if strings.HasPrefix(mime, prefix) {
+			return true
+		}
+	}
+	for _, suffix := range uploadMimeSuffixes {
+		if strings.HasSuffix(mime, suffix) {
+			return true
+		}
+	}
+	for _, accepted := range uploadMimeTypes {
+		if mime == accepted {
+			return true
+		}
+	}
+	return false
+}
+
+func init() { contract.AcceptedUploadMimeType = acceptedUploadMimeType }

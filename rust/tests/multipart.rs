@@ -120,8 +120,8 @@ async fn a_file_over_the_part_size_is_read_part_by_part() {
     let asset = mock
         .assets()
         .create(kept(
-            "archive.zip",
-            Content::file(&path, "application/zip").unwrap(),
+            "report.pdf",
+            Content::file(&path, "application/pdf").unwrap(),
             "file-1",
         ))
         .await
@@ -147,8 +147,8 @@ async fn a_failed_part_resumes_with_the_same_key() {
     let file = file_of(12 * MIB);
     let options = || {
         kept(
-            "archive.zip",
-            Content::bytes(file.clone(), "application/zip"),
+            "report.pdf",
+            Content::bytes(file.clone(), "application/pdf"),
             "upload-2",
         )
     };
@@ -192,8 +192,8 @@ async fn a_part_the_api_already_has_is_skipped() {
     let asset = mock
         .assets()
         .create(kept(
-            "archive.zip",
-            Content::bytes(file.clone(), "application/zip"),
+            "report.pdf",
+            Content::bytes(file.clone(), "application/pdf"),
             "upload-3",
         ))
         .await
@@ -248,11 +248,11 @@ async fn streams_and_content_of_one_part_go_in_one_request() {
     let streamed = mock
         .assets()
         .create(kept(
-            "stream.zip",
+            "stream.pdf",
             Content::stream(
                 futures_util::stream::iter(chunks),
                 file.len() as u64,
-                "application/zip",
+                "application/pdf",
             ),
             "stream-1",
         ))
@@ -260,8 +260,8 @@ async fn streams_and_content_of_one_part_go_in_one_request() {
         .unwrap();
     mock.assets()
         .create(SubmitAsset::new(
-            "exact.zip",
-            Content::bytes(file_of(8 * MIB), "application/zip"),
+            "exact.pdf",
+            Content::bytes(file_of(8 * MIB), "application/pdf"),
         ))
         .await
         .unwrap();

@@ -334,7 +334,10 @@ func (spec decisionSpec) build() *Decision {
 
 type mockScenario struct {
 	Name string
-	Mock struct {
+	// UntypedArgs, when set, says why the scenario's arguments can't be held by typed options:
+	// Go skips it.
+	UntypedArgs string `json:"untypedArgs"`
+	Mock        struct {
 		Moderate *struct {
 			Queued   *decisionSpec
 			Analyzed *decisionSpec
@@ -794,6 +797,9 @@ func TestSharedMockScenarios(t *testing.T) {
 	fixture := fixtures.Read[struct{ Scenarios []mockScenario }](t, "mock-scenarios.json")
 	for _, scenario := range fixture.Scenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
+			if scenario.UntypedArgs != "" {
+				t.Skip(scenario.UntypedArgs)
+			}
 			options := Options{ProjectID: "project-1", APIKey: CreateMockAPIKey(scenario.Mock.APIKeyGrants), MaxRetries: scenario.Mock.MaxRetries}
 			// Records what Moderate was given, and answers by name, then by queue mode for uploads.
 			moderateCalls := []map[string]any{}

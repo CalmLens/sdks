@@ -39,6 +39,7 @@ final class Transforms
         if (!is_array($value) || ($value !== [] && array_is_list($value))) {
             Values::invalid('Transform options must be an object');
         }
+        self::assertValid($value);
         $pairs = [];
         self::append($pairs, '', $value);
         if ($pairs === []) {
@@ -79,6 +80,188 @@ final class Transforms
             }
             $pairs[] = $name . '=' . rawurlencode($text);
         }
+    }
+
+    /**
+     * Checks transform options against the image transform schema, as the CDN does, and returns
+     * the dotted keys it doesn't know and those whose values it refuses (or that are required and
+     * missing). Null options are left out of a selector, so they are not checked.
+     *
+     * @return array{unknownKeys: list<string>, invalidKeys: list<string>}
+     */
+    public static function check(array $options): array
+    {
+        static $schema = null;
+        $schema ??= json_decode(TransformSchema::JSON, true, 512, JSON_THROW_ON_ERROR);
+        $found = ['unknownKeys' => [], 'invalidKeys' => []];
+        self::checkValue($schema, $options, '', $found);
+        return $found;
+    }
+
+    private static function checkValue(array $schema, mixed $value, string $key, array &$found): void
+    {
+        if ($value instanceof \stdClass) {
+            $value = (array) $value;
+        }
+        $rule = $schema;
+        if (isset($schema['oneOf'])) {
+            $rule = null;
+            foreach ($schema['oneOf'] as $branch) {
+                if (self::hasType($branch['type'] ?? null, $value)) {
+                    $rule = $branch;
+                    break;
+                }
+            }
+        }
+        if ($rule === null || !self::hasType($rule['type'] ?? null, $value)
+            || (isset($rule['enum']) && !self::inEnum($value, $rule['enum']))
+            || (isset($rule['minimum']) && $value < $rule['minimum'])
+            || (isset($rule['maximum']) && $value > $rule['maximum'])) {
+            $found['invalidKeys'][] = $key;
+            return;
+        }
+        if (($rule['type'] ?? null) !== 'object') {
+            return;
+        }
+        $path = fn (string $name) => $key === '' ? $name : "$key.$name";
+        foreach ($rule['required'] ?? [] as $name) {
+            if (($value[$name] ?? null) === null) {
+                $found['invalidKeys'][] = $path($name);
+            }
+        }
+        $names = array_map('strval', array_keys($value));
+        sort($names, SORT_STRING);
+        foreach ($names as $name) {
+            if ($value[$name] === null) {
+                continue;
+            }
+            if (isset($rule['properties'][$name])) {
+                self::checkValue($rule['properties'][$name], $value[$name], $path($name), $found);
+            } else {
+                $found['unknownKeys'][] = $path($name);
+            }
+        }
+    }
+
+    private static function hasType(?string $type, mixed $value): bool
+    {
+        return match ($type) {
+            'object' => is_array($value) && ($value === [] || !array_is_list($value)),
+            'string' => is_string($value),
+            'boolean' => is_bool($value),
+            'number' => is_int($value) || (is_float($value) && is_finite($value)),
+            'integer' => is_int($value) || (is_float($value) && is_finite($value) && floor($value) === $value),
+            default => true,
+        };
+    }
+
+    /** Whether `$value` is one of `$enum`, comparing numbers by value as JavaScript does (90.0 is 90). */
+    private static function inEnum(mixed $value, array $enum): bool
+    {
+        foreach ($enum as $option) {
+            if ($option === $value || ((is_int($value) || is_float($value)) && (is_int($option) || is_float($option)) && $option == $value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Fails with `sdk/invalid-argument` naming each transform option the CDN would refuse. */
+    private static function assertValid(array $options): void
+    {
+        ['unknownKeys' => $unknown, 'invalidKeys' => $invalid] = self::check($options);
+        if ($unknown === [] && $invalid === []) {
+            return;
+        }
+        $problems = [];
+        if ($unknown !== []) {
+            $problems[] = 'unknown option' . (count($unknown) > 1 ? 's ' : ' ') . implode(', ', $unknown);
+        }
+        if ($invalid !== []) {
+            $problems[] = 'invalid value' . (count($invalid) > 1 ? 's' : '') . ' for ' . implode(', ', $invalid);
+        }
+        Values::invalid('Transform options are invalid: ' . implode('; ', $problems)
+            . ". Pass the options themselves, such as ['width' => 640, 'format' => 'webp'].", details: ['unknownKeys' => $unknown, 'invalidKeys' => $invalid]);
+    }
+
+    /**
+     * Reads a CDN selector, the path segment after `/rendered` as sent (still percent-encoded), as
+     * the CDN does: an optional first `@lens`, then `key=value` options with dotted keys for nested
+     * ones (a bare key is true). Values are numbers, true, false, hex colours (`#` added) for colour
+     * options, or text. Returns null for anything the CDN refuses as `asset/invalid-transform`.
+     * Used by MockServerClient's CDN.
+     *
+     * @return ?array{lens: ?string, options: ?array<string, mixed>}
+     */
+    public static function parse(string $selector): ?array
+    {
+        if ($selector === '') {
+            return ['lens' => null, 'options' => null];
+        }
+        if (str_contains($selector, '/')) {
+            return null;
+        }
+        // Like decodeURIComponent: a malformed escape or bytes that aren't UTF-8 are refused.
+        $decode = static function (string $text): ?string {
+            if (preg_match('/%(?![0-9a-fA-F]{2})/', $text)) {
+                return null;
+            }
+            $decoded = rawurldecode($text);
+            return mb_check_encoding($decoded, 'UTF-8') ? $decoded : null;
+        };
+        $entries = explode(',', $selector);
+        $lens = null;
+        if (str_starts_with($entries[0], '@')) {
+            $lens = $decode(substr(array_shift($entries), 1));
+            if ($lens === null || !preg_match('/^[a-z0-9-]{1,50}$/D', $lens)) {
+                return null;
+            }
+        }
+        if ($entries === []) {
+            return ['lens' => $lens, 'options' => null];
+        }
+        $options = [];
+        foreach ($entries as $entry) {
+            if ($entry === '' || str_starts_with($entry, '@')) {
+                return null;
+            }
+            $separator = strpos($entry, '=');
+            $key = $separator === false ? $entry : substr($entry, 0, $separator);
+            $parts = explode('.', $key);
+            foreach ($parts as $part) {
+                if (!preg_match(self::OPTION_NAME, $part)) {
+                    return null;
+                }
+            }
+            $value = true;
+            if ($separator !== false) {
+                $text = $decode(substr($entry, $separator + 1));
+                if ($text === null || $text === '') {
+                    return null;
+                }
+                $value = match (true) {
+                    in_array($key, self::COLOUR_KEYS, true) && preg_match(self::HEX_COLOUR, "#$text") === 1 => '#' . strtolower($text),
+                    preg_match('/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/D', $text) === 1 => 0 + $text,
+                    $text === 'true', $text === 'false' => $text === 'true',
+                    default => $text,
+                };
+            }
+            $target = &$options;
+            foreach (array_slice($parts, 0, -1) as $part) {
+                if (array_key_exists($part, $target) && !is_array($target[$part])) {
+                    return null;
+                }
+                $target[$part] ??= [];
+                $target = &$target[$part];
+            }
+            $last = end($parts);
+            if (array_key_exists($last, $target)) {
+                return null;
+            }
+            $target[$last] = $value;
+            unset($target);
+        }
+        return ['lens' => $lens, 'options' => $options];
     }
 
     /** The selector as a path segment: a selector string is encoded like JavaScript's encodeURI. */

@@ -9,7 +9,6 @@ import { selectModerationContextItems } from "../contract/ModerationContextLimit
 import {
   DOMAIN,
   getRejectedUploadMimeTypeError,
-  isRejectedUploadMimeType,
   MAX_DIRECT_IMAGE_UPLOAD_BYTES,
   MAX_IMAGE_UPLOAD_BYTES,
   MAX_NON_IMAGE_UPLOAD_BYTES,
@@ -26,7 +25,7 @@ import type {
   UploadAssetPartOptions,
   UploadedAsset,
 } from "./CalmLensTypes";
-import { randomUuid, stringifyQuery } from "./CalmLensUtils";
+import { isAcceptedUploadMimeType, randomUuid, stringifyQuery } from "./CalmLensUtils";
 
 // Requests, uploads and response checks that `CalmLensServerClient` and `CalmLensAppClient`
 // share. Each client keeps one `CalmLensConnection` privately, so credentials stay hidden.
@@ -138,7 +137,7 @@ const setOptionalQueryValue = (params: URLSearchParams, key: string, value: unkn
 };
 
 const assertValidUploadMimeType = (mimeType: string) => {
-  if (isRejectedUploadMimeType(mimeType)) {
+  if (!isAcceptedUploadMimeType(mimeType)) {
     throw new CalmLensError(API_ERROR_CODES.INVALID_UPLOAD_MIME_TYPE, {
       message: getRejectedUploadMimeTypeError(mimeType),
       details: { mimeType },

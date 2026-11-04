@@ -42,11 +42,27 @@ module CalmLens
     def serialize(value)
       raise Internal.invalid('Transform options must be a Hash') unless value.is_a?(Hash)
 
+      assert_valid(value)
       pairs = []
       sorted_options(value).each { |key, item| append_pairs(pairs, key, item) }
       raise Internal.invalid('A transform needs at least one option') if pairs.empty?
 
       pairs.join(',')
+    end
+
+    # Raises `sdk/invalid-argument` naming each transform option the CDN would refuse, with
+    # `details` `{'unknownKeys', 'invalidKeys'}`.
+    def assert_valid(options)
+      unknown, invalid = TransformRules.check(options)
+      return if unknown.empty? && invalid.empty?
+
+      problems = []
+      problems << "unknown option#{'s' if unknown.size > 1} #{unknown.join(', ')}" unless unknown.empty?
+      problems << "invalid value#{'s' if invalid.size > 1} for #{invalid.join(', ')}" unless invalid.empty?
+      raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT,
+                                     "Transform options are invalid: #{problems.join('; ')}. Pass the options " \
+                                     "themselves, such as { width: 640, format: 'webp' }.",
+                                     details: { 'unknownKeys' => unknown, 'invalidKeys' => invalid })
     end
 
     def sorted_options(options, prefix = '')

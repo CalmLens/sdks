@@ -8605,6 +8605,714 @@
           }
         }
       ]
+    },
+    {
+      "name": "metadata must be a list of { id, value } items, as the API's schema requires",
+      "mock": {},
+      "untypedArgs": "Metadata that isn't a list of { id, value } items can't be held by the SDK's option types.",
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            },
+            "metadata": {
+              "authorId": "alice"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-type",
+              "status": 400,
+              "details": {
+                "path": "metadata"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            },
+            "metadata": "{\"authorId\":\"alice\"}"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-type",
+              "status": 400,
+              "details": {
+                "path": "metadata"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            },
+            "metadata": [
+              "source"
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-type",
+              "status": 400,
+              "details": {
+                "path": "metadata.0"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            },
+            "metadata": [
+              {
+                "value": "app"
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-type",
+              "status": 400,
+              "details": {
+                "path": "metadata.0.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            },
+            "metadata": [
+              {
+                "id": 7,
+                "value": "app"
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-type",
+              "status": 400,
+              "details": {
+                "path": "metadata.0.id"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            },
+            "metadata": [
+              {
+                "id": "source"
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-value",
+              "status": 400,
+              "details": {
+                "path": "metadata.0.value"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            },
+            "metadata": [
+              {
+                "id": "source",
+                "value": {
+                  "a": 1
+                }
+              }
+            ]
+          },
+          "save": "note",
+          "expect": {
+            "result": {
+              "metadata": [
+                {
+                  "id": "source",
+                  "value": {
+                    "a": 1
+                  }
+                }
+              ]
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": {
+              "$ref": "note.id"
+            },
+            "metadata": {
+              "source": "app"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-type",
+              "status": 400,
+              "details": {
+                "path": "metadata"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "note.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "metadata": [
+                {
+                  "id": "source",
+                  "value": {
+                    "a": 1
+                  }
+                }
+              ]
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "an option given as null is left out unless the API takes null for it",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "description": "kept"
+          },
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.createSignedUrl",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "viewerClaims": null,
+            "lens": null,
+            "transform": null
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "name": null,
+            "description": null
+          },
+          "expect": {
+            "result": {
+              "name": "a.png",
+              "description": null
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "the CDN refuses a transform it can't read or whose options the schema refuses",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "public.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "public",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "rendered",
+            "transform": "width=64"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "rendered",
+            "transform": "border.color=ff0000,width=64"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "rendered",
+            "transform": "bogus=1"
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform-options"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "rendered",
+            "transform": "options.format=webp,options.width=640,type=imageTransform"
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform-options"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "rendered",
+            "transform": "width=0"
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform-options"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "rendered",
+            "transform": "format=bmp"
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform-options"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "rendered",
+            "transform": "gravity.x=0.5"
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform-options"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "rendered",
+            "transform": "width="
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "rendered",
+            "transform": "Width=64"
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "public.id"
+            },
+            "resource": "rendered",
+            "transform": "width=64,width=32"
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": "missing-asset",
+            "resource": "rendered",
+            "transform": "width="
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "uploads of every type the API accepts are stored",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "TEXT/Markdown"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "video/mp4"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "audio/mpeg"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "text/plain; charset=utf-8"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "text/html"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "text/csv"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "application/pdf"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "application/json"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "application/ld+json"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "application/rss+xml"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "application/vnd.oasis.opendocument.text"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "application/x-yaml"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
     }
   ]
 }

@@ -1,0 +1,27 @@
+{
+  "accepted": [
+    "image/png",
+    "TEXT/Markdown",
+    "video/mp4",
+    "audio/mpeg",
+    "text/plain; charset=utf-8",
+    "text/html",
+    "text/csv",
+    "application/pdf",
+    "application/json",
+    "application/ld+json",
+    "application/rss+xml",
+    "application/vnd.oasis.opendocument.text",
+    "application/x-yaml"
+  ],
+  "refused": [
+    "application/zip",
+    "application/x-made-up",
+    "application/octet-stream",
+    "multipart/form-data",
+    "application/x-tar",
+    "font/woff2",
+    "model/gltf-binary",
+    "application/vnd.ms-excel"
+  ]
+}

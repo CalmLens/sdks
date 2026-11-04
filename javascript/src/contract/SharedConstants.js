@@ -1,1 +1,1 @@
-export { t as DOMAIN, n as MAX_DIRECT_IMAGE_UPLOAD_BYTES, r as MAX_IMAGE_UPLOAD_BYTES, i as MAX_NON_IMAGE_UPLOAD_BYTES, a as MIN_MULTIPART_UPLOAD_PART_BYTES, o as getRejectedUploadMimeTypeError, s as isRejectedUploadMimeType } from "./SharedConstants-CrqW8Uco.js";
+export { t as DOMAIN, n as MAX_DIRECT_IMAGE_UPLOAD_BYTES, r as MAX_IMAGE_UPLOAD_BYTES, i as MAX_NON_IMAGE_UPLOAD_BYTES, a as MIN_MULTIPART_UPLOAD_PART_BYTES, o as getRejectedUploadMimeTypeError, s as normalizeUploadMimeType } from "./SharedConstants-DxUCZwLZ.js";

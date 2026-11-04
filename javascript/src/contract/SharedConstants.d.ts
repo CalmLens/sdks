@@ -3,6 +3,6 @@ export declare const MAX_IMAGE_UPLOAD_BYTES: number;
 export declare const MAX_DIRECT_IMAGE_UPLOAD_BYTES: number;
 export declare const MAX_NON_IMAGE_UPLOAD_BYTES: number;
 export declare const MIN_MULTIPART_UPLOAD_PART_BYTES: number;
-export declare const isRejectedUploadMimeType: (mimeType: string) => boolean;
+export declare const normalizeUploadMimeType: (mimeType: string) => string;
 export declare const getRejectedUploadMimeTypeError: (mimeType: string) => string;
 export declare const DOMAIN = "calmlens.com";

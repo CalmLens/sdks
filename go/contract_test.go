@@ -15,6 +15,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,6 +39,11 @@ func TestTransformOptionsContract(t *testing.T) {
 			Options  json.RawMessage
 			Selector string
 		}
+		Invalid []struct {
+			Options     json.RawMessage
+			UnknownKeys []string
+			InvalidKeys []string
+		}
 	}](t, "transform-options.json")
 	for _, c := range fixture.Cases {
 		t.Run(c.Selector, func(t *testing.T) {
@@ -54,6 +60,47 @@ func TestTransformOptionsContract(t *testing.T) {
 			if selector != c.Selector {
 				t.Errorf("%s: got %q, want %q", c.Options, selector, c.Selector)
 			}
+		})
+	}
+	// Options the CDN would refuse are refused before a URL is built, naming every refused key:
+	// as plain JSON (TransformOptions takes any value that encodes as an object), and as
+	// ImageTransformOptions where the type can hold them.
+	for _, c := range fixture.Invalid {
+		keys := append(append([]string{}, c.UnknownKeys...), c.InvalidKeys...)
+		var compact bytes.Buffer
+		if err := json.Compact(&compact, c.Options); err != nil {
+			t.Fatal(err)
+		}
+		c.Options = compact.Bytes()
+		t.Run("refuses "+string(c.Options), func(t *testing.T) {
+			var options JSON
+			if err := json.Unmarshal(c.Options, &options); err != nil {
+				t.Fatal(err)
+			}
+			checkTransformRefused(t, options, c.UnknownKeys, c.InvalidKeys)
+		})
+		t.Run("refuses typed "+string(c.Options), func(t *testing.T) {
+			var options ImageTransformOptions
+			decoder := json.NewDecoder(bytes.NewReader(c.Options))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&options); err != nil {
+				t.Skipf("ImageTransformOptions can't hold %s: %v", c.Options, err)
+			}
+			// Some nested types decode leniently: they drop a key they don't have.
+			encoded, err := json.Marshal(options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var kept map[string]any
+			if err = json.Unmarshal(encoded, &kept); err != nil {
+				t.Fatal(err)
+			}
+			for _, key := range keys {
+				if !hasDottedKey(kept, key) {
+					t.Skipf("ImageTransformOptions doesn't keep %s of %s", key, c.Options)
+				}
+			}
+			checkTransformRefused(t, options, c.UnknownKeys, c.InvalidKeys)
 		})
 	}
 	t.Run("options", func(t *testing.T) {
@@ -82,6 +129,88 @@ func TestTransformOptionsContract(t *testing.T) {
 			t.Fatalf("colour keys %v, want %v", keys, want)
 		}
 	})
+}
+
+// checkTransformRefused requires GetAssetURL to refuse options with sdk/invalid-argument, naming
+// the unknown and invalid keys in its message and details.
+func checkTransformRefused(t *testing.T, options any, unknownKeys, invalidKeys []string) {
+	t.Helper()
+	client, err := NewServerClient(Options{APIKey: "key", ProjectID: "project-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err := client.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "asset-1", TransformOptions: options})
+	var refused *Error
+	if !errors.As(err, &refused) || refused.Code != CodeSDKInvalidArgument {
+		t.Fatalf("got %q, %v; want %s", endpoint, err, CodeSDKInvalidArgument)
+	}
+	want := JSON{"unknownKeys": toAny(unknownKeys), "invalidKeys": toAny(invalidKeys)}
+	got, _ := json.Marshal(refused.Details)
+	var details JSON
+	_ = json.Unmarshal(got, &details)
+	if !reflect.DeepEqual(details, want) {
+		t.Fatalf("details %v, want %v", details, want)
+	}
+	for _, key := range append(append([]string{}, unknownKeys...), invalidKeys...) {
+		if !strings.Contains(refused.Message, key) {
+			t.Errorf("message %q doesn't name %s", refused.Message, key)
+		}
+	}
+}
+
+func toAny(values []string) []any {
+	out := []any{}
+	for _, value := range values {
+		out = append(out, value)
+	}
+	return out
+}
+
+// hasDottedKey reports whether object holds a value at a dotted path such as border.colour.
+func hasDottedKey(object map[string]any, key string) bool {
+	var value any = object
+	for _, part := range strings.Split(key, ".") {
+		parent, ok := value.(map[string]any)
+		if !ok {
+			return false
+		}
+		if value, ok = parent[part]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// ---- upload-mime-types.json -----------------------------------------------------------------
+
+// Every type the API refuses is refused before anything is sent, with the API's code and the
+// type in its details. The mock scenarios store the accepted types.
+func TestUploadMimeTypesContract(t *testing.T) {
+	fixture := fixtures.Read[struct{ Refused []string }](t, "upload-mime-types.json")
+	if len(fixture.Refused) == 0 {
+		t.Fatal("upload-mime-types.json has no refused types")
+	}
+	for _, mimeType := range fixture.Refused {
+		t.Run(mimeType, func(t *testing.T) {
+			transport := &scriptedTransport{}
+			c, err := NewServerClient(Options{APIKey: "key", ProjectID: "project-1", MaxRetries: Ptr(0), HTTPClient: &http.Client{Transport: transport}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "x", Content: &Content{Type: mimeType, Base64: Ptr("aGVsbG8=")}})
+			var refused *Error
+			if !errors.As(err, &refused) || refused.Code != CodeInvalidUploadMimeType || refused.Details["mimeType"] != mimeType || len(transport.received) != 0 {
+				t.Fatalf("got %v (details %v) after %d requests; want %s before any request", err, refusedDetails(refused), len(transport.received), CodeInvalidUploadMimeType)
+			}
+		})
+	}
+}
+
+func refusedDetails(err *Error) JSON {
+	if err == nil {
+		return nil
+	}
+	return err.Details
 }
 
 // ---- webhooks.json --------------------------------------------------------------------------

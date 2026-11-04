@@ -27,6 +27,9 @@ from urllib.parse import quote, unquote, urlencode, urlsplit
 from urllib.request import Request, getproxies, proxy_bypass
 
 from . import error_codes
+from ._option_keys import NULLABLE_OPTION_KEYS
+from ._transform_schema import TRANSFORM_OPTIONS_SCHEMA
+from ._upload_mime_types import UPLOAD_MIME_PREFIXES, UPLOAD_MIME_REJECTED, UPLOAD_MIME_SUFFIXES, UPLOAD_MIME_TYPES
 from ._version import __version__
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
                      CalmLensValidationError, _parse_retry_after)
@@ -193,6 +196,79 @@ def _sorted_keys(options: Mapping[Any, Any], prefix: str = "") -> list[str]:
     return sorted(options)
 
 
+def _has_rule_type(type: Any, value: Any) -> bool:
+    if type == "object":
+        return isinstance(value, Mapping)
+    if type == "string":
+        return isinstance(value, str)
+    if type == "boolean":
+        return isinstance(value, bool)
+    if type in ("number", "integer"):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        try:
+            if not math.isfinite(value):
+                return False
+        except OverflowError:
+            return False
+        return type == "number" or float(value).is_integer()
+    return True
+
+
+def _check_transform_options(options: Mapping[str, Any]) -> tuple[list[str], list[str]]:
+    """Check transform options against the image transform schema, as the CDN does: the dotted
+    keys it doesn't know and those whose values it refuses (or that are required and missing).
+    ``None`` options are left out of a selector, so they are not checked."""
+    unknown_keys: list[str] = []
+    invalid_keys: list[str] = []
+
+    def check(schema: Mapping[str, Any], value: Any, key: str) -> None:
+        branches = schema.get("oneOf")
+        rule = next((branch for branch in branches if _has_rule_type(branch.get("type"), value)), None) \
+            if branches is not None else schema
+        if (rule is None or not _has_rule_type(rule.get("type"), value)
+                or ("enum" in rule and not any(type(value) is type(item) and value == item for item in rule["enum"]))
+                or ("minimum" in rule and value < rule["minimum"])
+                or ("maximum" in rule and value > rule["maximum"])):
+            invalid_keys.append(key)
+            return
+        if rule.get("type") != "object":
+            return
+
+        def path(name: str) -> str:
+            return f"{key}.{name}" if key else name
+        for name in rule.get("required", []):
+            if value.get(name) is None:
+                invalid_keys.append(path(name))
+        properties = rule.get("properties", {})
+        for name in sorted(str(name) for name in value):
+            if value.get(name) is None:
+                continue
+            if name in properties:
+                check(properties[name], value[name], path(name))
+            else:
+                unknown_keys.append(path(name))
+
+    check(TRANSFORM_OPTIONS_SCHEMA, options, "")
+    return unknown_keys, invalid_keys
+
+
+def _assert_transform_options(options: Mapping[str, Any]) -> None:
+    """Raise ``sdk/invalid-argument`` naming each transform option the CDN would refuse."""
+    unknown_keys, invalid_keys = _check_transform_options(options)
+    if not unknown_keys and not invalid_keys:
+        return
+    problems = []
+    if unknown_keys:
+        problems.append(f"unknown option{'s' if len(unknown_keys) > 1 else ''} {', '.join(unknown_keys)}")
+    if invalid_keys:
+        problems.append(f"invalid value{'s' if len(invalid_keys) > 1 else ''} for {', '.join(invalid_keys)}")
+    raise CalmLensValidationError(
+        error_codes.SDK_INVALID_ARGUMENT,
+        f"Transform options are invalid: {'; '.join(problems)}. Pass the options themselves, such as "
+        '{"width": 640, "format": "webp"}.', {"unknownKeys": unknown_keys, "invalidKeys": invalid_keys})
+
+
 def _serialize_transform(transform: Any) -> str:
     """Serialize structured transform options as a CDN selector, such as ``fit=cover,width=640``.
 
@@ -202,6 +278,7 @@ def _serialize_transform(transform: Any) -> str:
     """
     if not isinstance(transform, Mapping):
         raise _invalid("Transform options must be a mapping")
+    _assert_transform_options(transform)
     pairs: list[str] = []
     for key in _sorted_keys(transform):
         _transform_options(pairs, key, transform[key])
@@ -660,6 +737,30 @@ def _direct_size(mime: str, size: int | None) -> None:
         raise CalmLensValidationError(error_codes.FILE_TOO_LARGE, message)
 
 
+def _normalize_upload_mime_type(mime_type: str) -> str:
+    return mime_type.lower().split(";", 1)[0].strip()
+
+
+def _is_accepted_upload_mime_type(mime_type: str) -> bool:
+    """Whether the API accepts an upload of this MIME type: an image, audio, video, text, document
+    or website type, not a container such as ``application/octet-stream``. It refuses any other
+    type with ``upload/invalid-mime-type``."""
+    normalized = _normalize_upload_mime_type(mime_type)
+    if normalized in UPLOAD_MIME_REJECTED:
+        return False
+    return (normalized.startswith(UPLOAD_MIME_PREFIXES) or normalized.endswith(UPLOAD_MIME_SUFFIXES)
+            or normalized in UPLOAD_MIME_TYPES)
+
+
+def _invalid_upload_mime_type(mime_type: object) -> CalmLensValidationError:
+    normalized = _normalize_upload_mime_type(mime_type) if isinstance(mime_type, str) else ""
+    return CalmLensValidationError(
+        error_codes.INVALID_UPLOAD_MIME_TYPE,
+        f"{normalized or 'A missing type'} is not a valid upload file type. Uploads must use a concrete file "
+        "MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or "
+        "text/plain.", {"mimeType": mime_type})
+
+
 def _camel(key: str) -> str:
     head, *tail = key.split("_")
     return head + "".join(word[:1].upper() + word[1:] for word in tail)
@@ -692,8 +793,17 @@ def _validate_batch(options: Mapping[str, Any]) -> None:
         raise _invalid("operation must be one of " + ", ".join(ASSET_BATCH_OPERATIONS))
 
 
-def _merge(options: Mapping[str, Any] | None, **keywords: Any) -> dict[str, Any]:
-    """One options dict (camelCase, as in the API) or snake_case keyword arguments."""
+def _merge(operation: str, options: Mapping[str, Any] | None, /, **keywords: Any) -> dict[str, Any]:
+    """One options dict (camelCase, as in the API) or snake_case keyword arguments for
+    ``operation`` (its camelCase name, such as ``assets.createSignedUrl``). An option given as
+    ``None`` is left out, as if omitted, unless the API takes ``null`` for it (``NULLABLE_OPTION_KEYS``)."""
+    nullable = NULLABLE_OPTION_KEYS.get(operation, frozenset())
+    merged = _merge_options(options, **keywords)
+    return {key: value for key, value in merged.items() if value is not None or key in nullable}
+
+
+def _merge_options(options: Mapping[str, Any] | None, /, **keywords: Any) -> dict[str, Any]:
+    """One options dict (camelCase, as in the API) or snake_case keyword arguments, as given."""
     given = {k: v for k, v in keywords.items() if v is not _UNSET}
     if options is not None:
         if given:
@@ -975,8 +1085,9 @@ class CalmLensServerClient:
                     type: LensType = _UNSET, version: int = _UNSET, description: str | None = _UNSET,
                     active: bool = _UNSET, transform: ImageTransformOptions | None = _UNSET) -> Lens:
         """Create or update one named lens (see :meth:`ensure_lenses`)."""
-        lens = _merge(options, identifier=identifier, name=name, type=type, version=version,
-                      description=description, active=active, transform=transform)
+        # A lens definition is sent as given: ``description=None`` clears the lens's description.
+        lens = _merge_options(options, identifier=identifier, name=name, type=type, version=version,
+                              description=description, active=active, transform=transform)
         return self.ensure_lenses({"lenses": [cast(LensDefinition, lens)]})[0]
 
     def ensure_lenses(self, options: EnsureLensesOptions | None = None, /, *,
@@ -987,7 +1098,7 @@ class CalmLensServerClient:
         definition for that identifier. More than ``ENSURE_LENSES_MAX_PER_REQUEST`` new definitions
         are sent in consecutive requests, in order. Version conflicts raise ``lens/version-conflict``.
         """
-        merged = _merge(options, lenses=lenses)
+        merged = _merge("ensureLenses", options, lenses=lenses)
         definitions = merged.get("lenses")
         if not isinstance(definitions, list) or not definitions or any(
                 not isinstance(lens, Mapping) or not lens.get("identifier") for lens in definitions):
@@ -1064,7 +1175,7 @@ class UploadTokens:
         (``expires_in_seconds``, 1 to 3600, default 600). ``external_id`` becomes the external
         ID of the uploaded asset. Returns ``{"token": ..., "expiresAt": <ms since epoch>}``.
         """
-        merged = _merge(options, upload_preset_id=upload_preset_id, external_id=external_id,
+        merged = _merge("uploadTokens.sign", options, upload_preset_id=upload_preset_id, external_id=external_id,
                         expires_in_seconds=expires_in_seconds)
         return _sign_upload_token(self._c.api_key, merged, int(time.time() * 1000), str(uuid.uuid4()))
 
@@ -1093,7 +1204,7 @@ class Assets:
                limit: int = _UNSET, mode: SearchMode = _UNSET) -> AssetSearchResponse:
         """Search the project's assets by keyword and/or meaning (``mode``: ``keyword``,
         ``semantic`` or ``hybrid``)."""
-        merged = _merge(options, query=query, limit=limit, mode=mode)
+        merged = _merge("assets.search", options, query=query, limit=limit, mode=mode)
         _require(merged, "query")
         return cast(AssetSearchResponse, self._c._request("GET", self._c._project("assets/search"), query=merged))
 
@@ -1102,14 +1213,14 @@ class Assets:
              folder_id: str = _UNSET) -> AssetPage:
         """One page of the project's assets (``cursor`` resumes a previous page; ``filter`` is RSQL,
         e.g. ``classification.moderation.status==allowed``). Use :meth:`iter` to walk every page."""
-        merged = _merge(options, cursor=cursor, page_size=page_size, ordering=ordering, filter=filter,
+        merged = _merge("assets.list", options, cursor=cursor, page_size=page_size, ordering=ordering, filter=filter,
                         folder_id=folder_id)
         return cast(AssetPage, self._c._request("GET", self._c._project("assets"), query=merged))
 
     def iter(self, options: ListAssetsOptions | None = None, /, *, page_size: int = _UNSET,
              ordering: List[Ordering] = _UNSET, filter: str = _UNSET, folder_id: str = _UNSET) -> Iterator[Asset]:
         """Yield every matching asset, requesting pages lazily as you iterate."""
-        merged = _merge(options, page_size=page_size, ordering=ordering, filter=filter, folder_id=folder_id)
+        merged = _merge("assets.each", options, page_size=page_size, ordering=ordering, filter=filter, folder_id=folder_id)
         return self._iterate(lambda index: self.list(cast(ListAssetsOptions, {**merged, "cursor": index})),
                              merged.get("cursor"))
 
@@ -1129,7 +1240,7 @@ class Assets:
 
     def retrieve(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> Asset:
         """Fetch an asset by ID."""
-        merged = _merge(options, asset_id=asset_id)
+        merged = _merge("assets.retrieve", options, asset_id=asset_id)
         return cast(Asset, self._c._request("GET", "/assets/" + _id(merged.get("assetId"), "assetId")))
 
     def wait_for_decision(self, options: WaitForDecisionOptions | None = None, /, *, asset_id: str = _UNSET,
@@ -1144,7 +1255,7 @@ class Assets:
         seen) when there is no decision within ``timeout`` seconds (default 60). Webhooks
         report decisions without polling.
         """
-        merged = _merge(options, asset_id=asset_id, timeout=timeout)
+        merged = _merge("assets.waitForDecision", options, asset_id=asset_id, timeout=timeout)
         _id(merged.get("assetId"), "assetId")
         wanted = cast(AssetIdOptions, {"assetId": merged["assetId"]})
         limit = merged.get("timeout", DEFAULT_DECISION_TIMEOUT)
@@ -1172,9 +1283,10 @@ class Assets:
     def update(self, options: UpdateAssetOptions | None = None, /, *, asset_id: str = _UNSET, name: str = _UNSET,
                description: str | None = _UNSET, tags: List[str] | None = _UNSET,
                metadata: List[MetadataItem] | None = _UNSET, external_id: str | None = _UNSET,
-               external_url: str | None = _UNSET, visibility: Visibility = _UNSET) -> Asset:
-        """Change asset fields. Omitted fields are unchanged; ``None`` clears a nullable field."""
-        merged = _merge(options, asset_id=asset_id, name=name, description=description, tags=tags,
+               external_url: str | None = _UNSET, visibility: Visibility | None = _UNSET) -> Asset:
+        """Change asset fields. Omitted fields are unchanged; ``None`` clears a nullable field
+        (``name=None`` is left out, as the API takes no ``null`` name)."""
+        merged = _merge("assets.update", options, asset_id=asset_id, name=name, description=description, tags=tags,
                         metadata=metadata, external_id=external_id, external_url=external_url, visibility=visibility)
         return cast(Asset, self._c._request("PATCH", "/assets/" + _id(merged.get("assetId"), "assetId"),
                                             body={k: v for k, v in merged.items() if k != "assetId"}))
@@ -1184,7 +1296,7 @@ class Assets:
                       filter: str = _UNSET) -> AssetPage:
         """One page of the assets extracted from an asset (pages of a document, a website's
         text and images, ...). Use :meth:`iter_children` to walk every page."""
-        merged = _merge(options, asset_id=asset_id, cursor=cursor, page_size=page_size, ordering=ordering,
+        merged = _merge("assets.listChildren", options, asset_id=asset_id, cursor=cursor, page_size=page_size, ordering=ordering,
                         filter=filter)
         return cast(AssetPage, self._c._request(
             "GET", "/assets/" + _id(merged.get("assetId"), "assetId") + "/children",
@@ -1194,7 +1306,7 @@ class Assets:
                       page_size: int = _UNSET, ordering: List[Ordering] = _UNSET,
                       filter: str = _UNSET) -> Iterator[Asset]:
         """Yield every child of an asset, requesting pages lazily."""
-        merged = _merge(options, asset_id=asset_id, page_size=page_size, ordering=ordering, filter=filter)
+        merged = _merge("assets.eachChild", options, asset_id=asset_id, page_size=page_size, ordering=ordering, filter=filter)
         _id(merged.get("assetId"), "assetId")
         return self._iterate(lambda index: self.list_children(cast(ListChildrenOptions, {**merged, "cursor": index})),
                              merged.get("cursor"))
@@ -1223,7 +1335,7 @@ class Assets:
         moderates only the content and uses them to read it in context. Only the posts CalmLens
         uses are sent: the most recent 5 that fit in 2,000 characters.
         """
-        merged = _merge(options, name=name, content=content, part=part, url=url, description=description,
+        merged = _merge("assets.create", options, name=name, content=content, part=part, url=url, description=description,
                         processing_options=processing_options, visibility=visibility, metadata=metadata,
                         author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id,
                         upload_preset_id=upload_preset_id, total_size_in_bytes=total_size_in_bytes)
@@ -1238,7 +1350,7 @@ class Assets:
                  total_size_in_bytes: int = _UNSET, idempotency_key: str | None = None) -> Asset:
         """Like :meth:`create`, but waits for the decision where supported (audio and video
         are always asynchronous and return ``pending``)."""
-        merged = _merge(options, name=name, content=content, part=part, url=url, description=description,
+        merged = _merge("assets.classify", options, name=name, content=content, part=part, url=url, description=description,
                         processing_options=processing_options, visibility=visibility, metadata=metadata,
                         author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id,
                         upload_preset_id=upload_preset_id, total_size_in_bytes=total_size_in_bytes)
@@ -1269,13 +1381,9 @@ class Assets:
         if not isinstance(payload, Mapping):
             raise _invalid("content must be a dict")
         mime = payload.get("type", "")
-        normalized = mime.lower().split(";", 1)[0].strip() if isinstance(mime, str) else ""
-        if not normalized or normalized == "application/octet-stream" or normalized.startswith("multipart/"):
-            raise CalmLensValidationError(
-                error_codes.INVALID_UPLOAD_MIME_TYPE,
-                f"{normalized or 'A missing type'} is not a valid upload file type. Uploads must use a concrete file "
-                "MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or "
-                "text/plain.", {"mimeType": mime})
+        if not isinstance(mime, str) or not _is_accepted_upload_mime_type(mime):
+            raise _invalid_upload_mime_type(mime)
+        normalized = _normalize_upload_mime_type(mime)
         if multipart and payload.get("partNumber", 1) != 1:
             raise CalmLensValidationError(error_codes.USE_UPLOAD_PART,
                                           "Use upload_part for multipart upload parts after the first part")
@@ -1370,7 +1478,7 @@ class Assets:
         The final part is classified with the ``create``/``classify`` choice saved when the
         upload started; pass ``queue`` only to override it.
         """
-        merged = _merge(options, asset_id=asset_id, part=part, queue=queue)
+        merged = _merge("assets.uploadPart", options, asset_id=asset_id, part=part, queue=queue)
         asset = merged.get("assetId")
         _id(asset, "assetId")
         payload = merged.get("part")
@@ -1388,7 +1496,7 @@ class Assets:
                           transform: CdnTransform = _UNSET, viewer_claims: ViewerClaims = _UNSET) -> SignedUrl:
         """Sign a temporary CDN URL for private content (defaults: ``rendered``, applied by the API, and
         900 seconds)."""
-        merged = _merge(options, asset_id=asset_id, resource=resource, expires_in_seconds=expires_in_seconds,
+        merged = _merge("assets.createSignedUrl", options, asset_id=asset_id, resource=resource, expires_in_seconds=expires_in_seconds,
                         lens=lens, transform=transform, viewer_claims=viewer_claims)
         asset_path = "/assets/" + _id(merged.get("assetId"), "assetId") + "/signed-url"
         body = {"expiresInSeconds": DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
@@ -1408,7 +1516,7 @@ class Assets:
     def move(self, options: MoveAssetOptions | None = None, /, *, asset_id: str = _UNSET,
              folder_id: str | None = _UNSET) -> Asset:
         """Move an asset into a folder, or to the project root with ``folder_id=None``."""
-        merged = _merge(options, asset_id=asset_id, folder_id=folder_id)
+        merged = _merge("assets.move", options, asset_id=asset_id, folder_id=folder_id)
         if "folderId" not in merged:
             raise _invalid("folderId is required (None moves the asset to the project root)")
         return cast(Asset, self._c._request("POST", "/assets/" + _id(merged.get("assetId"), "assetId") + "/move",
@@ -1417,7 +1525,7 @@ class Assets:
     def retry(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> Asset:
         """Reprocess an asset whose ``classification.status`` is ``failed`` and whose content is
         still held (``content.status`` is not ``removed``)."""
-        merged = _merge(options, asset_id=asset_id)
+        merged = _merge("assets.retry", options, asset_id=asset_id)
         return cast(Asset, self._c._request("POST", "/assets/" + _id(merged.get("assetId"), "assetId") + "/retry"))
 
     def decide(self, options: DecideAssetOptions | None = None, /, *, asset_id: str = _UNSET,
@@ -1429,7 +1537,7 @@ class Assets:
         pending moderation can only be ``blocked`` or ``purged``. Purging needs ``confirm_purge=True``
         and the ``assets:delete`` permission, and permanently deletes the stored content. Not
         retried: it carries no ``Idempotency-Key``."""
-        merged = _merge(options, asset_id=asset_id, decision=decision, note=note, confirm_purge=confirm_purge)
+        merged = _merge("assets.decide", options, asset_id=asset_id, decision=decision, note=note, confirm_purge=confirm_purge)
         path = "/assets/" + _id(merged.get("assetId"), "assetId") + "/decision"
         _require(merged, "decision")
         _require(merged, "note")
@@ -1442,7 +1550,7 @@ class Assets:
         decided. With ``rerun=True`` the asset is moderated again with the project's current policy
         and returns in ``processing``; use it when the policy changed since the decision
         (``asset/policy-changed``)."""
-        merged = _merge(options, asset_id=asset_id, rerun=rerun)
+        merged = _merge("assets.explain", options, asset_id=asset_id, rerun=rerun)
         body = {"rerun": True} if merged.get("rerun") else {}
         return cast(Asset, self._c._request(
             "POST", "/assets/" + _id(merged.get("assetId"), "assetId") + "/explain", body=body))
@@ -1451,12 +1559,12 @@ class Assets:
         """Remove stored content (source, preview and retained extracted text) but keep the
         asset record, metadata and classification results. The returned asset's ``content.status`` is
         ``removed`` and the CDN no longer serves its content."""
-        merged = _merge(options, asset_id=asset_id)
+        merged = _merge("assets.deleteContent", options, asset_id=asset_id)
         return cast(Asset, self._c._request("DELETE", "/assets/" + _id(merged.get("assetId"), "assetId") + "/content"))
 
     def delete(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> None:
         """Delete the asset record together with its stored content."""
-        merged = _merge(options, asset_id=asset_id)
+        merged = _merge("assets.delete", options, asset_id=asset_id)
         self._c._request("DELETE", "/assets/" + _id(merged.get("assetId"), "assetId"))
 
     def batch(self, options: BatchAssetsOptions | None = None, /, *, asset_ids: List[str] = _UNSET,
@@ -1467,7 +1575,7 @@ class Assets:
         queued; the work runs in the background and records ``asset.deleted`` or
         ``asset.content-removed`` for each asset. Assets under a safety hold are skipped. Not
         retried: it carries no ``Idempotency-Key``."""
-        merged = _merge(options, asset_ids=asset_ids, operation=operation)
+        merged = _merge("assets.batch", options, asset_ids=asset_ids, operation=operation)
         _validate_batch(merged)
         return cast(BatchAssetsResponse, self._c._request(
             "POST", self._c._project("assets/batch"),
@@ -1485,33 +1593,33 @@ class Folders:
         """One page of child folders (of ``parent_id``, or the project root), sorted by name unless
         ``ordering`` says otherwise, with ``ancestors`` for showing their paths. Pass the page's
         ``nextCursor`` as ``cursor`` for the next page."""
-        merged = _merge(options, parent_id=parent_id, cursor=cursor, page_size=page_size, ordering=ordering,
+        merged = _merge("folders.list", options, parent_id=parent_id, cursor=cursor, page_size=page_size, ordering=ordering,
                         search=search)
         return cast(FolderPage, self._c._request("GET", self._c._project("folders"), query=merged))
 
     def retrieve(self, options: FolderIdOptions | None = None, /, *, folder_id: str = _UNSET) -> Folder:
         """Fetch a folder by ID."""
-        merged = _merge(options, folder_id=folder_id)
+        merged = _merge("folders.retrieve", options, folder_id=folder_id)
         return cast(Folder, self._c._request("GET", "/folders/" + _id(merged.get("folderId"), "folderId")))
 
     def create(self, options: CreateFolderOptions | None = None, /, *, name: str = _UNSET,
                parent_id: str | None = _UNSET) -> Folder:
         """Create a folder, at the project root or inside ``parent_id``."""
-        merged = _merge(options, name=name, parent_id=parent_id)
+        merged = _merge("folders.create", options, name=name, parent_id=parent_id)
         _require(merged, "name")
         return cast(Folder, self._c._request("POST", self._c._project("folders"), body=merged))
 
     def update(self, options: UpdateFolderOptions | None = None, /, *, folder_id: str = _UNSET,
                name: str = _UNSET) -> Folder:
         """Rename a folder."""
-        merged = _merge(options, folder_id=folder_id, name=name)
+        merged = _merge("folders.update", options, folder_id=folder_id, name=name)
         return cast(Folder, self._c._request("PATCH", "/folders/" + _id(merged.get("folderId"), "folderId"),
                                              body={k: v for k, v in merged.items() if k != "folderId"}))
 
     def move(self, options: MoveFolderOptions | None = None, /, *, folder_id: str = _UNSET,
              parent_id: str | None = _UNSET) -> Folder:
         """Move a folder inside another, or to the root with ``parent_id=None``."""
-        merged = _merge(options, folder_id=folder_id, parent_id=parent_id)
+        merged = _merge("folders.move", options, folder_id=folder_id, parent_id=parent_id)
         if "parentId" not in merged:
             raise _invalid("parentId is required (None moves the folder to the project root)")
         return cast(Folder, self._c._request("POST", "/folders/" + _id(merged.get("folderId"), "folderId") + "/move",
@@ -1519,7 +1627,7 @@ class Folders:
 
     def delete(self, options: FolderIdOptions | None = None, /, *, folder_id: str = _UNSET) -> None:
         """Delete an empty folder."""
-        merged = _merge(options, folder_id=folder_id)
+        merged = _merge("folders.delete", options, folder_id=folder_id)
         self._c._request("DELETE", "/folders/" + _id(merged.get("folderId"), "folderId"))
 
 
@@ -1534,19 +1642,19 @@ class HashLists:
              page_size: int = _UNSET) -> HashListPage:
         """One page of the project's hash lists, newest first; pass the previous page's
         ``nextCursor`` as ``cursor`` for the next."""
-        merged = _merge(options, cursor=cursor, page_size=page_size)
+        merged = _merge("hashLists.list", options, cursor=cursor, page_size=page_size)
         return cast(HashListPage, self._c._request("GET", self._c._project("hash-lists"), query=merged))
 
     def retrieve(self, options: HashListIdOptions | None = None, /, *, hash_list_id: str = _UNSET) -> HashList:
         """Fetch a hash list by ID."""
-        merged = _merge(options, hash_list_id=hash_list_id)
+        merged = _merge("hashLists.retrieve", options, hash_list_id=hash_list_id)
         return cast(HashList, self._c._request("GET", "/hash-lists/" + _id(merged.get("hashListId"), "hashListId")))
 
     def create(self, options: CreateHashListOptions | None = None, /, *, name: str = _UNSET,
                action: HashListAction = _UNSET, description: str | None = _UNSET) -> HashList:
         """Create a hash list. ``action`` is ``flag`` (report matches) or ``block`` (also block
         close matches)."""
-        merged = _merge(options, name=name, action=action, description=description)
+        merged = _merge("hashLists.create", options, name=name, action=action, description=description)
         _require(merged, "name")
         _require(merged, "action")
         return cast(HashList, self._c._request("POST", self._c._project("hash-lists"), body=merged))
@@ -1555,20 +1663,20 @@ class HashLists:
                name: str = _UNSET, description: str | None = _UNSET, action: HashListAction = _UNSET) -> HashList:
         """Rename a list or change what its matches do; the new action applies to later uploads.
         ``description=None`` clears the description."""
-        merged = _merge(options, hash_list_id=hash_list_id, name=name, description=description, action=action)
+        merged = _merge("hashLists.update", options, hash_list_id=hash_list_id, name=name, description=description, action=action)
         return cast(HashList, self._c._request("PATCH", "/hash-lists/" + _id(merged.get("hashListId"), "hashListId"),
                                                body={k: v for k, v in merged.items() if k != "hashListId"}))
 
     def delete(self, options: HashListIdOptions | None = None, /, *, hash_list_id: str = _UNSET) -> None:
         """Delete a hash list and every entry in it."""
-        merged = _merge(options, hash_list_id=hash_list_id)
+        merged = _merge("hashLists.delete", options, hash_list_id=hash_list_id)
         self._c._request("DELETE", "/hash-lists/" + _id(merged.get("hashListId"), "hashListId"))
 
     def list_entries(self, options: ListHashListEntriesOptions | None = None, /, *, hash_list_id: str = _UNSET,
                      cursor: str = _UNSET, page_size: int = _UNSET) -> HashListEntryPage:
         """One page of a list's entries, newest first; pass the previous page's ``nextCursor``
         as ``cursor`` for the next."""
-        merged = _merge(options, hash_list_id=hash_list_id, cursor=cursor, page_size=page_size)
+        merged = _merge("hashLists.listEntries", options, hash_list_id=hash_list_id, cursor=cursor, page_size=page_size)
         path = "/hash-lists/" + _id(merged.get("hashListId"), "hashListId") + "/entries"
         return cast(HashListEntryPage, self._c._request(
             "GET", path, query={k: v for k, v in merged.items() if k != "hashListId"}))
@@ -1578,7 +1686,7 @@ class HashLists:
                   label: str | None = _UNSET) -> HashListEntry:
         """Add a PDQ ``hash`` (with its ``quality`` when known), or the hash of the image asset
         ``asset_id``. A hash already in the list returns its existing entry."""
-        merged = _merge(options, hash_list_id=hash_list_id, hash=hash, quality=quality, asset_id=asset_id,
+        merged = _merge("hashLists.addEntry", options, hash_list_id=hash_list_id, hash=hash, quality=quality, asset_id=asset_id,
                         label=label)
         path = "/hash-lists/" + _id(merged.get("hashListId"), "hashListId") + "/entries"
         return cast(HashListEntry, self._c._request(
@@ -1586,7 +1694,7 @@ class HashLists:
 
     def remove_entry(self, options: HashListEntryIdOptions | None = None, /, *, entry_id: str = _UNSET) -> None:
         """Remove one entry from its list."""
-        merged = _merge(options, entry_id=entry_id)
+        merged = _merge("hashLists.removeEntry", options, entry_id=entry_id)
         self._c._request("DELETE", "/hash-list-entries/" + _id(merged.get("entryId"), "entryId"))
 
 
@@ -1605,12 +1713,12 @@ class Policies:
     def list(self, options: Mapping[str, Any] | None = None, /) -> PolicyList:
         """The organisation's policies, oldest first, and ``projectPolicyId``, the one the project
         moderates with. It takes no options."""
-        _merge(options)
+        _merge("policies.list", options)
         return cast(PolicyList, self._c._request("GET", self._c._project("policies")))
 
     def retrieve(self, options: PolicyIdOptions | None = None, /, *, policy_id: str = _UNSET) -> Policy:
         """Fetch one of the organisation's policies by ID."""
-        merged = _merge(options, policy_id=policy_id)
+        merged = _merge("policies.retrieve", options, policy_id=policy_id)
         return cast(Policy, self._c._request("GET", self._path(merged.get("policyId"))))
 
     def create(self, options: CreatePolicyOptions | None = None, /, *, name: str = _UNSET,
@@ -1618,7 +1726,7 @@ class Policies:
         """Create a policy from ``settings`` (defining every category) with a ``name``, or a copy of
         the latest release of a built-in preset with ``preset_id``. It moderates nothing until it is
         assigned to a project or named on an upload preset."""
-        merged = _merge(options, name=name, description=description, settings=settings, preset_id=preset_id)
+        merged = _merge("policies.create", options, name=name, description=description, settings=settings, preset_id=preset_id)
         return cast(Policy, self._c._request("POST", self._c._project("policies"), body=merged))
 
     def update(self, options: UpdatePolicyOptions | None = None, /, *, policy_id: str = _UNSET,
@@ -1626,7 +1734,7 @@ class Policies:
                settings: PolicySettings = _UNSET) -> Policy:
         """Change the name, description or settings (complete, defining every category); later
         moderation uses them. Saving a policy that follows automatic updates pins it as a copy."""
-        merged = _merge(options, policy_id=policy_id, revision=revision, name=name, description=description,
+        merged = _merge("policies.update", options, policy_id=policy_id, revision=revision, name=name, description=description,
                         settings=settings)
         return cast(Policy, self._c._request("PATCH", self._path(merged.get("policyId")),
                                              body={k: v for k, v in merged.items() if k != "policyId"}))
@@ -1637,7 +1745,7 @@ class Policies:
         """``operation="reset"`` restores the settings of the pinned preset version (send
         ``preset.version``); ``"update"`` moves an unchanged copy to the latest release (send
         ``preset.latestVersion``)."""
-        merged = _merge(options, policy_id=policy_id, operation=operation, revision=revision,
+        merged = _merge("policies.applyPreset", options, policy_id=policy_id, operation=operation, revision=revision,
                         preset_version=preset_version)
         return cast(Policy, self._c._request("POST", self._path(merged.get("policyId")) + "/preset",
                                              body={k: v for k, v in merged.items() if k != "policyId"}))
@@ -1648,20 +1756,20 @@ class Policies:
         """Switch automatic updates on or off for the project's preset policy. Switching on
         replaces the saved copy with the latest preset settings under the same ID; switching off
         pins the current preset version as a copy with unchanged settings."""
-        merged = _merge(options, policy_id=policy_id, enabled=enabled, revision=revision,
+        merged = _merge("policies.setAutomaticUpdates", options, policy_id=policy_id, enabled=enabled, revision=revision,
                         preset_version=preset_version)
         return cast(Policy, self._c._request("PUT", self._path(merged.get("policyId")) + "/automatic-updates",
                                              body={k: v for k, v in merged.items() if k != "policyId"}))
 
     def delete(self, options: PolicyIdOptions | None = None, /, *, policy_id: str = _UNSET) -> None:
         """Delete a policy that no project or upload preset uses."""
-        merged = _merge(options, policy_id=policy_id)
+        merged = _merge("policies.delete", options, policy_id=policy_id)
         self._c._request("DELETE", self._path(merged.get("policyId")))
 
     def assign(self, options: AssignPolicyOptions | None = None, /, *, policy_id: str = _UNSET) -> Policy:
         """Choose the policy the project moderates with. Later uploads use it, except those through
         an upload preset that names its own policy."""
-        merged = _merge(options, policy_id=policy_id)
+        merged = _merge("policies.assign", options, policy_id=policy_id)
         return cast(Policy, self._c._request("PUT", self._c._project("policy"), body=merged))
 
 
@@ -1675,7 +1783,7 @@ class Events:
              page_size: int = _UNSET) -> EventsPage:
         """Events created after ``cursor`` (a previous response's ``nextCursor``), oldest first.
         Without ``cursor`` it returns no events and a ``nextCursor`` for now."""
-        merged = _merge(options, cursor=cursor, page_size=page_size)
+        merged = _merge("events.list", options, cursor=cursor, page_size=page_size)
         return cast(EventsPage, self._c._request("GET", self._c._project("events"), query=merged))
 
     def iter_pages(self, options: ListEventsOptions | None = None, /, *, cursor: str = _UNSET,
@@ -1684,7 +1792,7 @@ class Events:
         page's ``nextCursor`` to resume later. Without ``cursor`` it yields one empty page whose
         ``nextCursor`` is now. Raises ``sdk/invalid-response`` (``details.cursor``) instead of looping
         when a page with more to follow returns a cursor already sent."""
-        merged = _merge(options, cursor=cursor, page_size=page_size)
+        merged = _merge("events.eachPage", options, cursor=cursor, page_size=page_size)
         sent = {merged["cursor"]} if merged.get("cursor") is not None else set()
         while True:
             page = self.list(cast(ListEventsOptions, merged))
@@ -1723,7 +1831,7 @@ class CDN:
         even with a signed URL or an API key. Set it only where your app has already decided the
         viewer may see age-restricted content. Your platform confirms the viewer's age; CalmLens
         does not verify this claim, and anyone can add it to a public URL."""
-        merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens, transform=transform,
+        merged = _merge("cdn.getAssetUrl", options, asset_identifier=asset_identifier, resource=resource, lens=lens, transform=transform,
                         viewer_claims=viewer_claims)
 
         selected = merged.get("resource", "rendered")
@@ -1758,7 +1866,7 @@ class CDN:
         last response is returned once retries run out. A redirect is not followed: it raises
         ``sdk/http-error``. The timeout is an inactivity limit, so large downloads are not cut off.
         """
-        merged = _merge(options, asset_identifier=asset_identifier, resource=resource, lens=lens,
+        merged = _merge("cdn.serve", options, asset_identifier=asset_identifier, resource=resource, lens=lens,
                         transform=transform, viewer_claims=viewer_claims, init=init)
         settings = merged.get("init") or {}
         method = settings.get("method", "GET")
@@ -1862,7 +1970,7 @@ class Text:
                  folder_id: str | None = _UNSET, idempotency_key: str | None = None) -> Asset:
         """Classify UTF-8 text and wait for the decision (asset name defaults to ``text``).
         ``author_id`` and ``context`` work as in :meth:`Assets.create`."""
-        merged = _merge(options, text=text, name=name, description=description, processing_options=processing_options,
+        merged = _merge("text.classify", options, text=text, name=name, description=description, processing_options=processing_options,
                         metadata=metadata, author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id)
         value = merged.pop("text", None)
         if not isinstance(value, str) or not value.strip():

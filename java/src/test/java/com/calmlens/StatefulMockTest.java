@@ -2,6 +2,7 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.calmlens.MockCalmLensServerClient.Options;
 import com.calmlens.MockCalmLensServerClient.Outcome;
@@ -135,5 +136,49 @@ class StatefulMockTest {
     assertEquals(ErrorCodes.HASH_LIST_ENTRY_NOT_FOUND, assertThrows(ApiException.class,
         () -> mock.client.hashLists.removeEntry(new Models.HashListEntryId(entry.id()))).getCode());
     assertEquals(List.of(), mock.client.hashLists.list().items());
+  }
+
+  /** A request sent straight to the in-memory API, as a client other than this SDK's could send it. */
+  private static JsonObject raw(MockApi api, String method, String path, java.util.Map<String, String> query, String upload, String json) throws Exception {
+    java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
+    headers.put("Content-Type", upload == null ? "application/json" : "text/plain");
+    if (upload != null) headers.put("X-CalmLens-Upload", upload);
+    byte[] body = (json == null ? "hello" : json).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    Transport.Response response = api.answer(new MockCalmLensServerClient.Request(method, "https://api.calmlens.com/v1" + path, path, query, headers, body, null));
+    JsonObject reply = JsonParser.parseString(new String(response.body().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+    reply.addProperty("status", response.status());
+    return reply;
+  }
+
+  @Test void theMockRefusesUploadTypesAndMetadataTheApiRefuses() throws Exception {
+    MockApi api = new MockApi("project-1", "https://api.calmlens.com/v1", "https://cdn.calmlens.com/v1", deterministic());
+    for (String type : List.of("application/zip", "application/octet-stream", "font/woff2")) {
+      JsonObject refused = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("name", "x", "contentType", type), "content", null);
+      assertEquals(400, refused.get("status").getAsInt(), type);
+      assertEquals(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, refused.get("code").getAsString(), type);
+      assertEquals(type, refused.getAsJsonObject("details").get("mimeType").getAsString(), type);
+    }
+    assertEquals(200, raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("name", "x", "contentType", "TEXT/Markdown"), "content", null)
+        .get("status").getAsInt());
+    // A URL upload has no content type to check.
+    assertEquals(200, raw(api, "POST", "/projects/project-1/assets", java.util.Map.of(), null, "{\"name\":\"x\",\"url\":\"https://example.com/\"}")
+        .get("status").getAsInt());
+
+    JsonObject dict = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of(), null, "{\"name\":\"x\",\"url\":\"https://example.com/\",\"metadata\":{\"a\":1}}");
+    assertEquals("validation/invalid-type", dict.get("code").getAsString());
+    assertEquals("metadata", dict.getAsJsonObject("details").get("path").getAsString());
+    JsonObject query = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("name", "x", "contentType", "text/plain", "metadata", "[{\"id\":\"a\"}]"), "content", null);
+    assertEquals("validation/invalid-value", query.get("code").getAsString());
+    assertEquals("metadata.0.value", query.getAsJsonObject("details").get("path").getAsString());
+    // Schema checks come before the asset lookup.
+    JsonObject update = raw(api, "PATCH", "/assets/asset_missing", java.util.Map.of(), null, "{\"metadata\":[{\"id\":7,\"value\":1}]}");
+    assertEquals(400, update.get("status").getAsInt());
+    assertEquals("metadata.0.id", update.getAsJsonObject("details").get("path").getAsString());
+    JsonObject name = raw(api, "PATCH", "/assets/asset_missing", java.util.Map.of(), null, "{\"name\":null}");
+    assertEquals("validation/invalid-type", name.get("code").getAsString());
+    assertEquals("name", name.getAsJsonObject("details").get("path").getAsString());
+    JsonObject signed = raw(api, "POST", "/assets/asset_missing/signed-url", java.util.Map.of(), null, "{\"resource\":null}");
+    assertEquals("validation/invalid-value", signed.get("code").getAsString());
+    assertEquals("resource", signed.getAsJsonObject("details").get("path").getAsString());
   }
 }

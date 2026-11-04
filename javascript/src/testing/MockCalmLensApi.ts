@@ -14,6 +14,11 @@ import type {
   Policy,
   PolicyList,
 } from "../client/CalmLensTypes";
+import {
+  checkTransformOptions,
+  isAcceptedUploadMimeType,
+  parseTransformSelector,
+} from "../client/CalmLensUtils";
 import { validateAssetPayload } from "../contract/AssetPayload.js";
 import type { TypedEvent } from "../contract/Event.js";
 import type { Folder } from "../contract/Folder.js";
@@ -27,7 +32,6 @@ import { type PermissionGrant, permits } from "../contract/Permissions.js";
 import { placeholderHashToDataURL } from "../contract/PlaceholderHashDecode.js";
 import {
   getRejectedUploadMimeTypeError,
-  isRejectedUploadMimeType,
   MAX_IMAGE_UPLOAD_BYTES,
 } from "../contract/SharedConstants.js";
 import { isFileAccepted } from "../ui/UploadController";
@@ -305,12 +309,34 @@ const fail = (
 const invalidField = (code: string, path: string) =>
   new ApiFailure(400, code, `Invalid ${path}`, { path });
 
+/**
+ * Refuses `metadata` the API's schema refuses (METADATA_ITEM_SCHEMA): it is `null` or a list of
+ * `{ id, value }` objects with a string `id` and any JSON `value`.
+ */
+const checkMetadata = (metadata: unknown) => {
+  if (metadata === undefined || metadata === null) return;
+  if (!Array.isArray(metadata)) throw invalidField("validation/invalid-type", "metadata");
+  metadata.forEach((item: unknown, index) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) {
+      throw invalidField("validation/invalid-type", `metadata.${index}`);
+    }
+    if (typeof (item as { id?: unknown }).id !== "string") {
+      throw invalidField("validation/invalid-type", `metadata.${index}.id`);
+    }
+    if ((item as { value?: unknown }).value === undefined) {
+      throw invalidField("validation/invalid-value", `metadata.${index}.value`);
+    }
+  });
+};
+
 /** A request as the in-memory API reads it. */
 interface MockRequest {
   method: string;
   url: string;
   /** Decoded path segments after the base URL. */
   segments: string[];
+  /** The same path segments as sent, still percent-encoded. */
+  rawSegments: string[];
   query: URLSearchParams;
   headers: Headers;
   bytes: Uint8Array<ArrayBuffer>;
@@ -737,6 +763,7 @@ export class MockCalmLensApi {
       method: (init?.method ?? "GET").toUpperCase(),
       url,
       segments: path.split("/").filter(Boolean).map(decodeSegment),
+      rawSegments: path.split("/").filter(Boolean),
       query: new URLSearchParams(queryIndex === -1 ? "" : relative.slice(queryIndex + 1)),
       headers,
       bytes,
@@ -1418,6 +1445,8 @@ export class MockCalmLensApi {
   }
 
   private async updateAsset(assetId: string, body: Record<string, unknown>): Promise<Asset> {
+    checkMetadata(body.metadata);
+    if (body.name === null) throw invalidField("validation/invalid-type", "name");
     const asset = await this.findOwnAsset(assetId);
     // Like the API: an externalId stays unique in the project; `null` clears a field.
     if (body.externalId) {
@@ -1447,6 +1476,15 @@ export class MockCalmLensApi {
   }
 
   private async createSignedUrl(assetId: string, body: Record<string, unknown>) {
+    // Like the API's schema, none of these fields takes null.
+    for (const key of ["viewerClaims", "resource", "lens", "transform", "expiresInSeconds"]) {
+      if (body[key] === null) {
+        throw invalidField(
+          key === "resource" ? "validation/invalid-value" : "validation/invalid-type",
+          key,
+        );
+      }
+    }
     const asset = await this.findOwnAsset(assetId);
     const expiresInSeconds = (body.expiresInSeconds as number | undefined) ?? 60 * 15;
     const resource = (body.resource as string | undefined) ?? "rendered";
@@ -1608,6 +1646,7 @@ export class MockCalmLensApi {
     const upload = request.headers.get("x-calmlens-upload");
     if (upload !== "content" && upload !== "part") {
       const body = this.json(request);
+      checkMetadata(body.metadata);
       return body as unknown as UploadFields;
     }
     const { query } = request;
@@ -1622,6 +1661,7 @@ export class MockCalmLensApi {
       }
     };
     const total = query.get("totalSizeInBytes");
+    checkMetadata(parsed("metadata"));
     return {
       name: query.get("name") ?? "",
       description: text("description"),
@@ -1657,7 +1697,7 @@ export class MockCalmLensApi {
       throw fail(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, { message: "Asset name is required" });
     const { contentType, part } = fields;
     const bytes = fields.bytes ?? new Uint8Array(0);
-    if (contentType !== undefined && isRejectedUploadMimeType(contentType)) {
+    if (contentType !== undefined && !isAcceptedUploadMimeType(contentType)) {
       throw fail(API_ERROR_CODES.INVALID_UPLOAD_MIME_TYPE, {
         message: getRejectedUploadMimeTypeError(contentType),
         details: { mimeType: contentType },
@@ -2391,6 +2431,21 @@ export class MockCalmLensApi {
     const [root, projectId, assetIdentifier, resource] = segments;
     const notFound = () =>
       this.jsonResponse(404, { code: "asset/not-found", message: "Asset not found" }, url);
+    // Like the CDN, the selector after the resource is read first (AssetTransformParser.ts), and
+    // lenses and transforms apply only to the rendered resource.
+    const invalidTransform = () =>
+      this.jsonResponse(
+        400,
+        { code: "asset/invalid-transform", message: "Invalid transform selector" },
+        url,
+      );
+    let selector: ReturnType<typeof parseTransformSelector>;
+    try {
+      selector = parseTransformSelector(request.rawSegments.slice(4).join("/"));
+    } catch {
+      return invalidTransform();
+    }
+    if (resource === "original" && (selector.lens || selector.options)) return invalidTransform();
     if (root !== "assets" || projectId !== this.projectId || !assetIdentifier) return notFound();
     const assets = await this.databaseStorage.listAssets(this.projectId);
     const asset = assets.find(
@@ -2462,6 +2517,21 @@ export class MockCalmLensApi {
         },
         url,
       );
+    }
+
+    // Then the options, checked against the transform schema once the asset may be served.
+    if (selector.options) {
+      const { unknownKeys, invalidKeys } = checkTransformOptions(selector.options);
+      if (unknownKeys.length || invalidKeys.length) {
+        return this.jsonResponse(
+          400,
+          {
+            code: "asset/invalid-transform-options",
+            message: `Invalid transform options: ${[...unknownKeys, ...invalidKeys].join(", ")}`,
+          },
+          url,
+        );
+      }
     }
 
     const parts = [...storedContent.parts.entries()]

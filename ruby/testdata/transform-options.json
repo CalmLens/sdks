@@ -233,5 +233,163 @@
       },
       "selector": "trim.border.color=ff0000,trim.border.keep=1.5,trim.border.tolerance=1.5,trim.bottom=1.5,trim.height=1.5,trim.left=1.5,trim.right=1.5,trim.top=1.5,trim.width=1.5"
     }
+  ],
+  "invalid": [
+    {
+      "options": {
+        "type": "imageTransform",
+        "options": {
+          "format": "webp",
+          "width": 640
+        }
+      },
+      "unknownKeys": [
+        "options",
+        "type"
+      ],
+      "invalidKeys": []
+    },
+    {
+      "options": {
+        "bogus": 1
+      },
+      "unknownKeys": [
+        "bogus"
+      ],
+      "invalidKeys": []
+    },
+    {
+      "options": {
+        "width": 640,
+        "border": {
+          "colour": "#ffffff"
+        }
+      },
+      "unknownKeys": [
+        "border.colour"
+      ],
+      "invalidKeys": []
+    },
+    {
+      "options": {
+        "trim": {
+          "border": {
+            "keep": 1,
+            "size": 2
+          }
+        }
+      },
+      "unknownKeys": [
+        "trim.border.size"
+      ],
+      "invalidKeys": []
+    },
+    {
+      "options": {
+        "gravity": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "gravity.mode"
+      ]
+    },
+    {
+      "options": {
+        "width": 0
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "width"
+      ]
+    },
+    {
+      "options": {
+        "height": 10001
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "height"
+      ]
+    },
+    {
+      "options": {
+        "width": 10.5
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "width"
+      ]
+    },
+    {
+      "options": {
+        "dpr": 4
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "dpr"
+      ]
+    },
+    {
+      "options": {
+        "format": "bmp"
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "format"
+      ]
+    },
+    {
+      "options": {
+        "quality": "max"
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "quality"
+      ]
+    },
+    {
+      "options": {
+        "quality": 1.5
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "quality"
+      ]
+    },
+    {
+      "options": {
+        "rotate": 45
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "rotate"
+      ]
+    },
+    {
+      "options": {
+        "anim": "false"
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "anim"
+      ]
+    },
+    {
+      "options": {
+        "fit": "cover",
+        "trim": {
+          "border": {
+            "keep": "x"
+          }
+        }
+      },
+      "unknownKeys": [],
+      "invalidKeys": [
+        "trim.border.keep"
+      ]
+    }
   ]
 }

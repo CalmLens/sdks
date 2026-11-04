@@ -7,6 +7,7 @@ use CalmLens\CalmLensException;
 use CalmLens\ErrorCodes;
 use CalmLens\Exception;
 use CalmLens\Internal\Session;
+use CalmLens\SdkErrorCodes;
 use CalmLens\ServerClient;
 use CalmLens\Testing\Classification;
 use CalmLens\Testing\MockDecision;
@@ -716,6 +717,48 @@ final class ContractTest extends TestCase
         self::assertNotSame([], $cases, "no case sets $name");
         $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'transform' => $cases[0]['options']]);
         self::assertMatchesRegularExpression('/(^|,)' . preg_quote($name, '/') . '[=.]/', explode('/rendered/', $url, 2)[1]);
+    }
+
+    public static function invalidTransformOptions(): iterable
+    {
+        foreach (self::fixtures('transform-options')['invalid'] as $case) {
+            yield json_encode($case['options'], JSON_THROW_ON_ERROR) => [$case];
+        }
+    }
+
+    /** Options the CDN refuses are refused before a URL is built, naming each key it refuses. */
+    #[DataProvider('invalidTransformOptions')]
+    public function testRefusesTransformOptionsTheCdnRefuses(array $case): void
+    {
+        try {
+            self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'transform' => $case['options']]);
+            self::fail('Expected sdk/invalid-argument');
+        } catch (CalmLensException $error) {
+            self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, $error->errorCode);
+            self::assertSame(['unknownKeys' => $case['unknownKeys'], 'invalidKeys' => $case['invalidKeys']], $error->details);
+            foreach ([...$case['unknownKeys'], ...$case['invalidKeys']] as $key) {
+                self::assertStringContainsString($key, $error->getMessage());
+            }
+        }
+    }
+
+    public static function refusedUploadMimeTypes(): iterable
+    {
+        foreach (self::fixtures('upload-mime-types')['refused'] as $type) {
+            yield $type => [$type];
+        }
+    }
+
+    /** An upload of a type the API refuses fails before anything is sent. */
+    #[DataProvider('refusedUploadMimeTypes')]
+    public function testRefusesAnUploadOfARefusedTypeBeforeSendingIt(string $type): void
+    {
+        try {
+            self::offlineClient()->assets->create(['name' => 'x', 'content' => ['data' => 'hello', 'type' => $type]]);
+            self::fail('Expected upload/invalid-mime-type');
+        } catch (CalmLensException $error) {
+            self::assertSame([ErrorCodes::INVALID_UPLOAD_MIME_TYPE, ['mimeType' => $type]], [$error->errorCode, $error->details]);
+        }
     }
 
     public function testTransformColourKeysMatchTheFixture(): void

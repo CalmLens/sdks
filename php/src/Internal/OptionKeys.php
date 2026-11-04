@@ -61,4 +61,23 @@ final class OptionKeys
         'policies.update' => ['description', 'name', 'policyId', 'revision', 'settings'],
         'text.classify' => ['authorId', 'context', 'description', 'externalId', 'externalUrl', 'folderId', 'metadata', 'name', 'processingOptions', 'text', 'uploadPresetId', 'visibility'],
     ];
+
+    /**
+     * The option keys each method sends as null when given null; any other option given as
+     * null is left out, as the API refuses null for it.
+     */
+    public const NULLABLE = [
+        'assets.classify' => ['authorId', 'context', 'description', 'externalId', 'folderId', 'metadata', 'processingOptions', 'uploadPresetId', 'visibility'],
+        'assets.create' => ['authorId', 'context', 'description', 'externalId', 'folderId', 'metadata', 'processingOptions', 'uploadPresetId', 'visibility'],
+        'assets.each' => ['filter', 'folderId'],
+        'assets.list' => ['filter', 'folderId'],
+        'assets.move' => ['folderId'],
+        'assets.update' => ['description', 'externalId', 'externalUrl', 'metadata', 'tags', 'visibility'],
+        'folders.create' => ['parentId'],
+        'folders.move' => ['parentId'],
+        'hashLists.addEntry' => ['label', 'quality'],
+        'hashLists.create' => ['description'],
+        'hashLists.update' => ['description'],
+        'text.classify' => ['authorId', 'context', 'description', 'externalId', 'folderId', 'metadata', 'processingOptions', 'uploadPresetId', 'visibility'],
+    ];
 }

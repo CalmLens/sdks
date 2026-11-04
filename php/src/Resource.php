@@ -18,11 +18,14 @@ abstract class Resource
 
     /**
      * Splits options from `requestOptions`. `$method` names the public method, whose options are
-     * checked against the keys it takes: an unknown key fails with `sdk/invalid-argument`.
+     * checked against the keys it takes: an unknown key fails with `sdk/invalid-argument`. An
+     * option given as null is left out, as if omitted, unless the method sends it as null (such as
+     * `description`, which null clears).
      */
     protected function split(array $options, string $method): array
     {
         Values::knownOptions($options, static::OPERATIONS . '.' . $method);
+        $options = Values::withoutNulls($options, static::OPERATIONS . '.' . $method);
         $request = $options['requestOptions'] ?? [];
         if (!is_array($request)) {
             Values::invalid('requestOptions must be an array');

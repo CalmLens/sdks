@@ -28,9 +28,63 @@ final class Values
         }
     }
 
-    public static function invalid(string $message, string $code = 'sdk/invalid-argument'): never
+    public static function invalid(string $message, string $code = 'sdk/invalid-argument', array $details = []): never
     {
-        throw CalmLensException::create($code, $message);
+        throw CalmLensException::create($code, $message, details: $details);
+    }
+
+    /**
+     * `$options` without the options given as null that `$operation` doesn't send as null
+     * (OptionKeys::NULLABLE): those are left out, as if omitted, since the API refuses null for them.
+     */
+    public static function withoutNulls(array $options, string $operation): array
+    {
+        $nullable = OptionKeys::NULLABLE[$operation] ?? [];
+        return array_filter($options, fn ($value, $key) => $value !== null || in_array((string) $key, $nullable, true), ARRAY_FILTER_USE_BOTH);
+    }
+
+    /**
+     * Whether the API accepts an upload of this MIME type: an image, audio, video, text, document
+     * or website type, not a container such as `application/octet-stream`. It refuses any other
+     * type with `upload/invalid-mime-type`.
+     */
+    public static function acceptedUploadMimeType(string $mimeType): bool
+    {
+        $type = self::uploadMimeType($mimeType);
+        if (in_array($type, UploadMimeTypes::REJECTED, true)) {
+            return false;
+        }
+        foreach (UploadMimeTypes::PREFIXES as $prefix) {
+            if (str_starts_with($type, $prefix)) {
+                return true;
+            }
+        }
+        foreach (UploadMimeTypes::SUFFIXES as $suffix) {
+            if (str_ends_with($type, $suffix)) {
+                return true;
+            }
+        }
+        return in_array($type, UploadMimeTypes::TYPES, true);
+    }
+
+    /** Fails with `upload/invalid-mime-type` (`details.mimeType`) for a type the API refuses. */
+    public static function checkUploadMimeType(string $mimeType): void
+    {
+        if (!self::acceptedUploadMimeType($mimeType)) {
+            self::invalid(self::refusedUploadMimeTypeMessage($mimeType), 'upload/invalid-mime-type', ['mimeType' => $mimeType]);
+        }
+    }
+
+    /** The API's message for an upload of a type it refuses. */
+    public static function refusedUploadMimeTypeMessage(string $mimeType): string
+    {
+        return self::uploadMimeType($mimeType) . ' is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.';
+    }
+
+    /** A MIME type lower-cased and without its parameters, as the API compares it. */
+    private static function uploadMimeType(string $mimeType): string
+    {
+        return trim(explode(';', strtolower($mimeType), 2)[0]);
     }
 
     public static function segment(mixed $value): string

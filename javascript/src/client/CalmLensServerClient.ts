@@ -15,7 +15,7 @@ import {
   splitsIntoParts,
 } from "./CalmLensConnection";
 import { CalmLensError, invalidArgument, invalidConfig, SDK_ERROR_CODES } from "./CalmLensError";
-import { SERVER_OPTION_KEYS } from "./CalmLensOptionKeys";
+import { NULLABLE_OPTION_KEYS, SERVER_OPTION_KEYS } from "./CalmLensOptionKeys";
 import type { TransportRequest } from "./CalmLensTransport";
 import type {
   AddHashListEntryOptions,
@@ -113,10 +113,17 @@ const getEnsureLensCacheKey = (options: EnsureLensOptions): string =>
 
 const requireId = (value: unknown, name: string): string => encodePathSegment(value, name);
 
-/** `options`, once `checkOptionKeys` finds only keys `operation` takes. */
+/**
+ * `options`, once `checkOptionKeys` finds only keys `operation` takes, without the options given as
+ * `null` that the API refuses as `null`: those are left out, as if omitted.
+ */
 const checked = <T>(operation: string, options: T): T => {
   checkOptionKeys(options, operation, SERVER_OPTION_KEYS);
-  return options;
+  if (!options || typeof options !== "object" || Array.isArray(options)) return options;
+  const nullable = NULLABLE_OPTION_KEYS[operation] ?? [];
+  return Object.fromEntries(
+    Object.entries(options).filter(([key, value]) => value !== null || nullable.includes(key)),
+  ) as T;
 };
 
 /**
@@ -404,8 +411,8 @@ export default class CalmLensServerClient {
        * Uploads an asset and waits for its moderation decision. Audio and video still finish
        * in the background. Retried safely with an `Idempotency-Key`.
        */
-      classify: async (options: SubmitAssetOptions): Promise<Asset> => {
-        checked("assets.classify", options);
+      classify: async (classifyOptions: SubmitAssetOptions): Promise<Asset> => {
+        const options = checked("assets.classify", classifyOptions);
         if (
           options &&
           "content" in options &&

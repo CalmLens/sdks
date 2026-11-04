@@ -234,9 +234,7 @@ final class Assets extends Resource
             Values::invalid('Invalid content type', 'upload/invalid-mime-type');
         }
         $baseMime = strtolower(trim(explode(';', $mime)[0]));
-        if (!str_contains($baseMime, '/') || $baseMime === 'application/octet-stream' || str_starts_with($baseMime, 'multipart/')) {
-            Values::invalid('Use a concrete file MIME type', 'upload/invalid-mime-type');
-        }
+        Values::checkUploadMimeType($mime);
         if ($multipart && ($content['partNumber'] ?? 1) !== 1) {
             Values::invalid('Use uploadPart for subsequent parts', 'upload/use-upload-part');
         }

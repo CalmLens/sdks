@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
+
+	"github.com/CalmLens/sdks/go/internal/contract"
 )
 
 // <generated: image-transform-options>
@@ -335,6 +339,9 @@ func serializeTransform(transform any) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if err = assertTransformOptions(options); err != nil {
+		return "", err
+	}
 	var pairs []string
 	for _, key := range sortedKeys(options) {
 		if !transformOptionName.MatchString(key) {
@@ -459,4 +466,241 @@ func transformPath(transform string) string {
 		}
 	}
 	return escaped.String()
+}
+
+// transformRule is one rule of the transform options' schema (transformOptionsSchemaJSON), with
+// only the keywords the SDK checks.
+type transformRule struct {
+	Type       string                   `json:"type"`
+	Enum       []any                    `json:"enum"`
+	Minimum    *float64                 `json:"minimum"`
+	Maximum    *float64                 `json:"maximum"`
+	OneOf      []transformRule          `json:"oneOf"`
+	Properties map[string]transformRule `json:"properties"`
+	Required   []string                 `json:"required"`
+}
+
+var transformSchema = func() transformRule {
+	var schema transformRule
+	if err := json.Unmarshal([]byte(transformOptionsSchemaJSON), &schema); err != nil {
+		panic("calmlens: invalid transform options schema: " + err.Error())
+	}
+	return schema
+}()
+
+// transformNumber returns a decoded option's numeric value; booleans and text are not numbers.
+func transformNumber(value any) (float64, bool) {
+	switch v := value.(type) {
+	case json.Number:
+		f, err := v.Float64()
+		return f, err == nil
+	case float64:
+		return v, true
+	}
+	return 0, false
+}
+
+func hasRuleType(kind string, value any) bool {
+	switch kind {
+	case "object":
+		_, ok := value.(map[string]any)
+		return ok
+	case "string":
+		_, ok := value.(string)
+		return ok
+	case "boolean":
+		_, ok := value.(bool)
+		return ok
+	case "number", "integer":
+		f, ok := transformNumber(value)
+		if !ok || math.IsInf(f, 0) || math.IsNaN(f) {
+			return false
+		}
+		return kind == "number" || f == math.Trunc(f)
+	}
+	return true
+}
+
+func inEnum(values []any, value any) bool {
+	number, isNumber := transformNumber(value)
+	for _, allowed := range values {
+		if f, ok := allowed.(float64); ok && isNumber && f == number || allowed == value {
+			return true
+		}
+	}
+	return false
+}
+
+// checkTransformOptions checks decoded transform options against the image transform schema, as
+// the CDN does, and returns the dotted keys it doesn't know and those whose values it refuses (or
+// that are required and missing). Options set to null are left out of a selector, so they are not
+// checked.
+func checkTransformOptions(options map[string]any) (unknownKeys, invalidKeys []string) {
+	unknownKeys, invalidKeys = []string{}, []string{}
+	var check func(schema transformRule, value any, key string)
+	check = func(schema transformRule, value any, key string) {
+		rule := &schema
+		if len(schema.OneOf) > 0 {
+			rule = nil
+			for i := range schema.OneOf {
+				if hasRuleType(schema.OneOf[i].Type, value) {
+					rule = &schema.OneOf[i]
+					break
+				}
+			}
+		}
+		number, isNumber := transformNumber(value)
+		if rule == nil || !hasRuleType(rule.Type, value) ||
+			rule.Enum != nil && !inEnum(rule.Enum, value) ||
+			rule.Minimum != nil && isNumber && number < *rule.Minimum ||
+			rule.Maximum != nil && isNumber && number > *rule.Maximum {
+			invalidKeys = append(invalidKeys, key)
+			return
+		}
+		if rule.Type != "object" {
+			return
+		}
+		object := value.(map[string]any)
+		path := func(name string) string {
+			if key == "" {
+				return name
+			}
+			return key + "." + name
+		}
+		for _, name := range rule.Required {
+			if object[name] == nil {
+				invalidKeys = append(invalidKeys, path(name))
+			}
+		}
+		for _, name := range sortedKeys(object) {
+			if object[name] == nil {
+				continue
+			}
+			if child, known := rule.Properties[name]; known {
+				check(child, object[name], path(name))
+			} else {
+				unknownKeys = append(unknownKeys, path(name))
+			}
+		}
+	}
+	check(transformSchema, options, "")
+	return unknownKeys, invalidKeys
+}
+
+// assertTransformOptions returns sdk/invalid-argument naming each transform option the CDN would
+// refuse, with the keys in its details.
+func assertTransformOptions(options map[string]any) error {
+	unknownKeys, invalidKeys := checkTransformOptions(options)
+	if len(unknownKeys) == 0 && len(invalidKeys) == 0 {
+		return nil
+	}
+	var problems []string
+	if len(unknownKeys) > 0 {
+		problems = append(problems, plural("unknown option", len(unknownKeys))+" "+strings.Join(unknownKeys, ", "))
+	}
+	if len(invalidKeys) > 0 {
+		problems = append(problems, plural("invalid value", len(invalidKeys))+" for "+strings.Join(invalidKeys, ", "))
+	}
+	return &Error{
+		Code:    CodeSDKInvalidArgument,
+		Message: "Transform options are invalid: " + strings.Join(problems, "; ") + ". Pass the options themselves, such as ImageTransformOptions{Width: calmlens.Ptr(640), Format: calmlens.ImageFormatWebP}.",
+		Details: JSON{"unknownKeys": unknownKeys, "invalidKeys": invalidKeys},
+	}
+}
+
+func plural(word string, count int) string {
+	if count > 1 {
+		return word + "s"
+	}
+	return word
+}
+
+var (
+	transformNumberText = regexp.MustCompile(`^-?(?:0|[1-9]\d*)(?:\.\d+)?$`)
+	lensIdentifier      = regexp.MustCompile(`^[a-z0-9-]{1,50}$`)
+)
+
+// parseTransformSelector reads a CDN selector, the path after the resource as sent (still
+// percent-encoded), as the CDN does (packages/shared/src/TransformSelector.ts): an optional first
+// @lens, then key=value options with dotted keys for nested ones (a bare key is true). Values are
+// numbers (json.Number), true, false, hex colours ("#" added) for colour options, or text. ok is
+// false for anything the CDN refuses as asset/invalid-transform. Used by calmlenstest's CDN.
+func parseTransformSelector(selector string) (lens string, options map[string]any, ok bool) {
+	if selector == "" {
+		return "", nil, true
+	}
+	if strings.Contains(selector, "/") {
+		return "", nil, false
+	}
+	decode := func(text string) (string, bool) {
+		decoded, err := url.PathUnescape(text)
+		return decoded, err == nil && utf8.ValidString(decoded)
+	}
+	entries := strings.Split(selector, ",")
+	if strings.HasPrefix(entries[0], "@") {
+		decoded, valid := decode(entries[0][1:])
+		if !valid || !lensIdentifier.MatchString(decoded) {
+			return "", nil, false
+		}
+		lens, entries = decoded, entries[1:]
+	}
+	if len(entries) == 0 {
+		return lens, nil, true
+	}
+	options = map[string]any{}
+	for _, entry := range entries {
+		if entry == "" || strings.HasPrefix(entry, "@") {
+			return "", nil, false
+		}
+		key, text, hasValue := strings.Cut(entry, "=")
+		parts := strings.Split(key, ".")
+		for _, part := range parts {
+			if !transformOptionName.MatchString(part) {
+				return "", nil, false
+			}
+		}
+		var value any = true
+		if hasValue {
+			decoded, valid := decode(text)
+			if !valid || decoded == "" {
+				return "", nil, false
+			}
+			switch {
+			case transformColourKeys[key] && hexColour.MatchString("#"+decoded):
+				value = "#" + strings.ToLower(decoded)
+			case transformNumberText.MatchString(decoded):
+				value = json.Number(decoded)
+			case decoded == "true" || decoded == "false":
+				value = decoded == "true"
+			default:
+				value = decoded
+			}
+		}
+		target := options
+		for _, part := range parts[:len(parts)-1] {
+			next, exists := target[part]
+			if !exists {
+				child := map[string]any{}
+				target[part] = child
+				target = child
+				continue
+			}
+			child, isObject := next.(map[string]any)
+			if !isObject {
+				return "", nil, false
+			}
+			target = child
+		}
+		last := parts[len(parts)-1]
+		if _, exists := target[last]; exists {
+			return "", nil, false
+		}
+		target[last] = value
+	}
+	return lens, options, true
+}
+
+func init() {
+	contract.CheckTransformOptions = checkTransformOptions
+	contract.ParseTransformSelector = parseTransformSelector
 }

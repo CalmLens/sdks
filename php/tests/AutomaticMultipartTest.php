@@ -106,7 +106,7 @@ final class AutomaticMultipartTest extends TestCase
         $handle = fopen('php://temp', 'w+b');
         fwrite($handle, 'skip' . $file);
         fseek($handle, 4);
-        $client->assets->create(['name' => 'archive.zip', 'content' => ['data' => $handle, 'type' => 'application/zip']]);
+        $client->assets->create(['name' => 'report.pdf', 'content' => ['data' => $handle, 'type' => 'application/pdf']]);
         self::assertSame(['1', '2'], array_map(fn ($request) => $request['query']['partNumber'], $sent));
         self::assertSame(hash('sha256', $file), hash('sha256', implode('', array_column($sent, 'body'))));
         fclose($handle);
@@ -119,7 +119,7 @@ final class AutomaticMultipartTest extends TestCase
             $moderated[] = strlen((string) $input->bytes);
             return 'allowed';
         });
-        $options = ['name' => 'archive.zip', 'content' => ['bytes' => self::fileOf(12 * self::MIB), 'type' => 'application/zip'],
+        $options = ['name' => 'report.pdf', 'content' => ['bytes' => self::fileOf(12 * self::MIB), 'type' => 'application/pdf'],
             'requestOptions' => ['idempotencyKey' => 'upload-3']];
         $mock->failNextRequest('transport-error', 'assets.uploadPart');
         self::assertSame('sdk/transport-error', self::errorCode(fn () => $mock->client()->assets->classify($options)));
@@ -145,7 +145,7 @@ final class AutomaticMultipartTest extends TestCase
             return ($request['query']['partNumber'] ?? null) === '3'
                 ? self::apiError(ErrorCodes::INVALID_UPLOAD_PART_NUMBER, ['expectedPartNumber' => 4, 'receivedPartNumber' => 3]) : null;
         }, maxRetries: 1);
-        $asset = $client->assets->create(['name' => 'archive.zip', 'content' => ['bytes' => $file, 'type' => 'application/zip'],
+        $asset = $client->assets->create(['name' => 'report.pdf', 'content' => ['bytes' => $file, 'type' => 'application/pdf'],
             'requestOptions' => ['idempotencyKey' => 'upload-2']]);
 
         self::assertSame('completed', $asset['upload']['status']);
@@ -176,9 +176,9 @@ final class AutomaticMultipartTest extends TestCase
         $sent = [];
         $client = self::scripted($sent, fn () => new Response(200, [], json_encode(self::asset('completed', null))),
             partSizeBytes: ServerClient::DEFAULT_PART_SIZE_BYTES);
-        $client->assets->create(['name' => 'exact.zip', 'content' => ['bytes' => self::fileOf(8 * self::MIB), 'type' => 'application/zip']]);
+        $client->assets->create(['name' => 'exact.pdf', 'content' => ['bytes' => self::fileOf(8 * self::MIB), 'type' => 'application/pdf']]);
         $stream = new NoSeekStream(Utils::streamFor(self::fileOf(9 * self::MIB)));
-        $client->assets->create(['name' => 'stream.zip', 'content' => ['data' => $stream, 'type' => 'application/zip', 'sizeInBytes' => 9 * self::MIB]]);
+        $client->assets->create(['name' => 'stream.pdf', 'content' => ['data' => $stream, 'type' => 'application/pdf', 'sizeInBytes' => 9 * self::MIB]]);
 
         self::assertSame([null, null], array_map(fn ($request) => $request['query']['partNumber'] ?? null, $sent));
         self::assertSame([8 * self::MIB, 9 * self::MIB], array_map(fn ($request) => strlen($request['body']), $sent));

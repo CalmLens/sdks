@@ -8,6 +8,7 @@ use CalmLens\Assets;
 use CalmLens\CalmLensException;
 use CalmLens\ErrorCodes;
 use CalmLens\Internal\Session;
+use CalmLens\Internal\Transforms;
 use CalmLens\Internal\Values;
 use CalmLens\ModerationContext;
 use CalmLens\SdkErrorCodes;
@@ -449,7 +450,10 @@ final class MockServerClient
             return $queued;
         }
         if ($cdn) {
-            return $this->serve($request->getMethod(), $parts, $query);
+            // The selector is read as sent, still percent-encoded, like the CDN.
+            $raw = substr((string) $request->getUri()->withQuery('')->withFragment(''), strlen($this->cdnBaseUrl));
+            $rawParts = array_values(array_filter(explode('/', $raw), fn ($part) => $part !== ''));
+            return $this->serve($request->getMethod(), $parts, $query, implode('/', array_slice($rawParts, 4)));
         }
         // The HTTP library trims header values, as every HTTP stack does before the API sees them.
         $key = $request->hasHeader('Idempotency-Key') ? $request->getHeaderLine('Idempotency-Key') : null;
@@ -519,6 +523,31 @@ final class MockServerClient
         self::fail($code, 400, "Invalid $path", ['path' => $path]);
     }
 
+    /**
+     * Refuses `metadata` the API's schema refuses: it is null or a list of `{ id, value }` objects
+     * with a string `id` and any JSON `value`.
+     */
+    private static function checkMetadata(mixed $metadata): void
+    {
+        if ($metadata === null) {
+            return;
+        }
+        if (!is_array($metadata) || !array_is_list($metadata)) {
+            self::invalid('validation/invalid-type', 'metadata');
+        }
+        foreach ($metadata as $index => $item) {
+            if (!is_array($item) || ($item !== [] && array_is_list($item))) {
+                self::invalid('validation/invalid-type', "metadata.$index");
+            }
+            if (!is_string($item['id'] ?? null)) {
+                self::invalid('validation/invalid-type', "metadata.$index.id");
+            }
+            if (!array_key_exists('value', $item)) {
+                self::invalid('validation/invalid-value', "metadata.$index.value");
+            }
+        }
+    }
+
     private function requestId(): string { return 'mock-request-' . ++$this->requestCount; }
 
     private function json(int $status, mixed $data, array $headers = [], ?string $requestId = null): Response
@@ -583,8 +612,23 @@ final class MockServerClient
             throw new \LogicException("MockServerClient does not emulate $method /" . implode('/', $parts) . '; enqueue a response for it');
         }
         $id = $parts[1];
-        $asset = $this->assets[$id] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
         $route = $method . ' ' . ($parts[2] ?? '');
+        // Like the API, the body is checked against its schema before the asset is looked up.
+        if ($route === 'PATCH ') {
+            self::checkMetadata($json['metadata'] ?? null);
+            if (array_key_exists('name', $json) && $json['name'] === null) {
+                self::invalid('validation/invalid-type', 'name');
+            }
+        }
+        if ($route === 'POST signed-url') {
+            // None of these fields takes null.
+            foreach (['viewerClaims', 'resource', 'lens', 'transform', 'expiresInSeconds'] as $field) {
+                if (array_key_exists($field, $json) && $json[$field] === null) {
+                    self::invalid($field === 'resource' ? 'validation/invalid-value' : 'validation/invalid-type', $field);
+                }
+            }
+        }
+        $asset = $this->assets[$id] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
         switch ($route) {
             case 'GET ':
                 return $asset;
@@ -690,6 +734,12 @@ final class MockServerClient
     private function createAsset(array $options, bool $queue, ?string $bytes, bool $multipart): array
     {
         $mime = (string) ($options['contentType'] ?? '');
+        $decode = fn (string $key) => is_string($options[$key] ?? null) && $bytes !== null ? json_decode($options[$key], true) : ($options[$key] ?? null);
+        self::checkMetadata($decode('metadata'));
+        // Like the API: content and a first part must be of a type CalmLens moderates; a URL is exempt.
+        if ($bytes !== null && !Values::acceptedUploadMimeType($mime)) {
+            self::fail(ErrorCodes::INVALID_UPLOAD_MIME_TYPE, null, Values::refusedUploadMimeTypeMessage($mime), ['mimeType' => $mime]);
+        }
         $url = $bytes === null ? ($options['url'] ?? null) : null;
         $type = self::kind($mime, $url);
         $size = $bytes === null ? null : strlen($bytes);
@@ -716,7 +766,6 @@ final class MockServerClient
             }
         }
         $now = ($this->now)();
-        $decode = fn (string $key) => is_string($options[$key] ?? null) && $bytes !== null ? json_decode($options[$key], true) : ($options[$key] ?? null);
         $processing = $decode('processingOptions') ?? ['keepContentAfterProcessing' => false];
         $keep = is_array($processing) && ($processing['keepContentAfterProcessing'] ?? false) === true;
         // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
@@ -1762,9 +1811,15 @@ final class MockServerClient
     }
 
     /** Serves stored content and placeholders like the CDN, with its headers. */
-    private function serve(string $method, array $segments, array $query): Response
+    private function serve(string $method, array $segments, array $query, string $selector): Response
     {
         [, $project, $identifier, $resource] = $segments + [null, null, null, null];
+        // Like the CDN, the selector after the resource is read first, and lenses and transforms
+        // apply only to the rendered resource.
+        $transform = Transforms::parse($selector);
+        if ($transform === null || ($resource === 'original' && ($transform['lens'] !== null || $transform['options'] !== null))) {
+            return $this->json(400, ['code' => 'asset/invalid-transform', 'message' => 'Invalid transform selector']);
+        }
         $asset = null;
         foreach ($this->assets as $candidate) {
             if ($candidate['id'] === $identifier || ($candidate['externalId'] ?? null) === $identifier) {
@@ -1799,6 +1854,14 @@ final class MockServerClient
         $private = $asset['visibility'] !== 'public';
         if ($private && !$this->canDownload($asset['folderId'] ?? null)) {
             return $this->json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'This API key needs assets:download permission for this asset’s folder.']);
+        }
+        // Then the options, checked against the transform schema once the asset may be served.
+        if ($transform['options'] !== null) {
+            ['unknownKeys' => $unknown, 'invalidKeys' => $invalid] = Transforms::check($transform['options']);
+            if ($unknown !== [] || $invalid !== []) {
+                return $this->json(400, ['code' => 'asset/invalid-transform-options',
+                    'message' => 'Invalid transform options: ' . implode(', ', [...$unknown, ...$invalid])]);
+            }
         }
         $type = $stored['type'] === '' ? 'application/octet-stream' : $stored['type'];
         $image = $asset['type'] === 'image';

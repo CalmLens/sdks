@@ -5,11 +5,13 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -475,5 +477,69 @@ func TestMockDecideValidatesLikeTheAPI(t *testing.T) {
 	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationStatusAllowed, Note: "x"}, calmlens.CodeAssetContentPurged, "")
 	if blocked, err := c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: asset.ID, Decision: calmlens.ModerationStatusBlocked, Note: "x"}); err != nil || blocked.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
 		t.Fatalf("blocking purged content: %v", err)
+	}
+}
+
+// The mock refuses, like the API's schema and before looking up the asset, what the typed client
+// can't send: metadata that isn't a list of { id, value } items, null for fields that don't take
+// null, and uploads of types CalmLens can't moderate.
+func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
+	m, err := NewServerClient(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	upload := func(mode string) http.Header {
+		return http.Header{"X-Calmlens-Upload": {mode}, "Content-Type": {"text/plain"}}
+	}
+	jsonHeader := http.Header{"Content-Type": {"application/json"}}
+	assets := "/projects/mock-project/assets"
+	cases := []struct {
+		name, method, path, query string
+		header                    http.Header
+		body                      string
+		code                      string
+		details                   map[string]any
+	}{
+		{"JSON metadata object", "POST", assets, "queue=false", jsonHeader, `{"name":"x","url":"https://example.com","metadata":{"a":1}}`, "validation/invalid-type", map[string]any{"path": "metadata"}},
+		{"raw upload metadata item not an object", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`["source"]`), upload("content"), "hello", "validation/invalid-type", map[string]any{"path": "metadata.0"}},
+		{"raw upload metadata id not a string", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":7,"value":1}]`), upload("content"), "hello", "validation/invalid-type", map[string]any{"path": "metadata.0.id"}},
+		{"raw upload metadata without a value", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":"source"}]`), upload("content"), "hello", "validation/invalid-value", map[string]any{"path": "metadata.0.value"}},
+		{"update metadata object", "PATCH", "/assets/missing", "", jsonHeader, `{"metadata":{"a":1}}`, "validation/invalid-type", map[string]any{"path": "metadata"}},
+		{"update null name", "PATCH", "/assets/missing", "", jsonHeader, `{"name":null}`, "validation/invalid-type", map[string]any{"path": "name"}},
+		{"signed URL null viewerClaims", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"viewerClaims":null}`, "validation/invalid-type", map[string]any{"path": "viewerClaims"}},
+		{"signed URL null resource", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"resource":null}`, "validation/invalid-value", map[string]any{"path": "resource"}},
+		{"signed URL null lens", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"lens":null}`, "validation/invalid-type", map[string]any{"path": "lens"}},
+		{"signed URL null transform", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"transform":null}`, "validation/invalid-type", map[string]any{"path": "transform"}},
+		{"signed URL null expiresInSeconds", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"expiresInSeconds":null}`, "validation/invalid-type", map[string]any{"path": "expiresInSeconds"}},
+		{"raw upload of a refused type", "POST", assets, "name=x&contentType=application%2Fzip", upload("content"), "hello", calmlens.CodeInvalidUploadMimeType, map[string]any{"mimeType": "application/zip"}},
+		{"first part of a refused type", "POST", assets, "name=x&isFinal=true&contentType=application%2Fx-made-up", upload("part"), "hello", calmlens.CodeInvalidUploadMimeType, map[string]any{"mimeType": "application/x-made-up"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			req, err := http.NewRequest(c.method, "https://api.calmlens.com/v1"+c.path+"?"+c.query, strings.NewReader(c.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header = c.header.Clone()
+			req.Header.Set("X-Api-Key", m.options.APIKey)
+			res, err := transport{m}.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			var body struct {
+				Code    string
+				Details map[string]any
+			}
+			if err = json.NewDecoder(res.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if res.StatusCode != http.StatusBadRequest || body.Code != c.code || !reflect.DeepEqual(body.Details, c.details) {
+				t.Fatalf("got %d %s %v; want 400 %s %v", res.StatusCode, body.Code, body.Details, c.code, c.details)
+			}
+		})
+	}
+	if len(m.DatabaseStorage.Assets) != 0 {
+		t.Fatalf("stored %d assets", len(m.DatabaseStorage.Assets))
 	}
 }

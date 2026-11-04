@@ -4,6 +4,10 @@ use super::decision::{
     MockModerationTrigger, MockOutcome,
 };
 use super::MockResponse;
+use crate::contract_checks::{
+    check_transform_options, invalid_upload_mime_type, is_accepted_upload_mime_type,
+    parse_transform_selector,
+};
 use crate::error::ErrorCode;
 use crate::models::{select_moderation_context_items, ModerationContext};
 use base64::Engine;
@@ -399,6 +403,31 @@ fn validation(issue: &str, path: &str) -> Failure {
     failure.details = json!({ "path": path });
     failure
 }
+/// Refuses `metadata` the API's schema refuses: it is `null` or a list of `{ id, value }`
+/// objects with a string `id` and any JSON `value`.
+fn check_metadata(metadata: Option<&Value>) -> Outcome<()> {
+    let Some(metadata) = metadata.filter(|metadata| !metadata.is_null()) else {
+        return Ok(());
+    };
+    let items = metadata
+        .as_array()
+        .ok_or_else(|| validation("invalid-type", "metadata"))?;
+    for (index, item) in items.iter().enumerate() {
+        let item = item
+            .as_object()
+            .ok_or_else(|| validation("invalid-type", &format!("metadata.{index}")))?;
+        if !item.get("id").is_some_and(Value::is_string) {
+            return Err(validation("invalid-type", &format!("metadata.{index}.id")));
+        }
+        if !item.contains_key("value") {
+            return Err(validation(
+                "invalid-value",
+                &format!("metadata.{index}.value"),
+            ));
+        }
+    }
+    Ok(())
+}
 /// A whole number from `low` to `high` in query parameter `path`, or the schema's error.
 fn bounded(
     value: Option<&String>,
@@ -465,16 +494,6 @@ struct Upload {
     total_size: Option<u64>,
 }
 
-/// MIME types an upload cannot use: they name no concrete file type.
-const REJECTED_UPLOAD_MIME_TYPES: [&str; 7] = [
-    "application/octet-stream",
-    "multipart/form-data",
-    "multipart/mixed",
-    "multipart/alternative",
-    "multipart/related",
-    "multipart/signed",
-    "multipart/encrypted",
-];
 fn normalize_mime(mime: &str) -> String {
     mime.split(';').next().unwrap_or("").trim().to_lowercase()
 }
@@ -978,7 +997,8 @@ impl Backend {
             query.entry(key).or_insert(value);
         }
         if cdn.is_some() {
-            let response = self.serve(&parts, &query, headers);
+            let raw_parts: Vec<&str> = rest.split('/').filter(|part| !part.is_empty()).collect();
+            let response = self.serve(&parts, &raw_parts, &query, headers);
             return Ok(if method == Method::HEAD {
                 response.body(Vec::new())
             } else {
@@ -1028,7 +1048,10 @@ impl Backend {
                 return Ok(response.clone().header("idempotent-replayed", "true"));
             }
         }
-        let body = if is_json && !raw.is_empty() {
+        // Raw uploads carry their content's own type, which may be JSON: only other requests
+        // have a JSON body.
+        let raw_upload = matches!(header(headers, "x-calmlens-upload"), "content" | "part");
+        let body = if is_json && !raw_upload && !raw.is_empty() {
             match serde_json::from_slice::<Value>(raw) {
                 Ok(Value::Object(body)) => body,
                 _ => return Ok(invalid("The body is not a JSON object").response()),
@@ -1768,15 +1791,16 @@ impl Backend {
                 return Err(invalid("sizeInBytes does not match the body"));
             }
         }
+        check_metadata(options.get("metadata"))?;
         if options.get("name").map_or("", text).is_empty() {
             return Err(invalid("Asset name is required"));
         }
         let website = options.contains_key("url");
         let mime = q.get("contentType").map_or("", String::as_str);
-        if !website && REJECTED_UPLOAD_MIME_TYPES.contains(&normalize_mime(mime).as_str()) {
+        if !website && !is_accepted_upload_mime_type(mime) {
             let mut failure = fail(
                 ErrorCode::InvalidUploadMimeType,
-                "Upload file type is not supported",
+                invalid_upload_mime_type(mime).message(),
             );
             failure.details = json!({ "mimeType": mime });
             return Err(failure);
@@ -1938,6 +1962,35 @@ impl Backend {
         raw: &[u8],
         now: u64,
     ) -> Outcome<Value> {
+        // Like the API, the body's schema is checked before the asset is looked up.
+        match (method, suffix) {
+            ("PATCH", "") => {
+                check_metadata(body.get("metadata"))?;
+                if body.get("name").is_some_and(Value::is_null) {
+                    return Err(validation("invalid-type", "name"));
+                }
+            }
+            ("POST", "signed-url") => {
+                // None of these fields takes null.
+                for key in [
+                    "viewerClaims",
+                    "resource",
+                    "lens",
+                    "transform",
+                    "expiresInSeconds",
+                ] {
+                    if body.get(key).is_some_and(Value::is_null) {
+                        let issue = if key == "resource" {
+                            "invalid-value"
+                        } else {
+                            "invalid-type"
+                        };
+                        return Err(validation(issue, key));
+                    }
+                }
+            }
+            _ => {}
+        }
         let mut asset = self
             .owned(&self.storage.assets, id)
             .ok_or_else(|| fail(ErrorCode::AssetNotFound, "Asset not found"))?
@@ -2246,6 +2299,7 @@ impl Backend {
     fn serve(
         &self,
         parts: &[String],
+        raw_parts: &[&str],
         q: &HashMap<String, String>,
         headers: &HeaderMap,
     ) -> MockResponse {
@@ -2253,6 +2307,19 @@ impl Backend {
             || custom(ErrorCode::AssetNotFound.as_str(), 404, "Asset not found").response();
         let not_available =
             || custom("asset/not-available", 403, "Asset is not available").response();
+        // Like the CDN, the selector after the resource (as sent, still percent-encoded) is read
+        // first, and lenses and transforms apply only to the rendered resource.
+        let invalid_transform =
+            || custom("asset/invalid-transform", 400, "Invalid transform selector").response();
+        let selector = raw_parts.get(4..).unwrap_or_default().join("/");
+        let Some(selector) = parse_transform_selector(&selector) else {
+            return invalid_transform();
+        };
+        if parts.get(3).is_some_and(|resource| resource == "original")
+            && (selector.lens.is_some() || selector.options.is_some())
+        {
+            return invalid_transform();
+        }
         let [scope, project, identifier, resource, ..] = parts else {
             return not_found();
         };
@@ -2321,6 +2388,19 @@ impl Backend {
                 "This API key needs assets:download permission for this asset's folder.",
             )
             .response();
+        }
+        // Then the options, checked against the transform schema once the asset may be served.
+        if let Some(options) = selector.options {
+            let (unknown, invalid) = check_transform_options(&Value::Object(options));
+            if !unknown.is_empty() || !invalid.is_empty() {
+                let keys = [unknown, invalid].concat().join(", ");
+                return custom(
+                    "asset/invalid-transform-options",
+                    400,
+                    &format!("Invalid transform options: {keys}"),
+                )
+                .response();
+            }
         }
         // Like the CDN: an image's bytes are immutable for a year, other content is kept for an
         // hour, by shared caches only when delivery is public.
@@ -2874,5 +2954,58 @@ impl Filter {
                 }
             })
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_metadata;
+    use serde_json::Value;
+
+    /// The metadata scenario in `testdata/mock-scenarios.json` passes metadata the SDK's types
+    /// can't hold, so its runner skips it: each step's metadata gets the step's outcome here.
+    #[test]
+    fn metadata_is_checked_like_the_api_schema() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata/mock-scenarios.json");
+        let file: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let scenario = file["scenarios"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|scenario| {
+                scenario["steps"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|step| step["expect"]["error"]["details"]["path"] == "metadata")
+            })
+            .expect("a metadata scenario");
+        let (mut refused, mut accepted) = (0, 0);
+        for step in scenario["steps"].as_array().unwrap() {
+            let Some(metadata) = step["args"].get("metadata") else {
+                continue;
+            };
+            let outcome = check_metadata(Some(metadata));
+            match step["expect"].get("error") {
+                Some(error) => {
+                    refused += 1;
+                    let failure = outcome.expect_err(&metadata.to_string());
+                    assert_eq!(failure.code, error["code"], "{metadata}");
+                    assert_eq!(failure.status, error["status"], "{metadata}");
+                    assert_eq!(
+                        failure.details["path"], error["details"]["path"],
+                        "{metadata}"
+                    );
+                }
+                None => {
+                    accepted += 1;
+                    assert!(outcome.is_ok(), "{metadata}");
+                }
+            }
+        }
+        assert!(
+            refused > 0 && accepted > 0,
+            "the scenario refuses and accepts metadata"
+        );
     }
 }

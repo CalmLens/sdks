@@ -404,14 +404,14 @@ func TestCDNURLsAndServeHeaders(t *testing.T) {
 		t.Fatal("expected Transform and TransformOptions error", err)
 	}
 	// Struct options are encoded through their JSON field names; numbers follow JavaScript's String(n).
-	type resize struct {
-		Width   float64  `json:"width"`
-		Height  *float64 `json:"height"`
-		Quality float64  `json:"quality"`
-		Tiny    float64  `json:"tiny"`
+	type adjust struct {
+		Blur       float64  `json:"blur"`
+		Height     *float64 `json:"height"`
+		Brightness float64  `json:"brightness"`
+		Contrast   float64  `json:"contrast"`
 	}
-	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformOptions: resize{Width: 1e21, Quality: -0.0, Tiny: 1.5e-7}})
-	if err != nil || !strings.HasSuffix(endpoint, "/rendered/quality=0,tiny=1.5e-7,width=1e%2B21") {
+	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformOptions: adjust{Blur: 1e21, Brightness: -0.0, Contrast: 1.5e-7}})
+	if err != nil || !strings.HasSuffix(endpoint, "/rendered/blur=1e%2B21,brightness=0,contrast=1.5e-7") {
 		t.Fatal(endpoint, err)
 	}
 	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformOptions: JSON{"width": math.NaN()}})

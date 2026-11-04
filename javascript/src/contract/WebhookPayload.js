@@ -1,7 +1,7 @@
 import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, o as backfill, s as updatedAt, t as EXAMPLE_IDS } from "./Ids-D2XfVlL6.js";
 import { t as CLASSIFICATION_CATEGORIES } from "./ModerationCategories-CHFRoeWV.js";
 import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
-import "./SharedConstants-CrqW8Uco.js";
+import "./SharedConstants-DxUCZwLZ.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { i as msg, n as MODERATION_QUALIFIERS, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-6yfnXdpa.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-DF7spSE4.js";
@@ -68,7 +68,10 @@ zod.object({
 	action: HASH_LIST_ACTION_SCHEMA.describe(`What a match does: \`flag\` reports it without changing the decision, \`block\` blocks matches 16 bits apart or fewer and flags looser ones`),
 	createdAt: createdAtField().describe("When the list was created, in milliseconds since the Unix epoch"),
 	updatedAt: updatedAtField().describe("When the list was last updated, in milliseconds since the Unix epoch")
-}).extend({ createdByUserId: idField("user").nullish() });
+}).extend({
+	createdByUserId: idField("user").nullish(),
+	revision: zod.string().max(64).nullish()
+});
 zod.object({
 	id: primaryIdField("hle").describe("Unique entry ID"),
 	projectId: idField("proj").describe("ID of the project that owns the entry"),
@@ -797,7 +800,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	storageId: saneStringField().nullish().describe("Internal storage key of the retained content; `null` when nothing is stored"),
 	uploadPartsReceived: zod.number().int().nullish().describe("Number of parts received so far for a multipart upload"),
 	type: ASSET_TYPE_SCHEMA.describe("Asset type, detected from the content's MIME type"),
-	metadata: zod.array(METADATA_ITEM_SCHEMA).nullish().meta(metaStore([docPropertyInfo({ description: "List of custom metadata items for the asset" })])),
+	metadata: zod.array(METADATA_ITEM_SCHEMA, { error: "Expected an array of { id, value } metadata items" }).nullish().meta(metaStore([docPropertyInfo({ description: "List of custom metadata items for the asset" })])),
 	tags: zod.array(saneStringField()).nullish().meta(metaStore([docPropertyInfo({
 		description: "Array of tags for the asset",
 		placeholder: "[\"tag1\", \"tag2\"]"

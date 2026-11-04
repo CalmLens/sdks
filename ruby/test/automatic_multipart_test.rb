@@ -70,7 +70,7 @@ class AutomaticMultipartTest < Minitest::Test
     file = file_of(12 * MIB)
     io = StringIO.new("skip#{file}")
     io.read(4)
-    client.assets.create(name: 'archive.zip', content: { data: io, type: 'application/zip' })
+    client.assets.create(name: 'report.pdf', content: { data: io, type: 'application/pdf' })
 
     assert_equal([5 * MIB, 5 * MIB, 2 * MIB], sent.map { |request| request.body.bytesize })
     assert_equal file, sent.map(&:body).join
@@ -79,14 +79,14 @@ class AutomaticMultipartTest < Minitest::Test
 
   def test_content_of_one_part_streams_and_text_go_in_one_request
     client, sent = scripted(->(_) { [200, asset('completed', nil)] })
-    client.assets.create(name: 'exact.zip', content: { data: file_of(8 * MIB), type: 'application/zip' })
+    client.assets.create(name: 'exact.pdf', content: { data: file_of(8 * MIB), type: 'application/pdf' })
     reader, writer = IO.pipe
     writer.binmode
     feeder = Thread.new do
       writer.write(file_of(9 * MIB))
       writer.close
     end
-    client.assets.create(name: 'stream.zip', content: { data: reader, type: 'application/zip', size_in_bytes: 9 * MIB })
+    client.assets.create(name: 'stream.pdf', content: { data: reader, type: 'application/pdf', size_in_bytes: 9 * MIB })
     feeder.join
     client.assets.create(name: 'long.txt', content: { plain_text: 'a' * (9 * MIB), type: 'text/plain' })
 
@@ -104,7 +104,7 @@ class AutomaticMultipartTest < Minitest::Test
 
       upload_response(request)
     end, part_size_bytes: 5 * MIB, max_retries: 1)
-    result = client.assets.create(name: 'archive.zip', content: { data: file_of(16 * MIB), type: 'application/zip' },
+    result = client.assets.create(name: 'report.pdf', content: { data: file_of(16 * MIB), type: 'application/pdf' },
                                   request_options: { idempotency_key: 'upload-2' })
 
     assert_equal 'completed', result.dig('upload', 'status')
@@ -156,7 +156,7 @@ class AutomaticMultipartTest < Minitest::Test
       'allowed'
     end)
     file = file_of(12 * MIB)
-    options = { name: 'archive.zip', content: { data: file, type: 'application/zip' },
+    options = { name: 'report.pdf', content: { data: file, type: 'application/pdf' },
                 processing_options: { keep_content_after_processing: true }, request_options: { idempotency_key: 'upload-3' } }
     client.fail_next_request('transport-error', operation: 'assets.upload_part')
     error = assert_raises(CalmLens::ConnectionError) { client.assets.classify(options) }

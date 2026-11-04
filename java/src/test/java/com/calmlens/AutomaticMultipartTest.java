@@ -93,13 +93,13 @@ class AutomaticMultipartTest {
   }
 
   @Test void aFileIsReadAgainPartByPart(@TempDir Path directory) throws IOException {
-    Path path = directory.resolve("archive.zip");
+    Path path = directory.resolve("report.pdf");
     byte[] file = fileOf(12 * MIB + 3);
     Files.write(path, file);
     List<Sent> sent = new ArrayList<>();
     CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").partSizeBytes(5L * MIB)
         .transport(scripted(sent, (request, index) -> uploadResponse(request))).build();
-    client.assets.create(new Models.SubmitAsset("archive.zip", Models.Content.file(path, "application/zip")));
+    client.assets.create(new Models.SubmitAsset("report.pdf", Models.Content.file(path, "application/pdf")));
     assertEquals(List.of("1", "2", "3"), each(sent, r -> r.query().get("partNumber")));
     assertArrayEquals(file, joined(sent));
     // Without a caller's key, the parts share a generated one.
@@ -110,9 +110,9 @@ class AutomaticMultipartTest {
     List<Sent> sent = new ArrayList<>();
     CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1")
         .transport(scripted(sent, (request, index) -> uploadResponse(request))).build();
-    client.assets.create(new Models.SubmitAsset("exact.bin", Models.Content.bytes(fileOf(8 * MIB), "application/zip")));
+    client.assets.create(new Models.SubmitAsset("exact.pdf", Models.Content.bytes(fileOf(8 * MIB), "application/pdf")));
     byte[] streamed = fileOf(9 * MIB);
-    client.assets.create(new Models.SubmitAsset("stream.bin", Models.Content.stream(new ByteArrayInputStream(streamed), streamed.length, "application/zip")));
+    client.assets.create(new Models.SubmitAsset("stream.pdf", Models.Content.stream(new ByteArrayInputStream(streamed), streamed.length, "application/pdf")));
     assertEquals(java.util.Arrays.asList(null, null), each(sent, r -> r.query().get("partNumber")));
     assertEquals(List.of(8 * MIB, 9 * MIB), each(sent, r -> r.body().length));
   }
@@ -127,7 +127,7 @@ class AutomaticMultipartTest {
             return apiError(ErrorCodes.INVALID_UPLOAD_PART_NUMBER, 409, "{\"expectedPartNumber\":4,\"receivedPartNumber\":3}");
           return uploadResponse(request);
         })).build(null, delay -> {});
-    Models.Asset result = client.assets.create(new Models.SubmitAsset("archive.zip", Models.Content.bytes(fileOf(16 * MIB), "application/zip")),
+    Models.Asset result = client.assets.create(new Models.SubmitAsset("report.pdf", Models.Content.bytes(fileOf(16 * MIB), "application/pdf")),
         new RequestOptions().idempotencyKey("upload-2"));
     assertEquals(Models.AssetClassificationStatus.COMPLETED, result.classification().status());
     assertEquals(List.of("upload-2", "upload-2:part-2", "upload-2:part-2", "upload-2:part-3", "upload-2:part-4"), each(sent, Sent::key));
@@ -170,7 +170,7 @@ class AutomaticMultipartTest {
           return MockDecision.of("allowed");
         }));
     byte[] file = fileOf(12 * MIB);
-    Models.SubmitAsset options = new Models.SubmitAsset("archive.zip", Models.Content.bytes(file, "application/zip"))
+    Models.SubmitAsset options = new Models.SubmitAsset("report.pdf", Models.Content.bytes(file, "application/pdf"))
         .processingOptions(new Models.ProcessingOptions().keepContentAfterProcessing(true));
     RequestOptions key = new RequestOptions().idempotencyKey("upload-3");
     mock.failNextRequest("transport-error", new MockCalmLensServerClient.FailureOptions().operation("assets.uploadPart"));

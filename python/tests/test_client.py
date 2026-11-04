@@ -269,9 +269,11 @@ class ClientTests(ClientTestCase):
         self.assertEqual(len(self.calls), 4)
 
     def test_structured_transform_formats_numbers_like_javascript(self):
-        options = {"a": 2.0, "b": 0.00001, "c": 1e-7, "d": 1e21, "e": -0.0, "f": 123456789012, "g": -2.5}
+        options = {"blur": 2.0, "brightness": 0.00001, "contrast": 1e-7, "gamma": 1e21, "saturation": -0.0,
+                   "sharpen": 123456789012, "border": {"width": -2.5}}
         url = self.client.cdn.get_asset_url(asset_identifier="a", transform=options)
-        self.assertTrue(url.endswith("/rendered/a=2,b=0.00001,c=1e-7,d=1e%2B21,e=0,f=123456789012,g=-2.5"))
+        self.assertTrue(url.endswith("/rendered/blur=2,border.width=-2.5,brightness=0.00001,contrast=1e-7,"
+                                     "gamma=1e%2B21,saturation=0,sharpen=123456789012"))
         url = self.client.cdn.get_asset_url(asset_identifier="a", transform={
             "background": "#FFAA00", "trim": {"border": {"color": "#ABC"}}, "quality": 80})
         self.assertTrue(url.endswith("/rendered/background=ffaa00,quality=80,trim.border.color=abc"))
@@ -279,7 +281,8 @@ class ClientTests(ClientTestCase):
         # a snake_case name is sent as written, so it is rejected rather than renamed.
         for bad in (float("nan"), float("inf"), {1: "x"}, {"bad_name": 1}, object()):
             with self.subTest(bad=bad), self.assertRaises(CalmLensError) as raised:
-                self.client.cdn.get_asset_url(asset_identifier="a", transform={"v": bad})
+                self.client.cdn.get_asset_url(asset_identifier="a", transform={"border": {"width": bad}}
+                                              if not isinstance(bad, dict) else {"border": bad})
             self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
         with self.assertRaises(CalmLensError) as raised:
             self.client.cdn.get_asset_url(asset_identifier="a", transform={"keep_me": 1})

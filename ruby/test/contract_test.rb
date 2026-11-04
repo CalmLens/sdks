@@ -45,6 +45,28 @@ class ContractTest < Minitest::Test
   end
   each_case('transform', TRANSFORM_OPTIONS['cases']) { |item| item['selector'] }
 
+  # Options the CDN refuses are refused before any URL is built, naming every refused key.
+  def replay_invalid_transform(item)
+    client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1', transport: ->(_) { flunk 'sent a request' })
+    error = assert_raises(CalmLens::InvalidArgumentError, item['options'].inspect) do
+      client.cdn.get_asset_url(asset_identifier: 'asset-1', transform: item['options'])
+    end
+    assert_equal 'sdk/invalid-argument', error.code
+    assert_equal item.slice('unknownKeys', 'invalidKeys'), error.details
+    (item['unknownKeys'] + item['invalidKeys']).each { |key| assert_includes error.message, key }
+  end
+  each_case('invalid_transform', TRANSFORM_OPTIONS['invalid']) { |item| JSON.generate(item['options']) }
+
+  # upload-mime-types.json: an upload of a type the API refuses is refused before it is sent.
+  def replay_refused_upload_type(type)
+    client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1', transport: ->(_) { flunk 'sent a request' })
+    error = assert_raises(CalmLens::Error, type) do
+      client.assets.create(name: 'x', content: { base64: 'aGVsbG8=', type: type })
+    end
+    assert_equal ['upload/invalid-mime-type', { 'mimeType' => type }], [error.code, error.details]
+  end
+  each_case('refused_upload_type', fixture('upload-mime-types')['refused']) { |type| type }
+
   # The option names the signatures accept, and the options written as colours, are the schema's.
   def test_transform_options_and_colour_keys_follow_the_schema
     loader = RBS::EnvironmentLoader.new

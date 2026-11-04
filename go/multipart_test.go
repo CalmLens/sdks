@@ -107,7 +107,7 @@ func TestADroppedPartIsRetriedWithItsKeyAndAPartTheAPIHasIsSkipped(t *testing.T)
 	if _, err := reader.Seek(7, io.SeekStart); err != nil {
 		t.Fatal(err)
 	}
-	asset, err := c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "archive.zip", Content: &Content{Type: "application/zip", Data: onlySeeker{reader}, SizeInBytes: &size}, IdempotencyKey: "upload-2"})
+	asset, err := c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "report.pdf", Content: &Content{Type: "application/pdf", Data: onlySeeker{reader}, SizeInBytes: &size}, IdempotencyKey: "upload-2"})
 	if err != nil || asset.Upload.Status != "completed" {
 		t.Fatal(asset, err)
 	}
@@ -140,12 +140,12 @@ func TestAFinalPartThatFindsTheUploadCompletedReadsTheAssetBack(t *testing.T) {
 func TestContentOfOnePartAndStreamsGoInOneRequest(t *testing.T) {
 	c, h := splitClient(t, DefaultPartSizeBytes)
 	ctx := context.Background()
-	if _, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "exact.zip", Content: &Content{Type: "application/zip", Bytes: fileOf(8 * mib)}}); err != nil {
+	if _, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "exact.pdf", Content: &Content{Type: "application/pdf", Bytes: fileOf(8 * mib)}}); err != nil {
 		t.Fatal(err)
 	}
 	stream := fileOf(9 * mib)
 	size := int64(len(stream))
-	if _, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "stream.zip", Content: &Content{Type: "application/zip", Data: io.MultiReader(bytes.NewReader(stream)), SizeInBytes: &size}}); err != nil {
+	if _, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "stream.pdf", Content: &Content{Type: "application/pdf", Data: io.MultiReader(bytes.NewReader(stream)), SizeInBytes: &size}}); err != nil {
 		t.Fatal(err)
 	}
 	equal(t, "partNumber", sentQuery(h, "partNumber"), []string{"", ""})

@@ -29,8 +29,12 @@
 #![deny(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+mod contract_checks;
 mod error;
 pub mod models;
+mod transform_schema;
+#[cfg(feature = "async")]
+mod upload_mime_types;
 mod webhooks;
 
 #[cfg(feature = "blocking")]

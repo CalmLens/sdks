@@ -864,6 +864,147 @@ async fn transform_option_contracts() {
     .await;
 }
 
+/// Transform options the CDN refuses, as `ImageTransformOptions` holds them, by `options`: the
+/// typed fields can't hold these values, so the options don't decode or don't keep them.
+const TRANSFORMS_NOT_HELD_BY_TYPE: [(&str, &str); 7] = [
+    (
+        r##"{"border":{"colour":"#ffffff"},"width":640}"##,
+        "ImageBorder has no extra map, so the unknown colour isn't kept",
+    ),
+    (
+        r#"{"trim":{"border":{"keep":1,"size":2}}}"#,
+        "TrimBorderOptions has no extra map, so the unknown size isn't kept",
+    ),
+    (
+        r#"{"gravity":{"x":0.5,"y":0.5}}"#,
+        "GravityPoint::mode is required",
+    ),
+    (r#"{"width":10.5}"#, "ImageTransformOptions::width is a u32"),
+    (r#"{"quality":1.5}"#, "ImageQuality is a u32 or a level"),
+    (
+        r#"{"anim":"false"}"#,
+        "ImageTransformOptions::anim is a bool",
+    ),
+    (
+        r#"{"fit":"cover","trim":{"border":{"keep":"x"}}}"#,
+        "TrimBorderOptions::keep is an f64",
+    ),
+];
+
+/// JSON equality with numbers compared by value, as a decoded `f64` writes `4` as `4.0`.
+fn same_json(left: &Value, right: &Value) -> bool {
+    match (left, right) {
+        (Value::Number(left), Value::Number(right)) => left.as_f64() == right.as_f64(),
+        (Value::Object(left), Value::Object(right)) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .all(|(key, value)| right.get(key).is_some_and(|other| same_json(value, other)))
+        }
+        (Value::Array(left), Value::Array(right)) => {
+            left.len() == right.len() && left.iter().zip(right).all(|(l, r)| same_json(l, r))
+        }
+        _ => left == right,
+    }
+}
+
+/// Every transform the CDN refuses (unknown options, including those in `extra`, and values it
+/// refuses) is refused with `sdk/invalid-argument` naming each key, before a URL is built.
+#[tokio::test]
+async fn refuses_transform_options_the_cdn_refuses() {
+    let fixture = fixture("transform-options");
+    let client = calmlens::ServerClient::new("key", "project-1").unwrap();
+    let client = &client;
+    each_case(
+        "invalid transform options",
+        named(&fixture["invalid"], "options"),
+        |case| async move {
+            let label = case["options"].to_string();
+            let decoded = serde_json::from_value::<ImageTransformOptions>(case["options"].clone());
+            if let Some((_, reason)) = TRANSFORMS_NOT_HELD_BY_TYPE
+                .iter()
+                .find(|(options, _)| *options == label)
+            {
+                let kept = decoded.as_ref().is_ok_and(|options| {
+                    same_json(&serde_json::to_value(options).unwrap(), &case["options"])
+                });
+                assert!(
+                    !kept,
+                    "{label}: {reason}, yet it decoded and kept the value"
+                );
+                println!("not held by type: {label}: {reason}");
+                return;
+            }
+            let options = decoded.unwrap_or_else(|cause| panic!("{label}: {cause}"));
+            let request = CdnRequest {
+                asset_identifier: "asset-1".into(),
+                transform: Some(options.into()),
+                ..Default::default()
+            };
+            let error = client.cdn().get_asset_url(&request).unwrap_err();
+            assert_eq!(error.code(), &ErrorCode::InvalidArgument, "{label}");
+            assert_eq!(
+                Value::Object(error.details().clone()),
+                json!({
+                    "unknownKeys": case["unknownKeys"],
+                    "invalidKeys": case["invalidKeys"],
+                }),
+                "{label}"
+            );
+            for key in case["unknownKeys"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .chain(case["invalidKeys"].as_array().unwrap())
+            {
+                let key = key.as_str().unwrap();
+                assert!(
+                    error.message().contains(key),
+                    "{label}: message lacks {key}"
+                );
+            }
+        },
+    )
+    .await;
+}
+
+// upload-mime-types.json
+
+/// Uploads of every type the API refuses are refused with `upload/invalid-mime-type` before
+/// anything is sent; accepted types are stored in the mock scenarios.
+#[tokio::test]
+async fn refuses_upload_mime_types_the_api_refuses() {
+    let fixture = fixture("upload-mime-types");
+    let mock = &MockServerClient::new().unwrap();
+    each_case(
+        "refused upload MIME types",
+        fixture["refused"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|kind| (kind.to_string(), kind)),
+        |kind| async move {
+            let kind = kind.as_str().unwrap();
+            let error = mock
+                .assets()
+                .create(SubmitAsset::new(
+                    "x",
+                    Content::bytes(b"hello".to_vec(), kind),
+                ))
+                .await
+                .unwrap_err();
+            assert_eq!(error.code(), &ErrorCode::InvalidUploadMimeType, "{kind}");
+            assert_eq!(
+                error.details().get("mimeType"),
+                Some(&json!(kind)),
+                "{kind}"
+            );
+        },
+    )
+    .await;
+    assert_eq!(mock.requests().len(), 0);
+}
+
 #[tokio::test]
 async fn validation_and_urls() {
     let client = calmlens::ServerClient::new("key", "project-1").unwrap();
@@ -1301,6 +1442,11 @@ async fn mock_scenarios() {
         named(&file["scenarios"], "name"),
         |scenario| async move {
             let name = scenario["name"].as_str().unwrap();
+            // Arguments the SDK's option types can't hold, such as metadata that isn't a list.
+            if let Some(reason) = scenario["untypedArgs"].as_str() {
+                println!("skipped, untyped arguments: {name}: {reason}");
+                return;
+            }
             let options = &scenario["mock"];
             let grants: Vec<testing::MockApiKeyGrant> =
                 typed(options.get("apiKeyGrants").cloned().unwrap_or(json!([])));
@@ -1670,6 +1816,8 @@ async fn reject(
         "assets.batch" => client.assets().batch(decode(options)?).await.map(drop),
         "folders.retrieve" => client.folders().retrieve(decode(options)?).await.map(drop),
         "cdn.serve" => client.cdn().serve(decode(options)?).await.map(drop),
+        "assets.create" => client.assets().create(decode(options)?).await.map(drop),
+        "assets.classify" => client.assets().classify(decode(options)?).await.map(drop),
         other => panic!("unhandled operation {other}"),
     })
 }

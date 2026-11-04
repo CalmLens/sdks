@@ -1459,7 +1459,7 @@ class UpdateAssetOptions(AssetIdOptions, total=False):
     metadata: Optional[list[MetadataItem]]
     externalId: Optional[str]
     externalUrl: Optional[str]
-    visibility: Visibility
+    visibility: Optional[Visibility]
 
 
 class SignedUrlOptions(AssetIdOptions, total=False):

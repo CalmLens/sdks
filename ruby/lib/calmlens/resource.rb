@@ -28,9 +28,15 @@ module CalmLens
     # Runs a public method: splits options, and raises every argument problem as {InvalidArgumentError}.
     # `method` names the public method: an option it doesn't take, such as a misspelt one, raises
     # `sdk/invalid-argument` instead of being silently dropped.
-    def call(options, method)
-      check_option_keys(options, [self.class::OPERATIONS, Internal.camelize(method)].compact.join('.'))
+    # An option given as nil is left out, as if omitted, unless the API takes null for it
+    # (Internal::NULLABLE_OPTION_KEYS), such as `description: nil` to clear a description;
+    # `keep_nil: true` sends every option as given, as for a lens definition.
+    def call(options, method, keep_nil: false)
+      operation = [self.class::OPERATIONS, Internal.camelize(method)].compact.join('.')
+      check_option_keys(options, operation)
       api, request = Internal.options(options)
+      nullable = Internal::NULLABLE_OPTION_KEYS.fetch(operation, [])
+      api = api.reject { |key, value| value.nil? && !nullable.include?(key) } unless keep_nil
       yield api, request
     rescue Error
       raise

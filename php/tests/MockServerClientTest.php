@@ -285,4 +285,20 @@ final class MockServerClientTest extends TestCase
         self::assertSame(ErrorCodes::ASSET_NOT_DECIDED, self::code(fn () => $client->assets->explain(['assetId' => $asset['id']])));
     }
 
+    /** The SDK refuses these types itself, so each is sent past it, straight to the mock, as another client could. */
+    public function testTheMockRefusesUploadsOfTypesTheApiRefuses(): void
+    {
+        $mock = new MockServerClient();
+        $session = (fn () => $this->session)->call($mock->client());
+        $http = (fn () => $this->http)->call($session);
+        $fixture = json_decode(file_get_contents(__DIR__ . '/../../ruby/testdata/upload-mime-types.json'), true, 512, JSON_THROW_ON_ERROR);
+        foreach ($fixture['refused'] as $type) {
+            $response = $http->request('POST', 'https://api.calmlens.invalid/v1/projects/project-1/assets?name=x&sizeInBytes=5&contentType=' . rawurlencode($type),
+                ['headers' => ['Content-Type' => $type, 'X-CalmLens-Upload' => 'content'], 'body' => 'hello', 'http_errors' => false]);
+            $body = json_decode((string) $response->getBody(), true);
+            self::assertSame([400, ErrorCodes::INVALID_UPLOAD_MIME_TYPE, ['mimeType' => $type]],
+                [$response->getStatusCode(), $body['code'] ?? null, $body['details'] ?? null], $type);
+        }
+        self::assertSame([], $mock->assets);
+    }
 }

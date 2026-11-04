@@ -29,6 +29,7 @@ import (
 
 	calmlens "github.com/CalmLens/sdks/go"
 	"github.com/CalmLens/sdks/go/internal/clock"
+	"github.com/CalmLens/sdks/go/internal/contract"
 )
 
 // Grant is one permission grant encoded into a mock API key by CreateMockAPIKey.
@@ -692,7 +693,7 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 		parts[i], _ = url.PathUnescape(escaped[i])
 	}
 	captured := CapturedRequest{Method: req.Method, Path: "/" + strings.Join(parts, "/"), Query: req.URL.Query(), Header: req.Header.Clone(), RawBody: raw, CDN: cdn}
-	if req.Header.Get("Content-Type") == "application/json" && len(raw) > 0 {
+	if jsonBody(req.Header) && len(raw) > 0 {
 		_ = json.Unmarshal(raw, &captured.Body)
 	}
 	m.requests = append(m.requests, captured)
@@ -715,7 +716,7 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 		return m.jsonResponse(req, header, nil, failure), nil
 	}
 	if cdn {
-		status, data, contentType := m.serve(req, parts, header)
+		status, data, contentType := m.serve(req, parts, escaped, header)
 		return response(req, status, header, contentType, data), nil
 	}
 	if req.Header.Get("X-Api-Key") != m.options.APIKey {
@@ -725,7 +726,7 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 	key := strings.Trim(req.Header.Get("Idempotency-Key"), " \t\r\n")
 	// Like the API, raw uploads are compared by query, Content-Type and length, not bytes.
 	compared := ""
-	if req.Header.Get("Content-Type") == "application/json" {
+	if jsonBody(req.Header) {
 		compared = string(raw)
 	}
 	fingerprint := strings.Join([]string{req.Method, req.URL.EscapedPath(), req.URL.RawQuery, req.Header.Get("Content-Type"), req.Header.Get("X-Calmlens-Upload"), strconv.Itoa(len(raw)), compared}, "\n")
@@ -989,6 +990,31 @@ func number(value any) float64 {
 
 var errUnknownRoute = &apiError{code: calmlens.CodeRouteNotFound, status: http.StatusNotFound}
 
+// checkMetadata refuses metadata the API's schema refuses: it is null or a list of { id, value }
+// objects with a string id and any JSON value.
+func checkMetadata(metadata any) error {
+	if metadata == nil {
+		return nil
+	}
+	items, ok := metadata.([]any)
+	if !ok {
+		return validation("validation/invalid-type", "metadata")
+	}
+	for index, entry := range items {
+		item, ok := entry.(map[string]any)
+		if !ok {
+			return validation("validation/invalid-type", fmt.Sprintf("metadata.%d", index))
+		}
+		if _, ok := item["id"].(string); !ok {
+			return validation("validation/invalid-type", fmt.Sprintf("metadata.%d.id", index))
+		}
+		if _, ok := item["value"]; !ok {
+			return validation("validation/invalid-value", fmt.Sprintf("metadata.%d.value", index))
+		}
+	}
+	return nil
+}
+
 // validation is a request the API's schema refuses: validation/<issue> with HTTP 400 and the
 // field in details.path.
 func validation(code, path string) error {
@@ -1032,9 +1058,16 @@ const (
 	cdnProtectionPolicy = "sandbox; default-src 'none'"
 )
 
+// jsonBody reports a request whose body is JSON: an application/json body that isn't a raw upload's
+// content, which may be JSON too.
+func jsonBody(headers http.Header) bool {
+	upload := headers.Get("X-CalmLens-Upload")
+	return headers.Get("Content-Type") == "application/json" && upload != "content" && upload != "part"
+}
+
 func (m *MockServerClient) dispatch(method string, parts []string, q url.Values, raw []byte, headers http.Header) (any, error) {
 	body := calmlens.JSON{}
-	if headers.Get("Content-Type") == "application/json" && len(raw) > 0 {
+	if jsonBody(headers) && len(raw) > 0 {
 		if err := json.Unmarshal(raw, &body); err != nil {
 			return nil, fail(calmlens.CodeInvalidUploadPayload)
 		}
@@ -1069,7 +1102,7 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 		case route == "assets/batch" && method == "POST":
 			return m.batchAssets(body, now)
 		case route == "assets" && method == "POST":
-			return m.createAsset(headers.Get("X-CalmLens-Upload"), body, q, raw, now)
+			return m.createAsset(headers.Get("X-CalmLens-Upload"), headers.Get("Content-Type"), body, q, raw, now)
 		case parts[2] == "policies", parts[2] == "policy":
 			return m.policyRoute(method, parts[2:], body)
 		}
@@ -1178,7 +1211,7 @@ func (m *MockServerClient) ensureLenses(body calmlens.JSON, now int64) (any, err
 
 // createAsset handles POST .../assets. The X-CalmLens-Upload header picks the mode: absent is
 // a JSON body, "content" raw file content and "part" the raw first part of a multipart upload.
-func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Values, raw []byte, now int64) (any, error) {
+func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON, q url.Values, raw []byte, now int64) (any, error) {
 	multipart := mode == "part"
 	options := body
 	if mode == "content" || multipart {
@@ -1199,23 +1232,37 @@ func (m *MockServerClient) createAsset(mode string, body calmlens.JSON, q url.Va
 			return nil, fail(calmlens.CodeInvalidUploadPayload)
 		}
 	}
+	if err := checkMetadata(options["metadata"]); err != nil {
+		return nil, err
+	}
 	if text(options["name"]) == "" {
 		return nil, fail(calmlens.CodeInvalidUploadPayload)
 	}
+	// Like the API: content and a multipart upload's first part need a type CalmLens can moderate.
+	if mode == "content" || multipart {
+		contentType := bodyType
+		if values, ok := q["contentType"]; ok {
+			contentType = values[0]
+		}
+		if !contract.AcceptedUploadMimeType(contentType) {
+			return nil, &apiError{code: calmlens.CodeInvalidUploadMimeType, status: http.StatusBadRequest, details: calmlens.JSON{"mimeType": contentType}}
+		}
+	}
 	mime := q.Get("contentType")
+	lower := strings.ToLower(mime)
 	kind := calmlens.AssetTypeFile
 	if options["url"] != nil {
 		kind = calmlens.AssetTypeWebsite
 	} else {
 		for _, prefix := range []string{"image", "video", "audio"} {
-			if strings.HasPrefix(mime, prefix+"/") {
+			if strings.HasPrefix(lower, prefix+"/") {
 				kind = prefix
 			}
 		}
-		if strings.HasPrefix(mime, "text/") {
+		if strings.HasPrefix(lower, "text/") {
 			kind = calmlens.AssetTypePlaintextDocument
 		}
-		if strings.Contains(mime, "pdf") || strings.Contains(mime, "document") {
+		if strings.Contains(lower, "pdf") || strings.Contains(lower, "document") {
 			kind = calmlens.AssetTypeMultimediaDocument
 		}
 	}
@@ -1734,6 +1781,27 @@ func (m *MockServerClient) deleteAssetTree(id string) {
 }
 
 func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.JSON, q url.Values, raw []byte, now int64) (any, error) {
+	// Like the API, the body's schema is checked before the asset is looked up.
+	switch {
+	case method == "PATCH" && suffix == "":
+		if err := checkMetadata(body["metadata"]); err != nil {
+			return nil, err
+		}
+		if value, ok := body["name"]; ok && value == nil {
+			return nil, validation("validation/invalid-type", "name")
+		}
+	case method == "POST" && suffix == "signed-url":
+		// None of these fields takes null.
+		for _, key := range []string{"viewerClaims", "resource", "lens", "transform", "expiresInSeconds"} {
+			if value, ok := body[key]; ok && value == nil {
+				code := "validation/invalid-type"
+				if key == "resource" {
+					code = "validation/invalid-value"
+				}
+				return nil, validation(code, key)
+			}
+		}
+	}
 	a, err := m.asset(id)
 	if err != nil {
 		return nil, err
@@ -2274,10 +2342,20 @@ func contains(values []string, value string) bool {
 
 // serve answers a CDN request like the CDN: a placeholder PNG, or the stored content with its
 // type, length, cache and protection headers; or a JSON error body.
-func (m *MockServerClient) serve(req *http.Request, parts []string, header http.Header) (int, []byte, string) {
+func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, header http.Header) (int, []byte, string) {
 	errorBody := func(status int, code, message string) (int, []byte, string) {
 		data, _ := json.Marshal(calmlens.JSON{"code": code, "message": message})
 		return status, data, "application/json"
+	}
+	// Like the CDN, the selector after the resource (as sent, still percent-encoded) is read
+	// first, and lenses and transforms apply only to the rendered resource.
+	var selector []string
+	if len(escaped) > 4 {
+		selector = escaped[4:]
+	}
+	lens, transform, ok := contract.ParseTransformSelector(strings.Join(selector, "/"))
+	if !ok || len(parts) >= 4 && parts[3] == calmlens.ResourceOriginal && (lens != "" || transform != nil) {
+		return errorBody(http.StatusBadRequest, "asset/invalid-transform", "Invalid transform selector")
 	}
 	if len(parts) < 4 || parts[0] != "assets" || parts[1] != m.options.ProjectID {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
@@ -2335,6 +2413,13 @@ func (m *MockServerClient) serve(req *http.Request, parts []string, header http.
 	restricted := asset["visibility"] != calmlens.VisibilityPublic
 	if restricted && !canDownload() {
 		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission", "This API key needs assets:download permission for this asset's folder.")
+	}
+	// Then the options, checked against the transform schema once the asset may be served.
+	if transform != nil {
+		unknownKeys, invalidKeys := contract.CheckTransformOptions(transform)
+		if keys := append(unknownKeys, invalidKeys...); len(keys) > 0 {
+			return errorBody(http.StatusBadRequest, calmlens.CodeInvalidTransformOptions, "Invalid transform options: "+strings.Join(keys, ", "))
+		}
 	}
 	// Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
 	// by shared caches only when delivery is public.

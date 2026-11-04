@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
@@ -523,10 +524,188 @@ public final class CalmLensServerClient implements AutoCloseable {
    */
   static String serializeTransform(Models.ImageTransformOptions transform) {
     Map<?, ?> options = transformOptions(transform);
+    assertTransformOptions(Json.GSON.toJsonTree(options));
     List<String> pairs = new ArrayList<>();
     for (String key : sortedKeys(options, "")) appendTransformOption(pairs, key, options.get(key));
     if (pairs.isEmpty()) throw argument("A transform needs at least one option");
     return String.join(",", pairs);
+  }
+
+  /** The image transform options' schema, read once from {@link TransformSchema#JSON}. */
+  private static final JsonObject TRANSFORM_OPTIONS_SCHEMA = JsonParser.parseString(TransformSchema.JSON).getAsJsonObject();
+
+  /** The dotted keys of transform options the CDN doesn't know, and those whose values it refuses. */
+  record TransformProblems(List<String> unknownKeys, List<String> invalidKeys) {
+    boolean isEmpty() { return unknownKeys.isEmpty() && invalidKeys.isEmpty(); }
+  }
+
+  /**
+   * Checks transform options against the image transform schema, as the CDN does, and returns the
+   * dotted keys it doesn't know and those whose values it refuses (or that are required and
+   * missing). Null options are left out of a selector, so they are not checked.
+   */
+  static TransformProblems checkTransformOptions(JsonElement options) {
+    TransformProblems problems = new TransformProblems(new ArrayList<>(), new ArrayList<>());
+    checkTransformRule(TRANSFORM_OPTIONS_SCHEMA, options, "", problems);
+    return problems;
+  }
+
+  private static void checkTransformRule(JsonObject schema, JsonElement value, String key, TransformProblems problems) {
+    JsonObject rule = schema;
+    if (schema.has("oneOf")) {
+      rule = null;
+      for (JsonElement branch : schema.getAsJsonArray("oneOf")) {
+        if (hasRuleType(str(branch.getAsJsonObject(), "type", null), value)) { rule = branch.getAsJsonObject(); break; }
+      }
+    }
+    if (rule == null || !hasRuleType(str(rule, "type", null), value) || rule.has("enum") && !inEnum(rule.getAsJsonArray("enum"), value)
+        || rule.has("minimum") && value.getAsBigDecimal().compareTo(rule.get("minimum").getAsBigDecimal()) < 0
+        || rule.has("maximum") && value.getAsBigDecimal().compareTo(rule.get("maximum").getAsBigDecimal()) > 0) {
+      problems.invalidKeys().add(key);
+      return;
+    }
+    if (!"object".equals(str(rule, "type", null))) return;
+    JsonObject object = value.getAsJsonObject();
+    JsonObject properties = rule.has("properties") ? rule.getAsJsonObject("properties") : new JsonObject();
+    if (rule.has("required"))
+      for (JsonElement name : rule.getAsJsonArray("required")) {
+        JsonElement child = object.get(name.getAsString());
+        if (child == null || child.isJsonNull()) problems.invalidKeys().add(childKey(key, name.getAsString()));
+      }
+    List<String> names = new ArrayList<>(object.keySet());
+    names.sort(null);
+    for (String name : names) {
+      JsonElement child = object.get(name);
+      if (child.isJsonNull()) continue;
+      if (properties.has(name)) checkTransformRule(properties.getAsJsonObject(name), child, childKey(key, name), problems);
+      else problems.unknownKeys().add(childKey(key, name));
+    }
+  }
+
+  private static String childKey(String key, String name) { return key.isEmpty() ? name : key + "." + name; }
+
+  /** Whether a JSON value has a schema type: integers are numbers with no fraction, booleans aren't numbers. */
+  private static boolean hasRuleType(String type, JsonElement value) {
+    if (type == null) return true;
+    boolean primitive = value.isJsonPrimitive();
+    return switch (type) {
+      case "object" -> value.isJsonObject();
+      case "string" -> primitive && value.getAsJsonPrimitive().isString();
+      case "boolean" -> primitive && value.getAsJsonPrimitive().isBoolean();
+      case "number" -> primitive && value.getAsJsonPrimitive().isNumber() && Double.isFinite(value.getAsDouble());
+      case "integer" -> primitive && value.getAsJsonPrimitive().isNumber() && Double.isFinite(value.getAsDouble())
+          && value.getAsBigDecimal().stripTrailingZeros().scale() <= 0;
+      default -> true;
+    };
+  }
+
+  /** Whether a value is one of an enum's, comparing numbers by value. */
+  private static boolean inEnum(JsonArray values, JsonElement value) {
+    for (JsonElement allowed : values) {
+      if (allowed.isJsonPrimitive() && allowed.getAsJsonPrimitive().isNumber() && value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber()) {
+        if (allowed.getAsBigDecimal().compareTo(value.getAsBigDecimal()) == 0) return true;
+      } else if (allowed.equals(value)) return true;
+    }
+    return false;
+  }
+
+  /** Throws {@code sdk/invalid-argument} naming each transform option the CDN would refuse. */
+  private static void assertTransformOptions(JsonElement options) {
+    TransformProblems problems = checkTransformOptions(options);
+    if (problems.isEmpty()) return;
+    List<String> parts = new ArrayList<>();
+    List<String> unknown = problems.unknownKeys(), invalid = problems.invalidKeys();
+    if (!unknown.isEmpty()) parts.add("unknown option" + (unknown.size() > 1 ? "s " : " ") + String.join(", ", unknown));
+    if (!invalid.isEmpty()) parts.add("invalid value" + (invalid.size() > 1 ? "s for " : " for ") + String.join(", ", invalid));
+    Map<String, Object> details = new LinkedHashMap<>();
+    details.put("unknownKeys", List.copyOf(unknown));
+    details.put("invalidKeys", List.copyOf(invalid));
+    throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "Transform options are invalid: " + String.join("; ", parts)
+        + ". Pass the options themselves, such as new ImageTransformOptions().width(640).format(\"webp\").", details, null);
+  }
+
+  /** A CDN selector as the CDN reads it: an optional lens and the transform options, each null when absent. */
+  record TransformSelector(String lens, JsonObject options) {}
+
+  private static final Pattern SELECTOR_LENS = Pattern.compile("^[a-z0-9-]{1,50}$");
+  private static final Pattern SELECTOR_NUMBER = Pattern.compile("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$");
+
+  /**
+   * Reads a CDN selector, the path after the resource as sent (still percent-encoded), as the CDN
+   * does: an optional first {@code @lens}, then {@code key=value} options with dotted keys for
+   * nested ones (a bare key is {@code true}). Values are numbers, {@code true}, {@code false}, hex
+   * colours ({@code #} added) for colour options, or text. Throws {@link IllegalArgumentException}
+   * on anything the CDN refuses as {@code asset/invalid-transform}. Used by the mock CDN.
+   */
+  static TransformSelector parseTransformSelector(String selector) {
+    if (selector.isEmpty()) return new TransformSelector(null, null);
+    IllegalArgumentException fail = new IllegalArgumentException("Invalid transform selector \"" + selector + "\"");
+    if (selector.contains("/")) throw fail;
+    List<String> entries = new ArrayList<>(List.of(selector.split(",", -1)));
+    String lens = null;
+    if (entries.get(0).startsWith("@")) {
+      lens = decodeSelectorText(entries.remove(0).substring(1), fail);
+      if (!SELECTOR_LENS.matcher(lens).matches()) throw fail;
+    }
+    if (entries.isEmpty()) return new TransformSelector(lens, null);
+    JsonObject options = new JsonObject();
+    for (String entry : entries) {
+      if (entry.isEmpty() || entry.startsWith("@")) throw fail;
+      int separator = entry.indexOf('=');
+      String key = separator == -1 ? entry : entry.substring(0, separator);
+      String[] parts = key.split("\\.", -1);
+      for (String part : parts) if (!TRANSFORM_OPTION_NAME.matcher(part).matches()) throw fail;
+      JsonElement value = new JsonPrimitive(true);
+      if (separator != -1) {
+        String text = decodeSelectorText(entry.substring(separator + 1), fail);
+        if (text.isEmpty()) throw fail;
+        if (TRANSFORM_COLOUR_KEYS.contains(key) && HEX_COLOUR.matcher("#" + text).matches()) value = new JsonPrimitive("#" + text.toLowerCase(Locale.ROOT));
+        else if (SELECTOR_NUMBER.matcher(text).matches()) value = new JsonPrimitive(new java.math.BigDecimal(text));
+        else if (text.equals("true") || text.equals("false")) value = new JsonPrimitive(text.equals("true"));
+        else value = new JsonPrimitive(text);
+      }
+      JsonObject target = options;
+      for (int i = 0; i < parts.length - 1; i++) {
+        JsonElement next = target.get(parts[i]);
+        if (next != null && !next.isJsonObject()) throw fail;
+        if (next == null) target.add(parts[i], next = new JsonObject());
+        target = next.getAsJsonObject();
+      }
+      if (target.has(parts[parts.length - 1])) throw fail;
+      target.add(parts[parts.length - 1], value);
+    }
+    return new TransformSelector(lens, options);
+  }
+
+  /** Percent-decodes selector text as {@code decodeURIComponent} does, refusing malformed escapes. */
+  private static String decodeSelectorText(String text, IllegalArgumentException fail) {
+    java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+    StringBuilder out = new StringBuilder();
+    for (int i = 0; i < text.length(); ) {
+      char c = text.charAt(i);
+      if (c != '%') {
+        if (bytes.size() > 0) { out.append(utf8(bytes.toByteArray(), fail)); bytes.reset(); }
+        out.append(c);
+        i++;
+        continue;
+      }
+      if (i + 2 >= text.length()) throw fail;
+      int high = Character.digit(text.charAt(i + 1), 16), low = Character.digit(text.charAt(i + 2), 16);
+      if (high < 0 || low < 0) throw fail;
+      bytes.write(high << 4 | low);
+      i += 3;
+    }
+    if (bytes.size() > 0) out.append(utf8(bytes.toByteArray(), fail));
+    return out.toString();
+  }
+
+  private static String utf8(byte[] bytes, IllegalArgumentException fail) {
+    try {
+      return StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+          .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+    } catch (java.nio.charset.CharacterCodingException malformed) {
+      throw fail;
+    }
   }
 
   /** Returns the options as nested maps of their wire values, or an empty map for none. */
@@ -855,18 +1034,34 @@ public final class CalmLensServerClient implements AutoCloseable {
 
   // ------------------------------------------------------------------ Uploads
 
-  /** MIME types the API refuses for uploads, after dropping parameters and lowercasing. */
-  private static final Set<String> REJECTED_UPLOAD_MIME_TYPES = Set.of("application/octet-stream", "multipart/form-data",
-      "multipart/mixed", "multipart/alternative", "multipart/related", "multipart/signed", "multipart/encrypted");
-
-  private static void checkMimeType(String type) {
+  /** A MIME type lower-cased, without parameters and trimmed, as the API compares upload types. */
+  private static String normalizeUploadMimeType(String type) {
     String lower = type.toLowerCase(Locale.ROOT);
     String mime = lower.split(";", -1)[0].strip();
-    if (mime.isEmpty()) mime = lower.strip();
-    if (REJECTED_UPLOAD_MIME_TYPES.contains(mime))
-      throw new CalmLensException(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, mime
-          + " is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process,"
-          + " such as image/png, image/jpeg, application/pdf, or text/plain.", Map.of("mimeType", type), null);
+    return mime.isEmpty() ? lower.strip() : mime;
+  }
+
+  /**
+   * Whether the API accepts an upload of this MIME type: an image, audio, video, text, document or
+   * website type, not a container such as {@code application/octet-stream}. It refuses any other
+   * type with {@code upload/invalid-mime-type}.
+   */
+  static boolean isAcceptedUploadMimeType(String type) {
+    String mime = normalizeUploadMimeType(type);
+    if (UploadMimeTypes.REJECTED.contains(mime)) return false;
+    return UploadMimeTypes.PREFIXES.stream().anyMatch(mime::startsWith) || UploadMimeTypes.SUFFIXES.stream().anyMatch(mime::endsWith)
+        || UploadMimeTypes.TYPES.contains(mime);
+  }
+
+  /** The API's message for an upload type it refuses. */
+  static String rejectedUploadMimeTypeMessage(String type) {
+    return normalizeUploadMimeType(type) + " is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens"
+        + " can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.";
+  }
+
+  private static void checkMimeType(String type) {
+    if (!isAcceptedUploadMimeType(type))
+      throw new CalmLensException(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, rejectedUploadMimeTypeMessage(type), Map.of("mimeType", type), null);
   }
 
   /**

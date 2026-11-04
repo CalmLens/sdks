@@ -1200,9 +1200,9 @@ pub struct UpdateAsset {
     /// The asset ID.
     #[serde(skip_serializing)]
     pub asset_id: String,
-    /// The name.
-    #[serde(default, skip_serializing_if = "Patch::is_missing")]
-    pub name: Patch<String>,
+    /// The new name. An asset always has a name, so it can't be cleared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     /// The description.
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub description: Patch<String>,
@@ -3137,8 +3137,10 @@ impl CdnTransform {
         matches!(self, Self::Selector(value) if value.is_empty())
     }
     /// The selector string the API and CDN accept. Fails with `sdk/invalid-argument` for a
-    /// selector containing `/`, `..`, `?` or `#` or starting with `@`, for no options, option
-    /// names that aren't camelCase letters and digits, or option values that are arrays.
+    /// selector containing `/`, `..`, `?` or `#` or starting with `@`, for no options, and for
+    /// structured options the CDN would refuse: options it doesn't know (such as keys in
+    /// `extra`) or values it refuses, such as a `width` of 0. The error's details list them as
+    /// `unknownKeys` and `invalidKeys`.
     pub fn selector(&self) -> crate::Result<String> {
         let options = match self {
             Self::Selector(value) => {
@@ -3155,9 +3157,11 @@ impl CdnTransform {
             Self::Options(options) => options,
         };
         let mut pairs = Vec::new();
-        match serde_json::to_value(options.as_ref())
-            .map_err(|cause| transform_error(&cause.to_string()))?
-        {
+        let value = serde_json::to_value(options.as_ref())
+            .map_err(|cause| transform_error(&cause.to_string()))?;
+        // Like the CDN: options in `extra` it doesn't know, and values out of range, are refused.
+        crate::contract_checks::assert_transform_options(&value)?;
+        match value {
             Value::Object(options) => append_transform_options(&mut pairs, None, &options)?,
             _ => return Err(transform_error("Transform options must be an object")),
         }

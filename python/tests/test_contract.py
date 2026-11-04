@@ -31,6 +31,7 @@ from calmlens import (CalmLensAPIError, CalmLensError, CalmLensServerClient, Cal
                       is_test_webhook_event, parse_webhook_event, testing, to_webhook_event_payload,
                       verify_webhook_signature)
 from calmlens import _mock_classification, _signed_test_inputs
+from calmlens._option_keys import NULLABLE_OPTION_KEYS
 from calmlens.client import _serialize_transform
 from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, sign_upload_token
 from calmlens.types import IMAGE_TRANSFORM_COLOUR_KEYS, ImageTransformOptions
@@ -84,16 +85,23 @@ def _content(value: Any) -> Any:
     return value
 
 
-def _invoke(client: CalmLensServerClient, operation: str, args: Any) -> Any:
-    """Run a JavaScript client operation with JavaScript option names on the Python client."""
+def _invoke(client: CalmLensServerClient, operation: str, args: Any, as_keywords: bool = False) -> Any:
+    """Run a JavaScript client operation with JavaScript option names on the Python client: as one
+    options dict, or with ``as_keywords`` as the snake_case keyword arguments callers write, such as
+    ``viewer_claims=None``."""
     args = dict(args or {})
     for key in ("content", "part"):
         if key in args:
             args[key] = _content(args[key])
+
+    def call(method: Any, options: dict[str, Any], **keywords: Any) -> Any:
+        if as_keywords:
+            return method(**{_snake(key): value for key, value in options.items()}, **keywords)
+        return method(options, **keywords)
     if operation in _ITERATORS:
         items: list[Any] = []
         try:
-            for item in _resolve_name(client, _ITERATORS[operation])(args):
+            for item in call(_resolve_name(client, _ITERATORS[operation]), args):
                 items.append(item)
         except CalmLensError as error:
             raise _Partial(items, error) from error
@@ -103,7 +111,7 @@ def _invoke(client: CalmLensServerClient, operation: str, args: Any) -> Any:
     keywords = {}
     if "idempotencyKey" in args:
         keywords["idempotency_key"] = args.pop("idempotencyKey")
-    return _resolve_name(client, _snake(operation))(args, **keywords)
+    return call(_resolve_name(client, _snake(operation)), args, **keywords)
 
 
 def _client_options(options: dict[str, Any]) -> dict[str, Any]:
@@ -325,12 +333,16 @@ class TypeContractTests(unittest.TestCase):
                                               complete=fixture.get("fullModel") is True), [])
 
     def test_options_match_the_declared_option_types(self) -> None:
+        """Every option has its declared type, apart from ``None`` for an option the API refuses
+        ``null`` for, which the client leaves out (the requests fixtures check that it does)."""
         for index, fixture in enumerate(_fixture("requests.json"), 1):
             operation = fixture["operation"]
             with self.subTest(f"{index}: {operation}"):
                 options_type, _ = _declared(operation)
+                nullable = NULLABLE_OPTION_KEYS.get(operation, frozenset())
                 options = {key: _content(value) if key in ("content", "part") else value
-                           for key, value in (fixture["options"] or {}).items() if key != "idempotencyKey"}
+                           for key, value in (fixture["options"] or {}).items()
+                           if key != "idempotencyKey" and (value is not None or key in nullable)}
                 self.assertEqual(_type_errors(options, options_type, "options"), [])
 
 
@@ -343,11 +355,47 @@ class TransformTests(unittest.TestCase):
             with self.subTest(options=case["options"]):
                 self.assertEqual(_serialize_transform(case["options"]), case["selector"])
 
+    def test_refuses_invalid_transform_options(self) -> None:
+        """Options the CDN refuses are refused before any URL is built or request sent, naming every
+        unknown and invalid key, in CDN URLs, served requests and signed URLs alike."""
+        client = _client()
+        calls = {
+            "cdn.get_asset_url": lambda options: client.cdn.get_asset_url(asset_identifier="asset-1",
+                                                                          transform=options),
+            "cdn.serve": lambda options: client.cdn.serve(asset_identifier="asset-1", transform=options),
+            "assets.create_signed_url": lambda options: client.assets.create_signed_url(asset_id="asset-1",
+                                                                                        transform=options),
+        }
+        for case in self.fixture["invalid"]:
+            for name, call in calls.items():
+                with self.subTest(name, options=case["options"]):
+                    with self.assertRaises(CalmLensValidationError) as raised:
+                        call(case["options"])
+                    self.assertEqual(raised.exception.code, "sdk/invalid-argument")
+                    self.assertEqual(raised.exception.details,
+                                     {"unknownKeys": case["unknownKeys"], "invalidKeys": case["invalidKeys"]})
+                    for key in [*case["unknownKeys"], *case["invalidKeys"]]:
+                        self.assertIn(key, str(raised.exception))
+
     def test_option_names(self) -> None:
         self.assertEqual(sorted(typing.get_type_hints(ImageTransformOptions)), sorted(self.fixture["options"]))
 
     def test_colour_keys(self) -> None:
         self.assertEqual(sorted(IMAGE_TRANSFORM_COLOUR_KEYS), sorted(self.fixture["colourKeys"]))
+
+
+class UploadMimeTypeTests(unittest.TestCase):
+    fixture = _fixture("upload-mime-types.json")
+
+    def test_refuses_types_the_api_refuses_before_sending(self) -> None:
+        """The client refuses each type the API refuses, as content or as a multipart upload's first
+        part, without sending a request (``_client`` fails on any request)."""
+        for mime_type in self.fixture["refused"]:
+            for mode in ("content", "part"):
+                with self.subTest(mime_type, mode=mode), self.assertRaises(CalmLensValidationError) as raised:
+                    _client().assets.create(name="x", **{mode: {"base64": "aGVsbG8=", "type": mime_type}})
+                self.assertEqual(raised.exception.code, "upload/invalid-mime-type")
+                self.assertEqual(raised.exception.details, {"mimeType": mime_type})
 
 
 # ---- client-cases.json ------------------------------------------------------------------------
@@ -875,13 +923,14 @@ def _run(client: MockCalmLensServerClient, operation: str, args: dict[str, Any],
                                  retry_after=args.get("retryAfter"))
         return None
     if operation == "cdn.serve":
-        with client.cdn.serve(args) as response:
+        with client.cdn.serve(**{_snake(key): value for key, value in args.items()}) as response:
             body = response.read()
             code = (json.loads(body).get("code")
                     if (response.content_type or "").startswith("application/json") else None)
             return {"status": response.status, "code": code, "bytes": body, "headers": response.headers}
     try:
-        return _json(_invoke(client, operation, args))
+        # Scenarios call the mock as users do, with keyword arguments.
+        return _json(_invoke(client, operation, args, as_keywords=True))
     except _Partial as failure:
         raise failure.error from None
 

@@ -38,7 +38,8 @@ from . import error_codes
 from ._mock_classification import CATEGORIES, QUALIFIERS
 from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_PART_SIZE_BYTES, DEFAULT_TIMEOUT,
                      CalmLensServerClient,
-                     _UNSET, _invalid, _json, _merge, _sign_upload_token)
+                     _HEX_COLOUR, _UNSET, _check_transform_options, _invalid, _invalid_upload_mime_type,
+                     _is_accepted_upload_mime_type, _json, _merge, _sign_upload_token)
 from ._signed_test_inputs import (MEDIA_TEST_SIGNALS, TEST_INPUT_PRESETS, TEXT_TEST_SIGNALS, ClassificationTestSignal,
                                   PaintedTestImage, SignedTestAction, SignedTestInput, SignedTestInstance,
                                   SignedTestRegion, SignedTestRegionalAction, SignedTestRegionalActionName,
@@ -46,8 +47,8 @@ from ._signed_test_inputs import (MEDIA_TEST_SIGNALS, TEST_INPUT_PRESETS, TEXT_T
                                   signal_test_input)
 from .errors import CalmLensError
 from .moderation_context import select_moderation_context_items
-from .types import (Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder, HashList, HashListEntry,
-                    SignedUploadToken, SignUploadTokenOptions)
+from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder,
+                    HashList, HashListEntry, SignedUploadToken, SignUploadTokenOptions)
 
 __all__ = ["MockCalmLensServerClient", "MockRequest", "MockOptions", "MockAssetOutcome", "MockDecision",
            "MockModerationContent", "MockModerationInput", "MockModerationTrigger", "MockModerate",
@@ -237,7 +238,7 @@ def sign_upload_token(api_key: str, options: SignUploadTokenOptions | None = Non
     fixed ``now`` (milliseconds since the epoch) with a fixed ``nonce``, so the token is the
     same every time, for comparing with known tokens in tests. Options are an options dict or
     the same keyword arguments as ``upload_tokens.sign``."""
-    merged = _merge(options, upload_preset_id=upload_preset_id, external_id=external_id,
+    merged = _merge("uploadTokens.sign", options, upload_preset_id=upload_preset_id, external_id=external_id,
                     expires_in_seconds=expires_in_seconds)
     return _sign_upload_token(api_key, merged, now, nonce)
 
@@ -668,6 +669,92 @@ def _invalid_field(code: str, path: str) -> _Failure:
     return _Failure(code, f"Invalid {path}", 400, {"path": path})
 
 
+def _check_metadata(metadata: Any) -> None:
+    """Refuse ``metadata`` the API's schema refuses: it is ``None`` or a list of ``{id, value}``
+    objects with a string ``id`` and any JSON ``value``."""
+    if metadata is None:
+        return
+    if not isinstance(metadata, list):
+        raise _invalid_field("validation/invalid-type", "metadata")
+    for index, item in enumerate(metadata):
+        if not isinstance(item, dict):
+            raise _invalid_field("validation/invalid-type", f"metadata.{index}")
+        if not isinstance(item.get("id"), str):
+            raise _invalid_field("validation/invalid-type", f"metadata.{index}.id")
+        if "value" not in item:
+            raise _invalid_field("validation/invalid-value", f"metadata.{index}.value")
+
+
+_SELECTOR_LENS = re.compile(r"[a-z0-9-]{1,50}")
+_SELECTOR_NAME = re.compile(r"[a-z][a-zA-Z0-9]*")
+_SELECTOR_NUMBER = re.compile(r"-?(?:0|[1-9]\d*)(?:\.\d+)?")
+
+
+class _InvalidSelector(Exception):
+    """A CDN selector the CDN refuses as ``asset/invalid-transform``."""
+
+
+def _decode_selector_text(text: str) -> str:
+    # Like decodeURIComponent: a malformed escape or invalid UTF-8 is refused.
+    if re.search(r"%(?![0-9a-fA-F]{2})", text):
+        raise _InvalidSelector(text)
+    try:
+        return unquote(text, errors="strict")
+    except UnicodeDecodeError:
+        raise _InvalidSelector(text) from None
+
+
+def _parse_transform_selector(selector: str) -> tuple[str | None, dict[str, Any] | None]:
+    """Read a CDN selector, the path after the resource as sent (still percent-encoded), as the CDN
+    does: an optional first ``@lens``, then ``key=value`` options with dotted keys for nested ones
+    (a bare key is ``True``). Values are numbers, ``true``, ``false``, hex colours (``#`` added)
+    for colour options, or text. Raises ``_InvalidSelector`` on anything the CDN refuses as
+    ``asset/invalid-transform``. Returns the lens and the options (each None when absent)."""
+    if not selector:
+        return None, None
+    if "/" in selector:
+        raise _InvalidSelector(selector)
+    entries = selector.split(",")
+    lens: str | None = None
+    if entries[0].startswith("@"):
+        lens = _decode_selector_text(entries.pop(0)[1:])
+        if not _SELECTOR_LENS.fullmatch(lens):
+            raise _InvalidSelector(selector)
+    if not entries:
+        return lens, None
+    options: dict[str, Any] = {}
+    for entry in entries:
+        if not entry or entry.startswith("@"):
+            raise _InvalidSelector(selector)
+        key, separator, text = entry.partition("=")
+        parts = key.split(".")
+        if not all(_SELECTOR_NAME.fullmatch(part) for part in parts):
+            raise _InvalidSelector(selector)
+        value: Any = True
+        if separator:
+            text = _decode_selector_text(text)
+            if text == "":
+                raise _InvalidSelector(selector)
+            if key in IMAGE_TRANSFORM_COLOUR_KEYS and _HEX_COLOUR.fullmatch("#" + text):
+                value = "#" + text.lower()
+            elif _SELECTOR_NUMBER.fullmatch(text):
+                value = float(text) if "." in text else int(text)
+            elif text in ("true", "false"):
+                value = text == "true"
+            else:
+                value = text
+        target = options
+        for part in parts[:-1]:
+            child = target.setdefault(part, {})
+            if not isinstance(child, dict):
+                raise _InvalidSelector(selector)
+            target = child
+        if parts[-1] in target:
+            raise _InvalidSelector(selector)
+        target[parts[-1]] = value
+    return lens, options
+
+
 def _bounded_int(value: Any, path: str, maximum: int) -> int:
     """A query integer from 1 to ``maximum``, refused like the API's schema."""
     try:
@@ -1028,8 +1115,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
         url = urlsplit(relative)
         query = _decode_query(parse_qsl(url.query, keep_blank_values=True))
         content_type = next((v for k, v in headers.items() if k.lower() == "content-type"), "")
+        upload = next((v for k, v in headers.items() if k.lower() == "x-calmlens-upload"), "")
         body: Any = raw
-        if raw is not None and content_type == "application/json":
+        if raw is not None and content_type == "application/json" and upload not in ("content", "part"):
             body = json.loads(raw)
         parts = [unquote(p) for p in url.path.strip("/").split("/")]
         operations = self._operations(request.get_method(), parts, query, headers, cdn)
@@ -1230,7 +1318,12 @@ class MockCalmLensServerClient(CalmLensServerClient):
         raw_upload = upload in ("content", "part")
         multipart = upload == "part"
         options = query if raw_upload else body
+        _check_metadata(options.get("metadata"))
         mime = options.get("contentType", "")
+        if raw_upload and not (isinstance(mime, str) and _is_accepted_upload_mime_type(mime)):
+            # Like the API: an upload of a type CalmLens can't moderate is refused before it is stored.
+            refused = _invalid_upload_mime_type(mime)
+            raise _Failure(refused.code, refused.message, 400, refused.details)
         kind = "website" if "url" in options else next(
             (k for k in ("image", "video", "audio") if mime.startswith(k + "/")),
             "plaintext-document" if mime.startswith("text/") else
@@ -1439,6 +1532,17 @@ class MockCalmLensServerClient(CalmLensServerClient):
                         body: dict[str, Any], raw: bytes | None) -> Any:
         assets = self.database_storage.assets
         now = self.now()
+        # Like the API, the request schema is checked before the asset is looked up.
+        if method == "PATCH" and not suffix:
+            _check_metadata(body.get("metadata"))
+            if "name" in body and body["name"] is None:
+                raise _invalid_field("validation/invalid-type", "name")
+        if suffix == "signed-url":
+            # None of these fields takes null.
+            for key in ("viewerClaims", "resource", "lens", "transform", "expiresInSeconds"):
+                if key in body and body[key] is None:
+                    raise _invalid_field("validation/invalid-value" if key == "resource" else "validation/invalid-type",
+                                         key)
         asset = self._asset(identifier)
         if method == "DELETE":
             if suffix == "content":
@@ -1898,6 +2002,15 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if len(segments) < 4 or segments[0] != "assets":
             return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
         project, identifier, resource = unquote(segments[1]), unquote(segments[2]), segments[3]
+        # Like the CDN, the selector after the resource is read first, and lenses and transforms
+        # apply only to the rendered resource.
+        invalid_transform = _Failure("asset/invalid-transform", "Invalid transform selector", 400)
+        try:
+            lens, transform_options = _parse_transform_selector("/".join(segments[4:]))
+        except _InvalidSelector:
+            return self._failure_response(invalid_transform)
+        if resource == "original" and (lens is not None or transform_options is not None):
+            return self._failure_response(invalid_transform)
         not_available = _Failure("asset/not-available", "Asset is not available", 403)
         with self._state_lock:
             asset = next((a for a in self.database_storage.assets.values()
@@ -1933,6 +2046,13 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._failure_response(_Failure(
                     "asset/api-key-missing-permission",
                     "This API key needs assets:download permission for this asset’s folder.", 403))
+            # Then the options, checked against the transform schema once the asset may be served.
+            if transform_options is not None:
+                unknown_keys, invalid_keys = _check_transform_options(transform_options)
+                if unknown_keys or invalid_keys:
+                    return self._failure_response(_Failure(
+                        "asset/invalid-transform-options",
+                        f"Invalid transform options: {', '.join([*unknown_keys, *invalid_keys])}", 400))
             content = b"".join(v for _, v in sorted(stored["parts"].items()))
             content_type = stored["type"] or "application/octet-stream"
             image = asset["type"] == "image"

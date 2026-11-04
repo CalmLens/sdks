@@ -431,6 +431,71 @@ class ContractTest {
     });
   }
 
+  /**
+   * Invalid cases {@link Models.ImageTransformOptions} cannot hold: unknown options and values of
+   * another type do not survive decoding, so no Java caller can pass them.
+   */
+  private static final Map<String, String> TRANSFORM_OPTIONS_REJECTED_BY_TYPE = Map.of(
+      "{\"type\":\"imageTransform\",\"options\":{\"format\":\"webp\",\"width\":640}}", "ImageTransformOptions has no type or options option",
+      "{\"bogus\":1}", "ImageTransformOptions has no bogus option",
+      "{\"width\":640,\"border\":{\"colour\":\"#ffffff\"}}", "ImageBorder has color, not colour",
+      "{\"trim\":{\"border\":{\"keep\":1,\"size\":2}}}", "TrimBorder has no size",
+      "{\"gravity\":{\"x\":0.5,\"y\":0.5}}", "Gravity.point requires a mode",
+      "{\"width\":10.5}", "width is an Integer",
+      "{\"quality\":1.5}", "a numeric Quality is an int",
+      "{\"anim\":\"false\"}", "anim is a Boolean",
+      "{\"fit\":\"cover\",\"trim\":{\"border\":{\"keep\":\"x\"}}}", "TrimBorder.keep is a Double");
+
+  /** Structured options as decoded and encoded again, or null when they do not decode. */
+  private static JsonElement transformRoundTrip(JsonElement options) {
+    try {
+      return Json.GSON.toJsonTree(Json.GSON.fromJson(options, Models.ImageTransformOptions.class));
+    } catch (RuntimeException undecodable) {
+      return null;
+    }
+  }
+
+  /** Options the CDN refuses are refused before any URL is built, naming every refused key. */
+  @TestFactory Stream<DynamicTest> refusesInvalidTransformOptions() throws Exception {
+    return cases(array("transform-options.json", "invalid"), c -> c.get("options").toString(), testCase -> {
+      JsonElement options = testCase.get("options");
+      String reason = TRANSFORM_OPTIONS_REJECTED_BY_TYPE.get(options.toString());
+      if (reason != null) {
+        assertNotEquals(options, transformRoundTrip(options), reason);
+        return;
+      }
+      assertEquals(options, transformRoundTrip(options), "decodes into ImageTransformOptions");
+      Models.ImageTransformOptions typed = Json.GSON.fromJson(options, Models.ImageTransformOptions.class);
+      CalmLensException error = assertThrows(CalmLensException.class,
+          () -> refusing().cdn.getAssetUrl(new Models.CdnRequest("asset-1").transform(typed)));
+      assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, error.getCode());
+      List<String> unknownKeys = Json.GSON.fromJson(testCase.get("unknownKeys"), new com.google.gson.reflect.TypeToken<List<String>>() {}.getType());
+      List<String> invalidKeys = Json.GSON.fromJson(testCase.get("invalidKeys"), new com.google.gson.reflect.TypeToken<List<String>>() {}.getType());
+      assertEquals(Map.of("unknownKeys", unknownKeys, "invalidKeys", invalidKeys), error.getDetails());
+      for (String key : unknownKeys) assertTrue(error.getMessage().contains(key), error.getMessage());
+      for (String key : invalidKeys) assertTrue(error.getMessage().contains(key), error.getMessage());
+    });
+  }
+
+  // upload-mime-types.json
+
+  /** Each type the API refuses is refused by {@code assets.create} before anything is sent. */
+  @TestFactory Stream<DynamicTest> refusesUploadsOfRefusedMimeTypesBeforeSending() throws Exception {
+    JsonArray refused = array("upload-mime-types.json", "refused");
+    assertFalse(refused.isEmpty(), "no fixture cases");
+    List<DynamicTest> tests = new ArrayList<>();
+    for (JsonElement element : refused) {
+      String type = element.getAsString();
+      tests.add(DynamicTest.dynamicTest(type, () -> {
+        CalmLensException error = assertThrows(CalmLensException.class, () -> refusing().assets.create(
+            new Models.SubmitAsset("x", new Models.Content().mimeType(type).base64("aGVsbG8="))));
+        assertEquals(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, error.getCode());
+        assertEquals(Map.of("mimeType", type), error.getDetails());
+      }));
+    }
+    return tests.stream();
+  }
+
   // mock-scenarios.json: replayed against MockCalmLensServerClient.
 
   /** Follows a dotted path: numeric segments index arrays, {@code length} is an array's length. */
@@ -712,6 +777,12 @@ class ContractTest {
   @TestFactory Stream<DynamicTest> mockScenarios() throws Exception {
     return cases(array("mock-scenarios.json", "scenarios"), s -> s.get("name").getAsString(), scenario -> {
       String name = scenario.get("name").getAsString();
+      if (scenario.has("untypedArgs")) {
+        // The scenario passes arguments the SDK's option types cannot hold.
+        String reason = scenario.get("untypedArgs").getAsString();
+        System.out.println("Skipping " + name + " (untyped args: " + reason + ")");
+        Assumptions.abort("untyped args: " + reason);
+      }
       JsonObject options = scenario.getAsJsonObject("mock");
       Grant[] grants = options.has("apiKeyGrants") ? grants(options.getAsJsonArray("apiKeyGrants")) : new Grant[0];
       CalmLensServerClient.Builder builder = CalmLensServerClient.builder(MockCalmLensServerClient.createMockApiKey(grants), "project-1")
@@ -884,7 +955,8 @@ class ContractTest {
   /** Fixture options a Java type cannot hold, so the type already refuses the request. */
   private static final Map<String, String> REJECTED_BY_TYPE = Map.of(
       "signed URL lifetime of a fraction of a second", "SignedUrlOptions.expiresInSeconds is a Long",
-      "batch with an unknown operation", "BatchAssets.operation is an AssetBatchOperation enum");
+      "batch with an unknown operation", "BatchAssets.operation is an AssetBatchOperation enum",
+      "signed URL with an unknown transform option", "ImageTransformOptions has no bogus option");
   private static final Map<String, Class<?>> REJECTED_TYPES = Map.of(
       "signed URL lifetime of a fraction of a second", Models.SignedUrlOptions.class,
       "batch with an unknown operation", Models.BatchAssets.class);
@@ -896,6 +968,11 @@ class ContractTest {
       JsonObject options = rejection.getAsJsonObject("options");
       if (REJECTED_BY_TYPE.containsKey(name)) {
         // The typed options cannot hold the fixture's value: it does not survive decoding.
+        if (options.has("transform") && options.get("transform").isJsonObject()) {
+          JsonElement transform = options.get("transform");
+          assertNotEquals(transform, transformRoundTrip(transform), REJECTED_BY_TYPE.get(name));
+          return;
+        }
         JsonObject typed = Models.encode(Fixtures.decode(options, REJECTED_TYPES.get(name)));
         assertNotEquals(options, typed, REJECTED_BY_TYPE.get(name));
         return;

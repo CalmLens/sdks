@@ -1,7 +1,11 @@
 import hashlib
 import hmac
 import http.client
+import json
 import unittest
+from pathlib import Path
+from urllib.parse import urlencode
+from urllib.request import Request
 
 from calmlens import CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError, error_codes
 from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, default_moderate
@@ -110,6 +114,38 @@ class MockTests(unittest.TestCase):
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.explain(asset_id=asset["id"])
         self.assertEqual(raised.exception.code, error_codes.ASSET_NOT_DECIDED)
+
+    def test_refuses_raw_uploads_of_types_the_api_refuses_and_stores_nothing(self):
+        # The client refuses these before sending, so the request goes straight to the mock's transport.
+        fixture = Path(__file__).resolve().parents[2] / "go" / "testdata" / "upload-mime-types.json"
+        for mime_type in json.loads(fixture.read_text())["refused"]:
+            with self.subTest(mime_type):
+                query = urlencode({"name": "x", "queue": "true", "contentType": mime_type, "sizeInBytes": 5})
+                request = Request(f"{self.client.base_url}/projects/{self.client.project_id}/assets?{query}",
+                                  data=b"hello", method="POST",
+                                  headers={"Content-Type": mime_type, "X-CalmLens-Upload": "content"})
+                with self.client.transport(request, 1) as response:
+                    self.assertEqual(response.status, 400)
+                    body = json.loads(response.read())
+                self.assertEqual(body["code"], error_codes.INVALID_UPLOAD_MIME_TYPE)
+                self.assertEqual(body["details"], {"mimeType": mime_type})
+                self.assertEqual(self.client.database_storage.assets, {})
+
+    def test_refuses_null_for_fields_the_api_refuses_null_for_before_the_asset_lookup(self):
+        # The client leaves these out, so the requests go straight to the mock's transport.
+        cases = [("POST", "signed-url", {"viewerClaims": None}, "validation/invalid-type", "viewerClaims"),
+                 ("POST", "signed-url", {"resource": None}, "validation/invalid-value", "resource"),
+                 ("POST", "signed-url", {"expiresInSeconds": None}, "validation/invalid-type", "expiresInSeconds"),
+                 ("PATCH", "", {"name": None}, "validation/invalid-type", "name")]
+        for method, suffix, body, code, path in cases:
+            with self.subTest(method=method, body=body):
+                request = Request(f"{self.client.base_url}/assets/missing{'/' + suffix if suffix else ''}",
+                                  data=json.dumps(body).encode(), method=method,
+                                  headers={"Content-Type": "application/json"})
+                with self.client.transport(request, 1) as response:
+                    self.assertEqual(response.status, 400)
+                    answer = json.loads(response.read())
+                self.assertEqual((answer["code"], answer["details"]), (code, {"path": path}))
 
     def test_errors_have_the_real_status_and_request_id(self):
         with self.assertRaises(CalmLensAPIError) as raised:
