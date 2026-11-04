@@ -932,9 +932,9 @@ module CalmLens
         touch(item.merge!('parentId' => parent_id))
       end
 
-      # Policies: the project starts on its General preset policy, following automatic updates. The
-      # mock holds no built-in preset settings: a preset's settings are `{ 'categorySettings' => {} }`
-      # at version 1, and uploads are never decided by a policy.
+      # Policies: the project starts on the organisation's own General preset policy, following
+      # automatic updates. The mock holds no built-in preset settings: a preset's settings are
+      # `{ 'categorySettings' => {} }` at version 1, and uploads are never decided by a policy.
       def new_policy(name, settings, description: '', automatic_updates: false, preset: nil)
         now = @now.call
         item = { 'id' => @create_id.call('pol'), 'name' => name, 'description' => description, 'settings' => settings,
@@ -946,7 +946,7 @@ module CalmLens
       def ensure_policies
         return if @project_policy_id
 
-        preset = { 'id' => 'general-community', 'version' => 1, 'projectId' => @project_id }
+        preset = { 'id' => 'general-community', 'version' => 1, 'own' => true }
         @project_policy_id = new_policy(PRESET_NAMES['general-community'], { 'categorySettings' => {} },
                                         automatic_updates: true, preset: preset)['id']
       end
@@ -977,7 +977,7 @@ module CalmLens
         end
         description = json['description'].is_a?(String) ? json['description'] : ''
         item = if preset_id
-                 origin = { 'id' => preset_id, 'version' => 1, 'projectId' => nil }
+                 origin = { 'id' => preset_id, 'version' => 1, 'own' => false }
                  new_policy(named ? name.strip : PRESET_NAMES[preset_id], { 'categorySettings' => {} },
                             description: description, preset: origin)
                else
@@ -1037,9 +1037,7 @@ module CalmLens
       def set_policy_automatic_updates(item, json)
         enabled = json['enabled'] == true
         preset = item['preset']
-        if preset.nil? || preset['projectId'] != @project_id || item['automaticUpdates'] == enabled
-          fail!(ErrorCodes::POLICY_AUTOMATIC_UPDATES_UNAVAILABLE)
-        end
+        fail!(ErrorCodes::POLICY_AUTOMATIC_UPDATES_UNAVAILABLE) if preset.nil? || !preset['own'] || item['automaticUpdates'] == enabled
         fail!(ErrorCodes::POLICY_REVISION_CONFLICT) unless json['revision'] == item['revision']
         fail!(ErrorCodes::POLICY_PRESET_VERSION_CONFLICT) unless json['presetVersion'] == 1
 

@@ -60,9 +60,9 @@ type PolicyPresetOrigin struct {
 	// LatestVersion is the newest release of the preset. A newer one than Version can be applied
 	// with PolicyPresetUpdate.
 	LatestVersion int `json:"latestVersion"`
-	// ProjectID is the project whose preset policy this is, or nil for a copy. Only a project's
-	// preset policy can follow automatic updates.
-	ProjectID *string `json:"projectId"`
+	// Own is whether this is the organisation's own policy for the preset rather than a copy made
+	// from it. An organisation has at most one per preset, and only it can follow automatic updates.
+	Own bool `json:"own"`
 }
 
 // PolicySettings say what a policy does with each moderation category. Settings you send must
@@ -141,9 +141,9 @@ type ApplyPolicyPresetOptions struct {
 	PresetVersion int
 }
 
-// SetPolicyAutomaticUpdatesOptions switches automatic updates for the project's preset policy.
-// Enabled replaces the saved copy with the latest preset, discarding its changes; disabling pins
-// the current preset version. PresetVersion is the policy's Preset.LatestVersion.
+// SetPolicyAutomaticUpdatesOptions switches automatic updates for the organisation's own preset
+// policy. Enabled replaces the saved copy with the latest preset, discarding its changes;
+// disabling pins the current preset version. PresetVersion is the policy's Preset.LatestVersion.
 type SetPolicyAutomaticUpdatesOptions struct {
 	PolicyID      string
 	Enabled       bool
@@ -206,7 +206,8 @@ func (s *PoliciesService) ApplyPreset(ctx context.Context, options ApplyPolicyPr
 	return s.policyRequest(ctx, "POST", options.PolicyID, "/preset", body)
 }
 
-// SetAutomaticUpdates switches automatic updates on or off for the project's preset policy.
+// SetAutomaticUpdates switches automatic updates on or off for the organisation's own preset
+// policy.
 func (s *PoliciesService) SetAutomaticUpdates(ctx context.Context, options SetPolicyAutomaticUpdatesOptions) (*Policy, error) {
 	body := struct {
 		Enabled       bool `json:"enabled"`

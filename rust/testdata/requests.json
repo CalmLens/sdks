@@ -1833,7 +1833,7 @@
             "id": "children-platform",
             "version": 30,
             "latestVersion": 30,
-            "projectId": null
+            "own": false
           },
           "projectIds": [
             "project-1"
@@ -1873,7 +1873,7 @@
         "id": "children-platform",
         "version": 30,
         "latestVersion": 30,
-        "projectId": null
+        "own": false
       },
       "projectIds": [
         "project-1"
@@ -1910,7 +1910,7 @@
         "id": "children-platform",
         "version": 30,
         "latestVersion": 30,
-        "projectId": null
+        "own": false
       },
       "projectIds": [
         "project-1"
@@ -1951,7 +1951,7 @@
         "id": "children-platform",
         "version": 30,
         "latestVersion": 30,
-        "projectId": null
+        "own": false
       },
       "projectIds": [
         "project-1"
@@ -1998,7 +1998,7 @@
         "id": "children-platform",
         "version": 30,
         "latestVersion": 30,
-        "projectId": null
+        "own": false
       },
       "projectIds": [
         "project-1"
@@ -2046,7 +2046,7 @@
         "id": "children-platform",
         "version": 30,
         "latestVersion": 30,
-        "projectId": null
+        "own": false
       },
       "projectIds": [
         "project-1"
@@ -2090,7 +2090,7 @@
         "id": "children-platform",
         "version": 30,
         "latestVersion": 30,
-        "projectId": null
+        "own": false
       },
       "projectIds": [
         "project-1"
@@ -2134,7 +2134,7 @@
         "id": "children-platform",
         "version": 30,
         "latestVersion": 30,
-        "projectId": null
+        "own": false
       },
       "projectIds": [
         "project-1"
@@ -2186,7 +2186,7 @@
         "id": "children-platform",
         "version": 30,
         "latestVersion": 30,
-        "projectId": null
+        "own": false
       },
       "projectIds": [
         "project-1"
@@ -12580,7 +12580,7 @@
             "id": "general-community",
             "version": 1,
             "latestVersion": 1,
-            "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+            "own": true
           },
           "projectIds": [
             "proj_8fK2mQx7Lp4NvB3tRz9Y"
@@ -12655,7 +12655,7 @@
         "id": "general-community",
         "version": 1,
         "latestVersion": 1,
-        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+        "own": true
       },
       "projectIds": [
         "proj_8fK2mQx7Lp4NvB3tRz9Y"
@@ -12731,7 +12731,7 @@
         "id": "general-community",
         "version": 1,
         "latestVersion": 1,
-        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+        "own": true
       },
       "projectIds": [
         "proj_8fK2mQx7Lp4NvB3tRz9Y"
@@ -12814,7 +12814,7 @@
         "id": "general-community",
         "version": 1,
         "latestVersion": 1,
-        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+        "own": true
       },
       "projectIds": [
         "proj_8fK2mQx7Lp4NvB3tRz9Y"
@@ -12893,7 +12893,7 @@
         "id": "general-community",
         "version": 1,
         "latestVersion": 1,
-        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+        "own": true
       },
       "projectIds": [
         "proj_8fK2mQx7Lp4NvB3tRz9Y"
@@ -12972,7 +12972,7 @@
         "id": "general-community",
         "version": 1,
         "latestVersion": 1,
-        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+        "own": true
       },
       "projectIds": [
         "proj_8fK2mQx7Lp4NvB3tRz9Y"
@@ -13046,7 +13046,7 @@
         "id": "general-community",
         "version": 1,
         "latestVersion": 1,
-        "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y"
+        "own": true
       },
       "projectIds": [
         "proj_8fK2mQx7Lp4NvB3tRz9Y"

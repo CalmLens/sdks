@@ -626,7 +626,7 @@ declare const POLICY_SCHEMA: zod.ZodObject<{
     }>;
     version: zod.ZodNumber;
     latestVersion: zod.ZodNumber;
-    projectId: zod.ZodNullable<zod.ZodString>;
+    own: zod.ZodBoolean;
   }, zod.core.$strip>>;
   projectIds: zod.ZodArray<zod.ZodString>;
   createdAt: zod.ZodNumber;
@@ -1261,7 +1261,7 @@ declare const GET_POLICIES_RESPONSE_SCHEMA: zod.ZodObject<{
       }>;
       version: zod.ZodNumber;
       latestVersion: zod.ZodNumber;
-      projectId: zod.ZodNullable<zod.ZodString>;
+      own: zod.ZodBoolean;
     }, zod.core.$strip>>;
     projectIds: zod.ZodArray<zod.ZodString>;
     createdAt: zod.ZodNumber;

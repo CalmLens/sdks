@@ -1753,9 +1753,9 @@ class Policies:
     def set_automatic_updates(self, options: SetPolicyAutomaticUpdatesOptions | None = None, /, *,
                               policy_id: str = _UNSET, enabled: bool = _UNSET, revision: int = _UNSET,
                               preset_version: int = _UNSET) -> Policy:
-        """Switch automatic updates on or off for the project's preset policy. Switching on
-        replaces the saved copy with the latest preset settings under the same ID; switching off
-        pins the current preset version as a copy with unchanged settings."""
+        """Switch automatic updates on or off for the organisation's own preset policy. Switching
+        on replaces the saved copy with the latest preset settings under the same ID; switching
+        off pins the current preset version as a copy with unchanged settings."""
         merged = _merge("policies.setAutomaticUpdates", options, policy_id=policy_id, enabled=enabled, revision=revision,
                         preset_version=preset_version)
         return cast(Policy, self._c._request("PUT", self._path(merged.get("policyId")) + "/automatic-updates",

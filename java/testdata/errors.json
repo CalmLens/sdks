@@ -2671,7 +2671,7 @@
       },
       "body": {
         "code": "policy/used-by-another-project",
-        "message": "Another project uses or owns this policy, so it can only be changed from the portal or that project.",
+        "message": "Another project uses this policy, so it can only be changed from the portal or that project.",
         "requestId": "req-policy-used-by-another-project",
         "details": {
           "reason": "policy_used_by_another_project"
@@ -2799,7 +2799,7 @@
       },
       "body": {
         "code": "policy/automatic-updates-unavailable",
-        "message": "Automatic updates can only be switched on for a saved copy of a project's preset policy, and off for one that has them.",
+        "message": "Automatic updates can only be switched on for a saved copy of one of the organisation's own preset policies, and off for one that has them.",
         "requestId": "req-policy-automatic-updates-unavailable",
         "details": {
           "reason": "policy_automatic_updates_unavailable"

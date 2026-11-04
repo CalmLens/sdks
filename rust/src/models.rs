@@ -4187,10 +4187,10 @@ pub struct PolicyPresetOrigin {
     /// [`PolicyPresetOperation::Update`].
     #[serde(default)]
     pub latest_version: u64,
-    /// The project whose preset policy this is, or `None` for a copy. Only a project's preset
-    /// policy can follow automatic updates.
+    /// Whether this is the organisation's own policy for the preset rather than a copy made from
+    /// it. An organisation has at most one per preset, and only it can follow automatic updates.
     #[serde(default)]
-    pub project_id: Option<String>,
+    pub own: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<PolicyPresetOrigin, _>")]
     pub extra: HashMap<String, Value>,
@@ -4408,8 +4408,9 @@ pub struct ApplyPolicyPreset {
     pub preset_version: u64,
 }
 
-/// Switches automatic updates for the project's preset policy. `enabled` replaces the saved copy
-/// with the latest preset, discarding its changes; `false` pins the current preset version.
+/// Switches automatic updates for the organisation's own preset policy. `enabled` replaces the
+/// saved copy with the latest preset, discarding its changes; `false` pins the current preset
+/// version.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetPolicyAutomaticUpdates {

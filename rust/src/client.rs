@@ -1538,7 +1538,7 @@ impl PoliciesClient<'_> {
         let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
         self.0.call(request).await
     }
-    /// Switches automatic updates on or off for the project's preset policy.
+    /// Switches automatic updates on or off for the organisation's own preset policy.
     pub async fn set_automatic_updates(
         &self,
         options: SetPolicyAutomaticUpdates,

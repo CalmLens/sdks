@@ -746,7 +746,7 @@ export default class CalmLensServerClient {
         return this.request("POST", `${policyPath(policyId)}/preset`, { body });
       },
 
-      /** Switches automatic updates on or off for the project's preset policy. */
+      /** Switches automatic updates on or off for the organisation's own preset policy. */
       setAutomaticUpdates: async (options: SetPolicyAutomaticUpdatesOptions): Promise<Policy> => {
         const { policyId, ...body } = checked("policies.setAutomaticUpdates", options);
         return this.request("PUT", `${policyPath(policyId)}/automatic-updates`, { body });

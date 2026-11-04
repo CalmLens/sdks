@@ -166,7 +166,7 @@ error_codes! {
     PolicyProjectsChanged = "policy/projects-changed", 409;
     /// `policy/in-use` (HTTP 409): Projects or upload presets still use this policy. Choose another policy for each of them before deleting it.
     PolicyInUse = "policy/in-use", 409;
-    /// `policy/used-by-another-project` (HTTP 409): Another project uses or owns this policy, so it can only be changed from the portal or that project.
+    /// `policy/used-by-another-project` (HTTP 409): Another project uses this policy, so it can only be changed from the portal or that project.
     PolicyUsedByAnotherProject = "policy/used-by-another-project", 409;
     /// `policy/no-preset` (HTTP 400): This policy has no preset baseline.
     PolicyNoPreset = "policy/no-preset", 400;
@@ -174,7 +174,7 @@ error_codes! {
     PolicyPresetVersionConflict = "policy/preset-version-conflict", 409;
     /// `policy/preset-update-unavailable` (HTTP 409): Only an unchanged copy of an older preset version can be updated. Reset or review your changes first.
     PolicyPresetUpdateUnavailable = "policy/preset-update-unavailable", 409;
-    /// `policy/automatic-updates-unavailable` (HTTP 409): Automatic updates can only be switched on for a saved copy of a project's preset policy, and off for one that has them.
+    /// `policy/automatic-updates-unavailable` (HTTP 409): Automatic updates can only be switched on for a saved copy of one of the organisation's own preset policies, and off for one that has them.
     PolicyAutomaticUpdatesUnavailable = "policy/automatic-updates-unavailable", 409;
     /// `upload-preset/not-found` (HTTP 404): Upload preset not found. Check the preset ID in the portal.
     UploadPresetNotFound = "upload-preset/not-found", 404;

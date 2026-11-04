@@ -360,7 +360,7 @@ type MockPresetId = keyof typeof MOCK_PRESET_NAMES;
 
 /** A stored policy: the API's shape without its derived fields, plus its reset baseline. */
 interface MockPolicy extends Omit<Policy, "preset" | "projectIds"> {
-  preset: { id: MockPresetId; version: number; projectId: string | null } | null;
+  preset: { id: MockPresetId; version: number; own: boolean } | null;
   baseline: Policy["settings"];
 }
 
@@ -1065,9 +1065,9 @@ export class MockCalmLensApi {
   }
 
   // ---- Policies ----------------------------------------------------------------------------
-  // The project starts on its General preset policy, following automatic updates. The mock holds
-  // no built-in preset settings: a preset's settings are `{ categorySettings: {} }` at version 1,
-  // and uploads are never decided by a policy.
+  // The project starts on the organisation's own General preset policy, following automatic
+  // updates. The mock holds no built-in preset settings: a preset's settings are
+  // `{ categorySettings: {} }` at version 1, and uploads are never decided by a policy.
 
   private readonly policies = new Map<string, MockPolicy>();
   private projectPolicyId: string | undefined;
@@ -1079,7 +1079,7 @@ export class MockCalmLensApi {
       name: MOCK_PRESET_NAMES["general-community"],
       settings: { categorySettings: {} },
       automaticUpdates: true,
-      preset: { id: "general-community", version: 1, projectId: this.projectId },
+      preset: { id: "general-community", version: 1, own: true },
       createdAt: now,
     });
     this.projectPolicyId = general.id;
@@ -1090,7 +1090,7 @@ export class MockCalmLensApi {
     description?: string;
     settings: Policy["settings"];
     automaticUpdates?: boolean;
-    preset?: { id: MockPresetId; version: number; projectId: string | null };
+    preset?: { id: MockPresetId; version: number; own: boolean };
     createdAt: number;
   }): MockPolicy {
     const policy: MockPolicy = {
@@ -1150,7 +1150,7 @@ export class MockCalmLensApi {
       name: typeof name === "string" && name.trim() ? name.trim() : MOCK_PRESET_NAMES[preset!],
       ...(typeof description === "string" ? { description } : {}),
       settings: preset ? { categorySettings: {} } : (settings as Policy["settings"]),
-      ...(preset ? { preset: { id: preset, version: 1, projectId: null } } : {}),
+      ...(preset ? { preset: { id: preset, version: 1, own: false } } : {}),
       createdAt: this.now(),
     });
     return this.toPolicy(policy);
@@ -1194,7 +1194,7 @@ export class MockCalmLensApi {
   private setPolicyAutomaticUpdates(policyId: string, body: Record<string, unknown>): Policy {
     const policy = this.findPolicy(policyId);
     const enabled = body.enabled === true;
-    if (policy.preset?.projectId !== this.projectId || policy.automaticUpdates === enabled) {
+    if (!policy.preset?.own || policy.automaticUpdates === enabled) {
       throw fail(API_ERROR_CODES.POLICY_AUTOMATIC_UPDATES_UNAVAILABLE);
     }
     if (body.revision !== policy.revision) throw fail(API_ERROR_CODES.POLICY_REVISION_CONFLICT);

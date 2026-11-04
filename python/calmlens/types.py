@@ -961,9 +961,9 @@ class PolicyPresetOrigin(TypedDict):
     version: int
     #: The newest release of the preset; a newer one than ``version`` can be applied with ``update``.
     latestVersion: int
-    #: The project whose preset policy this is, or ``None`` for a copy. Only a project's preset
-    #: policy can follow automatic updates.
-    projectId: Optional[str]
+    #: Whether this is the organisation's own policy for the preset rather than a copy made from
+    #: it. An organisation has at most one per preset, and only it can follow automatic updates.
+    own: bool
 
 
 class Policy(TypedDict):

@@ -459,7 +459,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "policy/used-by-another-project": {
     status: 409,
-    message: "Another project uses or owns this policy, so it can only be changed from the portal or that project.",
+    message: "Another project uses this policy, so it can only be changed from the portal or that project.",
   },
   "policy/no-preset": {
     status: 400,
@@ -475,7 +475,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "policy/automatic-updates-unavailable": {
     status: 409,
-    message: "Automatic updates can only be switched on for a saved copy of a project's preset policy, and off for one that has them.",
+    message: "Automatic updates can only be switched on for a saved copy of one of the organisation's own preset policies, and off for one that has them.",
   },
   "upload-preset/not-found": {
     status: 404,

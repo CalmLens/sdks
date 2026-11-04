@@ -61,9 +61,9 @@ module CalmLens
       end
     end
 
-    # Switches automatic updates on or off for the project's preset policy. Switching on replaces
-    # the saved copy with the latest preset settings under the same ID; switching off pins the
-    # current preset version as a copy with unchanged settings.
+    # Switches automatic updates on or off for the organisation's own preset policy. Switching on
+    # replaces the saved copy with the latest preset settings under the same ID; switching off pins
+    # the current preset version as a copy with unchanged settings.
     # @option options [String] :policy_id
     # @option options [Boolean] :enabled
     # @option options [Integer] :revision the policy's current revision

@@ -1564,9 +1564,9 @@ final class MockApi {
   }
 
   // ------------------------------------------------------------------ Policies
-  // The project starts on its General preset policy, following automatic updates. The mock holds
-  // no built-in preset settings: a preset's settings are {"categorySettings": {}} at version 1,
-  // and uploads are never decided by a policy.
+  // The project starts on the organisation's own General preset policy, following automatic
+  // updates. The mock holds no built-in preset settings: a preset's settings are
+  // {"categorySettings": {}} at version 1, and uploads are never decided by a policy.
 
   /** The built-in presets the mock knows, by display name. */
   private static final Map<String, String> PRESET_NAMES = Map.of("general-community", "General",
@@ -1580,7 +1580,7 @@ final class MockApi {
 
   private void ensurePolicies() {
     if (projectPolicyId != null) return;
-    projectPolicyId = str(newPolicy("General", "", emptySettings(), true, "general-community", projectId, now()), "id");
+    projectPolicyId = str(newPolicy("General", "", emptySettings(), true, "general-community", true, now()), "id");
   }
 
   private static JsonObject emptySettings() {
@@ -1590,7 +1590,7 @@ final class MockApi {
   }
 
   private JsonObject newPolicy(String name, String description, JsonObject settings, boolean automaticUpdates,
-      String presetId, String presetProjectId, long now) {
+      String presetId, boolean presetOwn, long now) {
     JsonObject policy = new JsonObject();
     policy.addProperty("id", createId("pol"));
     policy.addProperty("name", name);
@@ -1603,7 +1603,7 @@ final class MockApi {
       JsonObject preset = new JsonObject();
       preset.addProperty("id", presetId);
       preset.addProperty("version", 1);
-      preset.add("projectId", nullable(presetProjectId));
+      preset.addProperty("own", presetOwn);
       policy.add("preset", preset);
     }
     policy.addProperty("createdAt", now);
@@ -1656,7 +1656,7 @@ final class MockApi {
     String description = str(body, "description");
     JsonObject policy = newPolicy(name != null && !name.isBlank() ? name.trim() : PRESET_NAMES.get(preset),
         description == null ? "" : description, preset != null ? emptySettings() : settings.getAsJsonObject().deepCopy(),
-        false, preset, null, now);
+        false, preset, false, now);
     created = true;
     return toPolicy(policy);
   }
@@ -1701,7 +1701,7 @@ final class MockApi {
         return savePolicy(policy, body, now, saved -> saved.add("settings", policyBaselines.get(id).deepCopy()));
       case "PUT automatic-updates": {
         boolean enabled = bool(body, "enabled");
-        if (preset == null || !projectId.equals(str(preset, "projectId")) || bool(policy, "automaticUpdates") == enabled)
+        if (preset == null || !bool(preset, "own") || bool(policy, "automaticUpdates") == enabled)
           throw new Failure(ErrorCodes.POLICY_AUTOMATIC_UPDATES_UNAVAILABLE, "Automatic updates can't be switched this way for this policy");
         JsonElement revision = body.get("revision");
         if (revision == null || !revision.isJsonPrimitive() || !revision.getAsJsonPrimitive().isNumber() || revision.getAsDouble() != policy.get("revision").getAsLong())

@@ -639,12 +639,14 @@ module CalmLens
     ?"linkSafety" => link_safety_settings
   }
   # Where a policy started from a built-in preset. `version` is the release it is pinned to,
-  # `latestVersion` the newest; `projectId` is the project whose preset policy it is, or nil for a copy.
+  # `latestVersion` the newest; `own` is whether this is the organisation's own policy for the preset
+  # rather than a copy made from it. An organisation has at most one per preset, and only it can
+  # follow automatic updates.
   type policy_preset_origin = {
     "id" => policy_preset_id,
     "version" => Integer,
     "latestVersion" => Integer,
-    "projectId" => String?
+    "own" => bool
   }
   # A moderation policy. Policies belong to the project's organisation and its projects share them.
   # Send `revision` with each change; a policy changed since is refused with `policy/revision-conflict`.

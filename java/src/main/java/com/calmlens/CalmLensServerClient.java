@@ -1830,7 +1830,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Switches automatic updates on or off for the project's preset policy.
+     * Switches automatic updates on or off for the organisation's own preset policy.
      *
      * @param options the policy, whether it follows the preset, its revision and the preset version
      * @return the saved policy

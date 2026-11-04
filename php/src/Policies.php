@@ -65,7 +65,7 @@ final class Policies extends Resource
 
     /**
      * Switches automatic updates on (`enabled` true, replacing a saved copy with the latest preset)
-     * or off (pinning the current version as a copy) for the project's preset policy.
+     * or off (pinning the current version as a copy) for the organisation's own preset policy.
      */
     public function setAutomaticUpdates(array $options): array
     {

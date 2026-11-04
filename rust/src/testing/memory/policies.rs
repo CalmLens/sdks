@@ -1,5 +1,5 @@
-//! Policies in the in-memory API. The project starts on its General preset policy, following
-//! automatic updates. The mock holds no built-in preset settings: a preset's settings are
+//! Policies in the in-memory API. The project starts on the organisation's own General preset
+//! policy, following automatic updates. The mock holds no built-in preset settings: a preset's settings are
 //! `{"categorySettings": {}}` at version 1, and uploads are never decided by a policy.
 use super::{fail, unknown_route, Backend, Outcome};
 use crate::error::ErrorCode;
@@ -32,9 +32,9 @@ struct StoredPolicy {
     baseline: Value,
     revision: u64,
     automatic_updates: bool,
-    /// The preset it started from, if any, and the project whose preset policy it is (`None` for
-    /// a copy).
-    preset: Option<(String, Option<String>)>,
+    /// The preset it started from, if any, and whether it is the organisation's own policy for
+    /// the preset rather than a copy.
+    preset: Option<(String, bool)>,
     created_at: u64,
     updated_at: u64,
 }
@@ -51,12 +51,11 @@ impl Backend {
         if !self.policies.project_policy.is_empty() {
             return;
         }
-        let project = self.options.project_id.clone();
         let general = self.new_policy(
             "General".into(),
             String::new(),
             empty_settings(),
-            Some(("general-community".into(), Some(project))),
+            Some(("general-community".into(), true)),
         );
         let general = &mut self.policies.stored[general];
         general.automatic_updates = true;
@@ -67,7 +66,7 @@ impl Backend {
         name: String,
         description: String,
         settings: Value,
-        preset: Option<(String, Option<String>)>,
+        preset: Option<(String, bool)>,
     ) -> usize {
         let now = self.now();
         self.policies.stored.push(StoredPolicy {
@@ -98,8 +97,8 @@ impl Backend {
             "settings": policy.settings,
             "revision": policy.revision,
             "automaticUpdates": policy.automatic_updates,
-            "preset": policy.preset.as_ref().map(|(id, project)| json!({
-                "id": id, "version": 1, "latestVersion": 1, "projectId": project,
+            "preset": policy.preset.as_ref().map(|(id, own)| json!({
+                "id": id, "version": 1, "latestVersion": 1, "own": own,
             })),
             "projectIds": projects,
             "createdAt": policy.created_at,
@@ -184,7 +183,7 @@ impl Backend {
                     .to_owned(),
                 description(&body),
                 empty_settings(),
-                Some((preset.to_owned(), None)),
+                Some((preset.to_owned(), false)),
             ),
             (Some(settings), None) if name.is_some() => self.new_policy(
                 name.unwrap_or_default().to_owned(),
@@ -266,7 +265,7 @@ impl Backend {
     ) -> Outcome<Value> {
         let enabled = body.get("enabled") == Some(&Value::Bool(true));
         let policy = &self.policies.stored[index];
-        let own = matches!(&policy.preset, Some((_, Some(project))) if *project == self.options.project_id);
+        let own = matches!(policy.preset, Some((_, true)));
         if !own || policy.automatic_updates == enabled {
             return Err(fail(
                 ErrorCode::PolicyAutomaticUpdatesUnavailable,

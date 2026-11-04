@@ -516,7 +516,7 @@
     {
       "id": "policies.setAutomaticUpdates",
       "kind": "method",
-      "description": "Switch automatic updates on or off for a project's preset policy. A policy that follows automatic updates always has the latest preset settings.",
+      "description": "Switch automatic updates on or off for one of the organisation's own preset policies. A policy that follows automatic updates always has the latest preset settings.",
       "names": {
         "javascript": "policies.setAutomaticUpdates",
         "python": "policies.set_automatic_updates",

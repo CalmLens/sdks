@@ -2497,10 +2497,11 @@ public final class Models {
    * @param id the preset, such as {@code general-community} or {@code children-platform}
    * @param version the preset release the policy is pinned to; resetting restores it
    * @param latestVersion the newest release, which {@code update} applies
-   * @param projectId the project whose preset policy this is, or null for a copy; only a project's
-   *     preset policy can follow automatic updates
+   * @param own whether this is the organisation's own policy for the preset rather than a copy made
+   *     from it; an organisation has at most one per preset, and only it can follow automatic
+   *     updates
    */
-  public record PolicyPreset(String id, int version, int latestVersion, String projectId) {}
+  public record PolicyPreset(String id, int version, int latestVersion, boolean own) {}
 
   /**
    * A policy's settings.
@@ -2624,7 +2625,7 @@ public final class Models {
     private Integer presetVersion;
     public SetPolicyAutomaticUpdates() {}
     /**
-     * @param policyId the project's preset policy
+     * @param policyId the organisation's own preset policy
      * @param enabled whether it follows the preset
      * @param revision its current revision
      * @param presetVersion the preset's {@code latestVersion} you reviewed

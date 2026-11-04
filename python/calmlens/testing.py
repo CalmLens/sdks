@@ -1773,9 +1773,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
         entries[entry["id"]] = cast(HashListEntry, entry)
         return _Answer(201, entry)
 
-    # Policies: the project starts on its General preset policy, following automatic updates. The
-    # mock holds no built-in preset settings: a preset's settings are ``{"categorySettings": {}}`` at
-    # version 1, and uploads are never decided by a policy.
+    # Policies: the project starts on the organisation's own General preset policy, following
+    # automatic updates. The mock holds no built-in preset settings: a preset's settings are
+    # ``{"categorySettings": {}}`` at version 1, and uploads are never decided by a policy.
 
     def _new_policy(self, name: str, settings: dict[str, Any], *, description: str = "",
                     automatic_updates: bool = False, preset: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1790,7 +1790,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if self._project_policy_id is None:
             general = self._new_policy(_MOCK_PRESET_NAMES["general-community"], {"categorySettings": {}},
                                        automatic_updates=True,
-                                       preset={"id": "general-community", "version": 1, "projectId": self.project_id})
+                                       preset={"id": "general-community", "version": 1, "own": True})
             self._project_policy_id = general["id"]
 
     def _policy_view(self, policy: dict[str, Any]) -> dict[str, Any]:
@@ -1841,7 +1841,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if action == "automatic-updates":
             enabled = body.get("enabled") is True
             preset = policy["preset"]
-            if preset is None or preset["projectId"] != self.project_id or policy["automaticUpdates"] == enabled:
+            if preset is None or not preset["own"] or policy["automaticUpdates"] == enabled:
                 raise _Failure(error_codes.POLICY_AUTOMATIC_UPDATES_UNAVAILABLE)
             if body.get("revision") != policy["revision"]:
                 raise _Failure(error_codes.POLICY_REVISION_CONFLICT)
@@ -1877,7 +1877,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if preset_id is not None:
             policy = self._new_policy(cast(str, name).strip() if named else _MOCK_PRESET_NAMES[preset_id],
                                       {"categorySettings": {}}, description=description,
-                                      preset={"id": preset_id, "version": 1, "projectId": None})
+                                      preset={"id": preset_id, "version": 1, "own": False})
         else:
             policy = self._new_policy(cast(str, name).strip(), cast(dict[str, Any], settings), description=description)
         return self._policy_view(policy)

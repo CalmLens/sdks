@@ -702,7 +702,7 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	POLICY_USED_BY_ANOTHER_PROJECT: new ErrorCode({
 		id: "policy/used-by-another-project",
-		defaultMessage: "Another project uses or owns this policy, so it can only be changed from the portal or that project.",
+		defaultMessage: "Another project uses this policy, so it can only be changed from the portal or that project.",
 		status: 409
 	}),
 	POLICY_NO_PRESET: new ErrorCode({
@@ -722,7 +722,7 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	POLICY_AUTOMATIC_UPDATES_UNAVAILABLE: new ErrorCode({
 		id: "policy/automatic-updates-unavailable",
-		defaultMessage: "Automatic updates can only be switched on for a saved copy of a project's preset policy, and off for one that has them.",
+		defaultMessage: "Automatic updates can only be switched on for a saved copy of one of the organisation's own preset policies, and off for one that has them.",
 		status: 409
 	}),
 	UPLOAD_PRESET_NOT_FOUND: new ErrorCode({

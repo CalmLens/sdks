@@ -2394,7 +2394,7 @@
               "policies.0.name": "General",
               "policies.0.automaticUpdates": true,
               "policies.0.preset.id": "general-community",
-              "policies.0.preset.projectId": "project-1",
+              "policies.0.preset.own": true,
               "policies.0.projectIds": [
                 "project-1"
               ]
@@ -2419,7 +2419,7 @@
               "preset.id": "children-platform",
               "preset.version": 1,
               "preset.latestVersion": 1,
-              "preset.projectId": null,
+              "preset.own": false,
               "projectIds": []
             },
             "httpStatus": 201
@@ -2610,7 +2610,7 @@
       ]
     },
     {
-      "name": "a project's preset policy switches automatic updates off and on",
+      "name": "an organisation's own preset policy switches automatic updates off and on",
       "mock": {},
       "steps": [
         {
