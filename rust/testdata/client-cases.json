@@ -4662,7 +4662,7 @@
         {
           "operation": "assets.create",
           "args": {
-            "name": "archive.zip",
+            "name": "report.pdf",
             "content": {
               "uint8Array": {
                 "$fill": {
@@ -4670,7 +4670,7 @@
                   "length": 16777216
                 }
               },
-              "type": "application/zip"
+              "type": "application/pdf"
             },
             "idempotencyKey": "upload-3"
           },
@@ -4702,11 +4702,11 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=archive.zip&queue=true&contentType=application%2Fzip&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=16777216",
+          "rawQuery": "name=report.pdf&queue=true&contentType=application%2Fpdf&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=16777216",
           "query": [
             [
               "name",
-              "archive.zip"
+              "report.pdf"
             ],
             [
               "queue",
@@ -4714,7 +4714,7 @@
             ],
             [
               "contentType",
-              "application/zip"
+              "application/pdf"
             ],
             [
               "sizeInBytes",
@@ -4737,7 +4737,7 @@
             "idempotency-key": "upload-3",
             "accept": "application/json",
             "x-calmlens-upload": "part",
-            "content-type": "application/zip"
+            "content-type": "application/pdf"
           },
           "bodyLength": 5242880,
           "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
