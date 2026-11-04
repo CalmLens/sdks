@@ -59,15 +59,17 @@ for (const tab of TABS) {
 
     test("shows the bytes sent while a large photo uploads", async ({ page }) => {
       const panel = await open(page, tab.hash);
-      // Record every value the bar takes, however briefly it shows.
+      // Record every partial value the bar takes, however briefly it shows.
       await page.evaluate(() => {
-        const state = window as unknown as { partialProgress?: number };
+        const state = window as unknown as { partialProgress: number[] };
+        state.partialProgress = [];
         new MutationObserver(() => {
           for (const bar of document.querySelectorAll(
             "[role=tabpanel] [role=progressbar][aria-valuenow]",
           )) {
             const value = Number(bar.getAttribute("aria-valuenow"));
-            if (value > 0 && value < 100) state.partialProgress = value;
+            if (value > 0 && value < 100 && value !== state.partialProgress.at(-1))
+              state.partialProgress.push(value);
           }
         }).observe(document.body, {
           subtree: true,
@@ -79,7 +81,8 @@ for (const tab of TABS) {
 
       // The mock reads uploads slowly, but the browser and the server's socket can buffer up to
       // about 10 MB between them, so a 6 MB photo can be sent at once and skip every partial
-      // value. 18 MB (the photo, padded after its end marker) has to wait for the slow reads.
+      // value. 18 MB (the photo, padded after its end marker) has to wait for the slow reads, and
+      // goes in three parts, which the bar counts as one file.
       const photo = await readFile(
         new URL("../../../javascript/test-files/large.jpg", import.meta.url),
       );
@@ -91,20 +94,19 @@ for (const tab of TABS) {
         buffer: Buffer.concat([photo, Buffer.alloc(18_000_000 - photo.length)]),
       });
 
+      const progress = () =>
+        page.evaluate(() => (window as unknown as { partialProgress: number[] }).partialProgress);
       await expect
-        .poll(
-          () =>
-            page.evaluate(
-              () => (window as unknown as { partialProgress?: number }).partialProgress,
-            ),
-          { timeout: 15_000 },
-        )
+        .poll(async () => (await progress()).length, { timeout: 15_000 })
         .toBeGreaterThan(0);
       await expect(
         galleryItem(panel, "large-photo.jpg").getByText("allowed", { exact: true }),
       ).toBeVisible({
         timeout: 20_000,
       });
+      // The bar never restarts when the next part starts.
+      const values = await progress();
+      expect(values).toEqual([...values].sort((a, b) => a - b));
     });
 
     test("keeps a sensitive photo behind the reveal button until the viewer is allowed", async ({

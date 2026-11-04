@@ -55,7 +55,10 @@ const controller = createUploadController({
   // for the widget's progress bar. The browser can only set the name and description; the
   // preset decides the folder, visibility and everything else.
   upload: async (file, { signal, onProgress }) => {
-    const client = createClient({ signal, uploadFetch: createProgressFetch(onProgress) });
+    const client = createClient({
+      signal,
+      uploadFetch: createProgressFetch(onProgress, { totalBytes: file.size }),
+    });
     const asset = await client.assets.create({
       name: file.name,
       description,

@@ -26,7 +26,7 @@ export {
   getUploadItemOutcome,
   resolveMessages,
 } from "./ui/Messages";
-export { createProgressFetch } from "./ui/ProgressFetch";
+export { createProgressFetch, type ProgressFetchOptions } from "./ui/ProgressFetch";
 export type {
   MediaDisplayOptions,
   MediaProps,

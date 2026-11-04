@@ -20,7 +20,7 @@ const controller = createUploadController({
     const client = new CalmLensAppClient({
       uploadPresetId,
       signal,
-      uploadFetch: createProgressFetch(onProgress),
+      uploadFetch: createProgressFetch(onProgress, { totalBytes: file.size }),
     });
     const asset = await client.assets.create({
       name: file.name,

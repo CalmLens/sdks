@@ -460,7 +460,7 @@ export class UploadController<F extends UploadFile = UploadFile> {
       token: await this.#tokenFor(file, signal),
       baseUrl,
       signal,
-      uploadFetch: createProgressFetch(onProgress) as typeof fetch,
+      uploadFetch: createProgressFetch(onProgress, { totalBytes: file.size }) as typeof fetch,
     };
     const client = createClient ? createClient(options) : new CalmLensAppClient(options);
     return {
