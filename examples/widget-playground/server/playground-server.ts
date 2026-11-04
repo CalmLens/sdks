@@ -110,31 +110,59 @@ const answer = (response: ServerResponse, status: number, upload: UploadedAsset)
 
 const mockApi = async (request: IncomingMessage, response: ServerResponse, url: URL) => {
   const route = url.pathname.match(
-    /^\/mock-api\/v1\/upload-presets\/([^/]+)\/assets(?:\/([^/]+))?$/,
+    /^\/mock-api\/v1\/upload-presets\/([^/]+)\/assets(?:\/([^/]+)(\/part)?)?$/,
   );
   if (!route || route[1] !== MOCK_PRESET_ID)
     return json(response, 404, { code: "upload-preset/not-found" });
   try {
     const client = appClientFor(request);
+    const query = url.searchParams;
+    const idempotencyKey = request.headers["idempotency-key"]?.toString();
+    // The upload widget sends files larger than a part (8 MiB) in parts: the first creates the
+    // upload, the rest go to its `/part` endpoint, and the final one completes it.
+    const part = () => ({
+      partNumber: Number(query.get("partNumber")),
+      isFinal: query.get("isFinal") === "true",
+    });
     if (request.method === "POST" && !route[2]) {
-      const bytes = await readSlowly(request);
-      const upload = await client.assets.create({
-        name: url.searchParams.get("name") ?? "upload",
-        content: {
-          data: new Blob([bytes]),
-          type: url.searchParams.get("contentType") ?? "application/octet-stream",
-        },
-      });
-      uploadedAt.set(upload.id, Date.now());
+      const data = new Blob([await readSlowly(request)]);
+      const type = query.get("contentType") ?? "application/octet-stream";
+      const name = query.get("name") ?? "upload";
+      const inParts = request.headers["x-calmlens-upload"] === "part";
+      const upload = await client.assets.create(
+        inParts
+          ? {
+              name,
+              part: { data, type, ...part() },
+              totalSizeInBytes: Number(query.get("totalSizeInBytes")) || undefined,
+              idempotencyKey,
+            }
+          : { name, content: { data, type }, idempotencyKey },
+      );
+      if (!inParts || part().isFinal) uploadedAt.set(upload.id, Date.now());
       return answer(response, 201, upload);
     }
-    if (request.method === "GET" && route[2]) {
+    if (request.method === "POST" && route[2] && route[3]) {
+      const data = new Blob([await readSlowly(request)]);
+      const upload = await client.assets.uploadPart({
+        assetId: route[2],
+        part: { data, ...part() },
+        idempotencyKey,
+      });
+      if (part().isFinal) uploadedAt.set(upload.id, Date.now());
+      return answer(response, 200, upload);
+    }
+    if (request.method === "GET" && route[2] && !route[3]) {
       return answer(response, 200, await client.assets.retrieve({ assetId: route[2] }));
     }
     return json(response, 405, { code: "method-not-allowed" });
   } catch (error) {
     if (!CalmLensError.isCalmLensError(error)) throw error;
-    return json(response, error.status ?? 400, { code: error.code, message: error.message });
+    return json(response, error.status ?? 400, {
+      code: error.code,
+      message: error.message,
+      ...(error.details && { details: error.details }),
+    });
   }
 };
 
