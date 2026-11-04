@@ -123,7 +123,7 @@ public final class TestInputs {
       case "sexual.adult": return kind == Kind.IMAGE ? ADULT_IMAGE : ADULT_TEXT;
       case "hate.regional-symbol": return GERMANY;
       case "sexual.involving-minors": return one("sexual", "sexual-minors");
-      case "violence.graphic": return one("violence", "violence-graphic");
+      case "violence.graphic": return one("violence", "violence-injury", "violence-graphic");
       default:
         if (!MockClassification.CATEGORIES.contains(signal)) throw invalid("Unknown test signal " + signal);
         return one(signal);

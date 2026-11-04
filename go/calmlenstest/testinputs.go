@@ -125,7 +125,7 @@ func TestInputForSignal(signal string, kind TestInputKind) (TestInput, error) {
 	case "sexual.involving-minors":
 		return TestInput{Instances: []TestInstance{{Category: "sexual", Qualifiers: []string{"sexual-minors"}}}}, nil
 	case "violence.graphic":
-		return TestInput{Instances: []TestInstance{{Category: "violence", Qualifiers: []string{"violence-graphic"}}}}, nil
+		return TestInput{Instances: []TestInstance{{Category: "violence", Qualifiers: []string{"violence-injury", "violence-graphic"}}}}, nil
 	}
 	if !slices.Contains(mockCategories, signal) {
 		return TestInput{}, invalidTestInput("Unknown test signal %q", signal)

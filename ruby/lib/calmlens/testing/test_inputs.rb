@@ -82,7 +82,8 @@ module CalmLens
                when 'sexual.adult' then PRESETS[kind == 'image' ? :adult_image : :adult_text]
                when 'hate.regional-symbol' then PRESETS[:germany]
                when 'sexual.involving-minors' then { 'instances' => [{ 'category' => 'sexual', 'qualifiers' => ['sexual-minors'] }] }
-               when 'violence.graphic' then { 'instances' => [{ 'category' => 'violence', 'qualifiers' => ['violence-graphic'] }] }
+               when 'violence.graphic'
+                 { 'instances' => [{ 'category' => 'violence', 'qualifiers' => %w[violence-injury violence-graphic] }] }
                when *MockClassification::CATEGORIES then { 'instances' => [{ 'category' => signal, 'qualifiers' => [] }] }
                else raise Internal.invalid("Unknown test signal #{signal.inspect}")
                end

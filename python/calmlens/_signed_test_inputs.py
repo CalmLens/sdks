@@ -112,7 +112,7 @@ def signal_test_input(signal: ClassificationTestSignal, kind: Literal["text", "i
     elif signal == "sexual.involving-minors":
         preset = {"instances": [{"category": "sexual", "qualifiers": ["sexual-minors"]}]}
     elif signal == "violence.graphic":
-        preset = {"instances": [{"category": "violence", "qualifiers": ["violence-graphic"]}]}
+        preset = {"instances": [{"category": "violence", "qualifiers": ["violence-injury", "violence-graphic"]}]}
     elif signal in CATEGORIES:
         preset = {"instances": [{"category": signal, "qualifiers": []}]}
     else:

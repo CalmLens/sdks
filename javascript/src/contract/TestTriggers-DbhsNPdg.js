@@ -349,7 +349,7 @@ function testInputForSignal(signal, kind = "text") {
 		}] };
 		case "violence.graphic": return { instances: [{
 			category: "violence",
-			qualifiers: ["violence-graphic"]
+			qualifiers: ["violence-injury", "violence-graphic"]
 		}] };
 		default: return TEST_INPUT_SCHEMA.parse({ instances: [{
 			category: signal,

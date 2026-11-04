@@ -222,7 +222,9 @@ pub fn test_input_for_signal(signal: &str, kind: TestInputKind) -> Result<TestIn
         _ => {
             let one = match signal {
                 "sexual.involving-minors" => instance("sexual", &["sexual-minors"]),
-                "violence.graphic" => instance("violence", &["violence-graphic"]),
+                "violence.graphic" => {
+                    instance("violence", &["violence-injury", "violence-graphic"])
+                }
                 category if CATEGORIES.contains(&category) => instance(category, &[]),
                 _ => return Err(invalid_argument("Unknown test input signal")),
             };

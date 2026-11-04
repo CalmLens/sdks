@@ -82,7 +82,7 @@ final class TestInputs
             $signal === 'sexual.adult' => self::PRESETS[$kind === 'image' ? 'adultImage' : 'adultText'],
             $signal === 'hate.regional-symbol' => self::PRESETS['germany'],
             $signal === 'sexual.involving-minors' => ['instances' => [['category' => 'sexual', 'qualifiers' => ['sexual-minors']]]],
-            $signal === 'violence.graphic' => ['instances' => [['category' => 'violence', 'qualifiers' => ['violence-graphic']]]],
+            $signal === 'violence.graphic' => ['instances' => [['category' => 'violence', 'qualifiers' => ['violence-injury', 'violence-graphic']]]],
             in_array($signal, Classification::CATEGORIES, true) => ['instances' => [['category' => $signal, 'qualifiers' => []]]],
             default => throw self::invalid("Unknown test signal: $signal"),
         };
