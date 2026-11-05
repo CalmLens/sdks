@@ -122,8 +122,8 @@ class MockTest < Minitest::Test
     cursor = mock.events.list['nextCursor']
     mock.enqueue_event(type: 'api-key.created')
     event = mock.events.list(cursor: cursor)['items'].first
-    assert_equal %w[asset assetId createdAt description facts id projectId severity title type], event.keys.sort
-    assert_equal [nil, nil, nil], event.values_at('description', 'assetId', 'asset')
+    assert_equal %w[asset assetId assetSequence createdAt description facts id projectId severity title type], event.keys.sort
+    assert_equal [nil, nil, nil, nil], event.values_at('description', 'assetId', 'assetSequence', 'asset')
     assert_equal event, CalmLens.to_webhook_event_payload(event)
   end
 

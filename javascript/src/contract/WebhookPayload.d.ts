@@ -1,5 +1,5 @@
-import { i as EventFacts } from "./EventCatalog-BKqcghco.js";
-import { n as EventAsset, r as TypedEvent, t as Event } from "./Event-Dq9byoYb.js";
+import { i as EventFacts } from "./EventCatalog-CzSpo84N.js";
+import { n as EventAsset, r as TypedEvent, t as Event } from "./Event-CgnVG2ad.js";
 import * as zod from "zod";
 export declare const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
 export declare const WEBHOOK_TIMESTAMP_HEADER = "x-calmlens-timestamp";
@@ -17,6 +17,7 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
   title: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
   description: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
   assetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+  assetSequence: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
   asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     id: zod.ZodString;
     externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -66,6 +67,7 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
   title: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
   description: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
   assetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+  assetSequence: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
   asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     id: zod.ZodString;
     externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -127,6 +129,7 @@ declare const RECEIVED_WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodObject<{
   title: zod.ZodOptional<zod.ZodString>;
   description: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
   assetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+  assetSequence: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
   asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     id: zod.ZodString;
   }, zod.core.$loose>>>;
@@ -151,6 +154,7 @@ interface ReceivedWebhookEventPayload {
   title?: string;
   description?: string | null;
   assetId?: string | null;
+  assetSequence?: number | null;
   asset?: (EventAsset & Record<string, unknown>) | null;
   facts?: ReceivedFact;
   [key: string]: unknown;

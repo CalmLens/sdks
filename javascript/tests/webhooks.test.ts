@@ -18,6 +18,7 @@ const event: TypedEvent = {
   title: "Asset blocked",
   description: "Blocked by your policy",
   assetId: "asset_8fK2mQx7Lp4NvB3tRz9Y",
+  assetSequence: 2,
   asset: null,
   facts: [
     { key: "asset-name", value: "photo.jpg" },

@@ -19,6 +19,7 @@ const makeEvent = (id: string, type: "asset.uploaded" | "asset.allowed" | "asset
   title: "Asset allowed",
   description: null,
   assetId: null,
+  assetSequence: null,
   asset: null,
   facts: [],
   createdAt: 1760000000000,
@@ -134,6 +135,59 @@ describe("calmlens listen", () => {
     expect(calls[1]).toEqual({ cursor: "c0", pageSize: 100 });
     expect(calls[2]).toEqual({ cursor: "c1", pageSize: 100 });
     expect(forwarded).toEqual([allowedId]);
+  });
+
+  test("forwards each asset's events in assetSequence order, wherever the feed lists them", async () => {
+    const controller = new AbortController();
+    const [first, other] = [newId("asset"), newId("asset")];
+    const about = (assetId: string | null, assetSequence: number | null) => ({
+      ...makeEvent(newId("evt"), "asset.allowed"),
+      assetId,
+      assetSequence,
+    });
+    // An event stored a moment late is listed after a newer one about the same asset.
+    const later = about(first, 2);
+    const unrelated = about(other, 1);
+    const projectWide = about(null, null);
+    const earlier = about(first, 1);
+    const pages = [
+      { items: [], nextCursor: "c0", hasMore: false, excludedTypes: [] },
+      {
+        items: [later, unrelated, projectWide, earlier],
+        nextCursor: "c1",
+        hasMore: false,
+        excludedTypes: [],
+      },
+    ];
+    const forwarded: string[] = [];
+    await listen({
+      client: {
+        events: {
+          list: async (options) => {
+            const page = pages.shift();
+            if (page) return page;
+            controller.abort();
+            return {
+              items: [],
+              nextCursor: options.cursor ?? "",
+              hasMore: false,
+              excludedTypes: [],
+            };
+          },
+        },
+      },
+      forwardTo: "http://localhost:3000/hook",
+      secret: "s",
+      intervalMs: 1,
+      signal: controller.signal,
+      log: () => {},
+      fetchImpl: async (_url, init) => {
+        forwarded.push(JSON.parse(String(init?.body)).id);
+        return new Response(null, { status: 204 });
+      },
+    });
+
+    expect(forwarded).toEqual([earlier.id, unrelated.id, projectWide.id, later.id]);
   });
 
   test("reports the event types the key can't receive instead of silently skipping them", async () => {

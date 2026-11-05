@@ -158,11 +158,13 @@ type MockServerClient struct {
 	policies        policyStore
 	uploads         map[string]*upload
 	events          []calmlens.JSON
-	replays         map[string]replay
-	requests        []CapturedRequest
-	failures        []RequestFailure
-	grants          []Grant
-	requestCount    int
+	// assetSequences is each asset's latest event assetSequence, which the API keeps on the asset.
+	assetSequences map[string]int64
+	replays        map[string]replay
+	requests       []CapturedRequest
+	failures       []RequestFailure
+	grants         []Grant
+	requestCount   int
 	// lastStatus is the HTTP status of the last response, 0 when the last request failed
 	// without one; the contract tests check it.
 	lastStatus int
@@ -280,7 +282,9 @@ func (m *MockServerClient) WithStorage(fn func(db *InMemoryDatabaseStorage, imag
 }
 
 // EnqueueEvent appends events to the mock event feed and returns them as stored. Missing IDs,
-// project IDs, severities (low), titles (the type), facts and creation times are filled in, and
+// project IDs, severities (low), titles (the type), facts and creation times are filled in, each
+// event about an asset takes that asset's next AssetSequence like the API's (any given one is
+// ignored; events without an AssetID have none), and
 // an event with the AssetID of a stored asset and no Asset carries that asset's snapshot, like
 // the API's events, with the moderation status an asset.<status> event announces. Events.List returns them to cursors taken before they were enqueued, in
 // order.
@@ -306,6 +310,11 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 		}
 		if event.Facts == nil {
 			event.Facts = []calmlens.EventFact{}
+		}
+		event.AssetSequence = nil
+		if event.AssetID != nil {
+			sequence := m.nextAssetSequence(*event.AssetID)
+			event.AssetSequence = &sequence
 		}
 		data, _ := json.Marshal(event)
 		var raw calmlens.JSON
@@ -489,13 +498,20 @@ func contentPurged(a calmlens.JSON) bool {
 	})
 }
 
+// nextAssetSequence returns the assetSequence of the next event about assetID, like the API:
+// 1 for its first event, then one more for each later one.
+func (m *MockServerClient) nextAssetSequence(assetID string) int64 {
+	m.assetSequences[assetID]++
+	return m.assetSequences[assetID]
+}
+
 // addEvent records an event about asset in the feed.
 func (m *MockServerClient) addEvent(eventType, severity string, a calmlens.JSON, facts []any) {
 	now := m.options.Now()
 	m.events = append(m.events, calmlens.JSON{
 		"id": m.options.CreateID("evt"), "projectId": m.options.ProjectID,
 		"type": eventType, "severity": severity, "title": eventType,
-		"description": nil, "assetId": a["id"], "asset": snapshot(a),
+		"description": nil, "assetId": a["id"], "assetSequence": m.nextAssetSequence(text(a["id"])), "asset": snapshot(a),
 		"facts": facts, "createdAt": now,
 	})
 }
@@ -591,7 +607,7 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 	if images.Content == nil {
 		images.Content = map[string]*StoredContent{}
 	}
-	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}}
+	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}, assetSequences: map[string]int64{}}
 	client, err := calmlens.NewServerClient(calmlens.Options{APIKey: options.APIKey, ProjectID: options.ProjectID, BaseURL: options.BaseURL, CDNBaseURL: options.CDNBaseURL, Timeout: options.Timeout, UploadTimeout: options.UploadTimeout, MaxRetries: options.MaxRetries, MaxResponseBytes: options.MaxResponseBytes, PartSizeBytes: options.PartSizeBytes, HTTPClient: &http.Client{Transport: transport{mock}}})
 	if err != nil {
 		return nil, err

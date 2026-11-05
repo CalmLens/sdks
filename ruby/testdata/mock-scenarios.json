@@ -4582,15 +4582,18 @@
             "result": {
               "items.length": 9,
               "items.0.type": "asset.uploaded",
+              "items.0.assetSequence": 1,
               "items.1.type": "asset.failed",
               "items.1.assetId": {
                 "$ref": "failed.id"
               },
+              "items.1.assetSequence": 2,
               "items.2.type": "asset.retried",
               "items.2.severity": "low",
               "items.2.assetId": {
                 "$ref": "failed.id"
               },
+              "items.2.assetSequence": 3,
               "items.2.asset.classification.status": "processing",
               "items.2.facts": {
                 "$contains": {
@@ -4599,17 +4602,23 @@
                 }
               },
               "items.3.type": "asset.uploaded",
+              "items.3.assetSequence": 1,
               "items.4.type": "asset.classified",
+              "items.4.assetSequence": 2,
               "items.5.type": "asset.allowed",
               "items.5.assetId": {
                 "$ref": "allowed.id"
               },
+              "items.5.assetSequence": 3,
               "items.6.type": "asset.uploaded",
+              "items.6.assetSequence": 1,
               "items.7.type": "asset.failed",
+              "items.7.assetSequence": 2,
               "items.8.type": "asset.content-removed",
               "items.8.assetId": {
                 "$ref": "emptied.id"
               },
+              "items.8.assetSequence": 3,
               "items.8.asset.content.status": "removed"
             },
             "httpStatus": 200
@@ -5318,6 +5327,118 @@
               "code": "asset/not-found",
               "status": 404
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "each asset's events carry its own increasing assetSequence, and other events none",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.enqueueEvent",
+          "args": {
+            "type": "asset.allowed",
+            "facts": [
+              {
+                "key": "decided-by",
+                "value": "automated"
+              }
+            ]
+          },
+          "expect": {
+            "result": {
+              "assetId": null,
+              "assetSequence": null
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "b.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "b",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "outcome": "blocked"
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "feed.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 8,
+              "items.0.type": "asset.uploaded",
+              "items.0.assetId": {
+                "$ref": "a.id"
+              },
+              "items.0.assetSequence": 1,
+              "items.1.type": "asset.classified",
+              "items.1.assetSequence": 2,
+              "items.2.type": "asset.allowed",
+              "items.2.assetSequence": 3,
+              "items.3.assetId": null,
+              "items.3.assetSequence": null,
+              "items.4.type": "asset.uploaded",
+              "items.4.assetId": {
+                "$ref": "b.id"
+              },
+              "items.4.assetSequence": 1,
+              "items.5.assetSequence": 2,
+              "items.6.assetSequence": 3,
+              "items.7.type": "asset.blocked",
+              "items.7.assetId": {
+                "$ref": "a.id"
+              },
+              "items.7.assetSequence": 4
+            },
+            "httpStatus": 200
           }
         }
       ]

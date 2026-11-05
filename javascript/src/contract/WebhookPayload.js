@@ -664,6 +664,21 @@ const ASSET_TYPE_SCHEMA = zod.enum([
 	"website",
 	"file"
 ]);
+/** Spreadsheets: their sheets' text and embedded images are moderated, without page renders. */
+const SPREADSHEET_MIME_TYPES = [
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	"application/vnd.ms-excel.sheet.macroenabled.12",
+	"application/vnd.ms-excel",
+	"application/vnd.oasis.opendocument.spreadsheet"
+];
+/** Presentations: their slides' text and a render of each slide are moderated. */
+const PRESENTATION_MIME_TYPES = [
+	"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+	"application/vnd.ms-powerpoint.presentation.macroenabled.12",
+	"application/vnd.ms-powerpoint",
+	"application/vnd.oasis.opendocument.presentation"
+];
+[...SPREADSHEET_MIME_TYPES, ...PRESENTATION_MIME_TYPES];
 const ASSET_VISIBILITY_SCHEMA = zod.enum(["public", "private"]);
 const ASSET_SAFETY_HOLD_REASON_SCHEMA = zod.enum(["suspected-illegal-content"]);
 const ASSET_SAFETY_HOLD_SCHEMA = zod.object({
@@ -1236,7 +1251,13 @@ const ASSET_CLASSIFIED = defineEventType({
 		flaggedCategories: field(zod.array(zod.string()), FLAGGED_CATEGORIES_INFO),
 		moderationStatus: field(ASSET_MODERATION_STATUS_SCHEMA, {
 			label: msg("Moderation status"),
-			description: "The status the policy decided: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`. A reviewer's earlier decision on the asset keeps precedence.",
+			description: "The asset's status once classification finished: `allowed`, `limited`, `age-restricted`, `blocked` or `purged`. Usually the status the policy decided; when a reviewer decided the asset while it was being processed, their decision stands and this is their status.",
+			display: "enum",
+			valueLabels: MODERATION_STATUS_LABELS
+		}),
+		automatedStatus: field(ASSET_MODERATION_DECISION_SCHEMA.optional(), {
+			label: msg("Automated status"),
+			description: "Present only when a reviewer decided the asset while it was being processed: the status the policy decided, which was not applied. The report and scores are still stored with the asset.",
 			display: "enum",
 			valueLabels: MODERATION_STATUS_LABELS
 		})
@@ -2198,6 +2219,7 @@ const EVENT_FIELDS = {
 	title: saneStringField().describe("Short human-readable summary"),
 	description: saneStringField({ type: "large" }).nullish().describe("Longer human-readable explanation"),
 	assetId: idField("asset").nullish().describe("ID of the asset the event is about, for asset events"),
+	assetSequence: zod.number().int().positive().nullish().describe("The event's place among the events about its asset: it increases with each later event about the same asset. Deliveries can arrive out of order, so store the highest `assetSequence` you have processed for each asset and ignore an event with a lower one. Null for events that aren't about an asset."),
 	asset: EVENT_ASSET_SCHEMA.nullish().describe("Snapshot of the asset's moderation decision when the event was created, for asset events"),
 	facts: EVENT_FACTS_SCHEMA.describe("Registered event facts. See [Event facts](/docs/api/events#event-facts)."),
 	notify: zod.boolean().nullish().describe("Whether the event triggers in-app notifications"),
@@ -2225,6 +2247,7 @@ const PUBLIC_EVENT_SCHEMA = zod.strictObject(PUBLIC_EVENT_FIELDS).meta(metaStore
 		severity: "low",
 		title: "Product photo uploaded",
 		assetId: EXAMPLE_IDS.asset,
+		assetSequence: 1,
 		facts: [
 			{
 				key: "asset-name",
@@ -2251,6 +2274,7 @@ const toPublicEvent = (event) => ({
 	title: event.title,
 	description: event.description ?? null,
 	assetId: event.assetId ?? null,
+	assetSequence: event.assetSequence ?? null,
 	asset: event.asset ?? null,
 	facts: event.facts,
 	createdAt: event.createdAt
@@ -2271,6 +2295,7 @@ const TYPED_EVENT_SCHEMA = zod.discriminatedUnion("type", EVENT_TYPES.map((type)
 		severity: "low",
 		title: "Product photo uploaded",
 		assetId: EXAMPLE_IDS.asset,
+		assetSequence: 1,
 		facts: [
 			{
 				key: "asset-name",
@@ -2321,6 +2346,7 @@ zod.looseObject({
 	title: zod.string().optional(),
 	description: zod.string().nullish(),
 	assetId: zod.string().nullish(),
+	assetSequence: zod.number().nullish(),
 	asset: zod.looseObject({ id: zod.string() }).nullish(),
 	facts: zod.array(zod.looseObject({
 		key: zod.string(),

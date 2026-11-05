@@ -290,6 +290,15 @@ class ContractTest {
         assertEquals(c.get("isTest").getAsBoolean(), CalmLensServerClient.isTestWebhookEvent(Json.GSON.fromJson(c.get("event"), Models.WebhookEventPayload.class))));
   }
 
+  @TestFactory Stream<DynamicTest> webhookAssetSequences() throws Exception {
+    return cases(array("webhooks.json", "assetSequences"), c -> c.get("name").getAsString(), c -> {
+      Long lastSequence = c.get("lastSequence").isJsonNull() ? null : c.get("lastSequence").getAsLong();
+      boolean newer = c.get("newer").getAsBoolean();
+      assertEquals(newer, CalmLensServerClient.isNewerAssetEvent(Json.GSON.fromJson(c.get("event"), Models.WebhookEventPayload.class), lastSequence));
+      assertEquals(newer, CalmLensServerClient.isNewerAssetEvent(Json.GSON.fromJson(c.get("event"), Models.Event.class), lastSequence));
+    });
+  }
+
   /** An event becomes its delivery body, is signed into delivery headers, and parses back from them. */
   @TestFactory Stream<DynamicTest> webhookRoundTrips() throws Exception {
     return cases(array("webhooks.json", "roundTrips"), c -> c.get("name").getAsString(), c -> {

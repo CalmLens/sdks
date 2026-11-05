@@ -95,6 +95,8 @@ final class MockServerClient
     public array $hashListEntries = [];
     /** @var list<array> The events feed, oldest first. */
     public array $events = [];
+    /** @var array<string, int> Each asset's latest `assetSequence`, which the API keeps on the asset row. */
+    private array $assetEventSequences = [];
     /** @var array<string, array> Lenses by identifier. */
     public array $lenses = [];
 
@@ -273,7 +275,8 @@ final class MockServerClient
      * Adds an event to the feed returned by `events.list`. Omitted `id`, `projectId`, `severity`,
      * `title`, `description`, `assetId`, `asset`, `facts` and `createdAt` are filled in; when `assetId` names a stored
      * asset, the event carries a snapshot of its status, as the API's events do, with the moderation
-     * status an `asset.<status>` event announces. Pass the result to
+     * status an `asset.<status>` event announces. `assetSequence` is assigned like the API's (any
+     * given one is ignored): the asset's next number, from 1, or null without an `assetId`. Pass the result to
      * `Webhooks::toPayload` to build a matching webhook body.
      */
     public function enqueueEvent(array $event): array
@@ -286,8 +289,14 @@ final class MockServerClient
         if ($snapshot !== null && $announced !== null) {
             $snapshot['classification']['moderation']['status'] = $announced;
         }
+        // Like the API: each event about an asset takes the asset's next number; others have none.
+        $sequence = null;
+        if (is_string($assetId) && $assetId !== '') {
+            $sequence = $this->assetEventSequences[$assetId] = ($this->assetEventSequences[$assetId] ?? 0) + 1;
+        }
+        unset($event['assetSequence']);
         $event += ['id' => ($this->createId)('evt'), 'projectId' => $this->projectId, 'severity' => 'low',
-            'title' => $event['type'] ?? '', 'description' => null, 'assetId' => null,
+            'title' => $event['type'] ?? '', 'description' => null, 'assetId' => null, 'assetSequence' => $sequence,
             'asset' => $snapshot, 'facts' => [], 'createdAt' => $now];
         $this->events[] = $event;
         return $event;

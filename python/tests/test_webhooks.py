@@ -49,7 +49,7 @@ class WebhookTests(unittest.TestCase):
 
     def test_payload_is_the_listed_event_without_other_fields(self):
         event = {"id": "evt_1", "projectId": "project-1", "type": "asset.allowed", "severity": "low",
-                 "title": "Asset allowed", "description": None, "assetId": "asset_1", "asset": None,
+                 "title": "Asset allowed", "description": None, "assetId": "asset_1", "assetSequence": 3, "asset": None,
                  "facts": [{"key": "decided-by", "value": "automated"}], "createdAt": 1760000000000}
         stored = {**event, "userId": "user-1", "notify": True, "readAt": 1, "updatedAt": 2}
         self.assertEqual(to_webhook_event_payload(stored), event)  # type: ignore[arg-type]

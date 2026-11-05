@@ -49,7 +49,8 @@ final class Webhooks
         return [
             'id' => $event['id'], 'projectId' => $event['projectId'], 'type' => $event['type'],
             'severity' => $event['severity'], 'title' => $event['title'], 'description' => $event['description'] ?? null,
-            'assetId' => $event['assetId'] ?? null, 'asset' => $event['asset'] ?? null, 'facts' => $event['facts'],
+            'assetId' => $event['assetId'] ?? null, 'assetSequence' => $event['assetSequence'] ?? null,
+            'asset' => $event['asset'] ?? null, 'facts' => $event['facts'],
             'createdAt' => $event['createdAt'],
         ];
     }
@@ -114,7 +115,9 @@ final class Webhooks
         $nullableString = fn (string $key) => !array_key_exists($key, $fields) || $fields[$key] === null || is_string($fields[$key]);
         if ((array_key_exists('severity', $fields) && !is_string($fields['severity']))
             || (array_key_exists('title', $fields) && !is_string($fields['title']))
-            || !$nullableString('description') || !$nullableString('assetId')) {
+            || !$nullableString('description') || !$nullableString('assetId')
+            || (array_key_exists('assetSequence', $fields) && $fields['assetSequence'] !== null
+                && !is_int($fields['assetSequence']) && !is_float($fields['assetSequence']))) {
             return false;
         }
         if (array_key_exists('asset', $fields) && $fields['asset'] !== null
@@ -144,6 +147,19 @@ final class Webhooks
             }
         }
         return false;
+    }
+
+    /**
+     * Whether to apply `event` after `lastSequence`, the highest `assetSequence` you have applied for
+     * its asset (null when none). Deliveries can arrive out of order: an event about an asset is newer
+     * only with a higher `assetSequence`, so a retried or repeated delivery of an earlier one returns
+     * false. Events that aren't about an asset have no sequence and are always new. Store the highest
+     * `assetSequence` applied per `assetId` and ignore lower ones.
+     */
+    public static function isNewerAssetEvent(array $event, ?int $lastSequence): bool
+    {
+        $sequence = $event['assetSequence'] ?? null;
+        return $sequence === null || $lastSequence === null || $sequence > $lastSequence;
     }
 
     private static function header(array $headers, string $name): ?string

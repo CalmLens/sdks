@@ -794,6 +794,20 @@
       }
     },
     {
+      "id": "webhooks.isNewerAssetEvent",
+      "kind": "function",
+      "description": "Whether to apply an event after the highest assetSequence already applied for its asset: true for a higher sequence, an event without one, or nothing applied yet.",
+      "names": {
+        "javascript": "isNewerAssetEvent",
+        "python": "is_newer_asset_event",
+        "go": "IsNewerAssetEvent",
+        "rust": "is_newer_asset_event",
+        "java": "CalmLensServerClient.isNewerAssetEvent",
+        "ruby": "CalmLens.newer_asset_event?",
+        "php": "Webhooks::isNewerAssetEvent"
+      }
+    },
+    {
       "id": "uploadTokens.signAt",
       "kind": "mock-function",
       "description": "Signs an upload token with a fixed clock and nonce, for exact test tokens.",

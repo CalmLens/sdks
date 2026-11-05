@@ -149,6 +149,13 @@ declare const EVENT_TYPE_INFO: {
         pending: "pending";
         purged: "purged";
       }>>;
+      automatedStatus: EventFieldDefinition<zod.ZodOptional<zod.ZodEnum<{
+        "age-restricted": "age-restricted";
+        allowed: "allowed";
+        blocked: "blocked";
+        limited: "limited";
+        purged: "purged";
+      }>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
@@ -157,6 +164,7 @@ declare const EVENT_TYPE_INFO: {
       parentAsset?: string | undefined;
       flaggedCategories: string[];
       moderationStatus: "age-restricted" | "allowed" | "blocked" | "limited" | "pending" | "purged";
+      automatedStatus?: "age-restricted" | "allowed" | "blocked" | "limited" | "purged" | undefined;
     }>;
     factInfo: {
       label: string;
@@ -195,6 +203,13 @@ declare const EVENT_TYPE_INFO: {
         pending: "pending";
         purged: "purged";
       }>;
+      automatedStatus: zod.ZodOptional<zod.ZodEnum<{
+        "age-restricted": "age-restricted";
+        allowed: "allowed";
+        blocked: "blocked";
+        limited: "limited";
+        purged: "purged";
+      }>>;
     }, zod.core.$strip>;
   };
   readonly "asset.region-restricted": {

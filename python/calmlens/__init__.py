@@ -47,7 +47,8 @@ from .types import (
 )
 from .webhooks import (WEBHOOK_DELIVERY_HEADER, WEBHOOK_SIGNATURE_HEADER, WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
                        WEBHOOK_TIMESTAMP_HEADER, parse_webhook_event, create_webhook_headers,
-                       create_webhook_signature_header, is_test_webhook_event, to_webhook_event_payload,
+                       create_webhook_signature_header, is_newer_asset_event, is_test_webhook_event,
+                       to_webhook_event_payload,
                        verify_webhook_signature)
 
 __all__ = ["ViewerClaims",
@@ -58,7 +59,7 @@ __all__ = ["ViewerClaims",
     "WebhookVerificationError",
     "select_moderation_context_items", "MODERATION_CONTEXT_USED_ITEMS", "MODERATION_CONTEXT_USED_CHARACTERS",
     "verify_webhook_signature", "parse_webhook_event", "to_webhook_event_payload", "create_webhook_signature_header",
-    "create_webhook_headers", "is_test_webhook_event", "WEBHOOK_DELIVERY_HEADER", "WEBHOOK_SIGNATURE_HEADER", "WEBHOOK_TIMESTAMP_HEADER",
+    "create_webhook_headers", "is_test_webhook_event", "is_newer_asset_event", "WEBHOOK_DELIVERY_HEADER", "WEBHOOK_SIGNATURE_HEADER", "WEBHOOK_TIMESTAMP_HEADER",
     "WEBHOOK_SIGNATURE_TOLERANCE_SECONDS",
     "AgeRange", "Asset", "AssetClassificationFailureReason", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
     "AssetModeration", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",

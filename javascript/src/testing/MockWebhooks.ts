@@ -23,6 +23,7 @@ export const toWebhookEventPayload = (event: TypedEvent): WebhookEventPayload =>
     title: event.title,
     description: event.description ?? null,
     assetId: event.assetId ?? null,
+    assetSequence: event.assetSequence ?? null,
     asset: event.asset ?? null,
     facts: event.facts,
     createdAt: event.createdAt,

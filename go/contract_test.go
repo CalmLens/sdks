@@ -260,6 +260,12 @@ func TestWebhookContract(t *testing.T) {
 			Event  json.RawMessage
 			IsTest bool
 		}
+		AssetSequences []struct {
+			Name         string
+			Event        json.RawMessage
+			LastSequence *int64
+			Newer        bool
+		}
 		RoundTrips []struct {
 			Name             string
 			Event            json.RawMessage
@@ -383,6 +389,22 @@ func TestWebhookContract(t *testing.T) {
 			}
 			if event.Facts.IsTest() != fixture.IsTest {
 				t.Fatalf("IsTest = %v, want %v", !fixture.IsTest, fixture.IsTest)
+			}
+		})
+	}
+	for _, fixture := range fixtures.AssetSequences {
+		t.Run("asset sequence: "+fixture.Name, func(t *testing.T) {
+			var event Event
+			if err := decodeJSON(fixture.Event, &event); err != nil {
+				t.Fatal(err)
+			}
+			// Sequences start at 1, so 0 is "nothing applied yet".
+			var last int64
+			if fixture.LastSequence != nil {
+				last = *fixture.LastSequence
+			}
+			if got := IsNewerAssetEvent(&event, last); got != fixture.Newer {
+				t.Fatalf("IsNewerAssetEvent = %v, want %v", got, fixture.Newer)
 			}
 		})
 	}

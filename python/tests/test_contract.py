@@ -28,7 +28,7 @@ from urllib.parse import parse_qsl, urlsplit
 import calmlens
 from calmlens import (CalmLensAPIError, CalmLensError, CalmLensServerClient, CalmLensTimeoutError,
                       CalmLensTransportError, CalmLensValidationError, WebhookVerificationError, client as client_module,
-                      is_test_webhook_event, parse_webhook_event, testing, to_webhook_event_payload,
+                      is_newer_asset_event, is_test_webhook_event, parse_webhook_event, testing, to_webhook_event_payload,
                       verify_webhook_signature)
 from calmlens import _mock_classification, _signed_test_inputs
 from calmlens._option_keys import NULLABLE_OPTION_KEYS
@@ -830,6 +830,11 @@ class WebhookContractTests(unittest.TestCase):
         for case in self.fixtures["testFacts"]:
             with self.subTest(case["name"]):
                 self.assertIs(is_test_webhook_event(case["event"]), case["isTest"])
+
+    def test_asset_sequences(self) -> None:
+        for case in self.fixtures["assetSequences"]:
+            with self.subTest(case["name"]):
+                self.assertIs(is_newer_asset_event(case["event"], case["lastSequence"]), case["newer"])
 
     def test_round_trips(self) -> None:
         for case in self.fixtures["roundTrips"]:

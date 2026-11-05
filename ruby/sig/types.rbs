@@ -702,6 +702,8 @@ module CalmLens
     "title" => String,
     "description" => String?,
     "assetId" => String?,
+    # Increases with each event about the same asset; nil for events not about an asset.
+    "assetSequence" => Integer?,
     "asset" => event_asset?,
     "facts" => Array[event_fact],
     "createdAt" => Integer

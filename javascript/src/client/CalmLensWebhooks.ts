@@ -117,7 +117,7 @@ export async function parseWebhookEvent(
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
-const isOptional = (value: unknown, type: "string" | "object", nullable: boolean) =>
+const isOptional = (value: unknown, type: "string" | "number" | "object", nullable: boolean) =>
   value === undefined || (nullable && value === null) || typeof value === type;
 
 /**
@@ -136,12 +136,13 @@ const isWebhookEvent = (value: unknown): value is ReceivedWebhookEventPayload =>
   ) {
     return false;
   }
-  const { severity, title, description, assetId, asset, facts } = value;
+  const { severity, title, description, assetId, assetSequence, asset, facts } = value;
   return (
     isOptional(severity, "string", false) &&
     isOptional(title, "string", false) &&
     isOptional(description, "string", true) &&
     isOptional(assetId, "string", true) &&
+    isOptional(assetSequence, "number", true) &&
     (asset === undefined || asset === null || (isObject(asset) && typeof asset.id === "string")) &&
     (facts === undefined ||
       (Array.isArray(facts) &&
@@ -162,3 +163,20 @@ const isWebhookEvent = (value: unknown): value is ReceivedWebhookEventPayload =>
 export const isTestWebhookEvent = (event: Pick<ReceivedWebhookEventPayload, "facts">): boolean =>
   Array.isArray(event?.facts) &&
   event.facts.some((fact) => fact?.key === "test" && fact.value === true);
+
+/**
+ * Whether to apply `event` after `lastSequence`, the highest `assetSequence` you have applied for
+ * its asset (`null` or `undefined` when none). Deliveries can arrive out of order: an event about
+ * an asset is newer only with a higher `assetSequence`, so a retried or repeated delivery of an
+ * earlier one returns `false`. Events that aren't about an asset have no sequence and are always
+ * new. Store the event's `assetSequence` per `assetId` once you have applied it.
+ */
+export const isNewerAssetEvent = (
+  event: Pick<ReceivedWebhookEventPayload, "assetSequence">,
+  lastSequence: number | null | undefined,
+): boolean =>
+  event.assetSequence === null ||
+  event.assetSequence === undefined ||
+  lastSequence === null ||
+  lastSequence === undefined ||
+  event.assetSequence > lastSequence;

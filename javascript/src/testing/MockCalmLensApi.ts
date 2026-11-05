@@ -169,7 +169,10 @@ export interface MockFailureOptions {
 }
 
 /** An event to add to the mock feed; omitted fields get defaults. */
-export type MockEventInput = Partial<Omit<TypedEvent, "type">> & { type: TypedEvent["type"] };
+/** An event to add to the feed; its `assetSequence` is assigned like the API's. */
+export type MockEventInput = Partial<Omit<TypedEvent, "type" | "assetSequence">> & {
+  type: TypedEvent["type"];
+};
 
 /** The upload preset settings a `MockCalmLensAppClient` applies, as the API would. */
 export interface MockUploadPreset {
@@ -542,6 +545,8 @@ export class MockCalmLensApi {
   private readonly options: MockCalmLensApiOptions;
   private readonly lenses = new Map<string, Lens>();
   private readonly eventFeed: TypedEvent[] = [];
+  /** Each asset's latest `assetSequence`, which the API keeps on the asset row. */
+  private readonly assetEventSequences = new Map<string, number>();
   /** What each open multipart upload was started with, as the API saves it. */
   private readonly openUploads = new Map<string, { queue: boolean; totalSizeInBytes?: number }>();
   private readonly idempotentResults = new Map<
@@ -627,6 +632,10 @@ export class MockCalmLensApi {
       createdAt: now,
       ...input,
     } as TypedEvent;
+    // Like the API: each event about an asset takes the asset's next number; others have none.
+    const sequence = event.assetId ? (this.assetEventSequences.get(event.assetId) ?? 0) + 1 : null;
+    if (event.assetId && sequence !== null) this.assetEventSequences.set(event.assetId, sequence);
+    event.assetSequence = sequence;
     this.eventFeed.push(event);
     return event;
   }

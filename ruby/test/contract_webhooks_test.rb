@@ -96,6 +96,11 @@ class ContractWebhooksTest < Minitest::Test
   end
   each_case('webhook_test_fact', WEBHOOKS['testFacts']) { |entry| entry['name'] }
 
+  def replay_webhook_asset_sequence(entry)
+    assert_equal entry['newer'], CalmLens.newer_asset_event?(entry['event'], entry['lastSequence']), entry['name']
+  end
+  each_case('webhook_asset_sequence', WEBHOOKS['assetSequences']) { |entry| entry['name'] }
+
   def replay_webhook_round_trip(entry)
     assert_equal entry['payload'], CalmLens.to_webhook_event_payload(entry['event'])
     assert_equal entry['body'], JSON.generate(entry['payload'])

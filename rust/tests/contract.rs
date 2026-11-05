@@ -590,6 +590,27 @@ async fn webhook_test_fact_contracts() {
 }
 
 #[tokio::test]
+async fn webhook_asset_sequence_contracts() {
+    let fixtures = fixture("webhooks");
+    each_case(
+        "webhook asset sequences",
+        named(&fixtures["assetSequences"], "name"),
+        |c| async move {
+            let event: WebhookEventPayload = typed(c["event"].clone());
+            let last_sequence = c["lastSequence"].as_u64();
+            assert!(c["lastSequence"].is_null() || last_sequence.is_some());
+            assert_eq!(
+                calmlens::is_newer_asset_event(&event, last_sequence),
+                c["newer"].as_bool().unwrap(),
+                "{}",
+                c["name"]
+            );
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
 async fn webhook_round_trip_contracts() {
     let fixtures = fixture("webhooks");
     each_case(
@@ -1558,6 +1579,7 @@ fn references() -> BTreeSet<&'static str> {
         "construct_webhook_event" => |body: &[u8], headers: &http::HeaderMap| calmlens::construct_webhook_event(body, headers, "");
         "create_webhook_signature_header" => |body: &[u8]| calmlens::create_webhook_signature_header(body, "", "");
         "create_webhook_headers" => |body: &[u8]| calmlens::create_webhook_headers(body, "", 0, "");
+        "is_newer_asset_event" => calmlens::is_newer_asset_event;
         "models::WebhookEventPayload::from_event" => WebhookEventPayload::from_event;
         "models::WebhookEventPayload::is_test" => WebhookEventPayload::is_test;
         "testing::sign_upload_token" => testing::sign_upload_token;

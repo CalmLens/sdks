@@ -38,6 +38,7 @@ var surfaceFunctions = map[string]any{
 	"CreateWebhookHeaders":          calmlens.CreateWebhookHeaders,
 	"ToWebhookEventPayload":         calmlens.ToWebhookEventPayload,
 	"VerifyWebhookRequest":          calmlens.VerifyWebhookRequest,
+	"IsNewerAssetEvent":             calmlens.IsNewerAssetEvent,
 	"EventFacts.IsTest":             calmlens.EventFacts.IsTest,
 	"calmlenstest.SignUploadToken":  SignUploadToken,
 	"calmlenstest.NewServerClient":  NewServerClient,

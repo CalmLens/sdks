@@ -15,7 +15,7 @@ module CalmLens
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 300
 
   # A verified webhook delivery. The body has the shape of an {Events#list} item:
-  # `{id, projectId, type, severity, title, description, assetId, asset, facts, createdAt}`.
+  # `{id, projectId, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt}`.
   # Fields CalmLens adds later are kept in {#payload}, as are unknown asset and fact fields.
   #
   # @!attribute id [String] the event ID.
@@ -25,14 +25,21 @@ module CalmLens
   # @!attribute title [String, nil]
   # @!attribute description [String, nil]
   # @!attribute asset_id [String, nil]
+  # @!attribute asset_sequence [Integer, nil] increases with each event about the same asset; nil for
+  #   events not about an asset. Deliveries can arrive out of order: see {#newer_than?}.
   # @!attribute asset [Hash, nil] the asset's status when the event was created.
   # @!attribute facts [Array<Hash>] `{'key', 'value', 'url'?}` entries registered for the event type.
   # @!attribute created_at [Integer] milliseconds since the epoch.
   # @!attribute payload [Hash{String => Object}] the delivery body as received, with every field.
-  WebhookEvent = Struct.new(:id, :project_id, :type, :severity, :title, :description, :asset_id, :asset, :facts,
-                            :created_at, :payload, keyword_init: true) do
+  WebhookEvent = Struct.new(:id, :project_id, :type, :severity, :title, :description, :asset_id, :asset_sequence, :asset,
+                            :facts, :created_at, :payload, keyword_init: true) do
     # @return [Boolean] true for a test send from the portal or CLI.
     def test? = Webhooks.test_event?(self)
+
+    # @param last_sequence [Integer, nil] the highest `assetSequence` applied for this event's asset
+    # @return [Boolean] whether to apply this event after it.
+    # @see Webhooks.newer_asset_event?
+    def newer_than?(last_sequence) = Webhooks.newer_asset_event?(self, last_sequence)
 
     # @return [Hash{String => Object}] the delivery body as received, with every field.
     def to_payload = payload
@@ -79,16 +86,30 @@ module CalmLens
       facts.is_a?(Array) && facts.any? { |fact| fact.is_a?(Hash) && fact['key'] == 'test' && fact['value'] == true }
     end
 
+    # Whether to apply `event` after `last_sequence`, the highest `assetSequence` you have applied
+    # for its asset (nil when none). Deliveries can arrive out of order: an event about an asset is
+    # newer only with a higher `assetSequence`, so a retried or repeated delivery of an earlier one
+    # returns false. Events that aren't about an asset have no sequence and are always new. Store
+    # the highest `assetSequence` applied per `assetId` and ignore lower ones.
+    # @param event [WebhookEvent, Hash] a parsed delivery, or a delivery body with string keys
+    # @param last_sequence [Integer, nil]
+    # @return [Boolean]
+    def newer_asset_event?(event, last_sequence)
+      sequence = event.is_a?(Hash) ? event['assetSequence'] : event.asset_sequence
+      sequence.nil? || last_sequence.nil? || sequence > last_sequence
+    end
+
     # Converts an event from {Events#list} to the JSON body of its webhook delivery, which has the
-    # same fields: `description`, `assetId` and `asset` are nil when absent.
+    # same fields: `description`, `assetId`, `assetSequence` and `asset` are nil when absent.
     # @param event [Hash] an event with string keys, as {Events#list} returns it
-    # @return [Hash] `{ 'id', 'projectId', 'type', 'severity', 'title', 'description', 'assetId', 'asset', 'facts', 'createdAt' }`
+    # @return [Hash] `{ 'id', 'projectId', 'type', 'severity', 'title', 'description', 'assetId', 'assetSequence',
+    #   'asset', 'facts', 'createdAt' }`
     def to_payload(event)
       raise Internal.invalid('event must be a Hash') unless event.is_a?(Hash)
 
       { 'id' => event['id'], 'projectId' => event['projectId'], 'type' => event['type'], 'severity' => event['severity'],
         'title' => event['title'], 'description' => event['description'], 'assetId' => event['assetId'],
-        'asset' => event['asset'], 'facts' => event['facts'], 'createdAt' => event['createdAt'] }
+        'assetSequence' => event['assetSequence'], 'asset' => event['asset'], 'facts' => event['facts'], 'createdAt' => event['createdAt'] }
     end
 
     # Checks a delivery's signature and freshness in constant time. Pass the `signature` and
@@ -151,7 +172,8 @@ module CalmLens
 
       WebhookEvent.new(id: body['id'], project_id: body['projectId'], type: body['type'], severity: body['severity'],
                        title: body['title'], description: body['description'], asset_id: body['assetId'],
-                       asset: body['asset'], facts: body.fetch('facts', []), created_at: body['createdAt'], payload: body)
+                       asset_sequence: body['assetSequence'], asset: body['asset'], facts: body.fetch('facts', []),
+                       created_at: body['createdAt'], payload: body)
     rescue JSON::ParserError, EncodingError => e
       raise WebhookVerificationError.new(SdkErrorCodes::INVALID_WEBHOOK_PAYLOAD, 'Webhook body is not JSON'), cause: e
     end
@@ -165,7 +187,8 @@ module CalmLens
       optional = ->(key, *types) { !body.key?(key) || types.any? { |type| type.nil? ? body[key].nil? : body[key].is_a?(type) } }
       asset = body['asset']
       optional.call('severity', String) && optional.call('title', String) && optional.call('description', String, nil) &&
-        optional.call('assetId', String, nil) && (asset.nil? || (asset.is_a?(Hash) && asset['id'].is_a?(String))) &&
+        optional.call('assetId', String, nil) && optional.call('assetSequence', Numeric, nil) &&
+        (asset.nil? || (asset.is_a?(Hash) && asset['id'].is_a?(String))) &&
         (!body.key?('facts') || (body['facts'].is_a?(Array) && body['facts'].all? { |fact| fact?(fact) }))
     end
 
@@ -214,4 +237,7 @@ module CalmLens
 
   # @see Webhooks.test_event?
   def self.test_webhook_event?(...) = Webhooks.test_event?(...)
+
+  # @see Webhooks.newer_asset_event?
+  def self.newer_asset_event?(...) = Webhooks.newer_asset_event?(...)
 end

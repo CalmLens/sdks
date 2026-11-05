@@ -796,6 +796,14 @@ final class MockApi {
     return list;
   }
 
+  /** Each asset's latest event {@code assetSequence}, which the API keeps on the asset. */
+  private final Map<String, Long> assetSequences = new HashMap<>();
+
+  /** The {@code assetSequence} of the next event about an asset, like the API: 1 for its first event, then one more for each later one. */
+  long nextAssetSequence(String assetId) {
+    return assetSequences.merge(assetId, 1L, Long::sum);
+  }
+
   /** Adds an event to the feed, with a snapshot of {@code asset} when there is one. */
   JsonObject recordEvent(String type, String severity, JsonObject asset, List<Models.EventFact> facts) {
     long now = now();
@@ -807,6 +815,7 @@ final class MockApi {
     event.addProperty("title", type);
     event.add("description", JsonNull.INSTANCE);
     event.add("assetId", asset == null ? JsonNull.INSTANCE : asset.get("id"));
+    event.add("assetSequence", asset == null ? JsonNull.INSTANCE : new JsonPrimitive(nextAssetSequence(asset.get("id").getAsString())));
     event.add("asset", asset == null ? JsonNull.INSTANCE : snapshot(asset));
     event.add("facts", facts(facts));
     event.addProperty("createdAt", now);

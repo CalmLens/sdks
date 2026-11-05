@@ -122,7 +122,7 @@ pub fn verify_webhook_signature(
 /// Parses a webhook delivery body without verifying it; prefer [`construct_webhook_event`].
 ///
 /// The body must be a JSON object with string `id`, `type` and `projectId`, a numeric
-/// `createdAt`, and its other fields, when present, must have the API's types: `severity` and `title` strings, `description` and `assetId` strings or null, `asset` null or
+/// `createdAt`, and its other fields, when present, must have the API's types: `severity` and `title` strings, `description` and `assetId` strings or null, `assetSequence` a number or null, `asset` null or
 /// an object with a string `id`, and `facts` an array of `{key, value, url?}` objects with a
 /// string `key` and `url`. Anything else returns `sdk/invalid-webhook-payload`. Unknown fields
 /// are kept: [`WebhookEventPayload::json`] returns the body as received.
@@ -174,6 +174,12 @@ fn check_payload(value: &Value) -> std::result::Result<(), &'static str> {
     if !optional(payload, "assetId", true) {
         return Err("assetId");
     }
+    if !matches!(
+        payload.get("assetSequence"),
+        None | Some(Value::Null | Value::Number(_))
+    ) {
+        return Err("assetSequence");
+    }
     match payload.get("asset") {
         None | Some(Value::Null) => {}
         Some(Value::Object(asset)) if string(asset, "id") => {}
@@ -195,6 +201,19 @@ fn check_payload(value: &Value) -> std::result::Result<(), &'static str> {
         Some(_) => return Err("facts"),
     }
     Ok(())
+}
+
+/// Whether to apply `event` after `last_sequence`, the highest
+/// [`asset_sequence`](WebhookEventPayload::asset_sequence) you have applied for its asset (`None`
+/// when none). Deliveries can arrive out of order: an event about an asset is newer only with a
+/// higher `asset_sequence`, so a retried or repeated delivery of an earlier one returns `false`.
+/// Events that aren't about an asset have no sequence and are always new. Store the highest
+/// `asset_sequence` applied per `asset_id` and ignore events this returns `false` for.
+pub fn is_newer_asset_event(event: &WebhookEventPayload, last_sequence: Option<u64>) -> bool {
+    match (event.asset_sequence, last_sequence) {
+        (Some(sequence), Some(last)) => sequence > last,
+        _ => true,
+    }
 }
 
 /// The value of header `name` (any case), with repeated headers joined by `,`.

@@ -253,6 +253,8 @@ module CalmLens
     attr_accessor title: String?
     attr_accessor description: String?
     attr_accessor asset_id: String?
+    # Increases with each event about the same asset; nil for events not about an asset.
+    attr_accessor asset_sequence: Integer?
     attr_accessor asset: event_asset?
     attr_accessor facts: Array[event_fact]
     # Milliseconds since the Unix epoch.
@@ -260,9 +262,10 @@ module CalmLens
     # The delivery body as received, with every field.
     attr_accessor payload: Hash[String, json_value]
     def initialize: (?id: String, ?project_id: String, ?type: event_type | String, ?severity: event_severity?, ?title: String?,
-                     ?description: String?, ?asset_id: String?, ?asset: event_asset?, ?facts: Array[event_fact],
+                     ?description: String?, ?asset_id: String?, ?asset_sequence: Integer?, ?asset: event_asset?, ?facts: Array[event_fact],
                      ?created_at: Integer, ?payload: Hash[String, json_value]) -> void
     def test?: () -> bool
+    def newer_than?: (Integer? last_sequence) -> bool
     # The delivery body as received, with every field.
     def to_payload: () -> Hash[String, json_value]
   end
@@ -286,6 +289,7 @@ module CalmLens
     def self.parse_event: (payload: String, secret: String, ?signature: String?, ?timestamp: String?, ?headers: webhook_headers?,
                            ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
     def self.test_event?: (WebhookEvent | Hash[String, untyped] event) -> bool
+    def self.newer_asset_event?: (WebhookEvent | Hash[String, untyped] event, Integer? last_sequence) -> bool
   end
 
   def self.create_webhook_signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
@@ -298,6 +302,7 @@ module CalmLens
   def self.parse_webhook_event: (payload: String, secret: String, ?signature: String?, ?timestamp: String?,
                                  ?headers: webhook_headers?, ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
   def self.test_webhook_event?: (WebhookEvent | Hash[String, untyped] event) -> bool
+  def self.newer_asset_event?: (WebhookEvent | Hash[String, untyped] event, Integer? last_sequence) -> bool
 
   # require 'calmlens/testing'
   module Testing

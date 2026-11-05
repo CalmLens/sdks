@@ -21,6 +21,7 @@ __all__ = [
     "WEBHOOK_DELIVERY_HEADER", "WEBHOOK_TIMESTAMP_HEADER", "WEBHOOK_SIGNATURE_HEADER",
     "WEBHOOK_SIGNATURE_TOLERANCE_SECONDS", "to_webhook_event_payload", "create_webhook_signature_header",
     "create_webhook_headers", "verify_webhook_signature", "parse_webhook_event", "is_test_webhook_event",
+    "is_newer_asset_event",
 ]
 
 WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery"
@@ -58,6 +59,7 @@ def to_webhook_event_payload(event: Event) -> WebhookEventPayload:
         "title": event["title"],
         "description": event.get("description"),
         "assetId": event.get("assetId"),
+        "assetSequence": event.get("assetSequence"),
         "asset": event.get("asset"),
         "facts": event["facts"],
         "createdAt": event["createdAt"],
@@ -189,6 +191,10 @@ def _optional(data: Mapping[str, object], key: str, nullable: bool) -> bool:
     return key not in data or (nullable and data[key] is None) or isinstance(data[key], str)
 
 
+def _optional_number(data: Mapping[str, object], key: str) -> bool:
+    return key not in data or data[key] is None or _is_number(data[key])
+
+
 def _is_webhook_event(value: object) -> bool:
     """Whether ``value`` is a webhook body: the fields CalmLens always sends, and the API's types
     for the other known fields when present. Unknown fields are accepted."""
@@ -199,6 +205,7 @@ def _is_webhook_event(value: object) -> bool:
     asset, facts = value.get("asset"), value.get("facts", [])
     return (_optional(value, "severity", False) and _optional(value, "title", False)
             and _optional(value, "description", True) and _optional(value, "assetId", True)
+            and _optional_number(value, "assetSequence")
             and (asset is None or (isinstance(asset, dict) and isinstance(asset.get("id"), str)))
             and isinstance(facts, list)
             and all(isinstance(fact, dict) and isinstance(fact.get("key"), str) and "value" in fact
@@ -211,3 +218,13 @@ def is_test_webhook_event(event: Mapping[str, Any]) -> bool:
     facts = event.get("facts") if isinstance(event, Mapping) else None
     return isinstance(facts, list) and any(
         isinstance(fact, Mapping) and fact.get("key") == "test" and fact.get("value") is True for fact in facts)
+
+
+def is_newer_asset_event(event: Mapping[str, Any], last_sequence: int | None) -> bool:
+    """Whether to apply ``event`` after ``last_sequence``, the highest ``assetSequence`` you have
+    applied for its asset (``None`` when none). Deliveries can arrive out of order: an event about
+    an asset is newer only with a higher ``assetSequence``, so a retried or repeated delivery of an
+    earlier one returns False. Events that aren't about an asset have no sequence and are always
+    new. Store the highest ``assetSequence`` applied per ``assetId`` and ignore lower ones."""
+    sequence = event.get("assetSequence") if isinstance(event, Mapping) else None
+    return sequence is None or last_sequence is None or sequence > last_sequence

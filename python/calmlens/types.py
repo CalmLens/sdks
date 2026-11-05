@@ -1178,6 +1178,9 @@ class Event(TypedDict):
     title: str
     description: Optional[str]
     assetId: Optional[str]
+    #: Increases with each event about the same asset; ``None`` for events not about an asset.
+    #: Deliveries can arrive out of order: see :func:`~calmlens.webhooks.is_newer_asset_event`.
+    assetSequence: Optional[int]
     asset: Optional[EventAsset]
     facts: list[EventFact]
     createdAt: int
@@ -1198,6 +1201,7 @@ class WebhookEventPayload(_WebhookEventPayloadRequired, total=False):
     title: str
     description: Optional[str]
     assetId: Optional[str]
+    assetSequence: Optional[int]
     asset: Optional[EventAsset]
     facts: list[EventFact]
 

@@ -2683,6 +2683,8 @@ public final class Models {
    * @param title short summary
    * @param description longer explanation, or null
    * @param assetId asset the event is about, or null
+   * @param assetSequence increases with each event about the asset; null for events not about an
+   *     asset. Deliveries can arrive out of order: see {@code CalmLensServerClient.isNewerAssetEvent}
    * @param asset snapshot of the asset's decision, or null; retrieve the asset for its current state
    * @param facts registered facts (never null)
    * @param createdAt creation time
@@ -2690,7 +2692,7 @@ public final class Models {
    *     included; null for an event built in code
    */
   public record Event(String id, String projectId, String type, String severity, String title, String description,
-      String assetId, EventAsset asset, List<EventFact> facts,
+      String assetId, Long assetSequence, EventAsset asset, List<EventFact> facts,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt, Map<String, Object> json) {
     /** Copies facts; missing facts become an empty list. */
     public Event { facts = listOrEmpty(facts); json = json == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(json)); }
@@ -2705,17 +2707,18 @@ public final class Models {
      * @param title short summary
      * @param description longer explanation, or null
      * @param assetId asset the event is about, or null
+     * @param assetSequence the event's number among those about its asset, or null
      * @param asset snapshot of the asset, or null
      * @param facts registered facts
      * @param createdAt creation time
      */
     public Event(String id, String projectId, String type, String severity, String title, String description,
-        String assetId, EventAsset asset, List<EventFact> facts, Instant createdAt) {
-      this(id, projectId, type, severity, title, description, assetId, asset, facts, createdAt, null);
+        String assetId, Long assetSequence, EventAsset asset, List<EventFact> facts, Instant createdAt) {
+      this(id, projectId, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, null);
     }
 
     Event withJson(Map<String, Object> value) {
-      return new Event(id, projectId, type, severity, title, description, assetId, asset, facts, createdAt, value);
+      return new Event(id, projectId, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, value);
     }
   }
 
@@ -2748,6 +2751,8 @@ public final class Models {
    * @param title short summary
    * @param description longer explanation, or null
    * @param assetId asset the event is about, or null
+   * @param assetSequence increases with each event about the asset; null for events not about an
+   *     asset. Deliveries can arrive out of order: see {@code CalmLensServerClient.isNewerAssetEvent}
    * @param asset snapshot of the asset's decision, or null; retrieve the asset for its current state
    * @param facts registered facts (never null)
    * @param createdAt event creation time
@@ -2755,7 +2760,7 @@ public final class Models {
    *     this SDK version does not model included; null for a payload built in code
    */
   public record WebhookEventPayload(String id, String projectId, String type, String severity, String title, String description,
-      String assetId, EventAsset asset, List<EventFact> facts,
+      String assetId, Long assetSequence, EventAsset asset, List<EventFact> facts,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt, Map<String, Object> json) {
     /** Copies facts and the JSON object; missing facts become an empty list. */
     public WebhookEventPayload {
@@ -2773,17 +2778,18 @@ public final class Models {
      * @param title short summary
      * @param description longer explanation, or null
      * @param assetId asset the event is about, or null
+     * @param assetSequence the event's number among those about its asset, or null
      * @param asset snapshot of the asset, or null
      * @param facts registered facts
      * @param createdAt event creation time
      */
     public WebhookEventPayload(String id, String projectId, String type, String severity, String title, String description,
-        String assetId, EventAsset asset, List<EventFact> facts, Instant createdAt) {
-      this(id, projectId, type, severity, title, description, assetId, asset, facts, createdAt, null);
+        String assetId, Long assetSequence, EventAsset asset, List<EventFact> facts, Instant createdAt) {
+      this(id, projectId, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, null);
     }
 
     WebhookEventPayload withJson(Map<String, Object> value) {
-      return new WebhookEventPayload(id, projectId, type, severity, title, description, assetId, asset, facts, createdAt, value);
+      return new WebhookEventPayload(id, projectId, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, value);
     }
   }
 

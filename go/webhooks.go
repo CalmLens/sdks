@@ -26,12 +26,12 @@ const (
 
 // webhookEventFields are the fields of the public event shape that events.list returns and
 // webhook connectors deliver.
-var webhookEventFields = []string{"id", "projectId", "type", "severity", "title", "description", "assetId", "asset", "facts", "createdAt"}
+var webhookEventFields = []string{"id", "projectId", "type", "severity", "title", "description", "assetId", "assetSequence", "asset", "facts", "createdAt"}
 
 // ToWebhookEventPayload returns the body a webhook connector delivers for an event, such as one
 // from Events.List: the event in the same shape. Its Raw holds that body, built from the event's
-// Raw (or, for an event built in code, from its typed fields), with Description, AssetID and
-// Asset null when absent; fields that are not part of the shape are left out.
+// Raw (or, for an event built in code, from its typed fields), with Description, AssetID,
+// AssetSequence and Asset null when absent; fields that are not part of the shape are left out.
 func ToWebhookEventPayload(event Event) Event {
 	source := event.Raw
 	if source == nil {
@@ -43,7 +43,7 @@ func ToWebhookEventPayload(event Event) Event {
 	for _, key := range webhookEventFields {
 		if value, ok := source[key]; ok {
 			raw[key] = value
-		} else if key == "description" || key == "assetId" || key == "asset" {
+		} else if key == "description" || key == "assetId" || key == "assetSequence" || key == "asset" {
 			raw[key] = nil
 		}
 	}
@@ -223,6 +223,11 @@ func isWebhookEvent(value map[string]any) bool {
 	if !optional("severity", false) || !optional("title", false) || !optional("description", true) || !optional("assetId", true) {
 		return false
 	}
+	if sequence, present := value["assetSequence"]; present && sequence != nil {
+		if _, ok := sequence.(json.Number); !ok {
+			return false
+		}
+	}
 	if asset, present := value["asset"]; present && asset != nil {
 		object, ok := asset.(map[string]any)
 		if !ok || !isString(object["id"]) {
@@ -248,6 +253,16 @@ func isWebhookEvent(value map[string]any) bool {
 		}
 	}
 	return true
+}
+
+// IsNewerAssetEvent reports whether to apply event after lastSequence, the highest AssetSequence
+// you have applied for its asset (0 when none: sequences start at 1). Deliveries can arrive out
+// of order: an event about an asset is newer only with a higher AssetSequence, so a retried or
+// repeated delivery of an earlier one returns false. Events that aren't about an asset have no
+// sequence and are always new. Store the highest AssetSequence applied per AssetID and ignore
+// events this returns false for.
+func IsNewerAssetEvent(event *Event, lastSequence int64) bool {
+	return event.AssetSequence == nil || lastSequence <= 0 || *event.AssetSequence > lastSequence
 }
 
 // VerifyWebhookRequest reads r.Body (up to WithMaxBodyBytes, default 1 MiB), verifies it

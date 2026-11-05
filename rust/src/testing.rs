@@ -538,7 +538,9 @@ impl MockServerClient {
         Ok(())
     }
     /// Appends `event` to the in-memory events feed and returns it. An empty ID or project ID,
-    /// or a zero creation time, is filled in; when `asset_id` names a stored asset and `asset`
+    /// or a zero creation time, is filled in; an event about an asset takes that asset's next
+    /// `asset_sequence` like the API's (any given one is ignored; events without an `asset_id`
+    /// have none); when `asset_id` names a stored asset and `asset`
     /// is `None`, the event carries its snapshot, with the moderation status an
     /// `asset.<status>` event announces. `events().list` returns it to cursors taken
     /// before it was added.
@@ -557,6 +559,10 @@ impl MockServerClient {
             if event.created_at == 0 {
                 event.created_at = backend.now();
             }
+            event.asset_sequence = event
+                .asset_id
+                .as_deref()
+                .map(|id| backend.next_asset_sequence(id));
             let mut stored = serde_json::to_value(&event).expect("serializable event");
             if event.asset.is_none() {
                 if let Some(asset) = event

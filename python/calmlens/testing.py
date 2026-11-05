@@ -879,6 +879,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self._grants = _grants_of(self.api_key)
         self._idempotent: dict[str, tuple[str, int, bytes]] = {}
         self._uploads: dict[str, dict[str, Any]] = {}
+        # Each asset's latest ``assetSequence``, which the API keeps on the asset row.
+        self._asset_event_sequences: dict[str, int] = {}
         self._mock_lenses: dict[str, dict[str, Any]] = {}
         # Stored policies (the API's shape without ``projectIds`` and ``preset.latestVersion``, plus
         # their reset ``baseline``) and the one the project moderates with.
@@ -1004,9 +1006,14 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 # An ``asset.<status>`` event carries the status it announces.
                 asset["classification"]["moderation"]["status"] = type.removeprefix("asset.")  # type: ignore[typeddict-item]
             now = self.now()
+            # Like the API: each event about an asset takes the asset's next number; others have none.
+            sequence: int | None = None
+            if asset_id:
+                sequence = self._asset_event_sequences.get(asset_id, 0) + 1
+                self._asset_event_sequences[asset_id] = sequence
             event: Event = {"id": self.create_id("evt"), "projectId": self.project_id, "type": type,
                             "severity": severity, "title": title or type, "description": description,
-                            "assetId": asset_id, "asset": asset, "facts": copy.deepcopy(facts or []),
+                            "assetId": asset_id, "assetSequence": sequence, "asset": asset, "facts": copy.deepcopy(facts or []),
                             "createdAt": now}
             self.database_storage.events.append(event)
             return copy.deepcopy(event)

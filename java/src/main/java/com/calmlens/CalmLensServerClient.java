@@ -2144,11 +2144,11 @@ public final class CalmLensServerClient implements AutoCloseable {
   public static Models.WebhookEventPayload toWebhookEventPayload(Models.Event event) {
     if (event.json() == null)
       return new Models.WebhookEventPayload(event.id(), event.projectId(), event.type(), event.severity(), event.title(),
-          event.description(), event.assetId(), event.asset(), event.facts(), event.createdAt());
+          event.description(), event.assetId(), event.assetSequence(), event.asset(), event.facts(), event.createdAt());
     // From the event as received, so asset and fact fields this SDK version does not model are kept.
     Map<String, Object> json = event.json();
     Map<String, Object> payload = new LinkedHashMap<>();
-    for (String key : List.of("id", "projectId", "type", "severity", "title", "description", "assetId", "asset"))
+    for (String key : List.of("id", "projectId", "type", "severity", "title", "description", "assetId", "assetSequence", "asset"))
       payload.put(key, json.get(key));
     payload.put("facts", json.containsKey("facts") ? json.get("facts") : List.of());
     payload.put("createdAt", json.get("createdAt"));
@@ -2171,6 +2171,35 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @return whether it is a test send
    */
   public static boolean isTestWebhookEvent(Models.Event event) { return event != null && isTestFacts(event.facts()); }
+
+  /**
+   * Whether to apply an event after {@code lastSequence}, the highest {@code assetSequence} you have
+   * applied for its asset (null when none). Deliveries can arrive out of order: an event about an
+   * asset is newer only with a higher {@code assetSequence}, so a retried or repeated delivery of an
+   * earlier one returns false. Events that aren't about an asset have no sequence and are always
+   * new. Store the highest {@code assetSequence} applied per {@code assetId} and ignore events this
+   * returns false for.
+   *
+   * @param event a parsed delivery
+   * @param lastSequence the highest {@code assetSequence} applied for the event's asset, or null
+   * @return whether the event is newer than what you have applied
+   */
+  public static boolean isNewerAssetEvent(Models.WebhookEventPayload event, Long lastSequence) {
+    return isNewerSequence(event.assetSequence(), lastSequence);
+  }
+
+  /**
+   * @param event an event from {@code events.list}
+   * @param lastSequence the highest {@code assetSequence} applied for the event's asset, or null
+   * @return whether the event is newer than what you have applied
+   */
+  public static boolean isNewerAssetEvent(Models.Event event, Long lastSequence) {
+    return isNewerSequence(event.assetSequence(), lastSequence);
+  }
+
+  private static boolean isNewerSequence(Long sequence, Long lastSequence) {
+    return sequence == null || lastSequence == null || sequence > lastSequence;
+  }
 
   private static boolean isTestFacts(List<Models.EventFact> facts) {
     return facts != null && facts.stream().anyMatch(fact -> fact != null && "test".equals(fact.key()) && Boolean.TRUE.equals(fact.value()));
@@ -2427,6 +2456,8 @@ public final class CalmLensServerClient implements AutoCloseable {
       return false;
     if (!optionalString(event, "severity", false) || !optionalString(event, "title", false)
         || !optionalString(event, "description", true) || !optionalString(event, "assetId", true)) return false;
+    JsonElement sequence = event.get("assetSequence");
+    if (sequence != null && !sequence.isJsonNull() && !(sequence instanceof JsonPrimitive number && number.isNumber())) return false;
     JsonElement asset = event.get("asset");
     if (asset != null && !asset.isJsonNull() && !(asset instanceof JsonObject snapshot && isString(snapshot.get("id")))) return false;
     JsonElement facts = event.get("facts");

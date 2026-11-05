@@ -704,7 +704,8 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    * Adds an event to the feed that {@code events.list} and {@code events.pages} return after
    * cursors taken earlier. When {@code assetId} names a stored asset, the event carries a snapshot
    * of its status, as the API's events do, with the moderation status an {@code asset.<status>}
-   * event announces.
+   * event announces. An event about an asset takes that asset's next {@code assetSequence}, like
+   * the API's; one without an asset has none.
    *
    * @param type a registered event type, such as {@code asset.blocked}
    * @param assetId the asset the event is about, or null
@@ -721,6 +722,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     event.addProperty("title", type);
     event.add("description", null);
     event.addProperty("assetId", assetId);
+    event.addProperty("assetSequence", assetId == null ? null : api.nextAssetSequence(assetId));
     JsonObject asset = assetId == null ? null : api.storage.assets.get(assetId);
     JsonObject snapshot = asset == null ? null : MockApi.snapshot(asset);
     // An asset.<status> event carries the moderation status it announces.

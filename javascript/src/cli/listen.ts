@@ -137,6 +137,26 @@ export const unavailableWarning = (unavailableTypes: string[]): string =>
   ].join("\n");
 
 /**
+ * The page with each asset's events in `assetSequence` order. The feed can list an event stored
+ * a moment late after newer ones; each asset's events keep the places they had in the page, so
+ * events about different assets keep their order.
+ */
+export const inAssetOrder = (events: readonly Event[]): Event[] => {
+  const byAsset = new Map<string, Event[]>();
+  for (const event of events)
+    if (event.assetId) byAsset.set(event.assetId, [...(byAsset.get(event.assetId) ?? []), event]);
+  for (const assetEvents of byAsset.values())
+    assetEvents.sort((a, b) => (a.assetSequence ?? 0) - (b.assetSequence ?? 0));
+  const next = new Map<string, number>();
+  return events.map((event) => {
+    if (!event.assetId) return event;
+    const index = next.get(event.assetId) ?? 0;
+    next.set(event.assetId, index + 1);
+    return byAsset.get(event.assetId)![index]!;
+  });
+};
+
+/**
  * Forwards new events until `signal` aborts. Resolves normally on abort; rejects with the
  * underlying error for fatal API errors (bad key, wrong project).
  */
@@ -156,7 +176,7 @@ export const listen = async (options: ListenOptions): Promise<void> => {
       const page = await client.events.list({ cursor, pageSize: 100 });
       if (failures > 0) log(`${formatTime(new Date())}  Reconnected to CalmLens.`);
       failures = 0;
-      for (const event of page.items) {
+      for (const event of inAssetOrder(page.items)) {
         if (eventTypes.size > 0 && !eventTypes.has(event.type)) continue;
         log(formatForwardLine(event, await forwardEvent(event, options)));
       }

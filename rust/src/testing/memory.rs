@@ -547,6 +547,8 @@ pub(super) struct Backend {
     lenses: HashMap<String, Value>,
     replays: HashMap<String, (String, MockResponse)>,
     policies: policies::Policies,
+    /// Each asset's latest event `assetSequence`, which the API keeps on the asset.
+    asset_sequences: HashMap<String, u64>,
 }
 
 fn text(value: &Value) -> &str {
@@ -751,7 +753,15 @@ impl Backend {
             lenses: HashMap::new(),
             replays: HashMap::new(),
             policies: policies::Policies::default(),
+            asset_sequences: HashMap::new(),
         }
+    }
+    /// The `assetSequence` of the next event about `asset_id`, like the API: 1 for its first
+    /// event, then one more for each later one.
+    pub(super) fn next_asset_sequence(&mut self, asset_id: &str) -> u64 {
+        let sequence = self.asset_sequences.entry(asset_id.to_owned()).or_default();
+        *sequence += 1;
+        *sequence
     }
     pub(super) fn create_id(&self, prefix: &str) -> String {
         (self.options.create_id)(prefix)
@@ -884,10 +894,12 @@ impl Backend {
     /// Adds an event to the feed, as the API records it.
     fn push_event(&mut self, event_type: &str, severity: &str, asset: &Value, facts: Value) {
         let now = self.now();
+        let sequence = self.next_asset_sequence(text(&asset["id"]));
         let event = json!({
             "id": self.create_id("evt"), "projectId": self.options.project_id, "type": event_type,
             "severity": severity, "title": event_type, "description": null,
-            "assetId": asset["id"], "asset": snapshot(asset), "facts": facts, "createdAt": now,
+            "assetId": asset["id"], "assetSequence": sequence, "asset": snapshot(asset),
+            "facts": facts, "createdAt": now,
         });
         self.storage.events.push(event);
     }

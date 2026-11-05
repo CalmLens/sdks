@@ -1,5 +1,5 @@
 import "./Asset-CQt2Rst2.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-BKqcghco.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-CzSpo84N.js";
 import "./Page-DNdKkX2B.js";
 import * as zod from "zod";
 declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
@@ -81,6 +81,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
   title: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
   description: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
   assetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+  assetSequence: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
   asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     id: zod.ZodString;
     externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -169,6 +170,7 @@ declare const PUBLIC_EVENT_SCHEMA: zod.ZodObject<{
   title: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
   description: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
   assetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+  assetSequence: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
   asset: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     id: zod.ZodString;
     externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;

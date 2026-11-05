@@ -1279,13 +1279,16 @@ type Event struct {
 	// Type is one of the EventType constants.
 	Type string `json:"type"`
 	// Severity is SeverityLow or SeverityHigh.
-	Severity    string      `json:"severity"`
-	Title       string      `json:"title"`
-	Description *string     `json:"description"`
-	AssetID     *string     `json:"assetId"`
-	Asset       *EventAsset `json:"asset"`
-	Facts       EventFacts  `json:"facts"`
-	CreatedAt   int64       `json:"createdAt"`
+	Severity    string  `json:"severity"`
+	Title       string  `json:"title"`
+	Description *string `json:"description"`
+	AssetID     *string `json:"assetId"`
+	// AssetSequence increases with each event about the asset; nil for events not about an
+	// asset. Deliveries can arrive out of order: see IsNewerAssetEvent.
+	AssetSequence *int64      `json:"assetSequence"`
+	Asset         *EventAsset `json:"asset"`
+	Facts         EventFacts  `json:"facts"`
+	CreatedAt     int64       `json:"createdAt"`
 	// Raw contains the entire event, including fields added to the API after this SDK.
 	Raw JSON `json:"-"`
 }

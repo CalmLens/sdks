@@ -2690,6 +2690,10 @@ pub struct Event {
     /// The asset the event concerns.
     #[serde(default)]
     pub asset_id: Option<String>,
+    /// Increases with each event about the asset; `None` for events not about an asset.
+    /// Deliveries can arrive out of order: see [`crate::is_newer_asset_event`].
+    #[serde(default)]
+    pub asset_sequence: Option<u64>,
     /// Snapshot of the asset's state when the event was created. Retrieve the
     /// asset for its current state.
     #[serde(default)]
@@ -2741,6 +2745,10 @@ pub struct WebhookEventPayload {
     /// The asset the event concerns, or `None`.
     #[serde(default)]
     pub asset_id: Option<String>,
+    /// Increases with each event about the asset; `None` for events not about an asset.
+    /// Deliveries can arrive out of order: see [`crate::is_newer_asset_event`].
+    #[serde(default)]
+    pub asset_sequence: Option<u64>,
     /// Snapshot of the asset's state when the event was created, or `None`. Retrieve the asset
     /// for its current state.
     #[serde(default)]
@@ -2764,6 +2772,7 @@ impl WebhookEventPayload {
             title: event.title.clone(),
             description: event.description.clone(),
             asset_id: event.asset_id.clone(),
+            asset_sequence: event.asset_sequence,
             asset: event.asset.clone(),
             facts: event.facts.clone(),
             received: None,

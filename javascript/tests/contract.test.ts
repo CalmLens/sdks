@@ -698,6 +698,12 @@ const receiver: {
     headers: Record<string, string>;
     isTest: boolean;
   }[];
+  assetSequences: {
+    name: string;
+    event: server.WebhookEventPayload;
+    lastSequence: number | null;
+    newer: boolean;
+  }[];
 } = testdata("webhooks.json");
 
 /** The header containers a JavaScript receiver gets: Node's plain object and a fetch `Headers`. */
@@ -771,6 +777,12 @@ describe("webhook receivers", () => {
   for (const { name, event, isTest } of receiver.testFacts) {
     test(`${isTest ? "recognises" : "does not take"} ${name} ${isTest ? "as" : "for"} a test send`, () => {
       expect(server.isTestWebhookEvent(event)).toBe(isTest);
+    });
+  }
+
+  for (const { name, event, lastSequence, newer } of receiver.assetSequences) {
+    test(`${newer ? "applies" : "drops"} ${name}`, () => {
+      expect(server.isNewerAssetEvent(event, lastSequence)).toBe(newer);
     });
   }
 

@@ -95,14 +95,20 @@ module CalmLens
         @policies = {}
         @project_policy_id = nil
         @request_count = 0
+        # Each asset's latest `assetSequence`, which the API keeps on the asset row.
+        @asset_event_sequences = Hash.new(0)
       end
 
       # Adds an event to the feed, filling the fields the API always sets.
       def add_event(event)
         time = @now.call
         record = { 'id' => @create_id.call('evt'), 'projectId' => @project_id, 'severity' => 'low', 'description' => nil,
-                   'assetId' => nil, 'asset' => nil, 'facts' => [], 'createdAt' => time }.merge(event)
+                   'assetId' => nil, 'assetSequence' => nil, 'asset' => nil, 'facts' => [],
+                   'createdAt' => time }.merge(event)
         record['title'] ||= record['type']
+        # Like the API: each event about an asset takes the asset's next number; others have none.
+        asset_id = record['assetId']
+        record['assetSequence'] = asset_id ? (@asset_event_sequences[asset_id] += 1) : nil
         @state.events << record
         record
       end

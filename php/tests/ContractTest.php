@@ -555,6 +555,9 @@ final class ContractTest extends TestCase
             case 'testFacts':
                 self::assertSame($entry['isTest'], Webhooks::isTest($entry['event']));
                 return;
+            case 'assetSequences':
+                self::assertSame($entry['newer'], Webhooks::isNewerAssetEvent($entry['event'], $entry['lastSequence']));
+                return;
             case 'roundTrips':
                 self::assertSameJson($entry['payload'], Webhooks::toPayload($entry['event']));
                 $headers = Webhooks::createHeaders($entry['body'], $entry['deliveryId'], $entry['secret'], $entry['timestampSeconds']);

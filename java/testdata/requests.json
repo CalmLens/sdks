@@ -13081,6 +13081,7 @@
           "title": "example",
           "description": "example",
           "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "assetSequence": 1,
           "asset": {
             "id": "example",
             "externalId": "example",
