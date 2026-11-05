@@ -49,6 +49,12 @@ const (
 	signedURLSeconds = 300
 	// A cached signed URL is reused while at least this much of its lifetime remains.
 	signedURLReuse = 150 * time.Second
+	// The findings timeline is listed in pages of up to 100 segments. A two-minute clip has far
+	// fewer; the page cap only bounds a misbehaving response.
+	timelinePageSize = 100
+	maxTimelinePages = 50
+	// uploadStatusUploading is Upload.Status while a multipart upload still receives parts.
+	uploadStatusUploading = "uploading"
 	// A segment category is shown as a finding from "possible" (0.4) upwards.
 	findingThreshold = 0.4
 	// A demo clip stays in processing this long before its selected outcome is written.
@@ -429,15 +435,19 @@ func (a *app) refresh(ctx context.Context, item *entry) error {
 // uploading or pending, and is now decided or failed.
 func (a *app) refreshDecision(ctx context.Context, item *entry) (bool, error) {
 	a.mu.Lock()
-	id, key, choice, video, since := item.ID, item.Key, item.DemoResult, item.Video, item.PendingSince
+	id, key, choice, since := item.ID, item.Key, item.DemoResult, item.PendingSince
 	a.mu.Unlock()
 	if a.demo != nil && time.Since(since) >= demoDelay {
-		a.demo.Settle(id, choice, video)
+		a.demo.Settle(id, choice)
 	}
 	asset, err := a.client.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: id})
 	if err == nil && (asset.ExternalID == nil || *asset.ExternalID != key) {
 		// Never apply a decision for an asset that this record did not create.
 		err = errors.New("asset is not linked to this clip")
+	}
+	var segments []calmlens.MediaClassificationSegment
+	if err == nil {
+		segments, err = a.timelineSegments(ctx, asset)
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -449,14 +459,43 @@ func (a *app) refreshDecision(ctx context.Context, item *entry) (bool, error) {
 	before := item.Status
 	item.Status = clipStatus(asset)
 	item.Duration, item.Segments = 0, nil
-	if report := asset.Classification.Moderation; report.Raw != nil && report.Raw.Timeline != nil {
-		item.Duration, item.Segments = timeline(report.Raw.Timeline)
+	if asset.Content.DurationSeconds != nil {
+		item.Duration = *asset.Content.DurationSeconds
+	}
+	if len(segments) > 0 {
+		item.Segments = timeline(item.Duration, segments)
 	}
 	item.Error = ""
 	if !playable(item.Status) {
 		item.signedURL = ""
 	}
 	return (before == clipPending || before == clipUploading) && item.Status != clipPending && item.Status != clipUploading, nil
+}
+
+// timelineSegments lists an audio or video asset's whole findings timeline, page by page; nil
+// when the asset has none (Classification.Moderation.Timeline is nil). The demo keeps the
+// simulated segments itself, as the SDK's mock analyses no media.
+func (a *app) timelineSegments(ctx context.Context, asset *calmlens.Asset) ([]calmlens.MediaClassificationSegment, error) {
+	if asset.Classification.Moderation.Timeline == nil {
+		return nil, nil
+	}
+	if a.demo != nil {
+		return a.demo.Timeline(asset.ID), nil
+	}
+	segments := []calmlens.MediaClassificationSegment{}
+	options := calmlens.ListAssetTimelineOptions{AssetID: asset.ID, PageSize: timelinePageSize}
+	for page := 0; page < maxTimelinePages; page++ {
+		result, err := a.client.Assets.ListTimeline(ctx, options)
+		if err != nil {
+			return nil, err
+		}
+		segments = append(segments, result.Items...)
+		if !result.HasMore {
+			break
+		}
+		options.Cursor = result.NextCursor
+	}
+	return segments, nil
 }
 
 // Clip states shown on the page, derived from the asset's processing and moderation status. A
@@ -475,8 +514,9 @@ func playable(status string) bool {
 	return status == calmlens.ModerationStatusAllowed || status == calmlens.ModerationStatusLimited
 }
 
-// clipStatus reads the clip's state from the asset. Failed processing is final; statuses this
-// app doesn't know count as still pending, so the clip never plays before it is allowed.
+// clipStatus reads the clip's state from the asset. Failed processing is final; a multipart
+// upload still receiving parts is uploading; statuses this app doesn't know count as still
+// pending, so the clip never plays before it is allowed.
 func clipStatus(asset *calmlens.Asset) string {
 	switch status := asset.Classification.Moderation.Status; {
 	case asset.Classification.Status == calmlens.ClassificationStatusFailed:
@@ -484,18 +524,18 @@ func clipStatus(asset *calmlens.Asset) string {
 	case status == calmlens.ModerationStatusAllowed, status == calmlens.ModerationStatusLimited,
 		status == calmlens.ModerationStatusAgeRestricted, status == calmlens.ModerationStatusBlocked, status == calmlens.ModerationStatusPurged:
 		return status
-	case asset.Classification.Status == calmlens.ClassificationStatusPending:
+	case asset.Upload.Status == uploadStatusUploading:
 		return clipUploading
 	default:
 		return clipPending
 	}
 }
 
-// timeline converts raw.timeline into segment rows with the categories that scored in each.
-func timeline(media *calmlens.MediaClassificationReport) (float64, []segment) {
-	duration := media.DurationSeconds
+// timeline converts the findings timeline's segments into rows with the categories that scored
+// in each, placed on a bar of the clip's duration.
+func timeline(duration float64, segments []calmlens.MediaClassificationSegment) []segment {
 	rows := []segment{}
-	for _, s := range media.Segments {
+	for _, s := range segments {
 		row := segment{Source: s.Source, Start: s.StartSeconds, End: s.EndSeconds}
 		if duration > 0 {
 			row.Left = math.Max(0, math.Min(100, s.StartSeconds/duration*100))
@@ -525,7 +565,7 @@ func timeline(media *calmlens.MediaClassificationReport) (float64, []segment) {
 			}
 		}
 	}
-	return duration, rows
+	return rows
 }
 
 func clock(seconds float64) string {
@@ -928,7 +968,9 @@ func (a *app) media(w http.ResponseWriter, r *http.Request) {
 		a.streamDemo(w, r, id, contentType)
 		return
 	}
-	signed, err := a.client.Assets.CreateSignedURL(r.Context(), calmlens.SignedURLOptions{AssetID: id, Resource: calmlens.ResourceOriginal, ExpiresInSeconds: signedURLSeconds})
+	// Playback uses the rendered file, the clip as browser-safe audio or video, so the grant
+	// needs no original access.
+	signed, err := a.client.CDN.SignAssetURL(r.Context(), calmlens.SignAssetURLOptions{AssetID: id, Resource: calmlens.ResourceRendered, ExpiresIn: signedURLSeconds})
 	if err != nil {
 		log.Printf("Signed URL failed: %v", err)
 		http.Error(w, "Playback unavailable", 502)
@@ -953,7 +995,7 @@ func (a *app) streamDemo(w http.ResponseWriter, r *http.Request, id, contentType
 	if value := r.Header.Get("Range"); value != "" {
 		headers.Set("Range", value)
 	}
-	res, err := a.client.CDN.Serve(r.Context(), calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: id}, Headers: headers})
+	res, err := a.client.CDN.Serve(r.Context(), calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: id, Resource: calmlens.ResourceRendered}, Headers: headers})
 	if err != nil {
 		http.Error(w, "Playback unavailable", 502)
 		return

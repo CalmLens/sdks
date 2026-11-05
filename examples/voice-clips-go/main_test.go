@@ -346,12 +346,22 @@ func TestSignedURLOnlyAfterFreshAllowedRetrieve(t *testing.T) {
 	decideAsset(stored, calmlens.ModerationStatusAllowed)
 	rec := get(a, "/media?id="+item.ID)
 	location, _ := url.Parse(rec.Header().Get("Location"))
-	if rec.Code != 303 || location.Scheme != "https" || location.Query().Get("expiresInSeconds") != strconv.Itoa(signedURLSeconds) {
+	if rec.Code != 303 || location.Scheme != "https" || !strings.HasSuffix(location.Path, "/"+calmlens.ResourceRendered) {
 		t.Fatal(rec.Code, rec.Header().Get("Location"))
 	}
 	requests := mock.Requests()
-	if len(requests) != 2 || requests[0].Method != "GET" || requests[0].Path != "/assets/"+item.ID || requests[1].Path != "/assets/"+item.ID+"/signed-url" {
+	if len(requests) != 2 || requests[0].Method != "GET" || requests[0].Path != "/assets/"+item.ID || !strings.HasSuffix(requests[1].Path, "/signed-asset-urls") ||
+		requests[1].Body["assetId"] != item.ID || requests[1].Body["expiresIn"] != float64(signedURLSeconds) || requests[1].Body["original"] != false {
 		t.Fatalf("signature not preceded by a retrieve: %+v", requests)
+	}
+	// The browser loads the signed URL without the API key.
+	played, err := mock.FetchCDN(context.Background(), location.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	played.Body.Close()
+	if played.StatusCode != http.StatusOK {
+		t.Fatal("signed URL does not play", played.StatusCode)
 	}
 
 	// The signed URL is reused while it has plenty of life left, without calling CalmLens.
@@ -378,7 +388,7 @@ func TestSignedURLOnlyAfterFreshAllowedRetrieve(t *testing.T) {
 		t.Fatal("served a stale allowed status after a failed retrieve")
 	}
 	for _, r := range mock.Requests() {
-		if strings.HasSuffix(r.Path, "/signed-url") {
+		if strings.HasSuffix(r.Path, "/signed-asset-urls") {
 			t.Fatal("signed URL created without a fresh allowed retrieve")
 		}
 	}
@@ -389,28 +399,49 @@ func TestSignedURLOnlyAfterFreshAllowedRetrieve(t *testing.T) {
 
 func score(v float64) *float64 { return &v }
 
-func TestTimelineFromReportMedia(t *testing.T) {
-	a := demoApp(t)
-	mock := live(t, a)
-	item := liveClip(t, a, mock)
-	stored := mock.DatabaseStorage.Assets[item.ID]
-	decideAsset(stored, calmlens.ModerationStatusBlocked)
-	demo.Section(demo.Section(demo.Section(stored, "classification"), "moderation"), "raw")["timeline"] = calmlens.JSON{
-		"durationSeconds": 60, "sampledFrames": 0, "audioTranscribed": false,
-		"segments": []any{
-			calmlens.JSON{"source": "clip", "startSeconds": 29, "endSeconds": 60, "categories": calmlens.JSON{
-				"hate":     calmlens.JSON{"status": "evaluated", "score": 0.1, "likelihood": "very-unlikely"},
-				"violence": calmlens.JSON{"status": "not-evaluated", "reason": "unavailable"},
-			}},
-			calmlens.JSON{"source": "clip", "startSeconds": 0, "endSeconds": 30, "categories": calmlens.JSON{
-				"violence":   calmlens.JSON{"status": "evaluated", "score": 0.91, "likelihood": "very-likely"},
-				"harassment": calmlens.JSON{"status": "partial", "score": 0.45, "likelihood": "possible"},
-			}},
-		},
+// The clip's timeline is every page of Assets.ListTimeline, placed on a bar of the clip's
+// duration.
+func TestTimelineFromTheFindingsTimeline(t *testing.T) {
+	asset := `{"id":"asset_1","projectId":"project","name":"note.mp3","type":"audio","externalId":"clip_1","upload":{"status":"completed"},
+		"classification":{"status":"completed","moderation":{"status":"blocked","timeline":{"segmentCount":2}}},"content":{"status":"stored","durationSeconds":60}}`
+	pages := map[string]string{
+		"": `{"items":[{"source":"clip","startSeconds":29,"endSeconds":60,"categories":{
+			"hate":{"status":"evaluated","score":0.1,"likelihood":"very-unlikely"},
+			"violence":{"status":"not-evaluated","reason":"unavailable"}}}],"hasMore":true,"nextCursor":"page-2","pageSize":1,"ordering":[]}`,
+		"page-2": `{"items":[{"source":"clip","startSeconds":0,"endSeconds":30,"categories":{
+			"violence":{"status":"evaluated","score":0.91,"likelihood":"very-likely"},
+			"harassment":{"status":"partial","score":0.45,"likelihood":"possible"}}}],"hasMore":false,"nextCursor":null,"pageSize":1,"ordering":[]}`,
 	}
+	var mu sync.Mutex
+	cursors := []string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1/assets/asset_1":
+			_, _ = w.Write([]byte(asset))
+		case "/v1/projects/project/assets/asset_1/timeline":
+			cursor := r.URL.Query().Get("cursor")
+			mu.Lock()
+			cursors = append(cursors, cursor)
+			mu.Unlock()
+			_, _ = w.Write([]byte(pages[cursor]))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	a := demoApp(t)
+	client, err := calmlens.NewServerClient(calmlens.Options{APIKey: "key", ProjectID: "project", BaseURL: server.URL + "/v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.demo, a.client = nil, client
+	a.preset, a.apiURL, a.sdkDir = testPreset, "https://api.example.test/v1", sdkDir(t)
+	item := &entry{ID: "asset_1", Key: "clip_1", Name: "note.mp3", Type: "audio/mpeg", Status: clipPending}
+	a.entries = []*entry{item}
 	page := get(a, "/").Body.String()
-	if item.Duration != 60 || len(item.Segments) != 2 {
-		t.Fatal(item.Duration, item.Segments)
+	if item.Status != calmlens.ModerationStatusBlocked || item.Duration != 60 || len(item.Segments) != 2 || !reflect.DeepEqual(cursors, []string{"", "page-2"}) {
+		t.Fatal(item.Status, item.Duration, item.Segments, cursors)
 	}
 	first, second := item.Segments[0], item.Segments[1]
 	if first.Start != 0 || first.End != 30 || second.Start != 29 || second.End != 60 {
@@ -462,10 +493,10 @@ func TestDemoOutcomesProduceClipSegments(t *testing.T) {
 
 func TestTimelineBarDoesNotOverlap(t *testing.T) {
 	score := 0.9
-	_, rows := timeline(&calmlens.MediaClassificationReport{DurationSeconds: 60, Segments: []calmlens.MediaClassificationSegment{
+	rows := timeline(60, []calmlens.MediaClassificationSegment{
 		{StartSeconds: 29, EndSeconds: 60, Categories: map[string]calmlens.CategoryResult{}},
 		{StartSeconds: 0, EndSeconds: 30, Categories: map[string]calmlens.CategoryResult{"violence": {Status: calmlens.ResultEvaluated, Score: &score, Likelihood: "very-likely"}}},
-	}})
+	})
 	if rows[0].Left != 0 || rows[0].Left+rows[0].Width > rows[1].Left || rows[1].Left+rows[1].Width != 100 {
 		t.Fatal("bar segments overlap or leave the bar", rows)
 	}
@@ -479,15 +510,15 @@ func TestLanesAndMergedFindings(t *testing.T) {
 	result := func(score *float64) map[string]calmlens.CategoryResult {
 		return map[string]calmlens.CategoryResult{"violence": {Status: calmlens.ResultEvaluated, Score: score, Likelihood: map[*float64]string{&high: "very-likely", &low: "possible", &clear: "very-unlikely"}[score]}}
 	}
-	report := &calmlens.MediaClassificationReport{DurationSeconds: 4, Segments: []calmlens.MediaClassificationSegment{
+	segments := []calmlens.MediaClassificationSegment{
 		{Source: calmlens.SegmentSourceFrame, StartSeconds: 0, EndSeconds: 1, Categories: result(&clear)},
 		{Source: calmlens.SegmentSourceFrame, StartSeconds: 1, EndSeconds: 2, Categories: result(&low)},
 		{Source: calmlens.SegmentSourceFrame, StartSeconds: 2, EndSeconds: 3, Categories: result(&high)},
 		{Source: calmlens.SegmentSourceFrame, StartSeconds: 3, EndSeconds: 4, Categories: result(&clear)},
 		{Source: calmlens.SegmentSourceSpeech, StartSeconds: 0, EndSeconds: 4, Categories: result(&low)},
-	}}
-	item := entry{}
-	item.Duration, item.Segments = timeline(report)
+	}
+	item := entry{Duration: 4}
+	item.Segments = timeline(item.Duration, segments)
 	lanes := item.Lanes()
 	if len(lanes) != 2 || len(lanes[0].Segments) != 1 || lanes[0].Segments[0].Source != calmlens.SegmentSourceSpeech || len(lanes[1].Segments) != 4 {
 		t.Fatal("segments not grouped by source", lanes)
@@ -923,14 +954,14 @@ func TestLocalCDNPlayback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cdnURL, err := a.client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetIdentifier: "clip", Resource: calmlens.ResourceOriginal})
+	cdnURL, err := a.client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetID: "clip", Resource: calmlens.ResourceRendered})
 	if err != nil || !strings.HasPrefix(cdnURL, "http://localhost:6130/v1/assets/") {
 		t.Fatal(cdnURL, err)
 	}
 	for _, baseURL := range []string{"http://localhost:6130/v1", "http://127.0.0.1:6130/v1", "http://cdn.example.com/v1"} {
 		t.Run(baseURL, func(t *testing.T) {
 			app := demoApp(t)
-			mock, err := calmlenstest.NewServerClient(calmlenstest.Options{SignedURLBaseURL: baseURL})
+			mock, err := calmlenstest.NewServerClient(calmlenstest.Options{CDNBaseURL: baseURL})
 			if err != nil {
 				t.Fatal(err)
 			}

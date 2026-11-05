@@ -8,7 +8,7 @@ never passes through your server: the Go server only signs a single-use upload t
 clip, without calling CalmLens. It also shows
 [audio and video moderation](https://calmlens.com/docs/guides/audio-and-video)
 (beta), [multipart uploads](https://calmlens.com/docs/guides/multipart-uploads)
-for larger clips, the report's `media` timeline, private playback through short-lived
+for larger clips, the findings timeline, private playback through short-lived
 signed CDN URLs, retrying failed processing, deleting an asset, and verified webhooks.
 
 ## Run locally
@@ -119,7 +119,9 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
   an upload) and the server calls `Assets.Retrieve`; verified webhooks update a clip
   sooner. The **Activity** panel lists each decision the app picked up and whether it came
   from a status check or a webhook.
-- **Timeline.** `classification.moderation.raw.timeline` provides `durationSeconds` and `segments`. Native analysis
+- **Timeline.** `Classification.Moderation.Timeline` is set once the clip has a findings
+  timeline; `Assets.ListTimeline` lists its segments a page at a time, following
+  `NextCursor` while `HasMore`, and `Content.DurationSeconds` is the clip's length. Native analysis
   uses overlapping 30-second chunks (`source: "clip"`). Each segment lists the categories
   that were evaluated (or partially evaluated) with a score of at least 0.4 ("possible").
   A `not-evaluated` category is never shown as a zero score. Ranges are approximate. Segments
@@ -133,8 +135,9 @@ Local playback accepts HTTP URLs on loopback; deployed playback uses HTTPS.
   `age-restricted` asset only through signed URLs or API keys so your backend can put it
   behind an age check; this app has no age check, so it doesn't play those either. `blocked`
   and `purged` clips are never shown (a purged clip's content is deleted). The `/media` route retrieves
-  the asset again, then calls `Assets.CreateSignedURL` with a **300-second expiry**
-  (long enough to play and seek a two-minute clip) and redirects the `<audio>` or
+  the asset again, then calls `CDN.SignAssetURL` for the clip's `rendered` resource (the
+  browser-safe audio or video, so the grant needs no original access) with a **300-second
+  expiry** (long enough to play and seek a two-minute clip) and redirects the `<audio>` or
   `<video>` element to it. A failed retrieve, a clip that is pending, failed or not allowed, or a
   non-HTTPS URL never gets one. The signed URL is reused while at least 150 seconds of it
   remain, so seeking and replays don't call CalmLens again; a refresh or webhook that
@@ -185,7 +188,8 @@ listed in the Activity panel and changes nothing.
 - [upload.js](upload.js): the browser upload through the preset, single-request or
   multipart, with per-part progress.
 - `upload` and `send`: the demo's simulated server upload.
-- `refresh` and `timeline`: SDK retrieval and turning `classification.moderation.raw.timeline` into segment rows;
+- `refresh`, `timelineSegments` and `timeline`: SDK retrieval, listing the findings timeline
+  and turning its segments into rows;
   `Flagged` and `Reasons` summarise them.
 - `media`: fresh status check, the signed URL cache, live short-lived signed playback
   and streamed demo playback.

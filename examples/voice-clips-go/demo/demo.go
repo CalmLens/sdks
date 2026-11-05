@@ -4,6 +4,7 @@
 package demo
 
 import (
+	"sync"
 	"time"
 
 	calmlens "github.com/CalmLens/sdks/go"
@@ -42,6 +43,10 @@ func (s Scenario) Range(i int) (float64, float64) {
 type Backend struct {
 	// Mock is the SDK's in-memory client; Mock.ServerClient is used like a live client.
 	Mock *calmlenstest.MockServerClient
+	// The mock analyses no media, so its findings timelines are empty: the demo keeps each
+	// settled clip's simulated segments, which Timeline lists in their place.
+	mu       sync.Mutex
+	timeline map[string][]calmlens.MediaClassificationSegment
 }
 
 // New returns a demo backend whose key may download private content from the mock CDN.
@@ -50,18 +55,30 @@ func New() (*Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Backend{Mock: mock}, nil
+	return &Backend{Mock: mock, timeline: map[string][]calmlens.MediaClassificationSegment{}}, nil
 }
 
 // ServerClient returns the SDK client backed by the demo.
 func (b *Backend) ServerClient() *calmlens.ServerClient { return b.Mock.ServerClient }
 
+// Timeline lists a settled demo clip's simulated findings timeline, as Assets.ListTimeline
+// lists a real one; nil for other assets.
+func (b *Backend) Timeline(assetID string) []calmlens.MediaClassificationSegment {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]calmlens.MediaClassificationSegment(nil), b.timeline[assetID]...)
+}
+
 // Settle writes the selected outcome into a pending demo asset, in the same shape as a real
-// audio/video report. A purged clip also loses its stored content, as in CalmLens.
-func (b *Backend) Settle(assetID, choice string, video bool) {
+// audio/video decision, and keeps its simulated timeline. A purged clip also loses its stored
+// content, as in CalmLens.
+func (b *Backend) Settle(assetID, choice string) {
 	b.Mock.WithStorage(func(db *calmlenstest.InMemoryDatabaseStorage, images *calmlenstest.InMemoryImageStorage) {
 		if stored := db.Assets[assetID]; stored != nil && Section(stored, "classification")["status"] == calmlens.ClassificationStatusProcessing {
-			apply(stored, choice, video)
+			segments := apply(stored, choice)
+			b.mu.Lock()
+			b.timeline[assetID] = segments
+			b.mu.Unlock()
 			if choice == calmlens.ModerationStatusPurged {
 				delete(images.Content, assetID)
 				content := Section(stored, "content")
@@ -83,17 +100,18 @@ func Section(stored calmlens.JSON, key string) calmlens.JSON {
 	return value
 }
 
-func apply(stored calmlens.JSON, choice string, video bool) {
+// apply writes the outcome into the stored asset and returns its simulated timeline segments.
+func apply(stored calmlens.JSON, choice string) []calmlens.MediaClassificationSegment {
 	processing, moderation := Section(stored, "classification"), Section(Section(stored, "classification"), "moderation")
 	if choice == "error" {
 		processing["status"] = calmlens.ClassificationStatusFailed
-		return
+		return nil
 	}
 	scenario := Scenarios[choice]
 	overall := map[string]float64{}
-	segments := []any{}
+	segments := []calmlens.MediaClassificationSegment{}
 	for i, scores := range scenario.Segments {
-		categories := calmlens.JSON{}
+		categories := map[string]calmlens.CategoryResult{}
 		for _, id := range Categories {
 			score := 0.03
 			if s, ok := scores[id]; ok {
@@ -105,31 +123,30 @@ func apply(stored calmlens.JSON, choice string, video bool) {
 			}
 		}
 		start, end := scenario.Range(i)
-		segments = append(segments, calmlens.JSON{"source": "clip", "startSeconds": start, "endSeconds": end, "categories": categories})
+		segments = append(segments, calmlens.MediaClassificationSegment{Source: calmlens.SegmentSourceClip, StartSeconds: start, EndSeconds: end, Categories: categories})
 	}
 	categories := calmlens.JSON{}
 	for id, score := range overall {
-		categories[id] = categoryResult(score)
-	}
-	media := calmlens.JSON{"durationSeconds": scenario.Duration, "sampledFrames": 0, "audioTranscribed": false, "segments": segments}
-	if video {
-		media["frameIntervalSeconds"] = 0.5
-		media["sampledFrames"] = int(scenario.Duration * 2)
+		result := categoryResult(score)
+		categories[id] = calmlens.JSON{"status": result.Status, "score": *result.Score, "likelihood": result.Likelihood}
 	}
 	// The selected outcome is the moderation status the policy decided.
 	processing["status"] = calmlens.ClassificationStatusCompleted
-	moderation["status"] = choice
 	processing["completedAt"] = time.Now().UnixMilli()
-	moderation["raw"] = calmlens.JSON{"categories": categories, "timeline": media}
+	Section(stored, "content")["durationSeconds"] = scenario.Duration
+	moderation["status"] = choice
+	moderation["automatedStatus"] = choice
+	moderation["raw"] = calmlens.JSON{"categories": categories}
+	moderation["timeline"] = calmlens.JSON{"segmentCount": len(segments)}
 	moderation["categories"] = calmlens.JSON{}
-	moderation["automatedAction"] = map[string]string{"allowed": "allow", "limited": "limit", "age-restricted": "age-restrict", "blocked": "block", "purged": "purge"}[choice]
 	moderation["source"] = "policy"
 	moderation["flaggedCategories"] = []any{}
 	moderation["regions"] = []any{}
 	moderation["explanationComplete"] = true
+	return segments
 }
 
-func categoryResult(score float64) calmlens.JSON {
+func categoryResult(score float64) calmlens.CategoryResult {
 	likelihood := "very-unlikely"
 	switch {
 	case score >= 0.8:
@@ -141,5 +158,5 @@ func categoryResult(score float64) calmlens.JSON {
 	case score >= 0.2:
 		likelihood = "unlikely"
 	}
-	return calmlens.JSON{"status": "evaluated", "score": score, "likelihood": likelihood}
+	return calmlens.CategoryResult{Status: calmlens.ResultEvaluated, Score: &score, Likelihood: likelihood}
 }
