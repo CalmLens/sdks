@@ -1,7 +1,7 @@
 import { invalidArgument } from "../client/CalmLensError";
 import type { Asset, AssetSearchResponse } from "../client/CalmLensTypes";
 import type { CursorPage, Page } from "../contract/Page.js";
-import { MOCK_ASSET_FILTER_FIELDS, MOCK_FILTER_OPERATORS } from "./MockAssetFilters";
+import { MOCK_ASSET_FILTER_FIELDS } from "./MockAssetFilters";
 
 type Ordering = NonNullable<Page<unknown>["ordering"]>;
 
@@ -237,7 +237,10 @@ const parseFilter = (filter: string): FilterNode => {
       throw new MockInvalidFilter();
     const field = token.text;
     const operator = next();
-    if (operator.kind !== "operator" || !MOCK_FILTER_OPERATORS.includes(operator.text))
+    if (
+      operator.kind !== "operator" ||
+      !MOCK_ASSET_FILTER_FIELDS[field]!.operators.includes(operator.text)
+    )
       throw new MockInvalidFilter();
     let texts: string[];
     if (peek()?.kind === "paren" && peek()?.text === "(") {
@@ -307,6 +310,9 @@ const matchesComparison = (
 ): boolean => {
   const actual = readField(item, field) ?? null;
   const [value] = values;
+  // An asset without tags has none of them.
+  if (actual === null && MOCK_ASSET_FILTER_FIELDS[field]!.kind === "list")
+    return operator === "=out=";
   if (actual === null) return operator === "==" && value === null;
   if (operator === "!=" && value === null) return true;
   // Each tag counts as the asset's value.
@@ -354,7 +360,7 @@ const matchesNode = (item: Record<string, unknown>, node: FilterNode): boolean =
 
 /**
  * Applies an RSQL `filter` like the API (zodbase/rsql with MOCK_ASSET_FILTER_FIELDS): only the
- * listed fields and operators, `;` (and) binding tighter than `,` (or), and parentheses. Throws
+ * listed fields, each with its own operators, `;` (and) binding tighter than `,` (or), and parentheses. Throws
  * `MockInvalidFilter` for any filter the API refuses with `validation/invalid-filter`.
  */
 export const filterAssets = <T>(items: T[], filter: string | null | undefined): T[] => {

@@ -6,7 +6,7 @@ module CalmLens
   module Testing
     # Asset list filters as the API reads them (zodbase/rsql with @rsql/parser): comparisons joined
     # by `;` or `and` (binding tighter), `,` or `or`, and grouped with parentheses. A filter names
-    # only {MockAssetFilters::FIELDS} with only {MockAssetFilters::OPERATORS}; anything else, or
+    # only {MockAssetFilters::FIELDS}, each with only its own operators; anything else, or
     # bad syntax, answers 400 `validation/invalid-filter`. A number field's value must be a number,
     # and `null` is a missing value only on a nullable field. `*` in an `==` or `!=` text value
     # matches any run of characters regardless of case; without it `==` is exact. As in SQL, a
@@ -30,16 +30,19 @@ module CalmLens
       # A test for one comparison, refusing a field or operator the API doesn't accept.
       def comparison(field, operator, raw_values)
         rule = MockAssetFilters::FIELDS[field]
-        raise Invalid unless rule && MockAssetFilters::OPERATORS.include?(operator)
+        raise Invalid unless rule && rule[:operators].include?(operator)
 
         values = raw_values.map { |raw| typed(rule, raw) }
         pattern = values.first.is_a?(String) && values.first.include?('*') ? wildcard(values.first) : nil
         lambda do |item|
           actual = field.split('.').reduce(item) { |object, key| object.is_a?(Hash) ? object[key] : nil }
+          # A list holds any of the values (=in=) or none of them (=out=); a missing list holds none.
+          next values.any? { |value| Array(actual).include?(value) } == (operator == '=in=') if rule[:kind] == 'list'
+
           # Only `==null` matches a missing value.
           next operator == '==' && values.first.nil? if actual.nil?
 
-          compare(rule[:kind] == 'list' ? Array(actual) : [actual], operator, values, pattern)
+          compare([actual], operator, values, pattern)
         end
       end
 

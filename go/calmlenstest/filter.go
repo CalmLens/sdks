@@ -115,22 +115,14 @@ func items(value any) ([]any, bool) {
 // except `==null`, and `!=null` matches any present one.
 func (c comparison) match(a calmlens.JSON) bool {
 	value := lookup(a, c.field)
-	if list, ok := items(value); ok && filterFields[c.field].kind == "list" {
-		// A list field holds any of its values (=in=); other operators compare its items too.
-		anyItem := func(test func(any) bool) bool {
-			return slices.ContainsFunc(list, test)
-		}
-		switch c.op {
-		case "==", "=in=":
-			return anyItem(func(item any) bool {
-				return slices.ContainsFunc(c.values, func(v any) bool { return v != nil && matchValue(item, v) })
-			})
-		case "!=", "=out=":
-			return !anyItem(func(item any) bool {
-				return slices.ContainsFunc(c.values, func(v any) bool { return v != nil && matchValue(item, v) })
-			})
-		}
-		return false
+	if filterFields[c.field].kind == "list" {
+		// A list field holds any of the values (=in=) or none of them (=out=); a missing list
+		// holds none. Its other operators are refused when the filter is parsed.
+		list, _ := items(value)
+		held := slices.ContainsFunc(list, func(item any) bool {
+			return slices.ContainsFunc(c.values, func(v any) bool { return v != nil && equal(item, v) })
+		})
+		return held == (c.op == "=in=")
 	}
 	literal := c.values[0]
 	if literal == nil {
@@ -205,7 +197,7 @@ type filterParser struct {
 }
 
 // parseFilter parses an RSQL filter like the API (@rsql/parser with zodbase/rsql): comparisons
-// on filterFields with filterOperators, ";" or " and " for AND (binding tighter than ","
+// on filterFields, each with its own operators, ";" or " and " for AND (binding tighter than ","
 // or " or "), nested parentheses and whitespace between tokens. Each value is read by its
 // field's kind. Anything else is an error, which the mock answers with validation/invalid-filter.
 func parseFilter(input string) (filterNode, error) {
@@ -326,7 +318,7 @@ func (p *filterParser) term() (filterNode, error) {
 	if op == "" {
 		return nil, fmt.Errorf("missing operator after %q", field)
 	}
-	if !slices.Contains(filterOperators, op) {
+	if !slices.Contains(info.operators, op) {
 		return nil, fmt.Errorf("unsupported operator %s", op)
 	}
 	raw := []string{}

@@ -1040,8 +1040,8 @@ final class MockApi {
   // ------------------------------------------------------------------ Lists and search
 
   /**
-   * An RSQL filter as the API reads it: comparisons on the fields in {@link MockAssetFilters#FIELDS}
-   * with the operators in {@link MockAssetFilters#OPERATORS}, joined by {@code ;} (and), which binds
+   * An RSQL filter as the API reads it: comparisons on the fields in {@link MockAssetFilters#FIELDS},
+   * each with its own operators, joined by {@code ;} (and), which binds
    * tighter than {@code ,} (or), and grouped with {@code ( … )}. Anything else is
    * {@code validation/invalid-filter}.
    */
@@ -1100,7 +1100,7 @@ final class MockApi {
     return null;
   }
 
-  // An operator is == or != or a comparison, or =name= (FIQL): only MockAssetFilters.OPERATORS pass.
+  // An operator is == or != or a comparison, or =name= (FIQL): only the field's own operators pass.
   private static final Pattern COMPARISON = Pattern.compile("\\s*([^\\s=!~<>(),;\"']+)\\s*(==|!=|>=|<=|>|<|=[a-z]*=)(.*)", Pattern.DOTALL);
   private static final Pattern VALUE = Pattern.compile("\\s*(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'|[^\\s\"'(),;=!~<>]+)\\s*");
   private static final Pattern NUMBER = Pattern.compile("[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?");
@@ -1127,7 +1127,7 @@ final class MockApi {
     if (!found.matches()) throw invalidFilter();
     String name = found.group(1), operator = found.group(2), raw = found.group(3).strip();
     MockAssetFilters.Field field = MockAssetFilters.FIELDS.get(name);
-    if (field == null || !MockAssetFilters.OPERATORS.contains(operator)) throw invalidFilter();
+    if (field == null || !field.operators().contains(operator)) throw invalidFilter();
     boolean isList = operator.equals("=in=") || operator.equals("=out=");
     List<String> texts = new ArrayList<>();
     if (isList) {
@@ -1152,13 +1152,19 @@ final class MockApi {
         : null;
     return asset -> {
       JsonElement actual = path(asset, name);
+      if (list) {
+        // A list holds any of the values (=in=) or none of them (=out=); a missing list holds none.
+        Set<String> held = new HashSet<>();
+        if (actual != null && actual.isJsonArray())
+          actual.getAsJsonArray().forEach(item -> { if (item.isJsonPrimitive()) held.add(item.getAsString()); });
+        return values.stream().anyMatch(held::contains) == operator.equals("=in=");
+      }
       if (actual == null || actual.isJsonNull()) {
         // Like SQL, a comparison never matches a missing value; only == null finds one.
         return operator.equals("==") && glob == null && first == null;
       }
       List<Object> present = new ArrayList<>();
-      if (list && actual.isJsonArray()) actual.getAsJsonArray().forEach(item -> present.add(item.isJsonPrimitive() ? item.getAsString() : ""));
-      else if (!actual.isJsonPrimitive()) return false;
+      if (!actual.isJsonPrimitive()) return false;
       else if (number && actual.getAsJsonPrimitive().isNumber()) present.add(actual.getAsDouble());
       else present.add(actual.getAsString());
       Predicate<Object> equal = expected -> expected != null && present.stream().anyMatch(expected::equals);
@@ -1168,7 +1174,7 @@ final class MockApi {
         case "=in=": return values.stream().anyMatch(equal);
         case "=out=": return !values.contains(null) && values.stream().noneMatch(equal);
         default:
-          if (first == null || list) return false;
+          if (first == null) return false;
           Object left = present.get(0);
           int order;
           if (left instanceof Double l && first instanceof Double r) order = Double.compare(l, r);

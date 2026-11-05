@@ -1212,7 +1212,7 @@ final class MockServerClient
 
     /**
      * An RSQL filter like the API's (zodbase/rsql with @rsql/parser): comparisons on the fields in
-     * {@see AssetFilters::FIELDS} with the operators in {@see AssetFilters::OPERATORS}, joined by
+     * {@see AssetFilters::FIELDS}, each with its own operators, joined by
      * `;` or `and` (which bind tighter) and `,` or `or`, grouped with parentheses. Anything else
      * fails with `validation/invalid-filter`, like the API.
      */
@@ -1366,7 +1366,7 @@ final class MockServerClient
     private static function comparison(string $name, string $operator, array $raw): \Closure
     {
         $field = AssetFilters::FIELDS[$name] ?? null;
-        if ($field === null || !in_array($operator, AssetFilters::OPERATORS, true)) {
+        if ($field === null || !in_array($operator, $field['operators'], true)) {
             self::invalidFilter();
         }
         $values = array_map(function (string $value) use ($field): int|float|string|null {
@@ -1392,6 +1392,11 @@ final class MockServerClient
             foreach (explode('.', $name) as $key) {
                 $actual = is_array($actual) ? ($actual[$key] ?? null) : null;
             }
+            if ($list) {
+                // A list holds any of the values (=in=) or none of them (=out=); a missing list holds none.
+                $held = array_intersect($values, is_array($actual) ? $actual : []) !== [];
+                return $held === ($operator === '=in=');
+            }
             if ($actual === null) {
                 return $operator === '==' && $value === null && $pattern === null;
             }
@@ -1399,7 +1404,7 @@ final class MockServerClient
             $matches = fn ($item): bool => $pattern !== null
                 ? is_string($item) && preg_match($pattern, $item) === 1
                 : $equals($item, $value);
-            $items = $list && is_array($actual) ? $actual : [$actual];
+            $items = [$actual];
             $any = fn (callable $test): bool => array_filter($items, $test) !== [];
             return match ($operator) {
                 '==' => $value !== null && $any($matches),
@@ -1407,7 +1412,7 @@ final class MockServerClient
                 '=in=' => $any(fn ($item) => array_filter($values, fn ($expected) => $equals($item, $expected)) !== []),
                 '=out=' => !in_array(null, $values, true)
                     && !$any(fn ($item) => array_filter($values, fn ($expected) => $equals($item, $expected)) !== []),
-                default => !$list && $value !== null && match ($operator) {
+                default => $value !== null && match ($operator) {
                     '>' => self::compareFilterValues($actual, $value) > 0,
                     '>=' => self::compareFilterValues($actual, $value) >= 0,
                     '<' => self::compareFilterValues($actual, $value) < 0,

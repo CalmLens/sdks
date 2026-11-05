@@ -34,7 +34,7 @@ from urllib.parse import parse_qsl, quote, unquote, urlsplit
 from urllib.request import Request
 
 from . import error_codes
-from ._asset_filters import ASSET_FILTER_FIELDS, FILTER_OPERATORS
+from ._asset_filters import ASSET_FILTER_FIELDS
 from ._mock_classification import CATEGORIES, QUALIFIERS
 from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_PART_SIZE_BYTES, DEFAULT_TIMEOUT,
                      CalmLensServerClient,
@@ -407,8 +407,8 @@ def _wildcard(pattern: str) -> re.Pattern[str]:
 
 def _rsql(expression: str) -> Callable[[Mapping[str, Any]], bool]:
     """An asset list filter like the API's: ``;`` (and), which binds tighter than ``,`` (or),
-    ``( … )`` groups and quoted values, naming only the fields in ``ASSET_FILTER_FIELDS`` with the
-    operators in ``FILTER_OPERATORS``. A number field's value must be a number, and ``null`` is a
+    ``( … )`` groups and quoted values, naming only the fields in ``ASSET_FILTER_FIELDS``, each with
+    its own operators. A number field's value must be a number, and ``null`` is a
     missing value only on a nullable field. ``*`` in an ``==`` or ``!=`` value matches any run of
     characters, ignoring case; without it ``==`` is exact. As in SQL, a comparison never matches a
     missing value. Anything else raises ``_InvalidFilter``."""
@@ -418,9 +418,9 @@ def _rsql(expression: str) -> Callable[[Mapping[str, Any]], bool]:
         if not found:
             raise _InvalidFilter(text)
         name, operator, raw = found.groups()
-        if name not in ASSET_FILTER_FIELDS or operator not in FILTER_OPERATORS:
+        if name not in ASSET_FILTER_FIELDS or operator not in ASSET_FILTER_FIELDS[name][2]:
             raise _InvalidFilter(text)
-        kind, nullable = ASSET_FILTER_FIELDS[name]
+        kind, nullable, _ = ASSET_FILTER_FIELDS[name]
         listed = operator in ("=in=", "=out=")
         if listed:
             if not (raw.startswith("(") and raw.endswith(")")):
@@ -464,6 +464,11 @@ def _rsql(expression: str) -> Callable[[Mapping[str, Any]], bool]:
             actual: Any = asset
             for key in name.split("."):
                 actual = actual.get(key) if isinstance(actual, Mapping) else None
+            if kind == "list":
+                # A list holds any of the values (=in=) or none of them (=out=); a missing list
+                # holds none.
+                held = any(value in (actual or []) for value in values)
+                return held == (operator == "=in=")
             if pattern is not None:
                 texts = [item for item in actual if isinstance(item, str)] if isinstance(actual, list) else [actual]
                 if not texts or not all(isinstance(item, str) for item in texts):

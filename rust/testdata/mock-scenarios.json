@@ -3441,6 +3441,235 @@
       ]
     },
     {
+      "name": "tags filter only by membership: =in= has any of the tags, =out= has none",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "home.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "home",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "archive.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "archive",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "untagged.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "untagged",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "emptied.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "emptied",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": {
+              "$ref": "home.id"
+            },
+            "tags": [
+              "homepage",
+              "sale"
+            ]
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": {
+              "$ref": "archive.id"
+            },
+            "tags": [
+              "archive"
+            ]
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.update",
+          "args": {
+            "assetId": {
+              "$ref": "emptied.id"
+            },
+            "tags": []
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "tags=in=(sale,archive)"
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.id": {
+                "$ref": "archive.id"
+              },
+              "items.1.id": {
+                "$ref": "home.id"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "tags=out=(homepage)"
+          },
+          "expect": {
+            "result": {
+              "items.length": 3,
+              "items.0.id": {
+                "$ref": "emptied.id"
+              },
+              "items.1.id": {
+                "$ref": "untagged.id"
+              },
+              "items.2.id": {
+                "$ref": "archive.id"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "tags=out=(homepage,archive);name!=emptied.png"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "untagged.id"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "tags=out=(home)"
+          },
+          "expect": {
+            "result": {
+              "items.length": 4
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "tags==homepage"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "tags!=homepage"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "tags==*home*"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "tags==null"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "tags>a"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "list cursors resume after the last item when assets are created or deleted between pages",
       "mock": {},
       "steps": [

@@ -2841,6 +2841,8 @@ enum Term {
 }
 struct Comparison {
     field: &'static str,
+    /// Whether the field holds a list, such as tags.
+    list: bool,
     operator: &'static str,
     values: Vec<Operand>,
 }
@@ -2978,11 +2980,11 @@ fn parse_comparison(term: &str) -> Outcome<Comparison> {
             word[letters..].starts_with('=').then_some(letters + 2)
         })
         .ok_or_else(invalid_filter)?;
-    let (field, kind, nullable) = *asset_filters::ASSET_FILTER_FIELDS
+    let (field, kind, nullable, operators) = *asset_filters::ASSET_FILTER_FIELDS
         .iter()
-        .find(|(name, _, _)| *name == selector)
+        .find(|(name, _, _, _)| *name == selector)
         .ok_or_else(invalid_filter)?;
-    let operator = *asset_filters::FILTER_OPERATORS
+    let operator = *operators
         .iter()
         .find(|operator| **operator == &rest[..operator_len])
         .ok_or_else(invalid_filter)?;
@@ -3012,6 +3014,7 @@ fn parse_comparison(term: &str) -> Outcome<Comparison> {
     }
     Ok(Comparison {
         field,
+        list: kind == "list",
         operator,
         values,
     })
@@ -3068,14 +3071,20 @@ impl Comparison {
     fn matches(&self, asset: &Value) -> bool {
         let actual = lookup(asset, self.field);
         let first = &self.values[0];
+        if self.list {
+            // A list holds any of the values (=in=) or none of them (=out=); a missing list holds
+            // none. Its other operators are refused when the filter is parsed.
+            let items = actual.as_array().map(Vec::as_slice).unwrap_or_default();
+            let held = self
+                .values
+                .iter()
+                .any(|operand| items.iter().any(|item| operand.equals(item)));
+            return held == (self.operator == "=in=");
+        }
         if actual.is_null() {
             return self.operator == "==" && matches!(first, Operand::Null);
         }
-        // Tags hold a list: a term matches when one of them does.
-        let items: Vec<&Value> = match actual {
-            Value::Array(items) => items.iter().collect(),
-            value => vec![value],
-        };
+        let items = [actual];
         let equals = |operand: &Operand| match operand.pattern() {
             Some(pattern) => items.iter().any(|item| {
                 item.as_str()
