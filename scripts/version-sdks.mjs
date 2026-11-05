@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertSurfaces } from "./check-surface.mjs";
 
 export const languages = ["javascript", "python", "ruby", "rust", "java", "go", "php"];
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -83,8 +84,10 @@ const versions = () =>
   );
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const check = process.argv.includes("--check");
-  if (check) syncVersions(root, true);
-  else {
+  if (check) {
+    syncVersions(root, true);
+    assertSurfaces(root);
+  } else {
     syncVersions(root, true);
     const before = versions();
     execFileSync("bun", ["x", "--no-install", "changeset", "version"], {
@@ -92,6 +95,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       stdio: "inherit",
     });
     syncVersions(root);
+    // Refuse a Version SDKs PR whose bump is too small for the public surface changes.
+    assertSurfaces(root);
     // Changesets writes its changelogs in a layout the repository's formatter rejects.
     const changelogs = languages
       .map((language) => resolve(root, language, "CHANGELOG.md"))

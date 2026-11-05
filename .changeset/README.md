@@ -1,7 +1,10 @@
 # SDK releases
 
 Run `bun run changeset` for a user-visible SDK change, select the affected SDKs and
-choose patch, minor or major. JavaScript is `@calmlens/sdk`; native SDKs use
+choose patch, minor or major. Follow semantic versioning: on 0.x a breaking change is minor,
+and from 1.0 major. `bun run release:check` and the Version SDKs PR refuse a bump smaller than
+the public surface change since each SDK's previous release (`scripts/check-surface.mjs`).
+JavaScript is `@calmlens/sdk`; native SDKs use
 `@calmlens/sdk-<language>` as Changesets identifiers, not registry install names.
 
 The release workflow maintains a Version SDKs PR. Review its versions, native manifests
