@@ -663,27 +663,27 @@ class CalmmarketTest {
     mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
         .enqueue(200, Map.of("lenses", List.of(Map.of(
             "identifier", Calmmarket.CARD_LENS, "name", "Calmmarket listing card", "type", "image", "active", true, "version", 1))))
-        .enqueue(200, Map.of("url", "https://cdn.calmlens.com/signed/photo-1", "expiresAt", 1760000060000L));
+        .enqueue(200, Map.of("url", "https://cdn.calmlens.com/v1/assets/project-1/sig_photo1", "expiresAt", 1760000060000L));
     Calmmarket.Response first = get(app, "/listings/" + listing.id + "/photos/1");
     assertEquals(303, first.status());
-    assertEquals("https://cdn.calmlens.com/signed/photo-1", first.headers().get("location"));
+    assertEquals("https://cdn.calmlens.com/v1/assets/project-1/sig_photo1/rendered/@" + Calmmarket.CARD_LENS, first.headers().get("location"));
     List<MockCalmLensServerClient.Request> sent = mock.requests();
     MockCalmLensServerClient.Request lens = sent.get(4);
     assertEquals("PUT", lens.method());
     JsonObject definition = JsonParser.parseString(lens.bodyText()).getAsJsonObject().getAsJsonArray("lenses").get(0).getAsJsonObject();
     assertEquals(Calmmarket.CARD_LENS, definition.get("identifier").getAsString());
     MockCalmLensServerClient.Request signing = sent.get(5);
-    assertEquals("/assets/photo-1/signed-url", signing.path());
+    assertEquals("/projects/project-1/signed-asset-urls", signing.path());
     JsonObject body = JsonParser.parseString(signing.bodyText()).getAsJsonObject();
-    assertEquals(Calmmarket.CARD_LENS, body.get("lens").getAsString());
-    assertEquals(60, body.get("expiresInSeconds").getAsInt());
-    assertEquals("rendered", body.get("resource").getAsString());
+    assertEquals("photo-1", body.get("assetId").getAsString());
+    assertEquals(60, body.get("expiresIn").getAsInt());
+    assertFalse(body.get("original").getAsBoolean(), "the original upload is not granted");
 
     // The lens is ensured once; an unsafe signed URL is refused.
     mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
-        .enqueue(200, Map.of("url", "http://cdn.example.com/photo-1", "expiresAt", 1760000060000L));
+        .enqueue(200, Map.of("url", "http://cdn.example.com/v1/assets/project-1/sig_photo1", "expiresAt", 1760000060000L));
     assertEquals(502, get(app, "/listings/" + listing.id + "/photos/1").status());
-    assertEquals(List.of("GET /assets/photo-1", "POST /assets/photo-1/signed-url"), paths(mock, 6));
+    assertEquals(List.of("GET /assets/photo-1", "POST /projects/project-1/signed-asset-urls"), paths(mock, 6));
   }
 
   @Test

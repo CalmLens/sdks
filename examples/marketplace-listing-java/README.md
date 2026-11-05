@@ -99,7 +99,8 @@ live assets.
 
 The first allowed photo preview calls `ensureLens` for the `calmmarket-card` lens (a 640×480
 WebP crop). Each preview retrieves the photo's current decision again before calling
-`assets.createSignedUrl` and redirecting to it. If the refresh fails, the photo is hidden.
+`cdn.signAssetUrl`, which signs the photo's URL for 60 seconds and appends the `rendered`
+resource with the card lens, and redirecting to it. If the refresh fails, the photo is hidden.
 
 Configure the moderation policy in the CalmLens portal. `CALMLENS_API_URL` and
 `CALMLENS_CDN_URL` optionally point to a local CalmLens. Live SDK requests time out after 30

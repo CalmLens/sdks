@@ -755,8 +755,9 @@ public final class Calmmarket {
         client.ensureLens(CARD_LENS_DEFINITION); // idempotent; cached by the client
         lensReady.set(true);
       }
-      SignedUrl signed = client.assets.createSignedUrl(new SignedUrlOptions(photo.assetId)
-          .resource("rendered").lens(CARD_LENS).expiresInSeconds((long) SIGNED_URL_SECONDS));
+      // The grant covers the photo; the rendered resource and the card lens are appended beneath it.
+      SignedAssetUrl signed = client.cdn.signAssetUrl(new SignAssetUrlOptions(photo.assetId)
+          .expiresIn((long) SIGNED_URL_SECONDS).resource("rendered").lens(CARD_LENS));
       if (!safePreviewUrl(signed.url())) return text(502, "Invalid preview URL");
       Map<String, String> headers = securityHeaders();
       headers.put("location", signed.url());
