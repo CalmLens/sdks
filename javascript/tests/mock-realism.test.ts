@@ -144,7 +144,7 @@ describe("MockCalmLensServerClient events", () => {
 });
 
 describe("MockCalmLensServerClient assets.decide", () => {
-  it("records the reviewer and note, and refuses decisions the API refuses", async () => {
+  it("records the API key and note, and refuses decisions the API refuses", async () => {
     const client = createClient();
     const asset = await client.assets.classify(text("post"));
     const { nextCursor } = await client.events.list();
@@ -165,7 +165,7 @@ describe("MockCalmLensServerClient assets.decide", () => {
     const [event] = (await client.events.list({ cursor: nextCursor })).items;
     expect(event?.facts).toEqual(
       expect.arrayContaining([
-        { key: "decided-by", value: "reviewer" },
+        { key: "decided-by", value: "api-key" },
         { key: "reviewer-name", value: "An API key" },
         { key: "note", value: "Spam" },
       ]),

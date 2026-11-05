@@ -195,7 +195,7 @@ module CalmLens
         # Like the event catalog: only allowing and limiting are low severity.
         add_event('type' => "asset.#{decision}", 'severity' => %w[allowed limited].include?(decision) ? 'low' : 'high',
                   'title' => "asset.#{decision}", 'assetId' => item['id'], 'asset' => snapshot(item),
-                  'facts' => [{ 'key' => 'decided-by', 'value' => 'reviewer' }, { 'key' => 'asset-type', 'value' => item['type'] },
+                  'facts' => [{ 'key' => 'decided-by', 'value' => reviewer_name ? 'api-key' : 'reviewer' }, { 'key' => 'asset-type', 'value' => item['type'] },
                               { 'key' => 'asset-name', 'value' => item['name'], 'url' => "https://calmlens.com/go/asset/#{item['id']}" },
                               *reviewer_facts, { 'key' => 'note', 'value' => note }])
       end

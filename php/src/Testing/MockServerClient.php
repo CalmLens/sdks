@@ -1016,7 +1016,7 @@ final class MockServerClient
         }
         $this->enqueueEvent(['type' => 'asset.' . $decision, 'severity' => in_array($decision, ['allowed', 'limited'], true) ? 'low' : 'high',
             'title' => 'asset.' . $decision, 'assetId' => $asset['id'], 'asset' => $this->snapshot($asset),
-            'facts' => [['key' => 'decided-by', 'value' => 'reviewer'], ['key' => 'asset-type', 'value' => $asset['type']],
+            'facts' => [['key' => 'decided-by', 'value' => 'api-key'], ['key' => 'asset-type', 'value' => $asset['type']],
                 ['key' => 'asset-name', 'value' => $asset['name'], 'url' => 'https://calmlens.com/go/asset/' . $asset['id']], ['key' => 'note', 'value' => $note]]]);
         return $asset;
     }

@@ -410,8 +410,14 @@ func (m *MockServerClient) recordReview(a calmlens.JSON, decision string, note a
 	if decision == OutcomeAllowed || decision == OutcomeLimited {
 		severity = calmlens.SeverityLow
 	}
+	// A decision through the API (with its note) is the API key's; the Decide test hook's is a
+	// reviewer's.
+	decidedBy := calmlens.DecidedByAPIKey
+	if note == nil {
+		decidedBy = calmlens.DecidedByReviewer
+	}
 	m.addEvent("asset."+decision, severity, a, []any{
-		calmlens.JSON{"key": calmlens.FactDecidedBy, "value": calmlens.DecidedByReviewer},
+		calmlens.JSON{"key": calmlens.FactDecidedBy, "value": decidedBy},
 		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
 		calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"], "url": "https://calmlens.com/go/asset/" + text(a["id"])},
 		calmlens.JSON{"key": calmlens.FactNote, "value": note},

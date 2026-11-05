@@ -821,7 +821,7 @@
       ]
     },
     {
-      "name": "assets.decide records a reviewer's decision with its note, and refuses decisions the asset can't take",
+      "name": "assets.decide records the API key's decision with its note, and refuses decisions the asset can't take",
       "mock": {},
       "steps": [
         {
@@ -908,7 +908,7 @@
               "items.0.facts": {
                 "$contains": {
                   "key": "decided-by",
-                  "value": "reviewer"
+                  "value": "api-key"
                 }
               }
             },

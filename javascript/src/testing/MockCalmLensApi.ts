@@ -730,7 +730,8 @@ export class MockCalmLensApi {
       assetId: stored.id,
       asset: toEventAsset(stored),
       facts: [
-        { key: "decided-by", value: "reviewer" },
+        // A decision through the API is the API key's; the test hook's is a reviewer's.
+        { key: "decided-by", value: review ? "api-key" : "reviewer" },
         { key: "asset-type", value: stored.type },
         {
           key: "asset-name",

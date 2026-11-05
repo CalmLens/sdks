@@ -989,7 +989,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self.enqueue_event("asset." + decision, asset_id=record["id"],
                            severity="low" if decision in ("allowed", "limited") else "high",
                            facts=cast(list[EventFact], [
-                               {"key": "decided-by", "value": "reviewer"},
+                               # A decision through the API is the API key's.
+                               {"key": "decided-by",
+                                "value": "reviewer" if reviewer_name is None else "api-key"},
                                {"key": "asset-type", "value": record["type"]},
                                {"key": "asset-name", "value": record["name"],
                                 "url": f"https://calmlens.com/go/asset/{record['id']}"},

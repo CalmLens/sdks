@@ -932,7 +932,7 @@ final class MockApi {
     if (decision.equals("purged")) removeContent(asset, now);
     String name = str(asset, "name"), type = str(asset, "type");
     recordEvent("asset." + decision, decision.equals("allowed") || decision.equals("limited") ? "low" : "high", asset, java.util.Arrays.asList(
-        new Models.EventFact("decided-by", "reviewer", null), new Models.EventFact("asset-type", type, null),
+        new Models.EventFact("decided-by", "api-key", null), new Models.EventFact("asset-type", type, null),
         new Models.EventFact("asset-name", name, "https://calmlens.com/go/asset/" + str(asset, "id")), new Models.EventFact("note", note, null)));
     return asset;
   }

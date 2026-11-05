@@ -803,8 +803,10 @@ impl Backend {
         } else {
             "high"
         };
+        // A decision through the API (with its note) is the API key's; the test hook's is a reviewer's.
+        let decided_by = if note.is_null() { "reviewer" } else { "api-key" };
         let facts = json!([
-            {"key": "decided-by", "value": "reviewer"},
+            {"key": "decided-by", "value": decided_by},
             {"key": "asset-type", "value": asset["type"]},
             {"key": "asset-name", "value": asset["name"], "url": format!("https://calmlens.com/go/asset/{asset_id}")},
             {"key": "note", "value": note},
