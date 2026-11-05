@@ -1673,6 +1673,8 @@ fn values() -> BTreeMap<&'static str, String> {
             "CdnResource::Preview",
             CdnResource::Preview.as_str().to_owned(),
         ),
+        ("CdnResource::Hls", CdnResource::Hls.as_str().to_owned()),
+        ("CdnResource::Embed", CdnResource::Embed.as_str().to_owned()),
         (
             "CdnResource::Placeholder",
             CdnResource::Placeholder.as_str().to_owned(),
@@ -1747,7 +1749,10 @@ async fn offers_every_capability() {
                     };
                     values.get(name).map(String::as_str) == value
                         && client.cdn().get_asset_url(&request).is_ok_and(|url| {
-                            url.ends_with(&format!("/asset-1/{}", value.unwrap_or_default()))
+                            url.ends_with(&format!(
+                                "/asset-1/{}",
+                                capability["path"].as_str().unwrap_or_default()
+                            ))
                         })
                 }
                 "error-field" => fields

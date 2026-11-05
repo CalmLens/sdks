@@ -580,8 +580,8 @@ string_enum! {
 
 string_enum! {
     /// Which CDN resource of an asset to serve. Lenses and transforms apply to `Preview`, and to
-    /// `Rendered` when it is an image; the CDN refuses them on other resources with
-    /// `transform/invalid`.
+    /// `Rendered` when it is an image; the CDN refuses them on rendered PDFs, video and audio with
+    /// `transform/invalid`, and the original, hls, embed and placeholder take none.
     CdnResource {
         /// The asset's original file, exactly as uploaded. It takes no lens or transform.
         Original = "original",
@@ -592,6 +592,13 @@ string_enum! {
         /// itself, a document's first page or slide, a website's first screen, a video's poster
         /// frame or an audio waveform.
         Preview = "preview",
+        /// Preview. The adaptive stream of audio or video, its HLS master playlist (served at
+        /// `hls/index.m3u8`, with its playlists and segments beneath `hls/`), once `content.hls`
+        /// is set. It takes no lens or transform.
+        Hls = "hls",
+        /// Preview. An HTML page that shows the asset, for an iframe: a player for audio and
+        /// video, or the viewer for its type. It takes no lens or transform.
+        Embed = "embed",
         /// A small blurred PNG made from the preview, public whatever the asset's visibility or
         /// moderation. Only for CDN URLs, without a lens or transform; it needs no age
         /// confirmation.
@@ -608,11 +615,17 @@ string_enum! {
         Rendered = "rendered",
         /// A still image that stands for the asset.
         Preview = "preview",
+        /// Preview. The adaptive stream of audio or video; one signature covers every playlist
+        /// and segment beneath its master playlist. It takes no lens or transform.
+        Hls = "hls",
+        /// Preview. An HTML page that shows the asset, for an iframe. It takes no lens or
+        /// transform.
+        Embed = "embed",
     }
 }
 
 /// The CDN resources a signed URL can be created for, as the API accepts them.
-pub const SIGNED_CDN_RESOURCES: [&str; 3] = ["original", "rendered", "preview"];
+pub const SIGNED_CDN_RESOURCES: [&str; 5] = ["original", "rendered", "preview", "hls", "embed"];
 
 /// Processing options for an asset.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -661,6 +674,13 @@ pub struct ProcessingFeatures {
     /// AI-edited. Results are informational and never change the moderation decision.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_generated_detection: Option<FeatureOptions>,
+    /// Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made
+    /// browser-safe, served at [`CdnResource::Hls`] and played by [`CdnResource::Embed`].
+    /// Needs `keep_content_after_processing`, and is billed per started minute of media. Left
+    /// out, the project's streaming setting decides; `enabled: false` turns it off for an upload
+    /// in a project that streams by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub streaming: Option<FeatureOptions>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<ProcessingFeatures, _>")]
     pub extra: HashMap<String, Value>,
@@ -1914,6 +1934,12 @@ pub struct AssetContent {
     /// media not yet made browser-safe), once the content is removed and while the asset is held.
     #[serde(default)]
     pub rendered: Option<AssetRendered>,
+    /// Preview. The adaptive (HLS) stream of video or audio, once streaming has prepared it from
+    /// the rendered file, served at [`CdnResource::Hls`] and played by [`CdnResource::Embed`].
+    /// `None` for other assets, until a stream is prepared, once the content is removed and while
+    /// the asset is held.
+    #[serde(default)]
+    pub hls: Option<AssetHls>,
     /// A still image for the asset, served at the preview resource (and its blurred placeholder
     /// at the placeholder resource). `None` when the asset has none (text, spreadsheets and other
     /// files, or a document, video or audio whose still isn't made yet), once the content is
@@ -3174,6 +3200,55 @@ pub struct AssetRendered {
     pub peaks: Option<Vec<f64>>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetRendered, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// The adaptive (HLS) stream of audio or video, with fragmented MP4 (CMAF) segments, as the
+/// CDN's hls resource serves it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetHls {
+    /// Every rendition, video from the largest down, then audio.
+    #[serde(default)]
+    pub renditions: Vec<AssetHlsRendition>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetHls, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+string_enum! {
+    /// What a rendition of the adaptive stream carries.
+    AssetHlsRenditionKind {
+        /// A picture size. Video renditions carry no sound; they play with the audio rendition.
+        Video = "video",
+        /// The audio.
+        Audio = "audio",
+    }
+}
+
+/// One rendition of the adaptive stream, as the HLS master playlist lists it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetHlsRendition {
+    /// Whether it is a picture size or the audio.
+    #[serde(default)]
+    pub kind: AssetHlsRenditionKind,
+    /// The picture width in pixels; `None` for audio.
+    #[serde(default)]
+    pub width: Option<u32>,
+    /// The picture height in pixels; `None` for audio.
+    #[serde(default)]
+    pub height: Option<u32>,
+    /// The peak bit rate in bits per second, counting the audio a video rendition plays with.
+    #[serde(default)]
+    pub bandwidth: u64,
+    /// The rendition's codecs as RFC 6381 names, such as `avc1.64001f`.
+    #[serde(default)]
+    pub codecs: String,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetHlsRendition, _>")]
     pub extra: HashMap<String, Value>,
 }
 

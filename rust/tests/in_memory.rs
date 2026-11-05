@@ -150,6 +150,8 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
         CdnResource::Original,
         CdnResource::Rendered,
         CdnResource::Preview,
+        CdnResource::Hls,
+        CdnResource::Embed,
         CdnResource::Placeholder,
     ] {
         let response = mock
@@ -193,6 +195,79 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
     assert_eq!(
         (&held.content.rendered, &held.content.preview),
         (&None, &None)
+    );
+}
+
+/// The shared scenarios cover a video's embed page and missing stream; this is audio's embed page
+/// and stream, a text file's embed page, and blocked content's embed page.
+#[tokio::test]
+async fn serves_the_embed_page_of_any_asset_and_no_hls_stream_until_it_is_blocked() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    let asset = mock
+        .assets()
+        .classify(SubmitAsset {
+            processing_options: Some(ProcessingOptions {
+                keep_content_after_processing: Some(true),
+                features: Some(ProcessingFeatures {
+                    streaming: Some(FeatureOptions::enabled()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            visibility: Some(Visibility::Public),
+            ..SubmitAsset::new("song.wav", Content::bytes(&b"wav"[..], "audio/wav"))
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        (
+            &asset.content.rendered.as_ref().unwrap().kind,
+            &asset.content.hls
+        ),
+        (&AssetRenderedKind::Audio, &None)
+    );
+    let cdn = mock.cdn();
+    let serve = |resource: CdnResource| {
+        cdn.serve(CdnRequest {
+            asset_identifier: asset.id.clone(),
+            resource: Some(resource),
+            ..Default::default()
+        })
+    };
+    let note = mock
+        .assets()
+        .classify(SubmitAsset {
+            processing_options: Some(ProcessingOptions {
+                keep_content_after_processing: Some(true),
+                ..Default::default()
+            }),
+            visibility: Some(Visibility::Public),
+            ..SubmitAsset::new("note.txt", Content::text("hello"))
+        })
+        .await
+        .unwrap();
+    for identifier in [&asset.id, &note.id] {
+        let embed = cdn
+            .serve(CdnRequest {
+                asset_identifier: identifier.clone(),
+                resource: Some(CdnResource::Embed),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(embed.status().as_u16(), 200, "{identifier}");
+        assert_eq!(embed.headers()["content-type"], "text/html; charset=utf-8");
+        assert!(embed.bytes().await.unwrap().starts_with(b"<!doctype html>"));
+    }
+    let stream = serve(CdnResource::Hls).await.unwrap();
+    assert_eq!(stream.status().as_u16(), 404);
+    let body: serde_json::Value = serde_json::from_slice(&stream.bytes().await.unwrap()).unwrap();
+    assert_eq!(body["code"], "asset/no-rendered-version");
+    mock.decide(&asset.id, AssetModerationDecision::Blocked)
+        .unwrap();
+    assert_eq!(
+        serve(CdnResource::Embed).await.unwrap().status().as_u16(),
+        403
     );
 }
 

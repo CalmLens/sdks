@@ -355,6 +355,7 @@ fn processing_features_serialize_as_the_api_expects() {
                 age_estimation: Some(true),
                 ..FaceDetectionOptions::enabled()
             }),
+            streaming: Some(FeatureOptions::default()),
             ..ProcessingFeatures::default()
         }),
         ..ProcessingOptions::default()
@@ -363,7 +364,8 @@ fn processing_features_serialize_as_the_api_expects() {
         serde_json::to_value(&options).unwrap(),
         serde_json::json!({"features": {
             "ocr": {"enabled": true},
-            "faceDetection": {"enabled": true, "ageEstimation": true}
+            "faceDetection": {"enabled": true, "ageEstimation": true},
+            "streaming": {"enabled": false}
         }})
     );
 }

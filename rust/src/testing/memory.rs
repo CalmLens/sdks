@@ -684,8 +684,8 @@ fn automated_actor() -> Value {
     json!({"type": "automated", "id": null})
 }
 
-/// Paths beneath `/rendered/` the CDN reserves for streaming and an embeddable player.
-const RESERVED_RENDERED_PATHS: [&str; 2] = ["stream", "player"];
+/// The page the mock serves at `/embed`, standing in for the CDN's embed page.
+const MOCK_EMBED_HTML: &str = r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Embed</title></head><body></body></html>"#;
 
 /// The rendered file and preview the API reports for an asset with its content held, as
 /// `(rendered, preview)`. Once uploaded, an image renders as itself with a preview that has no
@@ -694,7 +694,7 @@ const RESERVED_RENDERED_PATHS: [&str; 2] = ["stream", "player"];
 /// as the preview; video and audio as a browser-safe file (MP4 or M4A unless browsers play the
 /// upload), audio with a waveform preview and video with no poster; and every preview has its
 /// ThumbHash. Text, spreadsheets and other files have neither. The mock decodes nothing, so sizes
-/// are unknown and audio has no peaks.
+/// are unknown, audio has no peaks, and audio and video never get an adaptive stream.
 fn mock_rendering(asset: &Value, processed: bool) -> (Value, Value) {
     let format = asset["content"]["format"].as_str();
     let mime = normalize_mime(format.unwrap_or(""));
@@ -761,9 +761,10 @@ fn mock_rendering(asset: &Value, processed: bool) -> (Value, Value) {
     }
 }
 
-/// Sets an asset's rendered file and preview.
+/// Sets an asset's rendered file and preview. The mock never prepares an HLS stream.
 fn set_rendering(content: &mut Map<String, Value>, (rendered, preview): (Value, Value)) {
     content.insert("rendered".into(), rendered);
+    content.insert("hls".into(), Value::Null);
     content.insert("preview".into(), preview);
 }
 
@@ -2135,7 +2136,7 @@ impl Backend {
                 "perceptualHash": null, "perceptualHashQuality": null, "metadata": null,
                 "extractedText": null,
                 // Like the API, the rendered file and preview come with processing.
-                "rendered": null, "preview": null,
+                "rendered": null, "hls": null, "preview": null,
             },
             "upload": {
                 "status": if open { "uploading" } else { "completed" }, "updatedAt": now,
@@ -2604,20 +2605,19 @@ impl Backend {
         };
         let resource = parts.get(3).map_or("", String::as_str);
         let selector_parts = raw_parts.get(4..).unwrap_or_default();
-        // Like the CDN, `/rendered/stream` and `/rendered/player` are reserved, then the selector
-        // after the resource (as sent, still percent-encoded) is read; the original takes none.
-        if resource == "rendered"
-            && selector_parts
-                .first()
-                .is_some_and(|part| RESERVED_RENDERED_PATHS.contains(part))
-        {
-            return no_rendered_version();
-        }
-        let Some(selector) = parse_transform_selector(&selector_parts.join("/")) else {
+        // Like the CDN, the selector after the resource (as sent, still percent-encoded) is read;
+        // the original and the embed page take none. Beneath `/hls/` are the stream's playlists
+        // and segments, not a selector.
+        let selector_text = if resource == "hls" {
+            String::new()
+        } else {
+            selector_parts.join("/")
+        };
+        let Some(selector) = parse_transform_selector(&selector_text) else {
             return invalid_transform();
         };
         let has_selector = selector.lens.is_some() || selector.options.is_some();
-        if resource == "original" && has_selector {
+        if (resource == "original" || resource == "embed") && has_selector {
             return invalid_transform();
         }
         let [scope, project, identifier, _, ..] = parts else {
@@ -2625,7 +2625,15 @@ impl Backend {
         };
         if scope != "assets"
             || *project != self.options.project_id
-            || !["original", "rendered", "preview", "placeholder"].contains(&resource)
+            || ![
+                "original",
+                "rendered",
+                "preview",
+                "hls",
+                "embed",
+                "placeholder",
+            ]
+            .contains(&resource)
         {
             return not_found();
         }
@@ -2698,11 +2706,36 @@ impl Backend {
             failure.details = json!({ "permission": "assets:download" });
             return failure.response();
         }
+        // The embed page shows any asset that may be delivered, as its viewer for the asset's type
+        // or a notice that the type has none.
+        if resource == "embed" {
+            let access = if public { "public" } else { "private" };
+            return cdn_response(
+                MOCK_EMBED_HTML.as_bytes().to_vec(),
+                &[
+                    ("content-type", "text/html; charset=utf-8".into()),
+                    (
+                        "cache-control",
+                        if claims.as_object().is_some_and(|c| !c.is_empty()) {
+                            "private, no-store".into()
+                        } else {
+                            format!("{access}, max-age=3600")
+                        },
+                    ),
+                    ("cache-tag", format!("asset-{id}")),
+                    ("x-content-type-options", "nosniff".into()),
+                ],
+            );
+        }
         // Then whether the asset has the resource, and whether it is a still image that takes a
         // lens or transform: the preview always is, the rendered file only when it is an image.
         if (resource == "rendered" && rendered.is_null())
             || (resource == "preview" && preview.is_null())
         {
+            return no_rendered_version();
+        }
+        // The mock prepares no HLS stream.
+        if resource == "hls" {
             return no_rendered_version();
         }
         let still_image =
@@ -3436,8 +3469,37 @@ impl Comparison {
 
 #[cfg(test)]
 mod tests {
-    use super::check_metadata;
+    use super::{check_metadata, Backend};
+    use crate::testing::MockOptions;
+    use reqwest::{header::HeaderMap, Method};
     use serde_json::Value;
+
+    /// Like the CDN, a lens or transform after the embed page is refused before the asset is
+    /// looked up. The SDK refuses such selectors itself, so the path is sent directly.
+    #[test]
+    fn refuses_selectors_after_the_embed_page_before_the_asset_lookup() {
+        let options = MockOptions::new();
+        let base = format!(
+            "{}/assets/{}/missing",
+            options.cdn_base_url, options.project_id
+        );
+        let mut backend = Backend::new(options);
+        for (path, status, code) in [
+            ("embed/width=10", 400, "transform/invalid"),
+            ("embed/@thumbnail", 400, "transform/invalid"),
+        ] {
+            let url = reqwest::Url::parse(&format!("{base}/{path}")).unwrap();
+            let response = backend
+                .handle(&Method::GET, &url, &HeaderMap::new(), &[])
+                .unwrap();
+            let body: Value = serde_json::from_slice(&response.body).unwrap();
+            assert_eq!(
+                (response.status, body["code"].as_str()),
+                (status, Some(code)),
+                "{path}"
+            );
+        }
+    }
 
     /// The metadata scenario in `testdata/mock-scenarios.json` passes metadata the SDK's types
     /// can't hold, so its runner skips it: each step's metadata gets the step's outcome here.

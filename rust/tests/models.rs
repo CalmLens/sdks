@@ -3,6 +3,35 @@ use calmlens::models::*;
 use serde_json::json;
 
 #[test]
+fn an_hls_stream_decodes_into_typed_renditions() {
+    let hls: AssetHls = serde_json::from_value(json!({"renditions":[{"kind":"video","width":1280,"height":720,"bandwidth":2500000,"codecs":"avc1.64001f"},{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]})).unwrap();
+    let summary: Vec<_> = hls
+        .renditions
+        .iter()
+        .map(|r| (&r.kind, r.width, r.height, r.bandwidth, r.codecs.as_str()))
+        .collect();
+    assert_eq!(
+        summary,
+        [
+            (
+                &AssetHlsRenditionKind::Video,
+                Some(1280),
+                Some(720),
+                2_500_000,
+                "avc1.64001f"
+            ),
+            (
+                &AssetHlsRenditionKind::Audio,
+                None,
+                None,
+                128_000,
+                "mp4a.40.2"
+            ),
+        ]
+    );
+}
+
+#[test]
 fn asset_nested_fields_decode_into_typed_models() {
     let wire = json!({"id":"asset-1","type":"image","content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"width":10,"height":20,"durationSeconds":null,"pageCount":null,"perceptualHash":"ph","perceptualHashQuality":87,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","cameraModel":null,"lensModel":null,"software":null,"creator":null,"copyright":null,"digitalSourceType":null,"containsLocation":true,"location":null},"rendered":{"kind":"image","format":"image/webp","width":10,"height":20},"preview":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000"},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":7,"applied":true}],"status":"age-restricted","automatedStatus":"limited","flaggedCategories":[],"regions":[{"region":"DE","status":"blocked","rule":"de-jmstv","category":"sexual"}],"timeline":{"segmentCount":3},"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"gambling","evidence":[]}],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","stage":"beta","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}]}});
     let asset: Asset = serde_json::from_value(wire).unwrap();

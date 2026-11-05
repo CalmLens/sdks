@@ -1298,8 +1298,9 @@ impl AssetsClient<'_> {
         let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
         self.0.call(request).await
     }
-    /// Creates a signed URL for an asset's rendered (the API's default), original or preview
-    /// resource (15 minutes by default). The original takes no lens or transform.
+    /// Creates a signed URL for an asset's rendered (the API's default), original, preview, hls
+    /// or embed resource (15 minutes by default). The original, hls and embed take no lens or
+    /// transform; an hls signature covers every playlist and segment beneath `hls/`.
     pub async fn create_signed_url(&self, options: SignedUrlOptions) -> Result<SignedUrl> {
         let path = format!("/assets/{}/signed-url", id(&options.asset_id)?);
         let resource = options
@@ -1312,10 +1313,12 @@ impl AssetsClient<'_> {
                 SIGNED_CDN_RESOURCES.join(", ")
             )));
         }
-        if resource == "original" && (options.lens.is_some() || options.transform.is_some()) {
-            return Err(invalid_argument(
-                "The original resource takes no lens or transform",
-            ));
+        if UNSELECTABLE_CDN_RESOURCES.contains(&resource)
+            && (options.lens.is_some() || options.transform.is_some())
+        {
+            return Err(invalid_argument(format!(
+                "The {resource} resource takes no lens or transform"
+            )));
         }
         if options
             .expires_in_seconds
@@ -1755,13 +1758,33 @@ impl TextClient<'_> {
     }
 }
 
+/// The resources that take no lens or transform: the exact upload, the adaptive stream, the embed
+/// page and the public placeholder.
+const UNSELECTABLE_CDN_RESOURCES: [&str; 4] = ["original", "hls", "embed", "placeholder"];
+
+/// Where a resource is served beneath an asset's CDN path. The adaptive stream is its HLS master
+/// playlist; its media playlists and segments are the other files beneath `hls/`.
+fn cdn_resource_path(resource: &str) -> Option<&'static str> {
+    Some(match resource {
+        "original" => "original",
+        "rendered" => "rendered",
+        "preview" => "preview",
+        "hls" => "hls/index.m3u8",
+        "embed" => "embed",
+        "placeholder" => "placeholder",
+        _ => return None,
+    })
+}
+
 /// CDN URLs and downloads. Get it from [`ServerClient::cdn`].
 #[derive(Debug, Clone, Copy)]
 pub struct CdnClient<'a>(&'a ServerClient);
 impl CdnClient<'_> {
-    /// The CDN URL of an asset's rendered (default), original, preview or placeholder resource,
-    /// with serialized viewer assertions from [`CdnRequest::viewer_claims`]. The original and the
-    /// placeholder take no lens or transform. Lenses and transforms apply to the preview, and to
+    /// The CDN URL of an asset's rendered (default), original, preview, hls, embed or
+    /// placeholder resource, with serialized viewer assertions from [`CdnRequest::viewer_claims`].
+    /// The hls resource is the HLS master playlist at `hls/index.m3u8` and the embed page the
+    /// HTML page at `embed`. The original, hls, embed and placeholder take no
+    /// lens or transform. Lenses and transforms apply to the preview, and to
     /// the rendered resource when it is an image; the CDN refuses them on rendered PDFs, video and
     /// audio with `transform/invalid`.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
@@ -1769,13 +1792,13 @@ impl CdnClient<'_> {
             .resource
             .as_ref()
             .map_or("rendered", |value| value.as_str());
-        if !SIGNED_CDN_RESOURCES.contains(&resource) && resource != "placeholder" {
+        let Some(path) = cdn_resource_path(resource) else {
             return Err(invalid_argument(format!(
                 "Resource must be one of {}, placeholder",
                 SIGNED_CDN_RESOURCES.join(", ")
             )));
-        }
-        if ["original", "placeholder"].contains(&resource)
+        };
+        if UNSELECTABLE_CDN_RESOURCES.contains(&resource)
             && (options.lens.is_some() || options.transform.is_some())
         {
             return Err(invalid_argument(format!(
@@ -1784,7 +1807,7 @@ impl CdnClient<'_> {
         }
         let config = &self.0.inner.config;
         let mut url = format!(
-            "{}/assets/{}/{}/{resource}",
+            "{}/assets/{}/{}/{path}",
             config.cdn_base_url,
             id(&config.project_id)?,
             id(&options.asset_identifier)?
