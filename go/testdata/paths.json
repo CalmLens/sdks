@@ -149,16 +149,51 @@
   "cdnUrls": [
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1"
+    },
+    {
+      "options": {
+        "externalId": "post-1"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/ext:post-1"
+    },
+    {
+      "options": {
+        "externalId": "a/b?c#d %e ✓",
+        "resource": "rendered"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/ext:a%2Fb%3Fc%23d%20%25e%20%E2%9C%93/rendered"
+    },
+    {
+      "options": {
+        "externalId": "..",
+        "resource": "preview"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/ext:../preview"
+    },
+    {
+      "options": {
+        "projectId": "project-2",
+        "assetId": "asset-1",
+        "resource": "rendered"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-2/asset-1/rendered"
+    },
+    {
+      "options": {
+        "assetId": "asset-1",
         "viewerClaims": {
           "region": "DE"
         }
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?viewerClaims=%7B%22region%22%3A%22DE%22%7D"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1?viewerClaims=%7B%22region%22%3A%22DE%22%7D"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "viewerClaims": {
           "region": "GB",
           "ageConfirmed": true
@@ -168,14 +203,53 @@
     },
     {
       "options": {
-        "assetIdentifier": "a/b c",
+        "assetId": "asset-1",
+        "resource": "rendered",
+        "viewerClaims": {
+          "ageConfirmed": true
+        }
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D"
+    },
+    {
+      "options": {
+        "assetId": "asset-1",
+        "resource": "rendered",
+        "viewerClaims": {
+          "ageConfirmed": false
+        }
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered"
+    },
+    {
+      "options": {
+        "assetId": "asset-1",
+        "resource": "rendered",
+        "viewerClaims": {}
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered"
+    },
+    {
+      "options": {
+        "assetId": "asset-1",
+        "resource": "rendered",
+        "viewerClaims": {
+          "region": "XX"
+        }
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetId": "a/b c",
+        "resource": "rendered",
         "transform": "format=png,width=1024"
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/a%2Fb%20c/rendered/format=png,width=1024"
     },
     {
       "options": {
-        "assetIdentifier": "ünï✓",
+        "assetId": "ünï✓",
         "resource": "rendered",
         "transform": "width=10,blur=2"
       },
@@ -183,28 +257,32 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": "width=10/blur=2"
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": "@thumbnail,width=10"
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "lens": "thumb/small"
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered/@thumb%2Fsmall"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "lens": "thumbnail",
         "transform": "format=avif"
       },
@@ -212,7 +290,7 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "rendered",
         "lens": "thumbnail",
         "transform": {
@@ -223,47 +301,98 @@
     },
     {
       "options": {
-        "assetIdentifier": ".."
+        "assetId": "asset-1",
+        "lens": "thumbnail"
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "."
+        "assetId": "asset-1",
+        "transform": {
+          "width": 10
+        }
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "externalId": "post-1"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {},
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "externalId": ""
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetId": ""
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetId": "."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "projectId": "..",
+        "assetId": "asset-1"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetId": "asset-1",
+        "resource": "rendered",
         "lens": ".."
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": "../../other-project/asset/content"
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": "width=10?download=1"
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": "width=10#x"
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": {
           "width": 1024,
           "format": "png"
@@ -273,7 +402,7 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "rendered",
         "transform": {
           "fit": "cover",
@@ -299,14 +428,16 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": {}
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": [
           {
             "width": 1
@@ -317,7 +448,8 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": {
           "dpr": 2,
           "quality": "high",
@@ -328,25 +460,7 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
-        "viewerClaims": {
-          "ageConfirmed": true
-        }
-      },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D"
-    },
-    {
-      "options": {
-        "assetIdentifier": "asset-1",
-        "viewerClaims": {
-          "ageConfirmed": false
-        }
-      },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered?viewerClaims=%7B%22ageConfirmed%22%3Afalse%7D"
-    },
-    {
-      "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "rendered",
         "lens": "thumbnail",
         "transform": {
@@ -360,14 +474,14 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "preview"
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/preview"
     },
     {
       "options": {
-        "assetIdentifier": "a/b c",
+        "assetId": "a/b c",
         "resource": "preview",
         "lens": "thumbnail",
         "transform": {
@@ -378,21 +492,21 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "placeholder"
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/placeholder"
     },
     {
       "options": {
-        "assetIdentifier": "a/b c",
+        "externalId": "a/b c",
         "resource": "placeholder"
       },
-      "url": "https://cdn.calmlens.com/v1/assets/project-1/a%2Fb%20c/placeholder"
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/ext:a%2Fb%20c/placeholder"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "placeholder",
         "viewerClaims": {
           "ageConfirmed": true,
@@ -403,7 +517,7 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "placeholder",
         "lens": "thumbnail"
       },
@@ -411,7 +525,7 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "placeholder",
         "transform": "width=10"
       },
@@ -419,7 +533,7 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "placeholder",
         "transform": {
           "width": 10
@@ -429,14 +543,14 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "hls"
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/hls/index.m3u8"
     },
     {
       "options": {
-        "assetIdentifier": "a/b c",
+        "assetId": "a/b c",
         "resource": "hls",
         "viewerClaims": {
           "ageConfirmed": true
@@ -446,7 +560,7 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "hls",
         "lens": "thumbnail"
       },
@@ -454,7 +568,7 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "hls",
         "transform": {
           "width": 10
@@ -464,14 +578,14 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "embed"
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/embed"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "embed",
         "transform": "width=10"
       },
@@ -479,14 +593,39 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "info"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/info"
+    },
+    {
+      "options": {
+        "externalId": "post-1",
+        "resource": "info",
+        "viewerClaims": {
+          "region": "DE"
+        }
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/ext:post-1/info?viewerClaims=%7B%22region%22%3A%22DE%22%7D"
+    },
+    {
+      "options": {
+        "assetId": "asset-1",
+        "resource": "info",
+        "lens": "thumbnail"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetId": "asset-1",
         "resource": "original"
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/original"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "original",
         "lens": "thumbnail"
       },
@@ -494,7 +633,7 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "original",
         "transform": "width=10"
       },
@@ -502,21 +641,23 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
         "resource": "content"
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": []
       },
       "error": "sdk/invalid-argument"
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": {
           "../width": 10
         }
@@ -525,7 +666,8 @@
     },
     {
       "options": {
-        "assetIdentifier": "asset-1",
+        "assetId": "asset-1",
+        "resource": "rendered",
         "transform": {
           "width": [
             10

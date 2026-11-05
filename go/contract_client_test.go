@@ -252,7 +252,9 @@ func fixtureCDN(t *testing.T, args fixtureArgs) CDNAssetURLOptions {
 			t.Fatal(err)
 		}
 	}
-	options.AssetIdentifier, _ = args["assetIdentifier"].(string)
+	options.ProjectID, _ = args["projectId"].(string)
+	options.AssetID, _ = args["assetId"].(string)
+	options.ExternalID, _ = args["externalId"].(string)
 	options.Resource, _ = args["resource"].(string)
 	options.Lens, _ = args["lens"].(string)
 	options.Transform, options.TransformOptions = fixtureTransform(args["transform"])
@@ -305,17 +307,15 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 			options.Part = *part
 		}
 		return one(c.Assets.UploadPart(ctx, options))
-	case "assets.createSignedUrl":
-		plain := fixtureArgs{}
-		for key, value := range args {
-			if key != "transform" {
-				plain[key] = value
-			}
+	case "cdn.signAssetUrl":
+		location := fixtureCDN(t, args)
+		options := SignAssetURLOptions{ProjectID: location.ProjectID, AssetID: location.AssetID, ExternalID: location.ExternalID,
+			Resource: location.Resource, Lens: location.Lens, Transform: location.Transform, TransformOptions: location.TransformOptions, ViewerClaims: location.ViewerClaims}
+		if expiresIn, ok := args["expiresIn"].(float64); ok {
+			options.ExpiresIn = int(expiresIn)
 		}
-		options := into[SignedURLOptions](t, plain)
-		options.AssetID, _ = args["assetId"].(string)
-		options.Transform, options.TransformOptions = fixtureTransform(args["transform"])
-		return one(c.Assets.CreateSignedURL(ctx, options))
+		options.Original, _ = args["original"].(bool)
+		return one(c.CDN.SignAssetURL(ctx, options))
 	case "assets.retry":
 		return one(c.Assets.Retry(ctx, into[AssetIDOptions](t, args)))
 	case "assets.decide":
@@ -529,6 +529,8 @@ func TestRequestFixtures(t *testing.T) {
 			Body   any
 		}
 		Response json.RawMessage
+		// Result is what the method returns when it isn't the response body.
+		Result json.RawMessage
 		// FullModel marks a response holding every field of the model its endpoint returns.
 		FullModel bool
 	}](t, "requests.json")
@@ -567,6 +569,8 @@ func TestRequestFixtures(t *testing.T) {
 			// else the body.
 			want := fixture.Response
 			switch {
+			case len(fixture.Result) > 0:
+				want = fixture.Result
 			case strings.HasSuffix(fixture.Operation, ".delete"), fixture.Operation == "hashLists.removeEntry":
 				want = json.RawMessage("null")
 			case fixture.Operation == "ensureLenses":
@@ -691,7 +695,7 @@ func TestPathFixtures(t *testing.T) {
 			// Unknown fixture options fail the test instead of being ignored.
 			args := decodeArgs(t, cdn.Options)
 			for key := range args {
-				if !strings.Contains(" assetIdentifier resource lens transform viewerClaims ", " "+key+" ") {
+				if !strings.Contains(" projectId assetId externalId resource lens transform viewerClaims ", " "+key+" ") {
 					t.Fatalf("unknown CDN URL option %s", key)
 				}
 			}
@@ -1128,7 +1132,7 @@ func TestClientDefaults(t *testing.T) {
 		"retryMaxDelayMs":                ms(RetryMaxDelay),
 		"retryAfterMaxMs":                ms(RetryAfterMax),
 		"maxResponseBytes":               float64(c.options.MaxResponseBytes),
-		"signedUrlExpiresInSeconds":      float64(DefaultSignedURLSeconds),
+		"signedUrlExpiresIn":             float64(DefaultSignedURLExpiresIn),
 		"uploadTokenExpiresInSeconds":    float64(uploadTokenDefaultTTLSeconds),
 		"waitForDecisionTimeoutMs":       ms(DefaultDecisionTimeout),
 		"waitForDecisionFirstIntervalMs": ms(decisionPollFirstDelay),

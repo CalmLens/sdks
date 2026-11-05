@@ -67,6 +67,7 @@ var surfaceConstants = map[string]string{
 	"ResourcePreview":                calmlens.ResourcePreview,
 	"ResourceHLS":                    calmlens.ResourceHLS,
 	"ResourceEmbed":                  calmlens.ResourceEmbed,
+	"ResourceInfo":                   calmlens.ResourceInfo,
 }
 
 var surfaceTypes = map[string]reflect.Type{
@@ -224,7 +225,7 @@ func TestSurface(t *testing.T) {
 		case "cdn-resource":
 			value, ok := surfaceConstants[name]
 			if ok && value == capability.Value {
-				url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetIdentifier: "asset-1", Resource: value})
+				url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetID: "asset-1", Resource: value})
 				present = err == nil && strings.HasSuffix(url, "/asset-1/"+capability.Path)
 			}
 		case "error-field":
@@ -234,8 +235,17 @@ func TestSurface(t *testing.T) {
 			typeName, fieldName, _ := strings.Cut(name, ".")
 			used[typeName] = true
 			if _, ok := surfaceTypes[typeName].FieldByName(fieldName); ok {
-				url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetIdentifier: "asset-1", ViewerClaims: &calmlens.ViewerClaims{AgeConfirmed: func() *bool { v := true; return &v }()}})
-				present = err == nil && strings.HasSuffix(url, "?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D")
+				// Each option is checked by the URL it builds.
+				switch fieldName {
+				case "ViewerClaims":
+					url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetID: "asset-1", ViewerClaims: &calmlens.ViewerClaims{AgeConfirmed: calmlens.Ptr(true)}})
+					present = err == nil && strings.HasSuffix(url, "/asset-1?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D")
+				case "ExternalID":
+					url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{ExternalID: "post/1"})
+					present = err == nil && strings.HasSuffix(url, "/ext:post%2F1")
+				default:
+					t.Fatalf("no check for CDN option %s", name)
+				}
 			}
 		case "mock-option":
 			typeName, fieldName, _ := strings.Cut(name, ".")
@@ -682,10 +692,16 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 			options.Part = *part
 		}
 		result, err = m.Assets.UploadPart(ctx, options)
-	case "assets.createSignedUrl":
-		options := decode[calmlens.SignedURLOptions](t, args)
-		options.AssetID, _ = args["assetId"].(string)
-		result, err = m.Assets.CreateSignedURL(ctx, options)
+	case "cdn.signAssetUrl":
+		result, err = m.CDN.SignAssetURL(ctx, decode[calmlens.SignAssetURLOptions](t, args))
+	case "cdn.getAssetUrl":
+		result, err = m.CDN.GetAssetURL(decode[calmlens.CDNAssetURLOptions](t, args))
+	case "cdn.getAssetInfo":
+		options := calmlens.GetAssetInfoOptions{}
+		if claims, ok := args["viewerClaims"]; ok {
+			options.ViewerClaims = calmlens.Ptr(decode[calmlens.ViewerClaims](t, claims.(map[string]any)))
+		}
+		result, err = m.CDN.GetAssetInfo(ctx, args["url"].(string), options)
 	case "assets.retry":
 		result, err = m.Assets.Retry(ctx, decode[calmlens.AssetIDOptions](t, args))
 	case "assets.decide":
@@ -789,7 +805,7 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 	return normalize(t, result), nil
 }
 
-// served is what a cdn.serve step returns.
+// served is what a cdn.serve or mock.fetchCdn step returns.
 type served struct {
 	status int
 	header http.Header
@@ -904,8 +920,14 @@ func TestSharedMockScenarios(t *testing.T) {
 					m.mu.Unlock()
 					var result any
 					var servedResponse served
-					if step.Operation == "cdn.serve" {
-						response, serveErr := m.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: decode[calmlens.CDNAssetURLOptions](t, args)})
+					if step.Operation == "cdn.serve" || step.Operation == "mock.fetchCdn" {
+						var response *http.Response
+						var serveErr error
+						if step.Operation == "cdn.serve" {
+							response, serveErr = m.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: decode[calmlens.CDNAssetURLOptions](t, args)})
+						} else {
+							response, serveErr = m.FetchCDN(ctx, args["url"].(string))
+						}
 						err = serveErr
 						if err == nil {
 							body, _ := io.ReadAll(response.Body)

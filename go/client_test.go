@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync"
@@ -394,19 +395,19 @@ func TestLensCache(t *testing.T) {
 }
 func TestCDNURLsAndServeHeaders(t *testing.T) {
 	c, h := setup(t)
-	endpoint, err := c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a/b?", Lens: "my lens"})
+	endpoint, err := c.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "a/b?", Resource: ResourceRendered, Lens: "my lens"})
 	if err != nil || endpoint != "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a%2Fb%3F/rendered/@my%20lens" {
 		t.Fatal(endpoint, err)
 	}
-	endpoint, _ = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", Transform: "width=20,label=[x]"})
+	endpoint, _ = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "a", Resource: ResourceRendered, Transform: "width=20,label=[x]"})
 	if !strings.HasSuffix(endpoint, "/rendered/width=20,label=%5Bx%5D") {
 		t.Fatal(endpoint)
 	}
-	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", Lens: "x", Transform: "format=avif"})
+	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "a", Resource: ResourceRendered, Lens: "x", Transform: "format=avif"})
 	if err != nil || !strings.HasSuffix(endpoint, "/@x,format=avif") {
 		t.Fatal(endpoint, err)
 	}
-	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", Transform: "width=1", TransformOptions: ImageTransformOptions{Width: Ptr(1)}})
+	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "a", Resource: ResourceRendered, Transform: "width=1", TransformOptions: ImageTransformOptions{Width: Ptr(1)}})
 	if ErrorCode(err) != CodeSDKInvalidArgument {
 		t.Fatal("expected Transform and TransformOptions error", err)
 	}
@@ -417,21 +418,21 @@ func TestCDNURLsAndServeHeaders(t *testing.T) {
 		Brightness float64  `json:"brightness"`
 		Contrast   float64  `json:"contrast"`
 	}
-	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformOptions: adjust{Blur: 1e21, Brightness: -0.0, Contrast: 1.5e-7}})
+	endpoint, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "a", Resource: ResourceRendered, TransformOptions: adjust{Blur: 1e21, Brightness: -0.0, Contrast: 1.5e-7}})
 	if err != nil || !strings.HasSuffix(endpoint, "/rendered/blur=1e%2B21,brightness=0,contrast=1.5e-7") {
 		t.Fatal(endpoint, err)
 	}
-	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformOptions: JSON{"width": math.NaN()}})
+	_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "a", Resource: ResourceRendered, TransformOptions: JSON{"width": math.NaN()}})
 	if ErrorCode(err) != CodeSDKInvalidArgument {
 		t.Fatal("expected non-finite option error", err)
 	}
 	for _, options := range []JSON{{"Width": 1}, {"border": JSON{"bad-name": 1}}, {"quality": nil}} {
-		_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "a", TransformOptions: options})
+		_, err = c.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "a", Resource: ResourceRendered, TransformOptions: options})
 		if ErrorCode(err) != CodeSDKInvalidArgument {
 			t.Fatal("expected invalid option error", options, err)
 		}
 	}
-	res, err := c.CDN.Serve(context.Background(), CDNServeOptions{CDNAssetURLOptions: CDNAssetURLOptions{AssetIdentifier: "a"}, Headers: http.Header{"X-Api-Key": {"wrong"}, "Range": {"bytes=0-1"}}})
+	res, err := c.CDN.Serve(context.Background(), CDNServeOptions{CDNAssetURLOptions: CDNAssetURLOptions{AssetID: "a"}, Headers: http.Header{"X-Api-Key": {"wrong"}, "Range": {"bytes=0-1"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -636,5 +637,46 @@ func TestOversizedOneRequestUploadsAreRefusedBeforeSending(t *testing.T) {
 	}
 	if len(h.calls) != 1 {
 		t.Fatal("not sent", len(h.calls))
+	}
+}
+
+// GetAssetInfo reads {url}/info without the API key, with the URL's viewer claims unless the
+// options give others, and reports a CDN refusal by its code.
+func TestGetAssetInfoKeepsOrReplacesTheURLsClaims(t *testing.T) {
+	info := `{"id":"asset-1","projectId":"project-1","type":"image","externalUrl":null,"content":{"format":"image/png","width":4,"height":3,"durationSeconds":null,"pageCount":null,"rendered":null,"preview":null,"hls":null},"availability":"age-restricted"}`
+	transport := &scriptedTransport{responses: []scriptedResponse{
+		{Body: json.RawMessage(info)},
+		{Body: json.RawMessage(info)},
+		{Status: 403, Body: json.RawMessage(`{"code":"signed-url/expired","message":"The signed URL has expired"}`), Headers: map[string]string{"content-type": "application/json"}},
+	}}
+	c, err := NewServerClient(Options{APIKey: "key", ProjectID: "project-1", MaxRetries: Ptr(0), HTTPClient: &http.Client{Transport: transport}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	assetURL := "https://cdn.calmlens.com/v1/assets/project-1/sig_00/?viewerClaims=" + url.QueryEscape(`{"region":"DE","ageConfirmed":false}`)
+	got, err := c.CDN.GetAssetInfo(ctx, assetURL, GetAssetInfoOptions{})
+	if err != nil || got.Availability != AssetAvailabilityAgeRestricted || got.Content.Width == nil || *got.Content.Width != 4 {
+		t.Fatal(got, err)
+	}
+	if _, err = c.CDN.GetAssetInfo(ctx, assetURL, GetAssetInfoOptions{ViewerClaims: &ViewerClaims{AgeConfirmed: Ptr(true)}}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.CDN.GetAssetInfo(ctx, "https://cdn.calmlens.com/v1/assets/project-1/sig_00", GetAssetInfoOptions{})
+	if ErrorCode(err) != CodeSignedURLExpired {
+		t.Fatal(err)
+	}
+	want := []string{
+		"/v1/assets/project-1/sig_00/info?viewerClaims=" + url.QueryEscape(`{"region":"DE"}`),
+		"/v1/assets/project-1/sig_00/info?viewerClaims=" + url.QueryEscape(`{"ageConfirmed":true}`),
+		"/v1/assets/project-1/sig_00/info",
+	}
+	for i, request := range transport.received {
+		if got := request.url.RequestURI(); got != want[i] || request.header.Get("X-Api-Key") != "" {
+			t.Errorf("request %d: %s with key %q, want %s without a key", i+1, got, request.header.Get("X-Api-Key"), want[i])
+		}
+	}
+	if _, err = c.CDN.GetAssetInfo(ctx, "/assets/project-1/asset-1", GetAssetInfoOptions{}); ErrorCode(err) != CodeSDKInvalidArgument {
+		t.Fatal("relative URL:", err)
 	}
 }

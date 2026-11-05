@@ -173,7 +173,7 @@ func TestTimeoutDoesNotCutOffUploadsOrDownloads(t *testing.T) {
 	if err != nil || asset.ID != "asset" {
 		t.Fatalf("upload cut off: %v", err)
 	}
-	res, err := client.CDN.Serve(ctx, CDNServeOptions{CDNAssetURLOptions: CDNAssetURLOptions{AssetIdentifier: "asset"}})
+	res, err := client.CDN.Serve(ctx, CDNServeOptions{CDNAssetURLOptions: CDNAssetURLOptions{AssetID: "asset"}})
 	if err != nil {
 		t.Fatal(err)
 	}

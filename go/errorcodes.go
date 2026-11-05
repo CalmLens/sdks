@@ -19,6 +19,8 @@ const (
 	CodeSignedURLExpired = "signed-url/expired"
 	// CodeSignedURLInvalid is returned with HTTP 403.
 	CodeSignedURLInvalid = "signed-url/invalid"
+	// CodeSignedURLOriginalNotGranted is returned with HTTP 403.
+	CodeSignedURLOriginalNotGranted = "signed-url/original-not-granted"
 	// CodeInvalidRequest is returned with HTTP 400.
 	CodeInvalidRequest = "validation/invalid-request"
 	// CodeInvalidType is returned with HTTP 400.
@@ -227,6 +229,7 @@ var publicErrorStatuses = map[string]int{
 	CodeRegionalEvidenceRequired:          403,
 	CodeSignedURLExpired:                  403,
 	CodeSignedURLInvalid:                  403,
+	CodeSignedURLOriginalNotGranted:       403,
 	CodeInvalidRequest:                    400,
 	CodeInvalidType:                       400,
 	CodeTooSmall:                          400,

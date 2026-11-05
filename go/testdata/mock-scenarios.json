@@ -1292,7 +1292,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "blocked.id"
             },
             "resource": "original"
@@ -1307,7 +1307,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "blocked.id"
             },
             "resource": "embed"
@@ -1322,7 +1322,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "other.id"
             },
             "resource": "original"
@@ -1422,7 +1422,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "purged.id"
             },
             "resource": "original"
@@ -1437,7 +1437,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "purged.id"
             },
             "resource": "embed"
@@ -1472,7 +1472,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "decided.id"
             },
             "resource": "original"
@@ -1517,7 +1517,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "decided.id"
             },
             "resource": "original"
@@ -1569,7 +1569,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "kept.id"
             },
             "resource": "original"
@@ -1602,7 +1602,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "temporary.id"
             },
             "resource": "original"
@@ -1633,7 +1633,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "kept.id"
             },
             "resource": "original"
@@ -1674,7 +1674,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "private.id"
             },
             "resource": "original"
@@ -1707,7 +1707,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "original"
@@ -1735,7 +1735,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "private.id"
             },
             "resource": "original"
@@ -1750,7 +1750,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "missing-asset",
+            "assetId": "missing-asset",
             "resource": "original"
           },
           "expect": {
@@ -1799,7 +1799,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "private.id"
             },
             "resource": "original"
@@ -1832,7 +1832,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "original"
@@ -1878,7 +1878,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "original"
@@ -1893,7 +1893,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "original",
@@ -1932,7 +1932,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "private.id"
             },
             "resource": "original",
@@ -1981,7 +1981,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "original"
@@ -2032,7 +2032,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "original"
@@ -2056,7 +2056,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "original"
@@ -4467,9 +4467,21 @@
           }
         },
         {
-          "operation": "assets.createSignedUrl",
+          "operation": "cdn.signAssetUrl",
           "args": {
             "assetId": "asset_00000000000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "cdn.signAssetUrl",
+          "args": {
+            "externalId": "no-such-post"
           },
           "expect": {
             "error": {
@@ -7240,7 +7252,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "accepted.id"
             },
             "resource": "original"
@@ -7255,7 +7267,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "accepted.id"
             },
             "resource": "original"
@@ -8128,7 +8140,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "inParent.id"
             },
             "resource": "original"
@@ -8147,7 +8159,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "inChild.id"
             },
             "resource": "original"
@@ -8162,7 +8174,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "root.id"
             },
             "resource": "original"
@@ -8193,7 +8205,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "inChild.id"
             },
             "resource": "original"
@@ -8212,7 +8224,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "root.id"
             },
             "resource": "original"
@@ -8243,7 +8255,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "inParent.id"
             },
             "resource": "original"
@@ -8272,7 +8284,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "root.id"
             },
             "resource": "original"
@@ -8291,7 +8303,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "inChild.id"
             },
             "resource": "original"
@@ -8316,7 +8328,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "inParent.id"
             },
             "resource": "original"
@@ -8355,7 +8367,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "placeholder"
@@ -8394,7 +8406,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "placeholder"
@@ -8424,7 +8436,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "original"
@@ -8448,7 +8460,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "placeholder"
@@ -8478,7 +8490,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "original"
@@ -8510,7 +8522,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "private.id"
             },
             "resource": "placeholder"
@@ -8540,7 +8552,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "private.id"
             },
             "resource": "original"
@@ -8573,7 +8585,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "queued.id"
             },
             "resource": "placeholder"
@@ -8606,7 +8618,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "note.id"
             },
             "resource": "placeholder"
@@ -8632,7 +8644,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "private.id"
             },
             "resource": "placeholder"
@@ -8667,7 +8679,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "unkept.id"
             },
             "resource": "placeholder"
@@ -8709,7 +8721,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "purged.id"
             },
             "resource": "placeholder"
@@ -8724,7 +8736,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "missing-asset",
+            "assetId": "missing-asset",
             "resource": "placeholder"
           },
           "expect": {
@@ -8765,7 +8777,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "image.id"
             },
             "resource": "rendered",
@@ -8780,7 +8792,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "image.id"
             },
             "resource": "preview",
@@ -8818,7 +8830,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "video.id"
             },
             "resource": "rendered"
@@ -8836,7 +8848,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "video.id"
             },
             "resource": "rendered",
@@ -8895,7 +8907,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "pdf.id"
             },
             "resource": "rendered",
@@ -8933,7 +8945,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "note.id"
             },
             "resource": "rendered"
@@ -8948,7 +8960,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "note.id"
             },
             "resource": "preview"
@@ -8963,7 +8975,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "note.id"
             },
             "resource": "original"
@@ -9011,7 +9023,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "video.id"
             },
             "resource": "hls"
@@ -9026,7 +9038,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "video.id"
             },
             "resource": "embed"
@@ -9041,27 +9053,59 @@
           }
         },
         {
-          "operation": "assets.createSignedUrl",
+          "operation": "cdn.signAssetUrl",
           "args": {
             "assetId": {
               "$ref": "video.id"
             },
             "resource": "hls"
           },
+          "save": "stream",
           "expect": {
             "httpStatus": 200
           }
         },
         {
-          "operation": "assets.createSignedUrl",
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$ref": "stream.url"
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/no-rendered-version"
+            }
+          }
+        },
+        {
+          "operation": "cdn.signAssetUrl",
           "args": {
             "assetId": {
               "$ref": "video.id"
             },
             "resource": "embed"
           },
+          "save": "embed",
           "expect": {
             "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$ref": "embed.url"
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "text/html; charset=utf-8"
+              }
+            }
           }
         },
         {
@@ -9089,7 +9133,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "image.id"
             },
             "resource": "embed"
@@ -9130,7 +9174,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "image.id"
             },
             "resource": "original"
@@ -9182,7 +9226,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "note.id"
             },
             "resource": "original"
@@ -10353,7 +10397,7 @@
           }
         },
         {
-          "operation": "assets.createSignedUrl",
+          "operation": "cdn.signAssetUrl",
           "args": {
             "assetId": {
               "$ref": "a.id"
@@ -10386,7 +10430,7 @@
       ]
     },
     {
-      "name": "a signed URL carries the viewer claims it was signed with",
+      "name": "a signed URL carries the viewer claims as an unsigned query after the resource",
       "mock": {},
       "steps": [
         {
@@ -10404,7 +10448,7 @@
           }
         },
         {
-          "operation": "assets.createSignedUrl",
+          "operation": "cdn.signAssetUrl",
           "args": {
             "assetId": {
               "$ref": "a.id"
@@ -10427,6 +10471,455 @@
               }
             },
             "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "a signed asset URL serves a private asset's resources, and the original only when granted",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "private.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "private"
+          },
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.signAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "expiresIn": 600
+          },
+          "save": "signed",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$concat": [
+                {
+                  "$ref": "signed.url"
+                },
+                "/rendered"
+              ]
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "image/png"
+              }
+            }
+          }
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$concat": [
+                {
+                  "$ref": "signed.url"
+                },
+                "/preview/width=64"
+              ]
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 200
+            }
+          }
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$concat": [
+                {
+                  "$ref": "signed.url"
+                },
+                "/original"
+              ]
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "signed-url/original-not-granted"
+            }
+          }
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$concat": [
+                {
+                  "$ref": "signed.url"
+                },
+                "ff/rendered"
+              ]
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "signed-url/invalid"
+            }
+          }
+        },
+        {
+          "operation": "cdn.signAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "original": true,
+            "resource": "original"
+          },
+          "save": "original",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$ref": "original.url"
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        },
+        {
+          "operation": "cdn.getAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "resource": "rendered"
+          },
+          "save": "public"
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$ref": "public"
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "auth/permission-denied"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an asset URL and a signed URL name the asset by its external ID",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "public.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public",
+            "externalId": "post/1 ✓"
+          },
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "externalId": "post/1 ✓",
+            "resource": "rendered"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "image/png"
+              }
+            }
+          }
+        },
+        {
+          "operation": "cdn.getAssetUrl",
+          "args": {
+            "externalId": "post/1 ✓",
+            "resource": "original"
+          },
+          "save": "public"
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$ref": "public"
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "externalId": "post/1",
+            "resource": "rendered"
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/not-found"
+            }
+          }
+        },
+        {
+          "operation": "cdn.signAssetUrl",
+          "args": {
+            "externalId": "post/1 ✓",
+            "original": true,
+            "resource": "original"
+          },
+          "save": "signed",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$ref": "signed.url"
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an asset URL's info reports the asset's display fields and the viewer's availability",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "public.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.getAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "save": "url"
+        },
+        {
+          "operation": "cdn.getAssetInfo",
+          "args": {
+            "url": {
+              "$ref": "url"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "a.id"
+              },
+              "projectId": "project-1",
+              "type": "image",
+              "availability": "available",
+              "content.rendered.kind": "image",
+              "content.format": "image/png"
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "outcome": "age-restricted"
+          }
+        },
+        {
+          "operation": "cdn.getAssetInfo",
+          "args": {
+            "url": {
+              "$ref": "url"
+            }
+          },
+          "expect": {
+            "result": {
+              "availability": "age-restricted"
+            }
+          }
+        },
+        {
+          "operation": "cdn.getAssetInfo",
+          "args": {
+            "url": {
+              "$ref": "url"
+            },
+            "viewerClaims": {
+              "ageConfirmed": true
+            }
+          },
+          "expect": {
+            "result": {
+              "availability": "available"
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "outcome": "blocked"
+          }
+        },
+        {
+          "operation": "cdn.getAssetInfo",
+          "args": {
+            "url": {
+              "$ref": "url"
+            }
+          },
+          "expect": {
+            "result": {
+              "availability": "unavailable"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "private.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "private"
+          },
+          "save": "private",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.getAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "private.id"
+            }
+          },
+          "save": "privateUrl"
+        },
+        {
+          "operation": "cdn.getAssetInfo",
+          "args": {
+            "url": {
+              "$ref": "privateUrl"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-available",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "cdn.signAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "private.id"
+            }
+          },
+          "save": "signed",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.getAssetInfo",
+          "args": {
+            "url": {
+              "$ref": "signed.url"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "private.id"
+              },
+              "availability": "available"
+            }
           }
         }
       ]
@@ -10456,7 +10949,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "rendered",
@@ -10471,7 +10964,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "rendered",
@@ -10486,7 +10979,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "rendered",
@@ -10502,7 +10995,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "rendered",
@@ -10518,7 +11011,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "rendered",
@@ -10534,7 +11027,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "rendered",
@@ -10550,7 +11043,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "rendered",
@@ -10566,7 +11059,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "rendered",
@@ -10582,7 +11075,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "rendered",
@@ -10598,7 +11091,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": {
+            "assetId": {
               "$ref": "public.id"
             },
             "resource": "rendered",
@@ -10614,7 +11107,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "missing-asset",
+            "assetId": "missing-asset",
             "resource": "rendered",
             "transform": "width="
           },

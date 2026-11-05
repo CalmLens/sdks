@@ -2,13 +2,8 @@ package calmlens
 
 import (
 	"context"
-	"encoding/json"
-	"io"
-	"net/http"
 	"net/url"
-	"slices"
 	"strings"
-	"sync/atomic"
 	"time"
 )
 
@@ -23,9 +18,6 @@ type FoldersService struct{ c *ServerClient }
 
 // EventsService reads the project event feed.
 type EventsService struct{ c *ServerClient }
-
-// CDNService builds CDN URLs and fetches CDN content.
-type CDNService struct{ c *ServerClient }
 
 // Search finds assets by keyword, semantic or hybrid search.
 func (s *AssetsService) Search(ctx context.Context, options SearchAssetsOptions) (*AssetSearchResponse, error) {
@@ -268,42 +260,6 @@ func (s *AssetsService) ListTimeline(ctx context.Context, options ListAssetTimel
 	return &result, nil
 }
 
-// MaxSignedURLSeconds is the longest signed URL lifetime the API accepts: 24 hours.
-const MaxSignedURLSeconds = 24 * 60 * 60
-
-// DefaultSignedURLSeconds is the lifetime CreateSignedURL sends when ExpiresInSeconds is zero.
-const DefaultSignedURLSeconds = 900
-
-// CreateSignedURL returns a short-lived URL for private CDN content.
-func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOptions) (*SignedURL, error) {
-	path, err := resourcePath("assets", options.AssetID, "/signed-url")
-	if err != nil {
-		return nil, err
-	}
-	transform, _, err := transformSelector(options.Transform, options.TransformOptions)
-	if err != nil {
-		return nil, err
-	}
-	if options.Resource != "" && !slices.Contains(SignedCDNResources, options.Resource) {
-		return nil, invalid(CodeSDKInvalidArgument, "a signed URL's resource must be one of "+strings.Join(SignedCDNResources, ", "))
-	}
-	if unselectableCDNResource(options.Resource) && (options.Lens != "" || transform != "") {
-		return nil, invalid(CodeSDKInvalidArgument, "the "+options.Resource+" resource takes no lens or transform")
-	}
-	if options.ExpiresInSeconds < 0 || options.ExpiresInSeconds > MaxSignedURLSeconds {
-		return nil, invalid(CodeSDKInvalidArgument, "ExpiresInSeconds must be from 1 to 86400 (0 for the default)")
-	}
-	options.Transform, options.TransformOptions = transform, nil
-	if options.ExpiresInSeconds == 0 {
-		options.ExpiresInSeconds = DefaultSignedURLSeconds
-	}
-	var result SignedURL
-	if err = s.c.request(ctx, "POST", path, nil, options, &result); err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
 // List returns one page of child folders, sorted by name unless options.Ordering says
 // otherwise. Pass the page's NextCursor as Cursor for the next page.
 func (s *FoldersService) List(ctx context.Context, options ListFoldersOptions) (*FolderPage, error) {
@@ -379,181 +335,6 @@ func (s *EventsService) List(ctx context.Context, options ListEventsOptions) (*E
 		return nil, err
 	}
 	return &result, nil
-}
-
-// cdnResourcePaths are where each resource is served beneath an asset's CDN path. The adaptive
-// stream is its HLS master playlist; its media playlists and segments are the other files
-// beneath hls/.
-var cdnResourcePaths = map[string]string{
-	ResourceOriginal:    "original",
-	ResourceRendered:    "rendered",
-	ResourcePreview:     "preview",
-	ResourceHLS:         "hls/index.m3u8",
-	ResourceEmbed:       "embed",
-	ResourcePlaceholder: "placeholder",
-}
-
-// unselectableCDNResource reports the resources that take no lens or transform: the exact
-// upload, the adaptive stream, the embed page and the public placeholder.
-func unselectableCDNResource(resource string) bool {
-	switch resource {
-	case ResourceOriginal, ResourceHLS, ResourceEmbed, ResourcePlaceholder:
-		return true
-	}
-	return false
-}
-
-// GetAssetURL builds a CDN URL without sending a request.
-func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
-	if options.AssetIdentifier == "" {
-		return "", invalid(CodeSDKInvalidArgument, "asset identifier is required")
-	}
-	transform, _, err := transformSelector(options.Transform, options.TransformOptions)
-	if err != nil {
-		return "", err
-	}
-	transformed := options.Lens != "" || options.Transform != "" || options.TransformOptions != nil
-	if options.Resource == "" {
-		options.Resource = ResourceRendered
-	}
-	cdnPath, ok := cdnResourcePaths[options.Resource]
-	if !ok {
-		return "", invalid(CodeSDKInvalidArgument, "resource must be one of "+strings.Join(SignedCDNResources, ", ")+", "+ResourcePlaceholder)
-	}
-	if unselectableCDNResource(options.Resource) && transformed {
-		return "", invalid(CodeSDKInvalidArgument, "the "+options.Resource+" resource takes no lens or transform")
-	}
-	asset, err := segment(options.AssetIdentifier)
-	if err != nil {
-		return "", err
-	}
-	endpoint := s.c.options.CDNBaseURL + "/assets/" + component(s.c.options.ProjectID) + "/" + asset + "/" + cdnPath
-	var selector []string
-	if options.Lens != "" {
-		lens, err := segment(options.Lens)
-		if err != nil {
-			return "", err
-		}
-		selector = append(selector, "@"+lens)
-	}
-	if options.TransformOptions != nil {
-		// Serialized options are already path-safe: unreserved characters, escapes, "=", "," and ".".
-		selector = append(selector, transform)
-	} else if transform != "" {
-		selector = append(selector, transformPath(transform))
-	}
-	if len(selector) > 0 {
-		endpoint += "/" + strings.Join(selector, ",")
-	}
-	params := url.Values{}
-	if options.ViewerClaims != nil {
-		data, err := json.Marshal(options.ViewerClaims)
-		if err != nil {
-			return "", err
-		}
-		params.Set("viewerClaims", string(data))
-	}
-	if len(params) > 0 {
-		endpoint += "?" + params.Encode()
-	}
-	return endpoint, nil
-}
-
-// Serve fetches CDN content and returns the raw response, including non-2xx statuses. The
-// body is streamed: the caller must close it. Options.Timeout bounds each attempt only until the
-// response headers arrive, so long downloads are not cut off; pass a context with a deadline to
-// bound the whole download. GET and HEAD requests are retried like API reads (429, 500, 502, 503, 504
-// and transport failures, honouring Retry-After); when retries run out, the last response is
-// returned. A redirect is never followed: it fails with sdk/http-error and its status.
-func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.Response, error) {
-	endpoint, err := s.GetAssetURL(options.CDNAssetURLOptions)
-	if err != nil {
-		return nil, err
-	}
-	method := options.Method
-	if method == "" {
-		method = "GET"
-	}
-	retryable := method == http.MethodGet || method == http.MethodHead
-	for attempt := 0; ; attempt++ {
-		canRetry := retryable && attempt < s.c.maxRetries
-		response, err := s.attempt(ctx, method, endpoint, options.Headers)
-		if err != nil {
-			sdkErr, ok := err.(*Error)
-			if !ok || !canRetry || !sdkErr.Retryable() || ctx.Err() != nil {
-				return nil, err
-			}
-			if waitErr := s.c.sleep(ctx, backoff(attempt)); waitErr != nil {
-				return nil, transportError(waitErr)
-			}
-			continue
-		}
-		if isRedirect(response) {
-			response.Body.Close()
-			return nil, redirectError(response)
-		}
-		if response.StatusCode >= 200 && response.StatusCode < 300 || !canRetry {
-			return response, nil
-		}
-		failure := &Error{Status: response.StatusCode, RetryAfter: parseRetryAfter(response.Header.Get("Retry-After"), s.c.now())}
-		delay, wait := retryDelay(failure, attempt)
-		if !failure.Retryable() || !wait {
-			return response, nil
-		}
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
-		response.Body.Close()
-		if waitErr := s.c.sleep(ctx, delay); waitErr != nil {
-			return nil, transportError(waitErr)
-		}
-	}
-}
-
-// attempt sends one CDN request. Options.Timeout ends when the response headers arrive.
-func (s *CDNService) attempt(ctx context.Context, method, endpoint string, headers http.Header) (*http.Response, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	var timedOut atomic.Bool
-	timer := time.AfterFunc(s.c.options.Timeout, func() {
-		timedOut.Store(true)
-		cancel()
-	})
-	req, err := http.NewRequestWithContext(ctx, method, endpoint, nil)
-	if err != nil {
-		timer.Stop()
-		cancel()
-		return nil, argumentError("Could not build the CDN request", err)
-	}
-	req.Header = headers.Clone()
-	if req.Header == nil {
-		req.Header = http.Header{}
-	}
-	req.Header.Set("X-Api-Key", s.c.options.APIKey)
-	req.Header.Set("User-Agent", userAgent)
-	response, err := s.c.http.Do(req)
-	if !timer.Stop() && timedOut.Load() {
-		cancel()
-		if response != nil {
-			response.Body.Close()
-		}
-		return nil, &Error{Code: CodeSDKTimeout, Message: "CDN request timed out", Cause: context.DeadlineExceeded}
-	}
-	if err != nil {
-		cancel()
-		return nil, transportError(err)
-	}
-	response.Body = &cancelOnClose{ReadCloser: response.Body, cancel: cancel}
-	return response, nil
-}
-
-// cancelOnClose releases a CDN request's context once its body is closed.
-type cancelOnClose struct {
-	io.ReadCloser
-	cancel context.CancelFunc
-}
-
-func (b *cancelOnClose) Close() error {
-	err := b.ReadCloser.Close()
-	b.cancel()
-	return err
 }
 
 // Classify moderates plain text and waits for the decision.

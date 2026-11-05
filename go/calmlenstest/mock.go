@@ -110,9 +110,10 @@ type Options struct {
 	// processing removes content unless the upload set
 	// ProcessingOptions.KeepContentAfterProcessing. Moderate runs while the mock answers a
 	// request, so it must not call the mock.
-	Moderate         func(ModerationInput) *Decision
-	CDNBaseURL       string
-	SignedURLBaseURL string
+	Moderate func(ModerationInput) *Decision
+	// CDNBaseURL defaults to https://mock.calmlens.invalid/v1. CDN.SignAssetURL returns asset URLs
+	// beneath it, which only the mock's CDN accepts.
+	CDNBaseURL string
 }
 
 // CapturedRequest is a request the client sent to the mock, already decoded.
@@ -599,9 +600,6 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 	if options.CDNBaseURL == "" {
 		options.CDNBaseURL = "https://mock.calmlens.invalid/v1"
 	}
-	if options.SignedURLBaseURL == "" {
-		options.SignedURLBaseURL = "https://mock.calmlens.invalid"
-	}
 	if options.MaxRetries == nil {
 		options.MaxRetries = calmlens.Ptr(0)
 	}
@@ -843,6 +841,9 @@ func validIdempotencyKey(key string) bool {
 // FailNextRequest.
 func operationsOf(method string, parts []string, q url.Values, cdn bool) []string {
 	if cdn {
+		if len(parts) >= 4 && parts[3] == calmlens.ResourceInfo {
+			return []string{"cdn.getAssetInfo"}
+		}
 		return []string{"cdn.serve"}
 	}
 	if len(parts) >= 3 && parts[0] == "projects" {
@@ -881,6 +882,8 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 			return []string{"assets.search"}
 		case route == "assets/batch":
 			return []string{"assets.batch"}
+		case route == "signed-asset-urls":
+			return []string{"cdn.signAssetUrl"}
 		case len(parts) == 5 && parts[2] == "assets" && parts[4] == "timeline":
 			return []string{"assets.listTimeline"}
 		case route == "assets" && q.Get("queue") == "false":
@@ -932,8 +935,6 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 		return []string{"assets.removeContent"}
 	case suffix == "children":
 		return []string{"assets.listChildren", "assets.iterateChildren"}
-	case suffix == "signed-url":
-		return []string{"assets.createSignedUrl"}
 	case suffix == "part":
 		return []string{"assets.uploadPart"}
 	case suffix == "decision":
@@ -948,9 +949,9 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 var mockOperations = []string{
 	"assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision",
 	"assets.update", "assets.listChildren", "assets.iterateChildren", "assets.listTimeline",
-	"assets.create", "assets.classify", "assets.uploadPart", "assets.createSignedUrl", "assets.move", "assets.retry",
+	"assets.create", "assets.classify", "assets.uploadPart", "assets.move", "assets.retry",
 	"assets.explain", "assets.decide", "assets.removeContent", "assets.delete", "assets.batch",
-	"text.classify", "cdn.serve", "events.list", "events.pages", "folders.list", "folders.retrieve",
+	"text.classify", "cdn.serve", "cdn.getAssetInfo", "cdn.signAssetUrl", "events.list", "events.pages", "folders.list", "folders.retrieve",
 	"folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
 	"hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete",
 	"hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "policies.list",
@@ -1164,6 +1165,8 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 			return m.search(q)
 		case route == "assets/batch" && method == "POST":
 			return m.batchAssets(body, now)
+		case route == "signed-asset-urls" && method == "POST":
+			return m.signAssetURL(body, now)
 		case len(parts) == 5 && parts[2] == "assets" && parts[4] == "timeline" && method == "GET":
 			return m.listTimeline(parts[3], q)
 		case route == "assets" && method == "POST":
@@ -1998,20 +2001,6 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		if value, ok := body["name"]; ok && value == nil {
 			return nil, validation("validation/invalid-type", "name")
 		}
-	case method == "POST" && suffix == "signed-url":
-		// None of these fields takes null.
-		for _, key := range []string{"viewerClaims", "resource", "lens", "transform", "expiresInSeconds"} {
-			if value, ok := body[key]; ok && value == nil {
-				code := "validation/invalid-type"
-				if key == "resource" {
-					code = "validation/invalid-value"
-				}
-				return nil, validation(code, key)
-			}
-		}
-		if resource, ok := body["resource"]; ok && !contains(calmlens.SignedCDNResources, text(resource)) {
-			return nil, validation("validation/invalid-value", "resource")
-		}
 	}
 	a, err := m.asset(id)
 	if err != nil {
@@ -2042,24 +2031,6 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		m.requestContentRemoval(a, now, "")
 	case method == "GET" && suffix == "children":
 		return m.page(func(child calmlens.JSON) bool { return child["parentId"] == id }, q, "children:"+id)
-	case method == "POST" && suffix == "signed-url":
-		params := url.Values{"expiresInSeconds": {fmt.Sprint(body["expiresInSeconds"])}}
-		for _, key := range []string{"lens", "transform"} {
-			if value := text(body[key]); value != "" {
-				params.Set(key, value)
-			}
-		}
-		// Like the API, the URL carries the viewer claims its signature covers.
-		if claims, ok := body["viewerClaims"].(map[string]any); ok {
-			encoded, _ := json.Marshal(claims)
-			params.Set("viewerClaims", string(encoded))
-		}
-		// Like the API, the resource defaults to rendered.
-		resource := text(body["resource"])
-		if resource == "" {
-			resource = calmlens.ResourceRendered
-		}
-		return calmlens.JSON{"url": m.options.SignedURLBaseURL + "/assets/" + id + "/" + resource + "?" + params.Encode(), "expiresAt": now + int64(number(body["expiresInSeconds"])*1000)}, nil
 	case method == "POST" && suffix == "retry":
 		classification := section(a, "classification")
 		if classification["status"] != calmlens.ClassificationStatusFailed || section(classification, "moderation")["status"] != calmlens.ModerationStatusPending {
@@ -2614,27 +2585,58 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	}
 	lens, transform, ok := contract.ParseTransformSelector(selectorText)
 	hasSelector := lens != "" || transform != nil
-	if !ok || (resource == calmlens.ResourceOriginal || resource == calmlens.ResourceEmbed) && hasSelector {
+	if !ok || (resource == calmlens.ResourceOriginal || resource == calmlens.ResourceEmbed || resource == calmlens.ResourceInfo) && hasSelector {
 		return invalidTransform()
 	}
 	if len(parts) < 4 || parts[0] != "assets" || parts[1] != m.options.ProjectID {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 	}
-	id := parts[2]
-	var asset calmlens.JSON
-	for _, a := range m.DatabaseStorage.Assets {
-		if a["projectId"] == m.options.ProjectID && (a["id"] == id || a["externalId"] == id) {
-			asset = a
-			break
+	// Like the CDN (CdnUtils.ts), the asset is "ext:" and its URL-encoded external ID, a grant
+	// ("sig_…") or its ID.
+	find := func(match func(calmlens.JSON) bool) calmlens.JSON {
+		for _, a := range m.DatabaseStorage.Assets {
+			if a["projectId"] == m.options.ProjectID && match(a) {
+				return a
+			}
 		}
+		return nil
+	}
+	var grant *mockGrant
+	var asset calmlens.JSON
+	switch raw := escaped[2]; {
+	case strings.HasPrefix(raw, "sig_"):
+		decoded, ok := decodeMockGrant(raw)
+		if !ok {
+			return errorBody(http.StatusForbidden, calmlens.CodeSignedURLInvalid, "The signed asset URL's grant is invalid")
+		}
+		if decoded.expiresAt <= m.options.Now() {
+			return errorBody(http.StatusForbidden, calmlens.CodeSignedURLExpired, "The signed URL has expired")
+		}
+		grant = &decoded
+		asset = find(func(a calmlens.JSON) bool { return a["id"] == decoded.assetID })
+	case strings.HasPrefix(raw, externalIDPrefix):
+		if external, err := url.PathUnescape(strings.TrimPrefix(raw, externalIDPrefix)); err == nil && external != "" {
+			asset = find(func(a calmlens.JSON) bool { return a["externalId"] == external })
+		}
+	default:
+		asset = find(func(a calmlens.JSON) bool { return a["id"] == parts[2] })
 	}
 	if asset == nil {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 	}
+	if resource == calmlens.ResourceOriginal && grant != nil && !grant.original {
+		return errorBody(http.StatusForbidden, calmlens.CodeSignedURLOriginalNotGranted, "This signed asset URL doesn't grant the original file")
+	}
 	notAvailable := func() (int, []byte, string) {
 		return errorBody(http.StatusForbidden, "asset/not-available", "Asset is not available")
 	}
-	canDownload := func() bool { return m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key")) }
+	// A grant authorises a private asset without the API key.
+	canDownload := func() bool {
+		return grant != nil || m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key"))
+	}
+	if resource == calmlens.ResourceInfo {
+		return m.serveInfo(req, asset, canDownload(), header)
+	}
 	moderation := section(section(asset, "classification"), "moderation")["status"]
 	tag := "asset-" + text(asset["id"])
 	content := section(asset, "content")
@@ -2772,6 +2774,53 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 		header.Set("Content-Disposition", "attachment")
 	}
 	return http.StatusOK, data, contentType
+}
+
+// serveInfo answers /info like the CDN (AssetInfo.ts): the allowlisted fields and whether the
+// viewer the claims describe can see the content, decided as the other resources decide it. A
+// private asset's info needs a grant or an API key with assets:download.
+func (m *MockServerClient) serveInfo(req *http.Request, asset calmlens.JSON, authorised bool, header http.Header) (int, []byte, string) {
+	errorBody := func(status int, code, message string) (int, []byte, string) {
+		data, _ := json.Marshal(calmlens.JSON{"code": code, "message": message})
+		return status, data, "application/json"
+	}
+	private := asset["visibility"] != calmlens.VisibilityPublic
+	if private && !authorised {
+		return errorBody(http.StatusNotFound, "asset/not-available", "Asset is not available")
+	}
+	claims := map[string]any{}
+	if raw := req.URL.Query().Get("viewerClaims"); raw != "" && json.Unmarshal([]byte(raw), &claims) != nil {
+		return errorBody(http.StatusBadRequest, calmlens.CodeInvalidViewerClaims, "Invalid viewer claims")
+	}
+	content := section(asset, "content")
+	classification := section(asset, "classification")
+	moderation := section(classification, "moderation")["status"]
+	availability := calmlens.AssetAvailabilityAvailable
+	switch {
+	case content["safetyHold"] != nil, section(asset, "upload")["status"] == "uploading",
+		moderation == calmlens.ModerationStatusBlocked, moderation == calmlens.ModerationStatusPurged,
+		classification["status"] == calmlens.ClassificationStatusFailed, content["status"] == calmlens.ContentStatusRemoved:
+		availability = calmlens.AssetAvailabilityUnavailable
+	case moderation == calmlens.ModerationStatusAgeRestricted && claims["ageConfirmed"] != true:
+		availability = calmlens.AssetAvailabilityAgeRestricted
+	}
+	info := calmlens.JSON{
+		"id": asset["id"], "projectId": asset["projectId"], "type": asset["type"], "externalUrl": asset["externalUrl"],
+		"content": calmlens.JSON{
+			"format": content["format"], "width": content["width"], "height": content["height"],
+			"durationSeconds": content["durationSeconds"], "pageCount": content["pageCount"],
+			"rendered": content["rendered"], "preview": content["preview"], "hls": content["hls"],
+		},
+		"availability": availability,
+	}
+	data, _ := json.Marshal(info)
+	access := "public"
+	if private {
+		access = "private"
+	}
+	header.Set("Cache-Control", access+", max-age=60")
+	header.Set("Cache-Tag", "asset-"+text(asset["id"]))
+	return http.StatusOK, data, "application/json"
 }
 
 // activeContentType reports content a browser could run as a document, which the CDN serves as

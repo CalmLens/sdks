@@ -9,7 +9,6 @@ package calmlens
 import (
 	"encoding/json"
 	"io"
-	"net/http"
 	"time"
 )
 
@@ -1166,7 +1165,7 @@ type MoveAssetOptions struct {
 const (
 	// ResourceOriginal is the asset's original file. It takes no Lens, Transform or TransformOptions.
 	ResourceOriginal = "original"
-	// ResourceRendered is the default: the asset's displayable file (an image in the best format
+	// ResourceRendered is the asset's displayable file (an image in the best format
 	// the client accepts, a PDF, or browser-safe video or audio). It takes a Lens, Transform or
 	// TransformOptions only when it is an image; the CDN refuses them otherwise with
 	// transform/invalid.
@@ -1175,8 +1174,8 @@ const (
 	// or an audio waveform. It takes a Lens, Transform or TransformOptions.
 	ResourcePreview = "preview"
 	// ResourceHLS (preview) is the adaptive stream of audio or video, its HLS master playlist at
-	// hls/index.m3u8, once Content.HLS is set; one signature covers every playlist and segment
-	// beneath hls/. It takes no Lens, Transform or TransformOptions.
+	// hls/index.m3u8, once Content.HLS is set; beneath a signed asset URL, its grant covers every
+	// playlist and segment beneath hls/. It takes no Lens, Transform or TransformOptions.
 	ResourceHLS = "hls"
 	// ResourceEmbed (preview) is an HTML page that shows the asset, for an iframe: a player for
 	// audio and video, or the viewer for its type. It takes no Lens, Transform or
@@ -1185,32 +1184,11 @@ const (
 	// ResourcePlaceholder is a small blurred PNG, public for every asset whatever its visibility
 	// or moderation status. It takes no Lens, Transform or TransformOptions, and needs no age confirmation.
 	ResourcePlaceholder = "placeholder"
+	// ResourceInfo is the asset's display info as JSON (AssetInfo): its type, size, rendered file,
+	// preview and stream, and whether the viewer its claims describe can see it. CDN.GetAssetInfo
+	// fetches it. It takes no Lens, Transform or TransformOptions.
+	ResourceInfo = "info"
 )
-
-// SignedCDNResources are the CDN resources a signed URL can be created for.
-var SignedCDNResources = []string{ResourceOriginal, ResourceRendered, ResourcePreview, ResourceHLS, ResourceEmbed}
-
-// SignedURLOptions requests a signed CDN URL. Resource is one of SignedCDNResources:
-// ResourceRendered (the server's default when empty), ResourcePreview, or ResourceOriginal,
-// ResourceHLS or ResourceEmbed, which take no lens or transform. ExpiresInSeconds
-// defaults to 900. Transform (options such as "format=png,width=1024") or TransformOptions
-// (ImageTransformOptions, serialized to the same selector) applies in one pass; with a Lens, its
-// options replace the lens's. Supply only one transform representation.
-type SignedURLOptions struct {
-	ViewerClaims     *ViewerClaims `json:"viewerClaims,omitempty"`
-	AssetID          string        `json:"-"`
-	Resource         string        `json:"resource,omitempty"`
-	Lens             string        `json:"lens,omitempty"`
-	Transform        string        `json:"transform,omitempty"`
-	TransformOptions any           `json:"-"`
-	ExpiresInSeconds int           `json:"expiresInSeconds"`
-}
-
-// SignedURL is a signed CDN URL and its expiry in unix milliseconds.
-type SignedURL struct {
-	URL       string `json:"url"`
-	ExpiresAt int64  `json:"expiresAt"`
-}
 
 // Folder is an asset folder.
 type Folder struct {
@@ -1487,36 +1465,6 @@ type EventsPage struct {
 	ExcludedTypes []string `json:"excludedTypes"`
 }
 
-// CDNAssetURLOptions identifies CDN content. AssetIdentifier is an asset ID or external
-// ID; Resource is ResourceRendered (default), ResourceOriginal, ResourcePreview, ResourceHLS,
-// ResourceEmbed or ResourcePlaceholder. Only ResourcePreview and ResourceRendered take a lens or
-// transform, applied in one pass; transform options replace the lens's same-named options. Supply Transform (options such as "format=png,width=1024") or TransformOptions
-// (ImageTransformOptions, or any value that encodes as a JSON object with the same option
-// names; one with no options is rejected), not both.
-type CDNAssetURLOptions struct {
-	ViewerClaims     *ViewerClaims
-	AssetIdentifier  string
-	Resource         string
-	Lens             string
-	Transform        string
-	TransformOptions any
-	// ViewerClaims with AgeConfirmed pointing to true appends a viewerClaims query parameter
-	// containing {"ageConfirmed":true}. The CDN requires it before it serves an asset whose
-	// moderation status is age-restricted, even with a signed URL or an API key. Set it only
-	// where your app has already decided the viewer may see age-restricted content. Your
-	// platform confirms the viewer's age; CalmLens does not verify this claim, and anyone can add
-	// it to a public URL. To control who loads an age-restricted asset, make it private and sign
-	// the claim into a signed URL.
-}
-
-// CDNServeOptions fetches CDN content with an optional method and extra headers (such as
-// Range).
-type CDNServeOptions struct {
-	CDNAssetURLOptions
-	Method  string
-	Headers http.Header
-}
-
 // Ptr conveniently supplies optional scalar fields.
 func Ptr[T any](value T) *T { return &value }
 
@@ -1652,13 +1600,15 @@ type FolderPage struct {
 	Ordering   []Order  `json:"ordering"`
 }
 
-// ViewerClaims are optional customer assertions. Age confirmation defaults to false.
+// ViewerClaims are optional customer assertions that a CDN URL carries, unsigned, in its
+// viewerClaims query. Region is the viewer's country (an ISO 3166-1 alpha-2 code such as "DE");
+// age confirmation defaults to false. The defaults (no region, AgeConfirmed nil or false) are
+// left out of URLs, so default URLs stay cacheable.
 //
 // AgeConfirmed is your platform's confirmation that the viewer passed its age check. Your
-// platform confirms the viewer's age; CalmLens does not verify this claim. Anyone requesting a
-// public asset's URL can set it, so it doesn't restrict access: to control who loads an
-// age-restricted asset, make it private and include the claim in a signed URL, whose signature
-// covers it.
+// platform confirms the viewer's age; CalmLens does not verify this claim, and anyone holding a
+// URL, signed or not, can add it. Set it only where your app has already decided the viewer may
+// see age-restricted content.
 type ViewerClaims struct {
 	Region       string `json:"region,omitempty"`
 	AgeConfirmed *bool  `json:"ageConfirmed,omitempty"`

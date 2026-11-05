@@ -139,7 +139,7 @@ func checkTransformRefused(t *testing.T, options any, unknownKeys, invalidKeys [
 	if err != nil {
 		t.Fatal(err)
 	}
-	endpoint, err := client.CDN.GetAssetURL(CDNAssetURLOptions{AssetIdentifier: "asset-1", TransformOptions: options})
+	endpoint, err := client.CDN.GetAssetURL(CDNAssetURLOptions{AssetID: "asset-1", Resource: ResourceRendered, TransformOptions: options})
 	var refused *Error
 	if !errors.As(err, &refused) || refused.Code != CodeSDKInvalidArgument {
 		t.Fatalf("got %q, %v; want %s", endpoint, err, CodeSDKInvalidArgument)
@@ -466,7 +466,13 @@ func payloadName(raw json.RawMessage) string {
 
 // Typed options that cannot hold the fixture's value: Go's type already refuses the request.
 var rejectedByType = map[string]string{
-	"signed URL lifetime of a fraction of a second": "SignedURLOptions.ExpiresInSeconds is an int",
+	"signed URL lifetime of a fraction of a second": "SignAssetURLOptions.ExpiresIn is an int",
+}
+
+// Values Go's typed options give another meaning: ExpiresIn of 0 is the default lifetime, so the
+// request carries a valid value for the API to accept.
+var meansDefault = map[string]string{
+	"signed URL lifetime below 1 second": "SignAssetURLOptions.ExpiresIn of 0 means DefaultSignedURLExpiresIn",
 }
 
 // TestRejections replays testdata/rejections.json (packages/sdk-contract/surface.ts): requests the
@@ -482,9 +488,15 @@ func TestRejections(t *testing.T) {
 		t.Run(rejection.Name, func(t *testing.T) {
 			args := decodeArgs(t, rejection.Options)
 			if reason, typed := rejectedByType[rejection.Name]; typed {
-				var options SignedURLOptions
+				var options SignAssetURLOptions
 				if json.Unmarshal(rejection.Options, &options) == nil {
 					t.Fatalf("%s, yet the options decoded", reason)
+				}
+				t.Skip(reason)
+			}
+			if reason, ok := meansDefault[rejection.Name]; ok {
+				if expiresIn, _ := args["expiresIn"].(float64); expiresIn != 0 {
+					t.Fatalf("%s, yet expiresIn is %v", reason, args["expiresIn"])
 				}
 				t.Skip(reason)
 			}

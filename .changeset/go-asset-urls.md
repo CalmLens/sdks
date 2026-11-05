@@ -1,0 +1,12 @@
+---
+"@calmlens/sdk-go": minor
+---
+
+One URL per asset: every CDN resource is a path beneath it, signed or not.
+
+- `CDN.GetAssetURL` returns the asset URL itself, `{CDNBaseURL}/assets/{projectId}/{asset}`, when `Resource` is empty, and a resource URL beneath it otherwise. Name the asset by exactly one of `AssetID` and `ExternalID` (the external ID it was uploaded with, written `ext:` and the URL-encoded ID); `ProjectID` defaults to the client's project. `AssetIdentifier` is removed, and a lens or transform without a resource fails with `sdk/invalid-argument`. Viewer claims leave out their defaults: a `Region` only when set, which must be a country code, and `AgeConfirmed` only when true.
+- `CDN.SignAssetURL(ctx, SignAssetURLOptions)` replaces `Assets.CreateSignedURL`, `SignedURLOptions`, `SignedURL` and `SignedCDNResources`. It signs a private asset's URL (by `AssetID` or `ExternalID`) for `ExpiresIn` seconds, from 1 to `MaxSignedURLExpiresIn` (24 hours; 0 sends `DefaultSignedURLExpiresIn`, 15 minutes), and returns a `SignedAssetURL` with `URL` and `ExpiresAt`. Every resource is served beneath the signed URL; the original only when signed with `Original`. `Resource`, `Lens`, `Transform`, `TransformOptions` and `ViewerClaims` aren't signed: they are appended as `CDN.GetAssetURL` appends them. `MaxSignedURLSeconds` and `DefaultSignedURLSeconds` are removed.
+- The new `info` resource (`ResourceInfo`) and `CDN.GetAssetInfo(ctx, url, GetAssetInfoOptions)` read an asset URL's display info: an `AssetInfo` with the asset's `ID`, `ProjectID`, `Type`, `ExternalURL`, `Content` (format, size, duration, page count, rendered file, preview and stream) and `Availability` (`AssetAvailabilityAvailable`, `AssetAvailabilityAgeRestricted` or `AssetAvailabilityUnavailable`) for the URL's viewer claims, or those the options give. It sends no API key; a refusal fails with the CDN's code, such as `signed-url/expired`.
+- `CDN.Serve` takes the same asset options; its resource defaults to `ResourceRendered`.
+- `CodeSignedURLOriginalNotGranted` (`signed-url/original-not-granted`, HTTP 403) is returned for the original beneath a signed URL that doesn't grant it.
+- The `calmlenstest` mock signs asset URLs beneath its `CDNBaseURL` with a readable grant, and its CDN serves them: private assets without the API key until the grant expires, the original only when granted, assets by external ID, and `info`. `MockServerClient.FetchCDN` fetches a mock CDN URL as a browser would, without the API key. `Options.SignedURLBaseURL` is removed.

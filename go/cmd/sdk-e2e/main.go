@@ -68,14 +68,24 @@ func invoke(c *sdk.ServerClient, cmd command) (any, error) {
 		return decode(cmd.Options, func(o sdk.AssetIDOptions) (any, error) { return nil, c.Assets.Delete(ctx, o) })
 	case "assets.move":
 		return decode(cmd.Options, func(o sdk.MoveAssetOptions) (any, error) { return c.Assets.Move(ctx, o) })
-	case "assets.createSignedUrl":
-		return decode(cmd.Options, func(o sdk.SignedURLOptions) (any, error) {
-			var id sdk.AssetIDOptions
-			if err := json.Unmarshal(cmd.Options, &id); err != nil {
-				return nil, err
-			}
-			o.AssetID = id.AssetID
-			return c.Assets.CreateSignedURL(ctx, o)
+	case "cdn.signAssetUrl":
+		return decode(cmd.Options, func(o signAssetURLCommand) (any, error) {
+			options := o.SignAssetURLOptions
+			options.Transform, options.TransformOptions = o.transform()
+			return c.CDN.SignAssetURL(ctx, options)
+		})
+	case "cdn.getAssetUrl":
+		return decode(cmd.Options, func(o assetURLCommand) (any, error) {
+			options := o.CDNAssetURLOptions
+			options.Transform, options.TransformOptions = o.transform()
+			return c.CDN.GetAssetURL(options)
+		})
+	case "cdn.getAssetInfo":
+		return decode(cmd.Options, func(o struct {
+			URL          string
+			ViewerClaims *sdk.ViewerClaims
+		}) (any, error) {
+			return c.CDN.GetAssetInfo(ctx, o.URL, sdk.GetAssetInfoOptions{ViewerClaims: o.ViewerClaims})
 		})
 	case "folders.create":
 		return decode(cmd.Options, func(o sdk.CreateFolderOptions) (any, error) { return c.Folders.Create(ctx, o) })
@@ -98,6 +108,35 @@ func invoke(c *sdk.ServerClient, cmd command) (any, error) {
 	default:
 		return nil, fmt.Errorf("unsupported adapter operation: %s", cmd.Operation)
 	}
+}
+
+// transformOption is a command's transform: a selector string or structured options.
+type transformOption struct {
+	Transform json.RawMessage `json:"transform"`
+}
+
+func (o transformOption) transform() (string, any) {
+	var selector string
+	if json.Unmarshal(o.Transform, &selector) == nil {
+		return selector, nil
+	}
+	var options map[string]any
+	if json.Unmarshal(o.Transform, &options) == nil && options != nil {
+		return "", options
+	}
+	return "", nil
+}
+
+// signAssetURLCommand holds cdn.signAssetUrl's options, whose transform is a string or an object.
+type signAssetURLCommand struct {
+	sdk.SignAssetURLOptions
+	transformOption
+}
+
+// assetURLCommand holds cdn.getAssetUrl's options, whose transform is a string or an object.
+type assetURLCommand struct {
+	sdk.CDNAssetURLOptions
+	transformOption
 }
 
 // A page as the API and the other SDKs report it: the SDK's empty NextCursor (no next page) is

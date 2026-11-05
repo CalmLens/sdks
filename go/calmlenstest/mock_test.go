@@ -80,7 +80,7 @@ func TestMockLifecycle(t *testing.T) {
 	if err != nil || failed.Classification.Status != calmlens.ClassificationStatusProcessing || failed.Classification.FailureReason != nil {
 		t.Fatal(failed, err)
 	}
-	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID}})
+	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: a.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestMockLifecycle(t *testing.T) {
 		t.Fatal(res.StatusCode)
 	}
 	c.DatabaseStorage.Assets[a.ID]["visibility"] = "public"
-	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: calmlens.ResourceOriginal}})
+	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: a.ID, Resource: calmlens.ResourceOriginal}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,17 +98,52 @@ func TestMockLifecycle(t *testing.T) {
 	if string(body) != "hello" || res.StatusCode != 200 {
 		t.Fatal(string(body), res.StatusCode)
 	}
-	signed, err := c.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{AssetID: a.ID, ExpiresInSeconds: 1})
+	signed, err := c.CDN.SignAssetURL(ctx, calmlens.SignAssetURLOptions{AssetID: a.ID, ExpiresIn: 1})
 	if err != nil || signed.ExpiresAt != 1123 {
 		t.Fatal(signed, err)
 	}
-	signed, err = c.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{AssetID: a.ID, TransformOptions: calmlens.JSON{"width": 64, "border": calmlens.JSON{"color": "#fff"}}})
+}
+
+// A grant serves until its expiry, then the CDN refuses it; a held asset can't be signed.
+func TestMockSignedAssetURLExpiresAndHeldAssetsAreNotSigned(t *testing.T) {
+	now := int64(1000)
+	c, err := NewServerClient(Options{Now: func() int64 { return now }})
 	if err != nil {
 		t.Fatal(err)
 	}
-	signedURL, err := url.Parse(signed.URL)
-	if err != nil || signedURL.Query().Get("transform") != "border.color=fff,width=64" {
-		t.Fatal(signed.URL, err)
+	ctx := context.Background()
+	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "a.png", Visibility: calmlens.VisibilityPrivate,
+		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)},
+		Content:           &calmlens.Content{Type: "image/png", Bytes: []byte("hello")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := c.CDN.SignAssetURL(ctx, calmlens.SignAssetURLOptions{AssetID: a.ID, ExpiresIn: 60, Original: true, Resource: calmlens.ResourceOriginal})
+	if err != nil || signed.ExpiresAt != 61000 {
+		t.Fatal(signed, err)
+	}
+	fetch := func() (int, string) {
+		res, err := c.FetchCDN(ctx, signed.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		var failure struct{ Code string }
+		body, _ := io.ReadAll(res.Body)
+		_ = json.Unmarshal(body, &failure)
+		return res.StatusCode, failure.Code
+	}
+	now = signed.ExpiresAt - 1
+	if status, code := fetch(); status != http.StatusOK {
+		t.Fatal("before expiry:", status, code)
+	}
+	now = signed.ExpiresAt
+	if status, code := fetch(); status != http.StatusForbidden || code != calmlens.CodeSignedURLExpired {
+		t.Fatal("at expiry:", status, code)
+	}
+	c.DatabaseStorage.Assets[a.ID]["content"].(calmlens.JSON)["safetyHold"] = calmlens.JSON{"reason": "csam-suspected"}
+	if _, err = c.CDN.SignAssetURL(ctx, calmlens.SignAssetURLOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetHeld {
+		t.Fatal("signed a held asset:", err)
 	}
 }
 func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
@@ -396,7 +431,7 @@ func TestMockServesStandInBytesForRenderedFilesAndPreviews(t *testing.T) {
 		{calmlens.ResourceRendered, "", "audio/mp4", "hello", "public, max-age=3600"},
 		{calmlens.ResourcePreview, "width=10", "image/png", string(placeholder), "public, max-age=31536000, immutable"},
 	} {
-		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: tc.resource, Transform: tc.transform}})
+		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: a.ID, Resource: tc.resource, Transform: tc.transform}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -408,14 +443,6 @@ func TestMockServesStandInBytesForRenderedFilesAndPreviews(t *testing.T) {
 		if immutable := strings.Contains(tc.cache, "immutable"); (res.Header.Get("ETag") != "") != immutable || (res.Header.Get("Expires") != "") != immutable {
 			t.Fatalf("%s: ETag %q, Expires %q", tc.resource, res.Header.Get("ETag"), res.Header.Get("Expires"))
 		}
-	}
-	if _, err = c.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{AssetID: a.ID, Resource: calmlens.ResourcePreview, Lens: "thumb"}); err != nil {
-		t.Fatal("signed preview:", err)
-	}
-	// Like the API, a resource outside the signed list is refused before the asset is looked up.
-	_, err = c.dispatch("POST", []string{"assets", "asset_00000000000000000000", "signed-url"}, nil, []byte(`{"resource":"placeholder"}`), http.Header{"Content-Type": {"application/json"}})
-	if refused, ok := err.(*apiError); !ok || refused.code != calmlens.CodeInvalidRequest || !reflect.DeepEqual(withoutIssueMessages(refused.details), issue("validation/invalid-value", "resource")) {
-		t.Fatal(err)
 	}
 }
 
@@ -429,7 +456,7 @@ func TestMockServesTheEmbedPageOfAnyAssetButNoHLSStream(t *testing.T) {
 	if err != nil || a.Content.Rendered != nil {
 		t.Fatal(a, err)
 	}
-	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: calmlens.ResourceEmbed}})
+	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: a.ID, Resource: calmlens.ResourceEmbed}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -473,7 +500,7 @@ func TestMockServesTheEmbedPageOfAnyAssetButNoHLSStream(t *testing.T) {
 	if _, err = c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: a.ID, Decision: calmlens.ModerationStatusBlocked, Note: "Blocked"}); err != nil {
 		t.Fatal(err)
 	}
-	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: calmlens.ResourceEmbed}})
+	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: a.ID, Resource: calmlens.ResourceEmbed}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -496,7 +523,7 @@ func TestMockSafetyHoldWithholdsEveryResourceAndTheTimeline(t *testing.T) {
 		db.Assets[a.ID]["content"].(calmlens.JSON)["safetyHold"] = calmlens.JSON{"placedAt": 1, "reason": calmlens.SafetyHoldReasonSuspectedIllegalContent}
 	})
 	for _, resource := range []string{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview, calmlens.ResourceHLS, calmlens.ResourceEmbed, calmlens.ResourcePlaceholder} {
-		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: resource}})
+		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetID: a.ID, Resource: resource}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -785,6 +812,7 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 	}
 	jsonHeader := http.Header{"Content-Type": {"application/json"}}
 	assets := "/projects/project-1/assets"
+	signing := "/projects/project-1/signed-asset-urls"
 	cases := []struct {
 		name, method, path, query string
 		header                    http.Header
@@ -798,11 +826,14 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 		{"raw upload metadata without a value", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":"source"}]`), upload("content"), "hello", calmlens.CodeInvalidRequest, issue("validation/invalid-value", "metadata.0.value")},
 		{"update metadata object", "PATCH", "/assets/missing", "", jsonHeader, `{"metadata":{"a":1}}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata")},
 		{"update null name", "PATCH", "/assets/missing", "", jsonHeader, `{"name":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "name")},
-		{"signed URL null viewerClaims", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"viewerClaims":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "viewerClaims")},
-		{"signed URL null resource", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"resource":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-value", "resource")},
-		{"signed URL null lens", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"lens":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "lens")},
-		{"signed URL null transform", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"transform":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "transform")},
-		{"signed URL null expiresInSeconds", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"expiresInSeconds":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "expiresInSeconds")},
+		{"signed URL null externalId", "POST", signing, "", jsonHeader, `{"externalId":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "externalId")},
+		{"signed URL null expiresIn", "POST", signing, "", jsonHeader, `{"assetId":"missing","expiresIn":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "expiresIn")},
+		{"signed URL null original", "POST", signing, "", jsonHeader, `{"assetId":"missing","original":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "original")},
+		{"signed URL by ID and external ID", "POST", signing, "", jsonHeader, `{"assetId":"missing","externalId":"post-1"}`, calmlens.CodeInvalidRequest, issue("custom", "")},
+		{"signed URL lifetime of a fraction of a second", "POST", signing, "", jsonHeader, `{"assetId":"missing","expiresIn":1.5}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "expiresIn")},
+		{"signed URL lifetime of 0", "POST", signing, "", jsonHeader, `{"assetId":"missing","expiresIn":0}`, calmlens.CodeInvalidRequest, issue("validation/too-small", "expiresIn")},
+		{"signed URL lifetime above 24 hours", "POST", signing, "", jsonHeader, `{"assetId":"missing","expiresIn":86401}`, calmlens.CodeInvalidRequest, issue("validation/too-big", "expiresIn")},
+		{"signed URL original not a boolean", "POST", signing, "", jsonHeader, `{"assetId":"missing","original":"yes"}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "original")},
 		{"raw upload of a refused type", "POST", assets, "name=x&contentType=application%2Fzip", upload("content"), "hello", calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/zip", "source": "calmlens"}},
 		{"first part of a refused type", "POST", assets, "name=x&isFinal=true&contentType=application%2Fx-made-up", upload("part"), "hello", calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/x-made-up", "source": "calmlens"}},
 	}
