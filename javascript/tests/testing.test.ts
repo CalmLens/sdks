@@ -823,7 +823,7 @@ describe("MockCalmLensServerClient", () => {
       name: "image.png",
       content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
     });
-    await client.assets.deleteContent({ assetId: asset.id });
+    await client.assets.removeContent({ assetId: asset.id });
     await expect(client.assets.retry({ assetId: asset.id })).rejects.toMatchObject({
       code: PUBLIC_ERROR_CODES.ASSET_CONTENT_UNAVAILABLE.getId(),
     });
@@ -883,7 +883,7 @@ describe("MockCalmLensServerClient", () => {
     expect(asset.content.status).toBe("stored");
     expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(200);
 
-    const removed = await client.assets.deleteContent({ assetId: asset.id });
+    const removed = await client.assets.removeContent({ assetId: asset.id });
     expect(removed.id).toBe(asset.id);
     expect(removed.classification.moderation.status).toBe("allowed");
     expect(removed.content).toMatchObject({
@@ -903,7 +903,7 @@ describe("MockCalmLensServerClient", () => {
     await expect(client.assets.delete({ assetId: asset.id })).rejects.toMatchObject({
       code: PUBLIC_ERROR_CODES.ASSET_NOT_FOUND.getId(),
     });
-    await expect(client.assets.deleteContent({ assetId: "" })).rejects.toMatchObject({
+    await expect(client.assets.removeContent({ assetId: "" })).rejects.toMatchObject({
       code: "sdk/invalid-argument",
     });
   });

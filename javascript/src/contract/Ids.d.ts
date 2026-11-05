@@ -22,6 +22,7 @@ declare const ID_PREFIXES: {
   readonly member: "mem";
   readonly invitation: "inv";
   readonly transfer: "xfer";
+  readonly assetBatch: "batch";
   readonly supportTicket: "tkt";
   readonly supportTicketMessage: "msg";
   readonly humanReview: "rev";

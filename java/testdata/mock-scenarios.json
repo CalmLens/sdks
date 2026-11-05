@@ -1021,12 +1021,7 @@
               "items.0.assetId": {
                 "$ref": "reported.id"
               },
-              "items.0.facts": {
-                "$contains": {
-                  "key": "decided-by",
-                  "value": "api-key"
-                }
-              }
+              "items.0.actor.type": "api-key"
             },
             "httpStatus": 200
           }
@@ -1359,12 +1354,7 @@
                 "$ref": "blocked.id"
               },
               "items.0.asset.classification.moderation.status": "blocked",
-              "items.0.facts": {
-                "$contains": {
-                  "key": "decided-by",
-                  "value": "reviewer"
-                }
-              },
+              "items.0.actor.type": "user",
               "hasMore": false
             },
             "httpStatus": 200
@@ -1625,7 +1615,7 @@
           }
         },
         {
-          "operation": "assets.deleteContent",
+          "operation": "assets.removeContent",
           "args": {
             "assetId": {
               "$ref": "kept.id"
@@ -2098,12 +2088,7 @@
                 "$ref": "public.id"
               },
               "items.1.asset.classification.moderation.status": "limited",
-              "items.1.facts": {
-                "$contains": {
-                  "key": "decided-by",
-                  "value": "reviewer"
-                }
-              }
+              "items.1.actor.type": "user"
             },
             "httpStatus": 200
           }
@@ -2311,7 +2296,7 @@
           }
         },
         {
-          "operation": "assets.deleteContent",
+          "operation": "assets.removeContent",
           "args": {
             "assetId": {
               "$ref": "kept.id"
@@ -4096,12 +4081,11 @@
             "assetId": {
               "$ref": "queued.id"
             },
-            "facts": [
-              {
-                "key": "decided-by",
-                "value": "reviewer"
-              }
-            ]
+            "actor": {
+              "type": "user",
+              "id": null
+            },
+            "facts": []
           },
           "expect": {
             "result": {
@@ -4751,7 +4735,7 @@
           }
         },
         {
-          "operation": "assets.deleteContent",
+          "operation": "assets.removeContent",
           "args": {
             "assetId": {
               "$ref": "emptied.id"
@@ -5064,7 +5048,7 @@
           }
         },
         {
-          "operation": "assets.deleteContent",
+          "operation": "assets.removeContent",
           "args": {
             "assetId": {
               "$ref": "kept.id"
@@ -5081,7 +5065,7 @@
           }
         },
         {
-          "operation": "assets.deleteContent",
+          "operation": "assets.removeContent",
           "args": {
             "assetId": {
               "$ref": "kept.id"
@@ -5118,7 +5102,7 @@
           }
         },
         {
-          "operation": "assets.deleteContent",
+          "operation": "assets.removeContent",
           "args": {
             "assetId": {
               "$ref": "kept.id"
@@ -5330,9 +5314,14 @@
             ],
             "operation": "remove-content"
           },
+          "save": "removal",
           "expect": {
             "result": {
-              "queued": true
+              "batchId": {
+                "$id": "batch"
+              },
+              "status": "queued",
+              "assetCount": 1
             },
             "httpStatus": 202
           }
@@ -5362,13 +5351,21 @@
               },
               {
                 "$ref": "b.id"
+              },
+              {
+                "$ref": "a.id"
               }
             ],
             "operation": "delete"
           },
+          "save": "deletion",
           "expect": {
             "result": {
-              "queued": true
+              "batchId": {
+                "$id": "batch"
+              },
+              "status": "queued",
+              "assetCount": 2
             },
             "httpStatus": 202
           }
@@ -5469,6 +5466,205 @@
             },
             "httpStatus": 200
           }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "feed.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.0.facts": {
+                "$contains": {
+                  "key": "batch-id",
+                  "value": {
+                    "$ref": "removal.batchId"
+                  }
+                }
+              },
+              "items.1.facts": {
+                "$contains": {
+                  "key": "batch-id",
+                  "value": {
+                    "$ref": "deletion.batchId"
+                  }
+                }
+              },
+              "items.2.facts": {
+                "$contains": {
+                  "key": "batch-id",
+                  "value": {
+                    "$ref": "deletion.batchId"
+                  }
+                }
+              },
+              "items.2.actor.type": "api-key"
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "the events feed lists only the requested types and asset, and keeps a cursor to its filters",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "all",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "types": [
+              "asset.uploaded"
+            ]
+          },
+          "save": "uploads",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "first.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "first",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "assetId": {
+              "$ref": "first.id"
+            }
+          },
+          "save": "firstFeed",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "second.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "second",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "uploads.nextCursor"
+            },
+            "types": [
+              "asset.uploaded"
+            ]
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.type": "asset.uploaded",
+              "items.0.assetId": {
+                "$ref": "first.id"
+              },
+              "items.1.type": "asset.uploaded",
+              "items.1.assetId": {
+                "$ref": "second.id"
+              },
+              "hasMore": false
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.removeContent",
+          "args": {
+            "assetId": {
+              "$ref": "first.id"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "firstFeed.nextCursor"
+            },
+            "assetId": {
+              "$ref": "first.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.type": "asset.content-removed",
+              "items.0.assetId": {
+                "$ref": "first.id"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "all.nextCursor"
+            },
+            "types": [
+              "asset.uploaded"
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "cursor/invalid",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "uploads.nextCursor"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "cursor/invalid",
+              "status": 400
+            }
+          }
         }
       ]
     },
@@ -5527,12 +5723,7 @@
               "items.1.type": "asset.purged",
               "items.1.severity": "high",
               "items.1.asset.content.status": "removed",
-              "items.1.facts": {
-                "$contains": {
-                  "key": "decided-by",
-                  "value": "reviewer"
-                }
-              }
+              "items.1.actor.type": "user"
             },
             "httpStatus": 200
           }
@@ -5587,8 +5778,8 @@
             "type": "asset.allowed",
             "facts": [
               {
-                "key": "decided-by",
-                "value": "automated"
+                "key": "flagged-categories",
+                "value": []
               }
             ]
           },
@@ -5685,8 +5876,8 @@
             "type": "asset.allowed",
             "facts": [
               {
-                "key": "decided-by",
-                "value": "automated"
+                "key": "flagged-categories",
+                "value": []
               }
             ]
           },
@@ -5773,8 +5964,8 @@
             "type": "asset.allowed",
             "facts": [
               {
-                "key": "decided-by",
-                "value": "automated"
+                "key": "flagged-categories",
+                "value": []
               }
             ]
           },
@@ -8428,7 +8619,7 @@
           }
         },
         {
-          "operation": "assets.deleteContent",
+          "operation": "assets.removeContent",
           "args": {
             "assetId": {
               "$ref": "private.id"
@@ -9128,11 +9319,11 @@
               "items.2.type": "asset.blocked",
               "items.2.severity": "high",
               "items.2.asset.classification.moderation.status": "blocked",
+              "items.2.actor": {
+                "type": "automated",
+                "id": null
+              },
               "items.2.facts": [
-                {
-                  "key": "decided-by",
-                  "value": "automated"
-                },
                 {
                   "key": "flagged-categories",
                   "value": [
@@ -9430,9 +9621,15 @@
                 ]
               },
               "items.1.type": "asset.age-restricted",
+              "items.1.actor": {
+                "type": "automated",
+                "id": null
+              },
               "items.1.facts.0": {
-                "key": "decided-by",
-                "value": "automated"
+                "key": "flagged-categories",
+                "value": [
+                  "sexual"
+                ]
               }
             },
             "httpStatus": 200

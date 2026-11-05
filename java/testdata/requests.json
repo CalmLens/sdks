@@ -1209,7 +1209,7 @@
     }
   },
   {
-    "operation": "assets.deleteContent",
+    "operation": "assets.removeContent",
     "options": {
       "assetId": "asset-1"
     },
@@ -1306,7 +1306,9 @@
       }
     },
     "response": {
-      "queued": true
+      "batchId": "batch-1",
+      "status": "queued",
+      "assetCount": 2
     }
   },
   {
@@ -1329,7 +1331,9 @@
       }
     },
     "response": {
-      "queued": true
+      "batchId": "batch-1",
+      "status": "queued",
+      "assetCount": 2
     }
   },
   {
@@ -1818,7 +1822,7 @@
           "hash": "0000000000000000000000000000000000000000000000000000000000000000",
           "quality": 90,
           "label": null,
-          "sourceAssetId": null,
+          "assetId": null,
           "createdAt": 1760000000000
         }
       ],
@@ -1850,7 +1854,7 @@
       "hash": "0000000000000000000000000000000000000000000000000000000000000000",
       "quality": 90,
       "label": null,
-      "sourceAssetId": null,
+      "assetId": null,
       "createdAt": 1760000000000
     }
   },
@@ -1877,7 +1881,7 @@
       "hash": "0000000000000000000000000000000000000000000000000000000000000000",
       "quality": 90,
       "label": null,
-      "sourceAssetId": null,
+      "assetId": null,
       "createdAt": 1760000000000
     }
   },
@@ -2307,6 +2311,35 @@
     }
   },
   {
+    "operation": "events.list",
+    "options": {
+      "cursor": "123_abc~k1",
+      "pageSize": 50,
+      "types": [
+        "asset.blocked",
+        "asset.purged"
+      ],
+      "assetId": "asset-1"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/events",
+      "query": {
+        "cursor": "123_abc~k1",
+        "pageSize": "50",
+        "assetId": "asset-1",
+        "types": "asset.blocked,asset.purged"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [],
+      "nextCursor": "123_abc",
+      "hasMore": false,
+      "excludedTypes": []
+    }
+  },
+  {
     "operation": "ensureLenses",
     "options": {
       "lenses": [
@@ -2649,8 +2682,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -3089,8 +3122,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -3568,8 +3601,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -4034,8 +4067,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -4533,8 +4566,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -4983,8 +5016,8 @@
                   "hashMatches": [
                     {
                       "source": "hash-list",
-                      "listId": "example",
-                      "entryId": "example",
+                      "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                      "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                       "distance": 1,
                       "action": "flag"
                     }
@@ -5439,8 +5472,8 @@
                 "hashMatches": [
                   {
                     "source": "hash-list",
-                    "listId": "example",
-                    "entryId": "example",
+                    "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                    "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                     "distance": 1,
                     "action": "flag"
                   }
@@ -5901,8 +5934,8 @@
                 "hashMatches": [
                   {
                     "source": "hash-list",
-                    "listId": "example",
-                    "entryId": "example",
+                    "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                    "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                     "distance": 1,
                     "action": "flag"
                   }
@@ -6357,8 +6390,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -6934,8 +6967,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -7374,8 +7407,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -7819,8 +7852,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -7994,7 +8027,7 @@
     "fullModel": true
   },
   {
-    "operation": "assets.deleteContent",
+    "operation": "assets.removeContent",
     "options": {
       "assetId": "asset-1"
     },
@@ -8259,8 +8292,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -8702,8 +8735,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -8898,7 +8931,9 @@
       }
     },
     "response": {
-      "queued": true
+      "batchId": "batch_5Rt8Xm3Lq9Vk2Wb7Np4C",
+      "status": "queued",
+      "assetCount": 1
     },
     "fullModel": true
   },
@@ -9177,8 +9212,8 @@
             "hashMatches": [
               {
                 "source": "hash-list",
-                "listId": "example",
-                "entryId": "example",
+                "hashListId": "hl_5Xk3Rm9Lq2Vt8Wb4Np7C",
+                "hashListEntryId": "hle_8Qm4Xk2Rt9Lv3Wb7Np5C",
                 "distance": 1,
                 "action": "flag"
               }
@@ -9628,7 +9663,7 @@
           "hash": "0000000000000000000000000000000000000000000000000000000000000001",
           "quality": 1,
           "label": "example",
-          "sourceAssetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+          "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
           "createdAt": 1767225600000
         }
       ],
@@ -9667,7 +9702,7 @@
       "hash": "0000000000000000000000000000000000000000000000000000000000000001",
       "quality": 1,
       "label": "example",
-      "sourceAssetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+      "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "createdAt": 1767225600000
     },
     "fullModel": true
@@ -10230,6 +10265,10 @@
         {
           "id": "evt_7Lm3Xq8Rk2Vt9Wb4Np5C",
           "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+          "actor": {
+            "type": "user",
+            "id": "example"
+          },
           "type": "asset.uploaded",
           "severity": "low",
           "title": "example",

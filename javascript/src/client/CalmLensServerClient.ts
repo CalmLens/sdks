@@ -38,7 +38,6 @@ import type {
   CreateHashListOptions,
   CreatePolicyOptions,
   DecideAssetOptions,
-  DeleteAssetContentOptions,
   DeleteAssetOptions,
   EnsureLensesOptions,
   EnsureLensOptions,
@@ -66,6 +65,7 @@ import type {
   Policy,
   PolicyIdOptions,
   PolicyList,
+  RemoveAssetContentOptions,
   RequestOptions,
   RetrieveAssetOptions,
   RetryAssetOptions,
@@ -538,8 +538,8 @@ export default class CalmLensServerClient {
        * keeping the asset record, metadata and classification results. The returned asset has
        * `content.status` set to `removed` and `content.removalReason` to `requested`; the CDN no longer serves it.
        */
-      deleteContent: async (options: DeleteAssetContentOptions): Promise<Asset> => {
-        const { assetId } = checked("assets.deleteContent", options);
+      removeContent: async (options: RemoveAssetContentOptions): Promise<Asset> => {
+        const { assetId } = checked("assets.removeContent", options);
         return this.request("DELETE", `/assets/${requireId(assetId, "Asset ID")}/content`);
       },
 
@@ -553,9 +553,10 @@ export default class CalmLensServerClient {
        * Deletes up to 500 assets (`operation: "delete"`) or removes their stored content
        * (`"remove-content"`) in one request. Every asset must exist in the project and the key
        * needs `assets:delete` for its folder, or nothing is queued. Resolves with
-       * `{ queued: true }` once queued; the work runs in the background and records
-       * `asset.deleted` or `asset.content-removed` for each asset. Assets under a safety hold
-       * are skipped. Not retried: it carries no `Idempotency-Key`.
+       * `{ batchId, status: "queued", assetCount }` once queued; the work runs in the background
+       * and records `asset.deleted` or `asset.content-removed` for each asset, with a `batch-id`
+       * fact naming `batchId`. Assets under a safety hold are skipped. Not retried: it carries no
+       * `Idempotency-Key`.
        */
       batch: async (options: BatchAssetsOptions): Promise<BatchAssetsResponse> => {
         const { assetIds, operation } = checked("assets.batch", options);
@@ -572,12 +573,17 @@ export default class CalmLensServerClient {
       /**
        * Lists project events after a cursor, oldest first. Call without `cursor` to get a cursor
        * for "now", then poll with each response's `nextCursor`. Webhook deliveries carry each
-       * event's same fields as a flat JSON body.
+       * event's same fields as a flat JSON body. `types` and `assetId` narrow the feed to some
+       * event types or one asset's events; a cursor belongs to the filters it was issued with, so
+       * pass the same ones with each `cursor`.
        */
-      list: async (options: ListEventsOptions = {}): Promise<GetEventsResponse> =>
-        this.request("GET", `${this.projectPath}/events`, {
-          query: { ...checked("events.list", options) },
-        }),
+      list: async (options: ListEventsOptions = {}): Promise<GetEventsResponse> => {
+        const { types, ...query } = checked("events.list", options);
+        return this.request("GET", `${this.projectPath}/events`, {
+          // The API takes the types as one comma-separated value.
+          query: { ...query, types: types?.length ? types.join(",") : undefined },
+        });
+      },
 
       /**
        * Yields pages of events after `cursor` until no more are waiting. Save each page's

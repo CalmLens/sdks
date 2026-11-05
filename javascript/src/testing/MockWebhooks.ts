@@ -18,6 +18,7 @@ export const toWebhookEventPayload = (event: TypedEvent): WebhookEventPayload =>
   ({
     id: event.id,
     projectId: event.projectId,
+    actor: event.actor,
     type: event.type,
     severity: event.severity,
     title: event.title,

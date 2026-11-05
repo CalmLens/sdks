@@ -95,7 +95,7 @@ const MOCK_OPERATIONS = [
   "assets.retry",
   "assets.explain",
   "assets.decide",
-  "assets.deleteContent",
+  "assets.removeContent",
   "assets.delete",
   "assets.batch",
   "text.classify",
@@ -230,6 +230,13 @@ const MAX_PAGE_SIZE = 100;
 const MAX_DECISION_NOTE_LENGTH = 1499;
 /** How the API names a reviewer acting through an unnamed API key. */
 const API_KEY_REVIEWER_NAME = "An API key";
+/** The actor of events the mock's API key causes: mock keys have no ID. */
+const MOCK_API_KEY_ACTOR = { type: "api-key", id: null } as const;
+/** The actor of a reviewer's decision through the `decide` test hook. */
+const MOCK_REVIEWER_ACTOR = { type: "user", id: null } as const;
+const AUTOMATED_ACTOR = { type: "automated", id: null } as const;
+/** An event type's shape (`resource.action`), as the mock checks `types` without the catalog. */
+const EVENT_TYPE_PATTERN = /^[a-z][a-z-]*\.[a-z][a-z-]*$/;
 const MAX_SEARCH_LIMIT = 20;
 const MAX_SEARCH_QUERY_LENGTH = 200;
 
@@ -582,7 +589,7 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
           ? ["assets.update"]
           : ["assets.delete"];
     case "content":
-      return ["assets.deleteContent"];
+      return ["assets.removeContent"];
     case "children":
       return ["assets.listChildren", "assets.iterateChildren"];
     case "signed-url":
@@ -753,6 +760,8 @@ export class MockCalmLensApi {
       description: null,
       assetId: null,
       asset: null,
+      // The mock's API key, which has no ID, unless the event names someone else.
+      actor: MOCK_API_KEY_ACTOR,
       facts: [],
       createdAt: now,
       ...input,
@@ -859,7 +868,10 @@ export class MockCalmLensApi {
       },
     ];
     const stored = await this.databaseStorage.updateAsset(decided);
-    if (decision === "purged") this.recordLifecycleEvent("asset.content-removed", stored);
+    if (decision === "purged")
+      this.recordLifecycleEvent("asset.content-removed", stored, {
+        actor: review ? MOCK_API_KEY_ACTOR : MOCK_REVIEWER_ACTOR,
+      });
     this.pushEvent({
       type: `asset.${decision}`,
       // Like the event catalog: only allowing and limiting are low severity.
@@ -867,21 +879,16 @@ export class MockCalmLensApi {
       title: `asset.${decision}`,
       assetId: stored.id,
       asset: toEventAsset(stored),
+      // A decision through the API is the API key's; the test hook's is a reviewer's.
+      actor: review ? MOCK_API_KEY_ACTOR : MOCK_REVIEWER_ACTOR,
       facts: [
-        // A decision through the API is the API key's; the test hook's is a reviewer's.
-        { key: "decided-by", value: review ? "api-key" : "reviewer" },
         { key: "asset-type", value: stored.type },
         {
           key: "asset-name",
           value: stored.name,
           url: `https://calmlens.com/go/asset/${stored.id}`,
         },
-        ...(review
-          ? [
-              { key: "reviewer-user-id", value: null },
-              { key: "reviewer-name", value: API_KEY_REVIEWER_NAME },
-            ]
-          : []),
+        ...(review ? [{ key: "reviewer-name", value: API_KEY_REVIEWER_NAME }] : []),
         { key: "note", value: review?.note ?? null },
       ],
     } as MockEventInput);
@@ -1507,7 +1514,7 @@ export class MockCalmLensApi {
       hash: hash!,
       quality,
       label: typeof body.label === "string" ? body.label : null,
-      sourceAssetId: assetId ?? null,
+      assetId: assetId ?? null,
       createdAt: this.now(),
     };
     this.hashListEntries.set(entry.id, entry);
@@ -1772,7 +1779,8 @@ export class MockCalmLensApi {
    * one `asset/not-found`, and either refuses the whole batch), then applies the operation at
    * once instead of in the background: `delete` deletes each asset with its stored child
    * assets and records `asset.deleted` with the asset as it was; `remove-content` removes
-   * the content like `deleteContent`. Mock assets carry no safety holds, so none is skipped.
+   * the content like `removeContent`. Each event carries the batch's `batch-id` fact. Mock assets
+   * carry no safety holds, so none is skipped.
    */
   private async batch(body: Record<string, unknown>) {
     const assetIds = Array.isArray(body.assetIds) ? (body.assetIds as unknown[]) : [];
@@ -1791,15 +1799,16 @@ export class MockCalmLensApi {
     for (const assetId of new Set(assetIds as string[])) {
       assets.push(await this.findOwnAsset(assetId));
     }
+    const batchId = this.createId("batch");
     for (const asset of assets) {
       if (operation === "delete") {
         await this.deleteAssetTree(asset);
-        this.recordLifecycleEvent("asset.deleted", asset);
+        this.recordLifecycleEvent("asset.deleted", asset, { batchId });
       } else {
-        await this.removeContent(asset);
+        await this.removeContent(asset, batchId);
       }
     }
-    return { queued: true };
+    return { batchId, status: "queued", assetCount: assets.length };
   }
 
   /**
@@ -1807,7 +1816,7 @@ export class MockCalmLensApi {
    * extracted text and the placeholder go. Content already removed keeps its reason, and an
    * `asset.content-removed` event is recorded either way.
    */
-  private async removeContent(asset: Asset): Promise<Asset> {
+  private async removeContent(asset: Asset, batchId?: string): Promise<Asset> {
     await this.imageStorage.deleteContent(asset.id);
     let removed = asset;
     if (asset.content.status === "removed") {
@@ -1834,7 +1843,7 @@ export class MockCalmLensApi {
         updatedAt: now,
       });
     }
-    this.recordLifecycleEvent("asset.content-removed", removed);
+    this.recordLifecycleEvent("asset.content-removed", removed, { batchId });
     return removed;
   }
 
@@ -2229,7 +2238,7 @@ export class MockCalmLensApi {
    */
   private recordProcessingEvents(asset: Asset, decision: MockDecision): void {
     if (decision.status === "pending") return;
-    const event = { assetId: asset.id, asset: toEventAsset(asset) };
+    const event = { assetId: asset.id, asset: toEventAsset(asset), actor: AUTOMATED_ACTOR };
     if (decision.status === "failed") {
       this.pushEvent({
         ...event,
@@ -2265,7 +2274,6 @@ export class MockCalmLensApi {
       // Like the event catalog: only allowing and limiting are low severity.
       severity: decision.status === "allowed" || decision.status === "limited" ? "low" : "high",
       facts: [
-        { key: "decided-by", value: "automated" },
         { key: "flagged-categories", value: flaggedCategories },
         { key: "asset-type", value: asset.type },
         assetNameFact(asset),
@@ -2339,9 +2347,12 @@ export class MockCalmLensApi {
   private recordLifecycleEvent(
     type: "asset.deleted" | "asset.content-removed" | "asset.retried",
     asset: Asset,
+    options: { batchId?: string; actor?: TypedEvent["actor"] } = {},
   ): void {
+    const { batchId, actor = MOCK_API_KEY_ACTOR } = options;
     this.pushEvent({
       type,
+      actor,
       severity: "low",
       assetId: asset.id,
       asset: toEventAsset(asset),
@@ -2353,6 +2364,7 @@ export class MockCalmLensApi {
           ...(type === "asset.deleted" ? {} : { url: `https://calmlens.com/go/asset/${asset.id}` }),
         },
         { key: "asset-type", value: asset.type },
+        ...(batchId ? [{ key: "batch-id", value: batchId }] : []),
       ],
     } as MockEventInput);
   }
@@ -2465,26 +2477,46 @@ export class MockCalmLensApi {
     // Like the API's query schema: an integer from 1 to 100.
     if (pageSize < 1) throw invalidField("validation/too-small", "pageSize");
     if (pageSize > MAX_PAGE_SIZE) throw invalidField("validation/too-big", "pageSize");
+    // `types` is a comma-separated list of event types and `assetId` an asset ID, as the API takes.
+    const typesValue = query.get("types");
+    const types = typesValue === null ? [] : typesValue.split(",");
+    if (
+      typesValue !== null &&
+      (types.length === 0 || types.some((type) => !EVENT_TYPE_PATTERN.test(type)))
+    )
+      throw invalidField("validation/invalid-value", "types");
+    const assetId = query.get("assetId");
+    if (assetId !== null && !isId(assetId, "asset"))
+      throw invalidField("validation/invalid-format", "assetId");
+    // Like the API, a cursor belongs to the filters it was issued with.
+    const filter = btoa(JSON.stringify([[...new Set(types)].sort(), assetId]));
+    const matches = (event: TypedEvent) =>
+      (!types.length || types.includes(event.type)) &&
+      (assetId === null || event.assetId === assetId);
     const cursor = query.get("cursor");
     // The mock's key holds every permission, so no event type is excluded.
     if (!cursor)
       return {
         items: [],
-        nextCursor: `mock_${this.eventFeed.length}`,
+        nextCursor: `mock_${this.eventFeed.length}~${filter}`,
         hasMore: false,
         excludedTypes: [],
       };
-    const match = /^mock_(\d+)$/.exec(cursor);
-    const position = match ? Number(match[1]) : Number.NaN;
+    const match = /^mock_(\d+)~(.*)$/.exec(cursor);
+    const position = match && match[2] === filter ? Number(match[1]) : Number.NaN;
     if (!Number.isSafeInteger(position) || position > this.eventFeed.length) {
       throw fail(API_ERROR_CODES.INVALID_CURSOR);
     }
-    const items = this.eventFeed.slice(position, position + pageSize);
-    const next = position + items.length;
+    const items: TypedEvent[] = [];
+    let next = position;
+    while (next < this.eventFeed.length && items.length < pageSize) {
+      const event = this.eventFeed[next++]!;
+      if (matches(event)) items.push(event);
+    }
     return {
       items,
-      nextCursor: `mock_${next}`,
-      hasMore: next < this.eventFeed.length,
+      nextCursor: `mock_${next}~${filter}`,
+      hasMore: this.eventFeed.slice(next).some(matches),
       excludedTypes: [],
     };
   }

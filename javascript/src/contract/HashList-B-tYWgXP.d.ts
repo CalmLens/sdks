@@ -19,7 +19,7 @@ declare const HASH_LIST_ENTRY_SCHEMA: zod.ZodObject<{
   hash: zod.ZodString;
   quality: zod.ZodNullable<zod.ZodNumber>;
   label: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
-  sourceAssetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+  assetId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
   createdAt: zod.ZodNumber;
 }, zod.core.$strip>;
 type HashListEntry = zod.infer<typeof HASH_LIST_ENTRY_SCHEMA>;

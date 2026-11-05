@@ -20,9 +20,9 @@ const event: TypedEvent = {
   assetId: "asset_8fK2mQx7Lp4NvB3tRz9Y",
   assetSequence: 2,
   asset: null,
+  actor: { type: "automated", id: null },
   facts: [
     { key: "asset-name", value: "photo.jpg" },
-    { key: "decided-by", value: "automated" },
     { key: "flagged-categories", value: ["harassment"] },
   ],
   createdAt: 1760000000000,

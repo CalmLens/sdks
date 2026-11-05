@@ -1,7 +1,17 @@
-import "./Asset-vzEhZ_bp.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-dnfPGB50.js";
+import "./Asset-P8vmfvmG.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-CodUobTN.js";
 import "./Page-DNdKkX2B.js";
 import * as zod from "zod";
+declare const ACTOR_SCHEMA: zod.ZodObject<{
+  type: zod.ZodEnum<{
+    "api-key": "api-key";
+    automated: "automated";
+    system: "system";
+    user: "user";
+  }>;
+  id: zod.ZodNullable<zod.ZodString>;
+}, zod.core.$strict>;
+type Actor = zod.infer<typeof ACTOR_SCHEMA>;
 declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;
   externalId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
@@ -45,8 +55,18 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;
   projectId: zod.ZodString;
   userId: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
+  actor: zod.ZodObject<{
+    type: zod.ZodEnum<{
+      "api-key": "api-key";
+      automated: "automated";
+      system: "system";
+      user: "user";
+    }>;
+    id: zod.ZodNullable<zod.ZodString>;
+  }, zod.core.$strict>;
   type: zod.ZodEnum<{
     "api-key.created": "api-key.created";
+    "api-key.deleted": "api-key.deleted";
     "api-key.revoked": "api-key.revoked";
     "appeal.resolved": "appeal.resolved";
     "appeal.submitted": "appeal.submitted";
@@ -60,21 +80,22 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
     "asset.hash-matched": "asset.hash-matched";
     "asset.limited": "asset.limited";
     "asset.link-flagged": "asset.link-flagged";
-    "asset.processing-progress": "asset.processing-progress";
+    "asset.progress-updated": "asset.progress-updated";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";
     "asset.retried": "asset.retried";
     "asset.review-requested": "asset.review-requested";
     "asset.uploaded": "asset.uploaded";
-    "connector.failing": "connector.failing";
+    "connector.disabled": "connector.disabled";
     "project.invitation-sent": "project.invitation-sent";
     "project.member-joined": "project.member-joined";
+    "project.member-left": "project.member-left";
     "project.member-removed": "project.member-removed";
     "project.member-role-changed": "project.member-role-changed";
     "project.transferred": "project.transferred";
     "upload-preset.daily-limit-reached": "upload-preset.daily-limit-reached";
-    "usage.limit-reached": "usage.limit-reached";
-    "usage.spend-limit-reached": "usage.spend-limit-reached";
+    "usage.free-uploads-exhausted": "usage.free-uploads-exhausted";
+    "usage.uploads-paused": "usage.uploads-paused";
   }>;
   severity: zod.ZodEnum<{
     high: "high";
@@ -136,8 +157,18 @@ type Event = zod.infer<typeof EVENT_SCHEMA>;
 declare const PUBLIC_EVENT_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;
   projectId: zod.ZodString;
+  actor: zod.ZodObject<{
+    type: zod.ZodEnum<{
+      "api-key": "api-key";
+      automated: "automated";
+      system: "system";
+      user: "user";
+    }>;
+    id: zod.ZodNullable<zod.ZodString>;
+  }, zod.core.$strict>;
   type: zod.ZodEnum<{
     "api-key.created": "api-key.created";
+    "api-key.deleted": "api-key.deleted";
     "api-key.revoked": "api-key.revoked";
     "appeal.resolved": "appeal.resolved";
     "appeal.submitted": "appeal.submitted";
@@ -151,21 +182,22 @@ declare const PUBLIC_EVENT_SCHEMA: zod.ZodObject<{
     "asset.hash-matched": "asset.hash-matched";
     "asset.limited": "asset.limited";
     "asset.link-flagged": "asset.link-flagged";
-    "asset.processing-progress": "asset.processing-progress";
+    "asset.progress-updated": "asset.progress-updated";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";
     "asset.retried": "asset.retried";
     "asset.review-requested": "asset.review-requested";
     "asset.uploaded": "asset.uploaded";
-    "connector.failing": "connector.failing";
+    "connector.disabled": "connector.disabled";
     "project.invitation-sent": "project.invitation-sent";
     "project.member-joined": "project.member-joined";
+    "project.member-left": "project.member-left";
     "project.member-removed": "project.member-removed";
     "project.member-role-changed": "project.member-role-changed";
     "project.transferred": "project.transferred";
     "upload-preset.daily-limit-reached": "upload-preset.daily-limit-reached";
-    "usage.limit-reached": "usage.limit-reached";
-    "usage.spend-limit-reached": "usage.spend-limit-reached";
+    "usage.free-uploads-exhausted": "usage.free-uploads-exhausted";
+    "usage.uploads-paused": "usage.uploads-paused";
   }>;
   severity: zod.ZodEnum<{
     high: "high";
@@ -225,4 +257,4 @@ type TypedEvent = { [TType in EventType]: Omit<PublicEvent, "type" | "facts"> & 
   type: TType;
   facts: EventFacts<TType>;
 }; }[EventType];
-export { EventAsset as n, TypedEvent as r, Event as t };
+export { Actor as i, EventAsset as n, TypedEvent as r, Event as t };

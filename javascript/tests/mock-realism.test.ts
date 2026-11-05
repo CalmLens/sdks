@@ -162,9 +162,9 @@ describe("MockCalmLensServerClient assets.decide", () => {
       },
     ]);
     const [event] = (await client.events.list({ cursor: nextCursor })).items;
+    expect(event?.actor).toEqual({ type: "api-key", id: null });
     expect(event?.facts).toEqual(
       expect.arrayContaining([
-        { key: "decided-by", value: "api-key" },
         { key: "reviewer-name", value: "An API key" },
         { key: "note", value: "Spam" },
       ]),

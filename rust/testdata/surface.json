@@ -206,17 +206,17 @@
       }
     },
     {
-      "id": "assets.deleteContent",
+      "id": "assets.removeContent",
       "kind": "method",
       "description": "Remove stored content, including the content derived from it in child assets, while retaining the asset records",
       "names": {
-        "javascript": "assets.deleteContent",
-        "python": "assets.delete_content",
-        "go": "Assets.DeleteContent",
-        "rust": "assets().delete_content",
-        "java": "assets.deleteContent",
-        "ruby": "assets.delete_content",
-        "php": "assets->deleteContent"
+        "javascript": "assets.removeContent",
+        "python": "assets.remove_content",
+        "go": "Assets.RemoveContent",
+        "rust": "assets().remove_content",
+        "java": "assets.removeContent",
+        "ruby": "assets.remove_content",
+        "php": "assets->removeContent"
       }
     },
     {
@@ -292,7 +292,7 @@
     {
       "id": "assets.batch",
       "kind": "method",
-      "description": "Delete up to 500 assets, or remove their stored content, in one request. Every asset must exist in the project and the API key needs `assets:delete` for its folder; otherwise nothing is queued. The response confirms that the operation is queued. It then runs in the background: `delete` deletes each asset with its child assets and stored content and records `asset.deleted`, and `remove-content` removes the content as a removal would (reason `requested`) and records `asset.content-removed`. Assets under a safety hold, or in a folder the key can no longer delete from when the operation runs, are skipped.",
+      "description": "Delete up to 500 assets, or remove their stored content, in one request. Every asset must exist in the project and the API key needs `assets:delete` for its folder; otherwise nothing is queued. The response gives the operation's `batchId` and confirms that it is queued. It then runs in the background: `delete` deletes each asset with its child assets and stored content and records `asset.deleted`, and `remove-content` removes the content as a removal would (reason `requested`) and records `asset.content-removed`; each of those events carries the `batch-id` fact. Assets under a safety hold, or in a folder the key can no longer delete from when the operation runs, are skipped and record no event. To follow the operation, read the events feed filtered by those types or by asset.",
       "names": {
         "javascript": "assets.batch",
         "python": "assets.batch",
@@ -334,7 +334,7 @@
     {
       "id": "events.list",
       "kind": "method",
-      "description": "List project events, oldest first, after a cursor. Webhook connectors deliver each event in the same shape. Each event's `facts` are `{ key, value, url? }` entries registered for its `type` (see the event types in the webhooks guide). Omit `cursor` to get a cursor for the current time without any events, then pass each response's `nextCursor` as `cursor`. When `hasMore` is false you have caught up; keep the cursor to poll for later events. Polling receives new events without a public webhook URL, for example during local development.",
+      "description": "List project events, oldest first, after a cursor. Webhook connectors deliver each event in the same shape. Each event's `facts` are `{ key, value, url? }` entries registered for its `type` (see the event types in the webhooks guide). Omit `cursor` to get a cursor for the current time without any events, then pass each response's `nextCursor` as `cursor`. When `hasMore` is false you have caught up; keep the cursor to poll for later events. Filter by `types` or `assetId` to receive only some events; a cursor belongs to its filters, and one used with other filters returns `cursor/invalid`. Polling receives new events without a public webhook URL, for example during local development.",
       "names": {
         "javascript": "events.list",
         "python": "events.list",

@@ -4284,7 +4284,9 @@
         {
           "status": 202,
           "body": {
-            "queued": true
+            "batchId": "batch-1",
+            "status": "queued",
+            "assetCount": 2
           },
           "headers": {
             "x-request-id": "req-1",
@@ -4304,7 +4306,9 @@
           },
           "expect": {
             "result": {
-              "queued": true
+              "batchId": "batch-1",
+              "status": "queued",
+              "assetCount": 2
             }
           }
         }
@@ -4343,7 +4347,9 @@
         {
           "status": 202,
           "body": {
-            "queued": true
+            "batchId": "batch-2",
+            "status": "queued",
+            "assetCount": 1
           },
           "headers": {
             "x-request-id": "req-1",
@@ -4362,7 +4368,9 @@
           },
           "expect": {
             "result": {
-              "queued": true
+              "batchId": "batch-2",
+              "status": "queued",
+              "assetCount": 1
             }
           }
         }
@@ -6883,7 +6891,7 @@
       ]
     },
     {
-      "name": "assets.deleteContent is not retried: it carries no Idempotency-Key",
+      "name": "assets.removeContent is not retried: it carries no Idempotency-Key",
       "area": "retries",
       "client": {
         "maxRetries": 2
@@ -6901,7 +6909,7 @@
       ],
       "steps": [
         {
-          "operation": "assets.deleteContent",
+          "operation": "assets.removeContent",
           "args": {
             "assetId": "asset-1"
           },
@@ -10809,10 +10817,14 @@
                 "description": null,
                 "assetId": "asset-1",
                 "asset": null,
+                "actor": {
+                  "type": "automated",
+                  "id": null
+                },
                 "facts": [
                   {
-                    "key": "decided-by",
-                    "value": "automated"
+                    "key": "flagged-categories",
+                    "value": []
                   }
                 ],
                 "createdAt": 1760000000000
@@ -10826,10 +10838,14 @@
                 "description": null,
                 "assetId": "asset-2",
                 "asset": null,
+                "actor": {
+                  "type": "automated",
+                  "id": null
+                },
                 "facts": [
                   {
-                    "key": "decided-by",
-                    "value": "automated"
+                    "key": "flagged-categories",
+                    "value": []
                   }
                 ],
                 "createdAt": 1760000000001
@@ -10857,10 +10873,14 @@
                 "description": null,
                 "assetId": "asset-1",
                 "asset": null,
+                "actor": {
+                  "type": "automated",
+                  "id": null
+                },
                 "facts": [
                   {
-                    "key": "decided-by",
-                    "value": "automated"
+                    "key": "flagged-categories",
+                    "value": []
                   }
                 ],
                 "createdAt": 1760000000000
@@ -10896,10 +10916,14 @@
                     "description": null,
                     "assetId": "asset-1",
                     "asset": null,
+                    "actor": {
+                      "type": "automated",
+                      "id": null
+                    },
                     "facts": [
                       {
-                        "key": "decided-by",
-                        "value": "automated"
+                        "key": "flagged-categories",
+                        "value": []
                       }
                     ],
                     "createdAt": 1760000000000
@@ -10913,10 +10937,14 @@
                     "description": null,
                     "assetId": "asset-2",
                     "asset": null,
+                    "actor": {
+                      "type": "automated",
+                      "id": null
+                    },
                     "facts": [
                       {
-                        "key": "decided-by",
-                        "value": "automated"
+                        "key": "flagged-categories",
+                        "value": []
                       }
                     ],
                     "createdAt": 1760000000001
@@ -10937,10 +10965,14 @@
                     "description": null,
                     "assetId": "asset-1",
                     "asset": null,
+                    "actor": {
+                      "type": "automated",
+                      "id": null
+                    },
                     "facts": [
                       {
-                        "key": "decided-by",
-                        "value": "automated"
+                        "key": "flagged-categories",
+                        "value": []
                       }
                     ],
                     "createdAt": 1760000000000
@@ -11088,10 +11120,14 @@
                 "description": null,
                 "assetId": "asset-1",
                 "asset": null,
+                "actor": {
+                  "type": "automated",
+                  "id": null
+                },
                 "facts": [
                   {
-                    "key": "decided-by",
-                    "value": "automated"
+                    "key": "flagged-categories",
+                    "value": []
                   }
                 ],
                 "createdAt": 1760000000000
@@ -11148,10 +11184,14 @@
                     "description": null,
                     "assetId": "asset-1",
                     "asset": null,
+                    "actor": {
+                      "type": "automated",
+                      "id": null
+                    },
                     "facts": [
                       {
-                        "key": "decided-by",
-                        "value": "automated"
+                        "key": "flagged-categories",
+                        "value": []
                       }
                     ],
                     "createdAt": 1760000000000

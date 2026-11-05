@@ -70,7 +70,7 @@ export type AssetClassificationStatus = KnownAssetClassificationStatus | (string
 /**
  * Why processing failed: `file-too-large`, `duration-limit`, `resolution-limit`,
  * `unsupported-format`, `undecodable-content`, `multiple-tracks`, `type-mismatch`,
- * `free-upload-limit`, `child-failed` or `processing-error`.
+ * `free-uploads-exhausted`, `media-limit`, `uploads-paused`, `child-failed` or `processing-error`.
  */
 export type AssetClassificationFailureReason =
   | NonNullable<SharedAssetClassification["failureReason"]>
@@ -529,7 +529,7 @@ export interface DeleteAssetOptions {
   assetId: string;
 }
 
-export interface DeleteAssetContentOptions {
+export interface RemoveAssetContentOptions {
   assetId: string;
 }
 
@@ -545,7 +545,7 @@ export interface BatchAssetsOptions {
   operation: AssetBatchOperation;
 }
 
-/** `assets.batch` resolves once the operation is queued: `{ queued: true }`. */
+/** `assets.batch` resolves once the operation is queued: `{ batchId, status: "queued", assetCount }`. */
 export type BatchAssetsResponse = PostAssetBatchOperationResponse;
 
 export type UpdateAssetOptions = PatchAssetBody & { assetId: string };

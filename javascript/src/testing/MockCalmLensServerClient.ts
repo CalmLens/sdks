@@ -220,7 +220,7 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
    * Applies a reviewer's decision to a stored asset, as the portal or API would: the moderation
    * status changes (`purged` also removes the content, with reason `requested` and an
    * `asset.content-removed` event), the review joins `manualReviews`, and an `asset.<decision>`
-   * event with a `decided-by: reviewer` fact joins the events feed. Rejects with
+   * event whose `actor` is a `user` joins the events feed. Rejects with
    * `asset/not-found` for an unknown asset. It sends no request.
    */
   decide(assetId: string, decision: MockReviewDecision): Promise<Asset> {

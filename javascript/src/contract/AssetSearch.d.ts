@@ -78,15 +78,15 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         "child-failed": "child-failed";
         "duration-limit": "duration-limit";
         "file-too-large": "file-too-large";
-        "free-upload-limit": "free-upload-limit";
+        "free-uploads-exhausted": "free-uploads-exhausted";
         "media-limit": "media-limit";
         "multiple-tracks": "multiple-tracks";
         "processing-error": "processing-error";
         "resolution-limit": "resolution-limit";
-        "spend-limit": "spend-limit";
         "type-mismatch": "type-mismatch";
         "undecodable-content": "undecodable-content";
         "unsupported-format": "unsupported-format";
+        "uploads-paused": "uploads-paused";
       }>>;
       updatedAt: zod.ZodNullable<zod.ZodNumber>;
       completedAt: zod.ZodNullable<zod.ZodNumber>;
@@ -4764,8 +4764,8 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             source: zod.ZodEnum<{
               "hash-list": "hash-list";
             }>;
-            listId: zod.ZodString;
-            entryId: zod.ZodString;
+            hashListId: zod.ZodString;
+            hashListEntryId: zod.ZodString;
             distance: zod.ZodNumber;
             action: zod.ZodEnum<{
               block: "block";

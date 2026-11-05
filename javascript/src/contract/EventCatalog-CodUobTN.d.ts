@@ -21,9 +21,11 @@ type EventCategory = zod.infer<typeof EVENT_CATEGORY_SCHEMA>;
  * - `enum`: a machine value such as `rejected`, shown humanized ("Rejected")
  * - `list`: an array of machine values, shown humanized and comma separated
  * - `number`: a count, shown with thousands separators
+ * - `date`: a time in milliseconds since the Unix epoch, shown as its UTC date
  */
 declare const EVENT_FIELD_DISPLAY_SCHEMA: zod.ZodEnum<{
   code: "code";
+  date: "date";
   enum: "enum";
   list: "list";
   number: "number";
@@ -41,6 +43,11 @@ interface EventFieldInfo {
    * and the public events feed, leave the fact out and word the title and description without it.
    */
   inAppOnly?: boolean;
+  /**
+   * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+   * fact. Deleting their account removes it from the events that name them.
+   */
+  names?: "actor" | "member";
   /** Display names for `enum` and `list` values that don't read well humanized. */
   valueLabels?: Readonly<Record<string, string>>;
 }
@@ -94,6 +101,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -140,7 +152,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>>;
       parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
-      flaggedCategories: EventFieldDefinition<zod.ZodArray<zod.ZodString>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>;
       moderationStatus: EventFieldDefinition<zod.ZodEnum<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
@@ -162,7 +183,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
-      flaggedCategories: string[];
+      flaggedCategories: ("criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence")[];
       moderationStatus: "age-restricted" | "allowed" | "blocked" | "limited" | "pending" | "purged";
       automatedStatus?: "age-restricted" | "allowed" | "blocked" | "limited" | "purged" | undefined;
     }>;
@@ -177,6 +198,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -194,7 +220,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>;
       parentAsset: zod.ZodOptional<zod.ZodString>;
-      flaggedCategories: zod.ZodArray<zod.ZodString>;
+      flaggedCategories: zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>;
       moderationStatus: zod.ZodEnum<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
@@ -276,6 +311,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -338,13 +378,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>>;
       parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
-      decidedBy: EventFieldDefinition<zod.ZodEnum<{
-        "api-key": "api-key";
-        automated: "automated";
-        reviewer: "reviewer";
-      }>>;
-      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodString>>>;
-      reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>>;
       reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
@@ -353,9 +396,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
-      decidedBy: "api-key" | "automated" | "reviewer";
-      flaggedCategories?: string[] | undefined;
-      reviewerUserId?: string | null | undefined;
+      flaggedCategories?: ("criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence")[] | undefined;
       reviewerName?: string | null | undefined;
       note?: string | null | undefined;
     }>;
@@ -370,6 +411,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -387,13 +433,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>;
       parentAsset: zod.ZodOptional<zod.ZodString>;
-      decidedBy: zod.ZodEnum<{
-        "api-key": "api-key";
-        automated: "automated";
-        reviewer: "reviewer";
-      }>;
-      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodString>>;
-      reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>;
       reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
@@ -425,13 +474,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>>;
       parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
-      decidedBy: EventFieldDefinition<zod.ZodEnum<{
-        "api-key": "api-key";
-        automated: "automated";
-        reviewer: "reviewer";
-      }>>;
-      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodString>>>;
-      reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>>;
       reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
@@ -440,9 +492,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
-      decidedBy: "api-key" | "automated" | "reviewer";
-      flaggedCategories?: string[] | undefined;
-      reviewerUserId?: string | null | undefined;
+      flaggedCategories?: ("criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence")[] | undefined;
       reviewerName?: string | null | undefined;
       note?: string | null | undefined;
     }>;
@@ -457,6 +507,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -474,13 +529,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>;
       parentAsset: zod.ZodOptional<zod.ZodString>;
-      decidedBy: zod.ZodEnum<{
-        "api-key": "api-key";
-        automated: "automated";
-        reviewer: "reviewer";
-      }>;
-      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodString>>;
-      reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>;
       reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
@@ -512,13 +570,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>>;
       parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
-      decidedBy: EventFieldDefinition<zod.ZodEnum<{
-        "api-key": "api-key";
-        automated: "automated";
-        reviewer: "reviewer";
-      }>>;
-      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodString>>>;
-      reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>>;
       reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
@@ -527,9 +588,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
-      decidedBy: "api-key" | "automated" | "reviewer";
-      flaggedCategories?: string[] | undefined;
-      reviewerUserId?: string | null | undefined;
+      flaggedCategories?: ("criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence")[] | undefined;
       reviewerName?: string | null | undefined;
       note?: string | null | undefined;
     }>;
@@ -544,6 +603,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -561,13 +625,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>;
       parentAsset: zod.ZodOptional<zod.ZodString>;
-      decidedBy: zod.ZodEnum<{
-        "api-key": "api-key";
-        automated: "automated";
-        reviewer: "reviewer";
-      }>;
-      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodString>>;
-      reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>;
       reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
@@ -599,13 +666,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>>;
       parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
-      decidedBy: EventFieldDefinition<zod.ZodEnum<{
-        "api-key": "api-key";
-        automated: "automated";
-        reviewer: "reviewer";
-      }>>;
-      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodString>>>;
-      reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>>;
       reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
@@ -614,9 +684,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
-      decidedBy: "api-key" | "automated" | "reviewer";
-      flaggedCategories?: string[] | undefined;
-      reviewerUserId?: string | null | undefined;
+      flaggedCategories?: ("criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence")[] | undefined;
       reviewerName?: string | null | undefined;
       note?: string | null | undefined;
     }>;
@@ -631,6 +699,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -648,13 +721,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>;
       parentAsset: zod.ZodOptional<zod.ZodString>;
-      decidedBy: zod.ZodEnum<{
-        "api-key": "api-key";
-        automated: "automated";
-        reviewer: "reviewer";
-      }>;
-      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodString>>;
-      reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>;
       reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
@@ -686,13 +762,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>>;
       parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
-      decidedBy: EventFieldDefinition<zod.ZodEnum<{
-        "api-key": "api-key";
-        automated: "automated";
-        reviewer: "reviewer";
-      }>>;
-      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodString>>>;
-      reviewerUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      flaggedCategories: EventFieldDefinition<zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>>;
       reviewerName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       note: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
@@ -701,9 +780,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
-      decidedBy: "api-key" | "automated" | "reviewer";
-      flaggedCategories?: string[] | undefined;
-      reviewerUserId?: string | null | undefined;
+      flaggedCategories?: ("criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence")[] | undefined;
       reviewerName?: string | null | undefined;
       note?: string | null | undefined;
     }>;
@@ -718,6 +795,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -735,13 +817,16 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>;
       parentAsset: zod.ZodOptional<zod.ZodString>;
-      decidedBy: zod.ZodEnum<{
-        "api-key": "api-key";
-        automated: "automated";
-        reviewer: "reviewer";
-      }>;
-      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodString>>;
-      reviewerUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      flaggedCategories: zod.ZodOptional<zod.ZodArray<zod.ZodEnum<{
+        "criminal-activity": "criminal-activity";
+        harassment: "harassment";
+        hate: "hate";
+        "personal-information": "personal-information";
+        profanity: "profanity";
+        "self-harm": "self-harm";
+        sexual: "sexual";
+        violence: "violence";
+      }>>>;
       reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       note: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
@@ -783,15 +868,15 @@ declare const EVENT_TYPE_INFO: {
         "child-failed": "child-failed";
         "duration-limit": "duration-limit";
         "file-too-large": "file-too-large";
-        "free-upload-limit": "free-upload-limit";
+        "free-uploads-exhausted": "free-uploads-exhausted";
         "media-limit": "media-limit";
         "multiple-tracks": "multiple-tracks";
         "processing-error": "processing-error";
         "resolution-limit": "resolution-limit";
-        "spend-limit": "spend-limit";
         "type-mismatch": "type-mismatch";
         "undecodable-content": "undecodable-content";
         "unsupported-format": "unsupported-format";
+        "uploads-paused": "uploads-paused";
       }>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
@@ -800,7 +885,7 @@ declare const EVENT_TYPE_INFO: {
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
       previousStatus?: "completed" | "failed" | "processing" | "queued" | null | undefined;
-      failureReason: "child-failed" | "duration-limit" | "file-too-large" | "free-upload-limit" | "media-limit" | "multiple-tracks" | "processing-error" | "resolution-limit" | "spend-limit" | "type-mismatch" | "undecodable-content" | "unsupported-format";
+      failureReason: "child-failed" | "duration-limit" | "file-too-large" | "free-uploads-exhausted" | "media-limit" | "multiple-tracks" | "processing-error" | "resolution-limit" | "type-mismatch" | "undecodable-content" | "unsupported-format" | "uploads-paused";
     }>;
     factInfo: {
       label: string;
@@ -813,6 +898,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -840,20 +930,20 @@ declare const EVENT_TYPE_INFO: {
         "child-failed": "child-failed";
         "duration-limit": "duration-limit";
         "file-too-large": "file-too-large";
-        "free-upload-limit": "free-upload-limit";
+        "free-uploads-exhausted": "free-uploads-exhausted";
         "media-limit": "media-limit";
         "multiple-tracks": "multiple-tracks";
         "processing-error": "processing-error";
         "resolution-limit": "resolution-limit";
-        "spend-limit": "spend-limit";
         "type-mismatch": "type-mismatch";
         "undecodable-content": "undecodable-content";
         "unsupported-format": "unsupported-format";
+        "uploads-paused": "uploads-paused";
       }>;
     }, zod.core.$strip>;
   };
-  readonly "asset.processing-progress": {
-    id: "asset.processing-progress";
+  readonly "asset.progress-updated": {
+    id: "asset.progress-updated";
     name: string;
     description: string;
     category: EventCategory;
@@ -899,6 +989,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -945,11 +1040,13 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      batchId: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      batchId?: string | undefined;
     }>;
     factInfo: {
       label: string;
@@ -962,6 +1059,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -978,6 +1080,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      batchId: zod.ZodOptional<zod.ZodString>;
     }, zod.core.$strip>;
   };
   readonly "asset.content-removed": {
@@ -1006,11 +1109,13 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      batchId: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      batchId?: string | undefined;
     }>;
     factInfo: {
       label: string;
@@ -1023,6 +1128,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1039,6 +1149,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      batchId: zod.ZodOptional<zod.ZodString>;
     }, zod.core.$strip>;
   };
   readonly "asset.retried": {
@@ -1084,6 +1195,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1170,6 +1286,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1265,6 +1386,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1355,6 +1481,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1389,8 +1520,8 @@ declare const EVENT_TYPE_INFO: {
       }>;
     }, zod.core.$strip>;
   };
-  readonly "usage.limit-reached": {
-    id: "usage.limit-reached";
+  readonly "usage.free-uploads-exhausted": {
+    id: "usage.free-uploads-exhausted";
     name: string;
     description: string;
     category: EventCategory;
@@ -1426,6 +1557,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1437,8 +1573,8 @@ declare const EVENT_TYPE_INFO: {
       organisationId: zod.ZodString;
     }, zod.core.$strip>;
   };
-  readonly "usage.spend-limit-reached": {
-    id: "usage.spend-limit-reached";
+  readonly "usage.uploads-paused": {
+    id: "usage.uploads-paused";
     name: string;
     description: string;
     category: EventCategory;
@@ -1459,12 +1595,12 @@ declare const EVENT_TYPE_INFO: {
         "spend-limit": "spend-limit";
         "usage-cap": "usage-cap";
       }>>;
-      resumesOn: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      resumesAt: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       reason: "payment-failed" | "project-budget" | "spend-limit" | "usage-cap";
-      resumesOn?: string | null | undefined;
+      resumesAt?: number | null | undefined;
     }>;
     factInfo: {
       label: string;
@@ -1477,6 +1613,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1489,7 +1630,7 @@ declare const EVENT_TYPE_INFO: {
         "spend-limit": "spend-limit";
         "usage-cap": "usage-cap";
       }>;
-      resumesOn: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      resumesAt: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
     }, zod.core.$strip>;
   };
   readonly "upload-preset.daily-limit-reached": {
@@ -1529,6 +1670,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1564,14 +1710,12 @@ declare const EVENT_TYPE_INFO: {
         editor: "editor";
         viewer: "viewer";
       }>>;
-      invitedByUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       memberUserId: string;
       memberName?: string | null | undefined;
       role: "admin" | "custom" | "editor" | "viewer";
-      invitedByUserId?: string | null | undefined;
     }>;
     factInfo: {
       label: string;
@@ -1584,6 +1728,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1598,7 +1747,6 @@ declare const EVENT_TYPE_INFO: {
         editor: "editor";
         viewer: "viewer";
       }>;
-      invitedByUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
   };
   readonly "project.member-removed": {
@@ -1625,16 +1773,12 @@ declare const EVENT_TYPE_INFO: {
         editor: "editor";
         viewer: "viewer";
       }>>;
-      left: EventFieldDefinition<zod.ZodBoolean>;
-      removedByUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       memberUserId: string;
       memberName?: string | null | undefined;
       role: "admin" | "custom" | "editor" | "viewer";
-      left: boolean;
-      removedByUserId?: string | null | undefined;
     }>;
     factInfo: {
       label: string;
@@ -1647,6 +1791,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1661,8 +1810,69 @@ declare const EVENT_TYPE_INFO: {
         editor: "editor";
         viewer: "viewer";
       }>;
-      left: zod.ZodBoolean;
-      removedByUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, zod.core.$strip>;
+  };
+  readonly "project.member-left": {
+    id: "project.member-left";
+    name: string;
+    description: string;
+    category: EventCategory;
+    severity: EventSeverity;
+    /** Whether the in-app connector (notification bell) subscribes to the type by default. */
+    notify: boolean;
+    /**
+     * The project-wide permission needed to see events of this type (portal feed, public events
+     * feed) and to subscribe a connector to it.
+     */
+    permission: PermissionAction;
+    /** Types of unreleased features are left out of the published contract until enabled. */
+    enabled?: boolean;
+    fields: {
+      memberUserId: EventFieldDefinition<zod.ZodString>;
+      memberName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      role: EventFieldDefinition<zod.ZodEnum<{
+        admin: "admin";
+        custom: "custom";
+        editor: "editor";
+        viewer: "viewer";
+      }>>;
+    };
+    /** Example data, used for synthetic test sends (`createSampleEvent`). */
+    example: NoInfer<{
+      memberUserId: string;
+      memberName?: string | null | undefined;
+      role: "admin" | "custom" | "editor" | "viewer";
+    }>;
+    factInfo: {
+      label: string;
+      description: string;
+      display: EventFieldDisplay;
+      /** Kept in the data but left out of rendered messages (usually an ID shown by another field). */
+      hidden?: boolean;
+      /**
+       * Personal or account-level data that stays in the portal. Webhook, Slack and email deliveries,
+       * and the public events feed, leave the fact out and word the title and description without it.
+       */
+      inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
+      /** Display names for `enum` and `list` values that don't read well humanized. */
+      valueLabels?: Readonly<Record<string, string>>;
+      schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
+      key: string;
+    }[];
+    values: zod.ZodObject<{
+      memberUserId: zod.ZodString;
+      memberName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      role: zod.ZodEnum<{
+        admin: "admin";
+        custom: "custom";
+        editor: "editor";
+        viewer: "viewer";
+      }>;
     }, zod.core.$strip>;
   };
   readonly "project.member-role-changed": {
@@ -1695,7 +1905,6 @@ declare const EVENT_TYPE_INFO: {
         editor: "editor";
         viewer: "viewer";
       }>>;
-      changedByUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
@@ -1703,7 +1912,6 @@ declare const EVENT_TYPE_INFO: {
       memberName?: string | null | undefined;
       previousRole: "admin" | "custom" | "editor" | "viewer";
       role: "admin" | "custom" | "editor" | "viewer";
-      changedByUserId?: string | null | undefined;
     }>;
     factInfo: {
       label: string;
@@ -1716,6 +1924,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1736,7 +1949,6 @@ declare const EVENT_TYPE_INFO: {
         editor: "editor";
         viewer: "viewer";
       }>;
-      changedByUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
   };
   readonly "project.invitation-sent": {
@@ -1762,13 +1974,11 @@ declare const EVENT_TYPE_INFO: {
         editor: "editor";
         viewer: "viewer";
       }>>;
-      invitedByUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       inviteeEmail: string;
       role: "admin" | "custom" | "editor" | "viewer";
-      invitedByUserId?: string | null | undefined;
     }>;
     factInfo: {
       label: string;
@@ -1781,6 +1991,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1794,7 +2009,6 @@ declare const EVENT_TYPE_INFO: {
         editor: "editor";
         viewer: "viewer";
       }>;
-      invitedByUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
   };
   readonly "project.transferred": {
@@ -1817,10 +2031,12 @@ declare const EVENT_TYPE_INFO: {
       previousOrganisationName: EventFieldDefinition<zod.ZodString>;
       organisationId: EventFieldDefinition<zod.ZodString>;
       organisationName: EventFieldDefinition<zod.ZodString>;
-      handover: EventFieldDefinition<zod.ZodBoolean>;
+      method: EventFieldDefinition<zod.ZodEnum<{
+        handover: "handover";
+        move: "move";
+      }>>;
       apiKeysRevoked: EventFieldDefinition<zod.ZodNumber>;
       connectorsPaused: EventFieldDefinition<zod.ZodNumber>;
-      transferredByUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
@@ -1828,10 +2044,9 @@ declare const EVENT_TYPE_INFO: {
       previousOrganisationName: string;
       organisationId: string;
       organisationName: string;
-      handover: boolean;
+      method: "handover" | "move";
       apiKeysRevoked: number;
       connectorsPaused: number;
-      transferredByUserId?: string | null | undefined;
     }>;
     factInfo: {
       label: string;
@@ -1844,6 +2059,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1854,10 +2074,12 @@ declare const EVENT_TYPE_INFO: {
       previousOrganisationName: zod.ZodString;
       organisationId: zod.ZodString;
       organisationName: zod.ZodString;
-      handover: zod.ZodBoolean;
+      method: zod.ZodEnum<{
+        handover: "handover";
+        move: "move";
+      }>;
       apiKeysRevoked: zod.ZodNumber;
       connectorsPaused: zod.ZodNumber;
-      transferredByUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
   };
   readonly "api-key.created": {
@@ -1884,7 +2106,6 @@ declare const EVENT_TYPE_INFO: {
         editor: "editor";
         viewer: "viewer";
       }>>;
-      createdByUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       createdByName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
@@ -1892,7 +2113,6 @@ declare const EVENT_TYPE_INFO: {
       keyId: string;
       keyName?: string | null | undefined;
       role: "admin" | "custom" | "editor" | "viewer";
-      createdByUserId?: string | null | undefined;
       createdByName?: string | null | undefined;
     }>;
     factInfo: {
@@ -1906,6 +2126,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1920,7 +2145,6 @@ declare const EVENT_TYPE_INFO: {
         editor: "editor";
         viewer: "viewer";
       }>;
-      createdByUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       createdByName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
   };
@@ -1942,19 +2166,12 @@ declare const EVENT_TYPE_INFO: {
     fields: {
       keyId: EventFieldDefinition<zod.ZodString>;
       keyName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
-      action: EventFieldDefinition<zod.ZodEnum<{
-        deleted: "deleted";
-        revoked: "revoked";
-      }>>;
-      revokedByUserId: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       revokedByName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       keyId: string;
       keyName?: string | null | undefined;
-      action: "deleted" | "revoked";
-      revokedByUserId?: string | null | undefined;
       revokedByName?: string | null | undefined;
     }>;
     factInfo: {
@@ -1968,6 +2185,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -1976,16 +2198,64 @@ declare const EVENT_TYPE_INFO: {
     values: zod.ZodObject<{
       keyId: zod.ZodString;
       keyName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-      action: zod.ZodEnum<{
-        deleted: "deleted";
-        revoked: "revoked";
-      }>;
-      revokedByUserId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       revokedByName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
   };
-  readonly "connector.failing": {
-    id: "connector.failing";
+  readonly "api-key.deleted": {
+    id: "api-key.deleted";
+    name: string;
+    description: string;
+    category: EventCategory;
+    severity: EventSeverity;
+    /** Whether the in-app connector (notification bell) subscribes to the type by default. */
+    notify: boolean;
+    /**
+     * The project-wide permission needed to see events of this type (portal feed, public events
+     * feed) and to subscribe a connector to it.
+     */
+    permission: PermissionAction;
+    /** Types of unreleased features are left out of the published contract until enabled. */
+    enabled?: boolean;
+    fields: {
+      keyId: EventFieldDefinition<zod.ZodString>;
+      keyName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+      deletedByName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
+    };
+    /** Example data, used for synthetic test sends (`createSampleEvent`). */
+    example: NoInfer<{
+      keyId: string;
+      keyName?: string | null | undefined;
+      deletedByName?: string | null | undefined;
+    }>;
+    factInfo: {
+      label: string;
+      description: string;
+      display: EventFieldDisplay;
+      /** Kept in the data but left out of rendered messages (usually an ID shown by another field). */
+      hidden?: boolean;
+      /**
+       * Personal or account-level data that stays in the portal. Webhook, Slack and email deliveries,
+       * and the public events feed, leave the fact out and word the title and description without it.
+       */
+      inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
+      /** Display names for `enum` and `list` values that don't read well humanized. */
+      valueLabels?: Readonly<Record<string, string>>;
+      schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
+      key: string;
+    }[];
+    values: zod.ZodObject<{
+      keyId: zod.ZodString;
+      keyName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+      deletedByName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
+    }, zod.core.$strip>;
+  };
+  readonly "connector.disabled": {
+    id: "connector.disabled";
     name: string;
     description: string;
     category: EventCategory;
@@ -2002,7 +2272,12 @@ declare const EVENT_TYPE_INFO: {
     fields: {
       connectorId: EventFieldDefinition<zod.ZodString>;
       connectorName: EventFieldDefinition<zod.ZodString>;
-      connectorType: EventFieldDefinition<zod.ZodString>;
+      connectorType: EventFieldDefinition<zod.ZodEnum<{
+        email: "email";
+        "in-app": "in-app";
+        slack: "slack";
+        webhook: "webhook";
+      }>>;
       consecutiveFailures: EventFieldDefinition<zod.ZodNumber>;
       lastError: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
     };
@@ -2010,7 +2285,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       connectorId: string;
       connectorName: string;
-      connectorType: string;
+      connectorType: "email" | "in-app" | "slack" | "webhook";
       consecutiveFailures: number;
       lastError?: string | null | undefined;
     }>;
@@ -2025,6 +2300,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -2033,7 +2313,12 @@ declare const EVENT_TYPE_INFO: {
     values: zod.ZodObject<{
       connectorId: zod.ZodString;
       connectorName: zod.ZodString;
-      connectorType: zod.ZodString;
+      connectorType: zod.ZodEnum<{
+        email: "email";
+        "in-app": "in-app";
+        slack: "slack";
+        webhook: "webhook";
+      }>;
       consecutiveFailures: zod.ZodNumber;
       lastError: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
     }, zod.core.$strip>;
@@ -2080,6 +2365,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
@@ -2147,6 +2437,11 @@ declare const EVENT_TYPE_INFO: {
        * and the public events feed, leave the fact out and word the title and description without it.
        */
       inAppOnly?: boolean;
+      /**
+       * A person's name: `actor` names the event's `actor`, `member` the member in the `member-user-id`
+       * fact. Deleting their account removes it from the events that name them.
+       */
+      names?: "actor" | "member";
       /** Display names for `enum` and `list` values that don't read well humanized. */
       valueLabels?: Readonly<Record<string, string>>;
       schema: zod.ZodType<unknown, unknown, zod.core.$ZodTypeInternals<unknown, unknown>>;
