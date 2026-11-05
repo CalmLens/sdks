@@ -58,6 +58,7 @@ declare const PUBLIC_ERROR_CODES: {
   readonly INVALID_IDEMPOTENCY_KEY: RequestErrorCode;
   readonly IDEMPOTENCY_KEY_REUSED: RequestErrorCode;
   readonly IDEMPOTENT_REQUEST_IN_PROGRESS: RequestErrorCode;
+  readonly NO_RENDERED_VERSION: RequestErrorCode;
   readonly ASSET_NOT_FOUND: RequestErrorCode;
   readonly PROJECT_NOT_FOUND: RequestErrorCode;
   readonly ASSET_REVIEW_CHANGED: RequestErrorCode;

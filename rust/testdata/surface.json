@@ -1655,6 +1655,11 @@
       "retryable": true
     },
     {
+      "code": "asset/no-rendered-version",
+      "status": 404,
+      "retryable": false
+    },
+    {
       "code": "asset/not-found",
       "status": 404,
       "retryable": false

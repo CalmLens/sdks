@@ -53,6 +53,7 @@ export const API_ERROR_CODES = {
   INVALID_IDEMPOTENCY_KEY: "idempotency/invalid-key",
   IDEMPOTENCY_KEY_REUSED: "idempotency/key-reused",
   IDEMPOTENT_REQUEST_IN_PROGRESS: "idempotency/request-in-progress",
+  NO_RENDERED_VERSION: "asset/no-rendered-version",
   ASSET_NOT_FOUND: "asset/not-found",
   PROJECT_NOT_FOUND: "project/not-found",
   ASSET_REVIEW_CHANGED: "asset/review-changed",
@@ -328,6 +329,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "idempotency/request-in-progress": {
     status: 409,
     message: "A request with this Idempotency-Key is still being processed. Retry after the Retry-After delay to receive its result.",
+  },
+  "asset/no-rendered-version": {
+    status: 404,
+    message: "This asset has no rendered version, such as a document whose page image hasn't been generated or a text asset. Request its original resource instead.",
   },
   "asset/not-found": {
     status: 404,

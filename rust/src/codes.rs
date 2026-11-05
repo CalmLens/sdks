@@ -102,6 +102,8 @@ error_codes! {
     IdempotencyKeyReused = "idempotency/key-reused", 409;
     /// `idempotency/request-in-progress` (HTTP 409): A request with this Idempotency-Key is still being processed. Retry after the Retry-After delay to receive its result.
     IdempotentRequestInProgress = "idempotency/request-in-progress", 409;
+    /// `asset/no-rendered-version` (HTTP 404): This asset has no rendered version, such as a document whose page image hasn't been generated or a text asset. Request its original resource instead.
+    NoRenderedVersion = "asset/no-rendered-version", 404;
     /// `asset/not-found` (HTTP 404): Asset not found
     AssetNotFound = "asset/not-found", 404;
     /// `project/not-found` (HTTP 404): Project not found

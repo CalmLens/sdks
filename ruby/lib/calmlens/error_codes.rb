@@ -56,6 +56,7 @@ module CalmLens
     INVALID_IDEMPOTENCY_KEY = 'idempotency/invalid-key'
     IDEMPOTENCY_KEY_REUSED = 'idempotency/key-reused'
     IDEMPOTENT_REQUEST_IN_PROGRESS = 'idempotency/request-in-progress'
+    NO_RENDERED_VERSION = 'asset/no-rendered-version'
     ASSET_NOT_FOUND = 'asset/not-found'
     PROJECT_NOT_FOUND = 'project/not-found'
     ASSET_REVIEW_CHANGED = 'asset/review-changed'
@@ -171,6 +172,7 @@ module CalmLens
       'idempotency/invalid-key' => 400,
       'idempotency/key-reused' => 409,
       'idempotency/request-in-progress' => 409,
+      'asset/no-rendered-version' => 404,
       'asset/not-found' => 404,
       'project/not-found' => 404,
       'asset/review-changed' => 409,

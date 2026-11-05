@@ -104,6 +104,8 @@ public final class ErrorCodes {
   public static final String IDEMPOTENCY_KEY_REUSED = "idempotency/key-reused";
   /** {@code idempotency/request-in-progress} (HTTP 409). */
   public static final String IDEMPOTENT_REQUEST_IN_PROGRESS = "idempotency/request-in-progress";
+  /** {@code asset/no-rendered-version} (HTTP 404). */
+  public static final String NO_RENDERED_VERSION = "asset/no-rendered-version";
   /** {@code asset/not-found} (HTTP 404). */
   public static final String ASSET_NOT_FOUND = "asset/not-found";
   /** {@code project/not-found} (HTTP 404). */
@@ -307,6 +309,7 @@ public final class ErrorCodes {
       Map.entry(INVALID_IDEMPOTENCY_KEY, 400),
       Map.entry(IDEMPOTENCY_KEY_REUSED, 409),
       Map.entry(IDEMPOTENT_REQUEST_IN_PROGRESS, 409),
+      Map.entry(NO_RENDERED_VERSION, 404),
       Map.entry(ASSET_NOT_FOUND, 404),
       Map.entry(PROJECT_NOT_FOUND, 404),
       Map.entry(ASSET_REVIEW_CHANGED, 409),

@@ -107,6 +107,8 @@ const (
 	CodeIdempotencyKeyReused = "idempotency/key-reused"
 	// CodeIdempotentRequestInProgress is returned with HTTP 409.
 	CodeIdempotentRequestInProgress = "idempotency/request-in-progress"
+	// CodeNoRenderedVersion is returned with HTTP 404.
+	CodeNoRenderedVersion = "asset/no-rendered-version"
 	// CodeAssetNotFound is returned with HTTP 404.
 	CodeAssetNotFound = "asset/not-found"
 	// CodeProjectNotFound is returned with HTTP 404.
@@ -283,6 +285,7 @@ var publicErrorStatuses = map[string]int{
 	CodeInvalidIdempotencyKey:             400,
 	CodeIdempotencyKeyReused:              409,
 	CodeIdempotentRequestInProgress:       409,
+	CodeNoRenderedVersion:                 404,
 	CodeAssetNotFound:                     404,
 	CodeProjectNotFound:                   404,
 	CodeAssetReviewChanged:                409,

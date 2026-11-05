@@ -1633,6 +1633,38 @@
     }
   },
   {
+    "code": "asset/no-rendered-version",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-no-rendered-version"
+      },
+      "body": {
+        "code": "asset/no-rendered-version",
+        "message": "This asset has no rendered version, such as a document whose page image hasn't been generated or a text asset. Request its original resource instead.",
+        "requestId": "req-asset-no-rendered-version",
+        "details": {
+          "reason": "no_rendered_version"
+        }
+      }
+    },
+    "expected": {
+      "code": "asset/no-rendered-version",
+      "status": 404,
+      "requestId": "req-asset-no-rendered-version",
+      "retryAfter": null,
+      "details": {
+        "reason": "no_rendered_version"
+      }
+    }
+  },
+  {
     "code": "asset/not-found",
     "status": 404,
     "operation": "assets.retrieve",

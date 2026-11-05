@@ -540,6 +540,11 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "A request with this Idempotency-Key is still being processed. Retry after the Retry-After delay to receive its result.",
 		status: 409
 	}),
+	NO_RENDERED_VERSION: new ErrorCode({
+		id: "asset/no-rendered-version",
+		defaultMessage: "This asset has no rendered version, such as a document whose page image hasn't been generated or a text asset. Request its original resource instead.",
+		status: 404
+	}),
 	ASSET_NOT_FOUND: new ErrorCode({
 		id: "asset/not-found",
 		defaultMessage: "Asset not found",

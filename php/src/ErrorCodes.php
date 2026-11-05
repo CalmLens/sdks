@@ -63,6 +63,7 @@ final class ErrorCodes
     public const INVALID_IDEMPOTENCY_KEY = 'idempotency/invalid-key';
     public const IDEMPOTENCY_KEY_REUSED = 'idempotency/key-reused';
     public const IDEMPOTENT_REQUEST_IN_PROGRESS = 'idempotency/request-in-progress';
+    public const NO_RENDERED_VERSION = 'asset/no-rendered-version';
     public const ASSET_NOT_FOUND = 'asset/not-found';
     public const PROJECT_NOT_FOUND = 'project/not-found';
     public const ASSET_REVIEW_CHANGED = 'asset/review-changed';
@@ -178,6 +179,7 @@ final class ErrorCodes
         'idempotency/invalid-key' => 400,
         'idempotency/key-reused' => 409,
         'idempotency/request-in-progress' => 409,
+        'asset/no-rendered-version' => 404,
         'asset/not-found' => 404,
         'project/not-found' => 404,
         'asset/review-changed' => 409,
