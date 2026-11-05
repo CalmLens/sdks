@@ -991,7 +991,7 @@ async fn refuses_transform_options_the_cdn_refuses() {
 
 // upload-mime-types.json
 
-/// Uploads of every type the API refuses are refused with `upload/invalid-mime-type` before
+/// Uploads of every type the API refuses are refused with `upload/unsupported-type` before
 /// anything is sent; accepted types are stored in the mock scenarios.
 #[tokio::test]
 async fn refuses_upload_mime_types_the_api_refuses() {
@@ -1014,7 +1014,7 @@ async fn refuses_upload_mime_types_the_api_refuses() {
                 ))
                 .await
                 .unwrap_err();
-            assert_eq!(error.code(), &ErrorCode::InvalidUploadMimeType, "{kind}");
+            assert_eq!(error.code(), &ErrorCode::UnsupportedUploadType, "{kind}");
             assert_eq!(
                 error.details().get("mimeType"),
                 Some(&json!(kind)),
@@ -1044,7 +1044,7 @@ async fn validation_and_urls() {
             .await
             .unwrap_err()
             .code(),
-        &"upload/invalid-payload"
+        &ErrorCode::InvalidUploadPayload
     );
     let both = CdnRequest {
         asset_identifier: "x".into(),
@@ -1315,12 +1315,25 @@ async fn run_step(
 }
 
 /// Whether `actual` holds every key of `wanted` with deep-equal values (other keys are free).
+/// Whether `actual` holds each of the `wanted` details. Objects in them (such as each of a
+/// validation error's `issues`) list only the fields to compare.
 fn has_details(actual: &Map<String, Value>, wanted: &Value) -> bool {
-    wanted
-        .as_object()
-        .unwrap()
-        .iter()
-        .all(|(key, value)| actual.get(key) == Some(value))
+    fn matches(actual: &Value, wanted: &Value) -> bool {
+        match (actual, wanted) {
+            (Value::Object(actual), Value::Object(wanted)) => wanted
+                .iter()
+                .all(|(key, value)| actual.get(key).is_some_and(|got| matches(got, value))),
+            (Value::Array(actual), Value::Array(wanted)) => {
+                actual.len() == wanted.len()
+                    && actual
+                        .iter()
+                        .zip(wanted)
+                        .all(|(got, value)| matches(got, value))
+            }
+            _ => actual == wanted,
+        }
+    }
+    matches(&Value::Object(actual.clone()), wanted)
 }
 
 /// Steps a Rust type cannot express, so the type refuses what the scenario expects refused.
@@ -1555,7 +1568,7 @@ fn references() -> BTreeSet<&'static str> {
         "assets().retrieve" => ServerClient::assets, AssetsClient::retrieve;
         "assets().list_children" => ServerClient::assets, AssetsClient::list_children;
         "assets().list_timeline" => ServerClient::assets, AssetsClient::list_timeline;
-        "assets().delete_content" => ServerClient::assets, AssetsClient::delete_content;
+        "assets().remove_content" => ServerClient::assets, AssetsClient::remove_content;
         "assets().delete" => ServerClient::assets, AssetsClient::delete;
         "assets().move_asset" => ServerClient::assets, AssetsClient::move_asset;
         "assets().batch" => ServerClient::assets, AssetsClient::batch;

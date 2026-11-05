@@ -56,7 +56,7 @@ async fn main() -> calmlens::Result<()> {
 }
 ```
 
-`assets().classify` and `text().classify` wait for the decision; `assets().create` queues processing, and `assets().wait_for_decision` or a webhook reports the result. The moderation status decides delivery:
+`assets().classify` and `text().classify` wait for the decision; `assets().create` queues processing, and `assets().wait_for_decision` or a webhook reports the result. `wait_for_decision` returns once the asset is settled: its `classification.status` is `completed`, with the decision in `classification.moderation.status`, or `failed`, with the reason in `classification.failure_reason`. While it is `queued` or `processing` it keeps waiting. The moderation status decides delivery:
 
 | Status           | Meaning                                                                                                   |
 | ---------------- | --------------------------------------------------------------------------------------------------------- |

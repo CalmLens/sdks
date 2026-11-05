@@ -123,7 +123,8 @@ pub fn verify_webhook_signature(
 ///
 /// The body must be a JSON object with string `id`, `type` and `projectId`, a numeric
 /// `createdAt`, and its other fields, when present, must have the API's types: `severity` and `title` strings, `description` and `assetId` strings or null, `assetSequence` a number or null, `asset` null or
-/// an object with a string `id`, and `facts` an array of `{key, value, url?}` objects with a
+/// an object with a string `id`, `actor` an object with a string `type` and an `id` string or null,
+/// and `facts` an array of `{key, value, url?}` objects with a
 /// string `key` and `url`. Anything else returns `sdk/invalid-webhook-payload`. Unknown fields
 /// are kept: [`WebhookEventPayload::json`] returns the body as received.
 pub fn parse_webhook_event(body: impl AsRef<[u8]>) -> Result<WebhookEventPayload> {
@@ -184,6 +185,13 @@ fn check_payload(value: &Value) -> std::result::Result<(), &'static str> {
         None | Some(Value::Null) => {}
         Some(Value::Object(asset)) if string(asset, "id") => {}
         Some(_) => return Err("asset"),
+    }
+    match payload.get("actor") {
+        None => {}
+        Some(Value::Object(actor))
+            if string(actor, "type") && optional(actor, "id", true) && actor.contains_key("id") => {
+        }
+        Some(_) => return Err("actor"),
     }
     match payload.get("facts") {
         None => {}

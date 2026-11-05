@@ -42,7 +42,7 @@ fn params(mock: &MockServerClient, name: &str) -> Vec<Option<String>> {
 fn uploading(parts: u32) -> Asset {
     let mut asset = Asset::new(
         "asset-1",
-        AssetClassificationStatus::Pending,
+        AssetClassificationStatus::Queued,
         AssetModerationStatus::Pending,
     );
     asset.upload.status = "uploading".into();
@@ -181,7 +181,7 @@ async fn a_part_the_api_already_has_is_skipped() {
     mock.enqueue_response(MockResponse::json(
         409,
         json!({
-            "code": "upload/invalid-part-number",
+            "code": "upload-part/invalid-number",
             "message": "Expected part 4",
             "requestId": "req-1",
             "details": { "expectedPartNumber": 4, "receivedPartNumber": 3 },
@@ -311,7 +311,8 @@ async fn a_split_upload_refuses_a_long_key_and_an_image_over_20_mib_before_sendi
         ))
         .await
         .unwrap_err();
-    assert_eq!(huge.code(), &ErrorCode::MultipartImageTooLarge);
+    assert_eq!(huge.code(), &ErrorCode::UploadTooLarge);
+    assert_eq!(huge.details().get("limitBytes"), Some(&json!(20 * MIB)));
     assert!(mock.requests().is_empty());
     // A 240-character key fits, and an image up to 20 MiB goes in parts.
     mock.enqueue(200, uploading(1));

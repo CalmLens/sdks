@@ -591,6 +591,7 @@ impl ServerClient {
         query.json("processingOptions", options.processing_options.as_ref())?;
         query.opt("visibility", options.visibility.as_ref());
         query.json("metadata", options.metadata.as_ref())?;
+        query.json("tags", options.tags.as_ref())?;
         query.opt("authorId", options.author_id.as_ref());
         query.json("context", context.as_ref())?;
         query.opt("externalId", options.external_id.as_ref());
@@ -613,6 +614,8 @@ impl ServerClient {
                 visibility: Option<&'a Visibility>,
                 #[serde(skip_serializing_if = "Option::is_none")]
                 metadata: Option<&'a Vec<MetadataItem>>,
+                #[serde(skip_serializing_if = "Option::is_none")]
+                tags: Option<&'a Vec<String>>,
                 #[serde(skip_serializing_if = "Option::is_none")]
                 author_id: Option<&'a String>,
                 #[serde(skip_serializing_if = "Option::is_none")]
@@ -640,6 +643,7 @@ impl ServerClient {
                     processing_options: options.processing_options.as_ref(),
                     visibility: options.visibility.as_ref(),
                     metadata: options.metadata.as_ref(),
+                    tags: options.tags.as_ref(),
                     author_id: options.author_id.as_ref(),
                     context: context.as_ref(),
                     external_id: options.external_id.as_ref(),
@@ -902,6 +906,12 @@ impl ServerClient {
         let mut query = Query::default();
         query.opt("cursor", options.cursor.as_ref());
         query.opt("pageSize", options.page_size);
+        // The API takes the types as one comma-separated value.
+        if let Some(types) = options.types.as_deref().filter(|types| !types.is_empty()) {
+            let types: Vec<&str> = types.iter().map(EventType::as_str).collect();
+            query.push("types", types.join(","));
+        }
+        query.opt("assetId", options.asset_id.as_ref());
         self.call(self.prepare(Method::GET, &self.project_path("events")?, &query.0)?)
             .await
     }
@@ -937,9 +947,9 @@ fn check_part_size(size: Option<u64>, is_final: bool) -> Result<()> {
 fn check_image_size(size: Option<u64>, _is_final: bool) -> Result<()> {
     let Some(size) = size else { return Ok(()) };
     if size > 20 * 1024 * 1024 {
-        return Err(Error::new(
-            ErrorCode::MultipartImageTooLarge,
-            "Multipart image uploads cannot exceed 20MB.",
+        return Err(upload_too_large(
+            20 * 1024 * 1024,
+            "Multipart image uploads cannot exceed 20 MiB.",
         ));
     }
     Ok(())
@@ -966,9 +976,17 @@ fn check_upload_size(mime: &str, size: Option<u64>, in_parts: bool) -> Result<()
         (5000 * 1024 * 1024, "Files can be at most 5,000 MiB")
     };
     if size > limit {
-        return Err(Error::new(ErrorCode::FileTooLarge, message));
+        return Err(upload_too_large(limit, message));
     }
     Ok(())
+}
+
+/// The `upload/too-large` error for content over the plan's `limit_bytes`, as the API reports it.
+fn upload_too_large(limit_bytes: u64, message: &str) -> Error {
+    let mut details = serde_json::Map::new();
+    details.insert("limitBytes".into(), limit_bytes.into());
+    details.insert("source".into(), "plan".into());
+    Error::new(ErrorCode::UploadTooLarge, message).with_details(details)
 }
 
 /// Text is small, so it keeps the API timeout; binary files may be arbitrarily large.
@@ -1168,12 +1186,14 @@ impl AssetsClient<'_> {
             .call(self.0.prepare(Method::GET, &path, &query.0)?)
             .await
     }
-    /// Retrieves the asset until it is decided ([`Asset::is_decided`]: moderation status no
-    /// longer `pending`, or classification status `failed`) and returns it. It checks again
-    /// after 0.5 seconds, waiting 1.5 times longer each time up to 2 seconds, and fails with
-    /// `sdk/timeout` and details `{assetId, classificationStatus, moderationStatus}` when
-    /// `options.timeout` (60 seconds by default) passes without a decision. Drop the future to
-    /// stop waiting. Webhooks report decisions without polling.
+    /// Retrieves the asset until it is settled ([`Asset::is_decided`]: classification status
+    /// `completed`, with its decision in `classification.moderation.status`, or `failed`) and
+    /// returns it. A `queued` or `processing` asset is still waiting, even when a reviewer has
+    /// already decided it. It checks again after 0.5 seconds, waiting 1.5 times longer each time
+    /// up to 2 seconds, and fails with `sdk/timeout` and details
+    /// `{assetId, classificationStatus, moderationStatus}` when `options.timeout` (60 seconds by
+    /// default) passes before it is settled. Drop the future to stop waiting. Webhooks report
+    /// decisions without polling.
     pub async fn wait_for_decision(&self, options: WaitForDecision) -> Result<Asset> {
         let timeout = options.timeout.unwrap_or(DEFAULT_DECISION_TIMEOUT);
         let asset_id = AssetId::new(options.asset_id);
@@ -1225,7 +1245,7 @@ impl AssetsClient<'_> {
     }
     /// Records a reviewer's decision, replacing the policy's: the asset's moderation status
     /// becomes `options.decision`, the note joins its review history and the matching
-    /// `asset.<status>` event is sent with `decided-by: reviewer`. An asset still pending
+    /// `asset.<status>` event is sent, with the API key as its `actor`. An asset still pending
     /// moderation can only be blocked or purged. Purging needs `confirm_purge` and the
     /// `assets:delete` permission, and permanently deletes the stored content.
     pub async fn decide(&self, options: DecideAsset) -> Result<Asset> {
@@ -1242,9 +1262,11 @@ impl AssetsClient<'_> {
         let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
         self.0.call(request).await
     }
-    /// Removes the stored content (`DELETE /assets/:assetId/content`). The asset record,
-    /// metadata and report remain; the returned asset has `storage_deleted_at` set.
-    pub async fn delete_content(&self, options: AssetId) -> Result<Asset> {
+    /// Removes the stored content (`DELETE /assets/:assetId/content`), including the content
+    /// derived from it in child assets, keeping the asset record, metadata and classification
+    /// results. The returned asset's `content.status` is `Removed` with `removal_reason`
+    /// `Requested`; the CDN no longer serves it.
+    pub async fn remove_content(&self, options: AssetId) -> Result<Asset> {
         let path = format!("/assets/{}/content", id(&options.asset_id)?);
         self.0
             .call(self.0.prepare(Method::DELETE, &path, &[])?)
@@ -1260,10 +1282,10 @@ impl AssetsClient<'_> {
     /// Deletes up to 500 assets ([`AssetBatchOperation::Delete`]) or removes their stored content
     /// ([`AssetBatchOperation::RemoveContent`]) in one request
     /// (`POST /projects/:projectId/assets/batch`). Every asset must exist in the project and the
-    /// key needs `assets:delete` for its folder, or nothing is queued. Returns once queued; the
-    /// work runs in the background and records `asset.deleted` or `asset.content-removed` for
-    /// each asset. Assets under a safety hold are skipped. Not retried: it carries no
-    /// `Idempotency-Key`.
+    /// key needs `assets:delete` for its folder, or nothing is queued. Returns the operation's
+    /// `batch_id` once queued; the work runs in the background and records `asset.deleted` or
+    /// `asset.content-removed` for each asset, with a `batch-id` fact naming `batch_id`. Assets
+    /// under a safety hold are skipped. Not retried: it carries no `Idempotency-Key`.
     pub async fn batch(&self, options: BatchAssets) -> Result<BatchAssetsResponse> {
         validate_batch(&options)?;
         let path = self.0.project_path("assets/batch")?;
@@ -1586,7 +1608,9 @@ impl PoliciesClient<'_> {
 pub struct EventsClient<'a>(&'a ServerClient);
 impl EventsClient<'_> {
     /// One page of events after `options.cursor`, oldest first. Without `cursor` the page is
-    /// empty and its `next_cursor` marks now.
+    /// empty and its `next_cursor` marks now. `types` and `asset_id` narrow the feed to some event
+    /// types or one asset's events; a cursor belongs to the filters it was issued with, so pass
+    /// the same ones with each `cursor`.
     pub async fn list(&self, options: ListEvents) -> Result<EventsPage> {
         self.0.events_page(&options).await
     }
@@ -1717,6 +1741,7 @@ impl TextClient<'_> {
                 description: options.description,
                 processing_options: options.processing_options,
                 metadata: options.metadata,
+                tags: options.tags,
                 author_id: options.author_id,
                 context: options.context,
                 external_id: options.external_id,
@@ -1738,7 +1763,7 @@ impl CdnClient<'_> {
     /// with serialized viewer assertions from [`CdnRequest::viewer_claims`]. The original and the
     /// placeholder take no lens or transform. Lenses and transforms apply to the preview, and to
     /// the rendered resource when it is an image; the CDN refuses them on rendered PDFs, video and
-    /// audio with `asset/invalid-transform`.
+    /// audio with `transform/invalid`.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
         let resource = options
             .resource

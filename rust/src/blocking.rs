@@ -263,8 +263,8 @@ blocking_methods!(AssetsClient => assets {
     fn decide(options: DecideAsset) -> Result<Asset>;
     /// See [`crate::AssetsClient::explain`].
     fn explain(options: ExplainAsset) -> Result<Asset>;
-    /// See [`crate::AssetsClient::delete_content`].
-    fn delete_content(options: AssetId) -> Result<Asset>;
+    /// See [`crate::AssetsClient::remove_content`].
+    fn remove_content(options: AssetId) -> Result<Asset>;
     /// See [`crate::AssetsClient::delete`].
     fn delete(options: AssetId) -> Result<()>;
     /// See [`crate::AssetsClient::batch`].

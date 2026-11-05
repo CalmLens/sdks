@@ -13,10 +13,10 @@ use crate::library::{NewUpload, DEMO_PROJECT_ID};
 use crate::messages::{rejected, Failure};
 use axum::http::StatusCode;
 use calmlens::models::{
-    Asset, AssetClassificationStatus, AssetContentRemovalReason, AssetContentStatus, AssetImage,
-    AssetModerationDecision, AssetModerationStatus, AssetPage, AssetReview, AssetSearchMatch,
-    AssetSearchResponse, ClassificationCategory, Folder, MetadataItem, ProcessingOptions,
-    SearchMatchField, Visibility,
+    Asset, AssetClassificationStatus, AssetContentRemovalReason, AssetContentStatus,
+    AssetModerationDecision, AssetModerationStatus, AssetPage, AssetPreview, AssetRendered,
+    AssetRenderedKind, AssetReview, AssetSearchMatch, AssetSearchResponse, ClassificationCategory,
+    Folder, MetadataItem, ReviewActor, ReviewActorType, SearchMatchField, Visibility,
 };
 use calmlens::{Bytes, Error, ErrorCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -109,20 +109,12 @@ impl DemoStore {
                     Decision::Failed | Decision::Pending => None,
                 };
                 if let Some(status) = status {
+                    let automated = AssetModerationDecision::from(status.as_str());
                     asset.classification.moderation.status = status;
                     asset.classification.completed_at = Some(now_ms());
                     let moderation = &mut asset.classification.moderation;
                     moderation.source = Some("policy".into());
-                    moderation.automated_action = Some(
-                        match entry.outcome {
-                            Decision::Limited => "limit",
-                            Decision::AgeRestricted => "age-restrict",
-                            Decision::Blocked => "block",
-                            Decision::Purged => "purge",
-                            _ => "allow",
-                        }
-                        .into(),
-                    );
+                    moderation.automated_status = Some(automated);
                     moderation.flagged_categories =
                         demo_category(entry.outcome).into_iter().collect();
                     moderation.explanation_complete = Some(true);
@@ -356,10 +348,18 @@ impl DemoStore {
                 entry.asset.content.size_in_bytes = Some(1_200_000 + hours * 7_300);
             }
             if let Some((_, (width, height))) = photo {
-                let mut image = AssetImage::default();
-                image.width = Some(width);
-                image.height = Some(height);
-                entry.asset.content.image = Some(image);
+                entry.asset.content.width = Some(width);
+                entry.asset.content.height = Some(height);
+                let mut rendered = AssetRendered::default();
+                rendered.kind = AssetRenderedKind::Image;
+                rendered.format = "image/png".into();
+                rendered.width = Some(width);
+                rendered.height = Some(height);
+                entry.asset.content.rendered = Some(rendered);
+                let mut preview = AssetPreview::default();
+                preview.width = Some(width);
+                preview.height = Some(height);
+                entry.asset.content.preview = Some(preview);
             }
             // Settled: back-date the review delay.
             entry.submitted_at = Instant::now() - DEMO_REVIEW_DELAY;
@@ -390,7 +390,7 @@ impl DemoStore {
             .find(|entry| entry.asset.name.as_deref() == Some("Old storefront"))
             .map(|entry| entry.asset.id.clone())
         {
-            let _ = self.delete_content(&id);
+            let _ = self.remove_content(&id);
         }
     }
 
@@ -561,10 +561,6 @@ impl DemoStore {
         asset.metadata = Some(upload.metadata);
         asset.tags = Some(Vec::new());
         asset.visibility = Some(Visibility::Private);
-        asset.processing_options = Some(ProcessingOptions {
-            keep_content_after_processing: Some(true),
-            ..Default::default()
-        });
         asset.created_at = Some(now_ms());
         asset.updated_at = asset.created_at;
         self.assets.insert(
@@ -656,7 +652,7 @@ impl DemoStore {
     }
 
     /// The record, metadata and report stay; only the stored content goes.
-    pub fn delete_content(&mut self, id: &str) -> Result<Asset, Failure> {
+    pub fn remove_content(&mut self, id: &str) -> Result<Asset, Failure> {
         let entry = self.entry_mut(id)?;
         entry.file = None;
         if !content_removed(&entry.asset) {
@@ -689,9 +685,12 @@ impl DemoStore {
                 review.id = format!("demo-review-{}", random_hex(8));
                 review.decision = decision;
                 review.note = Some("Simulated portal decision".to_string());
-                review.reviewer_name = Some("Demo reviewer".to_string());
+                let mut reviewer = ReviewActor::default();
+                reviewer.actor_type = ReviewActorType::User;
+                reviewer.id = Some("demo-reviewer".to_string());
+                review.decided_by = reviewer;
                 review.reviewed_at = now_ms();
-                review.applied_to_asset = true;
+                review.applied = true;
                 moderation.manual_reviews.push(review);
                 true
             }

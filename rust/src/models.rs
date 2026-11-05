@@ -168,10 +168,11 @@ macro_rules! string_enum {
 }
 
 string_enum! {
-    /// Where an asset is in the pipeline.
+    /// Where an asset is in the pipeline. It is settled once `Completed` or `Failed`.
     AssetClassificationStatus {
-        /// The content is still arriving, e.g. a multipart upload receiving parts.
-        Pending = "pending",
+        /// Waiting for its content, e.g. a multipart upload still receiving parts, or for its
+        /// turn.
+        Queued = "queued",
         /// The content is being processed and classified.
         Processing = "processing",
         /// Processing finished.
@@ -263,12 +264,13 @@ string_enum! {
         MultipleTracks = "multiple-tracks",
         /// The content does not match the asset's type.
         TypeMismatch = "type-mismatch",
-        /// The upload has more text than free uploads allow before billing is set up.
-        FreeUploadLimit = "free-upload-limit",
+        /// The organisation has used its free uploads, or the upload has more text than free
+        /// uploads allow, before billing is set up.
+        FreeUploadsExhausted = "free-uploads-exhausted",
         /// The audio or video is longer than the organisation's media limits allow.
         MediaLimit = "media-limit",
-        /// Processing stopped because the organisation reached its spend limit.
-        SpendLimit = "spend-limit",
+        /// Processing stopped because the organisation's usage limits paused uploads.
+        UploadsPaused = "uploads-paused",
         /// A part of the asset, such as an embedded image, failed.
         ChildFailed = "child-failed",
         /// Processing failed for another reason; retrying may succeed.
@@ -425,8 +427,8 @@ string_enum! {
         AssetUploaded = "asset.uploaded",
         /// `asset.classified`.
         AssetClassified = "asset.classified",
-        /// `asset.processing-progress`.
-        AssetProcessingProgress = "asset.processing-progress",
+        /// `asset.region-restricted`.
+        AssetRegionRestricted = "asset.region-restricted",
         /// `asset.allowed`.
         AssetAllowed = "asset.allowed",
         /// `asset.limited`.
@@ -439,6 +441,8 @@ string_enum! {
         AssetPurged = "asset.purged",
         /// `asset.failed`.
         AssetFailed = "asset.failed",
+        /// `asset.progress-updated`.
+        AssetProgressUpdated = "asset.progress-updated",
         /// `asset.deleted`.
         AssetDeleted = "asset.deleted",
         /// `asset.content-removed`.
@@ -447,26 +451,36 @@ string_enum! {
         AssetRetried = "asset.retried",
         /// `asset.review-requested`.
         AssetReviewRequested = "asset.review-requested",
-        /// `usage.limit-reached`.
-        UsageLimitReached = "usage.limit-reached",
-        /// `usage.spend-limit-reached`.
-        UsageSpendLimitReached = "usage.spend-limit-reached",
+        /// `asset.hash-matched`.
+        AssetHashMatched = "asset.hash-matched",
+        /// `asset.link-flagged`.
+        AssetLinkFlagged = "asset.link-flagged",
+        /// `usage.free-uploads-exhausted`.
+        UsageFreeUploadsExhausted = "usage.free-uploads-exhausted",
+        /// `usage.uploads-paused`.
+        UsageUploadsPaused = "usage.uploads-paused",
         /// `upload-preset.daily-limit-reached`.
         UploadPresetDailyLimitReached = "upload-preset.daily-limit-reached",
         /// `project.member-joined`.
         ProjectMemberJoined = "project.member-joined",
         /// `project.member-removed`.
         ProjectMemberRemoved = "project.member-removed",
+        /// `project.member-left`.
+        ProjectMemberLeft = "project.member-left",
         /// `project.member-role-changed`.
         ProjectMemberRoleChanged = "project.member-role-changed",
         /// `project.invitation-sent`.
         ProjectInvitationSent = "project.invitation-sent",
+        /// `project.transferred`.
+        ProjectTransferred = "project.transferred",
         /// `api-key.created`.
         ApiKeyCreated = "api-key.created",
         /// `api-key.revoked`.
         ApiKeyRevoked = "api-key.revoked",
-        /// `connector.failing`.
-        ConnectorFailing = "connector.failing",
+        /// `api-key.deleted`.
+        ApiKeyDeleted = "api-key.deleted",
+        /// `connector.disabled`.
+        ConnectorDisabled = "connector.disabled",
         /// `appeal.submitted`.
         AppealSubmitted = "appeal.submitted",
         /// `appeal.resolved`.
@@ -567,7 +581,7 @@ string_enum! {
 string_enum! {
     /// Which CDN resource of an asset to serve. Lenses and transforms apply to `Preview`, and to
     /// `Rendered` when it is an image; the CDN refuses them on other resources with
-    /// `asset/invalid-transform`.
+    /// `transform/invalid`.
     CdnResource {
         /// The asset's original file, exactly as uploaded. It takes no lens or transform.
         Original = "original",
@@ -956,6 +970,10 @@ pub struct SubmitAsset {
     /// Metadata items.
     #[serde(default)]
     pub metadata: Option<Vec<MetadataItem>>,
+    /// Tags for the asset, such as `["catalogue", "backpacks"]`, which it keeps in `tags`.
+    /// Uploads through an upload preset can't set them.
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
     /// Your identifier for who wrote the content. CalmLens only compares it with the author IDs
     /// in `context`, to tell which posts share a speaker.
     #[serde(default)]
@@ -1257,9 +1275,6 @@ pub struct UpdateAsset {
     /// CDN visibility.
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub visibility: Patch<Visibility>,
-    /// Processing options.
-    #[serde(default, skip_serializing_if = "Patch::is_missing")]
-    pub processing_options: Patch<ProcessingOptions>,
 }
 
 /// Options for [`AssetsClient::explain`](crate::AssetsClient::explain).
@@ -1352,13 +1367,27 @@ pub struct BatchAssets {
     pub operation: AssetBatchOperation,
 }
 
-/// The response of [`crate::AssetsClient::batch`]: the operation is queued.
+string_enum! {
+    /// Where a batch operation stands when [`crate::AssetsClient::batch`] returns.
+    AssetBatchStatus {
+        /// The operation is queued and runs in the background.
+        Queued = "queued",
+    }
+}
+
+/// The response of [`crate::AssetsClient::batch`]: the operation is queued. Follow it in the
+/// events feed: each `asset.deleted` or `asset.content-removed` event it records carries a
+/// `batch-id` fact naming `batch_id`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct BatchAssetsResponse {
-    /// Always `true`: the operation is queued.
-    pub queued: bool,
+    /// The operation's ID (`batch_` and 20 base62 characters).
+    pub batch_id: String,
+    /// `Queued`.
+    pub status: AssetBatchStatus,
+    /// How many distinct assets the operation covers.
+    pub asset_count: u32,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<BatchAssetsResponse, _>")]
     pub extra: HashMap<String, Value>,
@@ -1439,7 +1468,9 @@ pub struct MoveFolder {
     pub parent_id: Option<String>,
 }
 
-/// Options for one page of the events feed.
+/// Options for one page of the events feed. A cursor belongs to the filters it was issued with,
+/// so pass the same `types` and `asset_id` with each `cursor`; other filters fail with
+/// `cursor/invalid`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListEvents {
@@ -1450,6 +1481,12 @@ pub struct ListEvents {
     /// Events per page, 1 to 100 (the API's default is 50).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
+    /// Only events of these types. Sent as one comma-separated value; an empty list sends none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub types: Option<Vec<EventType>>,
+    /// Only events about this asset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset_id: Option<String>,
 }
 
 /// A named lens definition.
@@ -1573,9 +1610,6 @@ pub struct Asset {
     /// Tags.
     #[serde(default)]
     pub tags: Option<Vec<String>>,
-    /// Processing options.
-    #[serde(default)]
-    pub processing_options: Option<ProcessingOptions>,
     /// CDN visibility.
     #[serde(default)]
     pub visibility: Option<Visibility>,
@@ -1617,11 +1651,14 @@ impl Asset {
             ..Self::default()
         }
     }
-    /// Whether moderation has finished: the moderation status is no longer `pending`, or
-    /// processing failed.
+    /// Whether the asset is settled: its classification status is `completed` (moderation
+    /// decided it) or `failed`. A `queued` or `processing` asset is not, even when a reviewer has
+    /// already decided it.
     pub fn is_decided(&self) -> bool {
-        self.classification.moderation.status != AssetModerationStatus::Pending
-            || self.classification.status == AssetClassificationStatus::Failed
+        matches!(
+            self.classification.status,
+            AssetClassificationStatus::Completed | AssetClassificationStatus::Failed
+        )
     }
 }
 
@@ -1692,9 +1729,6 @@ pub struct AssetClassification {
     /// Text regions found in the image, which image transforms can redact.
     #[serde(default)]
     pub text_regions: Option<Vec<TextRegion>>,
-    /// Detected content labels.
-    #[serde(default)]
-    pub labels: Option<Vec<ClassificationLabel>>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetClassification, _>")]
     pub extra: HashMap<String, Value>,
@@ -1730,16 +1764,37 @@ pub struct AssetReview {
     pub decision: AssetModerationDecision,
     /// The reviewer’s explanation; required for an override.
     pub note: Option<String>,
-    /// The reviewing user's name, when known.
+    /// Who made the decision.
     #[serde(default)]
-    pub reviewer_name: Option<String>,
-    /// The reviewing user's email address, when known.
-    #[serde(default)]
-    pub reviewer_email: Option<String>,
+    pub decided_by: ReviewActor,
     /// Review time in milliseconds since the Unix epoch.
     pub reviewed_at: u64,
-    /// Whether this review changed the asset's moderation status.
-    pub applied_to_asset: bool,
+    /// Whether the decision was applied to the asset. `false` for a review queue decision that
+    /// was recorded without changing the asset's status.
+    pub applied: bool,
+}
+
+string_enum! {
+    /// Who made a reviewer's decision.
+    ReviewActorType {
+        /// A person, or an assistant's key acting for the person who approved it.
+        User = "user",
+        /// An API key of its own.
+        ApiKey = "api-key",
+    }
+}
+
+/// Who made a reviewer's decision on an asset: a person, or an API key through the API.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ReviewActor {
+    /// A `user` (or an assistant acting for one) or an `api-key`.
+    #[serde(default, rename = "type")]
+    pub actor_type: ReviewActorType,
+    /// The user's or API key's ID; `None` when it was not recorded.
+    #[serde(default)]
+    pub id: Option<String>,
 }
 
 /// Content-safety findings and decision.
@@ -1747,12 +1802,6 @@ pub struct AssetReview {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetModeration {
-    /// Category outcomes supplied by an authenticated test input.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub test_category_actions: Option<HashMap<ClassificationCategory, String>>,
-    /// Regional restrictions supplied by an authenticated test input.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub test_regional_actions: Option<Vec<TestRegionalAction>>,
     /// Reviews in chronological order.
     #[serde(default)]
     pub manual_reviews: Vec<AssetReview>,
@@ -1760,13 +1809,15 @@ pub struct AssetModeration {
     /// taking precedence.
     #[serde(default)]
     pub status: AssetModerationStatus,
-    /// The original automated action, before manual reviews.
+    /// The status automated moderation decided; `None` before a decision. Manual reviews can
+    /// change `status` without changing this, so the two differ when a reviewer overrode the
+    /// automated decision.
     #[serde(default)]
-    pub automated_action: Option<String>,
-    /// What determined the automated action.
+    pub automated_status: Option<AssetModerationDecision>,
+    /// What determined the automated status.
     #[serde(default)]
     pub source: Option<String>,
-    /// Mandatory rule that determined the automated action.
+    /// Mandatory rule that determined the automated status.
     #[serde(default)]
     pub rule: Option<String>,
     /// Categories acted on by automation.
@@ -1796,17 +1847,6 @@ pub struct AssetModeration {
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetModeration, _>")]
     pub extra: HashMap<String, Value>,
-}
-
-/// A regional restriction supplied by an authenticated test input.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct TestRegionalAction {
-    /// The jurisdiction receiving the restriction.
-    pub region: String,
-    /// The delivery restriction.
-    pub action: String,
 }
 
 /// Whether CalmLens holds an asset's content, and the content's details.
@@ -1906,7 +1946,7 @@ pub struct AssetModerationTimeline {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ModerationRaw {
-    /// Raw category scores, qualifiers and conditions.
+    /// Raw category scores and qualifiers.
     #[serde(default)]
     pub categories: HashMap<ClassificationCategory, CategoryResult>,
     /// Matches against project hash lists.
@@ -1938,13 +1978,11 @@ pub struct CategoryPolicyScore {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CategoryPolicySource {
-    /// Saved kind.
+    /// `allowance`, `restriction`, `default` or `below-threshold`.
     #[serde(default)]
     pub kind: String,
-    /// Saved index.
-    #[serde(default)]
-    pub index: Option<usize>,
-    /// Indexes of allowances contributing combined coverage.
+    /// For an allowance or restriction, the indexes of the deciding rules, the decisive rule
+    /// first; `None` for `default` and `below-threshold`.
     #[serde(default)]
     pub indexes: Option<Vec<usize>>,
 }
@@ -1987,19 +2025,19 @@ pub struct CategoryPolicySettingsSnapshot {
     pub restrictions: Vec<PolicyRuleSnapshot>,
 }
 
-/// The final automatic action, its source and flagged categories.
-/// A recorded regional decision.
+/// A stricter delivery decision in one jurisdiction the project serves.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct RegionalDecision {
     /// Viewer country or rule jurisdiction.
     pub region: String,
-    /// Regional moderation action.
-    pub action: String,
+    /// The status in force in the region, stricter than the asset's moderation status:
+    /// `limited`, `age-restricted`, `blocked` or `purged`.
+    pub status: AssetModerationDecision,
     /// Stable mandatory rule key.
     pub rule: String,
-    /// Category matched by the rule; absent for explicit test regional outcomes.
+    /// The category whose findings the rule acted on, when it acts on one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub category: Option<ClassificationCategory>,
 }
@@ -2024,28 +2062,9 @@ pub struct CategoryResult {
     /// Qualifier results.
     #[serde(default)]
     pub qualifiers: Option<HashMap<ModerationQualifier, QualifierResult>>,
-    /// Direct condition evidence, keyed by opaque condition identifiers.
-    #[serde(default)]
-    pub policy_conditions: Option<HashMap<String, PolicyConditionResult>>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<CategoryResult, _>")]
     pub extra: HashMap<String, Value>,
-}
-
-/// Direct assessment of a same-instance or combined-coverage policy condition.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct PolicyConditionResult {
-    /// Whether the condition was assessed.
-    #[serde(default)]
-    pub status: Option<EvaluationStatus>,
-    /// Assessed score, absent when unassessed.
-    #[serde(default)]
-    pub score: Option<f64>,
-    /// Why the condition was not assessed.
-    #[serde(default)]
-    pub reason: Option<NotEvaluatedReason>,
 }
 
 /// A qualifier's result.
@@ -2372,9 +2391,9 @@ pub struct LinkSafetyDecision {
     /// The strongest action the asset's links take under the policy's link-safety settings.
     #[serde(default)]
     pub action: LinkSafetyAction,
-    /// Indexes into [`LinkSafetyResult::links`] of the links that take that action.
+    /// The links that take that action, with where each leads and its verdict.
     #[serde(default)]
-    pub links: Vec<u32>,
+    pub links: Vec<CheckedLink>,
     /// The link-safety settings in force at decision time.
     #[serde(default)]
     pub settings: LinkSafetySettings,
@@ -2514,10 +2533,10 @@ pub struct HashMatch {
     pub source: String,
     /// The hash list.
     #[serde(default)]
-    pub list_id: String,
+    pub hash_list_id: String,
     /// The matched entry.
     #[serde(default)]
-    pub entry_id: String,
+    pub hash_list_entry_id: String,
     /// The Hamming distance between the hashes; lower is closer.
     #[serde(default)]
     pub distance: f64,
@@ -2600,31 +2619,6 @@ pub struct AgeRange {
     pub high: u32,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AgeRange, _>")]
-    pub extra: HashMap<String, Value>,
-}
-
-/// A classification label.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct ClassificationLabel {
-    /// The label.
-    #[serde(default)]
-    pub description: String,
-    /// The score.
-    #[serde(default)]
-    pub score: f64,
-    /// The topicality score.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub topicality_score: Option<f64>,
-    /// The likelihood.
-    #[serde(default)]
-    pub likelihood: Likelihood,
-    /// A knowledge base ID.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub knowledge_base_id: Option<String>,
-    /// Fields this SDK version does not know.
-    #[serde(flatten, deserialize_with = "extra_fields::<ClassificationLabel, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2767,6 +2761,44 @@ pub struct EventFact {
     pub extra: HashMap<String, Value>,
 }
 
+string_enum! {
+    /// Who caused an event.
+    ActorType {
+        /// A person in the portal, or an assistant's key acting for the person who approved it.
+        User = "user",
+        /// An API key of its own.
+        ApiKey = "api-key",
+        /// Automated moderation.
+        Automated = "automated",
+        /// CalmLens itself, such as when it pauses uploads.
+        System = "system",
+    }
+}
+
+/// Who caused an event: a `user` (or an assistant acting for one), an `api-key`, `automated`
+/// moderation or CalmLens itself (`system`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct Actor {
+    /// What kind of actor it is (`type` on the wire).
+    #[serde(default, rename = "type")]
+    pub actor_type: ActorType,
+    /// The user's or API key's ID. `None` for `automated` and `system`, and when the ID was not
+    /// recorded.
+    #[serde(default)]
+    pub id: Option<String>,
+}
+impl Actor {
+    /// An actor of `actor_type` with `id`, e.g. for a mock event.
+    pub fn new(actor_type: impl Into<ActorType>, id: Option<String>) -> Self {
+        Self {
+            actor_type: actor_type.into(),
+            id,
+        }
+    }
+}
+
 /// An event from the events feed.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2786,6 +2818,10 @@ pub struct Event {
     /// which fills it in.
     #[serde(default)]
     pub project_id: String,
+    /// Who caused the event. The API always sends it; the default (an empty actor type) only in
+    /// an event built for a mock, which fills it in.
+    #[serde(default)]
+    pub actor: Actor,
     /// The severity.
     #[serde(default)]
     pub severity: Option<EventSeverity>,
@@ -2841,6 +2877,10 @@ pub struct WebhookEventPayload {
     pub created_at: u64,
     /// The owning project.
     pub project_id: String,
+    /// Who caused the event. CalmLens sends it with every delivery; `None` only for a body
+    /// without one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<Actor>,
     /// The severity.
     #[serde(default)]
     pub severity: Option<EventSeverity>,
@@ -2876,6 +2916,8 @@ impl WebhookEventPayload {
             event_type: event.event_type.clone(),
             created_at: event.created_at,
             project_id: event.project_id.clone(),
+            // An event built without an actor, e.g. for a mock, is delivered without one.
+            actor: (event.actor != Actor::default()).then(|| event.actor.clone()),
             severity: event.severity.clone(),
             title: event.title.clone(),
             description: event.description.clone(),
@@ -3839,6 +3881,9 @@ pub struct ClassifyText {
     /// Metadata items.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Vec<MetadataItem>>,
+    /// Tags for the asset, such as `["catalogue", "backpacks"]`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
     /// Your identifier for who wrote the text. CalmLens only compares it with the author IDs in
     /// `context`, to tell which posts share a speaker.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -4081,7 +4126,7 @@ pub struct HashListEntry {
     pub label: Option<String>,
     /// The asset the hash was taken from.
     #[serde(default)]
-    pub source_asset_id: Option<String>,
+    pub asset_id: Option<String>,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
     pub created_at: u64,

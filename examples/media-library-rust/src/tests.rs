@@ -943,7 +943,7 @@ async fn removing_the_file_stops_thumbnails_and_keeps_the_record() {
 }
 
 #[tokio::test]
-async fn live_remove_file_calls_delete_content() {
+async fn live_remove_file_calls_remove_content() {
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
     let mut removed = asset("asset-1", "allowed");
@@ -1123,10 +1123,13 @@ async fn verified_webhook_refreshes_from_the_api_and_ignores_replays_and_tests()
         "asset.blocked",
         "asset-1",
         json!([
-            {"key": "reviewer-user-id", "value": "user-9"},
             {"key": "reviewer-name", "value": "Sam"},
             {"key": "note", "value": "Not licensed"}
         ]),
+    )
+    .replace(
+        r#""facts":"#,
+        r#""actor":{"type":"user","id":"user-9"},"facts":"#,
     );
     // A failed refresh asks CalmLens to retry the delivery.
     mock.enqueue_transport_error("connection reset");
@@ -1146,7 +1149,8 @@ async fn verified_webhook_refreshes_from_the_api_and_ignores_replays_and_tests()
     let activity = app.state.activity();
     assert_eq!(activity[0].kind, "review");
     let labels: Vec<&str> = activity[0].facts.iter().map(|f| f.label).collect();
-    assert_eq!(labels, ["Reviewer", "Note"]);
+    assert_eq!(labels, ["Decided by", "Reviewer", "Note"]);
+    assert_eq!(activity[0].facts[0].value, "A reviewer");
 
     // A replay of the event, or of the delivery under another event ID, changes nothing and
     // makes no request.
@@ -1229,7 +1233,7 @@ async fn demo_webhook_refreshes_from_the_demo_library() {
         "event-1",
         "asset.allowed",
         &id,
-        json!([{"key": "decided-by", "value": "automated"}]),
+        json!([{"key": "flagged-categories", "value": []}]),
     )
     .replace(
         r#""projectId":"project-1""#,
@@ -1417,7 +1421,7 @@ async fn undelivered_images_show_the_flagged_categories_from_the_report() {
     let app = live(&mock, "");
     let mut blocked = asset("asset-1", "blocked");
     blocked["classification"]["moderation"]["source"] = json!("policy");
-    blocked["classification"]["moderation"]["automatedAction"] = json!("block");
+    blocked["classification"]["moderation"]["automatedStatus"] = json!("blocked");
     blocked["classification"]["moderation"]["flaggedCategories"] = json!(["violence", "hate"]);
     mock.enqueue(
         200,

@@ -13,7 +13,8 @@ pub fn fixture(name: &str) -> Value {
 /// Decodes JSON options into a native options type.
 pub fn input<T: DeserializeOwned>(value: Value) -> calmlens::Result<T> {
     serde_json::from_value(value).map_err(|cause| {
-        calmlens::Error::new("upload/invalid-payload", cause.to_string()).with_source(cause)
+        calmlens::Error::new(calmlens::ErrorCode::InvalidUploadPayload, cause.to_string())
+            .with_source(cause)
     })
 }
 fn output<T: Serialize>(result: calmlens::Result<T>) -> calmlens::Result<Value> {
@@ -40,7 +41,7 @@ pub async fn invoke(
         "assets.retry" => output(client.assets().retry(input(options)?).await),
         "assets.decide" => output(client.assets().decide(input(options)?).await),
         "assets.explain" => output(client.assets().explain(input(options)?).await),
-        "assets.deleteContent" => output(client.assets().delete_content(input(options)?).await),
+        "assets.removeContent" => output(client.assets().remove_content(input(options)?).await),
         "assets.delete" => output(client.assets().delete(input(options)?).await),
         "assets.move" => output(client.assets().move_asset(input(options)?).await),
         "assets.batch" => output(client.assets().batch(input(options)?).await),

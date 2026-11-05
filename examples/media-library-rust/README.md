@@ -38,13 +38,13 @@ moderation:
   library has no age check, so it doesn't deliver them either. CalmLens delivers `limited`
   images like allowed ones and marks them so an app can reduce their reach; this library has no
   recommendations or feeds, so it shows them like allowed images.
-- **Lifecycle.** **Remove file** calls `assets().delete_content`: the record, its metadata and
+- **Lifecycle.** **Remove file** calls `assets().remove_content`: the record, its metadata and
   classification results stay, `content.status` becomes `removed`, and the CDN stops serving the
   content. **Delete** calls
   `assets().delete` and removes the asset.
 - **Moderation decisions.** Verified webhooks for `asset.classified`, `asset.allowed`,
   `asset.limited`, `asset.age-restricted`, `asset.blocked`, `asset.purged` (sent for automated and reviewer
-  decisions alike, with a `decided-by` fact saying which) and `asset.failed` refresh the asset
+  decisions alike, with an `actor` saying who decided) and `asset.failed` refresh the asset
   from the API and log its status.
 
 ## Run locally

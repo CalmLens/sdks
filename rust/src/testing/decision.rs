@@ -305,7 +305,7 @@ impl MockDecision {
         report.insert("categories".into(), policy_categories.into());
         report.insert("explanationComplete".into(), true.into());
         report.insert("source".into(), "policy".into());
-        report.insert("automatedAction".into(), self.status.action().into());
+        report.insert("automatedStatus".into(), self.status.as_str().into());
         report.insert("regions".into(), json!([]));
         // The mock analyses no audio or video, so a decision has no findings timeline.
         report.insert("timeline".into(), Value::Null);

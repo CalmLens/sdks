@@ -72,7 +72,7 @@ async fn api_errors_have_a_message_and_queued_api_errors_their_status() {
     assert_eq!(error.status(), Some(400));
 
     // A known code spelled as Other gets its own status and equals its variant.
-    mock.enqueue_api_error(ErrorCode::Other("misc/internal-error".into()), "Internal");
+    mock.enqueue_api_error(ErrorCode::Other("server/internal-error".into()), "Internal");
     let error = mock
         .folders()
         .list(ListFolders::default())
@@ -87,9 +87,12 @@ async fn validation_happens_before_the_transport() {
     let mock = MockServerClient::new().unwrap();
     mock.enqueue(200, json!({"id":"one"}));
     let blank = mock.assets().classify(SubmitAsset::text(" ")).await;
-    assert_eq!(blank.unwrap_err().code(), &"upload/invalid-payload");
+    assert_eq!(blank.unwrap_err().code(), &ErrorCode::InvalidUploadPayload);
     let unnamed = mock.assets().create(SubmitAsset::default()).await;
-    assert_eq!(unnamed.unwrap_err().code(), &"upload/invalid-payload");
+    assert_eq!(
+        unnamed.unwrap_err().code(),
+        &ErrorCode::InvalidUploadPayload
+    );
     let octet = mock
         .assets()
         .create(SubmitAsset::new(
@@ -97,7 +100,9 @@ async fn validation_happens_before_the_transport() {
             Content::bytes(vec![1, 2, 3], "application/octet-stream"),
         ))
         .await;
-    assert_eq!(octet.unwrap_err().code(), &ErrorCode::InvalidUploadMimeType);
+    let octet = octet.unwrap_err();
+    assert_eq!(octet.code(), &ErrorCode::UnsupportedUploadType);
+    assert_eq!(octet.details().get("source"), Some(&json!("calmlens")));
     let unnumbered = mock
         .assets()
         .upload_part(UploadPart {
@@ -154,9 +159,14 @@ async fn multipart_sizes_are_refused_before_the_transport_without_a_status() {
         [
             (ErrorCode::InvalidUploadPayload, None),
             (ErrorCode::InvalidUploadPayload, None),
-            (ErrorCode::MultipartImageTooLarge, None),
+            (ErrorCode::UploadTooLarge, None),
         ]
     );
+    assert_eq!(
+        refusals[2].details().get("limitBytes"),
+        Some(&json!(20 * MIB))
+    );
+    assert_eq!(refusals[2].details().get("source"), Some(&json!("plan")));
     assert!(mock.requests().is_empty());
     assert_eq!(mock.remaining_responses(), 1);
 }
@@ -211,7 +221,7 @@ async fn declared_payload_sizes_are_checked_for_first_and_later_parts() {
                     assert_eq!(request.query_param("sizeInBytes"), Some("5"));
                     assert_eq!(request.body, b"hello");
                 } else {
-                    assert_eq!(result.unwrap_err().code(), &"upload/invalid-payload");
+                    assert_eq!(result.unwrap_err().code(), &ErrorCode::InvalidUploadPayload);
                     assert_eq!(mock.requests().len(), before);
                 }
             }
@@ -495,7 +505,7 @@ fn json_content_options_decode_to_native_payloads() {
     let both = common::input::<SubmitAsset>(
         json!({"name":"x","content":{"base64":"aGk=","plainText":"hi","type":"text/plain"}}),
     );
-    assert_eq!(both.unwrap_err().code(), &"upload/invalid-payload");
+    assert_eq!(both.unwrap_err().code(), &ErrorCode::InvalidUploadPayload);
 }
 
 fn enqueue_status(
@@ -554,6 +564,41 @@ async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
     assert_eq!(waited, std::time::Duration::from_secs_f64(10.0625));
 }
 
+/// An asset is settled only once its processing is completed or failed: a queued or processing
+/// asset a reviewer has already decided is still waited for.
+#[tokio::test]
+async fn wait_for_decision_keeps_waiting_while_a_decided_asset_is_unsettled() {
+    let mock = MockServerClient::new().unwrap();
+    enqueue_status(
+        &mock,
+        AssetClassificationStatus::Queued,
+        AssetModerationStatus::Blocked,
+        1,
+    );
+    enqueue_status(
+        &mock,
+        AssetClassificationStatus::Processing,
+        AssetModerationStatus::Blocked,
+        1,
+    );
+    enqueue_status(
+        &mock,
+        AssetClassificationStatus::Completed,
+        AssetModerationStatus::Blocked,
+        1,
+    );
+    let asset = mock
+        .assets()
+        .wait_for_decision(WaitForDecision::new("asset-1"))
+        .await
+        .unwrap();
+    assert_eq!(
+        asset.classification.status,
+        AssetClassificationStatus::Completed
+    );
+    assert_eq!(mock.requests().len(), 3);
+}
+
 #[tokio::test]
 async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
     let mock = MockServerClient::new().unwrap();
@@ -605,11 +650,12 @@ async fn dropping_wait_for_decision_stops_retrieving() {
 async fn oversized_one_request_uploads_are_refused_before_the_transport() {
     const MIB: u64 = 1024 * 1024;
     let mock = MockServerClient::new().unwrap();
-    for (mime, size) in [
-        ("image/png", 10 * MIB + 1),
-        ("video/mp4", 50 * MIB + 1),
-        ("application/pdf", 5000 * MIB + 1),
+    for (mime, limit) in [
+        ("image/png", 10 * MIB),
+        ("video/mp4", 50 * MIB),
+        ("application/pdf", 5000 * MIB),
     ] {
+        let size = limit + 1;
         // The reader is never read: its declared size is refused first.
         let error = mock
             .assets()
@@ -621,7 +667,17 @@ async fn oversized_one_request_uploads_are_refused_before_the_transport() {
             .unwrap_err();
         assert_eq!(
             (error.code(), error.status()),
-            (&ErrorCode::FileTooLarge, None),
+            (&ErrorCode::UploadTooLarge, None),
+            "{mime}"
+        );
+        assert_eq!(
+            error.details().get("limitBytes"),
+            Some(&json!(limit)),
+            "{mime}"
+        );
+        assert_eq!(
+            error.details().get("source"),
+            Some(&json!("plan")),
             "{mime}"
         );
     }

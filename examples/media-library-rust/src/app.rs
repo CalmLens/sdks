@@ -22,9 +22,9 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{middleware, Form, Router};
 use calmlens::models::{
-    Asset, AssetClassificationStatus, AssetContentStatus, AssetModerationStatus, AssetPage,
-    AssetReview, AssetSearchResponse, ClassificationCategory, EventFact, Folder, MetadataItem,
-    WebhookEventPayload,
+    Actor, ActorType, Asset, AssetClassificationStatus, AssetContentStatus, AssetModerationStatus,
+    AssetPage, AssetReview, AssetSearchResponse, ClassificationCategory, EventFact, Folder,
+    MetadataItem, WebhookEventPayload,
 };
 use calmlens::ErrorCode;
 use serde::de::DeserializeOwned;
@@ -90,10 +90,9 @@ pub const SEARCH_MODES: [(&str, &str); 3] = [
 ];
 
 /// Registered fact keys and labels from packages/shared/src/EventCatalog.ts shown in the activity
-/// log. Other keys, such as the hidden `reviewer-user-id`, are not shown.
-const FACT_LABELS: [(&str, &str); 7] = [
+/// log. Other keys are not shown.
+const FACT_LABELS: [(&str, &str); 6] = [
     ("asset-name", "Asset"),
-    ("decided-by", "Decided by"),
     ("previous-status", "Previous status"),
     ("moderation-status", "Moderation status"),
     ("flagged-categories", "Categories"),
@@ -101,8 +100,7 @@ const FACT_LABELS: [(&str, &str); 7] = [
     ("note", "Note"),
 ];
 /// `asset.allowed`, `asset.limited`, `asset.age-restricted`, `asset.blocked` and `asset.purged`
-/// report every outcome, from automated moderation or a reviewer; their `decided-by` fact says
-/// which.
+/// report every outcome, from automated moderation or a reviewer; their `actor` says which.
 const EVENT_LABELS: [(&str, &str); 7] = [
     ("asset.classified", "Classified"),
     ("asset.allowed", "Allowed"),
@@ -562,6 +560,7 @@ impl AppState {
     async fn apply_claimed(&self, payload: &WebhookEventPayload) -> Result<EventOutcome, Failure> {
         let event_type = payload.event_type.as_str();
         let facts = &payload.facts;
+        let rows = display_facts(payload);
         if facts
             .iter()
             .any(|fact| fact.key == "test" && fact.value == Value::Bool(true))
@@ -606,7 +605,7 @@ impl AppState {
             }
             Err(failure) => return Err(failure),
         };
-        self.record("review", text, display_facts(facts));
+        self.record("review", text, rows);
         Ok(EventOutcome::Applied)
     }
 
@@ -647,10 +646,9 @@ impl AppState {
         payload.id = format!("demo-event-{}", random_hex(8));
         payload.event_type = "asset.blocked".into();
         payload.project_id = self.library.project_id().into();
+        payload.actor = Some(Actor::new(ActorType::User, Some("demo-reviewer".into())));
         payload.asset_id = Some(asset_id.into());
         payload.facts = vec![
-            fact("decided-by", "reviewer"),
-            fact("reviewer-user-id", "demo-reviewer"),
             fact("reviewer-name", "Demo reviewer"),
             fact("note", "Simulated portal decision"),
         ];
@@ -928,7 +926,7 @@ async fn remove_file(
                     "Tick the box to confirm removing the file.",
                 ));
             }
-            let asset = state.library.delete_content(&id).await?;
+            let asset = state.library.remove_content(&id).await?;
             state.record(
                 "lifecycle",
                 format!(
@@ -1312,7 +1310,7 @@ pub(crate) fn latest_review(asset: &Asset) -> Option<&AssetReview> {
         .manual_reviews
         .iter()
         .rev()
-        .find(|review| review.applied_to_asset)
+        .find(|review| review.applied)
 }
 
 /// The catalogue ID this app issued for an asset, or `None` for an asset it did not upload.
@@ -1417,42 +1415,61 @@ pub(crate) fn valid_id(id: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
-/// Registered facts become display rows. Only absolute HTTP(S) URLs become links.
-pub(crate) fn display_facts(facts: &[EventFact]) -> Vec<FactRow> {
-    facts
-        .iter()
-        .filter_map(|fact| {
-            let label = FACT_LABELS.iter().find(|(key, _)| *key == fact.key)?.1;
-            let value = match &fact.value {
-                Value::Null => return None,
-                Value::String(value) => value.clone(),
-                Value::Array(values) => values
-                    .iter()
-                    .map(|value| {
-                        value
-                            .as_str()
-                            .map(str::to_string)
-                            .unwrap_or_else(|| value.to_string())
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                other => other.to_string(),
-            };
-            if value.is_empty() {
-                return None;
-            }
-            let url = fact.url.clone().filter(|url| {
-                url::Url::parse(url).is_ok_and(|parsed| {
-                    matches!(parsed.scheme(), "http" | "https") && parsed.host().is_some()
+/// Who caused an event, as the activity log shows it.
+fn actor_label(actor: &Actor) -> Option<&'static str> {
+    Some(match actor.actor_type {
+        ActorType::Automated => "Automated moderation",
+        ActorType::User => "A reviewer",
+        ActorType::ApiKey => "An API key",
+        ActorType::System => "CalmLens",
+        _ => return None,
+    })
+}
+
+/// The event's actor and registered facts become display rows. Only absolute HTTP(S) URLs
+/// become links.
+pub(crate) fn display_facts(payload: &WebhookEventPayload) -> Vec<FactRow> {
+    let actor = payload
+        .actor
+        .as_ref()
+        .and_then(actor_label)
+        .map(|value| FactRow {
+            label: "Decided by",
+            value: value.into(),
+            url: None,
+        });
+    let facts = payload.facts.iter().filter_map(|fact| {
+        let label = FACT_LABELS.iter().find(|(key, _)| *key == fact.key)?.1;
+        let value = match &fact.value {
+            Value::Null => return None,
+            Value::String(value) => value.clone(),
+            Value::Array(values) => values
+                .iter()
+                .map(|value| {
+                    value
+                        .as_str()
+                        .map(str::to_string)
+                        .unwrap_or_else(|| value.to_string())
                 })
-            });
-            Some(FactRow {
-                label,
-                value: value.chars().take(200).collect(),
-                url,
+                .collect::<Vec<_>>()
+                .join(", "),
+            other => other.to_string(),
+        };
+        if value.is_empty() {
+            return None;
+        }
+        let url = fact.url.clone().filter(|url| {
+            url::Url::parse(url).is_ok_and(|parsed| {
+                matches!(parsed.scheme(), "http" | "https") && parsed.host().is_some()
             })
+        });
+        Some(FactRow {
+            label,
+            value: value.chars().take(200).collect(),
+            url,
         })
-        .collect()
+    });
+    actor.into_iter().chain(facts).collect()
 }
 
 /// Signed URLs must be HTTPS; plain HTTP is allowed only for a local CalmLens on loopback.

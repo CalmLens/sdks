@@ -8,7 +8,9 @@ use crate::app::{
     META_PHOTOGRAPHER, SEARCH_MODES, STATUS_FILTERS,
 };
 use crate::demo::DEMO_OUTCOMES;
-use calmlens::models::{Asset, AssetContentRemovalReason, Folder, SearchMatchField};
+use calmlens::models::{
+    Asset, AssetContentRemovalReason, AssetReview, Folder, ReviewActorType, SearchMatchField,
+};
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::time::UNIX_EPOCH;
@@ -474,10 +476,7 @@ fn short_reason(asset: &Asset) -> String {
         return removal_reason(asset).into();
     }
     if let Some(review) = latest_review(asset) {
-        return format!(
-            "By {}",
-            review.reviewer_name.as_deref().unwrap_or("a reviewer")
-        );
+        return format!("By {}", reviewer(review));
     }
     let categories: Vec<&str> = flagged_categories(asset)
         .iter()
@@ -562,7 +561,7 @@ fn detail(
         let _ = write!(
             html,
             "<p><strong>{}</strong> decided {}",
-            h(review.reviewer_name.as_deref().unwrap_or("A reviewer")),
+            h(&capitalized(reviewer(review))),
             h(review.decision.as_str())
         );
         if let Some(note) = review.note.as_deref().filter(|note| !note.is_empty()) {
@@ -638,11 +637,7 @@ fn detail(
         "</dd><dt>Description</dt><dd>{}</dd>",
         h(or_dash(asset.description.as_deref().unwrap_or("")))
     );
-    let image = asset.content.image.as_ref();
-    if let (Some(width), Some(height)) = (
-        image.and_then(|image| image.width),
-        image.and_then(|image| image.height),
-    ) {
+    if let (Some(width), Some(height)) = (asset.content.width, asset.content.height) {
         let _ = write!(html, "<dt>Dimensions</dt><dd>{width} × {height}</dd>");
     }
     if let Some(size) = asset.content.size_in_bytes {
@@ -668,7 +663,7 @@ fn detail(
             html,
             "<li>{} by {}<time>{}</time></li>",
             h(review.decision.as_str()),
-            h(review.reviewer_name.as_deref().unwrap_or("a reviewer")),
+            h(reviewer(review)),
             date(review.reviewed_at)
         );
     }
@@ -719,21 +714,31 @@ fn detail(
     );
 }
 
+/// Who made a reviewer's decision. Reviews name no person, only whether a reviewer or an API key
+/// decided.
+fn reviewer(review: &AssetReview) -> &'static str {
+    match review.decided_by.actor_type {
+        ReviewActorType::ApiKey => "an API key",
+        _ => "a reviewer",
+    }
+}
+
+fn capitalized(text: &str) -> String {
+    let mut chars = text.chars();
+    chars
+        .next()
+        .map(|first| first.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
+}
+
 /// What automatic moderation decided, before any reviewer changed it.
 fn automatic_outcome(asset: &Asset) -> &str {
     asset
         .classification
         .moderation
-        .automated_action
-        .as_deref()
-        .map(|action| match action {
-            "allow" => "allowed",
-            "limit" => "limited",
-            "age-restrict" => "age-restricted",
-            "block" => "blocked",
-            "purge" => "purged",
-            other => other,
-        })
+        .automated_status
+        .as_ref()
+        .map(|status| status.as_str())
         .or_else(|| {
             if latest_review(asset).is_none() {
                 Some(decision(asset).as_str())

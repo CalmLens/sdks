@@ -10,7 +10,7 @@ use crate::contract_checks::{
     parse_transform_selector,
 };
 use crate::error::ErrorCode;
-use crate::models::{select_moderation_context_items, ModerationContext};
+use crate::models::{select_moderation_context_items, EventType, ModerationContext};
 use base64::Engine;
 use http::{HeaderMap, Method};
 use serde_json::{json, Map, Value};
@@ -133,7 +133,7 @@ pub(super) const OPERATIONS: [&str; 48] = [
     "assets.listChildren",
     "assets.iterateChildren",
     "assets.listTimeline",
-    "assets.deleteContent",
+    "assets.removeContent",
     "assets.createSignedUrl",
     "assets.retry",
     "assets.explain",
@@ -305,7 +305,7 @@ impl MockOptions {
         self
     }
     /// Creates the ID of a new object of the kind its prefix names (`asset`, `fldr`, `hl`, `hle`,
-    /// `lens`, `evt` or `rev`). The default is like the API's: the prefix, `_` and 20 random
+    /// `lens`, `evt`, `rev` or `batch`). The default is like the API's: the prefix, `_` and 20 random
     /// base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
     pub fn create_id(mut self, value: impl Fn(&str) -> String + Send + Sync + 'static) -> Self {
         self.create_id = Arc::new(value);
@@ -395,14 +395,15 @@ fn is_asset_id(value: &str) -> bool {
         body.len() == 20 && body.bytes().all(|byte| byte.is_ascii_alphanumeric())
     })
 }
-/// A request the API's schema refuses: `validation/<issue>` with HTTP 400 and the field.
+/// A request the API's schema refuses: `validation/invalid-request` with HTTP 400, listing the
+/// field and its issue code (`validation/<issue>`, such as `validation/too-big`) in
+/// `details.issues`.
 fn validation(issue: &str, path: &str) -> Failure {
-    let mut failure = custom(
-        &format!("validation/{issue}"),
-        400,
-        &format!("Invalid {path}"),
-    );
-    failure.details = json!({ "path": path });
+    let message = format!("Invalid {path}");
+    let mut failure = fail(ErrorCode::InvalidRequest, &message);
+    failure.details = json!({
+        "issues": [{ "path": path, "message": message, "code": format!("validation/{issue}") }],
+    });
     failure
 }
 /// Refuses `metadata` the API's schema refuses: it is `null` or a list of `{ id, value }`
@@ -437,10 +438,9 @@ fn check_metadata(metadata: Option<&Value>) -> Outcome<()> {
 fn timeline_page(asset: &Value, q: &HashMap<String, String>) -> Outcome<Value> {
     let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
     if !asset["content"]["safetyHold"].is_null() {
-        return Err(fail(
-            ErrorCode::AssetSafetyHeld,
-            "This asset is under a safety hold",
-        ));
+        let mut failure = fail(ErrorCode::AssetHeld, "This asset is under a safety hold");
+        failure.details = json!({ "hold": "safety" });
+        return Err(failure);
     }
     if q.contains_key("cursor") {
         return Err(fail(ErrorCode::InvalidCursor, "Invalid cursor"));
@@ -541,7 +541,18 @@ fn asset_type(mime: &str) -> &'static str {
 const MIB: u64 = 1024 * 1024;
 /// Like the API: image uploads in parts total at most 20 MiB, at any size below that.
 fn image_size_error(kind: &str, size: u64, _is_final: bool) -> Option<ErrorCode> {
-    (kind == "image" && size > 20 * MIB).then_some(ErrorCode::MultipartImageTooLarge)
+    (kind == "image" && size > MAX_IMAGE_PARTS_BYTES).then_some(ErrorCode::UploadTooLarge)
+}
+/// The most an image uploaded in parts may total.
+const MAX_IMAGE_PARTS_BYTES: u64 = 20 * MIB;
+/// The failure for a size error `code`, with the plan's limit that `upload/too-large` carries.
+fn size_failure(code: ErrorCode, message: &str) -> Failure {
+    let too_large = code == ErrorCode::UploadTooLarge;
+    let mut failure = fail(code, message);
+    if too_large {
+        failure.details = json!({ "limitBytes": MAX_IMAGE_PARTS_BYTES, "source": "plan" });
+    }
+    failure
 }
 /// Like the API: the parts may not overshoot a declared total, and must reach it at the end.
 fn total_size_error(total: Option<u64>, received: u64, is_final: bool) -> Option<ErrorCode> {
@@ -573,6 +584,9 @@ pub(super) struct Backend {
     policies: policies::Policies,
     /// Each asset's latest event `assetSequence`, which the API keeps on the asset.
     asset_sequences: HashMap<String, u64>,
+    /// The processing options each asset was uploaded with, which the API keeps but doesn't
+    /// return.
+    processing_options: HashMap<String, Value>,
 }
 
 fn text(value: &Value) -> &str {
@@ -656,6 +670,19 @@ const SPREADSHEET_MIME_TYPES: [&str; 4] = [
     "application/vnd.ms-excel",
     "application/vnd.oasis.opendocument.spreadsheet",
 ];
+
+/// The actor of events the mock's API key causes: mock keys have no ID.
+fn api_key_actor() -> Value {
+    json!({"type": "api-key", "id": null})
+}
+/// The actor of a reviewer's decision through [`MockServerClient::decide`](super::MockServerClient::decide).
+fn reviewer_actor() -> Value {
+    json!({"type": "user", "id": null})
+}
+/// The actor of the events the pipeline records.
+fn automated_actor() -> Value {
+    json!({"type": "automated", "id": null})
+}
 
 /// Paths beneath `/rendered/` the CDN reserves for streaming and an embeddable player.
 const RESERVED_RENDERED_PATHS: [&str; 2] = ["stream", "player"];
@@ -857,6 +884,7 @@ impl Backend {
             replays: HashMap::new(),
             policies: policies::Policies::default(),
             asset_sequences: HashMap::new(),
+            processing_options: HashMap::new(),
         }
     }
     /// The `assetSequence` of the next event about `asset_id`, like the API: 1 for its first
@@ -886,8 +914,9 @@ impl Backend {
     /// Applies a reviewer's decision to stored asset `asset_id`, like the API: the moderation
     /// status changes (purged also removes the content with removal reason `requested`,
     /// recording an `asset.content-removed` event first), the review joins `manualReviews`, and
-    /// an `asset.<decision>` event with a `decided-by: reviewer` fact joins the feed. `note` is
-    /// the reviewer's note, or null for [`decide`](Self::decide).
+    /// an `asset.<decision>` event joins the feed. `note` is the reviewer's note, or null for
+    /// [`decide`](Self::decide). A decision through the API (with its note) is the API key's; the
+    /// test hook's is a reviewer's, whose events name a `user`.
     fn record_review(&mut self, asset_id: &str, decision: &str, note: Value) -> Value {
         let now = self.now();
         let review_id = self.create_id("rev");
@@ -902,13 +931,19 @@ impl Backend {
             .as_array_mut()
             .expect("array")
             .push(json!({
+                // Either way the review is the mock API key's, which has no ID.
                 "id": review_id, "decision": decision, "note": note,
-                "reviewerName": null, "reviewerEmail": null, "reviewedAt": now,
-                "appliedToAsset": true,
+                "decidedBy": {"type": "api-key", "id": null}, "reviewedAt": now,
+                "applied": true,
             }));
         let asset = asset.clone();
+        let actor = if note.is_null() {
+            reviewer_actor()
+        } else {
+            api_key_actor()
+        };
         if decision == "purged" {
-            self.record_lifecycle_event("asset.content-removed", &asset);
+            self.record_lifecycle_event("asset.content-removed", &asset, actor.clone(), None);
         }
         let event_type = format!("asset.{decision}");
         // Like the event catalog: only allowing and limiting are low severity.
@@ -917,19 +952,12 @@ impl Backend {
         } else {
             "high"
         };
-        // A decision through the API (with its note) is the API key's; the test hook's is a reviewer's.
-        let decided_by = if note.is_null() {
-            "reviewer"
-        } else {
-            "api-key"
-        };
         let facts = json!([
-            {"key": "decided-by", "value": decided_by},
             {"key": "asset-type", "value": asset["type"]},
             {"key": "asset-name", "value": asset["name"], "url": format!("https://calmlens.com/go/asset/{asset_id}")},
             {"key": "note", "value": note},
         ]);
-        self.push_event(&event_type, severity, &asset, facts);
+        self.push_event(&event_type, severity, &asset, actor, facts);
         asset
     }
 
@@ -966,7 +994,10 @@ impl Backend {
         let status = text(&asset["classification"]["moderation"]["status"]);
         let undecided = !matches!(decision, "blocked" | "purged");
         if asset["upload"]["status"] == "uploading"
-            || asset["classification"]["status"] == "processing"
+            || matches!(
+                text(&asset["classification"]["status"]),
+                "queued" | "processing"
+            )
         {
             return Err(fail(
                 ErrorCode::AssetProcessing,
@@ -994,23 +1025,31 @@ impl Backend {
         Ok(self.record_review(id, decision, note.into()))
     }
 
-    /// Adds an event to the feed, as the API records it.
-    fn push_event(&mut self, event_type: &str, severity: &str, asset: &Value, facts: Value) {
+    /// Adds an event `actor` caused to the feed, as the API records it.
+    fn push_event(
+        &mut self,
+        event_type: &str,
+        severity: &str,
+        asset: &Value,
+        actor: Value,
+        facts: Value,
+    ) {
         let now = self.now();
         let sequence = self.next_asset_sequence(text(&asset["id"]));
         let event = json!({
             "id": self.create_id("evt"), "projectId": self.options.project_id, "type": event_type,
             "severity": severity, "title": event_type, "description": null,
             "assetId": asset["id"], "assetSequence": sequence, "asset": snapshot(asset),
-            "facts": facts, "createdAt": now,
+            "actor": actor, "facts": facts, "createdAt": now,
         });
         self.storage.events.push(event);
     }
 
     /// Removes an asset's content like the API: the record and report stay; stored content,
     /// extracted text, metadata, the rendered file and the preview go. Content already removed keeps its reason, and an
-    /// `asset.content-removed` event is recorded either way.
-    fn remove_content(&mut self, mut asset: Value, now: u64) -> Value {
+    /// `asset.content-removed` event is recorded either way, with the `batch-id` fact of the
+    /// batch that removed it, if any.
+    fn remove_content(&mut self, mut asset: Value, now: u64, batch_id: Option<&str>) -> Value {
         let id = text(&asset["id"]).to_owned();
         self.storage.content.remove(&id);
         if asset["content"]["status"] != "removed" {
@@ -1025,7 +1064,7 @@ impl Backend {
         set_rendering(section(&mut asset, "content"), (Value::Null, Value::Null));
         asset["context"] = Value::Null;
         self.storage.assets.insert(id, asset.clone());
-        self.record_lifecycle_event("asset.content-removed", &asset);
+        self.record_lifecycle_event("asset.content-removed", &asset, api_key_actor(), batch_id);
         asset
     }
 
@@ -1051,7 +1090,8 @@ impl Backend {
 
     /// `POST /projects/:id/assets/batch`: the schema (1 to 500 UUIDs and a known operation) and
     /// every asset are checked before anything changes, then the operation is applied at once,
-    /// in request order, instead of in the background. Mock assets carry no safety holds.
+    /// in request order, instead of in the background, and the response names the batch. Each
+    /// event it records carries the batch's `batch-id` fact. Mock assets carry no safety holds.
     fn batch(&mut self, body: Map<String, Value>, now: u64) -> Outcome<Value> {
         let ids = match body.get("assetIds") {
             Some(Value::Array(ids)) => ids,
@@ -1086,27 +1126,44 @@ impl Backend {
                 .ok_or_else(|| fail(ErrorCode::AssetNotFound, "Asset not found"))?;
             assets.push(asset.clone());
         }
+        let batch_id = self.create_id("batch");
+        let asset_count = assets.len();
         for asset in assets {
             if operation == Some("delete") {
                 self.delete_asset_tree(text(&asset["id"]));
                 // One event per requested asset, with the asset as it was before the deletion.
-                self.record_lifecycle_event("asset.deleted", &asset);
+                self.record_lifecycle_event(
+                    "asset.deleted",
+                    &asset,
+                    api_key_actor(),
+                    Some(&batch_id),
+                );
             } else {
-                self.remove_content(asset, now);
+                self.remove_content(asset, now, Some(&batch_id));
             }
         }
-        Ok(json!({ "queued": true }))
+        Ok(json!({ "batchId": batch_id, "status": "queued", "assetCount": asset_count }))
     }
 
-    /// Adds an `asset.deleted`, `asset.content-removed` or `asset.retried` event, like the API.
-    fn record_lifecycle_event(&mut self, event_type: &str, asset: &Value) {
+    /// Adds an `asset.deleted`, `asset.content-removed` or `asset.retried` event `actor` caused,
+    /// like the API, with the `batch-id` fact of the batch that caused it, if any.
+    fn record_lifecycle_event(
+        &mut self,
+        event_type: &str,
+        asset: &Value,
+        actor: Value,
+        batch_id: Option<&str>,
+    ) {
         let mut name = json!({"key": "asset-name", "value": asset["name"]});
         // A deleted asset has no portal page to link to.
         if event_type != "asset.deleted" {
             name["url"] = format!("https://calmlens.com/go/asset/{}", text(&asset["id"])).into();
         }
-        let facts = json!([name, {"key": "asset-type", "value": asset["type"]}]);
-        self.push_event(event_type, "low", asset, facts);
+        let mut facts = vec![name, json!({"key": "asset-type", "value": asset["type"]})];
+        if let Some(batch_id) = batch_id {
+            facts.push(json!({"key": "batch-id", "value": batch_id}));
+        }
+        self.push_event(event_type, "low", asset, actor, facts.into());
     }
 
     pub(super) fn handle(
@@ -1390,7 +1447,10 @@ impl Backend {
         if asset["type"] != "image" || asset["classification"]["status"] != "completed" {
             return;
         }
-        let features = asset["processingOptions"]["features"].clone();
+        let features = self
+            .processing_options
+            .get(text(&asset["id"]))
+            .map_or(Value::Null, |options| options["features"].clone());
         for (feature, list) in [("personDetection", "people"), ("faceDetection", "faces")] {
             if features[feature]["enabled"] == true {
                 asset["classification"][feature] =
@@ -1474,7 +1534,7 @@ impl Backend {
             asset_name_fact(asset),
             {"key": "file-format", "value": asset["content"]["format"]},
         ]);
-        self.push_event("asset.uploaded", "low", asset, facts);
+        self.push_event("asset.uploaded", "low", asset, api_key_actor(), facts);
     }
 
     /// The events the pipeline records when it settles an asset: `asset.classified` and the
@@ -1494,7 +1554,7 @@ impl Backend {
                     {"key": "previous-status", "value": "processing"},
                     {"key": "failure-reason", "value": reason},
                 ]);
-                self.push_event("asset.failed", "high", asset, facts);
+                self.push_event("asset.failed", "high", asset, automated_actor(), facts);
             }
             _ => {
                 let flagged = decision.flagged_categories();
@@ -1504,7 +1564,7 @@ impl Backend {
                     {"key": "asset-type", "value": asset["type"]},
                     asset_name_fact(asset),
                 ]);
-                self.push_event("asset.classified", "low", asset, facts);
+                self.push_event("asset.classified", "low", asset, automated_actor(), facts);
                 // Like the event catalog: only allowing and limiting are low severity.
                 let severity = if matches!(status, MockOutcome::Allowed | MockOutcome::Limited) {
                     "low"
@@ -1512,35 +1572,70 @@ impl Backend {
                     "high"
                 };
                 let facts = json!([
-                    {"key": "decided-by", "value": "automated"},
                     {"key": "flagged-categories", "value": flagged},
                     {"key": "asset-type", "value": asset["type"]},
                     asset_name_fact(asset),
                 ]);
-                self.push_event(&format!("asset.{status}"), severity, asset, facts);
+                let event_type = format!("asset.{status}");
+                self.push_event(&event_type, severity, asset, automated_actor(), facts);
             }
         }
     }
 
+    /// A page of the events feed, like the API: `types` (a comma-separated list of known event
+    /// types) and `assetId` narrow it, and a cursor belongs to the filters it was issued with.
     fn list_events(&self, q: &HashMap<String, String>) -> Outcome<Value> {
         let events = &self.storage.events;
         // Like the API's query schema: an integer from 1 to 100, 50 by default.
         let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
-        // Cursors are `<n>_mock`: the number of events already delivered. Without one, the
-        // page is empty and its cursor marks now. `nextCursor` is never null: it is where to
-        // keep polling from. The mock's key holds every permission, so no event type is excluded.
+        let mut types: Vec<&str> = match q.get("types") {
+            None => Vec::new(),
+            Some(types) => types.split(',').collect(),
+        };
+        if types
+            .iter()
+            .any(|kind| matches!(EventType::from(*kind), EventType::Unknown(_)))
+        {
+            return Err(validation("invalid-value", "types"));
+        }
+        let asset_id = q.get("assetId").map(String::as_str);
+        if asset_id.is_some_and(|id| !is_asset_id(id)) {
+            return Err(validation("invalid-format", "assetId"));
+        }
+        types.sort_unstable();
+        types.dedup();
+        let matches = |event: &Value| {
+            (types.is_empty() || types.contains(&text(&event["type"])))
+                && asset_id.is_none_or(|id| event["assetId"] == id)
+        };
+        // Cursors are `<n>_mock` and the filters they were issued with: `n` events are behind
+        // the cursor. Without one, the page is empty and its cursor marks now. `nextCursor` is
+        // never null: it is where to keep polling from. The mock's key holds every permission,
+        // so no event type is excluded.
+        let filters = if types.is_empty() && asset_id.is_none() {
+            String::new()
+        } else {
+            format!("~{}~{}", types.join(","), asset_id.unwrap_or_default())
+        };
         let start = match q.get("cursor") {
             None => events.len(),
             Some(cursor) => cursor
-                .strip_suffix("_mock")
+                .strip_suffix(&format!("_mock{filters}"))
                 .and_then(|n| n.parse::<usize>().ok())
                 .filter(|n| *n <= events.len())
                 .ok_or_else(|| fail(ErrorCode::InvalidCursor, "Invalid cursor"))?,
         };
-        let end = (start + size).min(events.len());
+        let mut items = Vec::new();
+        let mut next = start;
+        while next < events.len() && items.len() < size {
+            if matches(&events[next]) {
+                items.push(events[next].clone());
+            }
+            next += 1;
+        }
         Ok(json!({
-            "items": events[start..end], "nextCursor": format!("{end}_mock"),
-            "hasMore": end < events.len(), "excludedTypes": [],
+            "items": items, "nextCursor": format!("{next}_mock{filters}"),
+            "hasMore": events[next..].iter().any(matches), "excludedTypes": [],
         }))
     }
 
@@ -1905,7 +2000,7 @@ impl Backend {
             "hash": hash,
             "quality": quality,
             "label": body.get("label").filter(|value| value.is_string()),
-            "sourceAssetId": asset_id,
+            "assetId": asset_id,
             "createdAt": now,
         });
         self.storage.hash_list_entries.push(entry.clone());
@@ -1927,10 +2022,11 @@ impl Backend {
         if mode == "content" || multipart {
             options = Map::new();
             for (key, value) in q {
-                let value = if ["metadata", "processingOptions", "context"].contains(&key.as_str())
+                let value = if ["metadata", "tags", "processingOptions", "context"]
+                    .contains(&key.as_str())
                 {
                     serde_json::from_str(value).map_err(|_| {
-                        invalid("metadata, processingOptions and context must be JSON")
+                        invalid("metadata, tags, processingOptions and context must be JSON")
                     })?
                 } else {
                     value.clone().into()
@@ -1951,10 +2047,10 @@ impl Backend {
         let mime = q.get("contentType").map_or("", String::as_str);
         if !website && !is_accepted_upload_mime_type(mime) {
             let mut failure = fail(
-                ErrorCode::InvalidUploadMimeType,
+                ErrorCode::UnsupportedUploadType,
                 invalid_upload_mime_type(mime).message(),
             );
-            failure.details = json!({ "mimeType": mime });
+            failure.details = json!({ "mimeType": mime, "source": "calmlens" });
             return Err(failure);
         }
         let kind = if website { "website" } else { asset_type(mime) };
@@ -1982,7 +2078,7 @@ impl Backend {
                         .flatten()
                 });
             if let Some(code) = error {
-                return Err(fail(code, "The upload's size is not accepted"));
+                return Err(size_failure(code, "The upload's size is not accepted"));
             }
             check_part_size(size, is_final)?;
             if !is_final {
@@ -2029,7 +2125,6 @@ impl Backend {
             "folderId": null, "uploadPresetId": null, "createdAt": now, "updatedAt": now,
             "name": null, "description": null, "externalId": null, "externalUrl": null,
             "type": kind, "metadata": null, "authorId": null, "context": null, "tags": null,
-            "processingOptions": processing,
             "visibility": "private",
             "content": {
                 "status": if keep { "stored" } else { "temporary" }, "removalReason": null,
@@ -2047,7 +2142,7 @@ impl Backend {
                 "partsReceived": if open { json!(part_number) } else { Value::Null },
             },
             "classification": {
-                "status": if open { "pending" } else { "processing" }, "failureReason": null,
+                "status": if open { "queued" } else { "processing" }, "failureReason": null,
                 "updatedAt": now, "completedAt": null, "progress": null,
                 // The mock never reads test inputs.
                 "testInput": false,
@@ -2057,10 +2152,12 @@ impl Backend {
                 },
             },
         });
+        self.processing_options.insert(id.clone(), processing);
         for key in [
             "name",
             "description",
             "metadata",
+            "tags",
             "authorId",
             "externalId",
             "externalUrl",
@@ -2173,7 +2270,7 @@ impl Backend {
                 storage.assets.remove(id);
                 storage.content.remove(id);
                 self.uploads.remove(id);
-                self.record_lifecycle_event("asset.deleted", &asset);
+                self.record_lifecycle_event("asset.deleted", &asset, api_key_actor(), None);
                 return Ok(json!({}));
             }
             ("GET", "children") => {
@@ -2222,7 +2319,7 @@ impl Backend {
                 // Back to processing, to be moderated again, with an `asset.retried` event.
                 apply_outcome(&mut asset, &mut storage.content, "pending", "policy", now);
                 storage.assets.insert(id.to_owned(), asset.clone());
-                self.record_lifecycle_event("asset.retried", &asset);
+                self.record_lifecycle_event("asset.retried", &asset, api_key_actor(), None);
                 return self.moderate_stored(asset, MockModerationTrigger::Retry, None, now);
             }
             ("POST", "explain") => {
@@ -2286,7 +2383,7 @@ impl Backend {
                 }
                 asset["updatedAt"] = now.into();
             }
-            ("DELETE", "content") => return Ok(self.remove_content(asset, now)),
+            ("DELETE", "content") => return Ok(self.remove_content(asset, now, None)),
             ("POST", "part") => {
                 let (received, is_final) = self.check_part(&asset, q, raw)?;
                 let part: u64 = q["partNumber"].parse().unwrap_or(0);
@@ -2356,7 +2453,7 @@ impl Backend {
         let error = image_size_error(text(&asset["type"]), received, is_final)
             .or_else(|| total_size_error(total, received, is_final));
         if let Some(code) = error {
-            return Err(fail(code, "The parts' size is not accepted"));
+            return Err(size_failure(code, "The parts' size is not accepted"));
         }
         check_part_size(raw.len() as u64, is_final)?;
         Ok((received, is_final))
@@ -2497,8 +2594,14 @@ impl Backend {
             )
             .response()
         };
-        let invalid_transform =
-            || custom("asset/invalid-transform", 400, "Invalid transform selector").response();
+        let invalid_transform = || {
+            custom(
+                ErrorCode::InvalidTransform.as_str(),
+                400,
+                "Invalid transform selector",
+            )
+            .response()
+        };
         let resource = parts.get(3).map_or("", String::as_str);
         let selector_parts = raw_parts.get(4..).unwrap_or_default();
         // Like the CDN, `/rendered/stream` and `/rendered/player` are reserved, then the selector
@@ -2588,12 +2691,12 @@ impl Backend {
         }
         let restricted = !public;
         if restricted && !can_download() {
-            return custom(
-                "asset/api-key-missing-permission",
-                403,
+            let mut failure = fail(
+                ErrorCode::PermissionDenied,
                 "This API key needs assets:download permission for this asset's folder.",
-            )
-            .response();
+            );
+            failure.details = json!({ "permission": "assets:download" });
+            return failure.response();
         }
         // Then whether the asset has the resource, and whether it is a still image that takes a
         // lens or transform: the preview always is, the rendered file only when it is an image.
@@ -2613,7 +2716,7 @@ impl Backend {
             if !unknown.is_empty() || !invalid.is_empty() {
                 let keys = [unknown, invalid].concat().join(", ");
                 return custom(
-                    "asset/invalid-transform-options",
+                    ErrorCode::InvalidTransformOptions.as_str(),
                     400,
                     &format!("Invalid transform options: {keys}"),
                 )
@@ -2762,7 +2865,7 @@ impl Backend {
             ("PATCH", ["assets", _]) => "assets.update",
             ("DELETE", ["assets", _]) => "assets.delete",
             ("GET", ["assets", _, "children"]) => "assets.listChildren",
-            ("DELETE", ["assets", _, "content"]) => "assets.deleteContent",
+            ("DELETE", ["assets", _, "content"]) => "assets.removeContent",
             ("POST", ["assets", _, "signed-url"]) => "assets.createSignedUrl",
             ("POST", ["assets", _, "retry"]) => "assets.retry",
             ("POST", ["assets", _, "explain"]) => "assets.explain",
@@ -2910,9 +3013,9 @@ fn content_purged(asset: &Value) -> bool {
         || moderation["manualReviews"]
             .as_array()
             .is_some_and(|reviews| {
-                reviews.iter().any(|review| {
-                    review["decision"] == "purged" && review["appliedToAsset"] == true
-                })
+                reviews
+                    .iter()
+                    .any(|review| review["decision"] == "purged" && review["applied"] == true)
             })
 }
 
@@ -3047,7 +3150,7 @@ fn compare(a: &Value, b: &Value) -> Ordering {
 
 /// An asset list filter as the API reads it (zodbase/rsql with @rsql/parser): `;` (and), which
 /// binds tighter than `,` (or), `( … )` groups, quoted or unquoted values, and only the fields
-/// and operators in `asset_filters`. Anything else is `validation/invalid-filter`.
+/// and operators in `asset_filters`. Anything else is `filter/invalid`.
 /// Alternatives (`,`) of terms (`;`) that must all hold.
 struct Filter(Vec<Vec<Term>>);
 enum Term {
@@ -3347,11 +3450,9 @@ mod tests {
             .unwrap()
             .iter()
             .find(|scenario| {
-                scenario["steps"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .any(|step| step["expect"]["error"]["details"]["path"] == "metadata")
+                scenario["steps"].as_array().unwrap().iter().any(|step| {
+                    step["expect"]["error"]["details"]["issues"][0]["path"] == "metadata"
+                })
             })
             .expect("a metadata scenario");
         let (mut refused, mut accepted) = (0, 0);
@@ -3366,10 +3467,12 @@ mod tests {
                     let failure = outcome.expect_err(&metadata.to_string());
                     assert_eq!(failure.code, error["code"], "{metadata}");
                     assert_eq!(failure.status, error["status"], "{metadata}");
-                    assert_eq!(
-                        failure.details["path"], error["details"]["path"],
-                        "{metadata}"
+                    let (issue, want) = (
+                        &failure.details["issues"][0],
+                        &error["details"]["issues"][0],
                     );
+                    assert_eq!(issue["path"], want["path"], "{metadata}");
+                    assert_eq!(issue["code"], want["code"], "{metadata}");
                 }
                 None => {
                     accepted += 1;

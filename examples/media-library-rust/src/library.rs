@@ -311,10 +311,10 @@ impl Library {
     }
 
     /// Removes the stored file. The record, its metadata and classification results stay.
-    pub async fn delete_content(&self, id: &str) -> Result<Asset, Failure> {
+    pub async fn remove_content(&self, id: &str) -> Result<Asset, Failure> {
         match self {
-            Library::Live(client) => Ok(client.assets().delete_content(AssetId::new(id)).await?),
-            Library::Demo(store) => Self::with_store(store, |store| store.delete_content(id)),
+            Library::Live(client) => Ok(client.assets().remove_content(AssetId::new(id)).await?),
+            Library::Demo(store) => Self::with_store(store, |store| store.remove_content(id)),
         }
     }
 

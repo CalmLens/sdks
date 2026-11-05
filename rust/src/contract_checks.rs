@@ -160,7 +160,7 @@ pub(crate) fn assert_transform_options(options: &Value) -> crate::Result<()> {
 
 /// Whether the API accepts an upload of this MIME type: an image, audio, video, text, document
 /// or website type, not a container such as `application/octet-stream`. It refuses any other
-/// type with `upload/invalid-mime-type`.
+/// type with `upload/unsupported-type`.
 #[cfg(feature = "async")]
 pub(crate) fn is_accepted_upload_mime_type(mime_type: &str) -> bool {
     use crate::upload_mime_types::{
@@ -190,13 +190,15 @@ pub(crate) fn normalize_upload_mime_type(mime_type: &str) -> String {
         .to_lowercase()
 }
 
-/// The `upload/invalid-mime-type` error for an upload of `mime_type`, with it in the details.
+/// The `upload/unsupported-type` error for an upload of `mime_type`, with it and the `calmlens`
+/// source in the details.
 #[cfg(feature = "async")]
 pub(crate) fn invalid_upload_mime_type(mime_type: &str) -> crate::Error {
     let mut details = Map::new();
     details.insert("mimeType".into(), mime_type.into());
+    details.insert("source".into(), "calmlens".into());
     crate::Error::new(
-        crate::ErrorCode::InvalidUploadMimeType,
+        crate::ErrorCode::UnsupportedUploadType,
         format!(
             "{} is not a valid upload file type. Uploads must use a concrete file MIME type that \
              CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or \
@@ -218,7 +220,7 @@ pub(crate) struct TransformSelector {
 /// CDN does: an optional first `@lens`, then `key=value` options with dotted keys for nested
 /// ones (a bare key is `true`). Values are numbers, `true`, `false`, hex colours (`#` added)
 /// for colour options, or text. `None` for anything the CDN refuses as
-/// `asset/invalid-transform`.
+/// `transform/invalid`.
 #[cfg(feature = "testing")]
 pub(crate) fn parse_transform_selector(selector: &str) -> Option<TransformSelector> {
     let mut parsed = TransformSelector {

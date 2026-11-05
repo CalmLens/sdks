@@ -4,7 +4,7 @@ use serde_json::json;
 
 #[test]
 fn asset_nested_fields_decode_into_typed_models() {
-    let wire = json!({"id":"asset-1","type":"image","processingOptions":{"keepContentAfterProcessing":true},"content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"width":10,"height":20,"durationSeconds":null,"pageCount":null,"perceptualHash":"ph","perceptualHashQuality":87,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","cameraModel":null,"lensModel":null,"software":null,"creator":null,"copyright":null,"digitalSourceType":null,"containsLocation":true,"location":null},"rendered":{"kind":"image","format":"image/webp","width":10,"height":20},"preview":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000"},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","reviewedAt":7,"appliedToAsset":true}],"status":"age-restricted","flaggedCategories":[],"regions":[],"timeline":{"segmentCount":3},"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"hashMatches":[{"source":"hash-list","listId":"list-1","entryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[1],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","stage":"beta","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"labels":[{"description":"beach","score":0.7,"likelihood":"very-likely"}]}});
+    let wire = json!({"id":"asset-1","type":"image","content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"width":10,"height":20,"durationSeconds":null,"pageCount":null,"perceptualHash":"ph","perceptualHashQuality":87,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","cameraModel":null,"lensModel":null,"software":null,"creator":null,"copyright":null,"digitalSourceType":null,"containsLocation":true,"location":null},"rendered":{"kind":"image","format":"image/webp","width":10,"height":20},"preview":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000"},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":7,"applied":true}],"status":"age-restricted","automatedStatus":"limited","flaggedCategories":[],"regions":[{"region":"DE","status":"blocked","rule":"de-jmstv","category":"sexual"}],"timeline":{"segmentCount":3},"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"gambling","evidence":[]}],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","stage":"beta","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}]}});
     let asset: Asset = serde_json::from_value(wire).unwrap();
 
     assert_eq!(asset.asset_type, Some(AssetType::Image));
@@ -31,6 +31,34 @@ fn asset_nested_fields_decode_into_typed_models() {
             Some("confirmed"),
             Some(7),
             Some(8)
+        )
+    );
+    let review = &moderation.manual_reviews[0];
+    assert_eq!(
+        (
+            &review.decided_by.actor_type,
+            review.decided_by.id.as_deref(),
+            review.applied
+        ),
+        (&ReviewActorType::User, Some("user-1"), true)
+    );
+    assert_eq!(
+        moderation.automated_status,
+        Some(AssetModerationDecision::Limited)
+    );
+    let region = &moderation.regions[0];
+    assert_eq!(
+        (
+            region.region.as_str(),
+            &region.status,
+            region.rule.as_str(),
+            &region.category
+        ),
+        (
+            "DE",
+            &AssetModerationDecision::Blocked,
+            "de-jmstv",
+            &Some(ClassificationCategory::Sexual)
         )
     );
     assert!(asset.is_decided());
@@ -95,14 +123,6 @@ fn asset_nested_fields_decode_into_typed_models() {
         (&text.extraction_type, text.id.as_deref()),
         (&ExtractedTextType::Document, Some("doc-1"))
     );
-    assert_eq!(
-        asset
-            .processing_options
-            .as_ref()
-            .unwrap()
-            .keep_content_after_processing,
-        Some(true)
-    );
 
     let report = asset.classification.moderation.raw.as_ref().unwrap();
     let sexual = &report.categories[&ClassificationCategory::Sexual];
@@ -121,15 +141,11 @@ fn asset_nested_fields_decode_into_typed_models() {
         report.categories[&ClassificationCategory::Violence].reason,
         Some(NotEvaluatedReason::NotSupported)
     );
-    assert_eq!(
-        asset.classification.labels.as_ref().unwrap()[0].likelihood,
-        Likelihood::VeryLikely
-    );
     let hash_match = &report.hash_matches.as_ref().unwrap()[0];
     assert_eq!(
         (
-            hash_match.list_id.as_str(),
-            hash_match.entry_id.as_str(),
+            hash_match.hash_list_id.as_str(),
+            hash_match.hash_list_entry_id.as_str(),
             hash_match.distance,
             &hash_match.action
         ),
@@ -176,9 +192,17 @@ fn asset_nested_fields_decode_into_typed_models() {
         )
     );
     let link_decision = moderation.link_safety.as_ref().unwrap();
+    let flagged: Vec<_> = link_decision
+        .links
+        .iter()
+        .map(|link| (link.url.as_str(), link.redirects, &link.verdict))
+        .collect();
     assert_eq!(
-        (&link_decision.action, link_decision.links.as_slice()),
-        (&LinkSafetyAction::AgeRestrict, [1].as_slice())
+        (&link_decision.action, flagged.as_slice()),
+        (
+            &LinkSafetyAction::AgeRestrict,
+            [("https://bit.example/x", 2, &LinkSafetyVerdict::Gambling)].as_slice()
+        )
     );
     assert_eq!(
         (
@@ -225,7 +249,7 @@ fn asset_nested_fields_decode_into_typed_models() {
 
 #[test]
 fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
-    let wire = json!({"id":"asset-1","type":"hologram","content":{"status":"archived","removalReason":"expired"},"upload":{"status":"completed"},"classification":{"status":"paused","moderation":{"manualReviews":[{"id":"review-1","decision":"deferred","note":null,"reviewedAt":7,"appliedToAsset":true}],"status":"escalated","flaggedCategories":[],"regions":[],"raw":{"categories":{"spam":{"status":"skipped","likelihood":"certain","qualifiers":{"bots":{"status":"evaluated"}}}}}},"labels":[{"description":"x","score":1,"likelihood":"certain"}]}});
+    let wire = json!({"id":"asset-1","type":"hologram","content":{"status":"archived","removalReason":"expired"},"upload":{"status":"completed"},"classification":{"status":"paused","moderation":{"manualReviews":[{"id":"review-1","decision":"deferred","note":null,"decidedBy":{"type":"assistant","id":null},"reviewedAt":7,"applied":true}],"status":"escalated","flaggedCategories":[],"regions":[],"raw":{"categories":{"spam":{"status":"skipped","likelihood":"certain","qualifiers":{"bots":{"status":"evaluated"}}}}}}}});
     let asset: Asset = serde_json::from_value(wire.clone()).unwrap();
     assert_eq!(
         asset.asset_type,
@@ -247,8 +271,15 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
             &Some(AssetContentRemovalReason::Unknown("expired".into()))
         )
     );
-    // Any status other than `pending` is a decision, even one this SDK version does not know.
-    assert!(asset.is_decided());
+    assert_eq!(
+        asset.classification.moderation.manual_reviews[0]
+            .decided_by
+            .actor_type,
+        ReviewActorType::Unknown("assistant".into())
+    );
+    // Only `completed` and `failed` settle an asset, so a classification status this SDK version
+    // does not know is still waiting, whatever the moderation status says.
+    assert!(!asset.is_decided());
     let spam = &&asset
         .classification
         .moderation
@@ -272,6 +303,10 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
         "escalated"
     );
     assert_eq!(reencoded["content"]["removalReason"], "expired");
+    assert_eq!(
+        reencoded["classification"]["moderation"]["manualReviews"][0]["decidedBy"]["type"],
+        "assistant"
+    );
     assert_eq!(
         reencoded["classification"]["moderation"]["raw"]["categories"]["spam"]["likelihood"],
         "certain"
@@ -504,8 +539,23 @@ fn newer_event_types_decode_to_their_own_variants() {
     );
     assert_eq!(decode("asset.retried"), EventType::AssetRetried);
     assert_eq!(
+        decode("usage.uploads-paused"),
+        EventType::UsageUploadsPaused
+    );
+    assert_eq!(
+        decode("usage.free-uploads-exhausted"),
+        EventType::UsageFreeUploadsExhausted
+    );
+    assert_eq!(
+        decode("asset.progress-updated"),
+        EventType::AssetProgressUpdated
+    );
+    assert_eq!(decode("connector.disabled"), EventType::ConnectorDisabled);
+    assert_eq!(decode("project.member-left"), EventType::ProjectMemberLeft);
+    assert_eq!(decode("api-key.deleted"), EventType::ApiKeyDeleted);
+    assert_eq!(
         decode("usage.spend-limit-reached"),
-        EventType::UsageSpendLimitReached
+        EventType::Unknown("usage.spend-limit-reached".into())
     );
     assert_eq!(
         decode("upload-preset.daily-limit-reached"),
@@ -533,7 +583,7 @@ fn newer_event_types_decode_to_their_own_variants() {
 
 #[test]
 fn report_policy_snapshot_decodes_into_typed_models() {
-    let policy: AssetModeration = serde_json::from_str(r#"{"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedAction":"purge"}"#).unwrap();
+    let policy: AssetModeration = serde_json::from_str(r#"{"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedStatus":"purged"}"#).unwrap();
     let category = &policy.categories[&ClassificationCategory::Violence];
     let settings = category.settings.as_ref().unwrap();
     assert_eq!(settings.category_action, "block");
@@ -541,7 +591,6 @@ fn report_policy_snapshot_decodes_into_typed_models() {
         settings.restrictions[0].name.as_deref(),
         Some("snapshot-rule")
     );
-    assert_eq!(category.source.as_ref().unwrap().index, Some(0));
     assert_eq!(settings.restrictions[0].r#match.as_deref(), Some("all"));
     assert_eq!(
         settings.restrictions[0].unless.as_deref(),
@@ -551,13 +600,12 @@ fn report_policy_snapshot_decodes_into_typed_models() {
         category.source.as_ref().unwrap().indexes.as_deref(),
         Some([0, 1].as_slice())
     );
-    let finding: CategoryResult = serde_json::from_value(json!({"status": "evaluated", "score": 0.9, "policyConditions": {"some:opaque": {"status": "evaluated", "score": 0.8}}})).unwrap();
-    let evidence = &finding.policy_conditions.as_ref().unwrap()["some:opaque"];
-    assert_eq!(evidence.status, Some(EvaluationStatus::Evaluated));
-    assert_eq!(evidence.score, Some(0.8));
     let decision = &policy;
     assert_eq!(decision.source.as_deref(), Some("hash-list"));
-    assert_eq!(decision.automated_action.as_deref(), Some("purge"));
+    assert_eq!(
+        decision.automated_status,
+        Some(AssetModerationDecision::Purged)
+    );
     assert_eq!(
         decision.flagged_categories,
         vec![ClassificationCategory::Violence]

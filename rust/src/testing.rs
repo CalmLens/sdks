@@ -41,7 +41,7 @@ pub use memory::{
 };
 
 use crate::error::ErrorCode;
-use crate::models::{Asset, AssetModerationDecision, Event};
+use crate::models::{Actor, ActorType, Asset, AssetModerationDecision, Event};
 use crate::transport::{Attempt, AttemptBody, Exchange, ResponseBody};
 use crate::{Error, Result, ServerClient, ServerClientBuilder};
 use bytes::Bytes;
@@ -382,8 +382,9 @@ impl MockServerClient {
     /// Retrieve, list (RSQL filter, ordering, folder, cursor), children, update, move, delete,
     /// delete content, retry, keyword search, signed URLs, folders, hash lists, lenses and the
     /// events feed read and change that storage, with the API's error codes, statuses and idempotent
-    /// replays. `wait_for_decision` returns at once for a decided asset; a pending one waits
-    /// for [`decide`](Self::decide) or the timeout. The CDN serves stored bytes, refusing
+    /// replays. `wait_for_decision` returns at once for a settled asset (processing `completed`
+    /// or `failed`); a queued or processing one waits for [`decide`](Self::decide),
+    /// [`complete_processing`](Self::complete_processing) or the timeout. The CDN serves stored bytes, refusing
     /// blocked and purged assets, age-restricted ones requested without
     /// `ViewerClaims::age_confirmed` set to `true` whatever the key, and private ones unless the
     /// API key has an `assets:download` grant ([`create_mock_api_key`]). Served content has its stored `content-type` and
@@ -447,7 +448,8 @@ impl MockServerClient {
     }
     /// Applies a reviewer decision to a stored asset, as the portal would: the moderation
     /// status changes (`purged` removes the content), the review is added to `manual_reviews`,
-    /// and an `asset.<status>` event with a `decided-by: reviewer` fact joins the events feed.
+    /// and an `asset.<status>` event whose `actor` is a `user` joins the events feed (after an
+    /// `asset.content-removed` event for a purge).
     /// The report stays as moderation left it. Fails with `sdk/invalid-argument` for a decision
     /// that is not `allowed`, `limited`, `age-restricted`, `blocked` or `purged`, and with
     /// `asset/not-found` (status 404) for an unknown asset.
@@ -539,7 +541,8 @@ impl MockServerClient {
         Ok(())
     }
     /// Appends `event` to the in-memory events feed and returns it. An empty ID or project ID,
-    /// or a zero creation time, is filled in; an event about an asset takes that asset's next
+    /// or a zero creation time, is filled in, and an event without an actor is the mock API
+    /// key's (`api-key` with no ID); an event about an asset takes that asset's next
     /// `asset_sequence` like the API's (any given one is ignored; events without an `asset_id`
     /// have none); when `asset_id` names a stored asset and `asset`
     /// is `None`, the event carries its snapshot, with the moderation status an
@@ -559,6 +562,10 @@ impl MockServerClient {
             }
             if event.created_at == 0 {
                 event.created_at = backend.now();
+            }
+            // The mock's API key, which has no ID, unless the event names someone else.
+            if event.actor.actor_type == ActorType::Unknown(String::new()) {
+                event.actor = Actor::new(ActorType::ApiKey, None);
             }
             event.asset_sequence = event
                 .asset_id

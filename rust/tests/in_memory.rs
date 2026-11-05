@@ -124,7 +124,14 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
         })
         .await
         .unwrap_err();
-    assert_eq!(error.code(), &ErrorCode::TooBig);
+    assert_eq!(error.code(), &ErrorCode::InvalidRequest);
+    assert_eq!(
+        (
+            &error.details()["issues"][0]["path"],
+            &error.details()["issues"][0]["code"]
+        ),
+        (&json!("pageSize"), &json!(ErrorCode::TooBig.as_str()))
+    );
     let hold = json!({"placedAt": 1, "reason": "suspected-illegal-content", "disposedAt": null});
     mock.with_storage(|storage| {
         storage.assets.get_mut(&decided.id).unwrap()["content"]["safetyHold"] = hold.clone();
@@ -137,7 +144,8 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
         })
         .await
         .unwrap_err();
-    assert_eq!(error.code(), &ErrorCode::AssetSafetyHeld);
+    assert_eq!(error.code(), &ErrorCode::AssetHeld);
+    assert_eq!(error.details().get("hold"), Some(&json!("safety")));
     for resource in [
         CdnResource::Original,
         CdnResource::Rendered,
@@ -186,6 +194,61 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
         (&held.content.rendered, &held.content.preview),
         (&None, &None)
     );
+}
+
+/// Raw uploads send tags as URL-encoded JSON in the query and URL uploads in the body, and the
+/// asset keeps them. Like the API, the asset doesn't return the processing options it was
+/// uploaded with.
+#[tokio::test]
+async fn uploads_send_tags_and_the_asset_keeps_them() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    let tags = vec!["catalogue".to_owned(), "backpacks".to_owned()];
+    let raw = mock
+        .assets()
+        .create(SubmitAsset {
+            tags: Some(tags.clone()),
+            ..kept("bag.png", b"png")
+        })
+        .await
+        .unwrap();
+    let text = mock
+        .text()
+        .classify(ClassifyText {
+            tags: Some(tags.clone()),
+            ..ClassifyText::new("hello")
+        })
+        .await
+        .unwrap();
+    let linked = mock
+        .assets()
+        .create(SubmitAsset {
+            tags: Some(tags.clone()),
+            ..SubmitAsset::from_url("page", "https://example.com/bag")
+        })
+        .await
+        .unwrap();
+    let requests = mock.requests();
+    assert_eq!(
+        (
+            requests[0].query_param("tags"),
+            requests[1].query_param("tags"),
+            requests[2].json().unwrap()["tags"].clone()
+        ),
+        (
+            Some(r#"["catalogue","backpacks"]"#),
+            Some(r#"["catalogue","backpacks"]"#),
+            json!(["catalogue", "backpacks"])
+        )
+    );
+    for asset in [&raw, &text, &linked] {
+        let stored = mock
+            .assets()
+            .retrieve(AssetId::new(asset.id.clone()))
+            .await
+            .unwrap();
+        assert_eq!(stored.tags.as_ref(), Some(&tags), "{}", asset.id);
+        assert!(!stored.extra.contains_key("processingOptions"));
+    }
 }
 
 #[tokio::test]
@@ -264,7 +327,7 @@ async fn failed_processing_can_be_retried_and_deleted_content_cannot() {
 
     let removed = mock
         .assets()
-        .delete_content(AssetId::new(&asset.id))
+        .remove_content(AssetId::new(&asset.id))
         .await
         .unwrap();
     assert_eq!(
@@ -445,13 +508,13 @@ async fn update_patches_and_search_matches_keywords() {
 async fn queued_responses_come_before_the_in_memory_state() {
     let mock = MockServerClient::in_memory(options()).unwrap();
     let first = mock.assets().create(named("x")).await.unwrap();
-    mock.enqueue_api_error(ErrorCode::SpendLimitReached, "limit");
+    mock.enqueue_api_error(ErrorCode::UploadsPaused, "limit");
     let error = mock
         .assets()
         .retrieve(AssetId::new(&first.id))
         .await
         .unwrap_err();
-    assert_eq!(error.code(), &ErrorCode::SpendLimitReached);
+    assert_eq!(error.code(), &ErrorCode::UploadsPaused);
     assert_eq!(mock.remaining_responses(), 0);
     assert_eq!(
         mock.assets()
@@ -472,6 +535,8 @@ async fn enqueued_events_carry_the_asset_snapshot() {
     event.asset_id = Some(asset.id.clone());
     let event = mock.enqueue_event(event);
     assert_eq!(event.project_id, "project-1");
+    // An event built without an actor is the mock API key's, which has no ID.
+    assert_eq!(event.actor, Actor::new(ActorType::ApiKey, None));
     assert_eq!(
         event.asset.as_ref().unwrap().classification_status(),
         Some(AssetClassificationStatus::Processing)
@@ -494,6 +559,65 @@ async fn enqueued_events_carry_the_asset_snapshot() {
         .await
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::InvalidCursor);
+}
+
+/// The shared scenarios cover filtering by type and asset and cursors bound to their filters;
+/// these are the types the API refuses and an empty `types` list, which filters nothing.
+#[tokio::test]
+async fn the_events_feed_refuses_unknown_types_and_an_empty_types_list_filters_nothing() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    for types in [
+        vec![EventType::Unknown("asset.exploded".into())],
+        vec![
+            EventType::AssetBlocked,
+            EventType::Unknown("blocked".into()),
+        ],
+    ] {
+        let error = mock
+            .events()
+            .list(ListEvents {
+                types: Some(types.clone()),
+                ..Default::default()
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), &ErrorCode::InvalidRequest, "{types:?}");
+        assert_eq!(
+            (
+                &error.details()["issues"][0]["path"],
+                &error.details()["issues"][0]["code"]
+            ),
+            (&json!("types"), &json!(ErrorCode::InvalidValue.as_str())),
+            "{types:?}"
+        );
+    }
+    let start = mock
+        .events()
+        .list(ListEvents {
+            types: Some(Vec::new()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let sent = mock.requests().last().unwrap().query.clone();
+    assert!(sent.iter().all(|(key, _)| key != "types"), "{sent:?}");
+    let asset = mock.assets().create(named("x")).await.unwrap();
+    // The empty list's cursor continues the unfiltered feed.
+    let page = mock
+        .events()
+        .list(ListEvents {
+            cursor: Some(start.next_cursor),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        page.items
+            .iter()
+            .map(|event| (&event.event_type, event.asset_id.as_deref()))
+            .collect::<Vec<_>>(),
+        [(&EventType::AssetUploaded, Some(asset.id.as_str()))]
+    );
 }
 
 #[tokio::test]
@@ -577,7 +701,7 @@ async fn hash_list_entries_come_from_assets_and_go_with_their_list() {
         (
             entry.hash.as_str(),
             entry.quality,
-            entry.source_asset_id.as_deref()
+            entry.asset_id.as_deref()
         ),
         (perceptual.as_str(), Some(87), Some(hashed.id.as_str()))
     );

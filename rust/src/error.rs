@@ -10,7 +10,7 @@ macro_rules! error_codes {
         /// version does not know arrive as [`ErrorCode::Other`], so new API codes never fail
         /// decoding. Compare with a string through `PartialEq<&str>`, or match variants. Codes
         /// compare, hash and map to HTTP statuses by their string form, so
-        /// `ErrorCode::Other("misc/internal-error".into())` equals `ErrorCode::InternalError`.
+        /// `ErrorCode::Other("server/internal-error".into())` equals `ErrorCode::InternalError`.
         #[derive(Debug, Clone)]
         #[non_exhaustive]
         pub enum ErrorCode {
