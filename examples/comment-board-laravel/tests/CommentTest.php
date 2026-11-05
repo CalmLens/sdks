@@ -77,7 +77,7 @@ final class CommentTest extends TestCase
     {
         config(['calmlens.api_key' => 'key', 'calmlens.api_url' => 'http://localhost:6110/v1', 'calmlens.cdn_url' => 'http://localhost:6130/v1']);
         $client = $this->app->make(ServerClient::class);
-        self::assertSame('http://localhost:6130/v1/assets/project-1/asset-1/rendered', $client->cdn->getAssetUrl(['assetIdentifier' => 'asset-1']));
+        self::assertSame('http://localhost:6130/v1/assets/project-1/asset-1/rendered', $client->cdn->getAssetUrl(['assetId' => 'asset-1', 'resource' => 'rendered']));
     }
 
     public function testValidationDoesNotCallApi(): void

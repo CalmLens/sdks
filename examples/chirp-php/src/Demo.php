@@ -119,7 +119,7 @@ final class Demo
         if ($resource === 'placeholder') {
             return $this->placeholder($assetId);
         }
-        $response = $this->mock->client()->cdn->serve(['assetIdentifier' => $assetId, 'resource' => $resource === 'original' ? 'original' : 'rendered',
+        $response = $this->mock->client()->cdn->serve(['assetId' => $assetId, 'resource' => $resource === 'original' ? 'original' : 'rendered',
             'viewerClaims' => json_decode($query['viewerClaims'] ?? '{}', true, 512, JSON_THROW_ON_ERROR)]);
         return [$response->getStatusCode(), ['Content-Type' => $response->getHeaderLine('Content-Type'),
             'Cache-Control' => $response->getHeaderLine('Cache-Control') ?: 'no-store'], (string) $response->getBody()];

@@ -76,13 +76,13 @@ final class Moderation
     public function imageUrl(string $assetId, bool $ageConfirmed = false): string
     {
         // The unguessable asset ID, not the externalId: post IDs appear in Chirp's own URLs.
-        return $this->client->cdn->getAssetUrl(['assetIdentifier' => $assetId, 'lens' => 'chirp-feed', ...($ageConfirmed ? ['viewerClaims' => ['ageConfirmed' => true]] : [])]);
+        return $this->client->cdn->getAssetUrl(['assetId' => $assetId, 'resource' => 'rendered', 'lens' => 'chirp-feed', ...($ageConfirmed ? ['viewerClaims' => ['ageConfirmed' => true]] : [])]);
     }
 
     /** A small blurred PNG of the image, public whatever the asset's visibility or status (not purged). */
     public function placeholderUrl(string $assetId): string
     {
-        return $this->client->cdn->getAssetUrl(['assetIdentifier' => $assetId, 'resource' => 'placeholder']);
+        return $this->client->cdn->getAssetUrl(['assetId' => $assetId, 'resource' => 'placeholder']);
     }
 
     public function deleteAsset(string $assetId): void
