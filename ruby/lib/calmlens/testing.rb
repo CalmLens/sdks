@@ -24,7 +24,10 @@ module CalmLens
   # `viewer/age-confirmation-required` (403) for an age-restricted asset without
   # `viewer_claims: {age_confirmed: true}`, whatever the key, and `auth/permission-denied` (403)
   # for a private asset unless `api_key` comes from {.create_api_key} with an `assets:download`
-  # grant. The default key has no grants. {#decide} applies a reviewer's decision, and
+  # grant (the default key has no grants), or the URL is signed: {CDN#sign_asset_url} returns
+  # `{cdn_base_url}/assets/{project_id}/sig_…`, a readable grant that only the mock's CDN accepts,
+  # which serves `original` only when signed with `original: true`. {#fetch_cdn} loads such a URL
+  # without the API key, as a browser would. {#decide} applies a reviewer's decision, and
   # {Assets#wait_for_decision} takes no real time: a pending asset times out at once.
   # Filters join comparisons with `;` (and), which binds tighter than `,` (or), and group them with
   # `( … )`; list cursors resume after the last item returned. {Assets#search} is the API's keyword
@@ -60,13 +63,13 @@ module CalmLens
     # Simulated failures for {#fail_next_request}, besides API error codes and exceptions.
     REQUEST_FAILURES = %w[transport-error timeout].freeze
     # The methods {#fail_next_request} can target, by resource. Iterators are their list calls.
-    OPERATIONS = { assets: %i[search list retrieve list_children list_timeline update create classify upload_part create_signed_url move
+    OPERATIONS = { assets: %i[search list retrieve list_children list_timeline update create classify upload_part move
                               retry explain wait_for_decision remove_content delete batch],
                    folders: %i[list retrieve create update delete move],
                    hash_lists: %i[list retrieve create update delete list_entries add_entry remove_entry],
                    policies: %i[list retrieve create update apply_preset set_automatic_updates delete assign],
                    text: %i[classify], events: %i[list],
-                   cdn: %i[serve] }.freeze
+                   cdn: %i[serve sign_asset_url get_asset_info] }.freeze
     private_constant :OPERATIONS
     # The operation names {#fail_next_request} accepts, in their camelCase form.
     OPERATION_NAMES = (OPERATIONS.flat_map do |resource, methods|
@@ -162,7 +165,8 @@ module CalmLens
       super(api_key: api_key, project_id: project_id, base_url: base_url, cdn_base_url: cdn_base_url, max_retries: max_retries,
             **options, transport: method(:receive))
       @fake = Testing::FakeAPI.new(project_id: project_id, base_url: self.base_url, cdn_base_url: self.cdn_base_url,
-                                   now: now, create_id: create_id, moderate: moderate, grants: MockServerClient.grants_of(api_key))
+                                   now: now, create_id: create_id, moderate: moderate, api_key: api_key,
+                                   grants: MockServerClient.grants_of(api_key))
       @state = @fake.state
       # Like the API, the stand-in checks upload sizes itself, in the API's order.
       @session.defer_upload_checks = true
@@ -240,6 +244,18 @@ module CalmLens
 
       @mock_lock.synchronize { @failures << { failure: failure, operation: name, details: details, retry_after: retry_after } }
       self
+    end
+
+    # Fetches a URL of the mock's CDN as a browser would, with a GET and without the API key: a signed
+    # asset URL from {CDN#sign_asset_url} (with a resource appended), or a public one from
+    # {CDN#get_asset_url}. The request is recorded like any other. Error statuses are returned, not
+    # raised.
+    # @param url [String]
+    # @return [Response] with its body read
+    def fetch_cdn(url)
+      raise Internal.invalid('url must be a String') unless url.is_a?(String)
+
+      @session.cdn('GET', url, {}, {}, authenticate: false)
     end
 
     # @see ServerClient#ensure_lenses

@@ -98,18 +98,20 @@ class TypeContractTest < Minitest::Test
   def method_type(operation)
     *resources, method = operation.split('.')
     snake = ->(name) { name.gsub(/([a-z])([A-Z])/, '\1_\2').downcase }
-    class_name = resources.empty? ? 'ServerClient' : resources.map { |name| name.sub(/\A./, &:upcase) }.join
+    class_names = resources.map { |name| name == 'cdn' ? 'CDN' : name.sub(/\A./, &:upcase) }
+    class_name = resources.empty? ? 'ServerClient' : class_names.join
     definition = RBS::DefinitionBuilder.new(env: ENVIRONMENT).build_instance(RBS::TypeName.parse("::CalmLens::#{class_name}"))
     method_definition = definition.methods.fetch(snake.call(method).to_sym) { flunk "No signature for #{operation}" }
     method_definition.method_types.first
   end
 
-  # The value the client returns for a fixture: nothing for deletes, the lenses for ensureLenses.
+  # The value the client returns for a fixture: nothing for deletes, the lenses for ensureLenses,
+  # and the fixture's `result` when it isn't the response body.
   def result(fixture)
     case fixture['operation']
     when /\.(delete|removeEntry)\z/ then nil
     when 'ensureLenses' then fixture['response']['lenses']
-    else fixture['response']
+    else fixture.fetch('result', fixture['response'])
     end
   end
 

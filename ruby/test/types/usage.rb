@@ -59,9 +59,11 @@ client.assets.decide(asset_id: updated['id'], decision: 'blocked', note: 'Spam')
 client.assets.decide(asset_id: updated['id'], decision: 'purged', note: 'Illegal', confirm_purge: true)
 client.assets.wait_for_decision(asset_id: uploaded['id'], timeout: 30)['classification']['moderation']['status']
 client.assets.remove_content(asset_id: updated['id'])['content']['updatedAt']
-signed = client.assets.create_signed_url(asset_id: updated['id'],
-                                         transform: { width: 200, fit: 'cover' })
+signed = client.cdn.sign_asset_url(asset_id: updated['id'], expires_in: 600, resource: 'rendered',
+                                   transform: { width: 200, fit: 'cover' })
 expires = signed['expiresAt']
+info = client.cdn.get_asset_info(signed['url'], viewer_claims: { region: 'DE' })
+available = info['availability'] == 'available' && info['content']['rendered']&.fetch('kind')
 client.assets.delete(asset_id: updated['id'])
 
 folder = client.folders.create(name: 'Inbox', parent_id: nil)
@@ -91,11 +93,11 @@ lenses = client.ensure_lenses(lenses: [{ identifier: 'thumb', name: 'Thumb', typ
 lens = client.ensure_lens(identifier: 'small', name: 'Small', type: 'image', active: true)
 lens_width = lenses.first&.dig('transform', 'width')
 
-url = client.cdn.get_asset_url(asset_identifier: 'post-1', lens: lens['identifier'], viewer_claims: { age_confirmed: true })
+url = client.cdn.get_asset_url(asset_id: 'post-1', resource: 'preview', lens: lens['identifier'], viewer_claims: { age_confirmed: true })
 renditions = asset['content']['hls']&.fetch('renditions')&.map { |rendition| [rendition['kind'], rendition['bandwidth']] }
-embed = client.cdn.get_asset_url(asset_identifier: 'post-1', resource: 'embed')
-hls = client.assets.create_signed_url(asset_id: 'post-1', resource: 'hls')['url']
-bytes = client.cdn.serve(asset_identifier: 'post-1', init: { method: 'HEAD', headers: { 'If-None-Match' => 'x' } }) do |response|
+embed = client.cdn.get_asset_url(external_id: 'post-1', project_id: 'project-2', resource: 'embed')
+hls = client.cdn.sign_asset_url(external_id: 'post-1', original: true, resource: 'hls')['url']
+bytes = client.cdn.serve(asset_id: 'post-1', init: { method: 'HEAD', headers: { 'If-None-Match' => 'x' } }) do |response|
   response.success? ? response.body(limit: 1024) : nil
 end
 
@@ -141,6 +143,7 @@ mock.enqueue_event(type: 'asset.allowed', asset_id: 'asset-1',
 mock.state.assets.each_value { |item| item['classification']['moderation']['status'] }
 mock.enqueue(status: 503, body: { code: 'server/unavailable' }).requests.map(&:path)
 answered = mock.clear_requests.requests.map(&:status)
+fetched = mock.fetch_cdn(mock.cdn.sign_asset_url(asset_id: 'asset-1', resource: 'rendered')['url']).status
 
 test_input_key = ENV.fetch('CALMLENS_TEST_INPUT_KEY')
 mixed = CalmLens::TestInputs::PRESETS.fetch(:mixed)
@@ -149,6 +152,7 @@ scored = CalmLens::TestInputs.generate_text_code({ instances: [{ category: 'viol
                                                  test_input_key)
 phrase = CalmLens::TestInputs.generate_media_code('violence', test_input_key)
 
-[status, processing, failure, reviews, removal, format, camera, score, ages, names, more, children, matched, expires, lens_width, url,
- renditions, embed, hls, bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered, signed, scored,
+[status, processing, failure, reviews, removal, format, camera, score, ages, names, more, children, matched, expires, available,
+ lens_width, url,
+ renditions, embed, hls, bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered, fetched, signed, scored,
  phrase, automated, regional, flagged_links, batched, webhook_actor]

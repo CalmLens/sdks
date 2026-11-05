@@ -36,10 +36,6 @@ module CalmLens
     DECISION_POLL_FACTOR = 1.5
     DECISION_POLL_MAX_DELAY = 2.0
     DEFAULT_DECISION_TIMEOUT = 60
-    # The lifetime of a signed URL when none is given: 15 minutes.
-    DEFAULT_SIGNED_URL_SECONDS = 15 * 60
-    # The longest signed URL lifetime the API accepts: 24 hours.
-    MAX_SIGNED_URL_SECONDS = 24 * 60 * 60
     # The operations {#batch} runs: `delete` deletes each asset with its child assets and stored
     # content; `remove-content` removes its stored content and keeps the record.
     BATCH_OPERATIONS = %w[delete remove-content].freeze
@@ -252,29 +248,6 @@ module CalmLens
       call(options, __method__) do |api, request|
         request('POST', "/assets/#{Internal.segment(api['assetId'])}/move",
                 body: { 'folderId' => Internal.required(api, 'folderId') }, request_options: request)
-      end
-    end
-
-    # Creates a time-limited URL that delivers private content without an API key.
-    # @option options [String] :asset_id
-    # @option options [String] :resource one of {CDN::SIGNED_RESOURCES}: `rendered` (the API's default),
-    #   `original`, `preview`, `hls` (the HLS master playlist of audio or video; one signature covers every
-    #   playlist and segment beneath `hls/`) or `embed` (the page that shows the asset in an iframe). `original`, `hls`
-    #   and `embed` take no lens or transform
-    # @option options [Integer] :expires_in_seconds default 900
-    # @option options [String] :lens a lens identifier
-    # @option options [String, Hash] :transform a selector String or structured options, as for
-    #   {CDN#get_asset_url}; they replace the lens's options of the same name
-    # @return [Hash] `{'url', 'expiresAt'}`
-    def create_signed_url(options)
-      call(options, __method__) do |api, request|
-        path = "/assets/#{Internal.segment(api['assetId'])}/signed-url"
-        body = { 'expiresInSeconds' => DEFAULT_SIGNED_URL_SECONDS }.merge(without(api, 'assetId'))
-        check_signed_url(body)
-        body['transform'] = Transforms.selector(body['transform']) if body.key?('transform')
-        request('POST', path,
-                body: body,
-                request_options: request)
       end
     end
 
@@ -517,21 +490,6 @@ module CalmLens
       return data if valid
 
       raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Expected an asset response', status: 200)
-    end
-
-    def check_signed_url(body)
-      resource = body.fetch('resource', 'rendered')
-      unless CDN::SIGNED_RESOURCES.include?(resource)
-        raise Internal.invalid("A signed URL's resource must be one of #{CDN::SIGNED_RESOURCES.join(', ')}")
-      end
-      if Internal::UNSELECTABLE_CDN_RESOURCES.include?(resource) && (body.key?('lens') || body.key?('transform'))
-        raise Internal.invalid("The #{resource} resource takes no lens or transform")
-      end
-
-      expires = body['expiresInSeconds']
-      return if expires.is_a?(Integer) && expires.between?(1, MAX_SIGNED_URL_SECONDS)
-
-      raise Internal.invalid('expires_in_seconds must be a whole number from 1 to 86400')
     end
 
     def check_mime(type)

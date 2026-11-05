@@ -102,8 +102,8 @@ class ServerClientTest < Minitest::Test
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: ->(_) { flunk 'sent a request' })
     [
       -> { client.assets.retrieve('not options') },
-      -> { client.cdn.serve(asset_identifier: 'a', init: { headers: { 'X-Test' => "a\r\nb" } }) },
-      -> { client.cdn.serve(asset_identifier: 'a', init: { method: 'POST' }) },
+      -> { client.cdn.serve(asset_id: 'a', init: { headers: { 'X-Test' => "a\r\nb" } }) },
+      -> { client.cdn.serve(asset_id: 'a', init: { method: 'POST' }) },
       lambda {
         client.assets.create(name: 'n', content: { plain_text: 'x', type: 'text/plain' }, request_options: { idempotency_key: "bad key\n" })
       },
@@ -136,24 +136,47 @@ class ServerClientTest < Minitest::Test
 
   def test_structured_transform_numbers_match_javascript_and_other_values_are_rejected
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: ->(_) { flunk 'sent a request' })
-    url = client.cdn.get_asset_url(asset_identifier: 'a',
+    url = client.cdn.get_asset_url(asset_id: 'a', resource: 'rendered',
                                    transform: { brightness: 2.0, blur: 1.0e-7, contrast: -90, gamma: 1e21 })
     assert_equal 'https://cdn.calmlens.com/v1/assets/project/a/rendered/blur=1e-7,brightness=2,contrast=-90,gamma=1e%2B21', url
     [Float::INFINITY, Float::NAN, :png, 1r, { 'border-color' => 1 }].each do |value|
       error = assert_raises(CalmLens::InvalidArgumentError, value.inspect) do
-        client.cdn.get_asset_url(asset_identifier: 'a', transform: { width: value })
+        client.cdn.get_asset_url(asset_id: 'a', resource: 'rendered', transform: { width: value })
       end
       assert_equal 'sdk/invalid-argument', error.code
     end
     assert_equal 'https://cdn.calmlens.com/v1/assets/project/a/rendered/@thumb,background=ffaa00,trim.border.color=abc',
-                 client.cdn.get_asset_url(asset_identifier: 'a', lens: 'thumb',
+                 client.cdn.get_asset_url(asset_id: 'a', resource: 'rendered', lens: 'thumb',
                                           transform: { trim: { border: { color: '#ABC' } }, background: '#FFAA00' })
     [{}, { width: nil }, [{ width: 1 }]].each do |transform|
       error = assert_raises(CalmLens::InvalidArgumentError, transform.inspect) do
-        client.cdn.get_asset_url(asset_identifier: 'a', lens: 'thumb', transform: transform)
+        client.cdn.get_asset_url(asset_id: 'a', resource: 'rendered', lens: 'thumb', transform: transform)
       end
       assert_equal 'sdk/invalid-argument', error.code
     end
+  end
+
+  INFO = '{"id":"a","projectId":"project","type":"image","externalUrl":null,"content":{},"availability":"available"}'
+
+  def test_asset_info_is_read_beneath_the_url_without_the_api_key_and_with_the_viewers_claims
+    client, sent = scripted([200, INFO], [200, INFO], [403, '{"code":"signed-url/expired"}'])
+    signed = 'https://cdn.example/v1/assets/project/sig_00/?viewerClaims=%7B%22region%22%3A%22DE%22%7D'
+    assert_equal 'available', client.cdn.get_asset_info(signed)['availability']
+    client.cdn.get_asset_info(signed, viewer_claims: { age_confirmed: true })
+    error = assert_raises(CalmLens::PermissionDeniedError) { client.cdn.get_asset_info(signed) }
+    assert_equal ['signed-url/expired', 403], [error.code, error.status]
+    assert_equal ['https://cdn.example/v1/assets/project/sig_00/info?viewerClaims=%7B%22region%22%3A%22DE%22%7D',
+                  'https://cdn.example/v1/assets/project/sig_00/info?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D'],
+                 sent.first(2).map(&:url)
+    assert_equal([['GET', nil]] * 3, sent.map { |request| [request.method, request.headers['X-Api-Key']] })
+  end
+
+  def test_asset_info_refuses_a_relative_url_and_a_response_that_is_not_asset_info
+    client, sent = scripted([200, '{"id":"a"}'])
+    assert_equal 'sdk/invalid-argument', assert_raises(CalmLens::InvalidArgumentError) { client.cdn.get_asset_info('/assets/p/a') }.code
+    assert_empty sent
+    error = assert_raises(CalmLens::InvalidResponseError) { client.cdn.get_asset_info('https://cdn.example/v1/assets/p/a') }
+    assert_equal 'sdk/invalid-response', error.code
   end
 
   def test_snake_case_options_are_converted_but_metadata_keys_are_not
@@ -194,7 +217,7 @@ class ServerClientTest < Minitest::Test
       'assets.create' => -> { client.assets.create(name: 'a.txt', content: { plain_text: 'a', type: 'text/plain' }, visiblity: 'private') },
       'assets.retrieve' => -> { client.assets.retrieve(asset_id: 'a', 'assetID' => 'b') },
       'assets.waitForDecision' => -> { client.assets.wait_for_decision(asset_id: 'a', timeout_seconds: 5) },
-      'cdn.getAssetUrl' => -> { client.cdn.get_asset_url(asset_identifier: 'a', lenz: 'thumbnail') },
+      'cdn.getAssetUrl' => -> { client.cdn.get_asset_url(asset_id: 'a', lenz: 'thumbnail') },
       'uploadTokens.sign' => -> { client.upload_tokens.sign(upload_preset_id: 'preset_1', external: 'x') }
     }
     calls.each do |operation, call|

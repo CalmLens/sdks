@@ -1,16 +1,7 @@
 [
   {
-    "name": "signed URL for the placeholder",
-    "operation": "assets.createSignedUrl",
-    "options": {
-      "assetId": "asset-1",
-      "resource": "placeholder"
-    },
-    "error": "sdk/invalid-argument"
-  },
-  {
     "name": "signed URL for an unknown resource",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
       "resource": "content"
@@ -19,7 +10,7 @@
   },
   {
     "name": "signed URL for the original through a lens",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
       "resource": "original",
@@ -29,7 +20,7 @@
   },
   {
     "name": "signed URL for the original with a transform",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
       "resource": "original",
@@ -39,7 +30,7 @@
   },
   {
     "name": "signed URL for the original with structured transform options",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
       "resource": "original",
@@ -51,7 +42,7 @@
   },
   {
     "name": "signed URL for the HLS stream through a lens",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
       "resource": "hls",
@@ -61,7 +52,7 @@
   },
   {
     "name": "signed URL for the embed page with a transform",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
       "resource": "embed",
@@ -70,37 +61,79 @@
     "error": "sdk/invalid-argument"
   },
   {
-    "name": "signed URL lifetime below 1 second",
-    "operation": "assets.createSignedUrl",
+    "name": "signed URL for the info through a lens",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
-      "expiresInSeconds": -1
+      "resource": "info",
+      "lens": "thumbnail"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL with a lens but no resource",
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "assetId": "asset-1",
+      "lens": "thumbnail"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL lifetime below 1 second",
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "assetId": "asset-1",
+      "expiresIn": 0
     },
     "error": "sdk/invalid-argument"
   },
   {
     "name": "signed URL lifetime above 24 hours",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
-      "expiresInSeconds": 86401
+      "expiresIn": 86401
     },
     "error": "sdk/invalid-argument"
   },
   {
     "name": "signed URL lifetime of a fraction of a second",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
-      "expiresInSeconds": 1.5
+      "expiresIn": 1.5
     },
     "error": "sdk/invalid-argument"
   },
   {
     "name": "signed URL without an asset ID",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": ""
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL with an empty external ID",
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "externalId": ""
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL naming no asset",
+    "operation": "cdn.signAssetUrl",
+    "options": {},
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL naming an asset by both its ID and its external ID",
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "assetId": "asset-1",
+      "externalId": "post-1"
     },
     "error": "sdk/invalid-argument"
   },
@@ -108,7 +141,7 @@
     "name": "structured transform in the earlier { type, options } shape",
     "operation": "cdn.serve",
     "options": {
-      "assetIdentifier": "asset-1",
+      "assetId": "asset-1",
       "transform": {
         "type": "imageTransform",
         "options": {
@@ -121,9 +154,10 @@
   },
   {
     "name": "signed URL with an unknown transform option",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
+      "resource": "rendered",
       "transform": {
         "width": 640,
         "bogus": 1
@@ -133,9 +167,10 @@
   },
   {
     "name": "signed URL with a transform option out of range",
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
+      "resource": "rendered",
       "transform": {
         "width": 0
       }
@@ -753,7 +788,7 @@
     "name": "serve the placeholder through a lens",
     "operation": "cdn.serve",
     "options": {
-      "assetIdentifier": "asset-1",
+      "assetId": "asset-1",
       "resource": "placeholder",
       "lens": "thumbnail"
     },
@@ -763,7 +798,7 @@
     "name": "serve the placeholder with a transform",
     "operation": "cdn.serve",
     "options": {
-      "assetIdentifier": "asset-1",
+      "assetId": "asset-1",
       "resource": "placeholder",
       "transform": "width=10"
     },
@@ -773,7 +808,7 @@
     "name": "serve the original through a lens",
     "operation": "cdn.serve",
     "options": {
-      "assetIdentifier": "asset-1",
+      "assetId": "asset-1",
       "resource": "original",
       "lens": "thumbnail"
     },
@@ -783,7 +818,7 @@
     "name": "serve the original with a transform",
     "operation": "cdn.serve",
     "options": {
-      "assetIdentifier": "asset-1",
+      "assetId": "asset-1",
       "resource": "original",
       "transform": "width=10"
     },
@@ -793,7 +828,7 @@
     "name": "serve the HLS stream with a transform",
     "operation": "cdn.serve",
     "options": {
-      "assetIdentifier": "asset-1",
+      "assetId": "asset-1",
       "resource": "hls",
       "transform": "width=10"
     },
@@ -803,17 +838,42 @@
     "name": "serve the embed page through a lens",
     "operation": "cdn.serve",
     "options": {
-      "assetIdentifier": "asset-1",
+      "assetId": "asset-1",
       "resource": "embed",
       "lens": "thumbnail"
     },
     "error": "sdk/invalid-argument"
   },
   {
-    "name": "serve without an asset identifier",
+    "name": "serve without an asset ID",
     "operation": "cdn.serve",
     "options": {
-      "assetIdentifier": ""
+      "assetId": ""
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve naming no asset",
+    "operation": "cdn.serve",
+    "options": {},
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve naming an asset by both its ID and its external ID",
+    "operation": "cdn.serve",
+    "options": {
+      "assetId": "asset-1",
+      "externalId": "post-1"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve the info through a lens",
+    "operation": "cdn.serve",
+    "options": {
+      "assetId": "asset-1",
+      "resource": "info",
+      "lens": "thumbnail"
     },
     "error": "sdk/invalid-argument"
   }

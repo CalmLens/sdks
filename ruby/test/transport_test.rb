@@ -149,19 +149,19 @@ class TransportTest < Minitest::Test
   def test_cdn_serve_streams_into_a_block_and_returns_its_value
     with_server(->(*) { [200, { 'Content-Type' => 'image/png', 'X-Request-Id' => 'req-9' }, 'p' * 70_000] }) do |client, _server|
       chunks = []
-      result = client.cdn.serve(asset_identifier: 'asset') do |response|
+      result = client.cdn.serve(asset_id: 'asset') do |response|
         assert_equal [200, 'image/png', 'req-9'], [response.status, response.content_type, response.request_id]
         response.each_chunk { |chunk| chunks << chunk }
         :done
       end
       assert_equal [:done, 70_000], [result, chunks.sum(&:bytesize)]
-      assert_equal 70_000, client.cdn.serve(asset_identifier: 'asset').body.bytesize
+      assert_equal 70_000, client.cdn.serve(asset_id: 'asset').body.bytesize
     end
   end
 
   def test_cdn_lens_and_transform_reach_the_server_as_one_path_segment
     with_server(->(*) { [200, {}, 'png'] }) do |client, server|
-      assert_equal 200, client.cdn.serve(asset_identifier: 'asset', lens: 'thumb', transform: 'border.color=fff,width=10').status
+      assert_equal 200, client.cdn.serve(asset_id: 'asset', lens: 'thumb', transform: 'border.color=fff,width=10').status
       assert_equal 'GET /assets/project/asset/rendered/@thumb,border.color=fff,width=10 HTTP/1.1', server.requests.pop[:line]
     end
   end
@@ -169,7 +169,7 @@ class TransportTest < Minitest::Test
   def test_errors_raised_in_the_serve_block_pass_through_unchanged
     with_server(->(*) { [200, {}, 'body'] }) do |client, _server|
       error = assert_raises(IOError) do
-        client.cdn.serve(asset_identifier: 'asset') do |response|
+        client.cdn.serve(asset_id: 'asset') do |response|
           response.each_chunk { |_chunk| raise IOError, 'disk full' } # rubocop:disable Lint/UnreachableLoop
         end
       end

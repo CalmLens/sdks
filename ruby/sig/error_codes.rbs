@@ -9,6 +9,7 @@ module CalmLens
     REGIONAL_EVIDENCE_REQUIRED: String
     SIGNED_URL_EXPIRED: String
     SIGNED_URL_INVALID: String
+    SIGNED_URL_ORIGINAL_NOT_GRANTED: String
     INVALID_REQUEST: String
     INVALID_TYPE: String
     TOO_SMALL: String

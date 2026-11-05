@@ -154,8 +154,6 @@ module CalmLens
     DECISION_POLL_FACTOR: Float
     DECISION_POLL_MAX_DELAY: Float
     DEFAULT_DECISION_TIMEOUT: Integer
-    DEFAULT_SIGNED_URL_SECONDS: Integer
-    MAX_SIGNED_URL_SECONDS: Integer
     BATCH_OPERATIONS: Array[asset_batch_operation]
     MAX_BATCH_ASSETS: Integer
 
@@ -177,7 +175,6 @@ module CalmLens
     def delete: (asset_id_options options) -> nil
     def batch: (batch_assets_options options) -> batch_assets_response
     def move: (move_asset_options options) -> asset
-    def create_signed_url: (create_signed_url_options options) -> signed_url
     def create: (upload_options options) -> asset
     def classify: (upload_options options) -> asset
     def upload_part: (upload_part_options options) -> asset
@@ -239,9 +236,19 @@ module CalmLens
   end
 
   class CDN < Resource
-    # The CDN resources a signed URL can be created for.
-    SIGNED_RESOURCES: Array[signed_cdn_resource]
+    # Every CDN resource beneath an asset URL.
+    RESOURCES: Array[cdn_resource]
+    # A signed asset URL's lifetime in seconds when `expires_in` is omitted.
+    DEFAULT_SIGNED_URL_EXPIRES_IN: Integer
+    # The longest signed asset URL lifetime, in seconds.
+    MAX_SIGNED_URL_EXPIRES_IN: Integer
+    # The start of the asset segment that names an asset by its external ID.
+    EXTERNAL_ID_PREFIX: String
+    # The ISO 3166-1 alpha-2 countries a viewer's `region` can be.
+    VIEWER_COUNTRIES: Array[String]
     def get_asset_url: (asset_url_options options) -> String
+    def sign_asset_url: (sign_asset_url_options options) -> signed_asset_url
+    def get_asset_info: (String url, ?viewer_claims: viewer_claims?) -> asset_info
     def serve: (serve_options options) -> Response
              | [T] (serve_options options) { (Response) -> T } -> T
   end
@@ -376,6 +383,8 @@ module CalmLens
     def enqueue: (body: json_input, ?status: Integer, ?headers: Hash[String, String]) -> self
     def enqueue_raw: (body: String, ?status: Integer, ?headers: Hash[String, String]) -> self
     def enqueue_error: (Exception error) -> self
+    # Fetches a mock CDN URL with a GET and without the API key, as a browser would.
+    def fetch_cdn: (String url) -> Response
     def enqueue_event: (mock_event_input event) -> event
     # Applies a reviewer's decision and adds the matching `asset.<decision>` event.
     def decide: (String asset_id, asset_moderation_decision decision) -> asset

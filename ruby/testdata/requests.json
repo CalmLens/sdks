@@ -30,7 +30,7 @@
     }
   },
   {
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "viewerClaims": {
@@ -40,18 +40,20 @@
     },
     "request": {
       "method": "POST",
-      "path": "/v1/assets/asset_5Gm2Rk8XqT3wLp9VbN4c/signed-url",
+      "path": "/v1/projects/project-1/signed-asset-urls",
       "query": {},
       "body": {
-        "viewerClaims": {
-          "region": "GB"
-        },
-        "resource": "rendered",
-        "expiresInSeconds": 900
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "expiresIn": 900,
+        "original": false
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/signed",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "expiresAt": 1760000900000
+    },
+    "result": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered?viewerClaims=%7B%22region%22%3A%22GB%22%7D",
       "expiresAt": 1760000900000
     }
   },
@@ -1337,29 +1339,34 @@
     }
   },
   {
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
+      "resource": "rendered",
       "lens": "thumb",
       "transform": "format=avif"
     },
     "request": {
       "method": "POST",
-      "path": "/v1/assets/asset-1/signed-url",
+      "path": "/v1/projects/project-1/signed-asset-urls",
       "query": {},
       "body": {
-        "expiresInSeconds": 900,
-        "lens": "thumb",
-        "transform": "format=avif"
+        "assetId": "asset-1",
+        "expiresIn": 900,
+        "original": false
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/signed",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "expiresAt": 1760000900000
+    },
+    "result": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered/@thumb,format=avif",
       "expiresAt": 1760000900000
     }
   },
   {
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
       "resource": "preview",
@@ -1368,40 +1375,68 @@
     },
     "request": {
       "method": "POST",
-      "path": "/v1/assets/asset-1/signed-url",
+      "path": "/v1/projects/project-1/signed-asset-urls",
       "query": {},
       "body": {
-        "resource": "preview",
-        "expiresInSeconds": 900,
-        "lens": "thumb",
-        "transform": "width=320"
+        "assetId": "asset-1",
+        "expiresIn": 900,
+        "original": false
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/signed",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "expiresAt": 1760000900000
+    },
+    "result": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/preview/@thumb,width=320",
       "expiresAt": 1760000900000
     }
   },
   {
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
+    "options": {
+      "externalId": "a/b?c#d ✓",
+      "original": true,
+      "expiresIn": 86400
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/projects/project-1/signed-asset-urls",
+      "query": {},
+      "body": {
+        "externalId": "a/b?c#d ✓",
+        "expiresIn": 86400,
+        "original": true
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "expiresAt": 1760000900000
+    }
+  },
+  {
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
       "viewerClaims": null,
       "resource": null,
       "lens": null,
       "transform": null,
-      "expiresInSeconds": null
+      "expiresIn": null,
+      "original": null
     },
     "request": {
       "method": "POST",
-      "path": "/v1/assets/asset-1/signed-url",
+      "path": "/v1/projects/project-1/signed-asset-urls",
       "query": {},
       "body": {
-        "expiresInSeconds": 900
+        "assetId": "asset-1",
+        "expiresIn": 900,
+        "original": false
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/signed",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
       "expiresAt": 1760000900000
     }
   },
@@ -1442,9 +1477,10 @@
     }
   },
   {
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset-1",
+      "resource": "rendered",
       "transform": {
         "width": 640,
         "border": {
@@ -1454,15 +1490,20 @@
     },
     "request": {
       "method": "POST",
-      "path": "/v1/assets/asset-1/signed-url",
+      "path": "/v1/projects/project-1/signed-asset-urls",
       "query": {},
       "body": {
-        "expiresInSeconds": 900,
-        "transform": "border.color=fff,width=640"
+        "assetId": "asset-1",
+        "expiresIn": 900,
+        "original": false
       }
     },
     "response": {
-      "url": "https://cdn.calmlens.com/signed",
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
+      "expiresAt": 1760000900000
+    },
+    "result": {
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/rendered/border.color=fff,width=640",
       "expiresAt": 1760000900000
     }
   },
@@ -3297,7 +3338,7 @@
     "fullModel": true
   },
   {
-    "operation": "assets.createSignedUrl",
+    "operation": "cdn.signAssetUrl",
     "options": {
       "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
       "viewerClaims": {
@@ -3307,18 +3348,20 @@
     },
     "request": {
       "method": "POST",
-      "path": "/v1/assets/asset_5Gm2Rk8XqT3wLp9VbN4c/signed-url",
+      "path": "/v1/projects/project-1/signed-asset-urls",
       "query": {},
       "body": {
-        "viewerClaims": {
-          "region": "GB"
-        },
-        "resource": "rendered",
-        "expiresInSeconds": 900
+        "assetId": "asset_5Gm2Rk8XqT3wLp9VbN4c",
+        "expiresIn": 900,
+        "original": false
       }
     },
     "response": {
       "url": "example",
+      "expiresAt": 1
+    },
+    "result": {
+      "url": "example/rendered?viewerClaims=%7B%22region%22%3A%22GB%22%7D",
       "expiresAt": 1
     },
     "fullModel": true

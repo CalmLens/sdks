@@ -14,29 +14,54 @@ class MockTest < Minitest::Test
     assert_equal %w[completed blocked stored],
                  [asset.dig('classification', 'status'), asset.dig('classification', 'moderation', 'status'),
                   asset.dig('content', 'status')]
-    assert_equal 403, mock.cdn.serve(asset_identifier: asset['id']).status
+    assert_equal 403, mock.cdn.serve(asset_id: asset['id']).status
     assert mock.state.content.key?(asset['id'])
   end
 
-  def test_cdn_serves_transformed_urls_and_signed_urls_carry_the_serialized_selector
+  def test_cdn_serves_transformed_urls_and_signed_urls_carry_the_serialized_selector_beneath_the_grant
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)
     transform = { width: 10, border: { color: '#fff' } }
-    assert_equal 'hello', mock.cdn.serve(asset_identifier: asset['id'], transform: transform).body
+    assert_equal 'hello', mock.cdn.serve(asset_id: asset['id'], transform: transform).body
     assert_equal "/assets/project-1/#{asset['id']}/rendered/border.color=fff,width=10", mock.requests.last.path
-    signed = URI(mock.assets.create_signed_url(asset_id: asset['id'], transform: transform)['url'])
-    assert_equal 'border.color=fff,width=10', URI.decode_www_form(signed.query).to_h['transform']
+    signed = mock.cdn.sign_asset_url(asset_id: asset['id'], resource: 'rendered', transform: transform)['url']
+    fetched = mock.fetch_cdn(signed)
+    assert_equal [200, 'hello'], [fetched.status, fetched.body]
+    assert_match %r{\A/assets/project-1/sig_\h+/rendered/border\.color=fff,width=10\z}, mock.requests.last.path
+  end
+
+  def test_a_signed_asset_url_expires_and_the_cdn_then_refuses_it
+    now = 1_760_000_000_000
+    mock = CalmLens::MockServerClient.new(now: -> { now })
+    asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)
+    signed = mock.cdn.sign_asset_url(asset_id: asset['id'], expires_in: 60)
+    assert_equal now + 60_000, signed['expiresAt']
+    assert_equal 200, mock.fetch_cdn("#{signed['url']}/rendered").status
+    now += 60_000
+    expired = mock.fetch_cdn("#{signed['url']}/rendered")
+    assert_equal [403, 'signed-url/expired'], [expired.status, JSON.parse(expired.body)['code']]
+    error = assert_raises(CalmLens::PermissionDeniedError) { mock.cdn.get_asset_info(signed['url']) }
+    assert_equal 'signed-url/expired', error.code
+  end
+
+  def test_fetch_cdn_sends_no_api_key_where_serve_sends_it
+    mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
+    asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)
+    assert_equal 200, mock.cdn.serve(asset_id: asset['id']).status
+    refused = mock.fetch_cdn(mock.cdn.get_asset_url(asset_id: asset['id'], resource: 'rendered'))
+    assert_equal [403, 'auth/permission-denied'], [refused.status, JSON.parse(refused.body)['code']]
+    assert_equal [DOWNLOAD, nil], mock.requests.map { |request| request.headers['X-Api-Key'] }.last(2)
   end
 
   def test_cdn_serve_passes_the_age_restricted_parameter_and_rejects_non_booleans
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)
-    served = mock.cdn.serve(asset_identifier: asset['id'], lens: 'thumb', viewer_claims: { age_confirmed: true })
+    served = mock.cdn.serve(asset_id: asset['id'], lens: 'thumb', viewer_claims: { age_confirmed: true })
     request = mock.requests.last
     assert_equal ["/assets/project-1/#{asset['id']}/rendered/@thumb", { 'viewerClaims' => '{"ageConfirmed":true}' }],
                  [request.path, request.query]
     assert_equal 200, served.status
-    error = assert_raises(CalmLens::InvalidArgumentError) { mock.cdn.get_asset_url(asset_identifier: asset['id'], viewer_claims: { age_confirmed: 'yes' }) }
+    error = assert_raises(CalmLens::InvalidArgumentError) { mock.cdn.get_asset_url(asset_id: asset['id'], viewer_claims: { age_confirmed: 'yes' }) }
     assert_equal 'sdk/invalid-argument', error.code
   end
 
@@ -46,24 +71,24 @@ class MockTest < Minitest::Test
     assert_equal({ 'kind' => 'audio', 'format' => 'audio/mp4', 'width' => nil, 'height' => nil, 'peaks' => [] },
                  asset.dig('content', 'rendered'))
     assert_equal [1200, 300, '#7f7f7f'], asset.dig('content', 'preview').values_at('width', 'height', 'averageColor')
-    rendered = mock.cdn.serve(asset_identifier: asset['id'])
+    rendered = mock.cdn.serve(asset_id: asset['id'])
     assert_equal [200, 'hello', 'audio/mp4'], [rendered.status, rendered.body, rendered.headers['content-type']]
-    preview = mock.cdn.serve(asset_identifier: asset['id'], resource: 'preview')
+    preview = mock.cdn.serve(asset_id: asset['id'], resource: 'preview')
     assert_equal [200, 'image/png'], [preview.status, preview.headers['content-type']]
 
     removed = mock.assets.remove_content(asset_id: asset['id'])
     assert_equal [nil, nil], removed['content'].values_at('rendered', 'preview')
-    assert_equal 'asset/not-available', JSON.parse(mock.cdn.serve(asset_identifier: asset['id'], resource: 'placeholder').body)['code']
+    assert_equal 'asset/not-available', JSON.parse(mock.cdn.serve(asset_id: asset['id'], resource: 'placeholder').body)['code']
   end
 
   def test_a_safety_hold_refuses_every_cdn_resource_and_the_timeline
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)
-    assert_equal 200, mock.cdn.serve(asset_identifier: asset['id'], resource: 'placeholder').status
+    assert_equal 200, mock.cdn.serve(asset_id: asset['id'], resource: 'placeholder').status
     mock.state.assets[asset['id']]['content']['safetyHold'] = { 'placedAt' => 1, 'reason' => 'suspected-illegal-content' }
 
     %w[original rendered preview hls embed placeholder].each do |resource|
-      served = mock.cdn.serve(asset_identifier: asset['id'], resource: resource)
+      served = mock.cdn.serve(asset_id: asset['id'], resource: resource)
       assert_equal [403, 'asset/not-available'], [served.status, JSON.parse(served.body)['code']], resource
     end
     error = assert_raises(CalmLens::APIError) { mock.assets.list_timeline(asset_id: asset['id']) }
@@ -89,7 +114,7 @@ class MockTest < Minitest::Test
     sheet = mock.assets.classify(name: 'sheet.csv', content: { data: 'a,b', type: 'text/csv' }, processing_options: KEEP,
                                  visibility: 'public')
     [video, sheet].each do |asset|
-      embed = mock.cdn.serve(asset_identifier: asset['id'], resource: 'embed', init: { method: 'HEAD' })
+      embed = mock.cdn.serve(asset_id: asset['id'], resource: 'embed', init: { method: 'HEAD' })
       assert_equal [200, 'text/html; charset=utf-8', ''], [embed.status, embed.headers['content-type'], embed.body], asset['name']
     end
   end

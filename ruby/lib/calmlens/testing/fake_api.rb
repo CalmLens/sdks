@@ -69,7 +69,7 @@ module CalmLens
       # An event type's shape (`resource.action`), as the mock checks `types` without the catalog.
       EVENT_TYPE_PATTERN = /\A[a-z][a-z-]*\.[a-z][a-z-]*\z/
       # The resources an asset's CDN path names.
-      RESOURCES = %w[original rendered preview hls embed placeholder].freeze
+      RESOURCES = %w[original rendered preview hls embed placeholder info].freeze
       # The page the mock serves at `/embed`, standing in for the CDN's embed page.
       EMBED_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Embed</title></head>' \
                    '<body></body></html>'
@@ -103,8 +103,9 @@ module CalmLens
       # The mock API key's `{ 'actions', 'folderId', 'includeSubfolders' }` grants.
       attr_accessor :grants
 
-      def initialize(project_id:, base_url:, cdn_base_url:, now:, create_id:, moderate:, grants:)
+      def initialize(project_id:, base_url:, cdn_base_url:, now:, create_id:, moderate:, api_key:, grants:)
         @project_id = project_id
+        @api_key = api_key
         @base_url = base_url
         @cdn_base_url = cdn_base_url
         @now = now
@@ -181,7 +182,7 @@ module CalmLens
       # @return [Response]
       def handle(method, url, headers, body)
         if url.start_with?("#{@cdn_base_url}/")
-          serve(method, url.delete_prefix(@cdn_base_url))
+          serve(method, url.delete_prefix(@cdn_base_url), headers)
         else
           api(method, url.delete_prefix(@base_url), headers, body)
         end
@@ -304,23 +305,12 @@ module CalmLens
         end
       end
 
-      # Like the API's schema, checked before the asset is looked up: asset updates take no null
-      # name, and signed URLs no null field.
+      # Like the API's schema, checked before the asset is looked up: asset updates take no null name.
       def check_asset_body(method, action, json)
-        case [method, action]
-        in ['PATCH', nil]
-          check_metadata(json['metadata'])
-          invalid!('validation/invalid-type', 'name') if json.key?('name') && json['name'].nil?
-        in ['POST', 'signed-url']
-          %w[viewerClaims resource lens transform expiresInSeconds].each do |key|
-            next unless json.key?(key) && json[key].nil?
+        return unless method == 'PATCH' && action.nil?
 
-            invalid!(key == 'resource' ? 'validation/invalid-value' : 'validation/invalid-type', key)
-          end
-          # Like the API, a signed URL is for one of the signed resources.
-          invalid!('validation/invalid-value', 'resource') unless CDN::SIGNED_RESOURCES.include?(json.fetch('resource', 'rendered'))
-        else nil
-        end
+        check_metadata(json['metadata'])
+        invalid!('validation/invalid-type', 'name') if json.key?('name') && json['name'].nil?
       end
 
       # Like the API: an upload's metadata is checked, then its MIME type, which must be one the
@@ -415,6 +405,7 @@ module CalmLens
         in ['GET', ['assets', 'search'], _] then search(query)
         in ['GET', ['assets', String => asset_id, 'timeline'], _] then timeline(asset_id, query)
         in ['POST', ['assets', 'batch'], _] then batch(json)
+        in ['POST', ['signed-asset-urls'], _] then sign_asset_url(json)
         in ['POST', ['assets'], nil] then create_asset(json, query['queue'] == true, url: json['url'])
         in ['POST', ['assets'], 'content'] then create_asset(query, query['queue'] == true, data: body)
         in ['POST', ['assets'], 'part'] then start_multipart(query, body)
@@ -912,7 +903,6 @@ module CalmLens
         in ['POST', 'move']
           check_folder(json['folderId']) if json['folderId']
           touch(item.merge!('folderId' => json['folderId']))
-        in ['POST', 'signed-url'] then signed_url(id, json)
         in ['POST', 'part'] then part(item, query, body)
         else route_not_found!(method, parts)
         end
@@ -979,14 +969,37 @@ module CalmLens
         moderate_stored(item, 'rerun')
       end
 
-      def signed_url(id, json)
-        expires = json.fetch('expiresInSeconds', 900)
-        query = json.slice('lens', 'transform').merge('expires' => expires)
-        # Like the API, the URL carries the viewer claims its signature covers.
-        query['viewerClaims'] = JSON.generate(json['viewerClaims']) if json['viewerClaims'].is_a?(Hash)
-        params = URI.encode_www_form(query)
-        { 'url' => "#{@cdn_base_url}/signed/#{URI.encode_www_form_component(id)}/#{json.fetch('resource', 'rendered')}?#{params}",
-          'expiresAt' => @now.call + (expires * 1000) }
+      # Signs an asset URL like the API (`POST /projects/:projectId/signed-asset-urls`): a grant to one
+      # asset, by ID or external ID, until it expires, serving the original only when asked. Only the
+      # mock's CDN accepts the grant.
+      def sign_asset_url(json)
+        # Like the API's schema, none of these fields takes null.
+        %w[assetId externalId expiresIn original].each do |key|
+          invalid!('validation/invalid-type', key) if json.key?(key) && json[key].nil?
+        end
+        if json.key?('assetId') == json.key?('externalId')
+          message = 'Send either assetId or externalId'
+          raise Failure.new(ErrorCodes::INVALID_REQUEST, message,
+                            details: { 'issues' => [{ 'path' => '', 'message' => message, 'code' => 'custom' }] }, status: 400)
+        end
+        expires = json.fetch('expiresIn', CDN::DEFAULT_SIGNED_URL_EXPIRES_IN)
+        invalid!('validation/invalid-type', 'expiresIn') unless expires.is_a?(Integer) || (expires.is_a?(Float) && expires == expires.floor)
+        invalid!('validation/too-small', 'expiresIn') if expires < 1
+        invalid!('validation/too-big', 'expiresIn') if expires > CDN::MAX_SIGNED_URL_EXPIRES_IN
+        original = json.fetch('original', false)
+        invalid!('validation/invalid-type', 'original') unless [true, false].include?(original)
+
+        item = if json.key?('externalId')
+                 project_assets.find { |asset| asset['externalId'] == json['externalId'] }
+               else
+                 own_asset(json['assetId'].to_s)
+               end
+        fail!(ErrorCodes::ASSET_NOT_FOUND) unless item
+        fail!(ErrorCodes::ASSET_HELD) if item['content']['safetyHold']
+
+        expires_at = @now.call + (expires.to_i * 1000)
+        { 'url' => "#{@cdn_base_url}/assets/#{Internal.component(@project_id)}/#{MockGrant.encode(item['id'], original, expires_at)}",
+          'expiresAt' => expires_at }
       end
 
       # In the API's order: the upload must be open, parts arrive in order, image totals and the
@@ -1380,36 +1393,101 @@ module CalmLens
       # and a private asset needs an API key with `assets:download` for its folder. The mock converts
       # nothing: an upload stands in for its rendered file, an image for its own preview, and the
       # placeholder PNG for a screenshot, page or waveform.
-      def serve(method, relative)
+      def serve(method, relative, headers)
         path, query = relative.split('#', 2).first.split('?', 2)
         raw_segments = path.split('/').reject(&:empty?)
-        _, project, identifier, resource = raw_segments.map { |part| URI.decode_www_form_component(part) }
-        selector_path = raw_segments.drop(4)
-        # Like the CDN, the adaptive stream's files sit beneath `/hls/` (its master playlist is
-        # `/hls/index.m3u8`). Otherwise the selector after the resource is read
-        # (AssetTransformParser.ts); the original and the embed page take none.
-        begin
-          lens, options = TransformRules.parse_selector(resource == 'hls' ? '' : selector_path.join('/'))
-        rescue ArgumentError
-          return invalid_transform
-        end
-        selected = !(lens || options).nil?
-        return invalid_transform if %w[original embed].include?(resource) && selected
+        root, project, _, resource = raw_segments.map { |part| URI.decode_www_form_component(part) }
+        selected, options = selector(resource, raw_segments.drop(4))
+        return invalid_transform if selected.nil?
+        return asset_not_found unless root == 'assets' && project == @project_id && raw_segments[2]
 
-        item = project == @project_id && project_assets.find { |asset| [asset['id'], asset['externalId']].include?(identifier) }
-        return error('asset/not-found', 'Asset not found', status: 404) unless item && RESOURCES.include?(resource)
+        grant, item = resolve_asset(raw_segments[2])
+        return grant if grant.is_a?(Response)
+        return asset_not_found unless item && RESOURCES.include?(resource)
+        if resource == 'original' && grant && !grant[:original]
+          return error(ErrorCodes::SIGNED_URL_ORIGINAL_NOT_GRANTED, "This signed asset URL doesn't grant the original file", status: 403)
+        end
+
+        params = URI.decode_www_form(query.to_s).to_h
+        # A grant authorises a private asset without the API key.
+        authorised = !grant.nil? || can_download?(item['folderId'], headers)
+        return info(method, item, authorised, params) if resource == 'info'
         return not_available if item['content']['safetyHold']
         return placeholder(method, item) if resource == 'placeholder'
 
-        deliver(method, item, resource, URI.decode_www_form(query.to_s).to_h, selected ? options || {} : nil)
+        deliver(method, item, resource, params, selected ? options || {} : nil, authorised)
+      end
+
+      # Whether the path after the resource selects a lens or transform, and its options; nil when the
+      # CDN refuses it. Like the CDN, the adaptive stream's files sit beneath `/hls/` (its master
+      # playlist is `/hls/index.m3u8`). Otherwise the selector after the resource is read
+      # (AssetTransformParser.ts); the original, the embed page and the info take none.
+      def selector(resource, path)
+        lens, options = TransformRules.parse_selector(resource == 'hls' ? '' : path.join('/'))
+        selected = !(lens || options).nil?
+        %w[original embed info].include?(resource) && selected ? nil : [selected, options]
+      rescue ArgumentError
+        nil
+      end
+
+      # Like the CDN (CdnUtils.ts), the asset segment is `ext:` and the URL-encoded external ID, a
+      # grant (`sig_…`) or the asset ID. Returns `[grant, asset]`, or an error response for a grant
+      # the mock didn't sign or that has expired.
+      def resolve_asset(segment)
+        if segment.start_with?('sig_')
+          grant = MockGrant.decode(segment)
+          return error(ErrorCodes::SIGNED_URL_INVALID, "The signed asset URL's grant is invalid", status: 403) unless grant
+          return error(ErrorCodes::SIGNED_URL_EXPIRED, 'The signed URL has expired', status: 403) if grant[:expires_at] <= @now.call
+
+          [grant, project_assets.find { |asset| asset['id'] == grant[:asset_id] }]
+        elsif segment.start_with?(CDN::EXTERNAL_ID_PREFIX)
+          external = MockGrant.percent_decode(segment.delete_prefix(CDN::EXTERNAL_ID_PREFIX))
+          [nil, external && !external.empty? ? project_assets.find { |asset| asset['externalId'] == external } : nil]
+        else
+          id = MockGrant.percent_decode(segment)
+          [nil, project_assets.find { |asset| asset['id'] == id }]
+        end
+      end
+
+      def asset_not_found = error(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', status: 404)
+
+      # The display info at `/info`, like the CDN's (AssetInfo.ts): the allowlisted fields and whether
+      # the viewer the claims describe can see the content, decided as the other resources decide it.
+      # A private asset's info needs a grant or an API key with `assets:download`.
+      def info(method, item, authorised, params)
+        restricted = item['visibility'] != 'public'
+        return error('asset/not-available', 'Asset is not available', status: 404) if restricted && !authorised
+
+        claims = JSON.parse(params.fetch('viewerClaims', '{}'))
+        body = { 'id' => item['id'], 'projectId' => item['projectId'], 'type' => item['type'], 'externalUrl' => item['externalUrl'],
+                 'content' => item['content'].slice(*%w[format width height durationSeconds pageCount rendered preview hls]),
+                 'availability' => availability(item, claims.is_a?(Hash) && claims['ageConfirmed'] == true) }
+        cdn_response(method, JSON.generate(body), { 'content-type' => 'application/json',
+                                                    'cache-control' => "#{restricted ? 'private' : 'public'}, max-age=60",
+                                                    'cache-tag' => "asset-#{item['id']}" })
+      rescue JSON::ParserError
+        error(ErrorCodes::INVALID_VIEWER_CLAIMS, 'Invalid viewer claims', status: 400)
+      end
+
+      # Whether a viewer can see an asset's content now, decided as the other resources decide it.
+      def availability(item, age_confirmed)
+        moderation = item['classification']['moderation']['status']
+        if item['content']['safetyHold'] || item['upload']['status'] == 'uploading' || %w[blocked purged].include?(moderation) ||
+           item['classification']['status'] == 'failed' || item['content']['status'] == 'removed'
+          'unavailable'
+        elsif moderation == 'age-restricted' && !age_confirmed
+          'age-restricted'
+        else
+          'available'
+        end
       end
 
       # Serves a found asset's resource after the delivery, age and access checks, then whether it
       # has the resource and takes the selector, then the transform options' schema check.
       # `selector` is the selector's options (empty for a lens alone), or nil without one.
-      def deliver(method, item, resource, params, selector)
+      def deliver(method, item, resource, params, selector, authorised)
         stored = @state.content[item['id']]
-        refused = refuse_delivery(item, resource, stored, params)
+        refused = refuse_delivery(item, resource, stored, params, authorised)
         return refused if refused
 
         restricted = item['visibility'] != 'public'
@@ -1437,7 +1515,7 @@ module CalmLens
 
       # The delivery checks, which refuse everyone, then age and access, as an error response, or nil.
       # Only the original needs the upload still stored.
-      def refuse_delivery(item, resource, stored, params)
+      def refuse_delivery(item, resource, stored, params, authorised)
         moderation = item['classification']['moderation']['status']
         if (resource == 'original' && stored.nil?) || item['upload']['status'] == 'uploading' ||
            %w[blocked purged].include?(moderation) || item['classification']['status'] == 'failed' ||
@@ -1447,7 +1525,7 @@ module CalmLens
         if moderation == 'age-restricted' && !viewer_age_confirmed?(params)
           return error('viewer/age-confirmation-required', 'Age confirmation required', status: 403)
         end
-        return if item['visibility'] == 'public' || can_download?(item['folderId'])
+        return if item['visibility'] == 'public' || authorised
 
         error(ErrorCodes::PERMISSION_DENIED, 'This API key needs assets:download permission for this asset’s folder.', status: 403)
       end
@@ -1524,8 +1602,11 @@ module CalmLens
                      headers: headers.merge('content-length' => bytes.bytesize.to_s, 'x-request-id' => request_id))
       end
 
-      # Whether the mock API key's grants give `assets:download` for `folder_id`.
-      def can_download?(folder_id)
+      # Whether the request carries the mock API key and its grants give `assets:download` for
+      # `folder_id`.
+      def can_download?(folder_id, headers)
+        return false unless header(headers, 'X-Api-Key') == @api_key
+
         @grants.any? do |grant|
           next false unless Array(grant['actions']).include?('assets:download')
           next true if grant['folderId'].nil?
@@ -1545,6 +1626,35 @@ module CalmLens
           current = @state.folders.dig(current, 'parentId')
         end
         false
+      end
+    end
+
+    # The mock's grant, the asset segment of a URL {CDN#sign_asset_url} signs on the mock: `sig_` and
+    # the lowercase hex of the UTF-8 text `{assetId}.{1|0}.{expiresAt}`, its asset, original access and
+    # expiry. Every SDK's mock writes it the same way. It is readable, not signed, as the mock has no
+    # secret to keep.
+    # @api private
+    module MockGrant
+      module_function
+
+      def encode(asset_id, original, expires_at)
+        "sig_#{"#{asset_id}.#{original ? 1 : 0}.#{expires_at}".unpack1('H*')}"
+      end
+
+      # `{asset_id:, original:, expires_at:}`, or nil for a segment the mock didn't sign.
+      def decode(segment)
+        hex = segment.delete_prefix('sig_')
+        return unless hex.match?(/\A(?:[0-9a-f]{2})+\z/)
+
+        text = [hex].pack('H*').force_encoding(Encoding::UTF_8)
+        match = text.valid_encoding? && /\A(.+)\.([01])\.(\d+)\z/m.match(text)
+        match && { asset_id: match[1], original: match[2] == '1', expires_at: Integer(match[3], 10) }
+      end
+
+      # Percent-decodes a path segment like decodeURIComponent; nil when it isn't valid UTF-8.
+      def percent_decode(text)
+        decoded = text.b.gsub(/%(\h\h)/) { Regexp.last_match(1).hex.chr }.force_encoding(Encoding::UTF_8)
+        decoded if decoded.valid_encoding?
       end
     end
 

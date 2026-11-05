@@ -472,7 +472,30 @@ module CalmLens
   type asset_batch_operation = "delete" | "remove-content"
   # `batchId` is named by the `batch-id` fact of the events the batch causes.
   type batch_assets_response = { "batchId" => String, "status" => "queued", "assetCount" => Integer }
-  type signed_url = { "url" => String, "expiresAt" => Integer }
+  # A signed asset URL, with any resource, selector and viewer claims appended, and when it expires
+  # (milliseconds since the Unix epoch).
+  type signed_asset_url = { "url" => String, "expiresAt" => Integer }
+  # Whether the viewer an asset URL's claims describe can see the content now.
+  type asset_availability = "available" | "age-restricted" | "unavailable"
+  # ASSET_INFO_SCHEMA: what the CDN's `info` resource returns, an allowlist of the asset's public
+  # fields plus the viewer's `availability`.
+  type asset_info = {
+    "id" => String,
+    "projectId" => String,
+    "type" => asset_type,
+    "externalUrl" => String?,
+    "content" => {
+      "format" => String?,
+      "width" => Integer?,
+      "height" => Integer?,
+      "durationSeconds" => Float?,
+      "pageCount" => Integer?,
+      "rendered" => asset_rendered?,
+      "preview" => asset_preview?,
+      "hls" => asset_hls?
+    },
+    "availability" => asset_availability
+  }
 
   # ---- Transforms and lenses (AssetTransform.ts, Lens.ts) -------------------------------------
 
@@ -833,19 +856,21 @@ module CalmLens
     ?confirm_purge: bool,
     ?request_options: request_options
   }
-  # The CDN resources a signed URL can be created for ({CalmLens::CDN::SIGNED_RESOURCES}).
-  type signed_cdn_resource = "original" | "rendered" | "preview" | "hls" | "embed"
-  # What a CDN URL serves: a signed resource or the public `placeholder`.
-  type cdn_resource = signed_cdn_resource | "placeholder"
-  type create_signed_url_options = {
-    ?viewer_claims: viewer_claims,
-    asset_id: String,
-    # Defaults to `rendered` on the server; `original`, `hls` and `embed` take no lens or transform.
-    ?resource: signed_cdn_resource,
-    ?expires_in_seconds: Integer,
-    # Transform options replace the lens's options of the same name.
+  # The resources beneath an asset URL ({CalmLens::CDN::RESOURCES}).
+  type cdn_resource = "original" | "rendered" | "preview" | "hls" | "embed" | "placeholder" | "info"
+  type sign_asset_url_options = {
+    # Exactly one of `asset_id` and `external_id`.
+    ?asset_id: String,
+    ?external_id: String,
+    ?project_id: String,
+    # Whole seconds from 1 to 86400; 900 by default.
+    ?expires_in: Integer,
+    # Whether the URL also serves `original`; false by default.
+    ?original: bool,
+    ?resource: cdn_resource,
     ?lens: String,
     ?transform: transform_input,
+    ?viewer_claims: viewer_claims,
     ?request_options: request_options
   }
 
@@ -1038,22 +1063,29 @@ module CalmLens
   }
 
   type asset_url_options = {
-    ?viewer_claims: viewer_claims,
-    # The asset ID or external ID.
-    asset_identifier: String,
-    # `rendered` is the default. `original`, `hls` (the HLS master playlist), `embed` (the
-    # page that shows the asset) and `placeholder` (a small blurred PNG) take no lens or transform;
-    # `preview` takes them, and `rendered` does when it is an image.
+    # Exactly one of `asset_id` and `external_id`.
+    ?asset_id: String,
+    ?external_id: String,
+    # The client's project by default.
+    ?project_id: String,
+    # Without one, the URL is the asset URL itself. `original`, `hls` (the HLS master playlist),
+    # `embed` (the page that shows the asset), `placeholder` (a small blurred PNG) and `info` take no
+    # lens or transform; `preview` takes them, and `rendered` does when it is an image.
     ?resource: cdn_resource,
-    # Transform options replace the lens's options of the same name.
+    # Transform options replace the lens's options of the same name; both need a resource.
     ?lens: String,
     ?transform: transform_input,
-    # Appends `?ageConfirmed=true`, so a public `age-restricted` asset is served from this URL. Set it
-    # only where your app has already decided the viewer may see age-restricted content.
+    # Unsigned viewer assertions, sent as the `viewerClaims` query without the defaults. Set
+    # `age_confirmed` only where your app has already decided the viewer may see age-restricted content.
+    ?viewer_claims: viewer_claims,
+    ?request_options: request_options
   }
   type serve_options = {
+    ?asset_id: String,
+    ?external_id: String,
+    ?project_id: String,
     ?viewer_claims: viewer_claims,
-    asset_identifier: String,
+    # `rendered` by default.
     ?resource: cdn_resource,
     ?lens: String,
     ?transform: transform_input,

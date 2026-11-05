@@ -143,10 +143,11 @@ class ContractClientTest < Minitest::Test
 
   # requests.json, in camelCase and snake_case: the request sent and the result returned.
   def replay_request(fixture)
+    # `result` is what the method returns when it isn't the response body.
     expected = case fixture['operation']
                when /\.(delete|removeEntry)\z/ then nil
                when 'ensureLenses' then fixture['response']['lenses']
-               else fixture['response']
+               else fixture.fetch('result', fixture['response'])
                end
     [fixture['options'], snake(fixture['options'])].each do |options|
       result, captured = capture(fixture) { |client| invoke(client, fixture['operation'], options) }
@@ -399,7 +400,7 @@ class ContractClientTest < Minitest::Test
       'retryMaxDelayMs' => CalmLens::ServerClient::RETRY_MAX_DELAY * 1000,
       'retryAfterMaxMs' => CalmLens::ServerClient::RETRY_AFTER_MAX * 1000,
       'maxResponseBytes' => setting.call(:@max_response_bytes),
-      'signedUrlExpiresInSeconds' => CalmLens::Assets::DEFAULT_SIGNED_URL_SECONDS,
+      'signedUrlExpiresIn' => CalmLens::CDN::DEFAULT_SIGNED_URL_EXPIRES_IN,
       'uploadTokenExpiresInSeconds' => CalmLens::UploadTokens::DEFAULT_TTL_SECONDS,
       'waitForDecisionTimeoutMs' => CalmLens::Assets::DEFAULT_DECISION_TIMEOUT * 1000,
       'waitForDecisionFirstIntervalMs' => CalmLens::Assets::DECISION_POLL_FIRST_DELAY * 1000,

@@ -12,6 +12,7 @@ module CalmLens
     REGIONAL_EVIDENCE_REQUIRED = 'asset/regional-evidence-required'
     SIGNED_URL_EXPIRED = 'signed-url/expired'
     SIGNED_URL_INVALID = 'signed-url/invalid'
+    SIGNED_URL_ORIGINAL_NOT_GRANTED = 'signed-url/original-not-granted'
     INVALID_REQUEST = 'validation/invalid-request'
     INVALID_TYPE = 'validation/invalid-type'
     TOO_SMALL = 'validation/too-small'
@@ -121,6 +122,7 @@ module CalmLens
       'asset/regional-evidence-required' => 403,
       'signed-url/expired' => 403,
       'signed-url/invalid' => 403,
+      'signed-url/original-not-granted' => 403,
       'validation/invalid-request' => 400,
       'validation/invalid-type' => 400,
       'validation/too-small' => 400,

@@ -13,9 +13,9 @@ module CalmLens
     # ASCII characters without a space at either end) and answers `idempotency/invalid-key`.
     IDEMPOTENCY_KEY = /\A[^\r\n\0]+\z/
     HEADER_VALUE = /\A[^\r\n\0]*\z/
-    # The CDN resources that take no lens or transform: the exact upload, the adaptive stream, the embed page
-    # and the public placeholder.
-    UNSELECTABLE_CDN_RESOURCES = %w[original hls embed placeholder].freeze
+    # The CDN resources that take no lens or transform: the exact upload, the adaptive stream, the embed page,
+    # the public placeholder and the display info.
+    UNSELECTABLE_CDN_RESOURCES = %w[original hls embed placeholder info].freeze
 
     module_function
 
@@ -106,9 +106,11 @@ module CalmLens
       raise invalid('Identifier is required') if text.empty?
       raise invalid('Identifier cannot be "." or ".."') if %w[. ..].include?(text)
 
-      # Like JavaScript's encodeURIComponent.
-      text.encode(Encoding::UTF_8).b.gsub(/[^A-Za-z0-9\-_.!~*'()]/n) { |byte| format('%%%02X', byte.ord) }
+      component(text)
     end
+
+    # Percent-encodes text like JavaScript's encodeURIComponent.
+    def component(text) = text.encode(Encoding::UTF_8).b.gsub(/[^A-Za-z0-9\-_.!~*'()]/n) { |byte| format('%%%02X', byte.ord) }
 
     # Splits an absolute URL into its parsed origin and its raw request target. Only the origin is
     # parsed, so the request target is sent exactly as the SDK built it.

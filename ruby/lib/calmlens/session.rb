@@ -99,10 +99,11 @@ module CalmLens
 
     # Sends a CDN request, retrying like an API read, and returns the last response rather than
     # raising an error status. With a block, yields the streaming {Response} and returns the block's
-    # value; otherwise returns the response with its body read.
-    def cdn(method, url, headers, request_options, &block)
+    # value; otherwise returns the response with its body read. `authenticate: false` sends no API
+    # key, as a browser would.
+    def cdn(method, url, headers, request_options, authenticate: true, &block)
       limit = request_options.fetch(:max_response_bytes, nil)
-      execute(method, url, headers, nil, request_options, allow_http_errors: true) do |response|
+      execute(method, url, headers, nil, request_options, allow_http_errors: true, authenticate: authenticate) do |response|
         next response.tap { response.body(limit: limit) } unless block
 
         streaming = Response.new(status: response.status, headers: response.headers) do |&sink|
@@ -119,6 +120,14 @@ module CalmLens
         rescue StandardError => e
           raise CallerError, e
         end
+      end
+    end
+
+    # Fetches JSON from the CDN without the API key, as a browser would, and returns it parsed. An
+    # error status raises the error the CDN's body names, such as `signed-url/expired`.
+    def cdn_json(url)
+      execute('GET', url, { 'Accept' => 'application/json' }, nil, {}, authenticate: false) do |response|
+        parse('GET', response, @max_response_bytes)
       end
     end
 
@@ -156,9 +165,10 @@ module CalmLens
       end
     end
 
-    def headers_for(extra)
-      extra.reject { |name, _| %w[x-api-key user-agent authorization].include?(name.downcase) }
-           .merge('X-Api-Key' => @api_key, 'User-Agent' => USER_AGENT)
+    def headers_for(extra, authenticate: true)
+      headers = extra.reject { |name, _| %w[x-api-key user-agent authorization].include?(name.downcase) }
+                     .merge('User-Agent' => USER_AGENT)
+      authenticate ? headers.merge('X-Api-Key' => @api_key) : headers
     end
 
     private
@@ -189,11 +199,12 @@ module CalmLens
     # Sends a request, retrying transport failures, timeouts, 429, 500, 502–504 and
     # `idempotency/request-in-progress` when it is safe to repeat: reads, and requests with an
     # `Idempotency-Key` whose body can be sent again. Redirects are never followed.
-    def execute(method, url, headers, body, request_options, allow_http_errors: false, deadline: nil, &handler)
+    def execute(method, url, headers, body, request_options, allow_http_errors: false, deadline: nil, authenticate: true, &handler)
       retries = request_options.fetch(:max_retries, @max_retries)
       retryable = retries.positive? && (%w[GET HEAD].include?(method) || headers.key?('Idempotency-Key')) &&
                   (body.nil? || body.replayable?)
-      request = Transport::Request.new(method: method, url: url, headers: headers_for(headers), body: body&.content,
+      request = Transport::Request.new(method: method, url: url, headers: headers_for(headers, authenticate: authenticate),
+                                       body: body&.content,
                                        open_timeout: request_options.fetch(:open_timeout, @open_timeout),
                                        timeout: request_options.fetch(:timeout, @timeout))
       limit = request_options.fetch(:max_response_bytes, @max_response_bytes)

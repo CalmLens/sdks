@@ -19,8 +19,8 @@ module CalmLens
     # beside a request's; Internal::OPTION_KEYS, generated from the API, has the rest.
     LOCAL_OPTION_KEYS = {
       'assets.waitForDecision' => %w[assetId timeout].freeze,
-      'cdn.getAssetUrl' => %w[assetIdentifier lens resource transform viewerClaims].freeze,
-      'cdn.serve' => %w[assetIdentifier init lens resource transform viewerClaims].freeze,
+      'cdn.getAssetUrl' => %w[assetId externalId lens projectId resource transform viewerClaims].freeze,
+      'cdn.serve' => %w[assetId externalId init lens projectId resource transform viewerClaims].freeze,
       'uploadTokens.sign' => %w[expiresInSeconds externalId uploadPresetId].freeze
     }.freeze
     private_constant :LOCAL_OPTION_KEYS

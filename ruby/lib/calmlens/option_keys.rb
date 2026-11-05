@@ -15,7 +15,6 @@ module CalmLens
         authorId content context description externalId externalUrl folderId isFinal metadata name part
         processingOptions sizeInBytes tags totalSizeInBytes uploadPresetId url visibility
       ].freeze,
-      'assets.createSignedUrl' => %w[assetId expiresInSeconds lens resource transform viewerClaims].freeze,
       'assets.decide' => %w[assetId confirmPurge decision note].freeze,
       'assets.delete' => %w[assetId].freeze,
       'assets.each' => %w[cursor filter folderId ordering pageSize].freeze,
@@ -31,6 +30,9 @@ module CalmLens
       'assets.search' => %w[limit mode query].freeze,
       'assets.update' => %w[assetId description externalId externalUrl metadata name tags visibility].freeze,
       'assets.uploadPart' => %w[assetId part queue].freeze,
+      'cdn.signAssetUrl' => %w[
+        assetId expiresIn externalId lens original projectId resource transform viewerClaims
+      ].freeze,
       'ensureLens' => %w[active description identifier name transform type version].freeze,
       'ensureLenses' => %w[lenses].freeze,
       'events.each' => %w[assetId cursor pageSize types].freeze,

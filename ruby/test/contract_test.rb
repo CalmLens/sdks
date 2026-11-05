@@ -40,7 +40,7 @@ class ContractTest < Minitest::Test
   # Every transform option serializes to the selector the CDN writes for it.
   def replay_transform(item)
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1')
-    url = client.cdn.get_asset_url(asset_identifier: 'asset-1', transform: item['options'])
+    url = client.cdn.get_asset_url(asset_id: 'asset-1', resource: 'rendered', transform: item['options'])
     assert_equal item['selector'], url.split('/rendered/', 2).last, item['options'].inspect
   end
   each_case('transform', TRANSFORM_OPTIONS['cases']) { |item| item['selector'] }
@@ -49,7 +49,7 @@ class ContractTest < Minitest::Test
   def replay_invalid_transform(item)
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1', transport: ->(_) { flunk 'sent a request' })
     error = assert_raises(CalmLens::InvalidArgumentError, item['options'].inspect) do
-      client.cdn.get_asset_url(asset_identifier: 'asset-1', transform: item['options'])
+      client.cdn.get_asset_url(asset_id: 'asset-1', resource: 'rendered', transform: item['options'])
     end
     assert_equal 'sdk/invalid-argument', error.code
     assert_equal item.slice('unknownKeys', 'invalidKeys'), error.details
@@ -146,6 +146,7 @@ class ContractTest < Minitest::Test
     when 'mock.clearRequests' then mock.clear_requests && nil
     when 'mock.enqueueEvent' then mock.enqueue_event(args)
     when 'mock.grant' then mock.api_key_grants = args['grants']
+    when 'mock.fetchCdn' then served(mock.fetch_cdn(args['url']))
     when 'mock.failNext'
       mock.fail_next_request(args['failure'], operation: args['operation'], details: args['details'], retry_after: args['retryAfter'])
     else flunk "Unknown mock step #{operation}"
@@ -156,11 +157,8 @@ class ContractTest < Minitest::Test
     return run_mock_step(mock, operation, args, moderate_calls) if operation.start_with?('mock.')
 
     case operation
-    when 'cdn.serve'
-      response = mock.cdn.serve(args)
-      body = response.body.to_s
-      code = response.content_type.to_s.start_with?('application/json') ? JSON.parse(body)['code'] : nil
-      { 'status' => response.status, 'code' => code, 'bytes' => body, 'headers' => response.headers }
+    when 'cdn.serve' then served(mock.cdn.serve(args))
+    when 'cdn.getAssetInfo' then json(mock.cdn.get_asset_info(args['url'], viewer_claims: args['viewerClaims']))
     when 'assets.iterate' then json(mock.assets.each(args).to_a)
     when 'assets.iterateChildren' then json(mock.assets.each_child(args).to_a)
     when 'events.pages' then json(mock.events.each_page(args).to_a)
@@ -173,6 +171,13 @@ class ContractTest < Minitest::Test
       target = resources.reduce(mock) { |value, resource| value.public_send(snake_name(resource)) }
       json(target.public_send(snake_name(method), options))
     end
+  end
+
+  # What a cdn.serve or mock.fetchCdn step returns.
+  def served(response)
+    body = response.body.to_s
+    code = response.content_type.to_s.start_with?('application/json') ? JSON.parse(body)['code'] : nil
+    { 'status' => response.status, 'code' => code, 'bytes' => body, 'headers' => response.headers }
   end
 
   # Header names are case-insensitive; Response#headers has lowercase names.
@@ -334,14 +339,23 @@ class ContractTest < Minitest::Test
       error = raised_error(spec)
       error.respond_to?(name) && error.public_send(name) == want
     when 'cdn-resource'
-      client.cdn.get_asset_url(asset_identifier: 'asset-1', resource: name).end_with?("/asset-1/#{capability['path']}")
-    when 'cdn-option'
-      client.cdn.get_asset_url(asset_identifier: 'asset-1',
-                               name.to_sym => { age_confirmed: true }).end_with?('?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D')
+      client.cdn.get_asset_url(asset_id: 'asset-1', resource: name).end_with?("/asset-1/#{capability['path']}")
+    when 'cdn-option' then cdn_option?(name)
     when 'mock-client' then constant(name).is_a?(Class)
     when 'mock-method' then CalmLens::MockServerClient.method_defined?(name)
     when 'mock-option' then mock_outcome(name) == 'blocked'
     else flunk "Unknown capability kind #{capability['kind']}"
+    end
+  end
+
+  # Each CDN option is checked by the URL it builds.
+  def cdn_option?(name)
+    case name
+    when 'viewer_claims'
+      client.cdn.get_asset_url(asset_id: 'asset-1', viewer_claims: { age_confirmed: true })
+            .end_with?('/asset-1?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D')
+    when 'external_id' then client.cdn.get_asset_url(external_id: 'post/1').end_with?('/ext:post%2F1')
+    else flunk "No check for CDN option #{name}"
     end
   end
 
