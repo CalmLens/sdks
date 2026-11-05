@@ -85,7 +85,7 @@ class ClientTests(ClientTestCase):
         for call in (lambda: self.client.assets.retrieve(), lambda: self.client.assets.delete({}),
                      lambda: self.client.assets.move(asset_id="a"), lambda: self.client.folders.create(),
                      lambda: self.client.assets.search(limit=2),
-                     lambda: self.client.cdn.get_asset_url(asset_identifier="a", resource="raw")):
+                     lambda: self.client.cdn.get_asset_url(asset_id="a", resource="raw")):
             with self.assertRaises(CalmLensValidationError) as raised:
                 call()
             self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
@@ -255,7 +255,7 @@ class ClientTests(ClientTestCase):
                                       idempotency_key="k\r\nX-Evil: 1")
         self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
         with self.assertRaises(CalmLensValidationError):
-            self.client.cdn.serve(asset_identifier="a", init={"headers": {"Range": "bytes=0-1\r\nX: y"}})
+            self.client.cdn.serve(asset_id="a", init={"headers": {"Range": "bytes=0-1\r\nX: y"}})
         self.assertEqual(self.calls, [])
 
     def test_version_matches_the_package_manifest(self):
@@ -299,37 +299,80 @@ class ClientTests(ClientTestCase):
     def test_structured_transform_formats_numbers_like_javascript(self):
         options = {"blur": 2.0, "brightness": 0.00001, "contrast": 1e-7, "gamma": 1e21, "saturation": -0.0,
                    "sharpen": 123456789012, "border": {"width": -2.5}}
-        url = self.client.cdn.get_asset_url(asset_identifier="a", transform=options)
+        url = self.client.cdn.get_asset_url(asset_id="a", resource="rendered", transform=options)
         self.assertTrue(url.endswith("/rendered/blur=2,border.width=-2.5,brightness=0.00001,contrast=1e-7,"
                                      "gamma=1e%2B21,saturation=0,sharpen=123456789012"))
-        url = self.client.cdn.get_asset_url(asset_identifier="a", transform={
+        url = self.client.cdn.get_asset_url(asset_id="a", resource="rendered", transform={
             "background": "#FFAA00", "trim": {"border": {"color": "#ABC"}}, "quality": 80})
         self.assertTrue(url.endswith("/rendered/background=ffaa00,quality=80,trim.border.color=abc"))
         # Keyword arguments are converted to camelCase, but transform option names are CDN names:
         # a snake_case name is sent as written, so it is rejected rather than renamed.
         for bad in (float("nan"), float("inf"), {1: "x"}, {"bad_name": 1}, object()):
             with self.subTest(bad=bad), self.assertRaises(CalmLensError) as raised:
-                self.client.cdn.get_asset_url(asset_identifier="a", transform={"border": {"width": bad}}
+                self.client.cdn.get_asset_url(asset_id="a", resource="rendered", transform={"border": {"width": bad}}
                                               if not isinstance(bad, dict) else {"border": bad})
             self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
         with self.assertRaises(CalmLensError) as raised:
-            self.client.cdn.get_asset_url(asset_identifier="a", transform={"keep_me": 1})
+            self.client.cdn.get_asset_url(asset_id="a", resource="rendered", transform={"keep_me": 1})
         self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
         with self.assertRaises(CalmLensError) as raised:
-            self.client.assets.create_signed_url(asset_id="a", lens="x", transform=[])
+            self.client.cdn.sign_asset_url(asset_id="a", resource="rendered", lens="x", transform=[])
         self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
 
     def test_cdn_urls_and_serve_headers(self):
-        url = self.client.cdn.get_asset_url({"assetIdentifier": "a/b?", "lens": "my lens"})
+        url = self.client.cdn.get_asset_url({"assetId": "a/b?", "resource": "rendered", "lens": "my lens"})
         self.assertEqual(url, "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a%2Fb%3F/rendered/@my%20lens")
-        self.assertTrue(self.client.cdn.get_asset_url({"assetIdentifier": "a", "transform": "width=20,label=[x]"}).endswith("/rendered/width=20,label=%5Bx%5D"))
-        self.assertEqual(self.client.cdn.get_asset_url({"assetIdentifier": "a", "lens": "x", "transform": "format=avif"}), "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a/rendered/@x,format=avif")
+        self.assertTrue(self.client.cdn.get_asset_url({"assetId": "a", "resource": "rendered", "transform": "width=20,label=[x]"}).endswith("/rendered/width=20,label=%5Bx%5D"))
+        self.assertEqual(self.client.cdn.get_asset_url({"assetId": "a", "resource": "rendered", "lens": "x", "transform": "format=avif"}), "https://cdn.calmlens.com/v1/assets/p%20%2F%3F/a/rendered/@x,format=avif")
         self.result, self.headers = b"0123456789", {"Content-Type": "image/png", "X-Request-Id": "req_cdn"}
-        with self.client.cdn.serve({"assetIdentifier": "a", "init": {"headers": {"x-api-key": "wrong", "Range": "bytes=0-1"}}}) as response:
+        with self.client.cdn.serve({"assetId": "a", "init": {"headers": {"x-api-key": "wrong", "Range": "bytes=0-1"}}}) as response:
             self.assertEqual(self.calls[-1].headers["X-api-key"], "key")
             self.assertEqual(self.calls[-1].headers["Range"], "bytes=0-1")
             self.assertEqual((response.content_type, response.request_id, response.ok), ("image/png", "req_cdn", True))
             self.assertEqual(list(response.iter_bytes(4)), [b"0123", b"4567", b"89"])
+
+
+INFO = {"id": "asset", "projectId": "p", "type": "image", "availability": "available",
+        "content": {"format": "image/png", "width": 1, "height": 1, "durationSeconds": None, "pageCount": None,
+                    "rendered": None, "preview": None, "hls": None}}
+
+
+class AssetInfoTests(ClientTestCase):
+    def test_reads_the_info_beneath_the_url_without_the_api_key_keeping_its_viewer_claims(self):
+        self.result = INFO
+        claims = "%7B%22region%22%3A%22DE%22%7D"
+        info = self.client.cdn.get_asset_info(f"https://cdn.example.test/v1/assets/p/sig_ab/?download=1&viewerClaims={claims}#x")
+        self.assertEqual(info, INFO)
+        request = self.calls[-1]
+        self.assertEqual((request.get_method(), request.full_url),
+                         ("GET", f"https://cdn.example.test/v1/assets/p/sig_ab/info?viewerClaims={claims}"))
+        self.assertEqual(request.headers["Accept"], "application/json")
+        self.assertNotIn("X-api-key", request.headers)
+
+    def test_given_viewer_claims_replace_the_urls_and_default_claims_are_left_out(self):
+        self.result = INFO
+        url = "https://cdn.example.test/v1/assets/p/a?viewerClaims=%7B%22region%22%3A%22DE%22%7D"
+        self.client.cdn.get_asset_info(url, viewer_claims={"ageConfirmed": True})
+        self.assertEqual(self.query(), {"viewerClaims": ['{"ageConfirmed":true}']})
+        self.client.cdn.get_asset_info(url, {"viewerClaims": {"ageConfirmed": False}})
+        self.assertEqual(urlsplit(self.calls[-1].full_url).query, "")
+
+    def test_a_refusal_raises_the_cdns_code_and_a_body_that_is_not_info_is_an_invalid_response(self):
+        self.result, self.status = {"code": "signed-url/expired", "message": "Expired"}, 403
+        with self.assertRaises(CalmLensError) as raised:
+            self.client.cdn.get_asset_info("https://cdn.example.test/v1/assets/p/sig_ab")
+        self.assertEqual((raised.exception.code, raised.exception.status), (error_codes.SIGNED_URL_EXPIRED, 403))
+        self.result, self.status = {**INFO, "availability": None}, 200
+        with self.assertRaises(CalmLensError) as raised:
+            self.client.cdn.get_asset_info("https://cdn.example.test/v1/assets/p/a")
+        self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_RESPONSE)
+
+    def test_refuses_a_url_that_is_not_absolute_http_and_claims_that_are_not_json_before_sending(self):
+        for url in ("/v1/assets/p/a", "file:///etc/passwd", "https://cdn.example.test/v1/assets/p/a?viewerClaims=%7B"):
+            with self.subTest(url=url), self.assertRaises(CalmLensValidationError) as raised:
+                self.client.cdn.get_asset_info(url)
+            self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
+        self.assertEqual(self.calls, [])
 
 
 class WaitForDecisionTests(ClientTestCase):

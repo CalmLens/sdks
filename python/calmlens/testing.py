@@ -36,11 +36,12 @@ from urllib.request import Request
 from . import error_codes
 from ._asset_filters import ASSET_FILTER_FIELDS
 from ._mock_classification import CATEGORIES, QUALIFIERS
-from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_PART_SIZE_BYTES, DEFAULT_TIMEOUT,
-                     CalmLensServerClient,
+from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_PART_SIZE_BYTES,
+                     DEFAULT_SIGNED_URL_EXPIRES_IN, DEFAULT_TIMEOUT, MAX_SIGNED_URL_EXPIRES_IN, USER_AGENT,
+                     CalmLensServerClient, CDNResponse,
                      _HEX_COLOUR, _UNSET, _check_transform_options, _invalid, _invalid_upload_mime_type,
                      _is_accepted_upload_mime_type, _json, _merge, _normalize_upload_mime_type,
-                     _sign_upload_token, SIGNED_CDN_RESOURCES)
+                     _sign_upload_token)
 from ._signed_test_inputs import (MEDIA_TEST_SIGNALS, TEST_INPUT_PRESETS, TEXT_TEST_SIGNALS, ClassificationTestSignal,
                                   PaintedTestImage, SignedTestAction, SignedTestDetectedFace,
                                   SignedTestDetectedPerson, SignedTestDetections, SignedTestFaceAge,
@@ -64,7 +65,7 @@ __all__ = ["MockCalmLensServerClient", "MOCK_PROJECT_ID", "MockRequest", "MockOp
            "SignedTestFaceAgePreset", "SignedTestFaceAgeRange", "TEST_INPUT_PRESETS", "TEXT_TEST_SIGNALS", "MEDIA_TEST_SIGNALS", "generate_test_text_code",
            "generate_media_test_code", "signal_test_input", "paint_test_image", "PaintedTestImage"]
 
-_MOCK_OPTIONS = {"database_storage", "image_storage", "create_id", "now", "moderate", "signed_url_base_url"}
+_MOCK_OPTIONS = {"database_storage", "image_storage", "create_id", "now", "moderate"}
 _MOCK_OUTCOMES = ("pending", "failed", "allowed", "limited", "age-restricted", "blocked", "purged")
 
 #: Where the mock's moderation leaves an upload: ``pending`` (still processing), ``failed``
@@ -573,7 +574,6 @@ class MockOptions(TypedDict, total=False):
     #: ``complete_processing`` without a decision (``complete``). Defaults to
     #: :func:`default_moderate`: queued work stays ``pending`` and everything else is ``allowed``.
     moderate: MockModerate
-    signed_url_base_url: str
 
 
 #: The ThumbHash the mock gives every processed asset's preview, standing in for one computed from
@@ -614,8 +614,8 @@ MockFailure = Union[str, BaseException]
 _OPERATIONS = frozenset({
     "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
     "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.create", "assets.classify", "assets.uploadPart",
-    "assets.createSignedUrl", "assets.move", "assets.retry", "assets.explain", "assets.decide",
-    "assets.removeContent", "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list",
+    "assets.move", "assets.retry", "assets.explain", "assets.decide",
+    "assets.removeContent", "assets.delete", "assets.batch", "text.classify", "cdn.serve", "cdn.getAssetInfo", "cdn.signAssetUrl", "events.list",
     "events.pages", "folders.list", "folders.retrieve", "folders.create", "folders.update", "folders.delete",
     "folders.move", "hashLists.list", "hashLists.retrieve", "hashLists.create", "hashLists.update",
     "hashLists.delete", "hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "policies.list",
@@ -825,6 +825,35 @@ def _check_metadata(metadata: Any) -> None:
             raise _invalid_field("validation/invalid-value", f"metadata.{index}.value")
 
 
+#: The characters ``encodeURIComponent`` leaves as they are, besides letters and digits.
+_COMPONENT_SAFE = "~!*'()-._"
+_MOCK_GRANT_TEXT = re.compile(r"(.+)\.([01])\.(\d+)", re.S)
+_LOWER_HEX_PAIRS = re.compile(r"(?:[0-9a-f]{2})+")
+
+
+def _encode_mock_grant(asset_id: str, original: bool, expires_at: int) -> str:
+    """The mock's grant, the asset segment of a URL ``cdn.sign_asset_url`` signs: ``sig_`` and the
+    lowercase hex of the UTF-8 string ``{assetId}.{1|0}.{expiresAt}``, its asset, original access
+    and expiry. Every SDK's mock writes it the same way. It is readable, not signed, as the mock has
+    no secret to keep."""
+    return "sig_" + f"{asset_id}.{1 if original else 0}.{expires_at}".encode("utf-8").hex()
+
+
+def _decode_mock_grant(segment: str) -> tuple[str, bool, int] | None:
+    """A mock grant's asset ID, original access and expiry, or None for a segment the mock didn't sign."""
+    encoded = segment.removeprefix("sig_")
+    if not _LOWER_HEX_PAIRS.fullmatch(encoded):
+        return None
+    try:
+        text = bytes.fromhex(encoded).decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    match = _MOCK_GRANT_TEXT.fullmatch(text)
+    if match is None:
+        return None
+    return match.group(1), match.group(2) == "1", int(match.group(3))
+
+
 _SELECTOR_LENS = re.compile(r"[a-z0-9-]{1,50}")
 _SELECTOR_NAME = re.compile(r"[a-z][a-zA-Z0-9]*")
 _SELECTOR_NUMBER = re.compile(r"-?(?:0|[1-9]\d*)(?:\.\d+)?")
@@ -972,7 +1001,6 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self.moderate: MockModerate = options.get("moderate") or default_moderate
         if not callable(self.moderate):
             raise _invalid("mock_options['moderate'] must be a function", error_codes.SDK_INVALID_CONFIG)
-        self.signed_url_base_url: str = options.get("signed_url_base_url", "https://mock.calmlens.invalid")
         # Waits (retry backoff, ``assets.wait_for_decision``) take no real time: sleeping only
         # advances this client's clock, so an unsettled asset times out at once.
         self._elapsed = 0.0
@@ -994,6 +1022,16 @@ class MockCalmLensServerClient(CalmLensServerClient):
         """Forget the requests recorded so far."""
         with self._state_lock:
             self._requests.clear()
+
+    def fetch_cdn(self, url: str) -> CDNResponse:
+        """Fetch a URL of the mock's CDN as a browser would, with a GET and without the API key: a
+        signed asset URL from ``cdn.sign_asset_url`` (with a resource appended), or a public one
+        from ``cdn.get_asset_url``. The request is recorded like any other. Close the response, or
+        use it as a context manager."""
+        if not isinstance(url, str) or not url.startswith(self.cdn_base_url + "/"):
+            raise _invalid(f"url must be beneath the mock's CDN base URL, {self.cdn_base_url}")
+        return CDNResponse(self.transport(Request(url, headers={"User-Agent": USER_AGENT}, method="GET"),
+                                          self.timeout))
 
     def enqueue_error(self, error: BaseException) -> MockCalmLensServerClient:
         """Fail the next request (API call or ``cdn.serve``) with ``error``. Queued errors are
@@ -1221,7 +1259,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         """The JavaScript client methods that send a request, the one it is recorded under first,
         for ``fail_next_request``."""
         if cdn:
-            return ["cdn.serve"]
+            return ["cdn.getAssetInfo"] if len(parts) >= 4 and parts[3] == "info" else ["cdn.serve"]
         if parts[0] == "projects":
             route = "/".join(parts[2:])
             if route == "events":
@@ -1233,6 +1271,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return [f"{kind}.list" if method == "GET" else f"{kind}.create"]
             if route == "policy":
                 return ["policies.assign"]
+            if route == "signed-asset-urls":
+                return ["cdn.signAssetUrl"]
             if len(parts) > 3 and parts[2] == "policies":
                 action = parts[4] if len(parts) > 4 else ""
                 if action:
@@ -1271,7 +1311,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return ["assets.retrieve", "assets.waitForDecision"] if method == "GET" \
                 else ["assets." + by_method.get(method, "")]
         return {"content": ["assets.removeContent"], "children": ["assets.listChildren", "assets.iterateChildren"],
-                "signed-url": ["assets.createSignedUrl"], "part": ["assets.uploadPart"], "move": ["assets.move"],
+                "part": ["assets.uploadPart"], "move": ["assets.move"],
                 "retry": ["assets.retry"], "explain": ["assets.explain"],
                 "decision": ["assets.decide"]}.get(suffix, [])
 
@@ -1315,7 +1355,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 raise failure
             response = self._failure_response(_Failure(failure, details=pending.details), pending.retry_after)
         elif cdn:
-            response = self._serve_cdn(request.get_method(), url.path, query)
+            api_key = next((v for k, v in headers.items() if k.lower() == "x-api-key"), None)
+            response = self._serve_cdn(request.get_method(), url.path, query, api_key == self.api_key)
         else:
             response = self._answer(request, raw, headers, url.path, query, body, parts,
                                     operations[0] if operations else "")
@@ -1437,6 +1478,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return folder
         if resource in ("policies", "policy"):
             return self._dispatch_policy(method, parts, body)
+        if resource == "signed-asset-urls" and method == "POST":
+            return self._sign_asset_url(body, now)
         if resource == "hash-lists":
             if method == "GET":
                 lists = [cast(dict[str, Any], h) for h in self.database_storage.hash_lists.values()
@@ -1456,6 +1499,41 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 items = [a for a in items if a.get("folderId") == query["folderId"]]
             return self._page(items, query, [self.project_id, query.get("filter"), query.get("folderId")])
         return self._create_asset(upload, query, body, raw, now)
+
+    def _sign_asset_url(self, body: dict[str, Any], now: int) -> dict[str, Any]:
+        """Like the API (``POST /projects/:projectId/signed-asset-urls``): a grant to one asset, by ID
+        or external ID, until it expires, serving the original only when asked. The mock's grant is
+        readable (see ``_encode_mock_grant``), unlike the CDN's, and only the mock's CDN accepts it."""
+        # Like the API's schema, none of these fields takes null.
+        for key in ("assetId", "externalId", "expiresIn", "original"):
+            if key in body and body[key] is None:
+                raise _invalid_field("validation/invalid-type", key)
+        if ("assetId" in body) == ("externalId" in body):
+            raise _Failure(error_codes.INVALID_REQUEST, "Send either assetId or externalId", details={
+                "issues": [{"path": "", "message": "Send either assetId or externalId", "code": "custom"}]})
+        expires_in = body.get("expiresIn", DEFAULT_SIGNED_URL_EXPIRES_IN)
+        if isinstance(expires_in, bool) or not isinstance(expires_in, (int, float)) \
+                or not float(expires_in).is_integer():
+            raise _invalid_field("validation/invalid-type", "expiresIn")
+        if expires_in < 1:
+            raise _invalid_field("validation/too-small", "expiresIn")
+        if expires_in > MAX_SIGNED_URL_EXPIRES_IN:
+            raise _invalid_field("validation/too-big", "expiresIn")
+        original = body.get("original", False)
+        if not isinstance(original, bool):
+            raise _invalid_field("validation/invalid-type", "original")
+        if "externalId" in body:
+            asset = next((a for a in self._project_assets() if a.get("externalId") == body["externalId"]), None)
+            if asset is None:
+                raise _Failure(error_codes.ASSET_NOT_FOUND)
+        else:
+            asset = self._asset(str(body["assetId"]))
+        if asset["content"].get("safetyHold"):
+            raise _Failure(error_codes.ASSET_HELD)
+        expires_at = now + int(expires_in) * 1000
+        grant = _encode_mock_grant(asset["id"], original, expires_at)
+        return {"url": f"{self.cdn_base_url}/assets/{quote(self.project_id or '', safe=_COMPONENT_SAFE)}/{grant}",
+                "expiresAt": expires_at}
 
     def _folders_list(self, query: dict[str, Any]) -> dict[str, Any]:
         """Like the API: one keyset page of a parent's child folders, optionally matching ``search``,
@@ -1732,14 +1810,6 @@ class MockCalmLensServerClient(CalmLensServerClient):
             _check_metadata(body.get("metadata"))
             if "name" in body and body["name"] is None:
                 raise _invalid_field("validation/invalid-type", "name")
-        if suffix == "signed-url":
-            # None of these fields takes null, and the resource must be one a signed URL serves.
-            for key in ("viewerClaims", "resource", "lens", "transform", "expiresInSeconds"):
-                if key in body and body[key] is None:
-                    raise _invalid_field("validation/invalid-value" if key == "resource" else "validation/invalid-type",
-                                         key)
-            if body.get("resource", "rendered") not in SIGNED_CDN_RESOURCES:
-                raise _invalid_field("validation/invalid-value", "resource")
         asset = self._asset(identifier)
         if method == "DELETE":
             if suffix == "content":
@@ -1755,16 +1825,6 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._page([a for a in self._project_assets() if a.get("parentId") == identifier], query,
                                   identifier)
             return asset
-        if suffix == "signed-url":
-            expires = body["expiresInSeconds"]
-            selector = "".join(f"&{k}={quote(str(body[k]), safe='')}" for k in ("lens", "transform") if body.get(k))
-            if isinstance(body.get("viewerClaims"), dict):
-                # Like the API, the URL carries the viewer claims its signature covers.
-                claims = json.dumps(body["viewerClaims"], separators=(",", ":"))
-                selector += f"&viewerClaims={quote(claims, safe='')}"
-            return {"url": f"{self.signed_url_base_url}/assets/{identifier}/{body.get('resource', 'rendered')}"
-                           f"?expiresInSeconds={expires}{selector}",
-                    "expiresAt": now + expires * 1000}
         if suffix == "retry":
             if asset["classification"]["status"] != "failed" or \
                     asset["classification"]["moderation"]["status"] != "pending":
@@ -2235,32 +2295,61 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     # CDN ---------------------------------------------------------------------------------
 
-    def _serve_cdn(self, method: str, path: str, query: Mapping[str, Any]) -> _Response:
+    def _serve_cdn(self, method: str, path: str, query: Mapping[str, Any], with_api_key: bool) -> _Response:
         segments = path.strip("/").split("/")
         if len(segments) < 4 or segments[0] != "assets":
             return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
-        project, identifier, resource = unquote(segments[1]), unquote(segments[2]), segments[3]
+        project, segment, resource = unquote(segments[1]), segments[2], segments[3]
         selector_path = segments[4:]
         no_rendered_version = _Failure("asset/no-rendered-version", "This asset has no such resource", 404)
         invalid_transform = _Failure(error_codes.INVALID_TRANSFORM, "Invalid transform selector", 400)
         # Like the CDN, the adaptive stream's files sit beneath ``/hls/`` (its master playlist is
         # ``/hls/index.m3u8``); the mock prepares no stream, so it has none. Otherwise the selector
-        # after the resource is read; the original and the embed page take none.
+        # after the resource is read; the original, the embed page and the info take none.
         is_hls = resource == "hls"
         try:
             lens, transform_options = _parse_transform_selector("" if is_hls else "/".join(selector_path))
         except _InvalidSelector:
             return self._failure_response(invalid_transform)
         has_selector = lens is not None or transform_options is not None
-        if resource in ("original", "embed") and has_selector:
+        if resource in ("original", "embed", "info") and has_selector:
             return self._failure_response(invalid_transform)
         not_available = _Failure("asset/not-available", "Asset is not available", 403)
         with self._state_lock:
-            asset = next((a for a in self.database_storage.assets.values()
-                          if a["projectId"] == project == self.project_id
-                          and (a["id"] == identifier or a.get("externalId") == identifier)), None)
+            def find(match: Callable[[dict[str, Any]], bool]) -> dict[str, Any] | None:
+                if project != self.project_id:
+                    return None
+                return next((a for a in self._project_assets() if match(a)), None)
+            # Like the CDN (CdnUtils.ts), the asset is ``ext:`` and its URL-encoded external ID, a
+            # grant (``sig_…``) or its ID.
+            grant: tuple[str, bool, int] | None = None
+            if segment.startswith("sig_"):
+                grant = _decode_mock_grant(segment)
+                if grant is None:
+                    return self._failure_response(_Failure(
+                        error_codes.SIGNED_URL_INVALID, "The signed asset URL's grant is invalid", 403))
+                if grant[2] <= self.now():
+                    return self._failure_response(_Failure(error_codes.SIGNED_URL_EXPIRED, "The signed URL has expired", 403))
+                granted = grant[0]
+                asset = find(lambda a: a["id"] == granted)
+            elif segment.startswith("ext:"):
+                try:
+                    external_id = _decode_selector_text(segment.removeprefix("ext:"))
+                except _InvalidSelector:
+                    external_id = ""
+                asset = find(lambda a: a.get("externalId") == external_id) if external_id else None
+            else:
+                identifier = unquote(segment)
+                asset = find(lambda a: a["id"] == identifier)
             if asset is None:
                 return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
+            if resource == "original" and grant is not None and not grant[1]:
+                return self._failure_response(_Failure(
+                    error_codes.SIGNED_URL_ORIGINAL_NOT_GRANTED, "This signed asset URL doesn't grant the original file", 403))
+            # A grant authorises a private asset without the API key.
+            authorised = grant is not None or (with_api_key and self._can_download(asset.get("folderId")))
+            if resource == "info":
+                return self._serve_info(method, asset, query, authorised)
             status = asset["classification"]["moderation"].get("status")
             rendered = cast(Optional[dict[str, Any]], asset["content"].get("rendered"))
             preview = cast(Optional[dict[str, Any]], asset["content"].get("preview"))
@@ -2291,7 +2380,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if status == "age-restricted" and claims.get("ageConfirmed") is not True:
                 return self._failure_response(_Failure("viewer/age-confirmation-required", "Age confirmation required", 403))
             private = asset["visibility"] != "public"
-            if private and not self._can_download(asset.get("folderId")):
+            if private and not authorised:
                 return self._failure_response(_Failure(
                     error_codes.PERMISSION_DENIED,
                     "This API key needs assets:download permission for this asset’s folder.", 403))
@@ -2350,6 +2439,35 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if normalized in _ACTIVE_CONTENT_TYPES or normalized.endswith("+xml"):
                 headers["Content-Disposition"] = "attachment"
         return self._cdn_response(method, content, headers)
+
+    def _serve_info(self, method: str, asset: dict[str, Any], query: Mapping[str, Any], authorised: bool) -> _Response:
+        """The display info at ``/info``, like the CDN's (AssetInfo.ts): the allowlisted fields and
+        whether the viewer the claims describe can see the content, decided as the other resources
+        decide it. A private asset's info needs a grant or an API key with ``assets:download``."""
+        private = asset["visibility"] != "public"
+        if private and not authorised:
+            return self._failure_response(_Failure("asset/not-available", "Asset is not available", 404))
+        try:
+            claims = json.loads(query.get("viewerClaims", "{}"))
+        except ValueError:
+            return self._failure_response(_Failure(error_codes.INVALID_VIEWER_CLAIMS, "Invalid viewer claims", 400))
+        content, classification = asset["content"], asset["classification"]
+        status = classification["moderation"].get("status")
+        if (content.get("safetyHold") or asset["upload"]["status"] == "uploading" or status in ("blocked", "purged")
+                or classification["status"] == "failed" or content["status"] == "removed"):
+            availability = "unavailable"
+        elif status == "age-restricted" and not (isinstance(claims, dict) and claims.get("ageConfirmed") is True):
+            availability = "age-restricted"
+        else:
+            availability = "available"
+        info = {"id": asset["id"], "projectId": asset["projectId"], "type": asset["type"],
+                "externalUrl": asset.get("externalUrl"),
+                "content": {key: content.get(key) for key in (
+                    "format", "width", "height", "durationSeconds", "pageCount", "rendered", "preview", "hls")},
+                "availability": availability}
+        return self._cdn_response(method, _json(info).encode("utf-8"), {
+            "Content-Type": "application/json", "Cache-Control": f"{'private' if private else 'public'}, max-age=60",
+            "Cache-Tag": f"asset-{asset['id']}"})
 
     def _cdn_response(self, method: str, content: bytes, headers: dict[str, str]) -> _Response:
         return self._respond(200, headers={**headers, "Content-Length": str(len(content))},

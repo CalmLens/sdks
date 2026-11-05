@@ -23,7 +23,7 @@ from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from types import TracebackType
 from typing import Any, BinaryIO, Callable, List, Literal, Protocol, cast
-from urllib.parse import quote, unquote, urlencode, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlsplit
 from urllib.request import Request, getproxies, proxy_bypass
 
 from . import error_codes
@@ -34,13 +34,13 @@ from ._version import __version__
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
                      CalmLensValidationError, _parse_retry_after)
 from .moderation_context import select_moderation_context_items
-from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, AssetIdOptions, AssetPage, AssetTimelinePage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform, SignedCdnResource,
+from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, AssetIdOptions, AssetPage, AssetTimelinePage, AssetSearchResponse, AssetInfo, AssetUrlOptions, CdnResource, CdnTransform,
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventType, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     ImageTransformOptions, LensDefinition, LensType, ListAssetsOptions, ListChildrenOptions, ListTimelineOptions, ListEventsOptions,
                     BatchAssetsOptions, BatchAssetsResponse,
                     MetadataItem, ModerationContext, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
-                    ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedUrl,
-                    SignedUploadToken, SignedUrlOptions, SignUploadTokenOptions, SubmitAssetOptions,
+                    ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedAssetUrl,
+                    SignedUploadToken, SignAssetUrlOptions, GetAssetInfoOptions, SignUploadTokenOptions, SubmitAssetOptions,
                     UpdateAssetOptions, UpdateFolderOptions, UploadPartOptions,
                     AddHashListEntryOptions, CreateHashListOptions, HashList, HashListAction, HashListEntry,
                     HashListEntryIdOptions, HashListEntryPage, HashListIdOptions, HashListPage,
@@ -50,7 +50,8 @@ from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, Ass
                     ViewerClaims, Visibility, WaitForDecisionOptions)
 from .webhooks import parse_webhook_event, verify_webhook_signature
 
-__all__ = ["CalmLensServerClient", "CDNResponse", "Transport", "TransportResponse", "DEFAULT_TIMEOUT", "SIGNED_CDN_RESOURCES",
+__all__ = ["CalmLensServerClient", "CDNResponse", "Transport", "TransportResponse", "DEFAULT_TIMEOUT", "CDN_RESOURCES",
+           "DEFAULT_SIGNED_URL_EXPIRES_IN", "MAX_SIGNED_URL_EXPIRES_IN",
            "DEFAULT_CONNECT_TIMEOUT", "DEFAULT_MAX_RETRIES", "DEFAULT_MAX_RESPONSE_BYTES", "DEFAULT_PART_SIZE_BYTES",
            "MIN_PART_SIZE_BYTES", "MAX_PART_SIZE_BYTES", "USER_AGENT"]
 
@@ -303,12 +304,38 @@ def _has_transform(transform: Any) -> bool:
     return transform is not None and transform != ""
 
 
-def _viewer_claims(claims: Any) -> Any:
-    """Viewer claims in the order the other SDKs send them, so equal claims build equal CDN URLs."""
-    if not isinstance(claims, dict):
-        return claims
-    known = {key: claims[key] for key in ("region", "ageConfirmed") if key in claims}
-    return {**known, **{key: value for key, value in claims.items() if key not in known}}
+#: The ISO 3166-1 alpha-2 countries a viewer's ``region`` can be, as the CDN accepts them.
+VIEWER_COUNTRIES: frozenset[str] = frozenset(
+    "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ "
+    "CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO "
+    "FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE "
+    "JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO "
+    "MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW "
+    "PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM "
+    "TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW".split())
+
+
+def _url_viewer_claims(claims: Any) -> dict[str, Any] | None:
+    """The viewer claims a URL carries: ``region`` when set and ``ageConfirmed`` only when true, in
+    that order. No region and an unconfirmed age are the CDN's defaults, left out so default URLs
+    stay cacheable (``None`` when nothing is left)."""
+    if claims is None:
+        return None
+    if not isinstance(claims, Mapping) or any(key not in ("region", "ageConfirmed") for key in claims):
+        raise _invalid("viewer_claims takes only region and ageConfirmed")
+    region, age_confirmed = claims.get("region"), claims.get("ageConfirmed")
+    if "region" in claims and (not isinstance(region, str) or region not in VIEWER_COUNTRIES):
+        raise _invalid("viewer_claims region must be an ISO 3166-1 alpha-2 country code, such as DE")
+    if "ageConfirmed" in claims and not isinstance(age_confirmed, bool):
+        raise _invalid("viewer_claims ageConfirmed must be a boolean")
+    sent = {**({"region": region} if region else {}), **({"ageConfirmed": True} if age_confirmed is True else {})}
+    return sent or None
+
+
+def _viewer_claims_query(claims: Any) -> str:
+    """The ``?viewerClaims=`` query of a URL with these claims, or an empty string for the defaults."""
+    sent = _url_viewer_claims(claims)
+    return "?" + urlencode({"viewerClaims": json.dumps(sent, separators=(",", ":"))}) if sent else ""
 
 
 def _transform_path(value: Any) -> str:
@@ -804,7 +831,7 @@ def _validate_batch(options: Mapping[str, Any]) -> None:
 
 def _merge(operation: str, options: Mapping[str, Any] | None, /, **keywords: Any) -> dict[str, Any]:
     """One options dict (camelCase, as in the API) or snake_case keyword arguments for
-    ``operation`` (its camelCase name, such as ``assets.createSignedUrl``). An option given as
+    ``operation`` (its camelCase name, such as ``cdn.signAssetUrl``). An option given as
     ``None`` is left out, as if omitted, unless the API takes ``null`` for it (``NULLABLE_OPTION_KEYS``)."""
     nullable = NULLABLE_OPTION_KEYS.get(operation, frozenset())
     merged = _merge_options(options, **keywords)
@@ -1196,19 +1223,67 @@ DECISION_POLL_DELAY_FACTOR = 1.5
 DECISION_POLL_MAX_DELAY = 2.0
 #: Seconds ``wait_for_decision`` polls before ``sdk/timeout`` when ``timeout`` is omitted.
 DEFAULT_DECISION_TIMEOUT = 60.0
-#: ``assets.create_signed_url``'s lifetime when ``expires_in_seconds`` is omitted.
-DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS = 900
-#: The CDN resources a signed URL can be created for, as the API accepts them.
-SIGNED_CDN_RESOURCES: tuple[SignedCdnResource, ...] = ("original", "rendered", "preview", "hls", "embed")
-#: Where each CDN resource is served beneath an asset's CDN path: the signed ones and the public
-#: ``placeholder``. The adaptive stream is its HLS master playlist; its media playlists and
-#: segments are the other files beneath ``hls/``.
+#: A signed asset URL's lifetime in seconds when ``expires_in`` is omitted: 15 minutes.
+DEFAULT_SIGNED_URL_EXPIRES_IN = 900
+#: The longest signed asset URL lifetime the API accepts, in seconds: 24 hours.
+MAX_SIGNED_URL_EXPIRES_IN = 86400
+#: Where each CDN resource is served beneath an asset's URL. The adaptive stream is its HLS master
+#: playlist; its media playlists and segments are the other files beneath ``hls/``.
 _CDN_RESOURCE_PATHS: dict[CdnResource, str] = {
-    "original": "original", "rendered": "rendered", "preview": "preview",
-    "hls": "hls/index.m3u8", "embed": "embed", "placeholder": "placeholder"}
-#: The resources that take no lens or transform: the exact upload, the adaptive stream, the embed
-#: page and the public placeholder.
-_UNSELECTABLE_CDN_RESOURCES = ("original", "hls", "embed", "placeholder")
+    "original": "original", "rendered": "rendered", "preview": "preview", "placeholder": "placeholder",
+    "hls": "hls/index.m3u8", "embed": "embed", "info": "info"}
+#: Every resource beneath an asset URL, as ``cdn.get_asset_url`` and ``cdn.sign_asset_url`` accept them.
+CDN_RESOURCES: tuple[CdnResource, ...] = tuple(_CDN_RESOURCE_PATHS)
+#: The resources that take a lens or transform: the others are served as they are.
+_SELECTABLE_CDN_RESOURCES = ("rendered", "preview")
+#: The asset segment of a URL that names the asset by its external ID starts with this.
+_EXTERNAL_ID_SEGMENT_PREFIX = "ext:"
+
+
+def _asset_segment(options: Mapping[str, Any]) -> str:
+    """The asset segment of a CDN URL: the asset ID, or ``ext:`` and the URL-encoded external ID.
+    Exactly one of them must be given."""
+    asset_id, external_id = options.get("assetId"), options.get("externalId")
+    if (asset_id is None) == (external_id is None):
+        raise _invalid("Pass either asset_id or external_id")
+    if asset_id is not None:
+        return _id(asset_id, "assetId")
+    if not isinstance(external_id, str) or not external_id:
+        raise _invalid("externalId is required")
+    try:
+        return _EXTERNAL_ID_SEGMENT_PREFIX + quote(external_id, safe="~!*'()-._")
+    except UnicodeEncodeError as error:
+        raise _invalid("externalId must be valid Unicode") from error
+
+
+def _append_asset_location(asset_url: str, options: Mapping[str, Any]) -> str:
+    """Append a resource, its ``@lens`` and transform selector, and the viewer claims to an asset URL
+    (public or signed). Without a resource the URL stays the asset URL, which takes no selector."""
+    resource, lens, transform = options.get("resource"), options.get("lens"), options.get("transform")
+    selected = lens is not None or transform is not None
+    url = asset_url
+    if resource is None:
+        if selected:
+            raise _invalid("A lens or transform needs a resource, such as rendered")
+    else:
+        if not isinstance(resource, str) or resource not in _CDN_RESOURCE_PATHS:
+            raise _invalid("resource must be one of " + ", ".join(CDN_RESOURCES))
+        if resource not in _SELECTABLE_CDN_RESOURCES and selected:
+            raise _invalid(f"The {resource} resource takes no lens or transform")
+        url += "/" + _CDN_RESOURCE_PATHS[resource]
+        selector = [] if lens is None else ["@" + _id(lens, "lens")]
+        if _has_transform(transform):
+            selector.append(_transform_path(transform))
+        if selector:
+            url += "/" + ",".join(selector)
+    return url + _viewer_claims_query(options.get("viewerClaims"))
+
+
+def _is_asset_info(data: Any) -> bool:
+    return (isinstance(data, dict) and all(isinstance(data.get(key), str) for key in ("id", "projectId", "type"))
+            and isinstance(data.get("content"), dict)
+            and data.get("availability") in ("available", "age-restricted", "unavailable"))
+
 
 _SUBMIT_QUERY_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "tags", "authorId", "context",
                       "externalId", "externalUrl", "folderId", "uploadPresetId")
@@ -1529,28 +1604,6 @@ class Assets:
                                None if merged.get("queue") is None else bool(merged["queue"]),
                                idempotency_key if idempotency_key is not None else str(uuid.uuid4()))
 
-    def create_signed_url(self, options: SignedUrlOptions | None = None, /, *, asset_id: str = _UNSET,
-                          resource: SignedCdnResource = _UNSET, expires_in_seconds: int = _UNSET, lens: str = _UNSET,
-                          transform: CdnTransform = _UNSET, viewer_claims: ViewerClaims = _UNSET) -> SignedUrl:
-        """Sign a temporary CDN URL for private content (defaults: ``rendered``, applied by the API, and
-        900 seconds)."""
-        merged = _merge("assets.createSignedUrl", options, asset_id=asset_id, resource=resource, expires_in_seconds=expires_in_seconds,
-                        lens=lens, transform=transform, viewer_claims=viewer_claims)
-        asset_path = "/assets/" + _id(merged.get("assetId"), "assetId") + "/signed-url"
-        body = {"expiresInSeconds": DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
-                **{k: v for k, v in merged.items() if k != "assetId"}}
-        resource = body.get("resource", "rendered")
-        if resource not in SIGNED_CDN_RESOURCES:
-            raise _invalid("A signed URL's resource must be one of " + ", ".join(SIGNED_CDN_RESOURCES))
-        if resource in _UNSELECTABLE_CDN_RESOURCES and ("lens" in body or "transform" in body):
-            raise _invalid(f"The {resource} resource takes no lens or transform")
-        expires = body["expiresInSeconds"]
-        if isinstance(expires, bool) or not isinstance(expires, int) or not 1 <= expires <= 86400:
-            raise _invalid("expires_in_seconds must be a whole number from 1 to 86400")
-        if "transform" in body:
-            body["transform"] = _transform_selector(body["transform"])
-        return cast(SignedUrl, self._c._request("POST", asset_path, body=body))
-
     def move(self, options: MoveAssetOptions | None = None, /, *, asset_id: str = _UNSET,
              folder_id: str | None = _UNSET) -> Asset:
         """Move an asset into a folder, or to the project root with ``folder_id=None``."""
@@ -1866,54 +1919,118 @@ class CDN:
     def __init__(self, client: CalmLensServerClient):
         self._c = client
 
-    def get_asset_url(self, options: AssetUrlOptions | None = None, /, *, asset_identifier: str = _UNSET,
-                      resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
+    def get_asset_url(self, options: AssetUrlOptions | None = None, /, *, project_id: str = _UNSET,
+                      asset_id: str = _UNSET, external_id: str = _UNSET, resource: CdnResource = _UNSET,
+                      lens: str = _UNSET, transform: CdnTransform = _UNSET,
                       viewer_claims: ViewerClaims = _UNSET) -> str:
-        """The CDN URL of an asset's ``rendered`` (default), ``original``, ``preview``, ``hls``,
-        ``embed`` or ``placeholder`` resource. ``rendered`` is the displayable file (an image in the
-        best format the client accepts, a PDF, or browser-safe video or audio), ``original`` the
-        exact upload and ``preview`` a still image for the asset. ``hls`` is the HLS master
-        playlist of audio or video, at ``hls/index.m3u8``, once ``content.hls`` is set, and
-        ``embed`` an HTML page that shows the asset (a viewer for its type), for an iframe.
+        """An asset's CDN URL, built without a request: the asset URL, which every resource is a
+        path beneath, or a resource's URL when ``resource`` is given, with its lens or transform and
+        the viewer claims.
+
+        Name the asset by exactly one of ``asset_id`` and ``external_id``; ``project_id`` defaults
+        to the client's. Use it for public assets: private ones need :meth:`sign_asset_url`.
         ``preview``, and ``rendered`` when it is an image, optionally go through a named ``lens``, a
-        ``transform``, or both (the lens runs first); the CDN refuses them on rendered PDFs, video and
-        audio with ``transform/invalid``, and ``original``, ``hls`` and ``embed`` take neither.
-        Private assets need an API key or a signed URL.
+        ``transform``, or both (the lens runs first); the other resources take neither.
 
-        ``placeholder`` is a small blurred PNG that the CDN serves publicly for every asset, whatever
-        its visibility or moderation status. It takes no ``lens`` or ``transform``, and needs no age confirmation.
-
-        ``viewer_claims={"ageConfirmed": True}`` appends a ``viewerClaims`` query parameter, which
-        the CDN requires before it serves an asset whose moderation status is ``age-restricted``,
-        even with a signed URL or an API key. Set it only where your app has already decided the
-        viewer may see age-restricted content. Your platform confirms the viewer's age; CalmLens
-        does not verify this claim, and anyone can add it to a public URL."""
-        merged = _merge("cdn.getAssetUrl", options, asset_identifier=asset_identifier, resource=resource, lens=lens, transform=transform,
+        ``viewer_claims`` are your app's unsigned assertions about the viewer, such as
+        ``{"ageConfirmed": True}``, which the CDN requires before it serves an age-restricted
+        asset. CalmLens does not verify them, and anyone holding the URL can add them: set
+        ``ageConfirmed`` only where your app has already decided the viewer may see age-restricted
+        content."""
+        merged = _merge("cdn.getAssetUrl", options, project_id=project_id, asset_id=asset_id,
+                        external_id=external_id, resource=resource, lens=lens, transform=transform,
                         viewer_claims=viewer_claims)
+        return self._asset_url(merged)
 
-        selected = merged.get("resource", "rendered")
-        if selected not in _CDN_RESOURCE_PATHS:
-            raise _invalid("Resource must be one of " + ", ".join(_CDN_RESOURCE_PATHS))
-        transformed = merged.get("lens") is not None or merged.get("transform") is not None
-        if selected in _UNSELECTABLE_CDN_RESOURCES and transformed:
-            raise _invalid(f"The {selected} resource takes no lens or transform")
-        url = (f"{self._c.cdn_base_url}/assets/{_id(self._c.project_id)}/"
-               f"{_id(merged.get('assetIdentifier'), 'assetIdentifier')}/{_CDN_RESOURCE_PATHS[selected]}")
-        selector = ["@" + _id(merged["lens"], "lens")] if merged.get("lens") else []
-        if _has_transform(merged.get("transform")):
-            selector.append(_transform_path(merged["transform"]))
-        if selector:
-            url += "/" + ",".join(selector)
-        params = []
-        if merged.get("viewerClaims") is not None:
-            params.append("viewerClaims=" + quote(json.dumps(_viewer_claims(merged["viewerClaims"]),
-                                                              separators=(",", ":")), safe=""))
-        return url + ("?" + "&".join(params) if params else "")
+    def _asset_url(self, options: Mapping[str, Any]) -> str:
+        project = _id(options.get("projectId", self._c.project_id), "projectId")
+        return _append_asset_location(f"{self._c.cdn_base_url}/assets/{project}/{_asset_segment(options)}", options)
 
-    def serve(self, options: ServeOptions | None = None, /, *, asset_identifier: str = _UNSET,
-              resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
-              viewer_claims: ViewerClaims = _UNSET, init: ServeInit = _UNSET) -> CDNResponse:
-        """Request an asset from the CDN with the client's API key.
+    def sign_asset_url(self, options: SignAssetUrlOptions | None = None, /, *, project_id: str = _UNSET,
+                       asset_id: str = _UNSET, external_id: str = _UNSET, expires_in: int = _UNSET,
+                       original: bool = _UNSET, resource: CdnResource = _UNSET, lens: str = _UNSET,
+                       transform: CdnTransform = _UNSET, viewer_claims: ViewerClaims = _UNSET) -> SignedAssetUrl:
+        """Sign a private asset's URL, so browsers and apps can load it without an API key until it
+        expires (``expires_in`` seconds, 1 to 86400, default 900).
+
+        Every resource is a path beneath the signed URL, as beneath a public asset URL;
+        ``original`` only when signed with ``original=True``. With ``resource``, returns that
+        resource's URL beneath the grant; the lens, transform and viewer claims are appended as
+        :meth:`get_asset_url` appends them and are not part of the signature."""
+        merged = _merge("cdn.signAssetUrl", options, project_id=project_id, asset_id=asset_id,
+                        external_id=external_id, expires_in=expires_in, original=original, resource=resource,
+                        lens=lens, transform=transform, viewer_claims=viewer_claims)
+        expires = merged.get("expiresIn", DEFAULT_SIGNED_URL_EXPIRES_IN)
+        if isinstance(expires, bool) or not isinstance(expires, (int, float)) or not math.isfinite(expires) \
+                or not float(expires).is_integer() or not 1 <= expires <= MAX_SIGNED_URL_EXPIRES_IN:
+            raise _invalid(f"expires_in must be a whole number of seconds from 1 to {MAX_SIGNED_URL_EXPIRES_IN}")
+        grants_original = merged.get("original", False)
+        if not isinstance(grants_original, bool):
+            raise _invalid("original must be a boolean")
+        _asset_segment(merged)
+        # The location is appended to the signed URL: check it before signing.
+        _append_asset_location("", merged)
+        project = _id(merged.get("projectId", self._c.project_id), "projectId")
+        asset = {"assetId": merged["assetId"]} if "assetId" in merged else {"externalId": merged["externalId"]}
+        signed = self._c._request("POST", f"/projects/{project}/signed-asset-urls",
+                                  body={**asset, "expiresIn": int(expires), "original": grants_original})
+        if not isinstance(signed, dict) or not isinstance(signed.get("url"), str) or not signed["url"] \
+                or isinstance(signed.get("expiresAt"), bool) or not isinstance(signed.get("expiresAt"), int):
+            raise CalmLensError(error_codes.SDK_INVALID_RESPONSE, "The API returned no signed asset URL")
+        return {"url": _append_asset_location(signed["url"], merged), "expiresAt": signed["expiresAt"]}
+
+    def get_asset_info(self, url: str, options: GetAssetInfoOptions | None = None, /, *,
+                       viewer_claims: ViewerClaims = _UNSET) -> AssetInfo:
+        """The display info of an asset URL, public or signed (its ``info`` resource): the asset's
+        type, size, rendered file, preview and stream, and whether the viewer its claims describe
+        can see it now (``availability``).
+
+        The viewer claims are ``viewer_claims``, else those the URL carries. The request is sent
+        without the API key, as a browser would send it. A refusal raises
+        :class:`CalmLensAPIError` with the CDN's code, such as ``signed-url/expired`` or
+        ``asset/not-available``."""
+        merged = _merge("cdn.getAssetInfo", options, viewer_claims=viewer_claims)
+        parts = urlsplit(url) if isinstance(url, str) else None
+        if parts is None or parts.scheme not in ("http", "https") or not parts.netloc:
+            raise _invalid("url must be an absolute http(s) asset URL")
+        path, _, query = url.split("#", 1)[0].partition("?")
+        claims = merged.get("viewerClaims")
+        if claims is None and query:
+            raw = parse_qs(query, keep_blank_values=True).get("viewerClaims")
+            if raw:
+                try:
+                    claims = json.loads(raw[0])
+                except ValueError as error:
+                    raise _invalid("The asset URL's viewerClaims are not JSON") from error
+        request = Request(path.rstrip("/") + "/info" + _viewer_claims_query(claims), method="GET",
+                          headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+        limit = self._c.max_response_bytes
+        try:
+            with self._c.transport(request, self._c.timeout) as response:
+                status, headers = response.status, _response_headers(response)
+                if _is_redirect(status, headers):
+                    raise _redirect_error(status, headers)
+                content = _read_body(response, headers, limit)
+        except _TRANSPORT_ERRORS as error:
+            raise _transport_error(error) from error
+        if content is None:
+            raise _too_large(status, headers, limit)
+        if not 200 <= status < 300:
+            raise self._c._api_error(status, headers, content)
+        try:
+            data = json.loads(content)
+        except (ValueError, UnicodeDecodeError):
+            data = None
+        if not _is_asset_info(data):
+            raise CalmLensError(error_codes.SDK_INVALID_RESPONSE, "The CDN returned no asset info", status=status,
+                                headers=headers)
+        return cast(AssetInfo, data)
+
+    def serve(self, options: ServeOptions | None = None, /, *, project_id: str = _UNSET, asset_id: str = _UNSET,
+              external_id: str = _UNSET, resource: CdnResource = _UNSET, lens: str = _UNSET,
+              transform: CdnTransform = _UNSET, viewer_claims: ViewerClaims = _UNSET,
+              init: ServeInit = _UNSET) -> CDNResponse:
+        """Request an asset's resource (default ``rendered``) from the CDN with the client's API key.
 
         Returns a streaming :class:`CDNResponse`, including for non-2xx responses (check
         ``status``); close it, or use it as a context manager. Transport failures, timeouts, 429,
@@ -1921,14 +2038,14 @@ class CDN:
         last response is returned once retries run out. A redirect is not followed: it raises
         ``sdk/http-error``. The timeout is an inactivity limit, so large downloads are not cut off.
         """
-        merged = _merge("cdn.serve", options, asset_identifier=asset_identifier, resource=resource, lens=lens,
-                        transform=transform, viewer_claims=viewer_claims, init=init)
+        merged = _merge("cdn.serve", options, project_id=project_id, asset_id=asset_id, external_id=external_id,
+                        resource=resource, lens=lens, transform=transform, viewer_claims=viewer_claims, init=init)
         settings = merged.get("init") or {}
         method = settings.get("method", "GET")
         if method not in ("GET", "HEAD"):
             raise _invalid("init.method must be GET or HEAD")
         extra = {k: _header_value(k, v) for k, v in (settings.get("headers") or {}).items() if k.lower() != "x-api-key"}
-        url = self.get_asset_url(cast(AssetUrlOptions, {k: v for k, v in merged.items() if k != "init"}))
+        url = self._asset_url({"resource": "rendered", **{k: v for k, v in merged.items() if k != "init"}})
         headers = self._c._headers(extra, api=False)
         attempt = 0
         while True:

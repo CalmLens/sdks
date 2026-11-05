@@ -204,11 +204,12 @@ class RequestTests(unittest.TestCase):
                     body = json.loads(body)
                 self.assertEqual({"method": request.method, "path": url.path, "query": dict(parse_qsl(url.query)),
                                   "body": body}, fixture["request"])
-                # Deletes and removeEntry return nothing; ensureLenses returns the lenses; everything
-                # else the body.
+                # A fixture's ``result`` is what the method returns when it isn't the body: deletes and
+                # removeEntry return nothing, ensureLenses the lenses and everything else the body.
                 returns_nothing = fixture["operation"].endswith(".delete") or fixture["operation"] == "hashLists.removeEntry"
-                expected = (None if returns_nothing else fixture["response"]["lenses"]
-                            if fixture["operation"] == "ensureLenses" else fixture["response"])
+                expected = (fixture["result"] if "result" in fixture else None if returns_nothing
+                            else fixture["response"]["lenses"] if fixture["operation"] == "ensureLenses"
+                            else fixture["response"])
                 self.assertEqual(_json(result), expected)
 
     def test_javascript_path_safety(self) -> None:
@@ -361,11 +362,11 @@ class TransformTests(unittest.TestCase):
         unknown and invalid key, in CDN URLs, served requests and signed URLs alike."""
         client = _client()
         calls = {
-            "cdn.get_asset_url": lambda options: client.cdn.get_asset_url(asset_identifier="asset-1",
+            "cdn.get_asset_url": lambda options: client.cdn.get_asset_url(asset_id="asset-1", resource="rendered",
                                                                           transform=options),
-            "cdn.serve": lambda options: client.cdn.serve(asset_identifier="asset-1", transform=options),
-            "assets.create_signed_url": lambda options: client.assets.create_signed_url(asset_id="asset-1",
-                                                                                        transform=options),
+            "cdn.serve": lambda options: client.cdn.serve(asset_id="asset-1", transform=options),
+            "cdn.sign_asset_url": lambda options: client.cdn.sign_asset_url(asset_id="asset-1", resource="rendered",
+                                                                            transform=options),
         }
         for case in self.fixture["invalid"]:
             for name, call in calls.items():
@@ -632,12 +633,16 @@ def _present(capability: dict[str, Any]) -> bool:
                 "errors.retryAfter": expected["retryAfterSeconds"]}[capability["id"]]
         return bool(getattr(_raised_error(), name, None) == want)
     if kind == "cdn-resource":
-        url = _client().cdn.get_asset_url({"assetIdentifier": "asset-1", "resource": name})
+        url = _client().cdn.get_asset_url({"assetId": "asset-1", "resource": name})
         return url.endswith(f"/asset-1/{capability['path']}")
     if kind == "cdn-option":
         get_asset_url = _client().cdn.get_asset_url
-        return (name in inspect.signature(get_asset_url).parameters
-                and get_asset_url(asset_identifier="asset-1", **{name: {"ageConfirmed": True}}).endswith("?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D"))
+        if name not in inspect.signature(get_asset_url).parameters:
+            return False
+        if name == "external_id":
+            return get_asset_url(external_id="post 1").endswith("/assets/project-1/ext:post%201")
+        return get_asset_url(asset_id="asset-1", **{name: {"ageConfirmed": True}}).endswith(
+            "/asset-1?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D")
     if kind == "mock-method":
         return callable(getattr(testing.MockCalmLensServerClient, name, None))
     if kind == "mock-option":
@@ -679,7 +684,7 @@ class SurfaceTests(unittest.TestCase):
             "retryMaxDelayMs": client_module.RETRY_MAX_DELAY * 1000,
             "retryAfterMaxMs": client_module.MAX_RETRY_AFTER_SECONDS * 1000,
             "maxResponseBytes": c.max_response_bytes, "partSizeBytes": c.part_size_bytes,
-            "signedUrlExpiresInSeconds": client_module.DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
+            "signedUrlExpiresIn": client_module.DEFAULT_SIGNED_URL_EXPIRES_IN,
             "uploadTokenExpiresInSeconds": client_module.UPLOAD_TOKEN_DEFAULT_EXPIRES_IN_SECONDS,
             "waitForDecisionTimeoutMs": client_module.DEFAULT_DECISION_TIMEOUT * 1000,
             "waitForDecisionFirstIntervalMs": client_module.DECISION_POLL_FIRST_DELAY * 1000,
@@ -939,12 +944,16 @@ def _run(client: MockCalmLensServerClient, operation: str, args: dict[str, Any],
         client.fail_next_request(args["failure"], operation=args.get("operation"), details=args.get("details"),
                                  retry_after=args.get("retryAfter"))
         return None
-    if operation == "cdn.serve":
-        with client.cdn.serve(**{_snake(key): value for key, value in args.items()}) as response:
+    if operation in ("cdn.serve", "mock.fetchCdn"):
+        served = (client.fetch_cdn(args["url"]) if operation == "mock.fetchCdn"
+                  else client.cdn.serve(**{_snake(key): value for key, value in args.items()}))
+        with served as response:
             body = response.read()
             code = (json.loads(body).get("code")
                     if (response.content_type or "").startswith("application/json") else None)
             return {"status": response.status, "code": code, "bytes": body, "headers": response.headers}
+    if operation == "cdn.getAssetInfo":
+        return _json(client.cdn.get_asset_info(args["url"], viewer_claims=args.get("viewerClaims", client_module._UNSET)))
     try:
         # Scenarios call the mock as users do, with keyword arguments.
         return _json(_invoke(client, operation, args, as_keywords=True))

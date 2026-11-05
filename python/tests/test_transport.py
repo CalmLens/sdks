@@ -88,7 +88,7 @@ class TransportFailureTests(unittest.TestCase):
                 def transport(request, timeout): raise error
                 client = CalmLensServerClient(api_key='key', project_id='project', transport=transport, max_retries=0)
                 self.assert_wrapped(lambda: client.assets.retrieve({'assetId': 'asset'}), error, code)
-                self.assert_wrapped(lambda: client.cdn.serve({'assetIdentifier': 'asset'}), error, code)
+                self.assert_wrapped(lambda: client.cdn.serve({'assetId': 'asset'}), error, code)
 
     def test_errors_raised_while_reading_the_body_are_wrapped(self):
         for error, code in self.FAILURES:
@@ -96,7 +96,7 @@ class TransportFailureTests(unittest.TestCase):
                 client = CalmLensServerClient(api_key='key', project_id='project', transport=lambda r, t: _FailingRead(error),
                                         max_retries=0)
                 self.assert_wrapped(lambda: client.events.list(), error, code)
-                with client.cdn.serve({'assetIdentifier': 'asset'}) as response:
+                with client.cdn.serve({'assetId': 'asset'}) as response:
                     self.assertEqual(response.status, 200)
                     self.assert_wrapped(response.read, error, code)
 

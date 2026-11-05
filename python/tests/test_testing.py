@@ -115,9 +115,9 @@ class MockTests(unittest.TestCase):
         self.assertEqual((audio["content"]["rendered"]["format"], audio["content"]["rendered"]["peaks"],
                           audio["content"]["preview"]["width"], audio["content"]["preview"]["height"]),
                          ("audio/mp4", [], 1200, 300))
-        with c.cdn.serve(asset_identifier=audio["id"], resource="rendered") as rendered:
+        with c.cdn.serve(asset_id=audio["id"], resource="rendered") as rendered:
             self.assertEqual((rendered.status, rendered.content_type, rendered.read()), (200, "audio/mp4", b"wav"))
-        with c.cdn.serve(asset_identifier=audio["id"], resource="preview", transform={"width": 10}) as preview:
+        with c.cdn.serve(asset_id=audio["id"], resource="preview", transform={"width": 10}) as preview:
             self.assertEqual((preview.status, preview.content_type), (200, "image/png"))
         removed = c.assets.remove_content(asset_id=image["id"])
         self.assertEqual((removed["content"]["rendered"], removed["content"]["preview"], removed["content"]["metadata"]),
@@ -135,7 +135,7 @@ class MockTests(unittest.TestCase):
             c.assets.list_timeline(asset_id=asset["id"])
         self.assertEqual((raised.exception.code, raised.exception.details), (error_codes.ASSET_HELD, {"hold": "safety"}))
         for resource in ("original", "rendered", "preview", "hls", "embed", "placeholder"):
-            with c.cdn.serve(asset_identifier=asset["id"], resource=resource) as response:
+            with c.cdn.serve(asset_id=asset["id"], resource=resource) as response:
                 self.assertEqual((resource, response.status, json.loads(response.read())["code"]),
                                  (resource, 403, "asset/not-available"))
 
@@ -159,9 +159,38 @@ class MockTests(unittest.TestCase):
         sheet = c.assets.classify(name="sheet.csv", content={"data": b"a,b", "type": "text/csv"},
                                   processing_options=keep, visibility="public")
         for asset in (video, sheet):
-            with c.cdn.serve(asset_identifier=asset["id"], resource="embed", init={"method": "HEAD"}) as embed:
+            with c.cdn.serve(asset_id=asset["id"], resource="embed", init={"method": "HEAD"}) as embed:
                 self.assertEqual((embed.status, embed.content_type, embed.read()),
                                  (200, "text/html; charset=utf-8", b""))
+
+    def test_a_signed_asset_url_holds_a_readable_grant_that_expires(self):
+        clock = [1000]
+        c = MockCalmLensServerClient(mock_options={"now": lambda: clock[0]})
+        asset = c.assets.classify(name="a.png", content={"data": b"png", "type": "image/png"},
+                                  processing_options={"keepContentAfterProcessing": True}, visibility="private")
+        signed = c.cdn.sign_asset_url(asset_id=asset["id"], expires_in=2, original=True)
+        # Every SDK's mock writes the grant as the hex of "{assetId}.{1|0}.{expiresAt}".
+        self.assertEqual(signed, {"url": f"{c.cdn_base_url}/assets/{c.project_id}/sig_"
+                                         + f"{asset['id']}.1.3000".encode().hex(), "expiresAt": 3000})
+        with c.fetch_cdn(signed["url"] + "/original") as response:
+            self.assertEqual((response.status, response.read()), (200, b"png"))
+        clock[0] = 3000
+        with c.fetch_cdn(signed["url"] + "/original") as response:
+            self.assertEqual((response.status, json.loads(response.read())["code"]),
+                             (403, error_codes.SIGNED_URL_EXPIRED))
+        with self.assertRaises(CalmLensAPIError) as raised:
+            c.cdn.get_asset_info(signed["url"])
+        self.assertEqual((raised.exception.code, raised.exception.status), (error_codes.SIGNED_URL_EXPIRED, 403))
+
+    def test_a_held_asset_cannot_be_signed_and_its_info_is_unavailable(self):
+        c = MockCalmLensServerClient()
+        asset = c.assets.classify(name="a.png", content={"data": b"png", "type": "image/png"},
+                                  processing_options={"keepContentAfterProcessing": True}, visibility="public")
+        c.database_storage.assets[asset["id"]]["content"]["safetyHold"] = {"placedAt": 1, "reason": "suspected-illegal-content"}
+        with self.assertRaises(CalmLensAPIError) as raised:
+            c.cdn.sign_asset_url(asset_id=asset["id"])
+        self.assertEqual(raised.exception.code, error_codes.ASSET_HELD)
+        self.assertEqual(c.cdn.get_asset_info(c.cdn.get_asset_url(asset_id=asset["id"]))["availability"], "unavailable")
 
     def test_unknown_mock_options_and_a_moderate_that_is_not_a_function_are_configuration_errors(self):
         for options in ({"moderate": "blocked"}, {"queued_outcome": "pending"}):
@@ -258,16 +287,19 @@ class MockTests(unittest.TestCase):
                 self.assertEqual(body["details"], {"mimeType": mime_type, "source": "calmlens"})
                 self.assertEqual(self.client.database_storage.assets, {})
 
-    def test_refuses_null_and_unsigned_resources_where_the_api_does_before_the_asset_lookup(self):
-        # The client leaves these out, so the requests go straight to the mock's transport.
-        cases = [("POST", "signed-url", {"viewerClaims": None}, "validation/invalid-type", "viewerClaims"),
-                 ("POST", "signed-url", {"resource": None}, "validation/invalid-value", "resource"),
-                 ("POST", "signed-url", {"resource": "placeholder"}, "validation/invalid-value", "resource"),
-                 ("POST", "signed-url", {"expiresInSeconds": None}, "validation/invalid-type", "expiresInSeconds"),
-                 ("PATCH", "", {"name": None}, "validation/invalid-type", "name")]
-        for method, suffix, body, code, path in cases:
+    def test_refuses_null_and_invalid_fields_where_the_api_does_before_the_asset_lookup(self):
+        # The client refuses these first, so the requests go straight to the mock's transport.
+        signed = f"projects/{self.client.project_id}/signed-asset-urls"
+        cases = [("POST", signed, {"assetId": "missing", "expiresIn": None}, "validation/invalid-type", "expiresIn"),
+                 ("POST", signed, {"externalId": "missing", "original": None}, "validation/invalid-type", "original"),
+                 ("POST", signed, {"assetId": "missing", "expiresIn": 1.5}, "validation/invalid-type", "expiresIn"),
+                 ("POST", signed, {"assetId": "missing", "expiresIn": 86401}, "validation/too-big", "expiresIn"),
+                 ("POST", signed, {"assetId": "missing", "original": "yes"}, "validation/invalid-type", "original"),
+                 ("POST", signed, {"expiresIn": 60}, "custom", ""),
+                 ("PATCH", "assets/missing", {"name": None}, "validation/invalid-type", "name")]
+        for method, route, body, code, path in cases:
             with self.subTest(method=method, body=body):
-                request = Request(f"{self.client.base_url}/assets/missing{'/' + suffix if suffix else ''}",
+                request = Request(f"{self.client.base_url}/{route}",
                                   data=json.dumps(body).encode(), method=method,
                                   headers={"Content-Type": "application/json"})
                 with self.client.transport(request, 1) as response:
@@ -293,7 +325,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         c = MockCalmLensServerClient(project_id="p1", base_url="https://api.example.test/v2/", cdn_base_url="https://cdn.example.test/v2",
                                timeout=5, mock_options={"create_id": lambda prefix: "a1"})
         self.assertEqual((c.project_id, c.base_url, c.cdn_base_url, c.timeout), ("p1", "https://api.example.test/v2", "https://cdn.example.test/v2", 5))
-        self.assertEqual(c.cdn.get_asset_url({"assetIdentifier": "a1"}), "https://cdn.example.test/v2/assets/p1/a1/rendered")
+        self.assertEqual(c.cdn.get_asset_url({"assetId": "a1", "resource": "rendered"}), "https://cdn.example.test/v2/assets/p1/a1/rendered")
         with self.assertRaises(CalmLensError):
             MockCalmLensServerClient(timeout=0)
         with self.assertRaises(CalmLensError):
@@ -318,7 +350,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         c.assets.classify(name="note", external_id="e1", content={"plain_text": "hi", "type": "text/plain"})
         c.assets.update({"assetId": "a1", "tags": ["x"]})
         c.events.list(cursor=cursor, page_size=5)
-        c.cdn.serve({"assetIdentifier": "a1", "lens": "thumb"}).close()
+        c.cdn.serve({"assetId": "a1", "lens": "thumb"}).close()
         upload, update, events, serve = c.requests
         self.assertEqual((upload.method, upload.path, upload.status), ("POST", "/projects/p1/assets", 200))
         self.assertEqual(upload.headers["X-calmlens-upload"], "content")
@@ -350,7 +382,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         self.assertEqual((error.code, error.status, error.retry_after), ("rate-limit/exceeded", 429, 3.0))
         self.assertTrue(error.request_id)
         with self.assertRaises(CalmLensTransportError):
-            c.cdn.serve({"assetIdentifier": "a1"})
+            c.cdn.serve({"assetId": "a1"})
         self.assertEqual(c.database_storage.assets, {})
         self.assertEqual(c.text.classify(text="hello")["classification"]["moderation"]["status"], "allowed")
         self.assertEqual(len(c.requests), 5)

@@ -14,11 +14,11 @@ from .qualifiers import ModerationQualifier
 class ViewerClaims(TypedDict, total=False):
     """Optional customer assertions for CDN delivery.
 
-    ``ageConfirmed`` is your platform's confirmation that the viewer passed its age check, and
-    defaults to false. Your platform confirms the viewer's age; CalmLens does not verify this
-    claim. Anyone requesting a public asset's URL can set it, so it doesn't restrict access: to
-    control who loads an age-restricted asset, make it private and include the claim in a signed
-    URL, whose signature covers it.
+    ``region`` is the viewer's ISO 3166-1 alpha-2 country, such as ``DE``. ``ageConfirmed`` is
+    your platform's confirmation that the viewer passed its age check, and defaults to false.
+    Claims are your app's unsigned assertions, sent with any asset URL, signed or not: CalmLens
+    does not verify them, and anyone holding a URL can add them. Default claims (no region, age
+    not confirmed) are left out of URLs so default URLs stay cacheable.
     """
 
     region: str
@@ -38,7 +38,7 @@ __all__ = [
     "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "StreamingFeatureOptions", "AssetPreview", "AssetModerationTimeline", "SignedCdnResource",
+    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "StreamingFeatureOptions", "AssetPreview", "AssetModerationTimeline", "AssetInfo", "AssetInfoContent", "AssetAvailability",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions",
@@ -48,7 +48,7 @@ __all__ = [
     "Ordering", "PartContent", "PartialCategoryResult", "PersonDetectionFeatureOptions", "PersonDetectionResult",
     "ProcessingFeatureResults", "ProcessingFeatureStage", "ProcessingFeatures", "ProcessingOptions",
     "QualifierResult", "QualifierResults", "SafetyHold", "SafetyHoldReason", "SearchAssetsOptions", "SearchMode",
-    "SemanticStatus", "ServeInit", "ServeOptions", "SignedUrl", "SignedUrlOptions", "StoredExtractedText",
+    "SemanticStatus", "ServeInit", "ServeOptions", "SignedAssetUrl", "SignAssetUrlOptions", "GetAssetInfoOptions", "StoredExtractedText",
     "SignedUploadToken", "SignUploadTokenOptions", "SubmitAssetOptions", "UpdateAssetOptions",
     "UpdateFolderOptions", "UploadPartOptions", "Visibility", "WaitForDecisionOptions",
     "WebhookEventPayload",
@@ -113,20 +113,18 @@ MediaSegmentSource = Union[Literal["frame", "speech", "frame-text", "clip"], str
 ProcessingFeatureStage = Union[Literal["beta", "ga"], str]
 #: Asset type a lens applies to (request values).
 LensType = Literal["image", "video", "audio", "document", "website"]
-#: The CDN resources a signed URL can be created for: ``original`` (the exact upload), ``rendered``
-#: (the displayable file: an image in the best format the client accepts, a PDF, or browser-safe
-#: video or audio), ``preview`` (a still image that stands for the asset), ``hls`` (the HLS
-#: master playlist of audio or video, once ``content.hls`` is set; one signature covers every
-#: playlist and segment beneath ``/hls/``) or ``embed`` (an HTML page that shows the asset, for an
-#: iframe).
-SignedCdnResource = Literal["original", "rendered", "preview", "hls", "embed"]
-#: Which CDN resource of an asset to address: a signed resource, or ``placeholder``, a small blurred
-#: PNG made from the preview that is served publicly for every asset whatever its visibility or
-#: moderation status, without age confirmation. Defaults to ``rendered``. Lenses and transforms
-#: apply to ``preview``, and to ``rendered`` when it is an image; the CDN refuses them on rendered
-#: PDFs, video and audio with ``transform/invalid``, and the SDK refuses them on
-#: ``original``, ``hls``, ``embed`` and ``placeholder``.
-CdnResource = Literal["original", "rendered", "preview", "hls", "embed", "placeholder"]
+#: A resource beneath an asset's CDN URL: ``original`` (the exact upload; under a signed URL only
+#: when it was signed with ``original=True``), ``rendered`` (the displayable file: an image in the
+#: best format the client accepts, a PDF, or browser-safe video or audio), ``preview`` (a still
+#: image that stands for the asset), ``placeholder`` (a small blurred PNG made from the preview,
+#: served publicly for every asset whatever its visibility or moderation status), ``hls`` (the HLS
+#: master playlist of audio or video at ``hls/index.m3u8``, once ``content.hls`` is set; its
+#: playlists and segments are the other files beneath ``hls/``), ``embed`` (an HTML page that shows
+#: the asset, for an iframe) or ``info`` (the asset's display info, see :class:`AssetInfo`). Lenses
+#: and transforms apply to ``preview``, and to ``rendered`` when it is an image; the CDN refuses them
+#: on rendered PDFs, video and audio with ``transform/invalid``, and the SDK refuses them on every
+#: other resource.
+CdnResource = Literal["original", "rendered", "preview", "placeholder", "hls", "embed", "info"]
 #: How ``assets.search`` matches.
 SearchMode = Literal["keyword", "semantic", "hybrid"]
 #: Fields a search result matched on. New fields may be added.
@@ -959,10 +957,43 @@ class AssetSearchResponse(TypedDict):
     semanticStatus: SemanticStatus
 
 
-class SignedUrl(TypedDict):
+class SignedAssetUrl(TypedDict):
+    """A signed asset URL, or a resource URL beneath its grant."""
     url: str
-    #: Milliseconds since the Unix epoch.
+    #: When the grant expires, in milliseconds since the Unix epoch.
     expiresAt: int
+
+
+#: Whether the viewer an asset URL's claims describe can see the asset now. New values may be added.
+AssetAvailability = Union[Literal["available", "age-restricted", "unavailable"], str]
+
+
+class AssetInfoContent(TypedDict):
+    """The display fields of an asset's content, named as on :class:`Asset`."""
+    format: Optional[str]
+    width: Optional[int]
+    height: Optional[int]
+    durationSeconds: Optional[float]
+    pageCount: Optional[int]
+    rendered: Optional[AssetRendered]
+    preview: Optional[AssetPreview]
+    hls: Optional[AssetHls]
+
+
+class _AssetInfoRequired(TypedDict):
+    id: str
+    projectId: str
+    type: AssetType
+    content: AssetInfoContent
+    availability: AssetAvailability
+
+
+class AssetInfo(_AssetInfoRequired, total=False):
+    """What ``cdn.get_asset_info`` returns: the asset URL's ``info`` resource, an allowlist of the
+    asset's public fields (no moderation, metadata, names, tags or extracted text) and whether the
+    viewer can see it now."""
+    #: A website asset's page.
+    externalUrl: Optional[str]
 
 
 # ---- Folders ----------------------------------------------------------------------------------
@@ -1601,15 +1632,6 @@ class UpdateAssetOptions(AssetIdOptions, total=False):
     visibility: Optional[Visibility]
 
 
-class SignedUrlOptions(AssetIdOptions, total=False):
-    viewerClaims: ViewerClaims
-    #: Defaults to ``rendered`` on the server. ``original`` takes no lens or transform.
-    resource: SignedCdnResource
-    expiresInSeconds: int
-    lens: str
-    transform: CdnTransform
-
-
 class WaitForDecisionOptions(AssetIdOptions, total=False):
     #: Seconds to wait for a decision before ``sdk/timeout`` (default 60).
     timeout: float
@@ -1647,15 +1669,30 @@ class EnsureLensesOptions(TypedDict):
     lenses: list[LensDefinition]
 
 
-class _AssetUrlRequired(TypedDict):
-    assetIdentifier: str
-
-
-class AssetUrlOptions(_AssetUrlRequired, total=False):
-    viewerClaims: ViewerClaims
+class AssetUrlOptions(TypedDict, total=False):
+    """An asset's CDN URL: exactly one of ``assetId`` and ``externalId``, and optionally a resource
+    beneath it with its lens or transform, and the viewer's claims."""
+    #: Defaults to the client's project.
+    projectId: str
+    assetId: str
+    externalId: str
+    #: Without it the URL is the asset URL itself, which takes no lens or transform.
     resource: CdnResource
     lens: str
     transform: CdnTransform
+    viewerClaims: ViewerClaims
+
+
+class SignAssetUrlOptions(AssetUrlOptions, total=False):
+    #: The grant's lifetime: 1 to 86400 whole seconds, default 900.
+    expiresIn: int
+    #: Whether the grant serves ``original``, the exact upload. Defaults to False.
+    original: bool
+
+
+class GetAssetInfoOptions(TypedDict, total=False):
+    #: The viewer's claims, in place of those the URL carries.
+    viewerClaims: ViewerClaims
 
 
 
