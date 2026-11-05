@@ -553,26 +553,34 @@ public final class Models {
    * @param linkDetection find QR codes and web links in images and moderate QR code text; on by
    *     default
    * @param aiGeneratedDetection (preview) read the AI provenance metadata images carry
+   * @param streaming (preview) prepare an adaptive (HLS) stream of audio or video once it is
+   *     decided and made browser-safe, served at the {@code hls} resource and played by the
+   *     {@code embed} page; needs {@code keepContentAfterProcessing} and is billed per started minute
+   *     of media. Left null, the project's streaming setting decides; {@code enabled} false turns
+   *     it off for this upload
    */
   public record ProcessingFeatures(FeatureOptions ocr, FeatureOptions personDetection, FaceDetectionOptions faceDetection,
-      FeatureOptions linkDetection, FeatureOptions aiGeneratedDetection) {
+      FeatureOptions linkDetection, FeatureOptions aiGeneratedDetection, FeatureOptions streaming) {
     /** No features set. */
-    public ProcessingFeatures() { this(null, null, null, null, null); }
+    public ProcessingFeatures() { this(null, null, null, null, null, null); }
 
     /** @param value OCR options @return a copy with these options */
-    public ProcessingFeatures ocr(FeatureOptions value) { return new ProcessingFeatures(value, personDetection, faceDetection, linkDetection, aiGeneratedDetection); }
+    public ProcessingFeatures ocr(FeatureOptions value) { return new ProcessingFeatures(value, personDetection, faceDetection, linkDetection, aiGeneratedDetection, streaming); }
 
     /** @param value person detection options @return a copy with these options */
-    public ProcessingFeatures personDetection(FeatureOptions value) { return new ProcessingFeatures(ocr, value, faceDetection, linkDetection, aiGeneratedDetection); }
+    public ProcessingFeatures personDetection(FeatureOptions value) { return new ProcessingFeatures(ocr, value, faceDetection, linkDetection, aiGeneratedDetection, streaming); }
 
     /** @param value face detection options @return a copy with these options */
-    public ProcessingFeatures faceDetection(FaceDetectionOptions value) { return new ProcessingFeatures(ocr, personDetection, value, linkDetection, aiGeneratedDetection); }
+    public ProcessingFeatures faceDetection(FaceDetectionOptions value) { return new ProcessingFeatures(ocr, personDetection, value, linkDetection, aiGeneratedDetection, streaming); }
 
     /** @param value link detection options @return a copy with these options */
-    public ProcessingFeatures linkDetection(FeatureOptions value) { return new ProcessingFeatures(ocr, personDetection, faceDetection, value, aiGeneratedDetection); }
+    public ProcessingFeatures linkDetection(FeatureOptions value) { return new ProcessingFeatures(ocr, personDetection, faceDetection, value, aiGeneratedDetection, streaming); }
 
     /** @param value AI-generated detection options @return a copy with these options */
-    public ProcessingFeatures aiGeneratedDetection(FeatureOptions value) { return new ProcessingFeatures(ocr, personDetection, faceDetection, linkDetection, value); }
+    public ProcessingFeatures aiGeneratedDetection(FeatureOptions value) { return new ProcessingFeatures(ocr, personDetection, faceDetection, linkDetection, value, streaming); }
+
+    /** @param value streaming options @return a copy with these options */
+    public ProcessingFeatures streaming(FeatureOptions value) { return new ProcessingFeatures(ocr, personDetection, faceDetection, linkDetection, aiGeneratedDetection, value); }
   }
 
   /**
@@ -1538,7 +1546,7 @@ public final class Models {
     /** @param assetId the asset */
     public SignedUrlOptions(String assetId) { this.assetId = assetId; }
     public SignedUrlOptions assetId(String value) { assetId = value; return this; }
-    /** @param value {@code rendered} (the API's default), {@code preview} or {@code original} (no lens or transform); see {@link CalmLensServerClient#SIGNED_CDN_RESOURCES} @return these options */
+    /** @param value {@code rendered} (the API's default), {@code preview}, or {@code original}, {@code hls} or {@code embed} (no lens or transform); see {@link CalmLensServerClient#SIGNED_CDN_RESOURCES} @return these options */
     public SignedUrlOptions resource(String value) { resource = value; return this; }
     public SignedUrlOptions lens(String value) { lens = value; return this; }
     /**
@@ -1707,7 +1715,7 @@ public final class Models {
     /** @param assetIdentifier an asset ID or external ID */
     public CdnRequest(String assetIdentifier) { this.assetIdentifier = assetIdentifier; }
     public CdnRequest assetIdentifier(String value) { assetIdentifier = value; return this; }
-    /** @param value {@code rendered} (default), {@code preview}, {@code original} (no lens or transform) or {@code placeholder} (no lens or transform); see {@link CalmLensServerClient#CDN_RESOURCES} @return these options */
+    /** @param value {@code rendered} (default), {@code preview}, or {@code original}, {@code hls}, {@code embed} or {@code placeholder} (no lens or transform); see {@link CalmLensServerClient#CDN_RESOURCES} @return these options */
     public CdnRequest resource(String value) { resource = value; return this; }
     public CdnRequest lens(String value) { lens = value; return this; }
     /**
@@ -2058,6 +2066,10 @@ public final class Models {
    * @param rendered the displayable file the CDN's {@code rendered} resource serves; null when the
    *     asset has none (text, spreadsheets, other files, before processing makes one, once the
    *     content is removed and while a safety hold is on)
+   * @param hls (preview) the adaptive stream of video or audio the CDN's {@code hls} resource
+   *     serves and the {@code embed} page plays, once streaming has prepared it from the rendered
+   *     file; null for other assets, until a stream is prepared, once the content is removed and
+   *     while a safety hold is on
    * @param preview the still image the CDN's {@code preview} resource serves; null when the asset
    *     has none, like {@code rendered}
    */
@@ -2066,7 +2078,7 @@ public final class Models {
       SafetyHold safetyHold, String format, String extension, Long sizeInBytes, Checksums checksums,
       Integer width, Integer height, Double durationSeconds, Integer pageCount,
       String perceptualHash, Integer perceptualHashQuality, FileMetadata metadata,
-      ExtractedText extractedText, AssetRendered rendered, AssetPreview preview) {}
+      ExtractedText extractedText, AssetRendered rendered, AssetHls hls, AssetPreview preview) {}
 
   /**
    * The one displayable file of an asset, as the CDN's {@code rendered} resource serves it.
@@ -2082,6 +2094,30 @@ public final class Models {
     /** Copies collections so the record stays immutable. */
     public AssetRendered { peaks = list(peaks); }
   }
+
+  /**
+   * The adaptive (HLS) stream of audio or video, with fragmented MP4 (CMAF) segments, as the CDN's
+   * {@code hls} resource serves it at {@code hls/index.m3u8}.
+   *
+   * @param renditions every rendition, video from the largest down, then audio
+   */
+  public record AssetHls(List<AssetHlsRendition> renditions) {
+    /** Copies collections so the record stays immutable. */
+    public AssetHls { renditions = list(renditions); }
+  }
+
+  /**
+   * One rendition of the adaptive stream, as the HLS master playlist lists it.
+   *
+   * @param kind {@code video} for a picture size (video renditions carry no sound; they play with
+   *     the {@code audio} rendition), or {@code audio}
+   * @param width picture width in pixels; null for audio
+   * @param height picture height in pixels; null for audio
+   * @param bandwidth peak bit rate in bits per second, counting the audio a video rendition plays
+   *     with
+   * @param codecs the rendition's codecs as RFC 6381 names, such as {@code avc1.64001f}
+   */
+  public record AssetHlsRendition(String kind, Integer width, Integer height, Long bandwidth, String codecs) {}
 
   /**
    * The still image that stands for an asset, as the CDN's {@code preview} resource serves it: the

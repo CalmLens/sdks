@@ -975,7 +975,7 @@ class ContractTest {
         return want.equals(accessor.invoke(error));
       }
       case "cdn-resource":
-        return refusing().cdn.getAssetUrl(new Models.CdnRequest("asset-1").resource(name)).endsWith("/asset-1/" + value);
+        return refusing().cdn.getAssetUrl(new Models.CdnRequest("asset-1").resource(name)).endsWith("/asset-1/" + capability.get("path").getAsString());
       case "cdn-option":
       case "mock-option": {
         int dot = name.lastIndexOf('.');

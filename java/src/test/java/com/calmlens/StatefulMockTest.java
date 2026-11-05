@@ -246,6 +246,44 @@ class StatefulMockTest {
         mock.client.events.list(new Models.ListEvents().cursor(start)).items().stream().map(Models.Event::actor).toList());
   }
 
+  /**
+   * The shared scenarios cover a video's embed page and missing stream; this is a text file's and
+   * audio's embed page, audio's missing HLS stream, a selector after the embed page, which the SDK refuses to build and the mock refuses before
+   * the asset lookup, and blocked content's embed page.
+   */
+  @Test void theMockServesTheEmbedPageOfAnyAssetButNoHlsStream() throws Exception {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    Models.Asset audio = mock.client.assets.classify(new Models.SubmitAsset("song.wav", Models.Content.bytes("wav".getBytes(java.nio.charset.StandardCharsets.UTF_8), "audio/wav"))
+        .processingOptions(new Models.ProcessingOptions(true, null, new Models.ProcessingFeatures().streaming(new Models.FeatureOptions(true))))
+        .visibility(Models.Visibility.PUBLIC));
+    assertSame(Models.AssetRenderedKind.AUDIO, audio.content().rendered().kind());
+    assertNull(audio.content().hls());
+    Models.Asset note = mock.client.assets.classify(new Models.SubmitAsset("note.txt", Models.Content.bytes("hello".getBytes(java.nio.charset.StandardCharsets.UTF_8), "text/plain"))
+        .processingOptions(new Models.ProcessingOptions(true, null, null)).visibility(Models.Visibility.PUBLIC));
+    for (Models.Asset asset : List.of(audio, note)) {
+      try (CdnResponse embed = mock.client.cdn.serve(new Models.CdnRequest(asset.id()).resource("embed"))) {
+        assertEquals(200, embed.status(), asset.name());
+        assertEquals("text/html; charset=utf-8", embed.header("Content-Type"));
+        assertTrue(new String(embed.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8).startsWith("<!doctype html>"));
+      }
+    }
+    try (CdnResponse hls = mock.client.cdn.serve(new Models.CdnRequest(audio.id()).resource("hls"))) {
+      assertEquals(404, hls.status());
+      assertEquals(ErrorCodes.NO_RENDERED_VERSION, JsonParser.parseString(new String(hls.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8))
+          .getAsJsonObject().get("code").getAsString());
+    }
+    MockApi api = new MockApi("project-1", "https://api.calmlens.com/v1", "https://cdn.calmlens.com/v1", deterministic());
+    String path = "/assets/project-1/missing/embed/width=10";
+    Transport.Response refused = api.answer(new MockCalmLensServerClient.Request("GET", "https://cdn.calmlens.com/v1" + path, path, java.util.Map.of(), java.util.Map.of(), new byte[0], null));
+    assertEquals(400, refused.status());
+    assertEquals("transform/invalid", JsonParser.parseString(new String(refused.body().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8))
+        .getAsJsonObject().get("code").getAsString());
+    mock.decide(note.id(), Outcome.BLOCKED);
+    try (CdnResponse blocked = mock.client.cdn.serve(new Models.CdnRequest(note.id()).resource("embed"))) {
+      assertEquals(403, blocked.status());
+    }
+  }
+
   /** No shared scenario can place a safety hold, so this one is placed in storage. */
   @Test void aSafetyHoldWithholdsTheRenderingAndRefusesEveryResourceAndTheTimeline() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
@@ -257,7 +295,7 @@ class StatefulMockTest {
       hold.addProperty("placedAt", 1_700_000_000_000L);
       storage.assets.get(asset.id()).getAsJsonObject("content").add("safetyHold", hold);
     });
-    for (String resource : List.of("original", "rendered", "preview", "placeholder")) {
+    for (String resource : List.of("original", "rendered", "preview", "hls", "embed", "placeholder")) {
       try (CdnResponse served = mock.client.cdn.serve(new Models.CdnRequest(asset.id()).resource(resource))) {
         assertEquals(403, served.status(), resource);
         assertEquals("asset/not-available", JsonParser.parseString(new String(served.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8))

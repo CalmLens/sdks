@@ -70,13 +70,30 @@ public final class CalmLensServerClient implements AutoCloseable {
   /**
    * The CDN resources a signed URL can be created for, as the API accepts them: the exact
    * {@code original} upload, the {@code rendered} file for display (an image, a PDF, or
-   * browser-safe video or audio) and the {@code preview}, a still image that stands for the asset.
+   * browser-safe video or audio), the {@code preview}, a still image that stands for the asset,
+   * the {@code hls} stream of audio or video, its adaptive HLS master playlist (one signature
+   * covers every playlist and segment beneath {@code hls/}), and the {@code embed} page, which
+   * shows the asset in an iframe.
    */
-  public static final List<String> SIGNED_CDN_RESOURCES = List.of("original", "rendered", "preview");
+  public static final List<String> SIGNED_CDN_RESOURCES = List.of("original", "rendered", "preview", "hls", "embed");
   /** Every CDN resource: the signed ones and the public {@code placeholder}. */
-  public static final List<String> CDN_RESOURCES = List.of("original", "rendered", "preview", "placeholder");
-  /** The resources that take no lens or transform: the exact upload and the public placeholder. */
-  private static final List<String> UNSELECTABLE_CDN_RESOURCES = List.of("original", "placeholder");
+  public static final List<String> CDN_RESOURCES = List.of("original", "rendered", "preview", "hls", "embed", "placeholder");
+  /**
+   * Where each resource is served beneath an asset's CDN path. The HLS stream is its master
+   * playlist; its media playlists and segments are the other files beneath {@code hls/}.
+   */
+  private static final Map<String, String> CDN_RESOURCE_PATHS = Map.of(
+      "original", "original",
+      "rendered", "rendered",
+      "preview", "preview",
+      "hls", "hls/index.m3u8",
+      "embed", "embed",
+      "placeholder", "placeholder");
+  /**
+   * The resources that take no lens or transform: the exact upload, the HLS stream, the embed page
+   * and the public placeholder.
+   */
+  private static final List<String> UNSELECTABLE_CDN_RESOURCES = List.of("original", "hls", "embed", "placeholder");
 
   /** Header carrying {@code v1=<hex>} HMAC-SHA256 signatures (comma-separated during secret rotation). */
   public static final String WEBHOOK_SIGNATURE_HEADER = "x-calmlens-signature";
@@ -1595,13 +1612,13 @@ public final class CalmLensServerClient implements AutoCloseable {
     public Models.SignedUrl createSignedUrl(Models.SignedUrlOptions options) {
       JsonObject o = Models.encode(options);
       String path = "/assets/" + id(str(o, "assetId", null)) + "/signed-url";
-      // As the API checks: a placeholder needs no signature, and the original takes no lens or
-      // transform.
+      // As the API checks: a placeholder needs no signature, and the original, hls and embed take
+      // no lens or transform.
       String resource = str(o, "resource", "rendered");
       if (!SIGNED_CDN_RESOURCES.contains(resource))
         throw argument("A signed URL's resource must be one of " + String.join(", ", SIGNED_CDN_RESOURCES));
-      if (resource.equals("original") && (o.has("lens") || options.transformValue() != null))
-        throw argument("The original resource takes no lens or transform");
+      if (UNSELECTABLE_CDN_RESOURCES.contains(resource) && (o.has("lens") || options.transformValue() != null))
+        throw argument("The " + resource + " resource takes no lens or transform");
       if (o.has("expiresInSeconds")) {
         long seconds = o.get("expiresInSeconds").getAsLong();
         if (seconds < 1 || seconds > MAX_SIGNED_URL_SECONDS) throw argument("expiresInSeconds must be from 1 to 86400");
@@ -1957,10 +1974,13 @@ public final class CalmLensServerClient implements AutoCloseable {
      * Builds the CDN URL of an asset's resource, with optional {@code viewerClaims} encoded in its
      * query: {@code rendered} (default: the displayable file, an image in the best format the
      * client accepts, a PDF, or browser-safe video or audio), {@code original} (the exact upload),
-     * {@code preview} (a still image for the asset) or {@code placeholder} (a small blurred PNG,
-     * public whatever the asset's visibility or moderation status, without age confirmation).
-     * Lenses and transforms apply to {@code preview}, and to {@code rendered} when it is an image;
-     * the CDN refuses them on rendered PDFs, video and audio with {@code transform/invalid}.
+     * {@code preview} (a still image for the asset), {@code hls} (the HLS master playlist of audio
+     * or video at {@code hls/index.m3u8}, once {@code content.hls} is set), {@code embed} (an HTML
+     * page that shows the asset, for an iframe) or {@code placeholder} (a small blurred PNG, public
+     * whatever the asset's visibility or moderation status, without age confirmation). Lenses and
+     * transforms apply to {@code preview}, and to {@code rendered} when it is an image; the CDN
+     * refuses them on rendered PDFs, video and audio with {@code transform/invalid}, and the
+     * SDK refuses them on the original, hls, embed and placeholder.
      *
      * @param options the asset and selector
      * @return the URL
@@ -1972,7 +1992,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (!CDN_RESOURCES.contains(resource)) throw argument("Resource must be one of " + String.join(", ", CDN_RESOURCES));
       boolean transformed = o.has("lens") && !o.get("lens").isJsonNull() || transform != null;
       if (UNSELECTABLE_CDN_RESOURCES.contains(resource) && transformed) throw argument("The " + resource + " resource takes no lens or transform");
-      String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + resource;
+      String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + CDN_RESOURCE_PATHS.get(resource);
       List<String> selector = new ArrayList<>();
       if (o.has("lens") && !o.get("lens").isJsonNull()) selector.add("@" + id(o.get("lens").getAsString()));
       if (transform instanceof String text) { if (!text.isEmpty()) selector.add(transformPath(text)); }

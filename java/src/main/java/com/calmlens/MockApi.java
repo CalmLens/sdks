@@ -95,8 +95,9 @@ final class MockApi {
    * from its pixels. The {@code placeholder} resource serves it as a PNG, like the CDN.
    */
   static final String MOCK_THUMBHASH = "1QcSHQRnh493V4dIh4eXh1h4kJUI";
-  /** Paths beneath {@code /rendered/} the CDN reserves for streaming and an embeddable player. */
-  private static final Set<String> RESERVED_RENDERED_PATHS = Set.of("stream", "player");
+  /** The page the mock serves at {@code /embed}, standing in for the CDN's embed page. */
+  private static final String MOCK_EMBED_HTML =
+      "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Embed</title></head><body></body></html>";
   /** The size of the waveform the API makes as an audio asset's preview. */
   private static final int WAVEFORM_WIDTH = 1200, WAVEFORM_HEIGHT = 300;
   /** Audio and video formats browsers play as uploaded, so the API serves them as stored. */
@@ -800,9 +801,13 @@ final class MockApi {
     return hold != null && !hold.isJsonNull();
   }
 
-  /** Removing or withholding content removes its rendered file and preview, as the API does. */
+  /**
+   * Removing or withholding content removes its rendered file, HLS stream and preview, as the API
+   * does. The mock never prepares an HLS stream.
+   */
   private static void withoutRendering(JsonObject content) {
     content.add("rendered", JsonNull.INSTANCE);
+    content.add("hls", JsonNull.INSTANCE);
     content.add("preview", JsonNull.INSTANCE);
   }
 
@@ -833,11 +838,12 @@ final class MockApi {
    * screenshot; a document or presentation as a PDF, with its first page as the preview; video and
    * audio as a browser-safe file (MP4 or M4A unless browsers play the upload), audio with a
    * waveform preview and video with no poster; and every preview has its ThumbHash. Text,
-   * spreadsheets and other files have neither. The mock decodes nothing, so sizes are unknown and
-   * audio has no peaks.
+   * spreadsheets and other files have neither. The mock decodes nothing, so sizes are unknown,
+   * audio has no peaks, and audio and video never get an HLS stream.
    */
   private static void applyRendering(JsonObject asset, boolean processed) {
     JsonObject content = asset.getAsJsonObject("content");
+    content.add("hls", JsonNull.INSTANCE);
     String type = str(asset, "type"), format = str(content, "format");
     String mime = format == null ? "" : format.toLowerCase(Locale.ROOT).split(";", 2)[0].strip();
     boolean browserSafe = BROWSER_SAFE_MEDIA_FORMATS.contains(mime);
@@ -2124,18 +2130,17 @@ final class MockApi {
     List<String> selectorPath = raw.subList(4, raw.size());
     Failure invalidTransform = new Failure(ErrorCodes.INVALID_TRANSFORM, 400, "Invalid transform selector");
     Failure noRenderedVersion = new Failure(ErrorCodes.NO_RENDERED_VERSION, 404, "This asset has no such resource");
-    // Like the CDN, /rendered/stream and /rendered/player are reserved, then the selector after the
-    // resource is read as sent (still percent-encoded); the original takes none.
-    if (resource.equals("rendered") && !selectorPath.isEmpty() && RESERVED_RENDERED_PATHS.contains(selectorPath.get(0)))
-      return error(noRenderedVersion);
+    // Like the CDN, the selector after the resource is read as sent (still percent-encoded); the
+    // original and the embed page take none. Beneath /hls/ are the stream's playlists and
+    // segments, not a selector.
     CalmLensServerClient.TransformSelector selector;
     try {
-      selector = CalmLensServerClient.parseTransformSelector(String.join("/", selectorPath));
+      selector = CalmLensServerClient.parseTransformSelector(resource.equals("hls") ? "" : String.join("/", selectorPath));
     } catch (IllegalArgumentException invalid) {
       return error(invalidTransform);
     }
     boolean hasSelector = selector.lens() != null || selector.options() != null;
-    if (resource.equals("original") && hasSelector) return error(invalidTransform);
+    if ((resource.equals("original") || resource.equals("embed")) && hasSelector) return error(invalidTransform);
     JsonObject asset = parts.get(1).equals(projectId) ? projectAssets().stream()
         .filter(a -> identifier.equals(str(a, "id")) || identifier.equals(str(a, "externalId"))).findFirst().orElse(null) : null;
     if (asset == null) return error(new Failure(ErrorCodes.ASSET_NOT_FOUND, 404, "Asset not found"));
@@ -2172,9 +2177,18 @@ final class MockApi {
     boolean isPrivate = !isPublic;
     if (isPrivate && !canDownload(str(asset, "folderId"), apiKey))
       return error(new Failure(ErrorCodes.PERMISSION_DENIED, 403, "This API key needs assets:download permission for this asset’s folder."));
-    // Then whether the asset has the resource, and whether it is a still image that takes a lens
-    // or transform: the preview always is, the rendered file only when it is an image.
-    if (resource.equals("rendered") && rendered == null || resource.equals("preview") && preview == null) return error(noRenderedVersion);
+    // The embed page shows any asset that may be delivered, as its viewer for the asset's type or a
+    // notice that the type has none.
+    if (resource.equals("embed")) {
+      return served(request, MOCK_EMBED_HTML.getBytes(StandardCharsets.UTF_8), "text/html; charset=utf-8",
+          "Cache-Control", !claims.isEmpty() ? "private, no-store" : (isPrivate ? "private" : "public") + ", max-age=3600",
+          "Cache-Tag", "asset-" + str(asset, "id"), "X-Content-Type-Options", "nosniff");
+    }
+    // Then whether the asset has the resource (the mock prepares no HLS stream), and whether it is
+    // a still image that takes a lens or transform: the preview always is, the rendered file only
+    // when it is an image.
+    if (resource.equals("rendered") && rendered == null || resource.equals("preview") && preview == null || resource.equals("hls"))
+      return error(noRenderedVersion);
     boolean renderedImage = rendered != null && "image".equals(str(rendered, "kind"));
     boolean stillImage = resource.equals("preview") || resource.equals("rendered") && renderedImage;
     if (!stillImage && hasSelector) return error(invalidTransform);
