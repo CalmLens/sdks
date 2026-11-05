@@ -36,6 +36,11 @@ final class Assets extends Resource
     public const MAX_DIRECT_IMAGE_BYTES = 10 * 1024 * 1024;
     public const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
     public const MAX_FILE_BYTES = 5000 * 1024 * 1024;
+    /**
+     * The largest audio or video uploaded in parts, in bytes. The API holds free uploads, made
+     * before billing is set up, to `MAX_MEDIA_BYTES` itself.
+     */
+    public const MAX_LONG_MEDIA_BYTES = 2 * 1024 * 1024 * 1024;
     /** The largest image uploaded in parts, in bytes. */
     public const MAX_MULTIPART_IMAGE_BYTES = 20 * 1024 * 1024;
     /** The longest `idempotencyKey` of an upload sent in parts: each part's key adds `:part-<n>`. */
@@ -254,9 +259,9 @@ final class Assets extends Resource
         $direct = !$multipart && !$this->session->deferUploadChecks;
         $image = str_starts_with($baseMime, 'image/');
         if ($direct && !$image && is_int($content['sizeInBytes'] ?? null)) {
-            // A declared size is refused before the stream is read or measured. Images are checked
-            // below, once it is known whether they go in parts.
-            self::checkDirectSize($baseMime, $content['sizeInBytes']);
+            // A declared size over any limit is refused before the stream is read or measured. Its
+            // own limit, and images, are checked below, once it is known whether it goes in parts.
+            self::checkSize($baseMime, $content['sizeInBytes'], true);
         }
         $body = UploadBody::from($content, $multipart, !$this->session->deferUploadChecks);
         // Content the client can read again is sent in parts when it is larger than one part.
@@ -270,7 +275,7 @@ final class Assets extends Resource
                 Values::invalid('Multipart image uploads cannot exceed 20 MiB', ErrorCodes::MULTIPART_IMAGE_TOO_LARGE);
             }
         } elseif ($direct) {
-            self::checkDirectSize($baseMime, $body->getSize());
+            self::checkSize($baseMime, $body->getSize(), $split);
         }
         $query = array_intersect_key($api, array_flip(['name', 'description', 'processingOptions', 'visibility', 'metadata', 'authorId', 'context', 'externalId', 'externalUrl', 'folderId', 'uploadPresetId']));
         $query += ['queue' => $queue, 'contentType' => $mime, 'sizeInBytes' => $body->getSize()];
@@ -288,6 +293,9 @@ final class Assets extends Resource
                 if ($size > 20 * 1024 * 1024) {
                     Values::invalid('Multipart image exceeds 20MiB', 'upload/multipart-image-too-large');
                 }
+            } elseif (!$this->session->deferUploadChecks) {
+                // A declared whole-file size over the limit for parts can never finish.
+                self::checkSize($baseMime, $total, true);
             }
             $query += ['partNumber' => 1, 'isFinal' => $content['isFinal'] ?? false, 'totalSizeInBytes' => $total];
         }
@@ -405,15 +413,19 @@ final class Assets extends Resource
     }
 
     /**
-     * Refuses one-request content whose known size is over the API's limit for its type, before
-     * any of it is sent: images up to 10 MiB (larger ones are uploaded in parts), audio and video
-     * up to 50 MiB and other files up to 5,000 MiB.
+     * Refuses content whose known size is over the API's limit for its type, before any of it is
+     * sent. In one request, images can be up to 10 MiB (larger ones are uploaded in parts), audio
+     * and video up to 50 MiB and other files up to 5,000 MiB. Sent in parts (`$inParts`), audio and
+     * video can be up to 2 GiB. Images in parts are checked apart.
      */
-    private static function checkDirectSize(string $mime, ?int $size): void
+    private static function checkSize(string $mime, ?int $size, bool $inParts): void
     {
         [$limit, $message] = match (true) {
             str_starts_with($mime, 'image/') => [self::MAX_DIRECT_IMAGE_BYTES, 'Images uploaded in one request can be at most 10 MiB; upload larger images in parts'],
-            str_starts_with($mime, 'audio/'), str_starts_with($mime, 'video/') => [self::MAX_MEDIA_BYTES, 'Audio and video files can be at most 50 MiB'],
+            str_starts_with($mime, 'audio/'), str_starts_with($mime, 'video/') => [
+                $inParts ? self::MAX_LONG_MEDIA_BYTES : self::MAX_MEDIA_BYTES,
+                'Audio and video files can be at most 50 MiB in one request, or 2 GiB in parts',
+            ],
             default => [self::MAX_FILE_BYTES, 'Files can be at most 5,000 MiB'],
         };
         if ($size !== null && $size > $limit) {

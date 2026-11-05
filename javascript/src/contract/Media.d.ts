@@ -8,3 +8,4 @@
  * container image.
  */
 export declare const MAX_MEDIA_UPLOAD_BYTES: number;
+export declare const MAX_LONG_MEDIA_UPLOAD_BYTES: number;

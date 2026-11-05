@@ -183,8 +183,11 @@ pub fn error_json(error: &calmlens::Error) -> Value {
         "status": error.status(),
         "requestId": error.request_id(),
         "retryAfter": error.retry_after().map(|delay| delay.as_secs()),
-        // API errors carry the body's `details` object; SDK errors have none.
-        "details": if error.details().is_empty() && error.code().as_str().starts_with("sdk/") {
+        // API responses' errors carry the body's `details` object; errors raised before sending
+        // (SDK codes, or API codes without a status) have none unless they set some.
+        "details": if error.details().is_empty()
+            && (error.code().as_str().starts_with("sdk/") || error.status().is_none())
+        {
             Value::Null
         } else {
             Value::Object(error.details().clone())

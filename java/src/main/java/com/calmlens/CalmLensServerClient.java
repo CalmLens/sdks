@@ -1087,17 +1087,20 @@ public final class CalmLensServerClient implements AutoCloseable {
   }
 
   /**
-   * Refuses, before anything is sent, one-request content whose known size is over the API's
-   * limit for its type: images up to 10 MiB (larger ones are uploaded in parts), audio and video
-   * up to 50 MiB and other files up to 5,000 MiB. A stream of unknown length is left to the API.
+   * Refuses, before anything is sent, content whose known size is over the API's limit for its
+   * type. In one request, images can be up to 10 MiB (larger ones are uploaded in parts), audio and
+   * video up to 50 MiB and other files up to 5,000 MiB. Sent in parts ({@code inParts}), audio and
+   * video can be up to 2 GiB; the API holds free uploads, made before billing is set up, to 50 MiB
+   * itself. Images in parts are checked apart. A stream of unknown length is left to the API.
    */
-  private void checkDirectSize(long size, String mime) {
+  private void checkUploadSize(long size, String mime, boolean inParts) {
     if (deferUploadChecks || size < 0) return;
     if (mime.startsWith("image/")) {
       if (size > 10L * 1024 * 1024)
         throw new CalmLensException(ErrorCodes.FILE_TOO_LARGE, "Images uploaded in one request can be at most 10 MiB; upload larger images in parts");
     } else if (mime.startsWith("audio/") || mime.startsWith("video/")) {
-      if (size > 50L * 1024 * 1024) throw new CalmLensException(ErrorCodes.FILE_TOO_LARGE, "Audio and video files can be at most 50 MiB");
+      if (size > (inParts ? 2048L : 50L) * 1024 * 1024)
+        throw new CalmLensException(ErrorCodes.FILE_TOO_LARGE, "Audio and video files can be at most 50 MiB in one request, or 2 GiB in parts");
     } else if (size > 5000L * 1024 * 1024) {
       throw new CalmLensException(ErrorCodes.FILE_TOO_LARGE, "Files can be at most 5,000 MiB");
     }
@@ -1193,11 +1196,15 @@ public final class CalmLensServerClient implements AutoCloseable {
     if (split) {
       if (key != null && key.length() > MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH)
         throw argument("An idempotency key can be at most " + MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH + " characters for an upload sent in parts");
-      if (!mime.startsWith("image/")) checkDirectSize(body.length(), mime);
+      if (!mime.startsWith("image/")) checkUploadSize(body.length(), mime, true);
       else if (!deferUploadChecks && body.length() > 20L * 1024 * 1024)
         throw new CalmLensException(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, "Multipart image uploads cannot exceed 20MB.");
-    } else if (multipart) checkPartSize(body.length(), flag(encoded, "isFinal"), mime.startsWith("image/"));
-    else checkDirectSize(body.length(), mime);
+    } else if (multipart) {
+      checkPartSize(body.length(), flag(encoded, "isFinal"), mime.startsWith("image/"));
+      // A declared whole-file size over the limit for parts can never finish.
+      if (!mime.startsWith("image/") && o.has("totalSizeInBytes") && !o.get("totalSizeInBytes").isJsonNull())
+        checkUploadSize(o.get("totalSizeInBytes").getAsLong(), mime, true);
+    } else checkUploadSize(body.length(), mime, false);
     for (String k : List.of("name", "description", "processingOptions", "visibility", "metadata", "authorId", "context", "externalId", "externalUrl", "folderId", "uploadPresetId", "totalSizeInBytes"))
       if (o.has(k)) query.add(k, o.get(k));
     query.addProperty("contentType", type);

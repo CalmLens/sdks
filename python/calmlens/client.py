@@ -721,16 +721,19 @@ def _image_size(size: int | None) -> None:
         raise CalmLensValidationError(error_codes.MULTIPART_IMAGE_TOO_LARGE)
 
 
-def _direct_size(mime: str, size: int | None) -> None:
-    """Refuse one-request content whose known size is over the API's limit for its type: images
-    up to 10 MiB (larger ones are uploaded in parts), audio and video up to 50 MiB and other files
-    up to 5,000 MiB, before any of it is sent."""
+def _upload_size(mime: str, size: int | None, in_parts: bool = False) -> None:
+    """Refuse content whose known size is over the API's limit for its type, before any of it is
+    sent. In one request, images can be up to 10 MiB (larger ones are uploaded in parts), audio and
+    video up to 50 MiB and other files up to 5,000 MiB. Sent in parts (``in_parts``), audio and video
+    can be up to 2 GiB; the API holds free uploads, made before billing is set up, to 50 MiB itself.
+    Images in parts are checked by ``_image_size``."""
     if size is None:
         return
     if mime.startswith("image/"):
         limit, message = 10 * 1024 * 1024, "Images uploaded in one request can be at most 10 MiB; upload larger images in parts"
     elif mime.startswith(("audio/", "video/")):
-        limit, message = 50 * 1024 * 1024, "Audio and video files can be at most 50 MiB"
+        limit = (2 * 1024 if in_parts else 50) * 1024 * 1024
+        message = "Audio and video files can be at most 50 MiB in one request, or 2 GiB in parts"
     else:
         limit, message = 5000 * 1024 * 1024, "Files can be at most 5,000 MiB"
     if size > limit:
@@ -1411,6 +1414,9 @@ class Assets:
         if checked and multipart and normalized.startswith("image/") and total is not None:
             # Like the API, a declared image total is checked before the part itself.
             _image_size(total)
+        elif checked and multipart:
+            # A declared whole-file size over the limit for parts can never finish.
+            _upload_size(normalized, total, in_parts=True)
         body = _payload(payload, multipart, checked)
         if checked and multipart and normalized.startswith("image/"):
             _image_size(body.size)
@@ -1425,9 +1431,11 @@ class Assets:
                                "for content uploaded in parts")
             if checked and normalized.startswith("image/"):
                 _image_size(body.size)
+            elif checked:
+                _upload_size(normalized, body.size, in_parts=True)
             return self._upload_in_parts(query, mime, body, key)
         if checked and not multipart:
-            _direct_size(normalized, body.size)
+            _upload_size(normalized, body.size)
         if multipart:
             query.update(partNumber=1, isFinal=payload.get("isFinal", False), totalSizeInBytes=total)
         headers = {"Content-Type": _header_value("type", mime), "X-CalmLens-Upload": "part" if multipart else "content"}

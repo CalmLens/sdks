@@ -53,7 +53,7 @@ export type MediaKind = MediaRenderedKind | "file";
 
 /**
  * Fetches a signed URL for one of a private asset's resources from your server, which creates it
- * with `cdn.getSignedUrl` (and any lens, transform and viewer claims).
+ * with `assets.createSignedUrl` (and any lens, transform and viewer claims).
  */
 export type GetSignedMediaUrl = (resource: SignedCdnResource) => Promise<string>;
 

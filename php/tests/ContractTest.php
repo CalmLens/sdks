@@ -180,9 +180,10 @@ final class ContractTest extends TestCase
     }
 
     /**
-     * The error fields every runner compares, null where there is none. An API error's `details`
-     * is the body's object as sent (empty when there are none); PHP keeps an SDK error without
-     * details as an empty array too, which the fixtures write as null.
+     * The error fields every runner compares, null where there is none. An API response's error
+     * `details` is the body's object as sent (empty when there are none); PHP keeps an error raised
+     * before sending (an SDK code, or an API code without a status) without details as an empty
+     * array too, which the fixtures write as null.
      */
     private static function errorFields(\Throwable $error): array
     {
@@ -190,7 +191,7 @@ final class ContractTest extends TestCase
         $retryAfter = $error->retryAfter();
         return ['code' => $error->errorCode, 'status' => $error->status, 'requestId' => $error->requestId,
             'retryAfter' => $retryAfter !== null && floor($retryAfter) === $retryAfter ? (int) $retryAfter : $retryAfter,
-            'details' => $error->details === [] && str_starts_with($error->errorCode, 'sdk/') ? null : $error->details];
+            'details' => $error->details === [] && (str_starts_with($error->errorCode, 'sdk/') || $error->status === null) ? null : $error->details];
     }
 
     #[DataProvider('errors')]
@@ -361,7 +362,10 @@ final class ContractTest extends TestCase
         }
         $received = [];
         $handler = function (RequestInterface $request, array $options) use ($case, &$received) {
-            $received[] = [$request, (string) $request->getBody()];
+            // A large raw body is kept as its length and hash, all its check reads, so a file sent
+            // in many parts isn't held in memory once for each.
+            $content = (string) $request->getBody();
+            $received[] = [$request, strlen($content) > 1024 * 1024 ? ['bodyLength' => strlen($content), 'bodySha256' => hash('sha256', $content)] : $content];
             $scripted = $case['responses'][count($received) - 1] ?? null;
             if ($scripted === null) {
                 throw new \LogicException('request ' . count($received) . ' has no scripted response');
@@ -467,8 +471,8 @@ final class ContractTest extends TestCase
                     self::assertSameJson($want['body'], json_decode($body, true), "$label: body");
                 }
             } else {
-                $raw = ['bodyLength' => strlen($body), 'bodySha256' => hash('sha256', $body)];
-                if (isset($want['bodyBase64'])) {
+                $raw = is_array($body) ? $body : ['bodyLength' => strlen($body), 'bodySha256' => hash('sha256', $body)];
+                if (isset($want['bodyBase64']) && is_string($body)) {
                     $raw['bodyBase64'] = base64_encode($body);
                 }
                 self::assertSame(array_intersect_key($want, $raw), $raw, "$label: raw body");

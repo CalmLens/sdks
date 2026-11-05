@@ -170,9 +170,6 @@ func TestPartSizeAndSplitUploadLimits(t *testing.T) {
 	if _, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "huge.png", Content: &Content{Type: "image/png", Bytes: fileOf(21 * mib)}}); ErrorCode(err) != CodeMultipartImageTooLarge {
 		t.Fatal(err)
 	}
-	if _, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "video.mp4", Content: &Content{Type: "video/mp4", Bytes: fileOf(51 * mib)}}); ErrorCode(err) != CodeFileTooLarge {
-		t.Fatal(err)
-	}
 	if len(h.calls) != 0 {
 		t.Fatal("sent", len(h.calls))
 	}

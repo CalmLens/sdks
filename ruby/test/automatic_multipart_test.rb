@@ -142,10 +142,6 @@ class AutomaticMultipartTest < Minitest::Test
       client.assets.create(name: 'huge.png', content: { data: file_of(21 * MIB), type: 'image/png' })
     end
     assert_equal CalmLens::ErrorCodes::MULTIPART_IMAGE_TOO_LARGE, error.code
-    error = assert_raises(CalmLens::InvalidArgumentError) do
-      client.assets.create(name: 'long.mp4', content: { data: StringIO.new(''), size_in_bytes: (50 * MIB) + 1, type: 'video/mp4' })
-    end
-    assert_equal CalmLens::ErrorCodes::FILE_TOO_LARGE, error.code
     assert_empty sent
   end
 

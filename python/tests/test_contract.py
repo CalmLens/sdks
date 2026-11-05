@@ -144,10 +144,11 @@ def _resolve_name(root: Any, path: str) -> Any:
 
 def _error_fields(error: BaseException) -> dict[str, Any]:
     """The error fields every runner compares, ``None`` where there is none. Python's ``details``
-    is always a dict: an API error code always has the body's ``details`` object (empty or not),
-    and an empty dict on an ``sdk/*`` error is no details."""
+    is always a dict: an API response's error always has the body's ``details`` object (empty or
+    not), and an empty dict on an error raised before sending (an ``sdk/*`` code, or an API code
+    such as ``upload/file-too-large`` without a status) is no details."""
     assert isinstance(error, CalmLensError), repr(error)
-    has_details = bool(error.details) or not error.code.startswith("sdk/")
+    has_details = bool(error.details) or (not error.code.startswith("sdk/") and error.status is not None)
     return {"code": error.code, "status": error.status, "requestId": error.request_id,
             "retryAfter": error.retry_after, "details": _json(error.details) if has_details else None}
 

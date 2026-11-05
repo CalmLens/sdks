@@ -84,17 +84,21 @@ func partSize(content Content, size *int64) error {
 	return nil
 }
 
-// The API's limits for one-request uploads: images up to 10 MiB (larger ones are uploaded in
-// parts), audio and video up to 50 MiB and other files up to 5,000 MiB.
+// The API's upload limits: in one request, images up to 10 MiB (larger ones are uploaded in
+// parts), audio and video up to 50 MiB and other files up to 5,000 MiB. Sent in parts, audio and
+// video can be up to 2 GiB; the API holds free uploads, made before billing is set up, to 50 MiB
+// itself.
 const (
 	maxDirectImageBytes = 10 * 1024 * 1024
 	maxMediaBytes       = 50 * 1024 * 1024
+	maxLongMediaBytes   = 2 * 1024 * 1024 * 1024
 	maxFileBytes        = 5000 * 1024 * 1024
 )
 
-// directSize refuses one-request content whose known size is over the API's limit for its
-// type, before any of it is sent.
-func directSize(mime string, size *int64) error {
+// uploadSize refuses content whose known size is over the API's limit for its type, before any
+// of it is sent: inParts selects the limits for content sent in parts. Images in parts are
+// checked by imageSize.
+func uploadSize(mime string, size *int64, inParts bool) error {
 	if size == nil {
 		return nil
 	}
@@ -103,7 +107,10 @@ func directSize(mime string, size *int64) error {
 	case strings.HasPrefix(mime, "image/"):
 		limit, message = maxDirectImageBytes, "Images uploaded in one request can be at most 10 MiB; upload larger images in parts"
 	case strings.HasPrefix(mime, "audio/") || strings.HasPrefix(mime, "video/"):
-		limit, message = maxMediaBytes, "Audio and video files can be at most 50 MiB"
+		limit, message = maxMediaBytes, "Audio and video files can be at most 50 MiB in one request, or 2 GiB in parts"
+		if inParts {
+			limit = maxLongMediaBytes
+		}
 	}
 	if *size > limit {
 		return invalid(CodeFileTooLarge, message)
@@ -274,7 +281,13 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 			}
 		}
 	} else if !multipart && !s.c.deferUploadChecks {
-		if err = directSize(mime, size); err != nil {
+		if err = uploadSize(mime, size, split != nil); err != nil {
+			return nil, err
+		}
+	}
+	// A declared whole-file size over the limit for parts can never finish.
+	if multipart && !s.c.deferUploadChecks && !strings.HasPrefix(mime, "image/") {
+		if err = uploadSize(mime, options.TotalSizeInBytes, true); err != nil {
 			return nil, err
 		}
 	}

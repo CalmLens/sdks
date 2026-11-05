@@ -706,7 +706,7 @@ impl ServerClient {
                 if mime.starts_with("image/") {
                     check_image_size(size, false)?;
                 } else {
-                    check_direct_size(&mime, size)?;
+                    check_upload_size(&mime, size, true)?;
                 }
             }
             return self
@@ -716,11 +716,14 @@ impl ServerClient {
         if multipart && !self.inner.transport.defers_upload_checks() {
             if mime.starts_with("image/") {
                 check_image_size(size, is_final)?;
+            } else {
+                // A declared whole-file size over the limit for parts can never finish.
+                check_upload_size(&mime, options.total_size_in_bytes, true)?;
             }
             check_part_size(size, is_final)?;
         }
         if !multipart && !self.inner.transport.defers_upload_checks() {
-            check_direct_size(&mime, size)?;
+            check_upload_size(&mime, size, false)?;
         }
         query.push("contentType", &content.mime_type);
         query.opt("sizeInBytes", size);
@@ -942,10 +945,12 @@ fn check_image_size(size: Option<u64>, _is_final: bool) -> Result<()> {
     Ok(())
 }
 
-/// Refuses one-request content whose known size is over the API's limit for its type, before it
-/// is sent: images up to 10 MiB (larger ones are uploaded in parts), audio and video up to 50 MiB
-/// and other files up to 5,000 MiB.
-fn check_direct_size(mime: &str, size: Option<u64>) -> Result<()> {
+/// Refuses content whose known size is over the API's limit for its type, before it is sent. In
+/// one request, images can be up to 10 MiB (larger ones are uploaded in parts), audio and video up
+/// to 50 MiB and other files up to 5,000 MiB. Sent in parts (`in_parts`), audio and video can be
+/// up to 2 GiB; the API holds free uploads, made before billing is set up, to 50 MiB itself.
+/// Images in parts are checked by `check_image_size`.
+fn check_upload_size(mime: &str, size: Option<u64>, in_parts: bool) -> Result<()> {
     let Some(size) = size else { return Ok(()) };
     let (limit, message) = if mime.starts_with("image/") {
         (
@@ -954,8 +959,8 @@ fn check_direct_size(mime: &str, size: Option<u64>) -> Result<()> {
         )
     } else if mime.starts_with("audio/") || mime.starts_with("video/") {
         (
-            50 * 1024 * 1024,
-            "Audio and video files can be at most 50 MiB",
+            if in_parts { 2048 } else { 50 } * 1024 * 1024,
+            "Audio and video files can be at most 50 MiB in one request, or 2 GiB in parts",
         )
     } else {
         (5000 * 1024 * 1024, "Files can be at most 5,000 MiB")

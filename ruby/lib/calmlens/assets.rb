@@ -23,6 +23,9 @@ module CalmLens
     MAX_DIRECT_IMAGE_BYTES = 10 * 1024 * 1024
     MAX_MEDIA_BYTES = 50 * 1024 * 1024
     MAX_FILE_BYTES = 5000 * 1024 * 1024
+    # Audio and video sent in parts can be up to 2 GiB; the API holds free uploads, made before
+    # billing is set up, to MAX_MEDIA_BYTES itself.
+    MAX_LONG_MEDIA_BYTES = 2 * 1024 * 1024 * 1024
     # The longest `idempotency_key` of an upload sent in parts: each part's key adds `:part-<n>`.
     MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH = 240
     # The moderation status before a decision; {#wait_for_decision} returns once an asset has any
@@ -397,7 +400,7 @@ module CalmLens
       body = UploadBody.from(content, multipart: multipart, part_size: !@session.defer_upload_checks)
       return upload_in_parts(options, request_options, queue, mime, body) if !multipart && splits?(content, body)
 
-      check_direct_size(mime, body.size) unless multipart || @session.defer_upload_checks
+      check_upload_size(mime, body.size) unless multipart || @session.defer_upload_checks
       query = options.slice(*SUBMIT_QUERY_KEYS).merge('queue' => queue, 'contentType' => content['type'],
                                                       'sizeInBytes' => body.size)
       query.merge!(first_part_query(options, content, mime, body)) if multipart
@@ -422,7 +425,7 @@ module CalmLens
                                'for content uploaded in parts')
       end
       unless @session.defer_upload_checks
-        mime.start_with?('image/') ? check_image_size(body.size) : check_direct_size(mime, body.size)
+        mime.start_with?('image/') ? check_image_size(body.size) : check_upload_size(mime, body.size, in_parts: true)
       end
 
       total = body.size
@@ -494,7 +497,10 @@ module CalmLens
       end
 
       final = content.fetch('isFinal', false)
-      check_image_size(total || body.size) if mime.start_with?('image/') && !@session.defer_upload_checks
+      unless @session.defer_upload_checks
+        # A declared whole-file size over the limit for parts can never finish.
+        mime.start_with?('image/') ? check_image_size(total || body.size) : check_upload_size(mime, total, in_parts: true)
+      end
       { 'partNumber' => 1, 'isFinal' => final, 'totalSizeInBytes' => total }
     end
 
@@ -538,15 +544,17 @@ module CalmLens
       mime
     end
 
-    # Refuses one-request content whose known size is over the API's limit for its type, before
-    # any of it is sent.
-    def check_direct_size(mime, size)
+    # Refuses content whose known size is over the API's limit for its type, before any of it is
+    # sent: `in_parts` selects the limits for content sent in parts. Images in parts are checked by
+    # {#check_image_size}.
+    def check_upload_size(mime, size, in_parts: false)
       return if size.nil?
 
       limit, message = if mime.start_with?('image/')
                          [MAX_DIRECT_IMAGE_BYTES, 'Images uploaded in one request can be at most 10 MiB; upload larger images in parts']
                        elsif mime.start_with?('audio/', 'video/')
-                         [MAX_MEDIA_BYTES, 'Audio and video files can be at most 50 MiB']
+                         [in_parts ? MAX_LONG_MEDIA_BYTES : MAX_MEDIA_BYTES,
+                          'Audio and video files can be at most 50 MiB in one request, or 2 GiB in parts']
                        else
                          [MAX_FILE_BYTES, 'Files can be at most 5,000 MiB']
                        end

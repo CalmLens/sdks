@@ -4,7 +4,7 @@ import {
   getAssetPayloadByteLength,
   validateAssetPayload,
 } from "../contract/AssetPayload.js";
-import { MAX_MEDIA_UPLOAD_BYTES } from "../contract/Media.js";
+import { MAX_LONG_MEDIA_UPLOAD_BYTES, MAX_MEDIA_UPLOAD_BYTES } from "../contract/Media.js";
 import { selectModerationContextItems } from "../contract/ModerationContextLimits.js";
 import {
   DOMAIN,
@@ -170,23 +170,25 @@ export const assertDeclaredPayloadSize = (
 };
 
 /**
- * Refuses one-request content whose known size is over the API's limit for its type: images up
- * to 10 MiB (larger ones are uploaded in parts), audio and video up to 50 MiB, other files up to
- * 5,000 MiB. Nothing is sent, so an oversized file fails at once instead of after its upload.
+ * Refuses content whose known size is over the API's limit for its type, so nothing is sent and
+ * an oversized file fails at once instead of after its upload. In one request, images can be up
+ * to 10 MiB (larger ones are uploaded in parts), audio and video up to 50 MiB and other files up
+ * to 5,000 MiB. Sent in parts (`inParts`), audio and video can be up to 2 GiB; the API holds free
+ * uploads, made before billing is set up, to 50 MiB itself. Images in parts are checked apart.
  */
-const assertDirectUploadSize = (
-  content: AssetBinaryPayloadInput & { type: string; sizeInBytes?: number },
-) => {
-  const size = content.sizeInBytes ?? getAssetPayloadByteLength(content);
+const assertUploadSize = (type: string, size: number | undefined, inParts: boolean) => {
   if (size === undefined) return;
-  const type = content.type.toLowerCase();
-  const [limit, message] = type.startsWith("image/")
+  const mime = type.toLowerCase();
+  const [limit, message] = mime.startsWith("image/")
     ? [
         MAX_DIRECT_IMAGE_UPLOAD_BYTES,
         "Images uploaded in one request can be at most 10 MiB; upload larger images in parts",
       ]
-    : type.startsWith("audio/") || type.startsWith("video/")
-      ? [MAX_MEDIA_UPLOAD_BYTES, "Audio and video files can be at most 50 MiB"]
+    : mime.startsWith("audio/") || mime.startsWith("video/")
+      ? [
+          inParts ? MAX_LONG_MEDIA_UPLOAD_BYTES : MAX_MEDIA_UPLOAD_BYTES,
+          "Audio and video files can be at most 50 MiB in one request, or 2 GiB in parts",
+        ]
       : [MAX_NON_IMAGE_UPLOAD_BYTES, "Files can be at most 5,000 MiB"];
   if (size > limit) throw new CalmLensError(API_ERROR_CODES.FILE_TOO_LARGE, { message });
 };
@@ -231,7 +233,13 @@ export const prepareSubmitAssetOptions = (
           message: "Multipart image uploads cannot exceed 20MB.",
         });
       }
-    } else if (!deferUploadChecks) assertDirectUploadSize(options.content);
+    } else if (!deferUploadChecks) {
+      assertUploadSize(
+        options.content.type,
+        options.content.sizeInBytes ?? getAssetPayloadByteLength(options.content),
+        inParts,
+      );
+    }
     if (!("plainText" in options.content)) {
       const validation = validateAssetPayload(options.content);
       if (!validation.ok) throw invalidPayload(validation.error);
@@ -247,6 +255,10 @@ export const prepareSubmitAssetOptions = (
           message: "Multipart image uploads cannot exceed 20MB.",
         });
       }
+    }
+    // A declared whole-file size over the limit for parts can never finish.
+    if (!deferUploadChecks && !isImageMimeType(options.part.type)) {
+      assertUploadSize(options.part.type, options.totalSizeInBytes, true);
     }
     // Deferred, only the base64 part boundary is checked here; the API checks part sizes.
     const validation = validateAssetPayload(options.part, {
