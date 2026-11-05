@@ -207,7 +207,7 @@ func TestMockRefusesFailuresItCannotInject(t *testing.T) {
 		"code and error":                   {Code: FailureTimeout, Err: errors.New("offline")},
 		"details on a transport error":     {Err: errors.New("offline"), Details: calmlens.JSON{"reason": "slow"}},
 		"Retry-After on a transport error": {Err: errors.New("offline"), RetryAfter: calmlens.Ptr(time.Second)},
-		"fractional Retry-After":           {Code: calmlens.CodeUploadLimitExceeded, RetryAfter: calmlens.Ptr(1500 * time.Millisecond)},
+		"fractional Retry-After":           {Code: calmlens.CodeFreeUploadsExhausted, RetryAfter: calmlens.Ptr(1500 * time.Millisecond)},
 	} {
 		if err := c.FailNextRequest(RequestFailure{Code: FailureTimeout}, failure); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
 			t.Errorf("%s: got %v, want sdk/invalid-argument", name, err)
@@ -414,7 +414,7 @@ func TestMockServesStandInBytesForRenderedFilesAndPreviews(t *testing.T) {
 	}
 	// Like the API, a resource outside the signed list is refused before the asset is looked up.
 	_, err = c.dispatch("POST", []string{"assets", "asset_00000000000000000000", "signed-url"}, nil, []byte(`{"resource":"placeholder"}`), http.Header{"Content-Type": {"application/json"}})
-	if refused, ok := err.(*apiError); !ok || refused.code != "validation/invalid-value" || refused.details["path"] != "resource" {
+	if refused, ok := err.(*apiError); !ok || refused.code != calmlens.CodeInvalidRequest || !reflect.DeepEqual(withoutIssueMessages(refused.details), issue("validation/invalid-value", "resource")) {
 		t.Fatal(err)
 	}
 }
@@ -444,15 +444,46 @@ func TestMockSafetyHoldWithholdsEveryResourceAndTheTimeline(t *testing.T) {
 		}
 	}
 	// The page size is checked first, then the hold.
-	if _, err = c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID, PageSize: 101}); calmlens.ErrorCode(err) != "validation/too-big" {
+	if _, err = c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID, PageSize: 101}); calmlens.ErrorCode(err) != calmlens.CodeInvalidRequest {
 		t.Fatal(err)
 	}
-	if _, err = c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetSafetyHeld {
+	var held *calmlens.Error
+	if _, err = c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID}); !errors.As(err, &held) || held.Code != calmlens.CodeAssetHeld || held.Status != http.StatusLocked || held.Details["hold"] != "safety" {
 		t.Fatal(err)
 	}
 	// A decision while held keeps the rendered file and preview withheld.
 	if a, err = c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: a.ID, Decision: calmlens.ModerationStatusBlocked, Note: "Held"}); err != nil || a.Content.Rendered != nil || a.Content.Preview != nil {
 		t.Fatal(a, err)
+	}
+}
+
+func TestMockEventsFeedRefusesMalformedFiltersAndEnqueuedEventsHaveActors(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	refused := func(options calmlens.ListEventsOptions, code, path string) {
+		t.Helper()
+		_, err := c.Events.List(ctx, options)
+		var apiErr *calmlens.Error
+		if !errors.As(err, &apiErr) || apiErr.Code != calmlens.CodeInvalidRequest || !reflect.DeepEqual(withoutIssueMessages(apiErr.Details), issue(code, path)) {
+			t.Fatalf("%+v: got %v, want %s at %s", options, err, code, path)
+		}
+	}
+	refused(calmlens.ListEventsOptions{Types: []string{calmlens.EventAssetBlocked, "blocked"}}, "validation/invalid-value", "types")
+	refused(calmlens.ListEventsOptions{AssetID: "asset-1"}, "validation/invalid-format", "assetId")
+	start, err := c.Events.List(ctx, calmlens.ListEventsOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyID := "key_1"
+	stored := c.EnqueueEvent(calmlens.Event{Type: calmlens.EventConnectorDisabled}, calmlens.Event{Type: calmlens.EventAPIKeyDeleted, Actor: calmlens.Actor{Type: calmlens.ActorUser, ID: &keyID}})
+	page, err := c.Events.List(ctx, calmlens.ListEventsOptions{Cursor: start.NextCursor})
+	if err != nil || len(page.Items) != 2 {
+		t.Fatal(page, err)
+	}
+	// An event enqueued without an actor is the mock API key's, which has no ID; a given one is kept.
+	if stored[0].Actor != (calmlens.Actor{Type: calmlens.ActorAPIKey}) || page.Items[0].Actor != stored[0].Actor ||
+		page.Items[1].Actor.Type != calmlens.ActorUser || *page.Items[1].Actor.ID != keyID {
+		t.Fatalf("actors %+v %+v", stored, page.Items)
 	}
 }
 
@@ -499,8 +530,16 @@ func TestMockWaitForDecisionReadsStorage(t *testing.T) {
 	if len(requests) < 2 || requests[1].Method != http.MethodGet || requests[1].Path != "/assets/"+queued.ID {
 		t.Fatal(requests)
 	}
+	// A decided asset still processing isn't settled yet.
 	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
 		db.Assets[queued.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["status"] = calmlens.ModerationStatusBlocked
+	})
+	_, err = c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID, Timeout: calmlens.Ptr(time.Duration(0))})
+	if !errors.As(err, &timeout) || timeout.Code != calmlens.CodeSDKTimeout || timeout.Details["classificationStatus"] != calmlens.ClassificationStatusProcessing {
+		t.Fatal(err)
+	}
+	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
+		db.Assets[queued.ID]["classification"].(calmlens.JSON)["status"] = calmlens.ClassificationStatusCompleted
 	})
 	got, err := c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID})
 	if err != nil || got.ID != queued.ID || got.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
@@ -565,7 +604,7 @@ func TestMockHashListEntriesFromAssetsPagesAndCascade(t *testing.T) {
 		content["perceptualHash"], content["perceptualHashQuality"] = hash, float64(73)
 	})
 	fromAsset, err := c.HashLists.AddEntry(ctx, calmlens.AddHashListEntryOptions{HashListID: list.ID, AssetID: a.ID, Label: calmlens.Ptr("Report 1")})
-	if err != nil || fromAsset.Hash != hash || fromAsset.Quality == nil || *fromAsset.Quality != 73 || fromAsset.SourceAssetID == nil || *fromAsset.SourceAssetID != a.ID || *fromAsset.Label != "Report 1" || c.lastStatus != http.StatusCreated {
+	if err != nil || fromAsset.Hash != hash || fromAsset.Quality == nil || *fromAsset.Quality != 73 || fromAsset.AssetID == nil || *fromAsset.AssetID != a.ID || *fromAsset.Label != "Report 1" || c.lastStatus != http.StatusCreated {
 		t.Fatalf("entry from asset: %+v, status %d, %v", fromAsset, c.lastStatus, err)
 	}
 	again, err := c.HashLists.AddEntry(ctx, calmlens.AddHashListEntryOptions{HashListID: list.ID, Hash: strings.ToUpper(hash)})
@@ -614,8 +653,14 @@ func TestMockDecideValidatesLikeTheAPI(t *testing.T) {
 		options.AssetID = asset.ID
 		_, err := c.Assets.Decide(ctx, options)
 		var apiErr *calmlens.Error
-		if !errors.As(err, &apiErr) || apiErr.Code != code || (path != "" && apiErr.Details["path"] != path) {
-			t.Fatalf("%+v: got %v, want %s at %q", options, err, code, path)
+		if path == "" {
+			if !errors.As(err, &apiErr) || apiErr.Code != code {
+				t.Fatalf("%+v: got %v, want %s", options, err, code)
+			}
+			return
+		}
+		if !errors.As(err, &apiErr) || apiErr.Code != calmlens.CodeInvalidRequest || !reflect.DeepEqual(withoutIssueMessages(apiErr.Details), issue(code, path)) {
+			t.Fatalf("%+v: got %v %v, want %s at %q", options, err, apiErr, code, path)
 		}
 	}
 	refused(calmlens.DecideAssetOptions{Decision: "approved", Note: "x"}, "validation/invalid-value", "decision")
@@ -626,14 +671,41 @@ func TestMockDecideValidatesLikeTheAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The review names the API key that decided (mock keys have no ID), never a person.
 	reviews := purged.Classification.Moderation.ManualReviews
-	if len(reviews) != 1 || reviews[0].Note == nil || *reviews[0].Note != "Illegal" {
+	if len(reviews) != 1 || reviews[0].Note == nil || *reviews[0].Note != "Illegal" || !reviews[0].Applied ||
+		reviews[0].DecidedBy != (calmlens.ReviewActor{Type: calmlens.ReviewActorAPIKey}) {
 		t.Fatalf("reviews %+v", reviews)
 	}
 	refused(calmlens.DecideAssetOptions{Decision: calmlens.ModerationStatusAllowed, Note: "x"}, calmlens.CodeAssetContentPurged, "")
 	if blocked, err := c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: asset.ID, Decision: calmlens.ModerationStatusBlocked, Note: "x"}); err != nil || blocked.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
 		t.Fatalf("blocking purged content: %v", err)
 	}
+}
+
+// issue is the details of a validation/invalid-request error for one issue, without its message.
+func issue(code, path string) map[string]any {
+	return map[string]any{"issues": []any{map[string]any{"path": path, "code": code}}}
+}
+
+// withoutIssueMessages drops each issue's message from a validation error's details, to compare
+// the rest with issue.
+func withoutIssueMessages(details map[string]any) map[string]any {
+	issues, ok := details["issues"].([]any)
+	if !ok {
+		return details
+	}
+	stripped := make([]any, len(issues))
+	for i, item := range issues {
+		copied := map[string]any{}
+		for key, value := range item.(map[string]any) {
+			if key != "message" {
+				copied[key] = value
+			}
+		}
+		stripped[i] = copied
+	}
+	return map[string]any{"issues": stripped}
 }
 
 // The mock refuses, like the API's schema and before looking up the asset, what the typed client
@@ -656,19 +728,19 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 		code                      string
 		details                   map[string]any
 	}{
-		{"JSON metadata object", "POST", assets, "queue=false", jsonHeader, `{"name":"x","url":"https://example.com","metadata":{"a":1}}`, "validation/invalid-type", map[string]any{"path": "metadata"}},
-		{"raw upload metadata item not an object", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`["source"]`), upload("content"), "hello", "validation/invalid-type", map[string]any{"path": "metadata.0"}},
-		{"raw upload metadata id not a string", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":7,"value":1}]`), upload("content"), "hello", "validation/invalid-type", map[string]any{"path": "metadata.0.id"}},
-		{"raw upload metadata without a value", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":"source"}]`), upload("content"), "hello", "validation/invalid-value", map[string]any{"path": "metadata.0.value"}},
-		{"update metadata object", "PATCH", "/assets/missing", "", jsonHeader, `{"metadata":{"a":1}}`, "validation/invalid-type", map[string]any{"path": "metadata"}},
-		{"update null name", "PATCH", "/assets/missing", "", jsonHeader, `{"name":null}`, "validation/invalid-type", map[string]any{"path": "name"}},
-		{"signed URL null viewerClaims", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"viewerClaims":null}`, "validation/invalid-type", map[string]any{"path": "viewerClaims"}},
-		{"signed URL null resource", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"resource":null}`, "validation/invalid-value", map[string]any{"path": "resource"}},
-		{"signed URL null lens", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"lens":null}`, "validation/invalid-type", map[string]any{"path": "lens"}},
-		{"signed URL null transform", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"transform":null}`, "validation/invalid-type", map[string]any{"path": "transform"}},
-		{"signed URL null expiresInSeconds", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"expiresInSeconds":null}`, "validation/invalid-type", map[string]any{"path": "expiresInSeconds"}},
-		{"raw upload of a refused type", "POST", assets, "name=x&contentType=application%2Fzip", upload("content"), "hello", calmlens.CodeInvalidUploadMimeType, map[string]any{"mimeType": "application/zip"}},
-		{"first part of a refused type", "POST", assets, "name=x&isFinal=true&contentType=application%2Fx-made-up", upload("part"), "hello", calmlens.CodeInvalidUploadMimeType, map[string]any{"mimeType": "application/x-made-up"}},
+		{"JSON metadata object", "POST", assets, "queue=false", jsonHeader, `{"name":"x","url":"https://example.com","metadata":{"a":1}}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata")},
+		{"raw upload metadata item not an object", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`["source"]`), upload("content"), "hello", calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata.0")},
+		{"raw upload metadata id not a string", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":7,"value":1}]`), upload("content"), "hello", calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata.0.id")},
+		{"raw upload metadata without a value", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":"source"}]`), upload("content"), "hello", calmlens.CodeInvalidRequest, issue("validation/invalid-value", "metadata.0.value")},
+		{"update metadata object", "PATCH", "/assets/missing", "", jsonHeader, `{"metadata":{"a":1}}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata")},
+		{"update null name", "PATCH", "/assets/missing", "", jsonHeader, `{"name":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "name")},
+		{"signed URL null viewerClaims", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"viewerClaims":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "viewerClaims")},
+		{"signed URL null resource", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"resource":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-value", "resource")},
+		{"signed URL null lens", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"lens":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "lens")},
+		{"signed URL null transform", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"transform":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "transform")},
+		{"signed URL null expiresInSeconds", "POST", "/assets/missing/signed-url", "", jsonHeader, `{"expiresInSeconds":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "expiresInSeconds")},
+		{"raw upload of a refused type", "POST", assets, "name=x&contentType=application%2Fzip", upload("content"), "hello", calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/zip", "source": "calmlens"}},
+		{"first part of a refused type", "POST", assets, "name=x&isFinal=true&contentType=application%2Fx-made-up", upload("part"), "hello", calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/x-made-up", "source": "calmlens"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -690,12 +762,45 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 			if err = json.NewDecoder(res.Body).Decode(&body); err != nil {
 				t.Fatal(err)
 			}
-			if res.StatusCode != http.StatusBadRequest || body.Code != c.code || !reflect.DeepEqual(body.Details, c.details) {
-				t.Fatalf("got %d %s %v; want 400 %s %v", res.StatusCode, body.Code, body.Details, c.code, c.details)
+			status, _ := calmlens.PublicErrorStatus(c.code)
+			if res.StatusCode != status || body.Code != c.code || !reflect.DeepEqual(withoutIssueMessages(body.Details), c.details) {
+				t.Fatalf("got %d %s %v; want %d %s %v", res.StatusCode, body.Code, body.Details, status, c.code, c.details)
 			}
 		})
 	}
 	if len(m.DatabaseStorage.Assets) != 0 {
 		t.Fatalf("stored %d assets", len(m.DatabaseStorage.Assets))
+	}
+}
+
+func TestMockStoresUploadTagsAndKeepsProcessingOptionsOutOfTheAsset(t *testing.T) {
+	c, err := NewServerClient(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	uploaded, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "photo.png", Content: &calmlens.Content{Type: "image/png", Bytes: []byte{1, 2, 3}}, Tags: []string{"catalogue", "backpacks"}, ProcessingOptions: keep})
+	if err != nil {
+		t.Fatal(err)
+	}
+	site, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "site", URL: "https://example.com", Tags: []string{"landing"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text, err := c.Text.Classify(ctx, calmlens.ClassifyTextOptions{Text: "hello", Tags: []string{"comment"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	retrieved, err := c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: site.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(uploaded.Tags, []string{"catalogue", "backpacks"}) || !reflect.DeepEqual(retrieved.Tags, []string{"landing"}) || !reflect.DeepEqual(text.Tags, []string{"comment"}) {
+		t.Fatal(uploaded.Tags, retrieved.Tags, text.Tags)
+	}
+	// The upload's processing options still apply, though the asset doesn't return them.
+	if _, ok := uploaded.Raw["processingOptions"]; ok || uploaded.Content.Status != calmlens.ContentStatusStored {
+		t.Fatal(uploaded.Raw["processingOptions"], uploaded.Content.Status)
 	}
 }

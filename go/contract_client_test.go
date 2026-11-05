@@ -324,8 +324,8 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		return one(c.Assets.Decide(ctx, options))
 	case "assets.explain":
 		return one(c.Assets.Explain(ctx, into[ExplainAssetOptions](t, args)))
-	case "assets.deleteContent":
-		return one(c.Assets.DeleteContent(ctx, into[AssetIDOptions](t, args)))
+	case "assets.removeContent":
+		return one(c.Assets.RemoveContent(ctx, into[AssetIDOptions](t, args)))
 	case "assets.delete":
 		return fixtureCall{}, c.Assets.Delete(ctx, into[AssetIDOptions](t, args))
 	case "assets.batch":

@@ -48,8 +48,9 @@ type Error struct {
 	Code string `json:"code"`
 	// Message is a human-readable description. Do not match on it.
 	Message string `json:"message"`
-	// Details holds structured details from the API, such as validation issues, or local
-	// details such as "cursor" for a repeated iterator cursor. It is nil when there are none,
+	// Details holds structured details from the API that tell an error code's cases apart, such
+	// as "issues" (each issue's "path", "message" and issue "code", such as CodeTooBig) for
+	// CodeInvalidRequest, or local details such as "cursor" for a repeated iterator cursor. It is nil when there are none,
 	// as for transport failures.
 	Details JSON `json:"details"`
 	// Status is the HTTP status, or 0 when no response was received.

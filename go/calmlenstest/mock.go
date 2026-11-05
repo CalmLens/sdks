@@ -90,7 +90,7 @@ type Options struct {
 	// MaxRetries defaults to 0 in the mock, so a FailNextRequest failure fails exactly one call.
 	// Set it to test the client's retry behaviour. Waits take no real time: retry backoff and
 	// Assets.WaitForDecision only advance the mock client's clock, so WaitForDecision returns
-	// sdk/timeout at once for an asset whose moderation stays pending.
+	// sdk/timeout at once for an asset that stays queued or processing.
 	MaxRetries      *int
 	DatabaseStorage *InMemoryDatabaseStorage
 	ImageStorage    *InMemoryImageStorage
@@ -173,6 +173,10 @@ type MockServerClient struct {
 	// waited is the time the client has spent waiting; mock waits advance it instead of sleeping.
 	waited time.Duration
 	mu     sync.Mutex
+
+	// processingOptions are the processing options each asset was uploaded with, which the API
+	// keeps but doesn't return.
+	processingOptions map[string]calmlens.JSON
 }
 
 // Failures for RequestFailure.Code besides API error codes.
@@ -186,7 +190,7 @@ const (
 // RequestFailure is how FailNextRequest fails a request.
 type RequestFailure struct {
 	// Code is FailureTransportError, FailureTimeout or an API error code, such as
-	// calmlens.CodeUploadLimitExceeded, which the mock answers with its HTTP status.
+	// calmlens.CodeFreeUploadsExhausted, which the mock answers with its HTTP status.
 	Code string
 	// Err, instead of Code, is the transport error the request fails with: the client returns a
 	// *calmlens.Error with code sdk/transport-error wrapping it, or sdk/timeout for
@@ -282,7 +286,8 @@ func (m *MockServerClient) WithStorage(fn func(db *InMemoryDatabaseStorage, imag
 }
 
 // EnqueueEvent appends events to the mock event feed and returns them as stored. Missing IDs,
-// project IDs, severities (low), titles (the type), facts and creation times are filled in, each
+// project IDs, actors (the mock's API key, which has no ID: calmlens.ActorAPIKey with a nil ID),
+// severities (low), titles (the type), facts and creation times are filled in, each
 // event about an asset takes that asset's next AssetSequence like the API's (any given one is
 // ignored; events without an AssetID have none), and
 // an event with the AssetID of a stored asset and no Asset carries that asset's snapshot, like
@@ -304,6 +309,9 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 		}
 		if event.ProjectID == "" {
 			event.ProjectID = m.options.ProjectID
+		}
+		if event.Actor.Type == "" {
+			event.Actor = mockAPIKeyActor
 		}
 		if event.CreatedAt == 0 {
 			event.CreatedAt = m.options.Now()
@@ -342,7 +350,7 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 // ...AgeRestricted, ...Blocked or ...Purged) to a stored asset, as the portal or API would: the moderation status
 // changes (purged also removes the content with removal reason requested, recording an
 // asset.content-removed event first), the review joins manualReviews, and an "asset.<decision>"
-// event with a decided-by: reviewer fact joins the events feed. The moderation report stays as
+// event whose Actor is a calmlens.ActorUser joins the events feed. The moderation report stays as
 // it was. It returns a *calmlens.Error with code asset/not-found for an unknown asset, and
 // sdk/invalid-argument for another decision, such as OutcomePending or OutcomeFailed.
 func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, error) {
@@ -400,8 +408,9 @@ func toAsset(a calmlens.JSON) (*calmlens.Asset, error) {
 // recordReview applies a reviewer's decision to a stored asset, like the API: the moderation
 // status changes (purged also removes the content with removal reason requested, recording an
 // asset.content-removed event first), the review joins manualReviews, and an
-// "asset.<decision>" event with a decided-by: reviewer fact joins the events feed. note is the
-// reviewer's note, or nil for the Decide test hook.
+// "asset.<decision>" event joins the events feed. note is the reviewer's note, or nil for the
+// Decide test hook. A decision through the API (with its note) is the mock API key's; the
+// Decide test hook's is a reviewer's, whose user ID the mock doesn't know.
 func (m *MockServerClient) recordReview(a calmlens.JSON, decision string, note any) {
 	m.applyOutcome(a, decision, calmlens.ContentRemovalReasonRequested, nil)
 	now := m.options.Now()
@@ -409,24 +418,22 @@ func (m *MockServerClient) recordReview(a calmlens.JSON, decision string, note a
 	reviews, _ := moderation["manualReviews"].([]any)
 	moderation["manualReviews"] = append(reviews, calmlens.JSON{
 		"id": m.options.CreateID("rev"), "decision": decision, "note": note,
-		"reviewerName": nil, "reviewerEmail": nil, "reviewedAt": now, "appliedToAsset": true,
+		// The review is the mock API key's, and mock API keys have no ID.
+		"decidedBy": calmlens.JSON{"type": calmlens.ReviewActorAPIKey, "id": nil}, "reviewedAt": now, "applied": true,
 	})
+	actor := mockAPIKeyActor
+	if note == nil {
+		actor = mockReviewerActor
+	}
 	if decision == OutcomePurged {
-		m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a)
+		m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a, actor, "")
 	}
 	// Like the event catalog: only allowing and limiting are low severity.
 	severity := calmlens.SeverityHigh
 	if decision == OutcomeAllowed || decision == OutcomeLimited {
 		severity = calmlens.SeverityLow
 	}
-	// A decision through the API (with its note) is the API key's; the Decide test hook's is a
-	// reviewer's.
-	decidedBy := calmlens.DecidedByAPIKey
-	if note == nil {
-		decidedBy = calmlens.DecidedByReviewer
-	}
-	m.addEvent("asset."+decision, severity, a, []any{
-		calmlens.JSON{"key": calmlens.FactDecidedBy, "value": decidedBy},
+	m.addEvent("asset."+decision, severity, a, actor, []any{
 		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
 		calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"], "url": "https://calmlens.com/go/asset/" + text(a["id"])},
 		calmlens.JSON{"key": calmlens.FactNote, "value": note},
@@ -494,7 +501,7 @@ func contentPurged(a calmlens.JSON) bool {
 	}
 	reviews, _ := section(section(a, "classification"), "moderation")["manualReviews"].([]any)
 	return slices.ContainsFunc(reviews, func(review any) bool {
-		return asJSON(review)["decision"] == OutcomePurged && asJSON(review)["appliedToAsset"] == true
+		return asJSON(review)["decision"] == OutcomePurged && asJSON(review)["applied"] == true
 	})
 }
 
@@ -505,25 +512,38 @@ func (m *MockServerClient) nextAssetSequence(assetID string) int64 {
 	return m.assetSequences[assetID]
 }
 
-// addEvent records an event about asset in the feed.
-func (m *MockServerClient) addEvent(eventType, severity string, a calmlens.JSON, facts []any) {
+// The actors of the mock's events: its API key (mock keys have no ID), a reviewer deciding through
+// the Decide test hook (whose user ID the mock doesn't know) and automated moderation.
+var (
+	mockAPIKeyActor   = calmlens.Actor{Type: calmlens.ActorAPIKey}
+	mockReviewerActor = calmlens.Actor{Type: calmlens.ActorUser}
+	automatedActor    = calmlens.Actor{Type: calmlens.ActorAutomated}
+)
+
+// addEvent records an event about asset, caused by actor, in the feed.
+func (m *MockServerClient) addEvent(eventType, severity string, a calmlens.JSON, actor calmlens.Actor, facts []any) {
 	now := m.options.Now()
 	m.events = append(m.events, calmlens.JSON{
-		"id": m.options.CreateID("evt"), "projectId": m.options.ProjectID,
+		"id": m.options.CreateID("evt"), "projectId": m.options.ProjectID, "actor": calmlens.JSON{"type": actor.Type, "id": actor.ID},
 		"type": eventType, "severity": severity, "title": eventType,
 		"description": nil, "assetId": a["id"], "assetSequence": m.nextAssetSequence(text(a["id"])), "asset": snapshot(a),
 		"facts": facts, "createdAt": now,
 	})
 }
 
-// recordLifecycleEvent adds an asset.deleted, asset.content-removed or asset.retried event, like
-// the API. A deleted asset has no portal page to link its name to.
-func (m *MockServerClient) recordLifecycleEvent(eventType string, a calmlens.JSON) {
+// recordLifecycleEvent adds an asset.deleted, asset.content-removed or asset.retried event caused
+// by actor, like the API, with the batch-id fact when batchID is set. A deleted asset has no
+// portal page to link its name to.
+func (m *MockServerClient) recordLifecycleEvent(eventType string, a calmlens.JSON, actor calmlens.Actor, batchID string) {
 	name := calmlens.JSON{"key": calmlens.FactAssetName, "value": a["name"]}
 	if eventType != calmlens.EventAssetDeleted {
 		name["url"] = "https://calmlens.com/go/asset/" + text(a["id"])
 	}
-	m.addEvent(eventType, calmlens.SeverityLow, a, []any{name, calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]}})
+	facts := []any{name, calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]}}
+	if batchID != "" {
+		facts = append(facts, calmlens.JSON{"key": calmlens.FactBatchID, "value": batchID})
+	}
+	m.addEvent(eventType, calmlens.SeverityLow, a, actor, facts)
 }
 
 // snapshot is the asset summary events carry.
@@ -608,7 +628,7 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 	if images.Content == nil {
 		images.Content = map[string]*StoredContent{}
 	}
-	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}, assetSequences: map[string]int64{}}
+	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}, assetSequences: map[string]int64{}, processingOptions: map[string]calmlens.JSON{}}
 	client, err := calmlens.NewServerClient(calmlens.Options{APIKey: options.APIKey, ProjectID: options.ProjectID, BaseURL: options.BaseURL, CDNBaseURL: options.CDNBaseURL, Timeout: options.Timeout, UploadTimeout: options.UploadTimeout, MaxRetries: options.MaxRetries, MaxResponseBytes: options.MaxResponseBytes, PartSizeBytes: options.PartSizeBytes, HTTPClient: &http.Client{Transport: transport{mock}}})
 	if err != nil {
 		return nil, err
@@ -909,7 +929,7 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 	case suffix == "" && method == "DELETE":
 		return []string{"assets.delete"}
 	case suffix == "content":
-		return []string{"assets.deleteContent"}
+		return []string{"assets.removeContent"}
 	case suffix == "children":
 		return []string{"assets.listChildren", "assets.iterateChildren"}
 	case suffix == "signed-url":
@@ -929,7 +949,7 @@ var mockOperations = []string{
 	"assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision",
 	"assets.update", "assets.listChildren", "assets.iterateChildren", "assets.listTimeline",
 	"assets.create", "assets.classify", "assets.uploadPart", "assets.createSignedUrl", "assets.move", "assets.retry",
-	"assets.explain", "assets.decide", "assets.deleteContent", "assets.delete", "assets.batch",
+	"assets.explain", "assets.decide", "assets.removeContent", "assets.delete", "assets.batch",
 	"text.classify", "cdn.serve", "events.list", "events.pages", "folders.list", "folders.retrieve",
 	"folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
 	"hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete",
@@ -1057,10 +1077,11 @@ func checkMetadata(metadata any) error {
 	return nil
 }
 
-// validation is a request the API's schema refuses: validation/<issue> with HTTP 400 and the
-// field in details.path.
+// validation is a request the API's schema refuses: validation/invalid-request with HTTP 400,
+// listing the field and its issue code (such as validation/too-big) in details.issues.
 func validation(code, path string) error {
-	return &apiError{code: code, status: http.StatusBadRequest, details: calmlens.JSON{"path": path}}
+	issue := calmlens.JSON{"path": path, "message": "Invalid " + path, "code": code}
+	return &apiError{code: calmlens.CodeInvalidRequest, status: http.StatusBadRequest, details: calmlens.JSON{"issues": []any{issue}}}
 }
 
 // intRange reads an integer query parameter that must be within [low, high], or fallback when
@@ -1191,7 +1212,7 @@ func (m *MockServerClient) listTimeline(id string, q url.Values) (any, error) {
 		return nil, err
 	}
 	if section(a, "content")["safetyHold"] != nil {
-		return nil, fail(calmlens.CodeAssetSafetyHeld)
+		return nil, &apiError{code: calmlens.CodeAssetHeld, status: http.StatusLocked, details: calmlens.JSON{"hold": "safety"}}
 	}
 	if q.Has("cursor") {
 		return nil, fail(calmlens.CodeInvalidCursor)
@@ -1207,20 +1228,55 @@ func (m *MockServerClient) listEvents(q url.Values) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Cursors are "<sequence>_mock": the number of events already delivered. The mock's key
-	// holds every permission, so no event type is excluded.
+	// types is a comma-separated list of event types and assetId an asset ID, as the API takes.
+	var types []string
+	if q.Has("types") {
+		types = strings.Split(q.Get("types"), ",")
+		if slices.ContainsFunc(types, func(t string) bool { return !eventTypePattern.MatchString(t) }) {
+			return nil, validation("validation/invalid-value", "types")
+		}
+		types = sortedUnique(types)
+	}
+	assetID := q.Get("assetId")
+	if q.Has("assetId") && !assetIDPattern.MatchString(assetID) {
+		return nil, validation("validation/invalid-format", "assetId")
+	}
+	matches := func(event calmlens.JSON) bool {
+		return (len(types) == 0 || slices.Contains(types, text(event["type"]))) && (assetID == "" || event["assetId"] == assetID)
+	}
+	// Cursors are "<sequence>_mock~<filters>": the number of events already read and, like the
+	// API, the filters they belong to. The mock's key holds every permission, so no event type is
+	// excluded.
+	filters := base64.RawURLEncoding.EncodeToString([]byte(strings.Join(types, ",") + "|" + assetID))
 	cursor := q.Get("cursor")
 	if cursor == "" {
-		return calmlens.JSON{"items": []calmlens.JSON{}, "nextCursor": fmt.Sprintf("%d_mock", len(m.events)), "hasMore": false, "excludedTypes": []string{}}, nil
+		return calmlens.JSON{"items": []calmlens.JSON{}, "nextCursor": fmt.Sprintf("%d_mock~%s", len(m.events), filters), "hasMore": false, "excludedTypes": []string{}}, nil
 	}
-	sequence, ok := strings.CutSuffix(cursor, "_mock")
+	sequence, rest, ok := strings.Cut(cursor, "_mock~")
 	position, err := strconv.Atoi(sequence)
-	if !ok || err != nil || position < 0 || position > len(m.events) {
+	if !ok || rest != filters || err != nil || position < 0 || position > len(m.events) {
 		return nil, fail(calmlens.CodeInvalidCursor)
 	}
-	end := min(position+size, len(m.events))
-	events := append([]calmlens.JSON{}, m.events[position:end]...)
-	return calmlens.JSON{"items": events, "nextCursor": fmt.Sprintf("%d_mock", end), "hasMore": end < len(m.events), "excludedTypes": []string{}}, nil
+	events := []calmlens.JSON{}
+	next := position
+	for ; next < len(m.events) && len(events) < size; next++ {
+		if matches(m.events[next]) {
+			events = append(events, m.events[next])
+		}
+	}
+	more := slices.ContainsFunc(m.events[next:], matches)
+	return calmlens.JSON{"items": events, "nextCursor": fmt.Sprintf("%d_mock~%s", next, filters), "hasMore": more, "excludedTypes": []string{}}, nil
+}
+
+// eventTypePattern is an event type's shape (resource.action): the mock checks types without
+// the event catalog.
+var eventTypePattern = regexp.MustCompile(`^[a-z][a-z-]*\.[a-z][a-z-]*$`)
+
+// sortedUnique returns values sorted, without repeats.
+func sortedUnique(values []string) []string {
+	sorted := slices.Clone(values)
+	slices.Sort(sorted)
+	return slices.Compact(sorted)
 }
 
 // ensureLenses saves each definition in order like the API: a new identifier is created, an
@@ -1283,7 +1339,7 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 		options = calmlens.JSON{}
 		for key, values := range q {
 			value := values[0]
-			if key == "metadata" || key == "processingOptions" || key == "context" {
+			if key == "metadata" || key == "tags" || key == "processingOptions" || key == "context" {
 				var parsed any
 				if err := json.Unmarshal([]byte(value), &parsed); err != nil {
 					return nil, fail(calmlens.CodeInvalidUploadPayload)
@@ -1310,7 +1366,7 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 			contentType = values[0]
 		}
 		if !contract.AcceptedUploadMimeType(contentType) {
-			return nil, &apiError{code: calmlens.CodeInvalidUploadMimeType, status: http.StatusBadRequest, details: calmlens.JSON{"mimeType": contentType}}
+			return nil, &apiError{code: calmlens.CodeUnsupportedUploadType, status: http.StatusUnsupportedMediaType, details: calmlens.JSON{"mimeType": contentType, "source": "calmlens"}}
 		}
 	}
 	mime := q.Get("contentType")
@@ -1409,9 +1465,10 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 		"folderId": orNull("folderId"), "uploadPresetId": orNull("uploadPresetId"),
 		"createdAt": now, "updatedAt": now, "name": options["name"],
 		"description": orNull("description"), "externalId": orNull("externalId"), "externalUrl": externalURL,
-		"type": kind, "metadata": orNull("metadata"), "authorId": orNull("authorId"), "context": used, "tags": nil,
-		"processingOptions": processingOptions, "visibility": visibility,
+		"type": kind, "metadata": orNull("metadata"), "authorId": orNull("authorId"), "context": used, "tags": orNull("tags"),
+		"visibility": visibility,
 	}
+	m.processingOptions[id] = asJSON(processingOptions)
 	content := calmlens.JSON{
 		"status": contentStatus, "removalReason": nil, "updatedAt": now, "safetyHold": nil,
 		"format": nil, "extension": nil, "sizeInBytes": nil, "checksums": nil,
@@ -1428,7 +1485,7 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 	if open {
 		uploadState["status"] = "uploading"
 		uploadState["partsReceived"] = 1
-		classification["status"] = calmlens.ClassificationStatusPending
+		classification["status"] = calmlens.ClassificationStatusQueued
 	}
 	a["content"], a["upload"], a["classification"] = content, uploadState, classification
 	if options["url"] == nil {
@@ -1491,7 +1548,7 @@ func usedContext(value any) (any, error) {
 // imageSizeError is the API's rule for image uploads in parts: at most 20 MiB, at any size below.
 func imageSizeError(kind string, size int64, final bool) error {
 	if kind == calmlens.AssetTypeImage && size > maxMultipartImage {
-		return fail(calmlens.CodeMultipartImageTooLarge)
+		return &apiError{code: calmlens.CodeUploadTooLarge, status: http.StatusRequestEntityTooLarge, details: calmlens.JSON{"limitBytes": maxMultipartImage, "source": "plan"}}
 	}
 	return nil
 }
@@ -1560,7 +1617,7 @@ func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
 	if a["type"] != calmlens.AssetTypeImage || classification["status"] != calmlens.ClassificationStatusCompleted {
 		return
 	}
-	features := asJSON(asJSON(a["processingOptions"])["features"])
+	features := asJSON(m.processingOptions[a["id"].(string)]["features"])
 	if enabled, _ := asJSON(features["personDetection"])["enabled"].(bool); enabled {
 		classification["personDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "stage": calmlens.FeatureStageBeta, "people": []any{}}
 	}
@@ -1588,7 +1645,7 @@ func (m *MockServerClient) moderateStored(a calmlens.JSON, trigger string) error
 // recordUploaded records asset.uploaded as the API does when an upload completes, with uploaded,
 // the asset's snapshot from before moderation.
 func (m *MockServerClient) recordUploaded(a, uploaded calmlens.JSON) {
-	m.addEvent(calmlens.EventAssetUploaded, calmlens.SeverityLow, a, []any{
+	m.addEvent(calmlens.EventAssetUploaded, calmlens.SeverityLow, a, mockAPIKeyActor, []any{
 		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
 		assetNameFact(a),
 		calmlens.JSON{"key": calmlens.FactFileFormat, "value": section(a, "content")["format"]},
@@ -1607,7 +1664,7 @@ func (m *MockServerClient) recordProcessingEvents(a calmlens.JSON, decision *Dec
 		if reason == nil {
 			reason = calmlens.AssetFailureReasonProcessingError
 		}
-		m.addEvent(calmlens.EventAssetFailed, calmlens.SeverityHigh, a, []any{
+		m.addEvent(calmlens.EventAssetFailed, calmlens.SeverityHigh, a, automatedActor, []any{
 			assetNameFact(a),
 			calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
 			calmlens.JSON{"key": calmlens.FactPreviousStatus, "value": calmlens.ClassificationStatusProcessing},
@@ -1616,7 +1673,7 @@ func (m *MockServerClient) recordProcessingEvents(a calmlens.JSON, decision *Dec
 		return
 	}
 	flagged := decision.flaggedCategories()
-	m.addEvent(calmlens.EventAssetClassified, calmlens.SeverityLow, a, []any{
+	m.addEvent(calmlens.EventAssetClassified, calmlens.SeverityLow, a, automatedActor, []any{
 		calmlens.JSON{"key": calmlens.FactFlaggedCategories, "value": flagged},
 		calmlens.JSON{"key": calmlens.FactModerationStatus, "value": decision.status},
 		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
@@ -1627,8 +1684,7 @@ func (m *MockServerClient) recordProcessingEvents(a calmlens.JSON, decision *Dec
 	if decision.status == OutcomeAllowed || decision.status == OutcomeLimited {
 		severity = calmlens.SeverityLow
 	}
-	m.addEvent("asset."+decision.status, severity, a, []any{
-		calmlens.JSON{"key": calmlens.FactDecidedBy, "value": "automated"},
+	m.addEvent("asset."+decision.status, severity, a, automatedActor, []any{
 		calmlens.JSON{"key": calmlens.FactFlaggedCategories, "value": flagged},
 		calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
 		assetNameFact(a),
@@ -1815,9 +1871,10 @@ func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int
 }
 
 // requestContentRemoval removes an asset's content on request, like the API: the record and
-// report stay; stored content, extracted text, the rendered file and preview go. Content already removed
-// keeps its reason, and an asset.content-removed event is recorded either way.
-func (m *MockServerClient) requestContentRemoval(a calmlens.JSON, now int64) {
+// report stay; stored content, extracted text, the rendered file and preview go. Content
+// already removed keeps its reason, and an asset.content-removed event is recorded either way,
+// with the batch-id fact when batchID is set.
+func (m *MockServerClient) requestContentRemoval(a calmlens.JSON, now int64, batchID string) {
 	content := section(a, "content")
 	if content["status"] == calmlens.ContentStatusRemoved {
 		delete(m.ImageStorage.Content, text(a["id"]))
@@ -1826,7 +1883,7 @@ func (m *MockServerClient) requestContentRemoval(a calmlens.JSON, now int64) {
 		m.removeContent(a, calmlens.ContentRemovalReasonRequested, now)
 		a["updatedAt"] = now
 	}
-	m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a)
+	m.recordLifecycleEvent(calmlens.EventAssetContentRemoved, a, mockAPIKeyActor, batchID)
 }
 
 // assetIDPattern is the asset ID form the API's schema accepts.
@@ -1860,7 +1917,8 @@ func newID(prefix string) string {
 // in the project, refusing the whole batch otherwise), then applies it at once, in request order,
 // instead of in the background: delete deletes each asset with its stored child assets and
 // records asset.deleted with the asset as it was; remove-content removes the content like
-// DELETE /assets/:id/content. Mock assets carry no safety holds, so none is skipped.
+// DELETE /assets/:id/content. Each event carries the batch's batch-id fact, and the response its
+// batch_ ID. Mock assets carry no safety holds, so none is skipped.
 func (m *MockServerClient) batchAssets(body calmlens.JSON, now int64) (any, error) {
 	ids, ok := body["assetIds"].([]any)
 	if !ok {
@@ -1898,15 +1956,16 @@ func (m *MockServerClient) batchAssets(body calmlens.JSON, now int64) (any, erro
 		}
 		assets = append(assets, a)
 	}
+	batchID := m.options.CreateID("batch")
 	for _, a := range assets {
 		if operation == calmlens.AssetBatchOperationDelete {
-			m.recordLifecycleEvent(calmlens.EventAssetDeleted, a)
+			m.recordLifecycleEvent(calmlens.EventAssetDeleted, a, mockAPIKeyActor, batchID)
 			m.deleteAssetTree(text(a["id"]))
 		} else {
-			m.requestContentRemoval(a, now)
+			m.requestContentRemoval(a, now, batchID)
 		}
 	}
-	return calmlens.JSON{"queued": true}, nil
+	return calmlens.JSON{"batchId": batchID, "status": calmlens.BatchStatusQueued, "assetCount": len(assets)}, nil
 }
 
 // deleteAssetTree deletes an asset, its stored child assets and their content.
@@ -1960,7 +2019,7 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 	switch {
 	case method == "GET" && suffix == "":
 	case method == "DELETE" && suffix == "":
-		m.recordLifecycleEvent(calmlens.EventAssetDeleted, a)
+		m.recordLifecycleEvent(calmlens.EventAssetDeleted, a, mockAPIKeyActor, "")
 		delete(m.ImageStorage.Content, id)
 		delete(m.DatabaseStorage.Assets, id)
 		delete(m.uploads, id)
@@ -1979,7 +2038,7 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		}
 		a["updatedAt"] = now
 	case method == "DELETE" && suffix == "content":
-		m.requestContentRemoval(a, now)
+		m.requestContentRemoval(a, now, "")
 	case method == "GET" && suffix == "children":
 		return m.page(func(child calmlens.JSON) bool { return child["parentId"] == id }, q, "children:"+id)
 	case method == "POST" && suffix == "signed-url":
@@ -2010,7 +2069,7 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		}
 		// Like the API: back to processing, to be moderated again, with an asset.retried event.
 		m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy, nil)
-		m.recordLifecycleEvent(calmlens.EventAssetRetried, a)
+		m.recordLifecycleEvent(calmlens.EventAssetRetried, a, mockAPIKeyActor, "")
 		if err := m.moderateStored(a, TriggerRetry); err != nil {
 			return nil, err
 		}
@@ -2618,7 +2677,7 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	}
 	restricted := asset["visibility"] != calmlens.VisibilityPublic
 	if restricted && !canDownload() {
-		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission", "This API key needs assets:download permission for this asset's folder.")
+		return errorBody(http.StatusForbidden, calmlens.CodePermissionDenied, "This API key needs assets:download permission for this asset's folder.")
 	}
 	// Then whether the asset has the resource, and whether it is a still image that takes a lens
 	// or transform: the preview always is, the rendered file only when it is an image.
@@ -2904,7 +2963,7 @@ func (m *MockServerClient) addHashListEntry(id string, body calmlens.JSON, now i
 	if value, ok := body["label"].(string); ok {
 		label = value
 	}
-	entry := calmlens.JSON{"id": m.options.CreateID("hle"), "projectId": m.options.ProjectID, "hashListId": id, "hash": hash, "quality": quality, "label": label, "sourceAssetId": source, "createdAt": now}
+	entry := calmlens.JSON{"id": m.options.CreateID("hle"), "projectId": m.options.ProjectID, "hashListId": id, "hash": hash, "quality": quality, "label": label, "assetId": source, "createdAt": now}
 	m.DatabaseStorage.HashListEntries[text(entry["id"])] = entry
 	m.status = http.StatusCreated
 	return entry, nil

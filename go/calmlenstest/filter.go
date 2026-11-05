@@ -199,7 +199,7 @@ type filterParser struct {
 // parseFilter parses an RSQL filter like the API (@rsql/parser with zodbase/rsql): comparisons
 // on filterFields, each with its own operators, ";" or " and " for AND (binding tighter than ","
 // or " or "), nested parentheses and whitespace between tokens. Each value is read by its
-// field's kind. Anything else is an error, which the mock answers with validation/invalid-filter.
+// field's kind. Anything else is an error, which the mock answers with filter/invalid.
 func parseFilter(input string) (filterNode, error) {
 	p := &filterParser{input: input}
 	p.space()

@@ -379,6 +379,36 @@ type mockScenario struct {
 }
 
 // at follows a dotted path: numeric segments index arrays, "length" is an array's length.
+// matchesFields reports whether got equals want, comparing only the fields want lists in each
+// object, at any depth; lists must have the same length.
+func matchesFields(got, want any) bool {
+	switch want := want.(type) {
+	case map[string]any:
+		object, ok := got.(map[string]any)
+		if !ok {
+			return false
+		}
+		for key, value := range want {
+			if field, present := object[key]; !present || !matchesFields(field, value) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		list, ok := got.([]any)
+		if !ok || len(list) != len(want) {
+			return false
+		}
+		for i := range want {
+			if !matchesFields(list[i], want[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	return reflect.DeepEqual(got, want)
+}
+
 func at(value any, path string) any {
 	if path == "" {
 		return value
@@ -661,8 +691,8 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		result, err = m.Assets.Decide(ctx, options)
 	case "assets.explain":
 		result, err = m.Assets.Explain(ctx, decode[calmlens.ExplainAssetOptions](t, args))
-	case "assets.deleteContent":
-		result, err = m.Assets.DeleteContent(ctx, decode[calmlens.AssetIDOptions](t, args))
+	case "assets.removeContent":
+		result, err = m.Assets.RemoveContent(ctx, decode[calmlens.AssetIDOptions](t, args))
 	case "assets.delete":
 		err = m.Assets.Delete(ctx, decode[calmlens.AssetIDOptions](t, args))
 	case "assets.batch":
@@ -898,8 +928,10 @@ func TestSharedMockScenarios(t *testing.T) {
 							t.Fatalf("%s: Retry-After %v, want %ds", label, apiErr.RetryAfter, *want.RetryAfter)
 						}
 						details := normalize(t, apiErr.Details)
+						// Details lists only the keys to compare, and objects in them (such as each of a
+						// validation error's issues) only the fields to compare.
 						for key, value := range want.Details {
-							if got := at(details, key); !reflect.DeepEqual(got, resolve(value, saved)) {
+							if got := at(details, key); !matchesFields(got, resolve(value, saved)) {
 								t.Fatalf("%s: details.%s is %#v, want %#v", label, key, got, value)
 							}
 						}

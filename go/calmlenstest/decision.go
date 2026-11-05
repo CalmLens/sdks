@@ -240,7 +240,7 @@ func (d *Decision) report() calmlens.JSON {
 		"raw":                 calmlens.JSON{"categories": categories},
 		"categories":          policyCategories,
 		"explanationComplete": true,
-		"source":              "policy", "automatedAction": statusAction[d.status], "regions": []any{}, "flaggedCategories": flagged,
+		"source":              "policy", "automatedStatus": d.status, "regions": []any{}, "flaggedCategories": flagged,
 	}
 }
 

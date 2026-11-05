@@ -26,7 +26,7 @@ const (
 
 // webhookEventFields are the fields of the public event shape that events.list returns and
 // webhook connectors deliver.
-var webhookEventFields = []string{"id", "projectId", "type", "severity", "title", "description", "assetId", "assetSequence", "asset", "facts", "createdAt"}
+var webhookEventFields = []string{"id", "projectId", "actor", "type", "severity", "title", "description", "assetId", "assetSequence", "asset", "facts", "createdAt"}
 
 // ToWebhookEventPayload returns the body a webhook connector delivers for an event, such as one
 // from Events.List: the event in the same shape. Its Raw holds that body, built from the event's

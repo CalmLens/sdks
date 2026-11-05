@@ -10,7 +10,7 @@ import (
 
 func TestAssetTypedFieldsDecode(t *testing.T) {
 	var a Asset
-	err := json.Unmarshal([]byte(`{"id":"a","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"policy","updatedAt":1760000000600,"format":"image/png","extension":"png","sizeInBytes":2048,"checksums":{"sha256":"abc","md5":null},"width":640,"height":480,"perceptualHash":"ph","perceptualHashQuality":88,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"preview":{"width":1200,"height":300,"thumbhash":"th","averageColor":"#fff"},"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"processingOptions":{"keepContentAfterProcessing":true,"features":{"ocr":{"enabled":true},"faceDetection":{"enabled":true,"ageEstimation":false}}},"upload":{"status":"completed","updatedAt":1760000000500,"partsReceived":3},"classification":{"status":"completed","updatedAt":1760000000500,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"Fine","reviewedAt":1760000000700,"appliedToAsset":true}],"status":"age-restricted","categories":{},"explanationComplete":true,"source":"hash-list","flaggedCategories":[],"automatedAction":"allow","regions":[],"raw":{"categories":{"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},"sexual-fictional":{"status":"not-evaluated","reason":"not-supported"}}},"hate":{"status":"not-evaluated","reason":"unavailable"}},"hashMatches":[{"source":"hash-list","listId":"list-1","entryId":"entry-1","distance":4,"action":"block"}]}},"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"completedAt":1760000000700,"labels":[{"description":"Beach","score":0.7,"topicalityScore":0.6,"likelihood":"likely","knowledgeBaseId":"/m/0b3yr"},{"description":"Sky","score":0.5,"likelihood":"possible"}]}}`), &a)
+	err := json.Unmarshal([]byte(`{"id":"a","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"policy","updatedAt":1760000000600,"format":"image/png","extension":"png","sizeInBytes":2048,"checksums":{"sha256":"abc","md5":null},"width":640,"height":480,"perceptualHash":"ph","perceptualHashQuality":88,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"preview":{"width":1200,"height":300,"thumbhash":"th","averageColor":"#fff"},"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":1760000000500,"partsReceived":3},"classification":{"status":"completed","updatedAt":1760000000500,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"Fine","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":1760000000700,"applied":true}],"status":"age-restricted","categories":{},"explanationComplete":true,"source":"hash-list","flaggedCategories":[],"automatedStatus":"allowed","regions":[{"region":"DE","status":"blocked","rule":"de-jugendschutz","category":"violence"}],"raw":{"categories":{"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},"sexual-fictional":{"status":"not-evaluated","reason":"not-supported"}}},"hate":{"status":"not-evaluated","reason":"unavailable"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]}},"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"completedAt":1760000000700}}`), &a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,6 +20,13 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if m := a.Classification.Moderation; m.Status != ModerationStatusAgeRestricted || m.ManualReviews[0].Decision != ModerationDecisionAgeRestricted ||
 		*m.ManualReviews[0].Note != "Fine" || m.ManualReviews[0].ReviewedAt != 1760000000700 || *a.Classification.CompletedAt != 1760000000700 {
 		t.Fatalf("moderation: %+v", m)
+	}
+	if review := a.Classification.Moderation.ManualReviews[0]; review.DecidedBy.Type != ReviewActorUser || *review.DecidedBy.ID != "user-1" || !review.Applied {
+		t.Fatalf("review: %+v", review)
+	}
+	if m := a.Classification.Moderation; *m.AutomatedStatus != ModerationStatusAllowed ||
+		!reflect.DeepEqual(m.Regions, []RegionalDecision{{Region: "DE", Status: ModerationStatusBlocked, Rule: "de-jugendschutz", Category: "violence"}}) {
+		t.Fatalf("automated and regional statuses: %+v", m)
 	}
 	content := a.Content
 	if content.Status != ContentStatusRemoved || *content.RemovalReason != ContentRemovalReasonPolicy || *content.UpdatedAt != 1760000000600 ||
@@ -44,11 +51,6 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if x := content.ExtractedText; x.Type != ExtractedTextDocument || *x.ID != "doc-1" || x.Content != nil {
 		t.Fatalf("extracted text: %+v", x)
 	}
-	o := a.ProcessingOptions
-	if !*o.KeepContentAfterProcessing || !o.Features.OCR.Enabled || o.Features.PersonDetection != nil ||
-		!o.Features.FaceDetection.Enabled || *o.Features.FaceDetection.AgeEstimation {
-		t.Fatalf("processing options: %+v", o)
-	}
 	report := a.Classification.Moderation
 	sexual := report.Raw.Categories[CategorySexual]
 	nudity, fictional := sexual.Qualifiers[QualifierSexualNudity], sexual.Qualifiers[QualifierSexualFictional]
@@ -61,7 +63,7 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if hate := report.Raw.Categories[CategoryHate]; hate.Reason != ReasonUnavailable || hate.Score != nil || hate.Qualifiers != nil {
 		t.Fatalf("hate: %+v", hate)
 	}
-	if !reflect.DeepEqual(report.Raw.HashMatches, []HashMatch{{Source: HashMatchSourceHashList, ListID: "list-1", EntryID: "entry-1", Distance: 4, Action: HashListActionBlock}}) ||
+	if !reflect.DeepEqual(report.Raw.HashMatches, []HashMatch{{Source: HashMatchSourceHashList, HashListID: "list-1", HashListEntryID: "entry-1", Distance: 4, Action: HashListActionBlock}}) ||
 		*report.Source != DecisionSourceHashList {
 		t.Fatalf("hash matches: %+v, decision %+v", report.Raw.HashMatches, report)
 	}
@@ -75,11 +77,6 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	}
 	if regions := a.Classification.TextRegions; !reflect.DeepEqual(regions, []TextRegion{{Box: BoundingBox{Left: 0.5, Top: 0.5, Width: 0.1, Height: 0.1}, PersonalInformation: true}}) {
 		t.Fatalf("text regions: %+v", regions)
-	}
-	labels := a.Classification.Labels
-	if len(labels) != 2 || labels[0].Description != "Beach" || labels[0].Score != 0.7 || *labels[0].TopicalityScore != 0.6 ||
-		labels[0].Likelihood != LikelihoodLikely || *labels[0].KnowledgeBaseID != "/m/0b3yr" || labels[1].TopicalityScore != nil || labels[1].KnowledgeBaseID != nil {
-		t.Fatalf("labels: %+v", labels)
 	}
 }
 
@@ -284,7 +281,7 @@ func TestEventFactsDecode(t *testing.T) {
     },
     {
       "id": "u",
-      "type": "usage.limit-reached",
+      "type": "usage.free-uploads-exhausted",
       "severity": "high",
       "facts": [
         {
@@ -328,92 +325,116 @@ func TestEventFactsDecode(t *testing.T) {
 		asset.Content.Status != ContentStatusStored || flagged.Facts.IsTest() {
 		t.Fatalf("%+v", flagged)
 	}
-	var usage UsageLimitReachedFacts
+	var usage UsageFreeUploadsExhaustedFacts
 	if err = page.Items[1].Facts.Decode(&usage); err != nil || usage.Limit != 9007199254740993 || usage.Used != 10 || usage.OrganisationID != "user-1" {
 		t.Fatalf("%+v %v", usage, err)
 	}
 	if err = page.Items[1].Facts.Decode(&AssetClassifiedFacts{}); ErrorCode(err) != "" {
 		t.Fatalf("unrelated keys are ignored, got %v", err)
 	}
-	if err = (EventFacts{{Key: FactLimit, Value: "many"}}).Decode(&UsageLimitReachedFacts{}); ErrorCode(err) != CodeSDKInvalidResponse {
+	if err = (EventFacts{{Key: FactLimit, Value: "many"}}).Decode(&UsageFreeUploadsExhaustedFacts{}); ErrorCode(err) != CodeSDKInvalidResponse {
 		t.Fatalf("mismatched value: %v", err)
 	}
 }
 
-func TestEventFactsDecodeTeamAndAPIKeyEvents(t *testing.T) {
+func TestEventFactsDecodeTeamAPIKeyAndUsageEvents(t *testing.T) {
 	var page EventsPage
 	err := json.Unmarshal([]byte(`{"items":[
-		{"id":"r","type":"api-key.revoked","severity":"low","facts":[{"key":"key-id","value":"key-1"},{"key":"key-name","value":"CI"},{"key":"action","value":"deleted"},{"key":"revoked-by-user-id","value":"user-1"}]},
-		{"id":"m","type":"project.member-removed","severity":"low","facts":[{"key":"member-user-id","value":"user-2"},{"key":"role","value":"editor"},{"key":"left","value":true},{"key":"removed-by-user-id","value":null}]},
-		{"id":"p","type":"upload-preset.daily-limit-reached","severity":"low","facts":[{"key":"preset-id","value":"p1"},{"key":"preset-name","value":"Avatars"},{"key":"daily-limit","value":500}]}],
+		{"id":"d","type":"api-key.deleted","severity":"low","actor":{"type":"user","id":"user-1"},"facts":[{"key":"key-id","value":"key-1"},{"key":"key-name","value":"CI"}]},
+		{"id":"m","type":"project.member-left","severity":"low","actor":{"type":"user","id":"user-2"},"facts":[{"key":"member-user-id","value":"user-2"},{"key":"role","value":"editor"}]},
+		{"id":"p","type":"upload-preset.daily-limit-reached","severity":"low","actor":{"type":"system","id":null},"facts":[{"key":"preset-id","value":"p1"},{"key":"preset-name","value":"Avatars"},{"key":"daily-limit","value":500}]},
+		{"id":"u","type":"usage.uploads-paused","severity":"high","actor":{"type":"system","id":null},"facts":[{"key":"reason","value":"usage-cap"},{"key":"resumes-at","value":1793491200000}]},
+		{"id":"t","type":"project.transferred","severity":"high","actor":{"type":"user","id":"user-1"},"facts":[{"key":"previous-organisation-id","value":"org-1"},{"key":"previous-organisation-name","value":"Studio North"},{"key":"organisation-id","value":"org-2"},{"key":"organisation-name","value":"Acme"},{"key":"method","value":"move"},{"key":"api-keys-revoked","value":0},{"key":"connectors-paused","value":0}]},
+		{"id":"c","type":"connector.disabled","severity":"high","actor":{"type":"system","id":null},"facts":[{"key":"connector-id","value":"conn-1"},{"key":"connector-name","value":"Alerts"},{"key":"connector-type","value":"slack"},{"key":"consecutive-failures","value":10}]}],
 		"nextCursor":"c","hasMore":false}`), &page)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if page.Items[0].Type != EventAPIKeyRevoked || page.Items[1].Type != EventProjectMemberRemoved || page.Items[2].Type != EventUploadPresetDailyLimitReached {
-		t.Fatalf("types %q %q %q", page.Items[0].Type, page.Items[1].Type, page.Items[2].Type)
+	types := []string{EventAPIKeyDeleted, EventProjectMemberLeft, EventUploadPresetDailyLimitReached, EventUsageUploadsPaused, EventProjectTransferred, EventConnectorDisabled}
+	for i, want := range types {
+		if page.Items[i].Type != want {
+			t.Fatalf("item %d type %q, want %q", i, page.Items[i].Type, want)
+		}
 	}
-	var revoked APIKeyRevokedFacts
-	if err = page.Items[0].Facts.Decode(&revoked); err != nil || revoked.Action != "deleted" || *revoked.KeyName != "CI" || *revoked.RevokedByUserID != "user-1" {
-		t.Fatalf("revoked %+v %v", revoked, err)
+	if actor := page.Items[0].Actor; actor.Type != ActorUser || actor.ID == nil || *actor.ID != "user-1" {
+		t.Fatalf("user actor %+v", actor)
 	}
-	var removed ProjectMemberRemovedFacts
-	if err = page.Items[1].Facts.Decode(&removed); err != nil || !removed.Left || removed.Role != "editor" || removed.RemovedByUserID != nil {
-		t.Fatalf("removed %+v %v", removed, err)
+	if actor := page.Items[2].Actor; actor.Type != ActorSystem || actor.ID != nil {
+		t.Fatalf("system actor %+v", actor)
+	}
+	var deleted APIKeyRevokedFacts
+	if err = page.Items[0].Facts.Decode(&deleted); err != nil || deleted.KeyID != "key-1" || *deleted.KeyName != "CI" {
+		t.Fatalf("deleted %+v %v", deleted, err)
+	}
+	var left ProjectMemberRemovedFacts
+	if err = page.Items[1].Facts.Decode(&left); err != nil || left.MemberUserID != "user-2" || left.Role != "editor" || left.MemberName != nil {
+		t.Fatalf("left %+v %v", left, err)
 	}
 	var preset UploadPresetDailyLimitReachedFacts
 	if err = page.Items[2].Facts.Decode(&preset); err != nil || preset.DailyLimit != 500 || preset.PresetName != "Avatars" {
 		t.Fatalf("preset %+v %v", preset, err)
 	}
-	if fact, ok := page.Items[0].Facts.Get(FactAction); !ok || fact.Key != "action" {
-		t.Fatalf("FactAction %v", fact)
+	var paused UsageUploadsPausedFacts
+	if err = page.Items[3].Facts.Decode(&paused); err != nil || paused.Reason != "usage-cap" || paused.ResumesAt == nil || *paused.ResumesAt != 1793491200000 {
+		t.Fatalf("paused %+v %v", paused, err)
+	}
+	if resumes, ok := page.Items[3].Facts.Get(FactResumesAt); !ok || resumes.Key != "resumes-at" {
+		t.Fatalf("FactResumesAt %v", resumes)
+	}
+	var transferred ProjectTransferredFacts
+	if err = page.Items[4].Facts.Decode(&transferred); err != nil || transferred.Method != TransferMethodMove || transferred.OrganisationName != "Acme" || transferred.PreviousOrganisationID != "org-1" {
+		t.Fatalf("transferred %+v %v", transferred, err)
+	}
+	var disabled ConnectorDisabledFacts
+	if err = page.Items[5].Facts.Decode(&disabled); err != nil || disabled.ConnectorType != ConnectorTypeSlack || disabled.ConsecutiveFailures != 10 || disabled.LastError != nil {
+		t.Fatalf("disabled %+v %v", disabled, err)
 	}
 }
 
-func TestEventFactsDecodeAssetDecisions(t *testing.T) {
+func TestEventFactsDecodeAssetDecisionsAndBatchRemovals(t *testing.T) {
 	var page EventsPage
 	err := json.Unmarshal([]byte(`{"items":[
-		{"id":"a","type":"asset.blocked","severity":"high","facts":[{"key":"asset-name","value":"cat.jpg"},{"key":"decided-by","value":"automated"},{"key":"flagged-categories","value":["violence"]}]},
-		{"id":"r","type":"asset.allowed","severity":"low","facts":[{"key":"decided-by","value":"reviewer"},{"key":"reviewer-user-id","value":"user-1"},{"key":"note","value":"Fine"}]}],
+		{"id":"a","type":"asset.blocked","severity":"high","actor":{"type":"automated","id":null},"facts":[{"key":"asset-name","value":"cat.jpg"},{"key":"flagged-categories","value":["violence"]}]},
+		{"id":"r","type":"asset.allowed","severity":"low","actor":{"type":"api-key","id":"key-1"},"facts":[{"key":"reviewer-name","value":"An API key"},{"key":"note","value":"Fine"}]},
+		{"id":"b","type":"asset.content-removed","severity":"low","actor":{"type":"api-key","id":"key-1"},"facts":[{"key":"asset-name","value":"cat.jpg"},{"key":"asset-type","value":"image"},{"key":"batch-id","value":"batch_1"}]}],
 		"nextCursor":"c","hasMore":false}`), &page)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var automated AssetDecisionFacts
-	if err = page.Items[0].Facts.Decode(&automated); err != nil || automated.DecidedBy != DecidedByAutomated || !reflect.DeepEqual(automated.FlaggedCategories, []string{CategoryViolence}) || automated.ReviewerUserID != nil || automated.Note != nil {
-		t.Fatalf("automated %+v %v", automated, err)
+	if err = page.Items[0].Facts.Decode(&automated); err != nil || page.Items[0].Actor != (Actor{Type: ActorAutomated}) || !reflect.DeepEqual(automated.FlaggedCategories, []string{CategoryViolence}) || automated.Note != nil {
+		t.Fatalf("automated %+v %+v %v", page.Items[0].Actor, automated, err)
 	}
 	var reviewed AssetDecisionFacts
-	if err = page.Items[1].Facts.Decode(&reviewed); err != nil || reviewed.DecidedBy != DecidedByReviewer || reviewed.FlaggedCategories != nil || *reviewed.ReviewerUserID != "user-1" || *reviewed.Note != "Fine" {
-		t.Fatalf("reviewed %+v %v", reviewed, err)
+	if err = page.Items[1].Facts.Decode(&reviewed); err != nil || page.Items[1].Actor.Type != ActorAPIKey || *page.Items[1].Actor.ID != "key-1" || reviewed.FlaggedCategories != nil || *reviewed.ReviewerName != "An API key" || *reviewed.Note != "Fine" {
+		t.Fatalf("reviewed %+v %+v %v", page.Items[1].Actor, reviewed, err)
 	}
-	if fact, ok := page.Items[1].Facts.Get(FactDecidedBy); !ok || fact.Value != DecidedByReviewer {
-		t.Fatalf("FactDecidedBy %+v", fact)
+	var removed AssetRemovedFacts
+	if err = page.Items[2].Facts.Decode(&removed); err != nil || removed.BatchID == nil || *removed.BatchID != "batch_1" || *removed.AssetType != AssetTypeImage {
+		t.Fatalf("removed %+v %v", removed, err)
+	}
+	if fact, ok := page.Items[2].Facts.Get(FactBatchID); !ok || fact.Value != "batch_1" {
+		t.Fatalf("FactBatchID %+v", fact)
 	}
 }
 
 func TestReportPolicySnapshotDecode(t *testing.T) {
 	var policy AssetModeration
-	if err := json.Unmarshal([]byte(`{"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","index":0,"indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedAction":"purge"}`), &policy); err != nil {
+	if err := json.Unmarshal([]byte(`{"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","indexes":[1,0]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedStatus":"purged","linkSafety":{"action":"block","links":[{"url":"https://example.com/login","finalUrl":"https://phish.example/","redirects":1,"source":"text","verdict":"phishing","evidence":[]}],"settings":{"verdictActions":{"phishing":"block"}}}}`), &policy); err != nil {
 		t.Fatal(err)
 	}
 	category := policy.Categories["violence"]
-	if category.Settings.CategoryAction != "block" || category.Settings.Restrictions[0].Name != "snapshot-rule" || *category.Source.Index != 0 {
+	if category.Settings.CategoryAction != "block" || category.Settings.Restrictions[0].Name != "snapshot-rule" {
 		t.Fatalf("lost category snapshot: %#v", category)
 	}
 	rule := category.Settings.Restrictions[0]
-	if rule.Match != "all" || !reflect.DeepEqual(rule.Unless, []string{"violence-documentary"}) || !reflect.DeepEqual(category.Source.Indexes, []int{0, 1}) {
+	if rule.Match != "all" || !reflect.DeepEqual(rule.Unless, []string{"violence-documentary"}) || !reflect.DeepEqual(category.Source.Indexes, []int{1, 0}) {
 		t.Fatalf("lost condition snapshot: %#v %#v", rule, category.Source)
 	}
-	var finding CategoryResult
-	if err := json.Unmarshal([]byte(`{"status":"evaluated","score":0.9,"policyConditions":{"some:opaque":{"status":"evaluated","score":0.8}}}`), &finding); err != nil {
-		t.Fatal(err)
+	if links := policy.LinkSafety.Links; len(links) != 1 || links[0].URL != "https://example.com/login" || *links[0].FinalURL != "https://phish.example/" || links[0].Redirects != 1 || links[0].Verdict != LinkVerdictPhishing {
+		t.Fatalf("lost link-safety links: %#v", policy.LinkSafety)
 	}
-	evidence := finding.PolicyConditions["some:opaque"]
-	if evidence.Status != "evaluated" || evidence.Score == nil || *evidence.Score != 0.8 {
-		t.Fatalf("lost condition evidence: %#v", evidence)
-	}
-	if *policy.AutomatedAction != "purge" || *policy.Source != DecisionSourceHashList || !reflect.DeepEqual(policy.FlaggedCategories, []string{"violence"}) {
+	if *policy.AutomatedStatus != ModerationStatusPurged || *policy.Source != DecisionSourceHashList || !reflect.DeepEqual(policy.FlaggedCategories, []string{"violence"}) {
 		t.Fatalf("lost decision snapshot: %#v", policy)
 	}
 }

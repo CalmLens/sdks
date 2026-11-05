@@ -82,7 +82,7 @@ func (s *AssetsService) Retry(ctx context.Context, options AssetIDOptions) (*Ass
 
 // Decide records a reviewer's decision, replacing the policy's: the asset's moderation status
 // becomes options.Decision, the note joins its review history and the matching asset.<status>
-// event is sent with decided-by: reviewer. An asset still pending moderation can only be
+// event is sent with the API key as its Actor. An asset still pending moderation can only be
 // blocked or purged. Purging needs ConfirmPurge and the assets:delete permission, and
 // permanently deletes the stored content.
 func (s *AssetsService) Decide(ctx context.Context, options DecideAssetOptions) (*Asset, error) {
@@ -111,11 +111,13 @@ const (
 	decisionPollMaxDelay   = 2 * time.Second
 )
 
-// WaitForDecision retrieves an asset until it has a moderation decision (Moderation.Status is no
-// longer ModerationStatusPending) or its processing failed
-// (Processing.Status ClassificationStatusFailed), and returns that asset. It waits 0.5s before the
+// WaitForDecision retrieves an asset until it is settled, its Classification.Status
+// ClassificationStatusCompleted (with its decision in Classification.Moderation.Status) or
+// ClassificationStatusFailed, and returns that asset. A ClassificationStatusQueued or
+// ClassificationStatusProcessing asset is still waiting, even when a reviewer has already decided
+// it. It waits 0.5s before the
 // second check and 1.5 times longer each time after that, up to 2s. A zero Timeout checks once.
-// When Timeout (default DefaultDecisionTimeout) passes without a decision it returns a *Error with code
+// When Timeout (default DefaultDecisionTimeout) passes before it is settled it returns a *Error with code
 // sdk/timeout and Details {"assetId", "classificationStatus", "moderationStatus"} holding the last
 // statuses seen. Cancelling ctx
 // stops waiting with sdk/cancelled. Webhooks report decisions without polling.
@@ -138,7 +140,7 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 			return nil, err
 		}
 		switch {
-		case asset.Classification.Moderation.Status != ModerationStatusPending, asset.Classification.Status == ClassificationStatusFailed:
+		case asset.Classification.Status == ClassificationStatusCompleted, asset.Classification.Status == ClassificationStatusFailed:
 			return asset, nil
 		}
 		remaining := deadline.Sub(s.c.now())
@@ -156,11 +158,11 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 	}
 }
 
-// DeleteContent removes the asset's stored content (source, preview and retained extracted
+// RemoveContent removes the asset's stored content (source, preview and retained extracted
 // text) and keeps the record, metadata and classification results. The returned asset has
 // Content.Status ContentStatusRemoved with RemovalReason ContentRemovalReasonRequested, and the
 // CDN no longer serves its content.
-func (s *AssetsService) DeleteContent(ctx context.Context, options AssetIDOptions) (*Asset, error) {
+func (s *AssetsService) RemoveContent(ctx context.Context, options AssetIDOptions) (*Asset, error) {
 	return s.assetRequest(ctx, "DELETE", options.AssetID, "/content", nil)
 }
 
@@ -176,9 +178,9 @@ func (s *AssetsService) Delete(ctx context.Context, options AssetIDOptions) erro
 // Batch deletes up to 500 assets (AssetBatchOperationDelete) or removes their stored content
 // (AssetBatchOperationRemoveContent) in one request. Every asset must exist in the project and
 // the key needs assets:delete for its folder, or nothing is queued. It returns once the
-// operation is queued; the work runs in the background and records asset.deleted or
-// asset.content-removed for each asset. Assets under a safety hold are skipped. It is not
-// retried: it carries no Idempotency-Key.
+// operation is queued, with the batch's BatchID; the work runs in the background and records
+// asset.deleted or asset.content-removed for each asset, with a FactBatchID fact naming BatchID.
+// Assets under a safety hold are skipped. It is not retried: it carries no Idempotency-Key.
 func (s *AssetsService) Batch(ctx context.Context, options BatchAssetsOptions) (*BatchAssetsResponse, error) {
 	if err := validateBatchAssetsOptions(options); err != nil {
 		return nil, err
@@ -367,6 +369,11 @@ func (s *EventsService) List(ctx context.Context, options ListEventsOptions) (*E
 	if err != nil {
 		return nil, err
 	}
+	// The API takes the types as one comma-separated value.
+	params.Del("types")
+	if len(options.Types) > 0 {
+		params.Set("types", strings.Join(options.Types, ","))
+	}
 	var result EventsPage
 	if err = s.c.request(ctx, "GET", s.c.project("events"), params, nil, &result); err != nil {
 		return nil, err
@@ -534,7 +541,7 @@ func (s *TextService) Classify(ctx context.Context, options ClassifyTextOptions)
 	if options.Name == "" {
 		options.Name = "text"
 	}
-	return s.c.Assets.Classify(ctx, SubmitAssetOptions{Name: options.Name, Content: &Content{Type: "text/plain", PlainText: &options.Text}, Description: options.Description, ProcessingOptions: options.ProcessingOptions, Metadata: options.Metadata, AuthorID: options.AuthorID, Context: options.Context, ExternalID: options.ExternalID, ExternalURL: options.ExternalURL, FolderID: options.FolderID, UploadPresetID: options.UploadPresetID, IdempotencyKey: options.IdempotencyKey})
+	return s.c.Assets.Classify(ctx, SubmitAssetOptions{Name: options.Name, Content: &Content{Type: "text/plain", PlainText: &options.Text}, Description: options.Description, ProcessingOptions: options.ProcessingOptions, Metadata: options.Metadata, Tags: options.Tags, AuthorID: options.AuthorID, Context: options.Context, ExternalID: options.ExternalID, ExternalURL: options.ExternalURL, FolderID: options.FolderID, UploadPresetID: options.UploadPresetID, IdempotencyKey: options.IdempotencyKey})
 }
 
 // HashListsService manages hash lists: perceptual hashes of images the project never wants

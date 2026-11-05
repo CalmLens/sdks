@@ -167,7 +167,7 @@ func TestPartSizeAndSplitUploadLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 	// An image over 20 MiB cannot be sent at all; one over 10 MiB can, in parts.
-	if _, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "huge.png", Content: &Content{Type: "image/png", Bytes: fileOf(21 * mib)}}); ErrorCode(err) != CodeMultipartImageTooLarge {
+	if _, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "huge.png", Content: &Content{Type: "image/png", Bytes: fileOf(21 * mib)}}); ErrorCode(err) != CodeUploadTooLarge {
 		t.Fatal(err)
 	}
 	if len(h.calls) != 0 {

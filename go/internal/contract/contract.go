@@ -9,7 +9,7 @@ var CheckTransformOptions func(options map[string]any) (unknownKeys, invalidKeys
 
 // ParseTransformSelector reads a CDN selector (the path after the resource, still
 // percent-encoded) as the CDN does, returning its lens and options (nil when it has none), or ok
-// false when the CDN refuses it as asset/invalid-transform; the calmlens package installs it.
+// false when the CDN refuses it as transform/invalid; the calmlens package installs it.
 var ParseTransformSelector func(selector string) (lens string, options map[string]any, ok bool)
 
 // AcceptedUploadMimeType reports whether the API accepts an upload of mimeType; the calmlens

@@ -85,14 +85,15 @@ func partSize(content Content, size *int64) error {
 }
 
 // The API's upload limits: in one request, images up to 10 MiB (larger ones are uploaded in
-// parts), audio and video up to 50 MiB and other files up to 5,000 MiB. Sent in parts, audio and
-// video can be up to 2 GiB; the API holds free uploads, made before billing is set up, to 50 MiB
+// parts), audio and video up to 50 MiB and other files up to 5,000 MiB. Sent in parts, images
+// can be up to 20 MiB and audio and video up to 2 GiB; the API holds free uploads, made before billing is set up, to 50 MiB
 // itself.
 const (
-	maxDirectImageBytes = 10 * 1024 * 1024
-	maxMediaBytes       = 50 * 1024 * 1024
-	maxLongMediaBytes   = 2 * 1024 * 1024 * 1024
-	maxFileBytes        = 5000 * 1024 * 1024
+	maxDirectImageBytes    = 10 * 1024 * 1024
+	maxMultipartImageBytes = 20 * 1024 * 1024
+	maxMediaBytes          = 50 * 1024 * 1024
+	maxLongMediaBytes      = 2 * 1024 * 1024 * 1024
+	maxFileBytes           = 5000 * 1024 * 1024
 )
 
 // uploadSize refuses content whose known size is over the API's limit for its type, before any
@@ -113,17 +114,22 @@ func uploadSize(mime string, size *int64, inParts bool) error {
 		}
 	}
 	if *size > limit {
-		return invalid(CodeFileTooLarge, message)
+		return tooLarge(message, limit)
 	}
 	return nil
 }
 
 // imageSize checks a multipart image total: images in parts can be any size up to 20 MiB.
 func imageSize(size *int64, final bool) error {
-	if size != nil && *size > 20*1024*1024 {
-		return invalid(CodeMultipartImageTooLarge, "Multipart image uploads cannot exceed 20MB")
+	if size != nil && *size > maxMultipartImageBytes {
+		return tooLarge("Multipart image uploads cannot exceed 20 MiB", maxMultipartImageBytes)
 	}
 	return nil
+}
+
+// tooLarge is the upload/too-large failure for content over the plan's limit of limitBytes.
+func tooLarge(message string, limitBytes int64) error {
+	return &Error{Code: CodeUploadTooLarge, Message: message, Details: JSON{"limitBytes": limitBytes, "source": "plan"}}
 }
 
 // maxSplitIdempotencyKeyLength is the longest IdempotencyKey of an upload sent in parts: each
@@ -242,9 +248,9 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	mime := normalizeUploadMimeType(content.Type)
 	if !acceptedUploadMimeType(content.Type) {
 		return nil, &Error{
-			Code:    CodeInvalidUploadMimeType,
+			Code:    CodeUnsupportedUploadType,
 			Message: mime + " is not a valid upload file type. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.",
-			Details: JSON{"mimeType": content.Type},
+			Details: JSON{"mimeType": content.Type, "source": "calmlens"},
 		}
 	}
 	if multipart && content.PartNumber > 1 {
@@ -446,7 +452,7 @@ func normalizeUploadMimeType(mimeType string) string {
 
 // acceptedUploadMimeType reports whether the API accepts an upload of this MIME type: an image,
 // audio, video, text, document or website type, not a container such as
-// application/octet-stream. The API refuses any other type with upload/invalid-mime-type.
+// application/octet-stream. The API refuses any other type with upload/unsupported-type.
 func acceptedUploadMimeType(mimeType string) bool {
 	mime := normalizeUploadMimeType(mimeType)
 	for _, rejected := range uploadMimeRejected {

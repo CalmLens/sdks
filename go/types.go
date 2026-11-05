@@ -19,9 +19,12 @@ import (
 type JSON = map[string]any
 
 // Processing status values of AssetClassification.Status and EventAssetClassification.Status: where the
-// asset is in the pipeline. Status is a plain string so values added later still decode.
+// asset is in the pipeline. ClassificationStatusQueued assets wait for their content (a multipart
+// upload still receiving parts) or their turn; an asset is settled once it is
+// ClassificationStatusCompleted or ClassificationStatusFailed. Status is a plain string so values
+// added later still decode.
 const (
-	ClassificationStatusPending    = "pending"
+	ClassificationStatusQueued     = "queued"
 	ClassificationStatusProcessing = "processing"
 	ClassificationStatusCompleted  = "completed"
 	ClassificationStatusFailed     = "failed"
@@ -98,13 +101,15 @@ const (
 	AssetFailureReasonMultipleTracks = "multiple-tracks"
 	// AssetFailureReasonTypeMismatch means the content does not match the asset's type.
 	AssetFailureReasonTypeMismatch = "type-mismatch"
-	// AssetFailureReasonFreeUploadLimit means the upload has more text than free uploads allow before billing is set up.
-	AssetFailureReasonFreeUploadLimit = "free-upload-limit"
+	// AssetFailureReasonFreeUploadsExhausted means the upload has more text than free uploads
+	// allow before billing is set up.
+	AssetFailureReasonFreeUploadsExhausted = "free-uploads-exhausted"
 	// AssetFailureReasonMediaLimit means the organisation has analysed its daily allowance of long
 	// audio and video; retry later.
 	AssetFailureReasonMediaLimit = "media-limit"
-	// AssetFailureReasonSpendLimit means analysing the asset would pass a spend limit.
-	AssetFailureReasonSpendLimit = "spend-limit"
+	// AssetFailureReasonUploadsPaused means analysing the asset would pass a limit on the
+	// organisation's usage, such as a spend limit, while uploads are paused.
+	AssetFailureReasonUploadsPaused = "uploads-paused"
 	// AssetFailureReasonChildFailed means a part of the asset, such as an embedded image, failed.
 	AssetFailureReasonChildFailed = "child-failed"
 	// AssetFailureReasonProcessingError means processing failed for another reason; retrying may succeed.
@@ -128,7 +133,7 @@ const (
 	AssetTypeFile               = "file"
 )
 
-// Policy action values for category results, policy rules and AssetModeration.AutomatedAction.
+// Policy action values for category results and policy rules.
 const (
 	ModerationActionAllow       = "allow"
 	ModerationActionLimit       = "limit"
@@ -158,9 +163,8 @@ type Asset struct {
 	AuthorID *string `json:"authorId"`
 	// Context holds the earlier posts CalmLens used, oldest first. It is nil when none were
 	// given and once the content is removed.
-	Context           *ModerationContext `json:"context"`
-	Tags              []string           `json:"tags"`
-	ProcessingOptions *ProcessingOptions `json:"processingOptions"`
+	Context *ModerationContext `json:"context"`
+	Tags    []string           `json:"tags"`
 	// Visibility is VisibilityPrivate or VisibilityPublic.
 	Visibility *string `json:"visibility"`
 	// Processing is where the asset is in the pipeline.
@@ -205,8 +209,7 @@ type AssetClassification struct {
 	AIGeneratedDetection *AIGeneratedDetectionResult `json:"aiGeneratedDetection,omitempty"`
 	// TextRegions are where OCR found text, and personal information within it, in an image.
 	// Redaction transforms (ImageRedaction) blur these regions.
-	TextRegions []TextRegion          `json:"textRegions,omitempty"`
-	Labels      []ClassificationLabel `json:"labels,omitempty"`
+	TextRegions []TextRegion `json:"textRegions,omitempty"`
 }
 
 // ClassificationProgress is how far sectioned analysis of long audio or video has got.
@@ -223,27 +226,38 @@ type AssetReview struct {
 	// Decision is one of the ModerationDecision constants.
 	Decision string  `json:"decision"`
 	Note     *string `json:"note"`
-	// ReviewerName is the reviewer's display name, when known.
-	ReviewerName *string `json:"reviewerName,omitempty"`
-	// ReviewerEmail is the reviewer's email address, when known.
-	ReviewerEmail  *string `json:"reviewerEmail,omitempty"`
-	ReviewedAt     int64   `json:"reviewedAt"`
-	AppliedToAsset bool    `json:"appliedToAsset"`
+	// DecidedBy is the person or API key that made the decision.
+	DecidedBy  ReviewActor `json:"decidedBy"`
+	ReviewedAt int64       `json:"reviewedAt"`
+	// Applied is whether the decision was applied to the asset.
+	Applied bool `json:"applied"`
 }
 
-// TestRegionalAction is a regional restriction supplied by an authenticated test input.
-type TestRegionalAction struct {
-	Region string `json:"region"`
-	Action string `json:"action"`
+// Values of ReviewActor.Type. Type is a plain string so values added later still decode.
+const (
+	// ReviewActorUser is a person, or an assistant's API key acting for one.
+	ReviewActorUser = "user"
+	// ReviewActorAPIKey is an API key.
+	ReviewActorAPIKey = "api-key"
+)
+
+// ReviewActor is who made a review decision.
+type ReviewActor struct {
+	// Type is ReviewActorUser or ReviewActorAPIKey.
+	Type string `json:"type"`
+	// ID is the user's or API key's ID; nil only when it was not recorded.
+	ID *string `json:"id"`
 }
 
 // AssetModeration holds content-safety findings and the decision in force.
 type AssetModeration struct {
-	TestCategoryActions map[string]string              `json:"testCategoryActions,omitempty"`
-	TestRegionalActions []TestRegionalAction           `json:"testRegionalActions,omitempty"`
-	ManualReviews       []AssetReview                  `json:"manualReviews"`
-	Status              string                         `json:"status"`
-	AutomatedAction     *string                        `json:"automatedAction,omitempty"`
+	ManualReviews []AssetReview `json:"manualReviews"`
+	Status        string        `json:"status"`
+	// AutomatedStatus is the status automated moderation decided (ModerationStatusAllowed,
+	// ModerationStatusLimited, ModerationStatusAgeRestricted, ModerationStatusBlocked or
+	// ModerationStatusPurged); a later applied review takes precedence in Status. Nil before a
+	// decision.
+	AutomatedStatus     *string                        `json:"automatedStatus,omitempty"`
 	Source              *string                        `json:"source,omitempty"`
 	Rule                *string                        `json:"rule,omitempty"`
 	FlaggedCategories   []string                       `json:"flaggedCategories"`
@@ -265,8 +279,8 @@ type LinkSafetyDecision struct {
 	// Action is the strongest action the asset's links take: ModerationActionAllow,
 	// ModerationActionLimit, ModerationActionAgeRestrict or ModerationActionBlock.
 	Action string `json:"action"`
-	// Links are indexes into AssetClassification.LinkSafety.Links of the links that take Action.
-	Links []int `json:"links"`
+	// Links are the checked links that take Action.
+	Links []CheckedLink `json:"links"`
 	// Settings are the policy's link-safety settings in force at decision time.
 	Settings LinkSafetySettings `json:"settings"`
 }
@@ -311,9 +325,10 @@ const HashMatchSourceHashList = "hash-list"
 // HashMatch is a hash list entry an image matched.
 type HashMatch struct {
 	// Source is where the matching hash came from, such as HashMatchSourceHashList.
-	Source  string `json:"source"`
-	ListID  string `json:"listId"`
-	EntryID string `json:"entryId"`
+	Source string `json:"source"`
+	// HashListID is the matching hash list and HashListEntryID its matching entry.
+	HashListID      string `json:"hashListId"`
+	HashListEntryID string `json:"hashListEntryId"`
 	// Distance is the number of bits that differ between the hashes; 0 is the same picture.
 	Distance int `json:"distance"`
 	// Action is what this match did: HashListActionBlock when it was close enough for a block
@@ -553,11 +568,13 @@ type CategoryPolicyScore struct {
 	Settings *CategoryPolicySettingsSnapshot `json:"settings,omitempty"`
 }
 
-// CategoryPolicySource identifies the deciding rule, or that the policy score stayed below 50%.
+// CategoryPolicySource identifies the deciding rules, or that the policy score stayed below 50%.
 type CategoryPolicySource struct {
-	Kind    string `json:"kind"`
-	Index   *int   `json:"index,omitempty"`
-	Indexes []int  `json:"indexes,omitempty"`
+	// Kind is "allowance", "restriction", "default" or "below-threshold".
+	Kind string `json:"kind"`
+	// Indexes are the deciding allowance or restriction rules, the decisive rule first; empty
+	// for the other kinds.
+	Indexes []int `json:"indexes,omitempty"`
 }
 
 // PolicyRuleSnapshot records a rule in force when the asset was decided.
@@ -589,8 +606,10 @@ const (
 
 // RegionalDecision records a stricter outcome in a served jurisdiction.
 type RegionalDecision struct {
-	Region   string `json:"region"`
-	Action   string `json:"action"`
+	Region string `json:"region"`
+	// Status is the asset's status for viewers in Region: ModerationStatusLimited,
+	// ModerationStatusAgeRestricted, ModerationStatusBlocked or ModerationStatusPurged.
+	Status   string `json:"status"`
 	Rule     string `json:"rule"`
 	Category string `json:"category,omitempty"`
 }
@@ -859,17 +878,8 @@ type CategoryResult struct {
 	Reason string `json:"reason"`
 	// Qualifiers holds results for the category's qualifiers, keyed by a Qualifier constant.
 	Qualifiers map[string]QualifierResult `json:"qualifiers"`
-	// PolicyConditions contains assessed same-instance and collective-coverage conditions. Keys are opaque.
-	PolicyConditions map[string]PolicyConditionResult `json:"policyConditions,omitempty"`
 	// Raw contains the entire category result.
 	Raw JSON `json:"-"`
-}
-
-// PolicyConditionResult carries either an evaluated score or an unassessed reason.
-type PolicyConditionResult struct {
-	Status string   `json:"status"`
-	Score  *float64 `json:"score,omitempty"`
-	Reason string   `json:"reason,omitempty"`
 }
 
 // QualifierResult is the result for one qualifier of a category, such as QualifierSexualNudity.
@@ -886,16 +896,6 @@ type QualifierResult struct {
 	Likelihood string `json:"likelihood,omitempty"`
 	// Reason explains a ResultNotEvaluated result: ReasonNotSupported or ReasonUnavailable.
 	Reason string `json:"reason,omitempty"`
-}
-
-// ClassificationLabel is a descriptive label detected in the content.
-type ClassificationLabel struct {
-	Description     string   `json:"description"`
-	Score           float64  `json:"score"`
-	TopicalityScore *float64 `json:"topicalityScore,omitempty"`
-	// Likelihood is one of the Likelihood constants.
-	Likelihood      string  `json:"likelihood"`
-	KnowledgeBaseID *string `json:"knowledgeBaseId,omitempty"`
 }
 
 // Order directions.
@@ -1011,6 +1011,9 @@ type SubmitAssetOptions struct {
 	// Visibility is VisibilityPrivate (the default) or VisibilityPublic.
 	Visibility string         `json:"visibility,omitempty"`
 	Metadata   []MetadataItem `json:"metadata,omitempty"`
+	// Tags are tags for the asset, such as []string{"catalogue", "backpacks"}, which it keeps in
+	// Asset.Tags.
+	Tags []string `json:"tags,omitempty"`
 	// AuthorID is your identifier for who wrote the content. CalmLens only compares it with the
 	// author IDs in Context, to tell which posts share a speaker.
 	AuthorID *string `json:"authorId,omitempty"`
@@ -1093,9 +1096,17 @@ type BatchAssetsOptions struct {
 	Operation AssetBatchOperation
 }
 
-// BatchAssetsResponse confirms that a batch operation is queued.
+// BatchStatusQueued is BatchAssetsResponse.Status once a batch operation is queued.
+const BatchStatusQueued = "queued"
+
+// BatchAssetsResponse confirms that a batch operation is queued. BatchID names the batch: the
+// asset.deleted and asset.content-removed events it causes carry it as their FactBatchID fact.
 type BatchAssetsResponse struct {
-	Queued bool `json:"queued"`
+	BatchID string `json:"batchId"`
+	// Status is BatchStatusQueued.
+	Status string `json:"status"`
+	// AssetCount is the number of distinct assets the operation runs on.
+	AssetCount int `json:"assetCount"`
 }
 
 // MoveAssetOptions moves an asset; a nil FolderID moves it to the root.
@@ -1111,7 +1122,7 @@ const (
 	// ResourceRendered is the default: the asset's displayable file (an image in the best format
 	// the client accepts, a PDF, or browser-safe video or audio). It takes a Lens, Transform or
 	// TransformOptions only when it is an image; the CDN refuses them otherwise with
-	// asset/invalid-transform.
+	// transform/invalid.
 	ResourceRendered = "rendered"
 	// ResourcePreview is a still image that stands for the asset, such as a document's first page
 	// or an audio waveform. It takes a Lens, Transform or TransformOptions.
@@ -1207,10 +1218,12 @@ type HashListEntry struct {
 	// Hash is the 256-bit PDQ hash as 64 hexadecimal characters.
 	Hash string `json:"hash"`
 	// Quality is the PDQ quality of Hash from 0 to 100, nil when unknown.
-	Quality       *int    `json:"quality"`
-	Label         *string `json:"label"`
-	SourceAssetID *string `json:"sourceAssetId"`
-	CreatedAt     int64   `json:"createdAt"`
+	Quality *int    `json:"quality"`
+	Label   *string `json:"label"`
+	// AssetID is the asset the hash was taken from, when the entry was added from an asset
+	// (AddHashListEntryOptions.AssetID).
+	AssetID   *string `json:"assetId"`
+	CreatedAt int64   `json:"createdAt"`
 }
 
 // HashListPage is one page of a project's hash lists, newest first.
@@ -1351,11 +1364,34 @@ type Lens struct {
 	UpdatedAt *int64  `json:"updatedAt"`
 }
 
+// Values of Actor.Type. Type is a plain string so values added later still decode.
+const (
+	// ActorUser is a person in the portal, or an assistant acting for one.
+	ActorUser = "user"
+	// ActorAPIKey is an API key of its own.
+	ActorAPIKey = "api-key"
+	// ActorAutomated is automated moderation.
+	ActorAutomated = "automated"
+	// ActorSystem is CalmLens itself, such as when it pauses uploads.
+	ActorSystem = "system"
+)
+
+// Actor is who caused an event.
+type Actor struct {
+	// Type is ActorUser, ActorAPIKey, ActorAutomated or ActorSystem.
+	Type string `json:"type"`
+	// ID is the user's or API key's ID; nil for ActorAutomated and ActorSystem, and when the ID
+	// was not recorded.
+	ID *string `json:"id"`
+}
+
 // Event is an entry in the project event feed, in the shape Events.List returns and webhook
 // connectors deliver.
 type Event struct {
 	ID        string `json:"id"`
 	ProjectID string `json:"projectId"`
+	// Actor is who caused the event.
+	Actor Actor `json:"actor"`
 	// Type is one of the EventType constants.
 	Type string `json:"type"`
 	// Severity is SeverityLow or SeverityHigh.
@@ -1375,10 +1411,14 @@ type Event struct {
 
 // ListEventsOptions reads events after Cursor, a previous page's NextCursor. Without Cursor,
 // the response is empty and its NextCursor marks "now". PageSize is 1 to 100 (0 for the
-// API's default of 50).
+// API's default of 50). Types (EventType constants) and AssetID narrow the feed to those event
+// types or one asset's events. A cursor belongs to the filters it was issued with, so pass the
+// same Types and AssetID with each Cursor.
 type ListEventsOptions struct {
-	Cursor   string `json:"cursor,omitempty"`
-	PageSize int    `json:"pageSize,omitempty"`
+	Cursor   string   `json:"cursor,omitempty"`
+	PageSize int      `json:"pageSize,omitempty"`
+	Types    []string `json:"types,omitempty"`
+	AssetID  string   `json:"assetId,omitempty"`
 }
 
 // EventsPage is one page of the event feed, oldest first. Unlike other pages, NextCursor is
@@ -1432,6 +1472,8 @@ type ClassifyTextOptions struct {
 	Description       *string
 	ProcessingOptions *ProcessingOptions
 	Metadata          []MetadataItem
+	// Tags work as in SubmitAssetOptions.
+	Tags []string
 	// AuthorID and Context work as in SubmitAssetOptions.
 	AuthorID       *string
 	Context        *ModerationContext

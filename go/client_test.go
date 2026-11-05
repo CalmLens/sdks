@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -85,7 +86,7 @@ func (h *harness) body() JSON {
 func TestTextAndRawUploads(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
-	_, err := c.Assets.Classify(ctx, SubmitAssetOptions{Name: "text", Content: &Content{Type: "text/plain", PlainText: Ptr("héllo 🌍")}, Metadata: []MetadataItem{{ID: "x", Value: false}}, ProcessingOptions: &ProcessingOptions{KeepContentAfterProcessing: Ptr(false)}})
+	_, err := c.Assets.Classify(ctx, SubmitAssetOptions{Name: "text", Content: &Content{Type: "text/plain", PlainText: Ptr("héllo 🌍")}, Metadata: []MetadataItem{{ID: "x", Value: false}}, Tags: []string{"a b", "c"}, ProcessingOptions: &ProcessingOptions{KeepContentAfterProcessing: Ptr(false)}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +94,7 @@ func TestTextAndRawUploads(t *testing.T) {
 		t.Fatal("incorrect body or headers")
 	}
 	q := h.last().URL.Query()
-	if q.Get("queue") != "false" || q.Get("name") != "text" || q.Get("metadata") != `[{"id":"x","value":false}]` || q.Get("processingOptions") != `{"keepContentAfterProcessing":false}` {
+	if q.Get("queue") != "false" || q.Get("name") != "text" || q.Get("metadata") != `[{"id":"x","value":false}]` || q.Get("tags") != `["a b","c"]` || q.Get("processingOptions") != `{"keepContentAfterProcessing":false}` {
 		t.Fatal(q)
 	}
 	if !strings.Contains(h.last().URL.EscapedPath(), "p%20%2F%3F") {
@@ -149,13 +150,13 @@ func TestMultipartLeavesQueueModeToTheServer(t *testing.T) {
 	// A declared image total above the maximum is rejected before any byte is sent.
 	huge := int64(21 * 1024 * 1024)
 	_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x.png", TotalSizeInBytes: &huge, Part: &Content{Type: "image/png", Bytes: make([]byte, 5*1024*1024)}})
-	if ErrorCode(err) != CodeMultipartImageTooLarge || len(h.calls) != 1 {
+	if ErrorCode(err) != CodeUploadTooLarge || len(h.calls) != 1 {
 		t.Fatal(err)
 	}
-	// A refusal raised before sending has no HTTP status.
+	// A refusal raised before sending has no HTTP status, and names the plan's 20 MiB limit.
 	var refused *Error
-	if !errors.As(err, &refused) || refused.Status != 0 {
-		t.Fatal("local refusal status", err)
+	if !errors.As(err, &refused) || refused.Status != 0 || refused.Details["limitBytes"] != int64(20*1024*1024) || refused.Details["source"] != "plan" {
+		t.Fatal("local refusal", err, refused.Details)
 	}
 	// A part under 5 MiB that is not the last is refused before sending; a small final image part
 	// that is the whole upload is sent.
@@ -327,13 +328,19 @@ func TestIteratorsFollowEveryPage(t *testing.T) {
 		{status: 200, result: JSON{"items": []JSON{{"id": "e1"}}, "nextCursor": "c1", "hasMore": true}},
 		{status: 200, result: JSON{"items": []JSON{{"id": "e2"}}, "nextCursor": "c2", "hasMore": false}},
 	}
-	events := c.Events.ListAll(ListEventsOptions{Cursor: "c0"})
+	// Each page keeps the filters its cursor belongs to; the types go as one comma-separated value.
+	events := c.Events.ListAll(ListEventsOptions{Cursor: "c0", Types: []string{EventAssetBlocked, EventAssetPurged}, AssetID: "asset-1"})
 	ids = nil
 	for events.Next(ctx) {
 		ids = append(ids, events.Event().ID)
 	}
 	if fmt.Sprint(ids) != "[e1 e2]" || events.Cursor() != "c2" || h.calls[1].URL.Query().Get("cursor") != "c1" {
 		t.Fatal(ids, events.Cursor())
+	}
+	for _, call := range h.calls {
+		if q := call.URL.Query(); !reflect.DeepEqual(q["types"], []string{"asset.blocked,asset.purged"}) || q.Get("assetId") != "asset-1" {
+			t.Fatal("filters not kept", call.URL)
+		}
 	}
 }
 
@@ -500,6 +507,28 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 	}
 }
 
+func TestWaitForDecisionWaitsWhileQueuedOrProcessingEvenOnceDecided(t *testing.T) {
+	c, h := setup(t)
+	fakeClock(c, h)
+	asset := func(classification, moderation string) reply {
+		return reply{status: 200, result: JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": classification, "moderation": JSON{"status": moderation}}}}
+	}
+	h.next = []reply{
+		asset(ClassificationStatusQueued, ModerationStatusPending),
+		asset(ClassificationStatusProcessing, ModerationStatusBlocked),
+		asset(ClassificationStatusCompleted, ModerationStatusBlocked),
+	}
+	got, err := c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"})
+	if err != nil || got.Classification.Status != ClassificationStatusCompleted || got.Classification.Moderation.Status != ModerationStatusBlocked || len(h.calls) != 3 {
+		t.Fatal(got, err, len(h.calls))
+	}
+	// A failed asset is settled too.
+	h.calls, h.next = nil, []reply{asset(ClassificationStatusFailed, ModerationStatusPending)}
+	if got, err = c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"}); err != nil || got.Classification.Status != ClassificationStatusFailed || len(h.calls) != 1 {
+		t.Fatal(got, err, len(h.calls))
+	}
+}
+
 func TestWaitForDecisionStopsWhenCancelled(t *testing.T) {
 	c, h := setup(t)
 	h.result = JSON{"id": "a", "upload": JSON{"status": "completed"}, "classification": JSON{"status": ClassificationStatusProcessing, "moderation": JSON{"status": ModerationStatusPending}}}
@@ -591,7 +620,8 @@ func TestOversizedOneRequestUploadsAreRefusedBeforeSending(t *testing.T) {
 		size := tc.size
 		// The one-shot stream is never read: the declared size is refused first.
 		_, err := c.Assets.Create(ctx, SubmitAssetOptions{Name: "big", Content: &Content{Type: tc.mime, Data: io.MultiReader(strings.NewReader("")), SizeInBytes: &size}})
-		if ErrorCode(err) != CodeFileTooLarge {
+		var refused *Error
+		if !errors.As(err, &refused) || refused.Code != CodeUploadTooLarge || refused.Details["limitBytes"] != tc.size-1 || refused.Details["source"] != "plan" {
 			t.Fatal(tc.mime, err)
 		}
 	}

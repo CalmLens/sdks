@@ -624,7 +624,7 @@ var (
 // percent-encoded), as the CDN does (packages/shared/src/TransformSelector.ts): an optional first
 // @lens, then key=value options with dotted keys for nested ones (a bare key is true). Values are
 // numbers (json.Number), true, false, hex colours ("#" added) for colour options, or text. ok is
-// false for anything the CDN refuses as asset/invalid-transform. Used by calmlenstest's CDN.
+// false for anything the CDN refuses as transform/invalid. Used by calmlenstest's CDN.
 func parseTransformSelector(selector string) (lens string, options map[string]any, ok bool) {
 	if selector == "" {
 		return "", nil, true

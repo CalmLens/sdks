@@ -841,7 +841,7 @@ func sign(body string) string {
 	return calmlens.SignWebhookPayload([]byte(body), webhookTimestamp, "secret")
 }
 func event(id, kind, assetID, facts string) string {
-	return fmt.Sprintf(`{ "id": %q, "projectId": "project", "type": %q, "severity": "low", "title": "Asset event", "description": null, "assetId": %q, "asset": {"id": %q, "upload": {"status":"completed"}, "classification": {"status":"completed", "moderation": {"status":"allowed"}}, "content": {"status": "stored"}}, "facts": %s, "createdAt": 1700000000000 }`, id, kind, assetID, assetID, facts)
+	return fmt.Sprintf(`{ "id": %q, "projectId": "project", "actor": {"type": "automated", "id": null}, "type": %q, "severity": "low", "title": "Asset event", "description": null, "assetId": %q, "asset": {"id": %q, "upload": {"status":"completed"}, "classification": {"status":"completed", "moderation": {"status":"allowed"}}, "content": {"status": "stored"}}, "facts": %s, "createdAt": 1700000000000 }`, id, kind, assetID, assetID, facts)
 }
 func retrieves(mock *calmlenstest.MockServerClient) int {
 	n := 0
@@ -858,7 +858,7 @@ func TestWebhookTamperReplayAndRetry(t *testing.T) {
 	mock := live(t, a)
 	item := liveClip(t, a, mock)
 	decideAsset(mock.DatabaseStorage.Assets[item.ID], calmlens.ModerationStatusBlocked)
-	body := event("event-1", calmlens.EventAssetBlocked, item.ID, `[{"key":"decided-by","value":"automated"}]`)
+	body := event("event-1", calmlens.EventAssetBlocked, item.ID, `[{"key":"flagged-categories","value":["harassment"]}]`)
 	if webhook(a, body, "bad").Code != 401 || webhook(a, strings.ReplaceAll(body, " ", ""), sign(body)).Code != 401 {
 		t.Fatal("forged or altered webhook accepted")
 	}

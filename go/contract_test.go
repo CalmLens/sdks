@@ -199,8 +199,8 @@ func TestUploadMimeTypesContract(t *testing.T) {
 			}
 			_, err = c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "x", Content: &Content{Type: mimeType, Base64: Ptr("aGVsbG8=")}})
 			var refused *Error
-			if !errors.As(err, &refused) || refused.Code != CodeInvalidUploadMimeType || refused.Details["mimeType"] != mimeType || len(transport.received) != 0 {
-				t.Fatalf("got %v (details %v) after %d requests; want %s before any request", err, refusedDetails(refused), len(transport.received), CodeInvalidUploadMimeType)
+			if !errors.As(err, &refused) || refused.Code != CodeUnsupportedUploadType || refused.Details["mimeType"] != mimeType || refused.Details["source"] != "calmlens" || len(transport.received) != 0 {
+				t.Fatalf("got %v (details %v) after %d requests; want %s before any request", err, refusedDetails(refused), len(transport.received), CodeUnsupportedUploadType)
 			}
 		})
 	}

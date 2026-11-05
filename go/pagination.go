@@ -186,8 +186,8 @@ func (it *EventIterator) Next(ctx context.Context) bool {
 // Event returns the current event. Call it only after Next returned true.
 func (it *EventIterator) Event() Event { return it.page.Items[it.pos-1] }
 
-// Cursor returns the cursor to resume from: pass it as ListEventsOptions.Cursor to continue
-// after the last page fetched.
+// Cursor returns the cursor to resume from: pass it as ListEventsOptions.Cursor, with the same
+// Types and AssetID, to continue after the last page fetched.
 func (it *EventIterator) Cursor() string { return it.options.Cursor }
 
 // Err returns the error that stopped iteration, if any.
