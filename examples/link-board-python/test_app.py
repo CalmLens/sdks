@@ -131,7 +131,7 @@ class DemoFlowTests(unittest.TestCase):
         link = board.links[0]
         stored = board.moderator.client.database_storage.assets[link["asset_id"]]
         stored["classification"]["moderation"].update(status="allowed", manualReviews=[
-            {"id": "r1", "decision": "allowed", "note": None, "reviewedAt": 1, "appliedToAsset": True}])
+            {"id": "r1", "decision": "allowed", "note": None, "decidedBy": {"type": "user", "id": None}, "reviewedAt": 1, "applied": True}])
         clock.now = 5 + RECHECK_SECONDS - 1
         board.refresh()
         self.assertEqual(link["status"], "blocked")
@@ -193,7 +193,7 @@ class DemoFlowTests(unittest.TestCase):
 
 class LiveTests(unittest.TestCase):
     def test_unknown_statuses_and_refresh_failures_stay_closed(self):
-        for processing, moderation in (("processing", "pending"), ("pending", "pending"), ("completed", "unknown"),
+        for processing, moderation in (("processing", "pending"), ("queued", "pending"), ("completed", "unknown"),
                                        ("completed", None)):
             client = MockCalmLensServerClient()
             board = live_board(client)
@@ -221,7 +221,7 @@ class LiveTests(unittest.TestCase):
         stored["classification"]["status"] = "completed"
         stored["classification"]["moderation"].update(status="blocked", raw={"categories": {
             "hate": {"status": "evaluated", "score": 0.81}, "sexual": {"status": "not-evaluated", "reason": "unavailable"}}},
-            source="policy", flaggedCategories=["hate"], automatedAction="block")
+            source="policy", flaggedCategories=["hate"], automatedStatus="blocked")
         board.refresh()
         self.assertEqual(board.links[0]["reason"], {"source": "policy", "found": [("hate", 0.81)], "unknown": ["sexual"]})
 

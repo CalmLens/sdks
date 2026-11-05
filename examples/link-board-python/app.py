@@ -137,7 +137,7 @@ def decision_source(report: AssetModeration | None) -> str | None:
 
 def latest_review(report: AssetModeration | None) -> str | None:
     """The decision of the latest moderator review applied to the asset, if any."""
-    reviews = [review for review in (report or {}).get("manualReviews") or [] if review.get("appliedToAsset")]
+    reviews = [review for review in (report or {}).get("manualReviews") or [] if review.get("applied")]
     return max(reviews, key=lambda review: review["reviewedAt"])["decision"] if reviews else None
 
 

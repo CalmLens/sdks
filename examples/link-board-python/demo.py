@@ -80,7 +80,7 @@ def demo_report(category: str | None = None, score: float = 0.0) -> dict:
     if category:
         categories[category] = {"status": "evaluated", "score": score, "likelihood": "very-likely"}
     return {"raw": {"categories": categories}, "categories": {}, "source": "policy",
-            "automatedAction": "allow", "flaggedCategories": [category] if category else [],
+            "automatedStatus": "allowed", "flaggedCategories": [category] if category else [],
             "regions": [], "explanationComplete": True}
 
 
@@ -89,7 +89,7 @@ def decide(asset: dict, status: str, report: dict):
     now = int(time.time() * 1000)
     asset["classification"]["status"] = "completed"
     asset["classification"]["moderation"].update(status=status, **report)
-    asset["classification"]["moderation"]["automatedAction"] = {"allowed": "allow", "limited": "limit", "age-restricted": "age-restrict", "blocked": "block", "purged": "purge"}[status]
+    asset["classification"]["moderation"]["automatedStatus"] = status
     asset["classification"]["completedAt"] = now
     if status == "purged":
         asset["content"].update(status="removed", removalReason="policy", updatedAt=now)
@@ -98,7 +98,7 @@ def decide(asset: dict, status: str, report: dict):
 def page_report() -> dict:
     """A website's own report when its parts decided it: its categories are not evaluated."""
     return {"raw": {"categories": {name: {"status": "not-evaluated", "reason": "unavailable"} for name in CATEGORIES}},
-            "categories": {}, "source": "children", "automatedAction": "allow", "flaggedCategories": [], "regions": [], "explanationComplete": True}
+            "categories": {}, "source": "children", "automatedStatus": "allowed", "flaggedCategories": [], "regions": [], "explanationComplete": True}
 
 
 class DemoModerator(Moderator):
