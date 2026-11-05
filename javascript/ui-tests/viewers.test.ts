@@ -104,8 +104,7 @@ const makePdf = (pages: string[]): Uint8Array => {
 const getContext = HTMLCanvasElement.prototype.getContext;
 beforeAll(() => {
   HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement) {
-    const canvas = this;
-    const state: Record<PropertyKey, unknown> = { canvas };
+    const state: Record<PropertyKey, unknown> = { canvas: this };
     return new Proxy(state, {
       get: (target, key) => {
         if (key in target) return target[key];
