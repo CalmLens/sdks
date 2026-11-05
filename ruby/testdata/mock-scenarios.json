@@ -4524,6 +4524,70 @@
       ]
     },
     {
+      "name": "an image's timeline is empty, a made-up timeline cursor is refused and an unknown asset is not found",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.listTimeline",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 0,
+              "hasMore": false,
+              "nextCursor": null,
+              "pageSize": 50
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.listTimeline",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "cursor": "not-a-cursor"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-cursor",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.listTimeline",
+          "args": {
+            "assetId": "asset_00000000000000000000"
+          },
+          "expect": {
+            "error": {
+              "code": "asset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "retry processes a failed asset again only while it still has content",
       "mock": {
         "moderate": {

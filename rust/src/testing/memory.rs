@@ -118,7 +118,7 @@ pub(super) struct QueuedFailure {
 
 /// The operation names [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
 /// takes: the JavaScript SDK's method paths.
-pub(super) const OPERATIONS: [&str; 47] = [
+pub(super) const OPERATIONS: [&str; 48] = [
     "assets.create",
     "assets.classify",
     "text.classify",
@@ -132,6 +132,7 @@ pub(super) const OPERATIONS: [&str; 47] = [
     "assets.delete",
     "assets.listChildren",
     "assets.iterateChildren",
+    "assets.listTimeline",
     "assets.deleteContent",
     "assets.createSignedUrl",
     "assets.retry",
@@ -430,6 +431,32 @@ fn check_metadata(metadata: Option<&Value>) -> Outcome<()> {
     Ok(())
 }
 /// A whole number from `low` to `high` in query parameter `path`, or the schema's error.
+/// An asset's findings timeline, a page at a time, as the API lists it: its report's segments in
+/// time order, with a cursor naming the next one's position.
+fn timeline_page(asset: &Value, q: &HashMap<String, String>) -> Outcome<Value> {
+    let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
+    let offset = match q.get("cursor") {
+        None => 0,
+        Some(cursor) => cursor
+            .strip_prefix("timeline:")
+            .filter(|digits| !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()))
+            .and_then(|digits| digits.parse::<usize>().ok())
+            .ok_or_else(|| fail(ErrorCode::InvalidCursor, "Invalid cursor"))?,
+    };
+    let segments = asset["classification"]["moderation"]["raw"]["timeline"]["segments"]
+        .as_array()
+        .map_or(&[][..], Vec::as_slice);
+    let has_more = offset.saturating_add(size) < segments.len();
+    let items: Vec<Value> = segments.iter().skip(offset).take(size).cloned().collect();
+    Ok(json!({
+        "items": items,
+        "nextCursor": if has_more { json!(format!("timeline:{}", offset + size)) } else { Value::Null },
+        "pageSize": size,
+        "hasMore": has_more,
+        "ordering": [],
+    }))
+}
+
 fn bounded(
     value: Option<&String>,
     default: usize,
@@ -1935,7 +1962,7 @@ impl Backend {
             },
             "classification": {
                 "status": if open { "pending" } else { "processing" }, "failureReason": null,
-                "updatedAt": now, "completedAt": null,
+                "updatedAt": now, "completedAt": null, "progress": null,
                 // The mock never reads test inputs.
                 "testInput": false,
                 "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": []},
@@ -2055,6 +2082,7 @@ impl Backend {
             ("GET", "children") => {
                 return self.page(q, id, |child| child["parentId"] == id);
             }
+            ("GET", "timeline") => return timeline_page(&asset, q),
             ("POST", "signed-url") => {
                 let expires = body
                     .get("expiresInSeconds")
@@ -2575,6 +2603,7 @@ impl Backend {
             ("PATCH", ["assets", _]) => "assets.update",
             ("DELETE", ["assets", _]) => "assets.delete",
             ("GET", ["assets", _, "children"]) => "assets.listChildren",
+            ("GET", ["assets", _, "timeline"]) => "assets.listTimeline",
             ("DELETE", ["assets", _, "content"]) => "assets.deleteContent",
             ("POST", ["assets", _, "signed-url"]) => "assets.createSignedUrl",
             ("POST", ["assets", _, "retry"]) => "assets.retry",

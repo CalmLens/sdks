@@ -13,6 +13,7 @@ const (
 	EventAssetBlocked                  = "asset.blocked"
 	EventAssetPurged                   = "asset.purged"
 	EventAssetFailed                   = "asset.failed"
+	EventAssetProcessingProgress       = "asset.processing-progress"
 	EventAssetDeleted                  = "asset.deleted"
 	EventAssetContentRemoved           = "asset.content-removed"
 	EventAssetRetried                  = "asset.retried"
@@ -76,6 +77,8 @@ const (
 	FactAction              = "action"
 	FactCreatedByUserID     = "created-by-user-id"
 	FactRevokedByUserID     = "revoked-by-user-id"
+	FactCompletedSections   = "completed-sections"
+	FactTotalSections       = "total-sections"
 	FactTest                = "test"
 )
 
@@ -264,6 +267,16 @@ type AssetFailedFacts struct {
 	PreviousStatus *string `json:"previous-status"`
 	// FailureReason is why processing failed (an AssetFailureReason constant).
 	FailureReason string `json:"failure-reason"`
+}
+
+// AssetProcessingProgressFacts are the facts of EventAssetProcessingProgress, sent while long
+// audio or video analysed in sections finishes more of them. CompletedSections and TotalSections
+// match the asset's AssetClassification.Progress.
+type AssetProcessingProgressFacts struct {
+	AssetName         *string `json:"asset-name"`
+	AssetType         *string `json:"asset-type"`
+	CompletedSections int64   `json:"completed-sections"`
+	TotalSections     int64   `json:"total-sections"`
 }
 
 // UsageLimitReachedFacts are the facts of EventUsageLimitReached. OrganisationID, the organisation

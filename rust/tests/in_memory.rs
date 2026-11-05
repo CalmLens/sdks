@@ -99,6 +99,46 @@ async fn storage_keeps_only_kept_content_and_drops_purged_content() {
 }
 
 #[tokio::test]
+async fn timeline_pages_through_the_report_segments_in_order() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    let asset = mock.assets().classify(kept("v.png", b"png")).await.unwrap();
+    let segment = |start: f64| json!({"source": "clip", "startSeconds": start, "endSeconds": start + 10.0, "categories": {}});
+    mock.with_storage(|storage| {
+        storage.assets.get_mut(&asset.id).unwrap()["classification"]["moderation"]["raw"] =
+            json!({"categories": {}, "timeline": {"segments": [segment(0.0), segment(10.0), segment(20.0)]}});
+    });
+    let page = |cursor: Option<String>| ListTimeline {
+        asset_id: asset.id.clone(),
+        cursor,
+        page_size: Some(2),
+    };
+    let first = mock.assets().list_timeline(page(None)).await.unwrap();
+    let starts = |page: &AssetTimelinePage| -> Vec<f64> {
+        page.items.iter().map(|item| item.start_seconds).collect()
+    };
+    assert_eq!(starts(&first), [0.0, 10.0]);
+    assert_eq!(first.has_more, Some(true));
+    assert_eq!(first.next_cursor.as_deref(), Some("timeline:2"));
+    let last = mock
+        .assets()
+        .list_timeline(page(first.next_cursor))
+        .await
+        .unwrap();
+    assert_eq!(starts(&last), [20.0]);
+    assert_eq!(last.has_more, Some(false));
+    assert_eq!(last.next_cursor, None);
+    let error = mock
+        .assets()
+        .list_timeline(ListTimeline {
+            page_size: Some(101),
+            ..page(None)
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::TooBig);
+}
+
+#[tokio::test]
 async fn explain_completes_evidence_and_rerun_moderates_again() {
     let mock = MockServerClient::in_memory(options()).unwrap();
     let asset = mock.assets().classify(kept("e.png", b"png")).await.unwrap();

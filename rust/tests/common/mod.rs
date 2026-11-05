@@ -45,6 +45,7 @@ pub async fn invoke(
         "assets.move" => output(client.assets().move_asset(input(options)?).await),
         "assets.batch" => output(client.assets().batch(input(options)?).await),
         "assets.listChildren" => output(client.assets().list_children(input(options)?).await),
+        "assets.listTimeline" => output(client.assets().list_timeline(input(options)?).await),
         "assets.uploadPart" => output(client.assets().upload_part(input(options)?).await),
         "assets.createSignedUrl" => {
             output(client.assets().create_signed_url(input(options)?).await)

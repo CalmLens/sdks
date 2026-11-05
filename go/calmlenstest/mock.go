@@ -910,6 +910,8 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 		return []string{"assets.deleteContent"}
 	case suffix == "children":
 		return []string{"assets.listChildren", "assets.iterateChildren"}
+	case suffix == "timeline":
+		return []string{"assets.listTimeline"}
 	case suffix == "signed-url":
 		return []string{"assets.createSignedUrl"}
 	case suffix == "part":
@@ -925,8 +927,8 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 // mockOperations are the operation names operationsOf gives, for RequestFailure.Operation.
 var mockOperations = []string{
 	"assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision",
-	"assets.update", "assets.listChildren", "assets.iterateChildren", "assets.create",
-	"assets.classify", "assets.uploadPart", "assets.createSignedUrl", "assets.move", "assets.retry",
+	"assets.update", "assets.listChildren", "assets.iterateChildren", "assets.listTimeline",
+	"assets.create", "assets.classify", "assets.uploadPart", "assets.createSignedUrl", "assets.move", "assets.retry",
 	"assets.explain", "assets.decide", "assets.deleteContent", "assets.delete", "assets.batch",
 	"text.classify", "cdn.serve", "events.list", "events.pages", "folders.list", "folders.retrieve",
 	"folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
@@ -1174,6 +1176,37 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 	return nil, errUnknownRoute
 }
 
+// listTimeline lists an asset's findings timeline a page at a time, as the API does: its
+// report's segments in time order, with a "timeline:<offset>" cursor naming the next one's
+// position.
+func listTimeline(a calmlens.JSON, q url.Values) (any, error) {
+	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
+	if err != nil {
+		return nil, err
+	}
+	offset := 0
+	if q.Has("cursor") {
+		digits, ok := strings.CutPrefix(q.Get("cursor"), "timeline:")
+		parsed, err := strconv.Atoi(digits)
+		if !ok || err != nil || strings.Trim(digits, "0123456789") != "" {
+			return nil, fail(calmlens.CodeInvalidCursor)
+		}
+		offset = parsed
+	}
+	segments := []any{}
+	if value := lookup(a, "classification.moderation.raw.timeline.segments"); value != nil {
+		encoded, _ := json.Marshal(value)
+		_ = json.Unmarshal(encoded, &segments)
+	}
+	start := min(offset, len(segments))
+	end := min(offset+size, len(segments))
+	var next any
+	if end < len(segments) {
+		next = fmt.Sprintf("timeline:%d", end)
+	}
+	return calmlens.JSON{"items": segments[start:end], "nextCursor": next, "pageSize": size, "hasMore": end < len(segments), "ordering": []any{}}, nil
+}
+
 // listEvents reads the feed like the API: without cursor, no events and a nextCursor for now;
 // with cursor, up to pageSize (default 50, at most 100) events added since, oldest first.
 // nextCursor is never null: it is where to keep polling from.
@@ -1394,8 +1427,8 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 	}
 	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
 	// The mock never reads test inputs.
-	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil, "testInput": false,
-		"moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{}, "flaggedCategories": []any{}, "regions": []any{}}}
+	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil, "progress": nil,
+		"testInput": false, "moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{}, "flaggedCategories": []any{}, "regions": []any{}}}
 	if open {
 		uploadState["status"] = "uploading"
 		uploadState["partsReceived"] = 1
@@ -1885,6 +1918,8 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		m.requestContentRemoval(a, now)
 	case method == "GET" && suffix == "children":
 		return m.page(func(child calmlens.JSON) bool { return child["parentId"] == id }, q, "children:"+id)
+	case method == "GET" && suffix == "timeline":
+		return listTimeline(a, q)
 	case method == "POST" && suffix == "signed-url":
 		params := url.Values{"expiresInSeconds": {fmt.Sprint(body["expiresInSeconds"])}}
 		for _, key := range []string{"lens", "transform"} {

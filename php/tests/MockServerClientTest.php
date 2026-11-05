@@ -132,6 +132,25 @@ final class MockServerClientTest extends TestCase
         self::assertSame([$cat['id'], 'child'], array_column($client->assets->list()['items'], 'id'));
     }
 
+    public function testTimelinePagesThroughTheReportsSegmentsWithPositionCursors(): void
+    {
+        $mock = new MockServerClient();
+        $client = $mock->client();
+        $clip = $client->text->classify(['name' => 'clip', 'text' => 'hi']);
+        self::assertSame([true, null], [array_key_exists('progress', $clip['classification']), $clip['classification']['progress']]);
+        $segments = array_map(fn (int $i) => ['source' => 'clip', 'startSeconds' => $i * 30, 'endSeconds' => $i * 30 + 30, 'categories' => []], range(0, 2));
+        $mock->assets[$clip['id']]['classification']['moderation']['raw'] = ['timeline' => ['segments' => $segments]];
+        $first = $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => 2]);
+        self::assertSame([array_slice($segments, 0, 2), 'timeline:2', 2, true, []],
+            [$first['items'], $first['nextCursor'], $first['pageSize'], $first['hasMore'], $first['ordering']]);
+        $last = $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => 2, 'cursor' => $first['nextCursor']]);
+        self::assertSame([[$segments[2]], null, false], [$last['items'], $last['nextCursor'], $last['hasMore']]);
+        self::assertSame('validation/too-big', self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => 101])));
+        self::assertSame('validation/too-small', self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => 0])));
+        $mock->failNextRequest('misc/internal-error', 'assets.listTimeline');
+        self::assertSame('misc/internal-error', self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id']])));
+    }
+
     public function testFiltersSupportOrWildcardsAndValueLists(): void
     {
         $time = 1;

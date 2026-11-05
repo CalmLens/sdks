@@ -979,6 +979,75 @@
     }
   },
   {
+    "operation": "assets.listTimeline",
+    "options": {
+      "assetId": "asset-1"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/assets/asset-1/timeline",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "source": "clip",
+          "startSeconds": 0,
+          "endSeconds": 30,
+          "categories": {
+            "violence": {
+              "status": "evaluated",
+              "score": 0.9,
+              "likelihood": "very-likely"
+            }
+          }
+        }
+      ],
+      "hasMore": true,
+      "nextCursor": "timeline:1",
+      "pageSize": 1,
+      "ordering": []
+    }
+  },
+  {
+    "operation": "assets.listTimeline",
+    "options": {
+      "assetId": "asset-1",
+      "pageSize": 50,
+      "cursor": "timeline:50"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/assets/asset-1/timeline",
+      "query": {
+        "pageSize": "50",
+        "cursor": "timeline:50"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "source": "clip",
+          "startSeconds": 0,
+          "endSeconds": 30,
+          "categories": {
+            "violence": {
+              "status": "evaluated",
+              "score": 0.9,
+              "likelihood": "very-likely"
+            }
+          }
+        }
+      ],
+      "hasMore": true,
+      "nextCursor": "timeline:1",
+      "pageSize": 1,
+      "ordering": []
+    }
+  },
+  {
     "operation": "assets.retry",
     "options": {
       "assetId": "asset-1"
@@ -2365,6 +2434,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -2607,6 +2680,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -3011,6 +3085,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -3253,6 +3331,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -3696,6 +3775,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -3938,6 +4021,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -4368,6 +4452,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -4610,6 +4698,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -5073,6 +5162,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -5315,6 +5408,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -5729,6 +5823,10 @@
               "failureReason": "file-too-large",
               "updatedAt": 1,
               "completedAt": 1,
+              "progress": {
+                "completedSections": 1,
+                "totalSections": 1
+              },
               "testInput": true,
               "moderation": {
                 "status": "pending",
@@ -5971,6 +6069,7 @@
                     "frameIntervalSeconds": 1.5,
                     "sampledFrames": 1,
                     "audioTranscribed": true,
+                    "segmentCount": 1,
                     "segments": [
                       {
                         "source": "frame",
@@ -6391,6 +6490,10 @@
             "failureReason": "file-too-large",
             "updatedAt": 1,
             "completedAt": 1,
+            "progress": {
+              "completedSections": 1,
+              "totalSections": 1
+            },
             "testInput": true,
             "moderation": {
               "status": "pending",
@@ -6633,6 +6736,7 @@
                   "frameIntervalSeconds": 1.5,
                   "sampledFrames": 1,
                   "audioTranscribed": true,
+                  "segmentCount": 1,
                   "segments": [
                     {
                       "source": "frame",
@@ -7059,6 +7163,10 @@
             "failureReason": "file-too-large",
             "updatedAt": 1,
             "completedAt": 1,
+            "progress": {
+              "completedSections": 1,
+              "totalSections": 1
+            },
             "testInput": true,
             "moderation": {
               "status": "pending",
@@ -7301,6 +7409,7 @@
                   "frameIntervalSeconds": 1.5,
                   "sampledFrames": 1,
                   "audioTranscribed": true,
+                  "segmentCount": 1,
                   "segments": [
                     {
                       "source": "frame",
@@ -7721,6 +7830,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -7963,6 +8076,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -8294,6 +8408,191 @@
     "fullModel": true
   },
   {
+    "operation": "assets.listTimeline",
+    "options": {
+      "assetId": "asset-1"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/assets/asset-1/timeline",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "source": "frame",
+          "startSeconds": 1.5,
+          "endSeconds": 1.5,
+          "categories": {
+            "sexual": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "violence": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "self-harm": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "harassment": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "hate": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "criminal-activity": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "personal-information": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            },
+            "profanity": {
+              "status": "evaluated",
+              "likelihood": "very-unlikely",
+              "score": 0.5,
+              "qualifiers": {
+                "sexual-pornographic-media": {
+                  "status": "evaluated",
+                  "someScore": 0.5,
+                  "allScore": 0.5,
+                  "likelihood": "very-unlikely"
+                }
+              },
+              "policyConditions": {
+                "example": {
+                  "status": "evaluated",
+                  "score": 0.5
+                }
+              }
+            }
+          }
+        }
+      ],
+      "nextCursor": "example",
+      "pageSize": 1,
+      "hasMore": true,
+      "ordering": [
+        {
+          "field": "example",
+          "direction": "asc"
+        }
+      ]
+    },
+    "fullModel": true
+  },
+  {
     "operation": "assets.retry",
     "options": {
       "assetId": "asset-1"
@@ -8367,6 +8666,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -8609,6 +8912,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -9013,6 +9317,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -9255,6 +9563,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -9664,6 +9973,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -9906,6 +10219,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -10310,6 +10624,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -10552,6 +10870,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -10959,6 +11278,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -11201,6 +11524,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",
@@ -11640,6 +11964,10 @@
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
+        "progress": {
+          "completedSections": 1,
+          "totalSections": 1
+        },
         "testInput": true,
         "moderation": {
           "status": "pending",
@@ -11882,6 +12210,7 @@
               "frameIntervalSeconds": 1.5,
               "sampledFrames": 1,
               "audioTranscribed": true,
+              "segmentCount": 1,
               "segments": [
                 {
                   "source": "frame",

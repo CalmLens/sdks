@@ -82,6 +82,7 @@ const MOCK_OPERATIONS = [
   "assets.update",
   "assets.listChildren",
   "assets.iterateChildren",
+  "assets.listTimeline",
   "assets.create",
   "assets.classify",
   "assets.uploadPart",
@@ -464,6 +465,8 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
       return ["assets.deleteContent"];
     case "children":
       return ["assets.listChildren", "assets.iterateChildren"];
+    case "timeline":
+      return ["assets.listTimeline"];
     case "signed-url":
       return ["assets.createSignedUrl"];
     case "part":
@@ -1043,6 +1046,8 @@ export class MockCalmLensApi {
           return [200, await this.deleteAsset(id)];
         case "GET children":
           return [200, await this.listChildren(id, request.query)];
+        case "GET timeline":
+          return [200, await this.listTimeline(id, request.query)];
         case "POST part":
           return [200, await this.uploadPart(id, request)];
         case "POST signed-url":
@@ -1507,6 +1512,29 @@ export class MockCalmLensApi {
     );
   }
 
+  /**
+   * An asset's findings timeline, a page at a time, as the API lists it: its report's segments in
+   * time order, with a cursor naming the next one's position.
+   */
+  private async listTimeline(assetId: string, query: URLSearchParams) {
+    const asset = await this.findOwnAsset(assetId);
+    const pageSize = this.integer(query, "pageSize", DEFAULT_PAGE_SIZE);
+    if (pageSize < 1) throw invalidField("validation/too-small", "pageSize");
+    if (pageSize > 100) throw invalidField("validation/too-big", "pageSize");
+    const cursor = query.get("cursor");
+    const offset = cursor === null ? 0 : Number(/^timeline:(\d+)$/.exec(cursor)?.[1] ?? Number.NaN);
+    if (!Number.isSafeInteger(offset)) throw fail(API_ERROR_CODES.INVALID_CURSOR);
+    const segments = asset.classification.moderation.raw?.timeline?.segments ?? [];
+    const hasMore = offset + pageSize < segments.length;
+    return {
+      items: segments.slice(offset, offset + pageSize),
+      nextCursor: hasMore ? `timeline:${offset + pageSize}` : null,
+      pageSize,
+      hasMore,
+      ordering: [],
+    };
+  }
+
   private async updateAsset(assetId: string, body: Record<string, unknown>): Promise<Asset> {
     checkMetadata(body.metadata);
     if (body.name === null) throw invalidField("validation/invalid-type", "name");
@@ -1858,6 +1886,7 @@ export class MockCalmLensApi {
         updatedAt: now,
         completedAt: null,
         // The mock never reads test inputs.
+        progress: null,
         testInput: false,
         moderation: { status: "pending", manualReviews: [], flaggedCategories: [], regions: [] },
       },

@@ -265,6 +265,10 @@ string_enum! {
         TypeMismatch = "type-mismatch",
         /// The upload has more text than free uploads allow before billing is set up.
         FreeUploadLimit = "free-upload-limit",
+        /// The audio or video is longer than the organisation's media limits allow.
+        MediaLimit = "media-limit",
+        /// Processing stopped because the organisation reached its spend limit.
+        SpendLimit = "spend-limit",
         /// A part of the asset, such as an embedded image, failed.
         ChildFailed = "child-failed",
         /// Processing failed for another reason; retrying may succeed.
@@ -421,6 +425,8 @@ string_enum! {
         AssetUploaded = "asset.uploaded",
         /// `asset.classified`.
         AssetClassified = "asset.classified",
+        /// `asset.processing-progress`.
+        AssetProcessingProgress = "asset.processing-progress",
         /// `asset.allowed`.
         AssetAllowed = "asset.allowed",
         /// `asset.limited`.
@@ -1193,6 +1199,20 @@ pub struct ListChildren {
     pub ordering: Option<Vec<Order>>,
 }
 
+/// Options for listing an audio or video asset's findings timeline.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListTimeline {
+    /// The asset ID.
+    pub asset_id: String,
+    /// The cursor returned by the previous page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// Items per page, 1 to 100.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
+}
+
 /// Changes to an asset. [`Patch::Missing`] fields are left unchanged.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1626,6 +1646,10 @@ pub struct AssetClassification {
     /// When classification completed, in milliseconds since the Unix epoch.
     #[serde(default)]
     pub completed_at: Option<u64>,
+    /// How many sections of a long audio or video asset have been analysed; `None` for assets
+    /// analysed in one pass.
+    #[serde(default)]
+    pub progress: Option<AssetClassificationProgress>,
     /// Whether the results came from one of the project's test inputs rather than analysing the
     /// content. Never use test results, such as age ranges, for real decisions.
     #[serde(default)]
@@ -1658,6 +1682,25 @@ pub struct AssetClassification {
     pub labels: Option<Vec<ClassificationLabel>>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetClassification, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// How far the analysis of a long audio or video asset, done in sections, has got.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetClassificationProgress {
+    /// The sections analysed so far.
+    #[serde(default)]
+    pub completed_sections: u32,
+    /// The sections in all.
+    #[serde(default)]
+    pub total_sections: u32,
+    /// Fields this SDK version does not know.
+    #[serde(
+        flatten,
+        deserialize_with = "extra_fields::<AssetClassificationProgress, _>"
+    )]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2538,9 +2581,13 @@ pub struct MediaClassificationReport {
     /// Whether the audio was transcribed.
     #[serde(default)]
     pub audio_transcribed: bool,
-    /// Results by time segment.
+    /// Results by time segment. A long asset's report may keep a shortened timeline; list every
+    /// segment with [`AssetsClient::list_timeline`](crate::AssetsClient::list_timeline).
     #[serde(default)]
     pub segments: Vec<MediaClassificationSegment>,
+    /// The number of segments in the full timeline, when it differs from `segments`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub segment_count: Option<u32>,
     /// Fields this SDK version does not know.
     #[serde(
         flatten,
@@ -2607,6 +2654,31 @@ impl AssetPage {
             ..Self::default()
         }
     }
+}
+
+/// A page of an audio or video asset's findings timeline, in time order.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetTimelinePage {
+    /// The segments on this page.
+    #[serde(default)]
+    pub items: Vec<MediaClassificationSegment>,
+    /// The cursor for the next page, or None.
+    #[serde(default)]
+    pub next_cursor: Option<String>,
+    /// The page size.
+    #[serde(default)]
+    pub page_size: Option<u32>,
+    /// Whether another page follows.
+    #[serde(default)]
+    pub has_more: Option<bool>,
+    /// The sort orders applied; the timeline is always in time order.
+    #[serde(default)]
+    pub ordering: Option<Vec<Order>>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetTimelinePage, _>")]
+    pub extra: HashMap<String, Value>,
 }
 
 /// A folder.

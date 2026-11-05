@@ -482,6 +482,10 @@ func normalize(t *testing.T, value any) any {
 		if typed.NextCursor == "" {
 			out.(map[string]any)["nextCursor"] = nil
 		}
+	case *calmlens.AssetTimelinePage:
+		if typed.NextCursor == "" {
+			out.(map[string]any)["nextCursor"] = nil
+		}
 	case *calmlens.HashListPage:
 		if typed.NextCursor == "" {
 			out.(map[string]any)["nextCursor"] = nil
@@ -634,6 +638,8 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		result, err = m.Assets.List(ctx, decode[calmlens.ListAssetsOptions](t, args))
 	case "assets.listChildren":
 		result, err = m.Assets.ListChildren(ctx, decode[calmlens.ListAssetChildrenOptions](t, args))
+	case "assets.listTimeline":
+		result, err = m.Assets.ListTimeline(ctx, decode[calmlens.ListAssetTimelineOptions](t, args))
 	case "assets.search":
 		result, err = m.Assets.Search(ctx, decode[calmlens.SearchAssetsOptions](t, args))
 	case "assets.uploadPart":

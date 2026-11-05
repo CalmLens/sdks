@@ -554,6 +554,11 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 			frameIntervalSeconds: zod.number().positive().optional(),
 			sampledFrames: zod.number().int().nonnegative(),
 			audioTranscribed: zod.boolean(),
+			/**
+			* Set on long media analysed in sections, whose report keeps a shortened timeline:
+			* the number of segments on its full timeline (the asset's timeline endpoint).
+			*/
+			segmentCount: zod.number().int().nonnegative().optional(),
 			segments: zod.array(zod.object({
 				source: zod.enum([
 					"frame",
@@ -653,9 +658,19 @@ const ASSET_FAILURE_REASON_SCHEMA = zod.enum([
 	"multiple-tracks",
 	"type-mismatch",
 	"free-upload-limit",
+	"media-limit",
+	"spend-limit",
 	"child-failed",
 	"processing-error"
 ]);
+/** How far sectioned analysis of long audio or video has got. */
+const CLASSIFICATION_PROGRESS_SCHEMA = zod.object({
+	completedSections: zod.number().int().nonnegative().describe("Sections analysed so far"),
+	totalSections: zod.number().int().positive().describe("Sections the media is analysed in")
+}).meta(metaStore([docPropertyInfo({
+	description: "Progress of long audio or video analysed in sections",
+	namedType: "ClassificationProgress"
+})]));
 const ASSET_TYPE_SCHEMA = zod.enum([
 	"image",
 	"video",
@@ -829,6 +844,8 @@ const STORED_ASSET_SCHEMA = zod.object({
 	classificationUpdatedAt: zod.number().nullish(),
 	/** Set with `classificationStatus: "failed"`, cleared when processing starts again. */
 	classificationFailureReason: ASSET_FAILURE_REASON_SCHEMA.nullish(),
+	/** Set while long audio or video is analysed in sections. */
+	classificationProgress: CLASSIFICATION_PROGRESS_SCHEMA.nullish(),
 	moderationStatus: ASSET_MODERATION_STATUS_SCHEMA,
 	manualReviews: zod.array(STORED_ASSET_REVIEW_SCHEMA).default([]).meta(metaStore([backfill({ value: [] })])),
 	reviewRevision: zod.number().int().default(0).meta(metaStore([backfill({ value: 0 })])),
@@ -882,6 +899,7 @@ const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 	failureReason: ASSET_FAILURE_REASON_SCHEMA.nullable().describe("Why processing failed, while `status` is `failed`; otherwise `null`. See [Failure reasons](/docs/guides/asset-lifecycle#failure-reasons)."),
 	updatedAt: epoch("When classification state last changed"),
 	completedAt: epoch("When classification completed"),
+	progress: CLASSIFICATION_PROGRESS_SCHEMA.nullable().describe("While long audio or video is analysed in sections and `status` is `processing`: how many of its sections are done. `null` otherwise. See [Long audio and video](/docs/guides/audio-and-video#long-audio-and-video)."),
 	testInput: zod.boolean().describe("Whether the results came from one of the project's test inputs (a signed text code, test image or media test phrase) rather than from analysing the content. Test results, including person and face detection and age ranges, are declared by the input: never use them for real decisions such as age checks. See [Testing](/docs/guides/testing)."),
 	moderation: ASSET_MODERATION_SCHEMA,
 	personDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.personDetection,
@@ -1146,6 +1164,8 @@ const ASSET_FAILURE_REASON_LABELS = {
 	"multiple-tracks": msg("Multiple tracks"),
 	"type-mismatch": msg("Doesn't match asset type"),
 	"free-upload-limit": msg("Free upload limit"),
+	"media-limit": msg("Daily media limit"),
+	"spend-limit": msg("Spend limit"),
 	"child-failed": msg("Part failed"),
 	"processing-error": msg("Processing error")
 };
@@ -1419,6 +1439,35 @@ const ASSET_FAILED = defineEventType({
 		assetType: "video",
 		previousStatus: "processing",
 		failureReason: "duration-limit"
+	}
+});
+const ASSET_PROCESSING_PROGRESS = defineEventType({
+	id: "asset.processing-progress",
+	name: msg("Processing progress"),
+	description: msg("Long audio or video analysed in sections finished more of them. Sent every tenth of its sections or 30 seconds, whichever comes first, while it is processing."),
+	category: "assets",
+	severity: "low",
+	notify: false,
+	permission: "assets:read",
+	fields: {
+		assetName: assetNameField,
+		assetType: assetTypeField,
+		completedSections: field(zod.number().int().nonnegative(), {
+			label: msg("Sections done"),
+			description: "Sections analysed so far, as in the asset's `classification.progress.completedSections`.",
+			display: "number"
+		}),
+		totalSections: field(zod.number().int().positive(), {
+			label: msg("Sections"),
+			description: "Sections the media is analysed in, as in `classification.progress.totalSections`.",
+			display: "number"
+		})
+	},
+	example: {
+		assetName: "lecture.mp4",
+		assetType: "video",
+		completedSections: 13,
+		totalSections: 63
 	}
 });
 const USAGE_LIMIT_REACHED = defineEventType({
@@ -2103,6 +2152,7 @@ const EVENT_TYPE_INFO = {
 	"asset.blocked": ASSET_BLOCKED,
 	"asset.purged": ASSET_PURGED,
 	"asset.failed": ASSET_FAILED,
+	"asset.processing-progress": ASSET_PROCESSING_PROGRESS,
 	"asset.deleted": ASSET_DELETED,
 	"asset.content-removed": ASSET_CONTENT_REMOVED,
 	"asset.retried": ASSET_RETRIED,

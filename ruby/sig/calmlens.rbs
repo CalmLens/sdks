@@ -168,6 +168,7 @@ module CalmLens
     def list_children: (list_asset_children_options options) -> asset_page
     def each_child: (list_asset_children_options options) { (asset) -> void } -> nil
                   | (list_asset_children_options options) -> Enumerator[asset, nil]
+    def list_timeline: (list_asset_timeline_options options) -> asset_timeline_page
     def retrieve: (asset_id_options options) -> asset
     def wait_for_decision: (wait_for_decision_options options) -> asset
     def update: (update_asset_options options) -> asset

@@ -1121,6 +1121,17 @@ impl AssetsClient<'_> {
     pub async fn list_children(&self, options: ListChildren) -> Result<AssetPage> {
         self.0.children_page(&options).await
     }
+    /// One page of an audio or video asset's findings timeline, in time order. A long asset's
+    /// report keeps a shortened timeline; this lists every segment.
+    pub async fn list_timeline(&self, options: ListTimeline) -> Result<AssetTimelinePage> {
+        let path = format!("/assets/{}/timeline", id(&options.asset_id)?);
+        let mut query = Query::default();
+        query.opt("cursor", options.cursor.as_deref());
+        query.opt("pageSize", options.page_size);
+        self.0
+            .call(self.0.prepare(Method::GET, &path, &query.0)?)
+            .await
+    }
     /// Every child of an asset from `options.cursor` on, ending and failing like
     /// [`iterate`](Self::iterate).
     pub fn iterate_children(&self, options: ListChildren) -> BoxStream<'static, Result<Asset>> {

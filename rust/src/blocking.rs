@@ -248,6 +248,8 @@ blocking_methods!(AssetsClient => assets {
     fn list(options: ListAssets) -> Result<AssetPage>;
     /// See [`crate::AssetsClient::list_children`].
     fn list_children(options: ListChildren) -> Result<AssetPage>;
+    /// See [`crate::AssetsClient::list_timeline`].
+    fn list_timeline(options: ListTimeline) -> Result<AssetTimelinePage>;
     /// See [`crate::AssetsClient::retrieve`].
     fn retrieve(options: AssetId) -> Result<Asset>;
     /// See [`crate::AssetsClient::wait_for_decision`]. Blocks until the asset is decided or

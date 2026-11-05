@@ -24,6 +24,7 @@ module CalmLens
       'assets.explain' => %w[assetId rerun].freeze,
       'assets.list' => %w[cursor filter folderId ordering pageSize].freeze,
       'assets.listChildren' => %w[assetId cursor ordering pageSize].freeze,
+      'assets.listTimeline' => %w[assetId cursor pageSize].freeze,
       'assets.move' => %w[assetId folderId].freeze,
       'assets.retrieve' => %w[assetId].freeze,
       'assets.retry' => %w[assetId].freeze,

@@ -178,6 +178,20 @@
       }
     },
     {
+      "id": "assets.listTimeline",
+      "kind": "method",
+      "description": "Get every segment of an audio or video asset's findings timeline, in time order. A long asset's report keeps a shortened timeline; this lists all of it",
+      "names": {
+        "javascript": "assets.listTimeline",
+        "python": "assets.list_timeline",
+        "go": "Assets.ListTimeline",
+        "rust": "assets().list_timeline",
+        "java": "assets.listTimeline",
+        "ruby": "assets.list_timeline",
+        "php": "assets->listTimeline"
+      }
+    },
+    {
       "id": "assets.update",
       "kind": "method",
       "description": "Update an existing asset",

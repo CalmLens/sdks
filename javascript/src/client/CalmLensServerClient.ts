@@ -25,6 +25,7 @@ import type {
   AssetPage,
   AssetSearchQuery,
   AssetSearchResponse,
+  AssetTimelinePage,
   AssignPolicyOptions,
   BatchAssetsOptions,
   BatchAssetsResponse,
@@ -55,6 +56,7 @@ import type {
   Lens,
   ListAssetChildrenOptions,
   ListAssetsOptions,
+  ListAssetTimelineOptions,
   ListEventsOptions,
   ListFoldersOptions,
   ListHashListEntriesOptions,
@@ -384,6 +386,17 @@ export default class CalmLensServerClient {
       ): Promise<AssetChildrenPage> => {
         const { assetId, ...query } = checked("assets.listChildren", options);
         return this.request("GET", `/assets/${requireId(assetId, "Asset ID")}/children`, {
+          query,
+        });
+      },
+
+      /**
+       * Lists one page of an audio or video asset's findings timeline, in time order. A long
+       * asset's report keeps a shortened timeline; this lists every segment.
+       */
+      listTimeline: async (options: ListAssetTimelineOptions): Promise<AssetTimelinePage> => {
+        const { assetId, ...query } = checked("assets.listTimeline", options);
+        return this.request("GET", `/assets/${requireId(assetId, "Asset ID")}/timeline`, {
           query,
         });
       },

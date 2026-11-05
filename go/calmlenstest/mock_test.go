@@ -295,6 +295,46 @@ func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
 	}
 }
 
+func TestMockPagesAnAssetsTimelineInTimeOrder(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	a, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "clip.mp4", Content: &calmlens.Content{Type: "video/mp4", Bytes: []byte("video")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	segments := []any{}
+	for i := range 3 {
+		segments = append(segments, calmlens.JSON{"source": calmlens.SegmentSourceFrame, "startSeconds": i, "endSeconds": i + 1, "categories": calmlens.JSON{}})
+	}
+	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["raw"] = calmlens.JSON{"categories": calmlens.JSON{}, "timeline": calmlens.JSON{"segments": segments}}
+	starts := []float64{}
+	cursor := ""
+	for {
+		page, err := c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID, Cursor: cursor, PageSize: 2})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, segment := range page.Items {
+			starts = append(starts, segment.StartSeconds)
+		}
+		if !page.HasMore {
+			if page.NextCursor != "" {
+				t.Fatal("last page has a next cursor", page.NextCursor)
+			}
+			break
+		}
+		cursor = page.NextCursor
+	}
+	if !slices.Equal(starts, []float64{0, 1, 2}) {
+		t.Fatal(starts)
+	}
+	for pageSize, code := range map[int]string{-1: "validation/too-small", 101: "validation/too-big"} {
+		if _, err = c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID, PageSize: pageSize}); calmlens.ErrorCode(err) != code {
+			t.Fatal(pageSize, err)
+		}
+	}
+}
+
 func TestMockSignsUploadTokensWithItsKeyWithoutARequest(t *testing.T) {
 	key := CreateMockAPIKey(nil)
 	c, err := NewServerClient(Options{APIKey: key})

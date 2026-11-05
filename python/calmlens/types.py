@@ -28,7 +28,7 @@ class ViewerClaims(TypedDict, total=False):
 __all__ = [
     "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "RegionalDecision", "ViewerClaims", "CategoryPolicyScore",
     "AgeRange", "Asset", "AssetClassificationFailureReason", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
-    "TestRegionalAction", "AssetReview", "AssetModeration", "ModerationRaw", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetClassification", "AssetUpload",
+    "TestRegionalAction", "AssetReview", "AssetModeration", "ModerationRaw", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetTimelinePage", "AssetTimelineSegment", "AssetClassification", "ClassificationProgress", "AssetUpload",
     "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
     "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
@@ -41,7 +41,7 @@ __all__ = [
     "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensType",
-    "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListEventsOptions", "MediaClassificationReport",
+    "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions", "MediaClassificationReport",
     "MediaClassificationSegment", "MediaSegmentSource", "MetadataItem", "ClassifyTextOptions", "ModerationAction",
     "ModerationQualifier", "MoveAssetOptions", "MoveFolderOptions", "NotEvaluatedCategoryResult",
     "NotEvaluatedFeatureResult", "NotEvaluatedQualifierResult", "NotEvaluatedReason", "OcrFeatureOptions",
@@ -85,8 +85,8 @@ AssetContentRemovalReason = Union[Literal["policy", "retention", "requested", "p
 #: ``failed``. New reasons may be added.
 AssetClassificationFailureReason = Union[Literal["file-too-large", "duration-limit", "resolution-limit",
                                                  "unsupported-format", "undecodable-content", "multiple-tracks",
-                                                 "type-mismatch", "free-upload-limit", "child-failed",
-                                                 "processing-error"], str]
+                                                 "type-mismatch", "free-upload-limit", "media-limit",
+                                                 "spend-limit", "child-failed", "processing-error"], str]
 #: Known asset types. New types may be added.
 AssetType = Union[Literal["image", "video", "audio", "plaintext-document", "multimedia-document", "website",
                           "file"], str]
@@ -125,7 +125,7 @@ SemanticStatus = Union[Literal["disabled", "ready", "indexing", "unavailable"], 
 #: Event types. New types may be added; ignore ones you don't handle.
 EventType = Union[Literal["asset.uploaded", "asset.classified", "asset.allowed", "asset.limited",
                           "asset.age-restricted", "asset.blocked", "asset.purged", "asset.failed", "asset.deleted", "asset.content-removed",
-                          "asset.retried", "asset.link-flagged", "usage.limit-reached", "usage.spend-limit-reached",
+                          "asset.retried", "asset.link-flagged", "asset.processing-progress", "usage.limit-reached", "usage.spend-limit-reached",
                           "upload-preset.daily-limit-reached", "project.member-joined",
                           "project.member-removed", "project.member-role-changed",
                           "project.invitation-sent", "api-key.created", "api-key.revoked",
@@ -142,7 +142,7 @@ EventFactKey = Union[Literal[
     "connector-type", "consecutive-failures", "last-error", "resumes-on", "reason", "failure-reason", "preset-id", "preset-name",
     "daily-limit", "left", "removed-by-user-id", "previous-role", "changed-by-user-id", "key-id",
     "key-name", "action", "created-by-user-id", "revoked-by-user-id", "link-verdict", "link-url",
-    "link-final-url", "link-action", "test",
+    "link-final-url", "link-action", "completed-sections", "total-sections", "test",
 ], str]
 #: A registered fact value: text, an integer count, a boolean, a list of values (such as
 #: ``flagged-categories``) or ``None``.
@@ -348,6 +348,13 @@ class _MediaClassificationReportRequired(TypedDict):
 
 class MediaClassificationReport(_MediaClassificationReportRequired, total=False):
     frameIntervalSeconds: float
+    #: How many segments the full timeline holds, when ``segments`` is shortened; list them all
+    #: with ``assets.list_timeline``.
+    segmentCount: int
+
+
+#: One stretch of an audio or video asset's findings: its source, times and scores.
+AssetTimelineSegment = MediaClassificationSegment
 
 
 class _ClassificationLabelRequired(TypedDict):
@@ -760,12 +767,20 @@ class AssetModeration(_AssetModerationRequired, total=False):
     linkSafety: LinkSafetyDecision
 
 
+class ClassificationProgress(TypedDict):
+    """How far long audio or video, analysed in sections, has got."""
+    completedSections: int
+    totalSections: int
+
+
 class _AssetClassificationRequired(TypedDict):
     status: AssetClassificationStatus
     #: Why processing failed, while ``status`` is ``failed``; otherwise ``None``.
     failureReason: Optional[AssetClassificationFailureReason]
     updatedAt: Optional[int]
     completedAt: Optional[int]
+    #: Sections analysed so far while long audio or video is processing; otherwise ``None``.
+    progress: Optional[ClassificationProgress]
     #: Whether the results came from one of the project's test inputs rather than analysing the
     #: content. Never use test results, such as age ranges, for real decisions.
     testInput: bool
@@ -842,6 +857,15 @@ Ordering = TypedDict("Ordering", {"field": str, "direction": Literal["asc", "des
 
 class AssetPage(TypedDict):
     items: list[Asset]
+    hasMore: bool
+    nextCursor: str | None
+    pageSize: int
+    ordering: list[Ordering]
+
+
+class AssetTimelinePage(TypedDict):
+    """One page of an audio or video asset's findings timeline, in time order."""
+    items: list[AssetTimelineSegment]
     hasMore: bool
     nextCursor: str | None
     pageSize: int
@@ -1451,6 +1475,15 @@ class ListChildrenOptions(_ListChildrenRequired, total=False):
     pageSize: int
     ordering: list[Ordering]
     filter: str
+
+
+class _ListTimelineRequired(TypedDict):
+    assetId: str
+
+
+class ListTimelineOptions(_ListTimelineRequired, total=False):
+    cursor: str
+    pageSize: int
 
 
 class _SearchRequired(TypedDict):

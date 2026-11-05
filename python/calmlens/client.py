@@ -34,9 +34,9 @@ from ._version import __version__
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
                      CalmLensValidationError, _parse_retry_after)
 from .moderation_context import select_moderation_context_items
-from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, AssetIdOptions, AssetPage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
+from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, AssetIdOptions, AssetPage, AssetTimelinePage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform,
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
-                    ImageTransformOptions, LensDefinition, LensType, ListAssetsOptions, ListChildrenOptions, ListEventsOptions,
+                    ImageTransformOptions, LensDefinition, LensType, ListAssetsOptions, ListChildrenOptions, ListTimelineOptions, ListEventsOptions,
                     BatchAssetsOptions, BatchAssetsResponse,
                     MetadataItem, ModerationContext, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
                     ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedUrl,
@@ -1310,6 +1310,15 @@ class Assets:
         _id(merged.get("assetId"), "assetId")
         return self._iterate(lambda index: self.list_children(cast(ListChildrenOptions, {**merged, "cursor": index})),
                              merged.get("cursor"))
+
+    def list_timeline(self, options: ListTimelineOptions | None = None, /, *, asset_id: str = _UNSET,
+                      cursor: str = _UNSET, page_size: int = _UNSET) -> AssetTimelinePage:
+        """One page of an audio or video asset's findings timeline, in time order. A long asset's
+        report keeps a shortened timeline; this lists every segment."""
+        merged = _merge("assets.listTimeline", options, asset_id=asset_id, cursor=cursor, page_size=page_size)
+        return cast(AssetTimelinePage, self._c._request(
+            "GET", "/assets/" + _id(merged.get("assetId"), "assetId") + "/timeline",
+            query={k: v for k, v in merged.items() if k != "assetId"}))
 
     def create(self, options: SubmitAssetOptions | None = None, /, *, name: str = _UNSET, content: Content = _UNSET,
                part: Content = _UNSET, url: str = _UNSET, description: str = _UNSET,

@@ -242,6 +242,27 @@ func (s *AssetsService) ListChildren(ctx context.Context, options ListAssetChild
 	return &result, nil
 }
 
+// ListTimeline returns one page of an audio or video asset's findings timeline, in time order.
+// A long asset's report keeps a shortened timeline; this lists every segment.
+func (s *AssetsService) ListTimeline(ctx context.Context, options ListAssetTimelineOptions) (*AssetTimelinePage, error) {
+	path, err := resourcePath("assets", options.AssetID, "/timeline")
+	if err != nil {
+		return nil, err
+	}
+	params, err := query(struct {
+		Cursor   string `json:"cursor,omitempty"`
+		PageSize int    `json:"pageSize,omitempty"`
+	}{options.Cursor, options.PageSize})
+	if err != nil {
+		return nil, err
+	}
+	var result AssetTimelinePage
+	if err = s.c.request(ctx, "GET", path, params, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // MaxSignedURLSeconds is the longest signed URL lifetime the API accepts: 24 hours.
 const MaxSignedURLSeconds = 24 * 60 * 60
 

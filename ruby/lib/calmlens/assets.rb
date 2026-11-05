@@ -89,6 +89,19 @@ module CalmLens
       end
     end
 
+    # Lists one page of an audio or video asset's findings timeline, in time order. A long asset's
+    # report keeps a shortened timeline; this lists every segment.
+    # @option options [String] :asset_id
+    # @option options [String] :cursor
+    # @option options [Integer] :page_size
+    # @return [Hash] a cursor page of timeline segments: items, nextCursor, hasMore, pageSize and ordering.
+    def list_timeline(options)
+      call(options, __method__) do |api, request|
+        query = without(api, 'assetId')
+        request('GET', "/assets/#{Internal.segment(api['assetId'])}/timeline", query: query, request_options: request)
+      end
+    end
+
     # Iterates every child of an asset, fetching pages as needed.
     # @param options [Hash] the options of {#list_children}
     # @yieldparam asset [Hash]

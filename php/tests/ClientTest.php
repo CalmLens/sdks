@@ -60,6 +60,7 @@ final class ClientTest extends TestCase
             'assets.retrieve' => fn () => $client->assets->retrieve(['assetId' => 'a', 'assetID' => 'b']),
             'assets.waitForDecision' => fn () => $client->assets->waitForDecision(['assetId' => 'a', 'timeoutSeconds' => 5]),
             'assets.listChildren' => fn () => iterator_to_array($client->assets->eachChild(['assetId' => 'a', 'filter' => 'name==a'])),
+            'assets.listTimeline' => fn () => $client->assets->listTimeline(['assetId' => 'a', 'ordering' => []]),
             'cdn.getAssetUrl' => fn () => $client->cdn->getAssetUrl(['assetIdentifier' => 'a', 'lenz' => 'thumbnail']),
             'uploadTokens.sign' => fn () => $client->uploadTokens->sign(['uploadPresetId' => 'preset_1', 'external' => 'x']),
             'ensureLenses' => fn () => $client->ensureLenses(['lens' => [['identifier' => 'thumbnail']]]),

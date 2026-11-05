@@ -602,7 +602,7 @@ module CalmLens
           'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
           'classification' => { 'status' => open ? 'pending' : 'processing', 'failureReason' => nil, 'updatedAt' => now,
                                 # The mock never reads test inputs.
-                                'completedAt' => nil, 'testInput' => false,
+                                'completedAt' => nil, 'progress' => nil, 'testInput' => false,
                                 'moderation' => { 'status' => 'pending', 'manualReviews' => [],
                                                   'flaggedCategories' => [], 'regions' => [] } }
         }
@@ -793,6 +793,7 @@ module CalmLens
           nil
         in ['DELETE', 'content'] then delete_content(item)
         in ['GET', 'children'] then page(project_assets.select { |child| child['parentId'] == id }, query, id)
+        in ['GET', 'timeline'] then timeline(item, query)
         in ['POST', 'retry'] then retry_asset(item)
         in ['POST', 'explain'] then explain(item, json['rerun'])
         in ['POST', 'decision'] then decide_request(item, json)
@@ -1161,6 +1162,22 @@ module CalmLens
 
         @state.hash_list_entries.delete(parts[1])
         {}
+      end
+
+      # An asset's findings timeline, a page at a time, as the API lists it: its report's segments in
+      # time order, with a cursor naming the next one's position.
+      def timeline(item, query)
+        size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
+        offset = 0
+        if query.key?('cursor')
+          match = query['cursor'].match(/\Atimeline:(\d+)\z/)
+          fail!(ErrorCodes::INVALID_CURSOR) unless match
+          offset = Integer(match[1], 10)
+        end
+        segments = item.dig('classification', 'moderation', 'raw', 'timeline', 'segments') || []
+        more = offset + size < segments.size
+        { 'items' => deep_copy(segments[offset, size] || []), 'nextCursor' => more ? "timeline:#{offset + size}" : nil,
+          'pageSize' => size, 'hasMore' => more, 'ordering' => [] }
       end
 
       # The page size and ordering, refused like the API's query schema: each ordering entry's field

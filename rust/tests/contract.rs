@@ -1554,6 +1554,7 @@ fn references() -> BTreeSet<&'static str> {
         "assets().search" => ServerClient::assets, AssetsClient::search;
         "assets().retrieve" => ServerClient::assets, AssetsClient::retrieve;
         "assets().list_children" => ServerClient::assets, AssetsClient::list_children;
+        "assets().list_timeline" => ServerClient::assets, AssetsClient::list_timeline;
         "assets().delete_content" => ServerClient::assets, AssetsClient::delete_content;
         "assets().delete" => ServerClient::assets, AssetsClient::delete;
         "assets().move_asset" => ServerClient::assets, AssetsClient::move_asset;

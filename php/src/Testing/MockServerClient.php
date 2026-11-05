@@ -74,7 +74,7 @@ final class MockServerClient
     private const ASSET_ID_PATTERN = '/^asset_[0-9A-Za-z]{20}$/D';
     /** The client methods `failNextRequest` can target. */
     public const OPERATIONS = ['assets.list', 'assets.search', 'assets.retrieve', 'assets.waitForDecision', 'assets.update',
-        'assets.listChildren', 'assets.create', 'assets.classify', 'assets.uploadPart', 'assets.createSignedUrl', 'assets.move',
+        'assets.listChildren', 'assets.listTimeline', 'assets.create', 'assets.classify', 'assets.uploadPart', 'assets.createSignedUrl', 'assets.move',
         'assets.retry', 'assets.explain', 'assets.decide', 'assets.deleteContent', 'assets.delete', 'assets.batch', 'text.classify',
         'cdn.serve', 'events.list', 'folders.list', 'folders.retrieve', 'folders.create', 'folders.update', 'folders.delete',
         'folders.move', 'hashLists.list', 'hashLists.retrieve', 'hashLists.create', 'hashLists.update', 'hashLists.delete',
@@ -427,7 +427,7 @@ final class MockServerClient
             return $method === 'DELETE' && $suffix === '' ? ['hashLists.removeEntry'] : [];
         }
         $names = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'POST move' => 'move',
-            'GET children' => 'listChildren', 'DELETE content' => 'deleteContent', 'POST retry' => 'retry',
+            'GET children' => 'listChildren', 'GET timeline' => 'listTimeline', 'DELETE content' => 'deleteContent', 'POST retry' => 'retry',
             'POST explain' => 'explain', 'POST decision' => 'decide', 'POST part' => 'uploadPart', 'POST signed-url' => 'createSignedUrl'];
         $name = $names[$method . ' ' . $suffix] ?? null;
         if ($name === null || !in_array($resource, ['assets', 'folders'], true)) {
@@ -652,6 +652,8 @@ final class MockServerClient
                 return $asset;
             case 'GET children':
                 return $this->page(array_filter($this->assets, fn ($child) => $child['parentId'] === $id), $query, $id);
+            case 'GET timeline':
+                return self::timeline($asset, $query);
             case 'PATCH ':
                 $fields = array_diff_key($json, array_flip(['id', 'projectId', 'upload', 'classification', 'content']));
                 // Like the API: an externalId stays unique in the project; null clears a field.
@@ -808,8 +810,8 @@ final class MockServerClient
                 'checksums' => null, 'image' => null, 'extractedText' => null, 'fileMetadata' => null],
             'upload' => ['status' => $final ? 'completed' : 'uploading', 'updatedAt' => $now, 'partsReceived' => $final ? null : 1],
             'classification' => ['status' => $final ? 'processing' : 'pending', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
-                // The mock never reads test inputs.
-                'testInput' => false,
+                // The mock analyses nothing in sections, and never reads test inputs.
+                'progress' => null, 'testInput' => false,
                 'moderation' => ['status' => 'pending', 'manualReviews' => [], 'flaggedCategories' => [], 'regions' => []]],
         ];
         $this->assets[$asset['id']] = $asset;
@@ -1167,6 +1169,26 @@ final class MockServerClient
             self::invalid('validation/invalid-type', $key);
         }
         return (int) $value;
+    }
+
+    /**
+     * GET /assets/:id/timeline, like the API: the report's timeline segments in time order, a page
+     * at a time, with a cursor naming the next page's position; empty without a timeline.
+     */
+    private static function timeline(array $asset, array $query): array
+    {
+        $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
+        $offset = 0;
+        if (isset($query['cursor'])) {
+            if (!is_string($query['cursor']) || !preg_match('/^timeline:(\d+)$/D', $query['cursor'], $match) || strlen($match[1]) > 15) {
+                self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
+            }
+            $offset = (int) $match[1];
+        }
+        $segments = $asset['classification']['moderation']['raw']['timeline']['segments'] ?? [];
+        $more = $offset + $size < count($segments);
+        return ['items' => array_slice($segments, $offset, $size), 'nextCursor' => $more ? 'timeline:' . ($offset + $size) : null,
+            'pageSize' => $size, 'hasMore' => $more, 'ordering' => []];
     }
 
     /**

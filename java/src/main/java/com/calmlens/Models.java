@@ -1314,6 +1314,22 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
+  /** Options for {@code assets.listTimeline}. */
+  public static final class ListTimeline {
+    private String assetId;
+    private String cursor;
+    private Integer pageSize;
+    public ListTimeline() {}
+    /** @param assetId the audio or video asset ID */
+    public ListTimeline(String assetId) { this.assetId = assetId; }
+    public ListTimeline assetId(String value) { assetId = value; return this; }
+    /** @param value the previous page's {@code nextCursor} @return these options */
+    public ListTimeline cursor(String value) { cursor = value; return this; }
+    /** @param value segments per page, 1 to 100 (default 50) @return these options */
+    public ListTimeline pageSize(Integer value) { pageSize = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
   /** Options for {@code assets.update}; unset fields keep their value. */
   public static final class UpdateAsset {
     private String assetId;
@@ -1705,8 +1721,11 @@ public final class Models {
    * @param status classification progress
    * @param failureReason why processing failed: {@code file-too-large}, {@code duration-limit},
    *     {@code resolution-limit}, {@code unsupported-format}, {@code undecodable-content}, {@code
-   *     multiple-tracks}, {@code type-mismatch}, {@code free-upload-limit}, {@code child-failed} or
-   *     {@code processing-error}; null unless {@code status} is {@code failed}
+   *     multiple-tracks}, {@code type-mismatch}, {@code free-upload-limit}, {@code media-limit},
+   *     {@code spend-limit}, {@code child-failed} or {@code processing-error}; null unless {@code
+   *     status} is {@code failed}
+   * @param progress how far analysis of a long audio or video asset has got, section by section;
+   *     null when it isn't analysed in sections
    * @param updatedAt when classification state last changed
    * @param completedAt when classification finished
    * @param testInput whether the results came from one of the project's test inputs rather than
@@ -1722,7 +1741,7 @@ public final class Models {
    * @param labels labels describing the content
    */
   public record AssetClassification(AssetClassificationStatus status, String failureReason,
-      @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
+      ClassificationProgress progress, @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       @JsonAdapter(Json.EpochMillis.class) Instant completedAt, Boolean testInput,
       AssetModeration moderation, PersonDetectionResult personDetection,
       FaceDetectionResult faceDetection, LinkDetectionResult linkDetection,
@@ -2097,6 +2116,14 @@ public final class Models {
   public record BoundingBox(Double left, Double top, Double width, Double height) {}
 
   /**
+   * How far analysis of a long audio or video asset has got.
+   *
+   * @param completedSections sections analysed so far
+   * @param totalSections sections in the asset
+   */
+  public record ClassificationProgress(Integer completedSections, Integer totalSections) {}
+
+  /**
    * Estimated age range in years. Estimates can be off by several years.
    *
    * @param low lowest estimated age
@@ -2111,18 +2138,20 @@ public final class Models {
    * @param frameIntervalSeconds frame sampling interval
    * @param sampledFrames frames sampled
    * @param audioTranscribed whether audio was transcribed
+   * @param segmentCount how many segments the full timeline has, when {@code segments} is
+   *     shortened; list them all with {@code assets.listTimeline}
    * @param segments per-segment results
    */
   public record MediaClassificationReport(Double durationSeconds, Double frameIntervalSeconds, Integer sampledFrames,
-      Boolean audioTranscribed, List<MediaClassificationSegment> segments) {
+      Boolean audioTranscribed, Integer segmentCount, List<MediaClassificationSegment> segments) {
     /** Copies collections so the record stays immutable. */
     public MediaClassificationReport { segments = list(segments); }
   }
 
   /**
-   * One media segment.
+   * One stretch of an audio or video asset's findings: its source, times and scores.
    *
-   * @param source {@code frame} or {@code audio}
+   * @param source {@code clip}, {@code frame}, {@code frame-text} or {@code speech}
    * @param startSeconds segment start
    * @param endSeconds segment end
    * @param categories results by category
@@ -2225,6 +2254,20 @@ public final class Models {
   public record AssetPage(List<Asset> items, String nextCursor, Integer pageSize, boolean hasMore, List<Order> ordering) {
     /** Copies collections; a missing item list becomes empty. */
     public AssetPage { items = listOrEmpty(items); ordering = list(ordering); }
+  }
+
+  /**
+   * One page of an audio or video asset's findings timeline, in time order.
+   *
+   * @param items segments on this page
+   * @param nextCursor continuation cursor, or null
+   * @param pageSize page size
+   * @param hasMore whether another page follows
+   * @param ordering ordering applied; always empty, as segments are in time order
+   */
+  public record AssetTimelinePage(List<MediaClassificationSegment> items, String nextCursor, Integer pageSize, boolean hasMore, List<Order> ordering) {
+    /** Copies collections; a missing item list becomes empty. */
+    public AssetTimelinePage { items = listOrEmpty(items); ordering = list(ordering); }
   }
 
   /**

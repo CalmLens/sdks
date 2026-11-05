@@ -603,7 +603,7 @@ MockFailure = Union[str, BaseException]
 #: The client methods ``fail_next_request`` can target, as JavaScript-style method paths.
 _OPERATIONS = frozenset({
     "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
-    "assets.listChildren", "assets.iterateChildren", "assets.create", "assets.classify", "assets.uploadPart",
+    "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.create", "assets.classify", "assets.uploadPart",
     "assets.createSignedUrl", "assets.move", "assets.retry", "assets.explain", "assets.decide",
     "assets.deleteContent", "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list",
     "events.pages", "folders.list", "folders.retrieve", "folders.create", "folders.update", "folders.delete",
@@ -1189,6 +1189,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return ["assets.retrieve", "assets.waitForDecision"] if method == "GET" \
                 else ["assets." + by_method.get(method, "")]
         return {"content": ["assets.deleteContent"], "children": ["assets.listChildren", "assets.iterateChildren"],
+                "timeline": ["assets.listTimeline"],
                 "signed-url": ["assets.createSignedUrl"], "part": ["assets.uploadPart"], "move": ["assets.move"],
                 "retry": ["assets.retry"], "explain": ["assets.explain"],
                 "decision": ["assets.decide"]}.get(suffix, [])
@@ -1458,7 +1459,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                        "partsReceived": None if final else 1},
             "classification": {"status": "processing" if final else "pending", "failureReason": None, "updatedAt": now,
                                # The mock never reads test inputs.
-                               "completedAt": None, "testInput": False,
+                               "completedAt": None, "progress": None, "testInput": False,
                                "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": []}},
         }
         if not final:
@@ -1653,6 +1654,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if suffix == "children":
                 return self._page([a for a in self._project_assets() if a.get("parentId") == identifier], query,
                                   identifier)
+            if suffix == "timeline":
+                return self._timeline(asset, query)
             return asset
         if suffix == "signed-url":
             expires = body["expiresInSeconds"]
@@ -2014,6 +2017,25 @@ class MockCalmLensServerClient(CalmLensServerClient):
         following = position + len(page)
         return {"items": page, "nextCursor": f"mock_{following}", "hasMore": following < len(events),
                 "excludedTypes": []}
+
+    @staticmethod
+    def _timeline(asset: dict[str, Any], query: dict[str, Any]) -> dict[str, Any]:
+        # An asset's findings timeline, a page at a time, as the API lists it: its report's
+        # segments in time order, with a cursor naming the next one's position.
+        size = _bounded_int(query.get("pageSize", _DEFAULT_PAGE_SIZE), "pageSize", _MAX_PAGE_SIZE)
+        cursor = query.get("cursor")
+        offset = 0
+        if cursor is not None:
+            found = re.fullmatch(r"timeline:([0-9]+)", str(cursor))
+            if not found:
+                raise _Failure(error_codes.INVALID_CURSOR)
+            offset = int(found.group(1))
+        raw = asset["classification"]["moderation"].get("raw") or {}
+        segments = (raw.get("timeline") or {}).get("segments") or []
+        more = offset + size < len(segments)
+        return {"items": copy.deepcopy(segments[offset:offset + size]),
+                "nextCursor": f"timeline:{offset + size}" if more else None,
+                "pageSize": size, "hasMore": more, "ordering": []}
 
     def _search(self, query: dict[str, Any]) -> dict[str, Any]:
         # Keyword search like the API's; the mock has no semantic index, so every mode is

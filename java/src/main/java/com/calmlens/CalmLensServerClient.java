@@ -1512,6 +1512,20 @@ public final class CalmLensServerClient implements AutoCloseable {
       return decode(json("GET", "/assets/" + id(str(o, "assetId", null)) + "/children", query, null), Models.AssetPage.class);
     }
 
+    /**
+     * Lists one page of an audio or video asset's findings timeline, in time order. A long asset's
+     * report keeps a shortened timeline; this lists every segment.
+     *
+     * @param options the asset and page
+     * @return one page of timeline segments
+     */
+    public Models.AssetTimelinePage listTimeline(Models.ListTimeline options) {
+      JsonObject o = Models.encode(options);
+      JsonObject query = new JsonObject();
+      without(o, "assetId").entrySet().forEach(entry -> query.add(entry.getKey(), entry.getValue()));
+      return decode(json("GET", "/assets/" + id(str(o, "assetId", null)) + "/timeline", query, null), Models.AssetTimelinePage.class);
+    }
+
     /** @param options the parent asset, page size and filter @return a lazy iterable over every child */
     public AutoPager<Models.Asset> iterateChildren(Models.ListChildren options) {
       JsonObject o = Models.encode(options);

@@ -100,6 +100,11 @@ const (
 	AssetFailureReasonTypeMismatch = "type-mismatch"
 	// AssetFailureReasonFreeUploadLimit means the upload has more text than free uploads allow before billing is set up.
 	AssetFailureReasonFreeUploadLimit = "free-upload-limit"
+	// AssetFailureReasonMediaLimit means the organisation has analysed its daily allowance of long
+	// audio and video; retry later.
+	AssetFailureReasonMediaLimit = "media-limit"
+	// AssetFailureReasonSpendLimit means analysing the asset would pass a spend limit.
+	AssetFailureReasonSpendLimit = "spend-limit"
 	// AssetFailureReasonChildFailed means a part of the asset, such as an embedded image, failed.
 	AssetFailureReasonChildFailed = "child-failed"
 	// AssetFailureReasonProcessingError means processing failed for another reason; retrying may succeed.
@@ -183,6 +188,8 @@ type AssetClassification struct {
 	FailureReason *string `json:"failureReason"`
 	UpdatedAt     *int64  `json:"updatedAt"`
 	CompletedAt   *int64  `json:"completedAt"`
+	// Progress is how far long audio or video analysed in sections has got; nil for other assets.
+	Progress *ClassificationProgress `json:"progress"`
 	// TestInput is whether the results came from one of the project's test inputs rather than
 	// analysing the content. Never use test results, such as age ranges, for real decisions.
 	TestInput       bool                   `json:"testInput"`
@@ -200,6 +207,14 @@ type AssetClassification struct {
 	// Redaction transforms (ImageRedaction) blur these regions.
 	TextRegions []TextRegion          `json:"textRegions,omitempty"`
 	Labels      []ClassificationLabel `json:"labels,omitempty"`
+}
+
+// ClassificationProgress is how far sectioned analysis of long audio or video has got.
+type ClassificationProgress struct {
+	// CompletedSections is the number of sections analysed so far.
+	CompletedSections int `json:"completedSections"`
+	// TotalSections is the number of sections the media is analysed in.
+	TotalSections int `json:"totalSections"`
 }
 
 // AssetReview records one reviewer decision without erasing earlier reviews.
@@ -733,11 +748,14 @@ type AgeRange struct {
 
 // MediaClassificationReport describes audio and video analysis.
 type MediaClassificationReport struct {
-	DurationSeconds      float64                      `json:"durationSeconds"`
-	FrameIntervalSeconds *float64                     `json:"frameIntervalSeconds,omitempty"`
-	SampledFrames        int                          `json:"sampledFrames"`
-	AudioTranscribed     bool                         `json:"audioTranscribed"`
-	Segments             []MediaClassificationSegment `json:"segments"`
+	DurationSeconds      float64  `json:"durationSeconds"`
+	FrameIntervalSeconds *float64 `json:"frameIntervalSeconds,omitempty"`
+	SampledFrames        int      `json:"sampledFrames"`
+	AudioTranscribed     bool     `json:"audioTranscribed"`
+	// SegmentCount is set on long media analysed in sections, whose report keeps a shortened
+	// timeline: the number of segments on its full timeline, listed by AssetsService.ListTimeline.
+	SegmentCount *int                         `json:"segmentCount,omitempty"`
+	Segments     []MediaClassificationSegment `json:"segments"`
 }
 
 // Media segment sources. Source is a plain string so sources added later still decode.
@@ -914,6 +932,22 @@ type ListAssetChildrenOptions struct {
 	Cursor   string
 	PageSize int
 	Ordering []Order
+}
+
+// ListAssetTimelineOptions selects a page of an audio or video asset's findings timeline.
+type ListAssetTimelineOptions struct {
+	AssetID  string
+	Cursor   string
+	PageSize int
+}
+
+// AssetTimelinePage is one page of an audio or video asset's findings timeline, in time order.
+type AssetTimelinePage struct {
+	Items      []MediaClassificationSegment `json:"items"`
+	HasMore    bool                         `json:"hasMore"`
+	NextCursor string                       `json:"nextCursor"`
+	PageSize   int                          `json:"pageSize"`
+	Ordering   []Order                      `json:"ordering"`
 }
 
 // Content accepts exactly one representation. Use pointer strings to distinguish empty text/base64.

@@ -138,7 +138,7 @@ final class MockApi {
   /** Every client method that sends a request, by its JavaScript method path, for {@code failNextRequest}. */
   static final Set<String> OPERATIONS = Set.of(
       "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
-      "assets.listChildren", "assets.iterateChildren", "assets.create", "assets.classify", "assets.uploadPart",
+      "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.create", "assets.classify", "assets.uploadPart",
       "assets.createSignedUrl", "assets.move", "assets.retry", "assets.explain", "assets.decide", "assets.deleteContent",
       "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list", "events.pages", "folders.list",
       "folders.retrieve", "folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
@@ -202,6 +202,7 @@ final class MockApi {
       case "assets PATCH " -> Set.of("assets.update");
       case "assets DELETE " -> Set.of("assets.delete");
       case "assets GET children" -> Set.of("assets.listChildren", "assets.iterateChildren");
+      case "assets GET timeline" -> Set.of("assets.listTimeline");
       case "assets DELETE content" -> Set.of("assets.deleteContent");
       case "assets POST retry" -> Set.of("assets.retry");
       case "assets POST explain" -> Set.of("assets.explain");
@@ -562,6 +563,8 @@ final class MockApi {
     JsonObject classification = new JsonObject();
     classification.addProperty("status", last ? "processing" : "pending");
     classification.add("failureReason", JsonNull.INSTANCE);
+    // The mock never analyses media in sections.
+    classification.add("progress", JsonNull.INSTANCE);
     classification.addProperty("updatedAt", now);
     classification.add("completedAt", JsonNull.INSTANCE);
     // The mock never reads test inputs.
@@ -988,6 +991,7 @@ final class MockApi {
     switch (method + " " + suffix) {
       case "GET ": return asset;
       case "GET children": return page(projectAssets().stream().filter(child -> id.equals(str(child, "parentId"))).collect(Collectors.toList()), q, Json.write(new JsonPrimitive(id)));
+      case "GET timeline": return timeline(asset, q);
       case "DELETE ":
         storage.assets.remove(id);
         storage.content.remove(id);
@@ -1241,6 +1245,33 @@ final class MockApi {
       String direction = Objects.requireNonNullElse(str(order, "direction"), "asc");
       if (!direction.equals("asc") && !direction.equals("desc")) throw Failure.validation(ErrorCodes.INVALID_VALUE, "ordering." + i + ".direction");
     }
+  }
+
+  /**
+   * An asset's findings timeline, a page at a time, as the API lists it: its report's segments in
+   * time order, with a cursor naming the next one's position.
+   */
+  private JsonObject timeline(JsonObject asset, JsonObject q) throws Failure {
+    int pageSize = (int) bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+    String cursor = str(q, "cursor");
+    int offset = 0;
+    if (cursor != null) {
+      java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("timeline:(\\d{1,9})").matcher(cursor);
+      if (!matcher.matches()) throw new Failure(ErrorCodes.INVALID_CURSOR, "The cursor is invalid or belongs to a different query.");
+      offset = Integer.parseInt(matcher.group(1));
+    }
+    JsonElement segments = path(asset, "classification.moderation.raw.timeline.segments");
+    JsonArray all = segments != null && segments.isJsonArray() ? segments.getAsJsonArray() : new JsonArray();
+    JsonArray items = new JsonArray();
+    for (int i = offset; i < all.size() && i < (long) offset + pageSize; i++) items.add(all.get(i).deepCopy());
+    boolean hasMore = (long) offset + pageSize < all.size();
+    JsonObject page = new JsonObject();
+    page.add("items", items);
+    page.add("nextCursor", hasMore ? new JsonPrimitive("timeline:" + (offset + pageSize)) : JsonNull.INSTANCE);
+    page.addProperty("pageSize", pageSize);
+    page.addProperty("hasMore", hasMore);
+    page.add("ordering", new JsonArray());
+    return page;
   }
 
   private JsonObject page(List<JsonObject> items, JsonObject q, String scope) throws Failure {

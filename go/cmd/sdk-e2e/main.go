@@ -58,6 +58,8 @@ func invoke(c *sdk.ServerClient, cmd command) (any, error) {
 		return decode(cmd.Options, func(o sdk.ListAssetsOptions) (any, error) { return pageOutput(c.Assets.List(ctx, o)) })
 	case "assets.listChildren":
 		return decode(cmd.Options, func(o sdk.ListAssetChildrenOptions) (any, error) { return pageOutput(c.Assets.ListChildren(ctx, o)) })
+	case "assets.listTimeline":
+		return decode(cmd.Options, func(o sdk.ListAssetTimelineOptions) (any, error) { return pageOutput(c.Assets.ListTimeline(ctx, o)) })
 	case "assets.uploadPart":
 		return decode(cmd.Options, func(o sdk.UploadAssetPartOptions) (any, error) { return c.Assets.UploadPart(ctx, o) })
 	case "assets.deleteContent":

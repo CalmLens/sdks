@@ -60,6 +60,19 @@ final class Assets extends Resource
         return $this->session->request('GET', $path . '/children', query: $api, options: $request);
     }
 
+    /**
+     * One page of an audio or video asset's findings timeline, in time order: each segment's
+     * `source`, `startSeconds`, `endSeconds` and `categories`. Pass the page's `nextCursor` as
+     * `cursor` for the next page; `pageSize` is 1 to 100 (50 by default). Assets without a
+     * timeline return an empty page.
+     */
+    public function listTimeline(array $options): array
+    {
+        [$api, $request] = $this->split($options, __FUNCTION__);
+        $path = $this->path($api, 'assets', 'assetId');
+        return $this->session->request('GET', $path . '/timeline', query: $api, options: $request);
+    }
+
     public function each(array $options = []): \Generator
     {
         foreach ($this->pages($this->list(...), $options) as $page) {

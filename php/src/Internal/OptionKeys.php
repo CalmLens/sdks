@@ -26,6 +26,7 @@ final class OptionKeys
         'assets.explain' => ['assetId', 'rerun'],
         'assets.list' => ['cursor', 'filter', 'folderId', 'ordering', 'pageSize'],
         'assets.listChildren' => ['assetId', 'cursor', 'ordering', 'pageSize'],
+        'assets.listTimeline' => ['assetId', 'cursor', 'pageSize'],
         'assets.move' => ['assetId', 'folderId'],
         'assets.retrieve' => ['assetId'],
         'assets.retry' => ['assetId'],

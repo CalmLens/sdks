@@ -41,7 +41,7 @@ module CalmLens
   type asset_content_status = "temporary" | "stored" | "removed"
   type asset_content_removal_reason = "policy" | "retention" | "requested" | "parent-removed" | "disposed"
   # Why processing failed, while the classification status is `failed`.
-  type asset_classification_failure_reason = "file-too-large" | "duration-limit" | "resolution-limit" | "unsupported-format" | "undecodable-content" | "multiple-tracks" | "type-mismatch" | "free-upload-limit" | "child-failed" | "processing-error"
+  type asset_classification_failure_reason = "file-too-large" | "duration-limit" | "resolution-limit" | "unsupported-format" | "undecodable-content" | "multiple-tracks" | "type-mismatch" | "free-upload-limit" | "media-limit" | "spend-limit" | "child-failed" | "processing-error"
   type asset_type = "image" | "video" | "audio" | "plaintext-document" | "multimedia-document" | "website" | "file"
   type asset_visibility = "public" | "private"
   # FLAGGED_CONTENT_ACTION_SCHEMA in PolicyRule.ts.
@@ -129,12 +129,17 @@ module CalmLens
   }
 
   type asset_upload = { "status" => "uploading" | "completed", "updatedAt" => Integer?, "partsReceived" => Integer? }
+  # How many sections of long audio or video are analysed so far.
+  type classification_progress = { "completedSections" => Integer, "totalSections" => Integer }
   type asset_classification = {
     "status" => asset_classification_status,
     # `null` unless `status` is `failed`.
     "failureReason" => asset_classification_failure_reason?,
     "updatedAt" => Integer?,
     "completedAt" => Integer?,
+    # While long audio or video is analysed in sections and `status` is `processing`: how many of its
+    # sections are done. `nil` otherwise.
+    "progress" => classification_progress?,
     # Whether the results came from one of the project's test inputs rather than analysing the
     # content. Never use test results, such as age ranges, for real decisions.
     "testInput" => bool,
@@ -274,6 +279,9 @@ module CalmLens
     ?"frameIntervalSeconds" => number,
     "sampledFrames" => Integer,
     "audioTranscribed" => bool,
+    # Set on long media analysed in sections, whose report keeps a shortened timeline: the number of
+    # segments on its full timeline, which `assets.list_timeline` lists.
+    ?"segmentCount" => Integer,
     "segments" => Array[media_segment]
   }
 
@@ -414,6 +422,14 @@ module CalmLens
 
   type asset_page = {
     "items" => Array[asset],
+    "hasMore" => bool,
+    "nextCursor" => String?,
+    "pageSize" => Integer,
+    "ordering" => Array[order]
+  }
+  # One page of an audio or video asset's findings timeline, in time order.
+  type asset_timeline_page = {
+    "items" => Array[media_segment],
     "hasMore" => bool,
     "nextCursor" => String?,
     "pageSize" => Integer,
@@ -674,7 +690,7 @@ module CalmLens
   # deliveries and the public events feed leave out facts that hold personal or account data.
   type event_type = "asset.uploaded" | "asset.classified" | "asset.allowed" | "asset.limited" |
                     "asset.age-restricted" | "asset.blocked" | "asset.purged" | "asset.failed" | "asset.deleted" | "asset.content-removed" | "asset.retried" |
-                    "asset.review-requested" | "asset.hash-matched" | "usage.limit-reached" | "usage.spend-limit-reached" |
+                    "asset.review-requested" | "asset.hash-matched" | "asset.processing-progress" | "usage.limit-reached" | "usage.spend-limit-reached" |
                     "upload-preset.daily-limit-reached" | "project.member-joined" | "project.member-removed" |
                     "project.member-role-changed" | "project.invitation-sent" | "api-key.created" |
                     "api-key.revoked" | "connector.failing" | "appeal.submitted" | "appeal.resolved"
@@ -751,6 +767,12 @@ module CalmLens
     ?cursor: String,
     ?page_size: Integer,
     ?ordering: Array[order_input],
+    ?request_options: request_options
+  }
+  type list_asset_timeline_options = {
+    asset_id: String,
+    ?cursor: String,
+    ?page_size: Integer,
     ?request_options: request_options
   }
   type update_asset_options = {

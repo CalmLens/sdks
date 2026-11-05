@@ -33,8 +33,10 @@ import type {
 } from "../contract/Policy.js";
 import type {
   AssetBatchOperation,
+  AssetTimelineSegment,
   GetAssetChildrenQuery,
   GetAssetsPageQuery,
+  GetAssetTimelineQuery,
   GetEventsQuery,
   GetFoldersQuery,
   GetFoldersResponse,
@@ -134,6 +136,10 @@ export type SignedUrl = PostAssetSignedUrlResponse;
 export type AssetPage = CursorPage<Asset>;
 /** One page of an asset's extracted children. */
 export type AssetChildrenPage = CursorPage<Asset>;
+/** One stretch of an audio or video asset's findings: its source, times and scores. */
+export type { AssetTimelineSegment };
+/** One page of an audio or video asset's findings timeline, in time order. */
+export type AssetTimelinePage = CursorPage<AssetTimelineSegment>;
 
 export type AssetSearchResult = Omit<SharedAssetSearchResult, "asset"> & { asset: Asset };
 export interface AssetSearchResponse {
@@ -566,6 +572,11 @@ export type ListAssetChildrenOptions = Partial<GetAssetChildrenQuery> & {
 };
 /** `assets.iterateChildren` options. */
 export type IterateAssetChildrenOptions = Omit<ListAssetChildrenOptions, "cursor">;
+
+/** `assets.listTimeline` options. */
+export type ListAssetTimelineOptions = Partial<GetAssetTimelineQuery> & {
+  assetId: string;
+};
 
 export type AssetContentOptions = AssetBinaryPayloadInput & {
   type: string;

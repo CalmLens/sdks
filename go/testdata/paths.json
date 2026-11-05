@@ -30,6 +30,13 @@
       "error": "sdk/invalid-argument"
     },
     {
+      "operation": "assets.listTimeline",
+      "options": {
+        "assetId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
       "operation": "assets.retry",
       "options": {
         "assetId": ".."

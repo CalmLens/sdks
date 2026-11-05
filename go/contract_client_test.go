@@ -289,6 +289,8 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		return one(c.Assets.List(ctx, into[ListAssetsOptions](t, args)))
 	case "assets.listChildren":
 		return one(c.Assets.ListChildren(ctx, into[ListAssetChildrenOptions](t, args)))
+	case "assets.listTimeline":
+		return one(c.Assets.ListTimeline(ctx, into[ListAssetTimelineOptions](t, args)))
 	case "assets.search":
 		return one(c.Assets.Search(ctx, into[SearchAssetsOptions](t, args)))
 	case "assets.uploadPart":

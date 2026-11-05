@@ -101,15 +101,21 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         "duration-limit": "duration-limit";
         "file-too-large": "file-too-large";
         "free-upload-limit": "free-upload-limit";
+        "media-limit": "media-limit";
         "multiple-tracks": "multiple-tracks";
         "processing-error": "processing-error";
         "resolution-limit": "resolution-limit";
+        "spend-limit": "spend-limit";
         "type-mismatch": "type-mismatch";
         "undecodable-content": "undecodable-content";
         "unsupported-format": "unsupported-format";
       }>>;
       updatedAt: zod.ZodNullable<zod.ZodNumber>;
       completedAt: zod.ZodNullable<zod.ZodNumber>;
+      progress: zod.ZodNullable<zod.ZodObject<{
+        completedSections: zod.ZodNumber;
+        totalSections: zod.ZodNumber;
+      }, zod.core.$strip>>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
         categories: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
@@ -4991,6 +4997,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             frameIntervalSeconds: zod.ZodOptional<zod.ZodNumber>;
             sampledFrames: zod.ZodNumber;
             audioTranscribed: zod.ZodBoolean;
+            segmentCount: zod.ZodOptional<zod.ZodNumber>;
             segments: zod.ZodArray<zod.ZodObject<{
               source: zod.ZodEnum<{
                 clip: "clip";
