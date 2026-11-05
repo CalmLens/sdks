@@ -1138,6 +1138,29 @@ describe("MockCalmLensAppClient", () => {
     ).toBe("upload-preset/content-type-not-allowed");
   });
 
+  it("gives an upload the external ID its token was signed for, as the API does", async () => {
+    const server = new MockCalmLensAppClient({ uploadPresetId: PRESET }).server;
+    const { token } = await server.uploadTokens.sign({
+      uploadPresetId: PRESET,
+      externalId: "post-1",
+    });
+    const app = new MockCalmLensAppClient({
+      uploadPresetId: PRESET,
+      token,
+      mockOptions: { server },
+    });
+    const upload = await app.assets.create({ name: "a.png", content: photo });
+    expect((await server.assets.retrieve({ assetId: upload.id })).externalId).toBe("post-1");
+    // A token without one leaves the upload without an external ID.
+    const { token: plain } = await server.uploadTokens.sign({ uploadPresetId: PRESET });
+    const unnamed = await new MockCalmLensAppClient({
+      uploadPresetId: PRESET,
+      token: plain,
+      mockOptions: { server },
+    }).assets.create({ name: "b.png", content: photo });
+    expect((await server.assets.retrieve({ assetId: unnamed.id })).externalId).toBeNull();
+  });
+
   it("hides decisions when the preset doesn't show them, and checks only its own uploads", async () => {
     const app = new MockCalmLensAppClient({
       uploadPresetId: PRESET,

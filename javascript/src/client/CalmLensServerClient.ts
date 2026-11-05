@@ -555,8 +555,8 @@ export default class CalmLensServerClient {
     return {
       /**
        * Lists project events after a cursor, oldest first. Call without `cursor` to get a cursor
-       * for "now", then poll with each response's `nextCursor`. Webhook deliveries carry the same
-       * events reshaped as `{ id, type, createdAt, projectId, data }`.
+       * for "now", then poll with each response's `nextCursor`. Webhook deliveries carry each
+       * event's same fields as a flat JSON body.
        */
       list: async (options: ListEventsOptions = {}): Promise<GetEventsResponse> =>
         this.request("GET", `${this.projectPath}/events`, {

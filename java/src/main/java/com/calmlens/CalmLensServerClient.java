@@ -56,7 +56,7 @@ import javax.crypto.spec.SecretKeySpec;
  * }</pre>
  *
  * <p>Failures are {@link CalmLensException}s. Reads ({@code GET}) and uploads, which carry an
- * {@code Idempotency-Key}, are retried with jittered backoff on network failures, HTTP 429, 502,
+ * {@code Idempotency-Key}, are retried with jittered backoff on network failures, HTTP 429, 500, 502,
  * 503 and 504 and {@link ErrorCodes#IDEMPOTENT_REQUEST_IN_PROGRESS}, honouring {@code Retry-After}.
  * Requests never follow redirects.
  */
@@ -899,7 +899,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     return timedOut ? new RequestTimeoutException(message, failure) : new TransportException(ErrorCodes.SDK_TRANSPORT_ERROR, message, failure);
   }
 
-  private static boolean retryableStatus(int status) { return status == 429 || status == 502 || status == 503 || status == 504; }
+  private static boolean retryableStatus(int status) { return status == 429 || status == 500 || status == 502 || status == 503 || status == 504; }
 
   private static boolean isRedirect(int status) { return status >= 300 && status < 400; }
 
@@ -1922,7 +1922,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     /**
      * Streams an asset from the CDN with the API key. Every status but a redirect is returned
      * (redirects fail with {@link ErrorCodes#SDK_HTTP_ERROR} and are never followed); close the
-     * response when done. Transport failures and HTTP 429, 502, 503 and 504 are retried like API
+     * response when done. Transport failures and HTTP 429, 500, 502, 503 and 504 are retried like API
      * reads, and once retries run out the last response is returned.
      *
      * @param options the asset, selector, method and headers

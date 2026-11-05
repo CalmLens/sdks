@@ -199,6 +199,15 @@ class ContractTest < Minitest::Test
     end
   end
 
+  # The URL's query parameters, each read as JSON, equal `params`.
+  def check_query_json(url, params, label)
+    query = URI.decode_www_form(URI.parse(url).query.to_s).to_h
+    params.each do |name, value|
+      assert query.key?(name), "#{label} ?#{name}"
+      assert_equal value, JSON.parse(query[name]), "#{label} ?#{name}"
+    end
+  end
+
   def check_step(mock, step, saved, label, moderate_calls)
     args = resolve(step.fetch('args', {}), saved)
     expect = step.fetch('expect', {})
@@ -222,6 +231,8 @@ class ContractTest < Minitest::Test
     expect.fetch('result', {}).each do |path, raw|
       if raw.is_a?(Hash) && raw.key?('$contains')
         assert_includes at(result, path), resolve(raw['$contains'], saved), "#{label}: #{path}"
+      elsif raw.is_a?(Hash) && raw.key?('$queryJson')
+        check_query_json(at(result, path), raw['$queryJson'], "#{label}: #{path}")
       elsif raw.is_a?(Hash) && raw.key?('$id')
         assert_match(/\A#{raw['$id']}_[0-9A-Za-z]{20}\z/, at(result, path), "#{label}: #{path}")
       else

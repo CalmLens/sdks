@@ -21,7 +21,7 @@ final class Session
     public const RETRY_MAX_DELAY_MS = 8000;
     /** A `Retry-After` longer than this is returned to the caller instead of waited out. */
     public const RETRY_AFTER_MAX_MS = 60000;
-    private const RETRYABLE_STATUSES = [429, 502, 503, 504];
+    private const RETRYABLE_STATUSES = [429, 500, 502, 503, 504];
 
     private ClientInterface $http;
     /** Sleeps for a number of seconds; replaced by the mock so waits take no real time. */

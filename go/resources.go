@@ -411,7 +411,7 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 // Serve fetches CDN content and returns the raw response, including non-2xx statuses. The
 // body is streamed: the caller must close it. Options.Timeout bounds each attempt only until the
 // response headers arrive, so long downloads are not cut off; pass a context with a deadline to
-// bound the whole download. GET and HEAD requests are retried like API reads (429, 502, 503, 504
+// bound the whole download. GET and HEAD requests are retried like API reads (429, 500, 502, 503, 504
 // and transport failures, honouring Retry-After); when retries run out, the last response is
 // returned. A redirect is never followed: it fails with sdk/http-error and its status.
 func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.Response, error) {

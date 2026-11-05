@@ -629,6 +629,11 @@ def _without_placeholder(image: Any) -> Any:
     return {**image, "thumbhash": None, "averageColor": None} if isinstance(image, dict) else image
 
 
+#: The ``asset.<status>`` events, whose asset snapshot carries the moderation status they announce.
+_ANNOUNCED_STATUSES = frozenset({"asset.allowed", "asset.limited", "asset.age-restricted", "asset.blocked",
+                                 "asset.purged"})
+
+
 def _event_asset(asset: Mapping[str, Any]) -> EventAsset:
     """The asset snapshot events carry (getEventAsset in the API)."""
     return {"id": asset["id"], "externalId": asset.get("externalId"), "uploadPresetId": asset.get("uploadPresetId"),
@@ -932,10 +937,14 @@ class MockCalmLensServerClient(CalmLensServerClient):
         """Add an event to the feed returned by ``events.list`` (and ``events.iter``).
         ``facts`` are ``{"key", "value", "url"?}`` entries registered for ``type``. When
         ``asset_id`` names a stored asset, the event carries a snapshot of its status, as
-        the API's events do."""
+        the API's events do; an ``asset.<status>`` event's snapshot has the moderation status
+        it announces."""
         with self._state_lock:
             stored = self.database_storage.assets.get(asset_id) if asset_id else None
             asset = _event_asset(stored) if stored is not None else None
+            if asset is not None and type in _ANNOUNCED_STATUSES:
+                # An ``asset.<status>`` event carries the status it announces.
+                asset["classification"]["moderation"]["status"] = type.removeprefix("asset.")  # type: ignore[typeddict-item]
             now = self.now()
             event: Event = {"id": self.create_id("evt"), "projectId": self.project_id, "type": type,
                             "severity": severity, "title": title or type, "description": description,
@@ -1569,6 +1578,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
             selector = "".join(f"&{k}={quote(str(body[k]), safe='')}" for k in ("lens", "transform") if body.get(k))
             return {"url": f"{self.signed_url_base_url}/assets/{identifier}/{body.get('resource', 'rendered')}"
                            f"?expiresInSeconds={expires}{selector}",
+            if isinstance(body.get("viewerClaims"), dict):
+                # Like the API, the URL carries the viewer claims its signature covers.
+                claims = json.dumps(body["viewerClaims"], separators=(",", ":"))
+                selector += f"&viewerClaims={quote(claims, safe='')}"
                     "expiresAt": now + expires * 1000}
         if suffix == "retry":
             if asset["classification"]["status"] != "failed" or \

@@ -282,7 +282,7 @@ func (m *MockServerClient) WithStorage(fn func(db *InMemoryDatabaseStorage, imag
 // EnqueueEvent appends events to the mock event feed and returns them as stored. Missing IDs,
 // project IDs, severities (low), titles (the type), facts and creation times are filled in, and
 // an event with the AssetID of a stored asset and no Asset carries that asset's snapshot, like
-// the API's events. Events.List returns them to cursors taken before they were enqueued, in
+// the API's events, with the moderation status an asset.<status> event announces. Events.List returns them to cursors taken before they were enqueued, in
 // order.
 func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Event {
 	m.mu.Lock()
@@ -312,7 +312,12 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 		_ = json.Unmarshal(data, &raw)
 		if event.Asset == nil && event.AssetID != nil {
 			if a, err := m.asset(*event.AssetID); err == nil {
-				raw["asset"] = snapshot(a)
+				asset := snapshot(a)
+				// An asset.<status> event carries the moderation status it announces.
+				if status, ok := announcedStatus[event.Type]; ok {
+					section(asset, "classification")["moderation"] = calmlens.JSON{"status": status}
+				}
+				raw["asset"] = asset
 				data, _ = json.Marshal(raw)
 			}
 		}
@@ -506,6 +511,12 @@ func snapshot(a calmlens.JSON) calmlens.JSON {
 		"upload":  calmlens.JSON{"status": section(a, "upload")["status"]},
 		"content": calmlens.JSON{"status": section(a, "content")["status"]},
 		"classification": calmlens.JSON{
+// announcedStatus is the moderation status each asset.<status> event announces.
+var announcedStatus = map[string]string{
+	"asset.allowed": "allowed", "asset.limited": "limited", "asset.age-restricted": "age-restricted",
+	"asset.blocked": "blocked", "asset.purged": "purged",
+}
+
 			"status":     section(a, "classification")["status"],
 			"moderation": calmlens.JSON{"status": section(section(a, "classification"), "moderation")["status"]},
 		},
@@ -1850,6 +1861,11 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 			resource = calmlens.ResourceRendered
 		}
 		return calmlens.JSON{"url": m.options.SignedURLBaseURL + "/assets/" + id + "/" + resource + "?" + params.Encode(), "expiresAt": now + int64(number(body["expiresInSeconds"])*1000)}, nil
+		// Like the API, the URL carries the viewer claims its signature covers.
+		if claims, ok := body["viewerClaims"].(map[string]any); ok {
+			encoded, _ := json.Marshal(claims)
+			params.Set("viewerClaims", string(encoded))
+		}
 	case method == "POST" && suffix == "retry":
 		classification := section(a, "classification")
 		if classification["status"] != calmlens.ClassificationStatusFailed || section(classification, "moderation")["status"] != calmlens.ModerationStatusPending {

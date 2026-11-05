@@ -273,6 +273,8 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
       "items": [
         {
           "id": "e1",
+          "projectId": "p1",
+          "createdAt": 1,
           "type": "asset.blocked",
           "severity": "high",
           "title": "t",
@@ -303,6 +305,8 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
         },
         {
           "id": "e2",
+          "projectId": "p1",
+          "createdAt": 2,
           "type": "billing.charged",
           "severity": "critical",
           "title": "t",
@@ -314,7 +318,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
     }))
     .unwrap();
     let blocked = &page.items[0];
-    assert_eq!(blocked.event_type, Some(EventType::AssetBlocked));
+    assert_eq!(blocked.event_type, EventType::AssetBlocked);
     assert_eq!(blocked.severity, Some(EventSeverity::High));
     let asset = blocked.asset.as_ref().unwrap();
     assert_eq!(
@@ -336,7 +340,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
     let future = &page.items[1];
     assert_eq!(
         future.event_type,
-        Some(EventType::Unknown("billing.charged".into()))
+        EventType::Unknown("billing.charged".into())
     );
     assert_eq!(
         future.severity,

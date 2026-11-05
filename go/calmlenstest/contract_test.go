@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"reflect"
 	"regexp"
 	"sort"
@@ -926,6 +927,18 @@ func TestSharedMockScenarios(t *testing.T) {
 							}
 							if !found {
 								t.Fatalf("%s: %s is %#v, want it to contain %#v", label, path, got, wanted)
+							}
+						} else if params, ok := marker(raw, "$queryJson"); ok {
+							text, _ := got.(string)
+							parsed, err := url.Parse(text)
+							if err != nil {
+								t.Fatalf("%s: %s is %q, not a URL", label, path, text)
+							}
+							for name, value := range params.(map[string]any) {
+								var decoded any
+								if err := json.Unmarshal([]byte(parsed.Query().Get(name)), &decoded); err != nil || !reflect.DeepEqual(decoded, value) {
+									t.Fatalf("%s: %s ?%s is %q, want %#v", label, path, name, parsed.Query().Get(name), value)
+								}
 							}
 						} else if prefix, ok := marker(raw, "$id"); ok {
 							id, _ := got.(string)

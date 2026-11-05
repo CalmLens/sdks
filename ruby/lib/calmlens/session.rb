@@ -10,7 +10,7 @@ module CalmLens
   # The resources share one session per client. It never prints the API key.
   # @api private
   class Session
-    RETRYABLE_STATUSES = [429, 502, 503, 504].freeze
+    RETRYABLE_STATUSES = [429, 500, 502, 503, 504].freeze
     USER_AGENT = "calmlens-ruby/#{VERSION} (ruby/#{RUBY_VERSION})".freeze
 
     # Raised through the transport so an exception from the caller's streaming block is
@@ -186,7 +186,7 @@ module CalmLens
         returned.zip(sent).all? { |saved, definition| saved.is_a?(Hash) && saved['identifier'] == definition['identifier'] }
     end
 
-    # Sends a request, retrying transport failures, timeouts, 429, 502–504 and
+    # Sends a request, retrying transport failures, timeouts, 429, 500, 502–504 and
     # `idempotency/request-in-progress` when it is safe to repeat: reads, and requests with an
     # `Idempotency-Key` whose body can be sent again. Redirects are never followed.
     def execute(method, url, headers, body, request_options, allow_http_errors: false, deadline: nil, &handler)

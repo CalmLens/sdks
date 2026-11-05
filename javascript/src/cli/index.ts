@@ -20,12 +20,13 @@ Commands:
   login     Sign in through your browser and choose a project. The CLI keeps the key it
             receives, so listen and trigger need no API key or project ID.
   logout    Revoke and forget the key from login.
-  listen    Forward your project's events to a local webhook handler with the same body
-            ({ id, type, createdAt, projectId, data }) and headers (x-calmlens-timestamp,
-            x-calmlens-signature: v1=...) as real deliveries. No public URL needed.
+  listen    Forward your project's events to a local webhook handler with the same flat
+            body (id, projectId, type, severity, title, description, assetId, asset, facts,
+            createdAt) and headers (x-calmlens-timestamp, x-calmlens-signature: v1=...) as
+            real deliveries. No public URL needed.
   trigger   Moderate a harmless test comment so CalmLens creates real events. Each trigger
             counts as one upload. Test comments other than clean carry the project's
-            test input key (Assets → Try it → Test inputs in the portal).
+            test input key (Project settings → Test inputs in the portal).
 
 Options:
   --forward-to <url>     Local webhook URL, e.g. http://localhost:3000/api/webhooks/calmlens
@@ -204,12 +205,12 @@ const main = async () => {
       if (!testInputKey)
         fail(
           `trigger ${kind} needs your project's test input key: pass --test-key <key> or set CALMLENS_TEST_INPUT_KEY.\n` +
-            "Copy it from Assets → Try it → Test inputs in the CalmLens portal.",
+            "Copy it from Project settings → Test inputs in the CalmLens portal.",
         );
       if (!TEST_INPUT_KEY_PATTERN.test(testInputKey as string))
         fail(
           `"${testInputKey}" isn't a test input key: it is 32 lowercase hexadecimal characters.\n` +
-            "Copy it from Assets → Try it → Test inputs in the CalmLens portal.",
+            "Copy it from Project settings → Test inputs in the CalmLens portal.",
         );
       text = await generateTestTextCode(kind, testInputKey as string);
     }

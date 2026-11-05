@@ -97,7 +97,7 @@ RETRY_MAX_DELAY = 8.0
 MAX_RETRY_AFTER_SECONDS = 60.0
 USER_AGENT = f"calmlens-python/{__version__} ({platform.python_implementation().lower()}/{platform.python_version()})"
 
-_RETRY_STATUSES = frozenset({429, 502, 503, 504})
+_RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 _ENV_API_KEY, _ENV_PROJECT_ID = "CALMLENS_API_KEY", "CALMLENS_PROJECT_ID"
 
 
@@ -896,7 +896,7 @@ class CalmLensServerClient:
             ``None`` (the default) uses ``timeout``.
         connect_timeout: Seconds allowed to open a connection.
         max_retries: Retries for requests that are safe to resend (``GET`` and writes sent
-            with an ``Idempotency-Key``) after network failures, timeouts, 429, 502, 503, 504 and
+            with an ``Idempotency-Key``) after network failures, timeouts, 429, 500, 502, 503, 504 and
             ``idempotency/request-in-progress``; 0 disables retries.
         max_response_bytes: The largest API response body the client reads; a larger one fails
             with ``sdk/response-too-large``. CDN downloads are not limited.
@@ -1862,7 +1862,7 @@ class CDN:
 
         Returns a streaming :class:`CDNResponse`, including for non-2xx responses (check
         ``status``); close it, or use it as a context manager. Transport failures, timeouts, 429,
-        502, 503 and 504 are retried like API reads (``Retry-After`` replaces the backoff), and the
+        500, 502, 503 and 504 are retried like API reads (``Retry-After`` replaces the backoff), and the
         last response is returned once retries run out. A redirect is not followed: it raises
         ``sdk/http-error``. The timeout is an inactivity limit, so large downloads are not cut off.
         """

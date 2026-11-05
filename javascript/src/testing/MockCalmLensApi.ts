@@ -34,6 +34,7 @@ import {
   getRejectedUploadMimeTypeError,
   MAX_IMAGE_UPLOAD_BYTES,
 } from "../contract/SharedConstants.js";
+import { decodeUploadToken } from "../contract/UploadToken.js";
 import { isFileAccepted } from "../ui/UploadController";
 import {
   type MockAssetOutcome,
@@ -256,6 +257,15 @@ const toEventAsset = (asset: Asset) => ({
   },
   content: { status: asset.content.status },
 });
+
+/** The moderation status each `asset.<status>` event announces. */
+const ANNOUNCED_STATUS: Partial<Record<string, Asset["classification"]["moderation"]["status"]>> = {
+  "asset.allowed": "allowed",
+  "asset.limited": "limited",
+  "asset.age-restricted": "age-restricted",
+  "asset.blocked": "blocked",
+  "asset.purged": "purged",
+};
 
 /** A `moderate` answer or `completeProcessing` decision as a checked `MockDecision`. */
 const toDecision = (value: unknown): MockDecision => {
@@ -583,14 +593,17 @@ export class MockCalmLensApi {
    * the stored event.
    */
   async enqueueEvent(input: MockEventInput): Promise<TypedEvent> {
-    // Like the API's events, one about an asset carries the asset as it is now.
+    // Like the API's events, one about an asset carries the asset as it is now, with the
+    // moderation status an `asset.<status>` event announces.
     const asset =
       input.asset === undefined && input.assetId
         ? await this.databaseStorage.getAsset(input.assetId)
         : undefined;
-    return this.pushEvent(
-      asset ? ({ ...input, asset: toEventAsset(asset) } as MockEventInput) : input,
-    );
+    if (!asset) return this.pushEvent(input);
+    const snapshot = toEventAsset(asset);
+    const announced = ANNOUNCED_STATUS[input.type];
+    if (announced) snapshot.classification.moderation.status = announced;
+    return this.pushEvent({ ...input, asset: snapshot } as MockEventInput);
   }
 
   /** Adds an event to the feed, filling the fields the API always sets. */
@@ -1502,8 +1515,12 @@ export class MockCalmLensApi {
     const expiresInSeconds = (body.expiresInSeconds as number | undefined) ?? 60 * 15;
     const resource = (body.resource as string | undefined) ?? "rendered";
     const selector =
+    // Like the API, the URL carries the viewer claims its signature covers.
       (body.lens ? `&lens=${encodeURIComponent(String(body.lens))}` : "") +
-      (body.transform ? `&transform=${encodeURIComponent(String(body.transform))}` : "");
+      (body.transform ? `&transform=${encodeURIComponent(String(body.transform))}` : "") +
+      (body.viewerClaims
+        ? `&viewerClaims=${encodeURIComponent(JSON.stringify(body.viewerClaims))}`
+        : "");
     return {
       url: `${this.options.signedUrlBaseUrl}/assets/${asset.id}/${resource}?expiresInSeconds=${expiresInSeconds}${selector}`,
       expiresAt: this.now() + expiresInSeconds * 1000,
@@ -2153,6 +2170,15 @@ export class MockCalmLensApi {
     const token = request.headers.get("authorization");
     if (preset.requireToken && !token) throw fail(API_ERROR_CODES.UPLOAD_PRESET_TOKEN_REQUIRED);
     if (
+    // Like the API, a browser upload's external ID is the one its token was signed for.
+    const tokenExternalId = token
+      ? decodeUploadToken(token.replace(/^Bearer /, ""))?.claims.x
+      : undefined;
+    if (fields.externalId && fields.externalId !== tokenExternalId) {
+      throw fail(API_ERROR_CODES.UPLOAD_PRESET_FIELD_NOT_ALLOWED, {
+        details: { field: "externalId" },
+      });
+    }
       preset.allowedContentTypes &&
       !isFileAccepted(
         { name: fields.name, type: fields.contentType ?? "" },
@@ -2173,6 +2199,7 @@ export class MockCalmLensApi {
       {
         ...fields,
         uploadPresetId,
+        externalId: tokenExternalId,
         visibility: preset.visibility ?? "public",
         folderId: preset.folderId ?? undefined,
         processingOptions: {

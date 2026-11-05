@@ -1382,7 +1382,7 @@
     {
       "code": "sdk/http-error",
       "status": 500,
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "sdk/http-error",
@@ -1487,7 +1487,7 @@
     {
       "code": "misc/internal-error",
       "status": 500,
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "auth/unauthenticated",
@@ -1682,7 +1682,7 @@
     {
       "code": "asset/update-failed",
       "status": 500,
-      "retryable": false
+      "retryable": true
     },
     {
       "code": "asset/safety-held",

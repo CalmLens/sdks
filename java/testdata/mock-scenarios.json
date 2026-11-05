@@ -3453,6 +3453,43 @@
             },
             "httpStatus": 200
           }
+        },
+        {
+          "operation": "mock.enqueueEvent",
+          "args": {
+            "type": "asset.blocked",
+            "assetId": {
+              "$ref": "queued.id"
+            },
+            "facts": [
+              {
+                "key": "decided-by",
+                "value": "reviewer"
+              }
+            ]
+          },
+          "expect": {
+            "result": {
+              "asset.id": {
+                "$ref": "queued.id"
+              },
+              "asset.classification.moderation.status": "blocked"
+            }
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.status": "pending"
+            },
+            "httpStatus": 200
+          }
         }
       ]
     },
@@ -8872,6 +8909,52 @@
             "result": {
               "name": "a.png",
               "description": null
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "a signed URL carries the viewer claims it was signed with",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "a.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "a",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.createSignedUrl",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            },
+            "resource": "rendered",
+            "viewerClaims": {
+              "region": "DE",
+              "ageConfirmed": true
+            }
+          },
+          "expect": {
+            "result": {
+              "url": {
+                "$queryJson": {
+                  "viewerClaims": {
+                    "region": "DE",
+                    "ageConfirmed": true
+                  }
+                }
+              }
             },
             "httpStatus": 200
           }

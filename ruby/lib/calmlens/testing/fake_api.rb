@@ -56,6 +56,8 @@ module CalmLens
       DEFAULT_PAGE_SIZE = 50
       MAX_PAGE_SIZE = 100
       REVIEW_DECISIONS = %w[allowed limited age-restricted blocked purged].freeze
+      # The moderation status each `asset.<status>` event announces.
+      ANNOUNCED_STATUSES = REVIEW_DECISIONS.to_h { |status| ["asset.#{status}", status] }.freeze
       MAX_DECISION_NOTE_LENGTH = 1499
       RESOURCES = %w[original rendered placeholder].freeze
       MIN_PART = 5 * 1024 * 1024
@@ -104,10 +106,16 @@ module CalmLens
         record
       end
 
-      # Adds an event like {#add_event}; one about a stored asset carries the asset as it is now.
+      # Adds an event like {#add_event}; one about a stored asset carries the asset as it is now,
+      # with the moderation status an `asset.<status>` event announces.
       def enqueue_event(event)
         item = own_asset(event['assetId'])
-        event = event.merge('asset' => snapshot(item)) if item && !event.key?('asset')
+        if item && !event.key?('asset')
+          asset = snapshot(item)
+          announced = ANNOUNCED_STATUSES[event['type']]
+          asset['classification']['moderation']['status'] = announced if announced
+          event = event.merge('asset' => asset)
+        end
         add_event(event)
       end
 
@@ -837,7 +845,10 @@ module CalmLens
 
       def signed_url(id, json)
         expires = json.fetch('expiresInSeconds', 900)
-        params = URI.encode_www_form(json.slice('lens', 'transform').merge('expires' => expires))
+        query = json.slice('lens', 'transform').merge('expires' => expires)
+        # Like the API, the URL carries the viewer claims its signature covers.
+        query['viewerClaims'] = JSON.generate(json['viewerClaims']) if json['viewerClaims'].is_a?(Hash)
+        params = URI.encode_www_form(query)
         { 'url' => "#{@cdn_base_url}/signed/#{URI.encode_www_form_component(id)}/#{json.fetch('resource', 'rendered')}?#{params}",
           'expiresAt' => @now.call + (expires * 1000) }
       end

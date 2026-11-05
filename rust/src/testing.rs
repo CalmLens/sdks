@@ -535,9 +535,10 @@ impl MockServerClient {
         });
         Ok(())
     }
-    /// Appends `event` to the in-memory events feed and returns it. A missing ID, project ID
-    /// or creation time is filled in; when `asset_id` names a stored asset and `asset` is
-    /// `None`, the event carries its snapshot. `events().list` returns it to cursors taken
+    /// Appends `event` to the in-memory events feed and returns it. An empty ID or project ID,
+    /// or a zero creation time, is filled in; when `asset_id` names a stored asset and `asset`
+    /// is `None`, the event carries its snapshot, with the moderation status an
+    /// `asset.<status>` event announces. `events().list` returns it to cursors taken
     /// before it was added.
     ///
     /// # Panics
@@ -548,10 +549,12 @@ impl MockServerClient {
             if event.id.is_empty() {
                 event.id = backend.create_id("evt");
             }
-            event
-                .project_id
-                .get_or_insert_with(|| backend.project_id().to_owned());
-            event.created_at.get_or_insert_with(|| backend.now());
+            if event.project_id.is_empty() {
+                event.project_id = backend.project_id().to_owned();
+            }
+            if event.created_at == 0 {
+                event.created_at = backend.now();
+            }
             let mut stored = serde_json::to_value(&event).expect("serializable event");
             if event.asset.is_none() {
                 if let Some(asset) = event
@@ -560,6 +563,10 @@ impl MockServerClient {
                     .and_then(|id| backend.storage.assets.get(id))
                 {
                     stored["asset"] = memory::snapshot(asset);
+                    // An `asset.<status>` event carries the moderation status it announces.
+                    if let Some(status) = memory::announced_status(&stored["type"]) {
+                        stored["asset"]["classification"]["moderation"]["status"] = status.into();
+                    }
                     event.asset = serde_json::from_value(stored["asset"].clone()).ok();
                 }
             }

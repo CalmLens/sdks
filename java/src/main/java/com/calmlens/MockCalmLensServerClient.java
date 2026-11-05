@@ -65,7 +65,7 @@ import java.util.function.LongSupplier;
  * ({@link #enqueue(String, String, int, Object)}) waits until a request for that route arrives;
  * other requests meanwhile go to the in-memory API. The mock's client makes no retries unless its
  * builder sets {@code maxRetries}, so each queued response or failure answers one call. With
- * retries, reads and uploads are retried on HTTP 429, 502, 503 and 504 and on network failures
+ * retries, reads and uploads are retried on HTTP 429, 500, 502, 503 and 504 and on network failures
  * (without waiting), and each attempt takes the next queued answer.
  *
  * <p>{@code assets.waitForDecision} retrieves the asset until its {@code
@@ -695,10 +695,16 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     return Json.GSON.fromJson(asset, Models.Asset.class);
   }
 
+  /** The moderation status each {@code asset.<status>} event announces. */
+  private static final Map<String, String> ANNOUNCED_STATUSES = Map.of(
+      "asset.allowed", "allowed", "asset.limited", "limited", "asset.age-restricted", "age-restricted",
+      "asset.blocked", "blocked", "asset.purged", "purged");
+
   /**
    * Adds an event to the feed that {@code events.list} and {@code events.pages} return after
    * cursors taken earlier. When {@code assetId} names a stored asset, the event carries a snapshot
-   * of its status, as the API's events do.
+   * of its status, as the API's events do, with the moderation status an {@code asset.<status>}
+   * event announces.
    *
    * @param type a registered event type, such as {@code asset.blocked}
    * @param assetId the asset the event is about, or null
@@ -716,7 +722,12 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     event.add("description", null);
     event.addProperty("assetId", assetId);
     JsonObject asset = assetId == null ? null : api.storage.assets.get(assetId);
-    event.add("asset", asset == null ? null : MockApi.snapshot(asset));
+    JsonObject snapshot = asset == null ? null : MockApi.snapshot(asset);
+    // An asset.<status> event carries the moderation status it announces.
+    String announced = ANNOUNCED_STATUSES.get(type);
+    if (snapshot != null && announced != null)
+      snapshot.getAsJsonObject("classification").getAsJsonObject("moderation").addProperty("status", announced);
+    event.add("asset", snapshot);
     event.add("facts", MockApi.facts(java.util.Arrays.asList(facts)));
     event.addProperty("createdAt", now);
     api.storage.events.add(event);

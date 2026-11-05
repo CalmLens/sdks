@@ -55,7 +55,7 @@ public class CalmLensException extends RuntimeException {
    * Whether repeating the same request later may succeed. It follows from {@link #getCode()} and
    * {@link #getStatus()} alone, whatever the exception's class: {@link ErrorCodes#SDK_TRANSPORT_ERROR},
    * {@link ErrorCodes#SDK_TIMEOUT} (a request timeout or {@code waitForDecision}'s deadline), {@link
-   * ErrorCodes#IDEMPOTENT_REQUEST_IN_PROGRESS} and HTTP 429, 502, 503 and 504 are retryable; nothing
+   * ErrorCodes#IDEMPOTENT_REQUEST_IN_PROGRESS} and HTTP 429, 500, 502, 503 and 504 are retryable; nothing
    * else is, {@link ErrorCodes#SDK_CANCELLED} and other 5xx statuses included. The client already
    * retries these for safe requests (see {@link CalmLensServerClient.Builder#maxRetries(int)}).
    * Repeat a write only with the same idempotency key.
@@ -67,6 +67,6 @@ public class CalmLensException extends RuntimeException {
     int status = getStatus();
     return ErrorCodes.SDK_TRANSPORT_ERROR.equals(code) || ErrorCodes.SDK_TIMEOUT.equals(code)
         || ErrorCodes.IDEMPOTENT_REQUEST_IN_PROGRESS.equals(code)
-        || status == 429 || status == 502 || status == 503 || status == 504;
+        || status == 429 || status == 500 || status == 502 || status == 503 || status == 504;
   }
 }

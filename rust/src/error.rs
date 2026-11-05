@@ -8,8 +8,10 @@ macro_rules! error_codes {
         ///
         /// API codes are generated from the CalmLens API's public error list. Codes this SDK
         /// version does not know arrive as [`ErrorCode::Other`], so new API codes never fail
-        /// decoding. Compare with a string through `PartialEq<&str>`, or match variants.
-        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        /// decoding. Compare with a string through `PartialEq<&str>`, or match variants. Codes
+        /// compare, hash and map to HTTP statuses by their string form, so
+        /// `ErrorCode::Other("misc/internal-error".into())` equals `ErrorCode::InternalError`.
+        #[derive(Debug, Clone)]
         #[non_exhaustive]
         pub enum ErrorCode {
             $( $(#[$doc])* $variant, )*
@@ -62,6 +64,11 @@ macro_rules! error_codes {
             pub fn http_status(&self) -> Option<u16> {
                 match self {
                     $(Self::$variant => Some($status),)*
+                    // A known code spelled as `Other` has the same status as its variant.
+                    Self::Other(code) => match Self::parse(code) {
+                        Self::Other(_) => None,
+                        known => known.http_status(),
+                    },
                     _ => None,
                 }
             }
@@ -87,6 +94,18 @@ macro_rules! error_codes {
 }
 
 include!("codes.rs");
+
+impl PartialEq for ErrorCode {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+impl Eq for ErrorCode {}
+impl std::hash::Hash for ErrorCode {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_str().hash(state);
+    }
+}
 
 impl fmt::Display for ErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -231,13 +250,16 @@ impl Error {
         self.inner.code == ErrorCode::Timeout
     }
     /// Whether repeating the same request may succeed: transport failures, timeouts, `429`,
-    /// `502`, `503`, `504` and `idempotency/request-in-progress`. A retried write is only safe
+    /// `500`, `502`, `503`, `504` and `idempotency/request-in-progress`. A retried write is only safe
     /// with the same `Idempotency-Key`, which the SDK reuses across its own retries.
     pub fn is_retryable(&self) -> bool {
-        matches!(
-            self.inner.code,
-            ErrorCode::TransportError | ErrorCode::Timeout | ErrorCode::IdempotentRequestInProgress
-        ) || matches!(self.inner.status, Some(429 | 502 | 503 | 504))
+        [
+            ErrorCode::TransportError,
+            ErrorCode::Timeout,
+            ErrorCode::IdempotentRequestInProgress,
+        ]
+        .contains(&self.inner.code)
+            || matches!(self.inner.status, Some(429 | 500 | 502 | 503 | 504))
     }
 }
 

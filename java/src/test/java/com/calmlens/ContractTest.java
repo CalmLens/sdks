@@ -768,6 +768,19 @@ class ContractTest {
           boolean found = false;
           for (JsonElement item : actual.getAsJsonArray()) found |= normalize(item).equals(member);
           assertTrue(found, label + ": " + entry.getKey() + " " + actual + " lacks " + member);
+        } else if (raw.isJsonObject() && raw.getAsJsonObject().has("$queryJson")) {
+          Map<String, String> query = new HashMap<>();
+          String rawQuery = java.net.URI.create(actual.getAsString()).getRawQuery();
+          for (String pair : rawQuery == null ? new String[0] : rawQuery.split("&")) {
+            int equals = pair.indexOf('=');
+            query.put(java.net.URLDecoder.decode(equals < 0 ? pair : pair.substring(0, equals), StandardCharsets.UTF_8),
+                equals < 0 ? "" : java.net.URLDecoder.decode(pair.substring(equals + 1), StandardCharsets.UTF_8));
+          }
+          for (Map.Entry<String, JsonElement> param : raw.getAsJsonObject().getAsJsonObject("$queryJson").entrySet()) {
+            assertTrue(query.containsKey(param.getKey()), label + ": " + entry.getKey() + " lacks ?" + param.getKey());
+            assertEquals(normalize(param.getValue()), normalize(JsonParser.parseString(query.get(param.getKey()))),
+                label + ": " + entry.getKey() + " ?" + param.getKey());
+          }
         } else if (raw.isJsonObject() && raw.getAsJsonObject().has("$id")) {
           String prefix = raw.getAsJsonObject().get("$id").getAsString();
           assertTrue(actual != null && actual.isJsonPrimitive() && actual.getAsString().matches(prefix + "_[0-9A-Za-z]{20}"),

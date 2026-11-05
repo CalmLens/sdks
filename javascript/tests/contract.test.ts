@@ -387,6 +387,15 @@ describe("shared mock scenarios", () => {
             const actual = at(result, path);
             if (isMarker(raw, "$contains")) {
               expect(actual, `${label}: ${path}`).toContainEqual(resolveRefs(raw.$contains, saved));
+            } else if (isMarker(raw, "$queryJson")) {
+              const query = new URL(actual as string).searchParams;
+              for (const [name, value] of Object.entries(
+                raw.$queryJson as Record<string, unknown>,
+              )) {
+                const param = query.get(name);
+                expect(param, `${label}: ${path} ?${name}`).not.toBeNull();
+                expect(JSON.parse(param!), `${label}: ${path} ?${name}`).toEqual(value);
+              }
             } else if (isMarker(raw, "$id")) {
               expect(actual, `${label}: ${path}`).toMatch(
                 new RegExp(`^${raw.$id}_[0-9A-Za-z]{20}$`),

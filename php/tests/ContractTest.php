@@ -961,6 +961,12 @@ final class ContractTest extends TestCase
                     if (is_array($raw) && array_key_exists('$contains', $raw)) {
                         $wanted = self::canon(self::resolve($raw['$contains'], $saved));
                         self::assertContains($wanted, array_map(self::canon(...), (array) self::at($result, $path)), "$label: $path");
+                    } elseif (is_array($raw) && array_key_exists('$queryJson', $raw)) {
+                        parse_str((string) parse_url((string) self::at($result, $path), PHP_URL_QUERY), $query);
+                        foreach ($raw['$queryJson'] as $name => $value) {
+                            self::assertArrayHasKey($name, $query, "$label: $path ?$name");
+                            self::assertSameJson($value, json_decode($query[$name], true), "$label: $path ?$name");
+                        }
                     } elseif (is_array($raw) && array_key_exists('$id', $raw)) {
                         $actual = self::at($result, $path);
                         self::assertIsString($actual, "$label: $path");

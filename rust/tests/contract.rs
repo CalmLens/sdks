@@ -1413,6 +1413,19 @@ async fn check_step(
                     items.contains(member),
                     "{label}: {path} {actual} lacks {member}"
                 );
+            } else if let Some(Value::Object(params)) = wanted.get("$queryJson") {
+                let url = reqwest::Url::parse(actual.as_str().unwrap_or_default())
+                    .unwrap_or_else(|_| panic!("{label}: {path} {actual} is not a URL"));
+                for (name, value) in params {
+                    let param = url
+                        .query_pairs()
+                        .find(|(key, _)| key == name.as_str())
+                        .map(|(_, param)| param.into_owned())
+                        .unwrap_or_else(|| panic!("{label}: {path} lacks ?{name}"));
+                    let decoded: Value = serde_json::from_str(&param)
+                        .unwrap_or_else(|_| panic!("{label}: {path} ?{name} is not JSON"));
+                    assert_eq!(&decoded, value, "{label}: {path} ?{name}");
+                }
             } else if let Some(prefix) = wanted.get("$id").and_then(Value::as_str) {
                 let id = actual.as_str().unwrap_or_default();
                 let body = id

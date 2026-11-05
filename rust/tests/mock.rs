@@ -70,6 +70,16 @@ async fn api_errors_have_a_message_and_queued_api_errors_their_status() {
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::Other("billing/new-code".into()));
     assert_eq!(error.status(), Some(400));
+
+    // A known code spelled as Other gets its own status and equals its variant.
+    mock.enqueue_api_error(ErrorCode::Other("misc/internal-error".into()), "Internal");
+    let error = mock
+        .folders()
+        .list(ListFolders::default())
+        .await
+        .unwrap_err();
+    assert_eq!(error.status(), Some(500));
+    assert_eq!(error.code(), &ErrorCode::InternalError);
 }
 
 #[tokio::test]

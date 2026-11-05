@@ -166,7 +166,7 @@ impl ServerClientBuilder {
     /// How many times to retry a repeatable request (2 by default; 0 disables retries).
     ///
     /// GET and HEAD requests and POSTs carrying an `Idempotency-Key` (uploads and parts) are
-    /// retried after transport failures and timeouts, `429`, `502`, `503`, `504` and
+    /// retried after transport failures and timeouts, `429`, `500`, `502`, `503`, `504` and
     /// `idempotency/request-in-progress`, waiting for `Retry-After` when the server sends one
     /// and otherwise for a jittered exponential backoff. Uploads from readers and streams are
     /// sent once.

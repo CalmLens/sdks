@@ -64,7 +64,7 @@ module CalmLens
     # @param max_response_bytes [Integer] the largest response body read; a larger one fails with
     #   `sdk/response-too-large`, before it is read when its `Content-Length` says so.
     # @param max_retries [Integer] retries of requests that are safe to repeat: GET/HEAD, and uploads,
-    #   which carry an `Idempotency-Key`. Connection failures, timeouts, 429, 502, 503, 504 and
+    #   which carry an `Idempotency-Key`. Connection failures, timeouts, 429, 500, 502, 503, 504 and
     #   `idempotency/request-in-progress` are retried with jittered exponential backoff, honouring
     #   `Retry-After`. Other writes are never retried. 0 disables retries.
     # @param retry_base_delay [Numeric] seconds before the first retry when the API gives no

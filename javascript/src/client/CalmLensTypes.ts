@@ -278,7 +278,7 @@ export interface RequestOptions {
   uploadTimeoutMs?: number;
   /**
    * How many times to retry a request that failed before a response arrived or returned 429,
-   * 502, 503, 504 or `idempotency/request-in-progress`. Only reads and requests carrying an
+   * 500, 502, 503, 504 or `idempotency/request-in-progress`. Only reads and requests carrying an
    * `Idempotency-Key` (creates and uploads) are retried, with jittered backoff that honours
    * `Retry-After`. Streamed bodies are never retried. Defaults to 2; 0 disables retries.
    */

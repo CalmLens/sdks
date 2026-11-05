@@ -7074,7 +7074,7 @@
       ]
     },
     {
-      "name": "a 500 is not retried",
+      "name": "a 500 internal error is retried",
       "area": "retries",
       "client": {
         "maxRetries": 2
@@ -7082,7 +7082,130 @@
       "responses": [
         {
           "status": 500,
-          "bodyText": "<html><body>500</body></html>",
+          "body": {
+            "code": "misc/internal-error",
+            "message": "An internal error occurred. Retry later, and quote requestId to support.",
+            "requestId": "req-1",
+            "details": {}
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json",
+            "retry-after": "0"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "completed",
+              "moderation": {
+                "status": "allowed",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-2",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored"
+              },
+              "upload": {
+                "status": "completed"
+              },
+              "classification": {
+                "status": "completed",
+                "moderation": {
+                  "status": "allowed",
+                  "flaggedCategories": [],
+                  "regions": []
+                }
+              }
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ],
+      "sleepsMs": [
+        0
+      ]
+    },
+    {
+      "name": "a 501 is not retried",
+      "area": "retries",
+      "client": {
+        "maxRetries": 2
+      },
+      "responses": [
+        {
+          "status": 501,
+          "bodyText": "<html><body>501</body></html>",
           "headers": {
             "x-request-id": "req-1",
             "content-type": "text/html"
@@ -7098,7 +7221,7 @@
           "expect": {
             "error": {
               "code": "sdk/http-error",
-              "status": 500,
+              "status": 501,
               "requestId": "req-1",
               "retryAfter": null,
               "details": null

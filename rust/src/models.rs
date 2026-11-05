@@ -2666,15 +2666,18 @@ pub struct EventFact {
 pub struct Event {
     /// The event ID.
     pub id: String,
-    /// The event type (`type` on the wire).
-    #[serde(default, rename = "type")]
-    pub event_type: Option<EventType>,
-    /// Milliseconds since the Unix epoch.
+    /// The event type (`type` on the wire). Every event has one; types this SDK version does
+    /// not know arrive as [`EventType::Unknown`].
+    #[serde(rename = "type")]
+    pub event_type: EventType,
+    /// Milliseconds since the Unix epoch. The API always sends it; `0` only in an event built
+    /// for a mock, which fills it in.
     #[serde(default)]
-    pub created_at: Option<u64>,
-    /// The owning project.
+    pub created_at: u64,
+    /// The owning project. The API always sends it; empty only in an event built for a mock,
+    /// which fills it in.
     #[serde(default)]
-    pub project_id: Option<String>,
+    pub project_id: String,
     /// The severity.
     #[serde(default)]
     pub severity: Option<EventSeverity>,
@@ -2703,7 +2706,7 @@ impl Event {
     pub fn new(id: impl Into<String>, event_type: impl Into<EventType>) -> Self {
         Self {
             id: id.into(),
-            event_type: Some(event_type.into()),
+            event_type: event_type.into(),
             ..Self::default()
         }
     }
@@ -2754,9 +2757,9 @@ impl WebhookEventPayload {
     pub fn from_event(event: &Event) -> Self {
         Self {
             id: event.id.clone(),
-            event_type: event.event_type.clone().unwrap_or_default(),
-            created_at: event.created_at.unwrap_or_default(),
-            project_id: event.project_id.clone().unwrap_or_default(),
+            event_type: event.event_type.clone(),
+            created_at: event.created_at,
+            project_id: event.project_id.clone(),
             severity: event.severity.clone(),
             title: event.title.clone(),
             description: event.description.clone(),

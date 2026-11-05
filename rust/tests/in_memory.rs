@@ -381,7 +381,7 @@ async fn enqueued_events_carry_the_asset_snapshot() {
     let mut event = Event::new("", EventType::AssetUploaded);
     event.asset_id = Some(asset.id.clone());
     let event = mock.enqueue_event(event);
-    assert_eq!(event.project_id.as_deref(), Some("project-1"));
+    assert_eq!(event.project_id, "project-1");
     assert_eq!(
         event.asset.as_ref().unwrap().classification_status(),
         Some(AssetClassificationStatus::Processing)

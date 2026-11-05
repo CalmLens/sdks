@@ -62,6 +62,9 @@ final class MockServerClient
 {
     /** What `decide` accepts: a reviewer's decision. */
     public const DECISIONS = ['allowed', 'limited', 'age-restricted', 'blocked', 'purged'];
+    /** The moderation status each `asset.<status>` event announces. */
+    private const ANNOUNCED_STATUSES = ['asset.allowed' => 'allowed', 'asset.limited' => 'limited',
+        'asset.age-restricted' => 'age-restricted', 'asset.blocked' => 'blocked', 'asset.purged' => 'purged'];
     /** The ThumbHash the mock gives every classified image, standing in for one computed from its pixels. */
     public const THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI';
     private const MIB = 1024 * 1024;
@@ -269,17 +272,23 @@ final class MockServerClient
     /**
      * Adds an event to the feed returned by `events.list`. Omitted `id`, `projectId`, `severity`,
      * `title`, `description`, `assetId`, `asset`, `facts` and `createdAt` are filled in; when `assetId` names a stored
-     * asset, the event carries a snapshot of its status, as the API's events do. Pass the result to
+     * asset, the event carries a snapshot of its status, as the API's events do, with the moderation
+     * status an `asset.<status>` event announces. Pass the result to
      * `Webhooks::toPayload` to build a matching webhook body.
      */
     public function enqueueEvent(array $event): array
     {
         $now = ($this->now)();
         $assetId = $event['assetId'] ?? null;
+        $snapshot = is_string($assetId) && isset($this->assets[$assetId]) ? $this->snapshot($this->assets[$assetId]) : null;
+        // An `asset.<status>` event carries the moderation status it announces.
+        $announced = self::ANNOUNCED_STATUSES[$event['type'] ?? ''] ?? null;
+        if ($snapshot !== null && $announced !== null) {
+            $snapshot['classification']['moderation']['status'] = $announced;
+        }
         $event += ['id' => ($this->createId)('evt'), 'projectId' => $this->projectId, 'severity' => 'low',
             'title' => $event['type'] ?? '', 'description' => null, 'assetId' => null,
-            'asset' => is_string($assetId) && isset($this->assets[$assetId]) ? $this->snapshot($this->assets[$assetId]) : null,
-            'facts' => [], 'createdAt' => $now];
+            'asset' => $snapshot, 'facts' => [], 'createdAt' => $now];
         $this->events[] = $event;
         return $event;
     }
@@ -694,7 +703,12 @@ final class MockServerClient
                 return $this->uploadPart($asset, $query, $body);
             case 'POST signed-url':
                 $expires = $json['expiresInSeconds'] ?? 900;
-                $params = http_build_query(array_intersect_key($json, array_flip(['lens', 'transform'])) + ['expires' => $expires]);
+                $query = array_intersect_key($json, array_flip(['lens', 'transform'])) + ['expires' => $expires];
+                // Like the API, the URL carries the viewer claims its signature covers.
+                if (is_array($json['viewerClaims'] ?? null)) {
+                    $query['viewerClaims'] = json_encode((object) $json['viewerClaims'], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+                }
+                $params = http_build_query($query);
                 return ['url' => $this->cdnBaseUrl . '/signed/' . rawurlencode($id) . '/' . ($json['resource'] ?? 'rendered') . '?' . $params,
                     'expiresAt' => ($this->now)() + $expires * 1000];
         }

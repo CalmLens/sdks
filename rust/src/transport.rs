@@ -267,9 +267,9 @@ pub(crate) struct CallOptions {
     pub max_response_bytes: usize,
 }
 
-const RETRYABLE_STATUSES: [u16; 4] = [429, 502, 503, 504];
+const RETRYABLE_STATUSES: [u16; 5] = [429, 500, 502, 503, 504];
 
-/// Sends `request`, retrying transport failures, timeouts, `429`, `502`, `503`, `504` and
+/// Sends `request`, retrying transport failures, timeouts, `429`, `500`, `502`, `503`, `504` and
 /// `idempotency/request-in-progress` with jittered backoff (or the `Retry-After` the server
 /// sent) when the request is repeatable. A redirect is never followed: it fails with
 /// `sdk/http-error`. With `api_errors`, an unsuccessful status is returned as an [`Error`];

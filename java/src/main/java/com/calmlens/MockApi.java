@@ -1005,6 +1005,9 @@ final class MockApi {
           String value = str(body, key);
           if (value != null) params.add(key + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8));
         }
+        // Like the API, the URL carries the viewer claims its signature covers.
+        if (body.has("viewerClaims") && body.get("viewerClaims").isJsonObject())
+          params.add("viewerClaims=" + URLEncoder.encode(body.get("viewerClaims").toString(), StandardCharsets.UTF_8));
         JsonObject signed = new JsonObject();
         signed.addProperty("url", options.signedUrlBaseUrl + "/assets/" + CalmLensServerClient.encodeComponent(id) + "/"
             + Objects.requireNonNullElse(str(body, "resource"), "rendered") + "?" + String.join("&", params));

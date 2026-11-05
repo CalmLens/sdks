@@ -87,11 +87,11 @@ func (e *Error) Error() string {
 func (e *Error) Unwrap() error { return e.Cause }
 
 // Retryable reports whether repeating the same request may succeed: transport failures and
-// timeouts, 429, 502, 503, 504 and idempotency/request-in-progress. Writes without an
+// timeouts, 429, 500, 502, 503, 504 and idempotency/request-in-progress. Writes without an
 // Idempotency-Key may already have been applied; check before repeating them.
 func (e *Error) Retryable() bool {
 	switch e.Status {
-	case 429, 502, 503, 504:
+	case 429, 500, 502, 503, 504:
 		return true
 	}
 	return e.Code == CodeSDKTransportError || e.Code == CodeSDKTimeout || e.Code == CodeIdempotentRequestInProgress

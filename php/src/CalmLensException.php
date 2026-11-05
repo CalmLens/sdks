@@ -93,12 +93,12 @@ class CalmLensException extends \RuntimeException
 
     /**
      * True when repeating the same request may succeed: connection failures, timeouts,
-     * throttling (429), 502/503/504 and `idempotency/request-in-progress`. Repeat a write only
+     * throttling (429), 500, 502, 503, 504 and `idempotency/request-in-progress`. Repeat a write only
      * with the same idempotency key.
      */
     public function isRetryable(): bool
     {
-        return in_array($this->status, [429, 502, 503, 504], true)
+        return in_array($this->status, [429, 500, 502, 503, 504], true)
             || in_array($this->errorCode, [SdkErrorCodes::TIMEOUT, SdkErrorCodes::TRANSPORT_ERROR, ErrorCodes::IDEMPOTENT_REQUEST_IN_PROGRESS], true);
     }
 }

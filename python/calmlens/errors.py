@@ -28,7 +28,7 @@ __all__ = [
     "CalmLensValidationError", "WebhookVerificationError",
 ]
 
-_RETRYABLE_STATUSES = frozenset({429, 502, 503, 504})
+_RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
 _RETRYABLE_CODES = frozenset({error_codes.SDK_TRANSPORT_ERROR, error_codes.SDK_TIMEOUT,
                               error_codes.IDEMPOTENT_REQUEST_IN_PROGRESS})
 
@@ -98,7 +98,7 @@ class CalmLensError(Exception):
     @property
     def is_retryable(self) -> bool:
         """True when sending the same request again later may succeed: network failures,
-        timeouts, 429, 502, 503, 504 and ``idempotency/request-in-progress``. Retrying a
+        timeouts, 429, 500, 502, 503, 504 and ``idempotency/request-in-progress``. Retrying a
         non-idempotent write without an ``Idempotency-Key`` can still create duplicates.
 
         Decided from ``code`` and ``status`` alone, so every error class agrees: an
