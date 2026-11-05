@@ -60,14 +60,26 @@ module CalmLens
       # The moderation status each `asset.<status>` event announces.
       ANNOUNCED_STATUSES = REVIEW_DECISIONS.to_h { |status| ["asset.#{status}", status] }.freeze
       MAX_DECISION_NOTE_LENGTH = 1499
-      RESOURCES = %w[original rendered placeholder].freeze
+      RESOURCES = [*CDN::SIGNED_RESOURCES, 'placeholder'].freeze
+      # Paths beneath `/rendered/` the CDN reserves for streaming and an embeddable player.
+      RESERVED_RENDERED_PATHS = %w[stream player].freeze
       MIN_PART = 5 * 1024 * 1024
       MAX_MULTIPART_IMAGE = 20 * 1024 * 1024
       # Like the API: an upload has at most this many parts.
       MAX_PARTS = 10_000
-      # The ThumbHash the mock gives every classified image, standing in for one computed from its
-      # pixels. The `placeholder` resource serves it as a PNG, like the CDN.
+      # The ThumbHash the mock gives every processed asset's preview, standing in for one computed
+      # from its pixels. The `placeholder` resource serves it as a PNG, like the CDN.
       THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI'
+      # Removing or withholding content removes its rendered file and preview, as the API does.
+      NO_RENDERING = { 'rendered' => nil, 'preview' => nil }.freeze
+      # The size of the waveform the API makes as an audio asset's preview.
+      WAVEFORM_SIZE = { 'width' => 1200, 'height' => 300 }.freeze
+      # Audio and video formats browsers play as uploaded, so the API serves them as stored (Asset.ts).
+      BROWSER_SAFE_MEDIA_FORMATS = %w[video/mp4 audio/mpeg audio/aac audio/mp4 audio/x-m4a audio/ogg].freeze
+      # Spreadsheets, which have no rendered file or preview (Asset.ts).
+      SPREADSHEET_MIME_TYPES = %w[application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+                                  application/vnd.ms-excel.sheet.macroenabled.12 application/vnd.ms-excel
+                                  application/vnd.oasis.opendocument.spreadsheet].freeze
       # The built-in presets the mock knows, by display name.
       PRESET_NAMES = { 'general-community' => 'General', 'children-platform' => 'Kids',
                        'education-support' => 'Learning and support', 'wholesome-community' => 'Teen-safe' }.freeze
@@ -282,6 +294,8 @@ module CalmLens
 
             invalid!(key == 'resource' ? 'validation/invalid-value' : 'validation/invalid-type', key)
           end
+          # Like the API, a signed URL is for one of the signed resources.
+          invalid!('validation/invalid-value', 'resource') unless CDN::SIGNED_RESOURCES.include?(json.fetch('resource', 'rendered'))
         else nil
         end
       end
@@ -376,6 +390,7 @@ module CalmLens
         in [_, ['policies', String => policy_id, *rest], _] then policy(method, policy_id, rest, json)
         in ['GET', ['assets'], _] then list(query)
         in ['GET', ['assets', 'search'], _] then search(query)
+        in ['GET', ['assets', String => asset_id, 'timeline'], _] then timeline(asset_id, query)
         in ['POST', ['assets', 'batch'], _] then batch(json)
         in ['POST', ['assets'], nil] then create_asset(json, query['queue'] == true, url: json['url'])
         in ['POST', ['assets'], 'content'] then create_asset(query, query['queue'] == true, data: body)
@@ -588,7 +603,10 @@ module CalmLens
                   'processingOptions' => processing, 'visibility' => options.fetch('visibility', 'private'),
                   **sections(now: now, open: open, keep: keep, format: mime, size: data&.bytesize) }
         @state.assets[asset['id']] = asset
-        @state.content[asset['id']] = { 'type' => mime, 'parts' => { 1 => data } } if data
+        if data
+          @state.content[asset['id']] = { 'type' => mime, 'parts' => { 1 => data } }
+          asset['content'].merge!(rendering(asset, false)) unless open
+        end
         open ? asset : upload_completed(asset, queue, data)
       end
 
@@ -596,15 +614,18 @@ module CalmLens
         {
           'content' => { 'status' => keep ? 'stored' : 'temporary', 'removalReason' => nil, 'updatedAt' => now,
                          'safetyHold' => nil, 'format' => format.empty? ? nil : format, 'extension' => nil,
-                         'sizeInBytes' => size, 'checksums' => nil, 'image' => nil, 'extractedText' => nil,
-                         'fileMetadata' => nil },
+                         # The mock decodes nothing, so the file's own details are unknown, and like
+                         # the API, the rendered file and preview come with processing.
+                         'sizeInBytes' => size, 'checksums' => nil, 'width' => nil, 'height' => nil,
+                         'durationSeconds' => nil, 'pageCount' => nil, 'perceptualHash' => nil,
+                         'perceptualHashQuality' => nil, 'metadata' => nil, 'extractedText' => nil, **NO_RENDERING },
           # Like the API, only an open upload counts the parts received.
           'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
           'classification' => { 'status' => open ? 'pending' : 'processing', 'failureReason' => nil, 'updatedAt' => now,
                                 # The mock never reads test inputs.
                                 'completedAt' => nil, 'progress' => nil, 'testInput' => false,
                                 'moderation' => { 'status' => 'pending', 'manualReviews' => [],
-                                                  'flaggedCategories' => [], 'regions' => [] } }
+                                                  'flaggedCategories' => [], 'regions' => [], 'timeline' => nil } }
         }
       end
 
@@ -732,28 +753,25 @@ module CalmLens
 
       # Moves an asset to an outcome like the pipeline would: a decision finishes processing, `purged`
       # deletes the content (with `purge_reason`, `policy` for the pipeline), and finished processing
-      # removes content kept only temporarily. A classified image gets a ThumbHash for its
-      # placeholder, which goes with its content. `report` is a decision's categories, score and policy.
+      # removes content kept only temporarily. A decided asset gets its rendered file and preview
+      # (with a ThumbHash for its placeholder), which go with its content. `report` is a decision's
+      # categories, score and policy.
       def apply_outcome(asset, outcome, purge_reason = 'policy', report = nil)
         processing, moderation = AssetRecord.statuses(outcome)
         now = @now.call
         decided = processing == 'completed'
         purge = moderation == 'purged' && asset['content']['status'] != 'removed'
         remove = purge || (decided && asset['content']['status'] == 'temporary')
-        image = asset['content']['image']
-        if decided && asset['type'] == 'image' && asset['content']['status'] != 'removed' && !purge
-          image = { 'width' => nil, 'height' => nil, 'perceptualHash' => nil }.merge(image || {})
-                                                                              .merge('thumbhash' => THUMBHASH,
-                                                                                     'averageColor' => image&.fetch('averageColor',
-                                                                                                                    nil) || '#7f7f7f')
-        elsif moderation == 'purged'
-          image = without_placeholder(image)
-        end
-        asset['content']['image'] = image
+        # Like the API, an asset whose content is held has its rendered file and preview, completed by
+        # its decision, and removing content (when processing finishes or by purging) removes them
+        # with it, so no placeholder outlives the content. A safety hold withholds them.
+        content = asset['content']
+        held = content['status'] != 'removed' && !purge && !content['safetyHold']
+        content.merge!(held ? rendering(asset, decided) : NO_RENDERING)
         if remove
           forget_content(asset)
-          asset['content'].merge!('status' => 'removed', 'removalReason' => purge ? purge_reason : 'retention', 'updatedAt' => now,
-                                  'extractedText' => nil, 'fileMetadata' => nil, 'image' => without_placeholder(image))
+          content.merge!('status' => 'removed', 'removalReason' => purge ? purge_reason : 'retention', 'updatedAt' => now,
+                         'extractedText' => nil, 'metadata' => nil, **NO_RENDERING)
         end
         asset['upload'].merge!('status' => 'completed', 'updatedAt' => now)
         update_classification(asset['classification'], processing, moderation, now)
@@ -775,8 +793,46 @@ module CalmLens
         item['context'] = nil
       end
 
-      # Removing content removes the placeholder and average colour with it.
-      def without_placeholder(image) = image&.merge('thumbhash' => nil, 'averageColor' => nil)
+      # Whether browsers play an audio or video upload's format as it is, so it is served as stored.
+      def browser_safe_media?(format) = BROWSER_SAFE_MEDIA_FORMATS.include?(mime_type(format))
+
+      # A MIME type without parameters, in lower case.
+      def mime_type(format) = format.to_s.downcase.split(';', 2).first.to_s.strip
+
+      # The rendered file and preview the API reports for an asset with its content held (Asset.ts,
+      # getAssetRendered and getAssetPreview). Once uploaded, an image renders as itself with a preview
+      # that has no ThumbHash yet, and a PDF and browser-safe audio and video render as uploaded. Once
+      # processed, a website renders as its screenshot; a document or presentation as a PDF, with its
+      # first page as the preview; video and audio as a browser-safe file (MP4 or M4A unless browsers
+      # play the upload), audio with a waveform preview and video with no poster; and every preview has
+      # its ThumbHash. Text, spreadsheets and other files have neither. The mock decodes nothing, so
+      # sizes are unknown and audio has no peaks.
+      def rendering(asset, processed)
+        format = asset['content']['format']
+        mime = mime_type(format)
+        safe = browser_safe_media?(format)
+        media = %w[video audio].include?(asset['type'])
+        return NO_RENDERING.dup unless processed || asset['type'] == 'image' || mime == 'application/pdf' || (media && safe)
+
+        unsized = { 'width' => nil, 'height' => nil }
+        preview = lambda do |size = unsized|
+          size.merge('thumbhash' => processed ? THUMBHASH : nil, 'averageColor' => processed ? '#7f7f7f' : nil)
+        end
+        case asset['type']
+        when 'image' then { 'rendered' => { 'kind' => 'image', 'format' => format || 'image/png', **unsized }, 'preview' => preview.call }
+        when 'website' then { 'rendered' => { 'kind' => 'image', 'format' => 'image/png', **unsized }, 'preview' => preview.call }
+        when 'multimedia-document'
+          return NO_RENDERING.dup if SPREADSHEET_MIME_TYPES.include?(mime)
+
+          { 'rendered' => { 'kind' => 'pdf', 'format' => 'application/pdf', **unsized }, 'preview' => processed ? preview.call : nil }
+        when 'video' then { 'rendered' => { 'kind' => 'video', 'format' => safe ? format : 'video/mp4', **unsized }, 'preview' => nil }
+        when 'audio'
+          rendered = { 'kind' => 'audio', 'format' => safe ? format : 'audio/mp4', **unsized }
+          rendered['peaks'] = [] if processed
+          { 'rendered' => rendered, 'preview' => processed ? preview.call(WAVEFORM_SIZE.dup) : nil }
+        else NO_RENDERING.dup
+        end
+      end
 
       def asset(method, parts, query, json, body)
         id = parts[1]
@@ -793,7 +849,6 @@ module CalmLens
           nil
         in ['DELETE', 'content'] then delete_content(item)
         in ['GET', 'children'] then page(project_assets.select { |child| child['parentId'] == id }, query, id)
-        in ['GET', 'timeline'] then timeline(item, query)
         in ['POST', 'retry'] then retry_asset(item)
         in ['POST', 'explain'] then explain(item, json['rerun'])
         in ['POST', 'decision'] then decide_request(item, json)
@@ -819,18 +874,18 @@ module CalmLens
         touch(item.merge!(json.except('id', 'projectId', 'upload', 'classification', 'content')))
       end
 
-      # Like the API: the record and report stay; stored content, extracted text and the placeholder
-      # go. Content already removed keeps its reason, and an `asset.content-removed` event is
+      # Like the API: the record and report stay; stored content, extracted text, metadata, the
+      # rendered file and the preview go. Content already removed keeps its reason, and an `asset.content-removed` event is
       # recorded either way.
       def delete_content(item)
         forget_content(item)
         content = item['content']
         if content['status'] == 'removed'
-          content['image'] = without_placeholder(content['image']) if content.dig('image', 'thumbhash')
+          content.merge!(NO_RENDERING)
         else
           now = @now.call
           content.merge!('status' => 'removed', 'removalReason' => 'requested', 'updatedAt' => now, 'extractedText' => nil,
-                         'fileMetadata' => nil, 'image' => without_placeholder(content['image']))
+                         'metadata' => nil, **NO_RENDERING)
           item['updatedAt'] = now
         end
         lifecycle_event('asset.content-removed', item)
@@ -1138,10 +1193,10 @@ module CalmLens
         if asset_id
           asset = @state.assets[asset_id]
           fail!(ErrorCodes::ASSET_NOT_FOUND) unless asset && asset['projectId'] == @project_id
-          image = asset.dig('content', 'image')
-          fail!(ErrorCodes::HASH_LIST_ASSET_NOT_HASHED) unless image.is_a?(Hash) && image['perceptualHash']
-          hash = image['perceptualHash']
-          quality = image['perceptualHashQuality']
+          content = asset['content']
+          fail!(ErrorCodes::HASH_LIST_ASSET_NOT_HASHED) unless content['perceptualHash']
+          hash = content['perceptualHash']
+          quality = content['perceptualHashQuality']
         end
         fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'Use a PDQ hash of 64 hexadecimal characters') unless hash.match?(/\A\h{64}\z/)
 
@@ -1164,20 +1219,17 @@ module CalmLens
         {}
       end
 
-      # An asset's findings timeline, a page at a time, as the API lists it: its report's segments in
-      # time order, with a cursor naming the next one's position.
-      def timeline(item, query)
+      # An asset's findings timeline, as the API lists it (publicGetAssetTimeline.ts): refused while a
+      # safety hold is on. The mock analyses no audio or video, so it keeps no segments: every
+      # timeline is empty, and no cursor continues one.
+      def timeline(id, query)
+        item = own_asset(id)
+        fail!(ErrorCodes::ASSET_NOT_FOUND) unless item
         size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
-        offset = 0
-        if query.key?('cursor')
-          match = query['cursor'].match(/\Atimeline:(\d+)\z/)
-          fail!(ErrorCodes::INVALID_CURSOR) unless match
-          offset = Integer(match[1], 10)
-        end
-        segments = item.dig('classification', 'moderation', 'raw', 'timeline', 'segments') || []
-        more = offset + size < segments.size
-        { 'items' => deep_copy(segments[offset, size] || []), 'nextCursor' => more ? "timeline:#{offset + size}" : nil,
-          'pageSize' => size, 'hasMore' => more, 'ordering' => [] }
+        fail!(ErrorCodes::ASSET_SAFETY_HELD) if item['content']['safetyHold']
+        fail!(ErrorCodes::INVALID_CURSOR) if query.key?('cursor')
+
+        { 'items' => [], 'nextCursor' => nil, 'pageSize' => size, 'hasMore' => false, 'ordering' => [] }
       end
 
       # The page size and ordering, refused like the API's query schema: each ordering entry's field
@@ -1261,79 +1313,121 @@ module CalmLens
         left.to_s <=> right.to_s
       end
 
-      # Answers like the CDN: a placeholder is the asset's ThumbHash as a PNG, public whatever
-      # the asset's visibility or moderation; other resources pass delivery checks first, which refuse
-      # everyone (content still uploading, blocked or purged, failed processing, removed content),
-      # then an age-restricted asset needs `viewerClaims.ageConfirmed=true` whatever the key, and a
-      # private asset needs an API key with `assets:download` for its folder.
+      # Answers like the CDN (serveAssetResource.ts): `original` is the upload; `rendered` the image,
+      # PDF, video or audio file `content.rendered` describes; `preview` the still `content.preview`
+      # describes; and `placeholder` its ThumbHash as a PNG, public whatever the asset's visibility or
+      # moderation. A safety hold refuses every resource. Other resources pass delivery checks first,
+      # which refuse everyone (content still uploading, blocked or purged, failed processing, removed
+      # content), then an age-restricted asset needs `viewerClaims.ageConfirmed=true` whatever the key,
+      # and a private asset needs an API key with `assets:download` for its folder. The mock converts
+      # nothing: an upload stands in for its rendered file, an image for its own preview, and the
+      # placeholder PNG for a screenshot, page or waveform.
       def serve(method, relative)
         path, query = relative.split('#', 2).first.split('?', 2)
         raw_segments = path.split('/').reject(&:empty?)
         _, project, identifier, resource = raw_segments.map { |part| URI.decode_www_form_component(part) }
-        # Like the CDN, the selector after the resource is read first, and lenses and transforms
-        # apply only to the rendered resource.
+        selector_path = raw_segments.drop(4)
+        # Like the CDN, `/rendered/stream` and `/rendered/player` are reserved, then the selector
+        # after the resource is read (AssetTransformParser.ts); the original takes none.
+        return no_rendered_version if resource == 'rendered' && RESERVED_RENDERED_PATHS.include?(selector_path.first)
+
         begin
-          lens, options = TransformRules.parse_selector(raw_segments.drop(4).join('/'))
+          lens, options = TransformRules.parse_selector(selector_path.join('/'))
         rescue ArgumentError
           return invalid_transform
         end
-        return invalid_transform if resource == 'original' && (lens || options)
+        selected = !(lens || options).nil?
+        return invalid_transform if resource == 'original' && selected
 
         item = project == @project_id && project_assets.find { |asset| [asset['id'], asset['externalId']].include?(identifier) }
         return error('asset/not-found', 'Asset not found', status: 404) unless item && RESOURCES.include?(resource)
+        return not_available if item['content']['safetyHold']
         return placeholder(method, item) if resource == 'placeholder'
 
-        deliver(method, item, URI.decode_www_form(query.to_s).to_h, options)
+        deliver(method, item, resource, URI.decode_www_form(query.to_s).to_h, selected ? options || {} : nil)
       end
 
-      # Serves a found asset's content after the delivery, age and access checks, then the
-      # transform options' schema check.
-      def deliver(method, item, params, options)
-        moderation = item['classification']['moderation']['status']
+      # Serves a found asset's resource after the delivery, age and access checks, then whether it
+      # has the resource and takes the selector, then the transform options' schema check.
+      # `selector` is the selector's options (empty for a lens alone), or nil without one.
+      def deliver(method, item, resource, params, selector)
         stored = @state.content[item['id']]
-        if stored.nil? || item['upload']['status'] == 'uploading' || %w[blocked purged].include?(moderation) ||
-           item['classification']['status'] == 'failed' || item['content']['status'] == 'removed'
-          return not_available
-        end
-
-        if moderation == 'age-restricted' && !viewer_age_confirmed?(params)
-          return error('viewer/age-confirmation-required', 'Age confirmation required',
-                       status: 403)
-        end
+        refused = refuse_delivery(item, resource, stored, params)
+        return refused if refused
 
         restricted = item['visibility'] != 'public'
-        if restricted && !can_download?(item['folderId'])
-          return error('asset/api-key-missing-permission',
-                       'This API key needs assets:download permission for this asset’s folder.', status: 403)
-        end
+        # Then whether the asset has the resource, and whether it is a still image that takes a lens
+        # or transform: the preview always is, the rendered file only when it is an image.
+        rendered, preview = item['content'].values_at('rendered', 'preview')
+        return no_rendered_version if (resource == 'rendered' && !rendered) || (resource == 'preview' && !preview)
 
-        refused = options ? TransformRules.check(options).flatten : []
+        still = resource == 'preview' || (resource == 'rendered' && rendered['kind'] == 'image')
+        return invalid_transform if !still && selector
+
+        refused = selector ? TransformRules.check(selector).flatten : []
         return error('asset/invalid-transform-options', "Invalid transform options: #{refused.join(', ')}", status: 400) if refused.any?
 
-        type = stored['type'].to_s.empty? ? 'application/octet-stream' : stored['type']
-        cdn_response(method, stored['parts'].sort.map(&:last).join.b,
-                     viewer_delivery_headers(item, type, restricted, params))
+        bytes, type = resource_body(item, resource, stored)
+        return not_available unless bytes
+
+        immutable = still || (resource == 'original' && item['type'] == 'image')
+        cdn_response(method, bytes, viewer_delivery_headers(item, type, restricted, immutable, params))
+      end
+
+      # The delivery checks, which refuse everyone, then age and access, as an error response, or nil.
+      # Only the original needs the upload still stored.
+      def refuse_delivery(item, resource, stored, params)
+        moderation = item['classification']['moderation']['status']
+        if (resource == 'original' && stored.nil?) || item['upload']['status'] == 'uploading' ||
+           %w[blocked purged].include?(moderation) || item['classification']['status'] == 'failed' ||
+           item['content']['status'] == 'removed'
+          return not_available
+        end
+        if moderation == 'age-restricted' && !viewer_age_confirmed?(params)
+          return error('viewer/age-confirmation-required', 'Age confirmation required', status: 403)
+        end
+        return if item['visibility'] == 'public' || can_download?(item['folderId'])
+
+        error('asset/api-key-missing-permission', 'This API key needs assets:download permission for this asset’s folder.', status: 403)
+      end
+
+      # A resource's bytes and Content-Type: the upload, which stands in for its own rendered file
+      # and an image's preview, or the placeholder PNG for a still the mock doesn't make. Nil bytes
+      # when the upload is no longer stored.
+      def resource_body(item, resource, stored)
+        rendered = item['content']['rendered']
+        serves_upload = resource == 'original' || (resource == 'rendered' && rendered['kind'] != 'image') || item['type'] == 'image'
+        return [Placeholder.png(item.dig('content', 'preview', 'thumbhash') || THUMBHASH), 'image/png'] unless serves_upload
+        return [nil, nil] unless stored
+
+        type = if resource == 'rendered' then rendered['format']
+               elsif stored['type'].to_s.empty? then 'application/octet-stream'
+               else stored['type']
+               end
+        [stored['parts'].sort.map(&:last).join.b, type]
       end
 
       def viewer_age_confirmed?(params)
         JSON.parse(params.fetch('viewerClaims', '{}'))['ageConfirmed'] == true
       end
 
-      def viewer_delivery_headers(item, type, restricted, params)
-        headers = delivery_headers(item, type, restricted)
+      def viewer_delivery_headers(item, type, restricted, immutable, params)
+        headers = delivery_headers(item, type, restricted, immutable)
         headers['Cache-Control'] = 'private, no-store' if params.key?('viewerClaims')
         headers
       end
 
       def invalid_transform = error('asset/invalid-transform', 'Invalid transform selector', status: 400)
 
+      def no_rendered_version = error('asset/no-rendered-version', 'This asset has no such resource', status: 404)
+
       def not_available = error('asset/not-available', 'Asset is not available', status: 403)
 
-      # Like the CDN's placeholder handler: an image's ThumbHash, public whatever the asset's
+      # Like the CDN's placeholder handler: the preview's ThumbHash, public whatever the asset's
       # visibility or moderation; refused for purged assets and assets without one (not yet
-      # classified, or content removed).
+      # processed, without a preview, or content removed).
       def placeholder(method, item)
-        thumbhash = item.dig('content', 'image', 'thumbhash')
+        thumbhash = item.dig('content', 'preview', 'thumbhash')
         return not_available if thumbhash.nil? || item['classification']['moderation']['status'] == 'purged'
 
         cdn_response(method, Placeholder.png(thumbhash),
@@ -1341,14 +1435,13 @@ module CalmLens
                      'cache-tag' => "asset-#{item['id']}", 'etag' => "\"#{thumbhash}\"")
       end
 
-      # Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
-      # by shared caches only when delivery is public. Active content is served as a download.
-      def delivery_headers(item, type, restricted)
-        image = item['type'] == 'image'
-        headers = { 'content-type' => type,
-                    'cache-control' => "#{restricted ? 'private' : 'public'}, #{image ? 'max-age=31536000, immutable' : 'max-age=3600'}",
+      # Like the CDN: a still image's bytes are immutable for a year, other content is kept for an
+      # hour, by shared caches only when delivery is public. Active content is served as a download.
+      def delivery_headers(item, type, restricted, immutable)
+        lifetime = immutable ? 'max-age=31536000, immutable' : 'max-age=3600'
+        headers = { 'content-type' => type, 'cache-control' => "#{restricted ? 'private' : 'public'}, #{lifetime}",
                     'cache-tag' => "asset-#{item['id']}" }
-        headers.merge!('etag' => "\"#{item['id']}\"", 'expires' => Time.at((@now.call / 1000) + 31_536_000).utc.httpdate) if image
+        headers.merge!('etag' => "\"#{item['id']}\"", 'expires' => Time.at((@now.call / 1000) + 31_536_000).utc.httpdate) if immutable
         headers.merge!('x-content-type-options' => 'nosniff', 'content-security-policy' => "sandbox; default-src 'none'")
         mime = type.downcase.split(';', 2).first.to_s.strip
         headers['content-disposition'] = 'attachment' if ACTIVE_TYPES.include?(mime) || mime.end_with?('+xml')

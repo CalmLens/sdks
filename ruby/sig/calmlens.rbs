@@ -239,6 +239,8 @@ module CalmLens
   end
 
   class CDN < Resource
+    # The CDN resources a signed URL can be created for.
+    SIGNED_RESOURCES: Array[signed_cdn_resource]
     def get_asset_url: (asset_url_options options) -> String
     def serve: (serve_options options) -> Response
              | [T] (serve_options options) { (Response) -> T } -> T

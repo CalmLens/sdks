@@ -20,7 +20,7 @@ class MockTest < Minitest::Test
 
   def test_cdn_serves_transformed_urls_and_signed_urls_carry_the_serialized_selector
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
-    asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
+    asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)
     transform = { width: 10, border: { color: '#fff' } }
     assert_equal 'hello', mock.cdn.serve(asset_identifier: asset['id'], transform: transform).body
     assert_equal "/assets/project-1/#{asset['id']}/rendered/border.color=fff,width=10", mock.requests.last.path
@@ -30,7 +30,7 @@ class MockTest < Minitest::Test
 
   def test_cdn_serve_passes_the_age_restricted_parameter_and_rejects_non_booleans
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
-    asset = mock.assets.classify(name: 'note.txt', content: { plain_text: 'hello', type: 'text/plain' }, processing_options: KEEP)
+    asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)
     served = mock.cdn.serve(asset_identifier: asset['id'], lens: 'thumb', viewer_claims: { age_confirmed: true })
     request = mock.requests.last
     assert_equal ["/assets/project-1/#{asset['id']}/rendered/@thumb", { 'viewerClaims' => '{"ageConfirmed":true}' }],
@@ -40,6 +40,36 @@ class MockTest < Minitest::Test
     assert_equal 'sdk/invalid-argument', error.code
   end
 
+  def test_decided_audio_renders_as_m4a_with_a_waveform_preview_until_its_content_is_removed
+    mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
+    asset = mock.assets.classify(name: 'take.wav', content: { data: 'hello', type: 'audio/wav' }, processing_options: KEEP)
+    assert_equal({ 'kind' => 'audio', 'format' => 'audio/mp4', 'width' => nil, 'height' => nil, 'peaks' => [] },
+                 asset.dig('content', 'rendered'))
+    assert_equal [1200, 300, '#7f7f7f'], asset.dig('content', 'preview').values_at('width', 'height', 'averageColor')
+    rendered = mock.cdn.serve(asset_identifier: asset['id'])
+    assert_equal [200, 'hello', 'audio/mp4'], [rendered.status, rendered.body, rendered.headers['content-type']]
+    preview = mock.cdn.serve(asset_identifier: asset['id'], resource: 'preview')
+    assert_equal [200, 'image/png'], [preview.status, preview.headers['content-type']]
+
+    removed = mock.assets.delete_content(asset_id: asset['id'])
+    assert_equal [nil, nil], removed['content'].values_at('rendered', 'preview')
+    assert_equal 'asset/not-available', JSON.parse(mock.cdn.serve(asset_identifier: asset['id'], resource: 'placeholder').body)['code']
+  end
+
+  def test_a_safety_hold_refuses_every_cdn_resource_and_the_timeline
+    mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
+    asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)
+    assert_equal 200, mock.cdn.serve(asset_identifier: asset['id'], resource: 'placeholder').status
+    mock.state.assets[asset['id']]['content']['safetyHold'] = { 'placedAt' => 1, 'reason' => 'suspected-illegal-content' }
+
+    %w[original rendered preview placeholder].each do |resource|
+      served = mock.cdn.serve(asset_identifier: asset['id'], resource: resource)
+      assert_equal [403, 'asset/not-available'], [served.status, JSON.parse(served.body)['code']], resource
+    end
+    error = assert_raises(CalmLens::APIError) { mock.assets.list_timeline(asset_id: asset['id']) }
+    assert_equal ['asset/safety-held', 423], [error.code, error.status]
+  end
+
   def test_hash_list_entries_take_an_assets_hash_and_go_with_their_list
     mock = CalmLens::MockServerClient.new
     list = mock.hash_lists.create(name: 'Removed images', action: 'flag')
@@ -47,7 +77,7 @@ class MockTest < Minitest::Test
     error = assert_raises(CalmLens::APIError) { mock.hash_lists.add_entry(hash_list_id: list['id'], asset_id: asset['id']) }
     assert_equal ['hash-list/asset-not-hashed', 409], [error.code, error.status]
 
-    mock.state.assets[asset['id']]['content']['image'] = { 'perceptualHash' => 'ab' * 32, 'perceptualHashQuality' => 80 }
+    mock.state.assets[asset['id']]['content'].merge!('perceptualHash' => 'ab' * 32, 'perceptualHashQuality' => 80)
     entry = mock.hash_lists.add_entry(hash_list_id: list['id'], asset_id: asset['id'], label: 'Report 1042')
     assert_equal ['ab' * 32, 80, asset['id'], 'Report 1042'], entry.values_at('hash', 'quality', 'sourceAssetId', 'label')
     again = mock.hash_lists.add_entry(hash_list_id: list['id'], hash: 'AB' * 32)

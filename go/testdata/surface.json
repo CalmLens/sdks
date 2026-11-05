@@ -180,7 +180,7 @@
     {
       "id": "assets.listTimeline",
       "kind": "method",
-      "description": "Get every segment of an audio or video asset's findings timeline, in time order. A long asset's report keeps a shortened timeline; this lists all of it",
+      "description": "Page through every segment of an audio or video asset's findings timeline, in time order. The asset's `classification.moderation.timeline.segmentCount` says how many there are. Lists nothing for other assets or while a copyright hold is on, and returns `asset/safety-held` while a safety hold is on",
       "names": {
         "javascript": "assets.listTimeline",
         "python": "assets.list_timeline",
@@ -994,6 +994,21 @@
         "java": "rendered",
         "ruby": "rendered",
         "php": "rendered"
+      }
+    },
+    {
+      "id": "cdn.resource.preview",
+      "kind": "cdn-resource",
+      "description": "The CDN's preview resource.",
+      "value": "preview",
+      "names": {
+        "javascript": "preview",
+        "python": "preview",
+        "go": "ResourcePreview",
+        "rust": "CdnResource::Preview",
+        "java": "preview",
+        "ruby": "preview",
+        "php": "preview"
       }
     },
     {

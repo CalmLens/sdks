@@ -8382,8 +8382,7 @@
             "result": {
               "content.status": "removed",
               "content.removalReason": "retention",
-              "content.image.thumbhash": null,
-              "content.image.averageColor": null
+              "content.preview": null
             },
             "httpStatus": 200
           }
@@ -8455,6 +8454,263 @@
             "cdn": {
               "status": 404,
               "code": "asset/not-found"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "each asset type's rendered file and preview, and the CDN serves only the resources an asset has",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "image.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "image",
+          "expect": {
+            "result": {
+              "content.rendered.kind": "image",
+              "content.rendered.format": "image/png"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "image.id"
+            },
+            "resource": "rendered",
+            "transform": "width=10"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "image.id"
+            },
+            "resource": "preview",
+            "transform": "width=10"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "clip.mp4",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "video/mp4"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "video",
+          "expect": {
+            "result": {
+              "content.rendered.kind": "video",
+              "content.rendered.format": "video/mp4",
+              "classification.moderation.timeline": null
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "video.id"
+            },
+            "resource": "rendered"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello",
+              "headers": {
+                "Content-Type": "video/mp4"
+              }
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "video.id"
+            },
+            "resource": "rendered",
+            "transform": "width=10"
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "video.id"
+            },
+            "resource": "rendered",
+            "transform": "stream"
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/no-rendered-version"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "song.mp3",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "audio/mpeg"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "expect": {
+            "result": {
+              "content.rendered.kind": "audio",
+              "content.rendered.format": "audio/mpeg"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "doc.pdf",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "application/pdf"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "pdf",
+          "expect": {
+            "result": {
+              "content.rendered.kind": "pdf",
+              "content.rendered.format": "application/pdf"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "pdf.id"
+            },
+            "resource": "rendered",
+            "transform": "width=10"
+          },
+          "expect": {
+            "cdn": {
+              "status": 400,
+              "code": "asset/invalid-transform"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "note",
+          "expect": {
+            "result": {
+              "content.rendered": null,
+              "content.preview": null
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "note.id"
+            },
+            "resource": "rendered"
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/no-rendered-version"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "note.id"
+            },
+            "resource": "preview"
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/no-rendered-version"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "note.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello"
             }
           }
         }

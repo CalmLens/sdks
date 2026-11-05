@@ -441,9 +441,17 @@ export const transformSelector = (transform: CdnTransform | undefined): string |
 
 export const DEFAULT_CDN_BASE_URL = `https://cdn.${DOMAIN}/v1`;
 
+/** The CDN resources a signed URL can be created for, as the API accepts them. */
+export const SIGNED_CDN_RESOURCES = ["original", "rendered", "preview"] as const;
+
 const CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
+  ...SIGNED_CDN_RESOURCES,
+  "placeholder",
+]);
+
+/** The resources that take no lens or transform: the exact upload and the public placeholder. */
+const UNSELECTABLE_CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
   "original",
-  "rendered",
   "placeholder",
 ]);
 
@@ -453,11 +461,6 @@ export const DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 15;
 /** The longest signed URL lifetime the API accepts: 24 hours. */
 const MAX_SIGNED_URL_SECONDS = 60 * 60 * 24;
 
-/**
- * Checks signed URL options as the API does: only the `original` and `rendered` resources are
- * signed (a placeholder needs no signature), lenses and transforms apply only to `rendered`, and
- * the lifetime is a whole number of seconds from 1 to 24 hours.
- */
 /** The most assets one `assets.batch` request takes. */
 export const ASSET_BATCH_MAX_ASSETS = 500;
 /** The operations `assets.batch` runs. */
@@ -476,6 +479,11 @@ export const validateBatchAssetsOptions = ({ assetIds, operation }: BatchAssetsO
   }
 };
 
+/**
+ * Checks signed URL options as the API does: the `original`, `rendered` and `preview` resources
+ * are signed (a placeholder needs no signature), the original takes no lens or transform, and the
+ * lifetime is a whole number of seconds from 1 to 24 hours.
+ */
 export const validateSignedUrlOptions = (options: {
   resource?: unknown;
   lens?: unknown;
@@ -483,11 +491,13 @@ export const validateSignedUrlOptions = (options: {
   expiresInSeconds?: unknown;
 }): void => {
   const { resource = "rendered", lens, transform, expiresInSeconds } = options;
-  if (resource !== "original" && resource !== "rendered") {
-    throw invalidArgument("A signed URL's resource must be original or rendered");
+  if (!(SIGNED_CDN_RESOURCES as readonly unknown[]).includes(resource)) {
+    throw invalidArgument(
+      `A signed URL's resource must be one of ${SIGNED_CDN_RESOURCES.join(", ")}`,
+    );
   }
   if (resource === "original" && (lens !== undefined || transform !== undefined)) {
-    throw invalidArgument("Lenses and transforms apply only to the rendered resource");
+    throw invalidArgument("The original resource takes no lens or transform");
   }
   if (
     expiresInSeconds !== undefined &&
@@ -503,10 +513,12 @@ export const validateSignedUrlOptions = (options: {
  * Builds an asset's CDN URL without a client: no API key and no request, so it works in browsers.
  * `CalmLensServerClient`'s `cdn.getAssetUrl` uses it too.
  *
- * `resource` is `rendered` (default), `original` or `placeholder`. Only `rendered` takes a lens or
- * transform, and it serves images in the best format the browser accepts. A
- * placeholder is a small blurred PNG that the CDN serves publicly for every asset whatever its
- * visibility or moderation status, without requiring age confirmation.
+ * `resource` is `rendered` (default: the displayable file, an image in the best format the browser
+ * accepts, a PDF, or browser-safe video or audio), `original` (the exact upload), `preview` (a
+ * still image for the asset) or `placeholder` (a small blurred PNG that the CDN serves publicly
+ * for every asset whatever its visibility or moderation status, without requiring age
+ * confirmation). Lenses and transforms apply to `preview`, and to `rendered` when it is an image;
+ * the CDN refuses them on rendered PDFs, video and audio with `asset/invalid-transform`.
  */
 export const getAssetUrl = ({
   projectId,
@@ -516,16 +528,13 @@ export const getAssetUrl = ({
   ...options
 }: GetAssetUrlOptions): string => {
   if (!CDN_RESOURCES.has(resource)) {
-    throw invalidArgument("resource must be original, rendered or placeholder");
-  }
-  if (resource === "original" && (options.lens !== undefined || options.transform !== undefined)) {
-    throw invalidArgument("Lenses and transforms apply only to the rendered resource");
+    throw invalidArgument(`resource must be one of ${[...CDN_RESOURCES].join(", ")}`);
   }
   if (
-    resource === "placeholder" &&
+    UNSELECTABLE_CDN_RESOURCES.has(resource) &&
     (options.lens !== undefined || options.transform !== undefined)
   ) {
-    throw invalidArgument("A placeholder takes no lens or transform");
+    throw invalidArgument(`The ${resource} resource takes no lens or transform`);
   }
   const url = `${cdnBaseUrl.replace(/\/+$/, "")}/assets/${encodePathSegment(projectId, "Project ID")}/${encodePathSegment(assetIdentifier, "Asset identifier")}/${resource}`;
   return appendCdnSelector(url, options);

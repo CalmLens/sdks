@@ -18,6 +18,7 @@ import {
   checkTransformOptions,
   isAcceptedUploadMimeType,
   parseTransformSelector,
+  SIGNED_CDN_RESOURCES,
 } from "../client/CalmLensUtils";
 import { validateAssetPayload } from "../contract/AssetPayload.js";
 import type { TypedEvent } from "../contract/Event.js";
@@ -33,6 +34,7 @@ import { placeholderHashToDataURL } from "../contract/PlaceholderHashDecode.js";
 import {
   getRejectedUploadMimeTypeError,
   MAX_IMAGE_UPLOAD_BYTES,
+  normalizeUploadMimeType,
 } from "../contract/SharedConstants.js";
 import { decodeUploadToken } from "../contract/UploadToken.js";
 import { isFileAccepted } from "../ui/UploadController";
@@ -230,8 +232,8 @@ const MAX_SEARCH_LIMIT = 20;
 const MAX_SEARCH_QUERY_LENGTH = 200;
 
 /**
- * The ThumbHash the mock gives every classified image, standing in for one computed from its
- * pixels. The `placeholder` resource serves it as a PNG, like the CDN.
+ * The ThumbHash the mock gives every processed asset's preview, standing in for one computed from
+ * its pixels. The `placeholder` resource serves it as a PNG, like the CDN.
  */
 const MOCK_THUMBHASH = "1QcSHQRnh493V4dIh4eXh1h4kJUI";
 
@@ -292,9 +294,107 @@ const assetNameFact = (asset: Asset) => ({
   url: `https://calmlens.com/go/asset/${asset.id}`,
 });
 
-/** Removing content removes the placeholder and average colour with it. */
-const withoutPlaceholder = (image: Asset["content"]["image"]) =>
-  image ? { ...image, thumbhash: null, averageColor: null } : image;
+/** Paths beneath `/rendered/` the CDN reserves for streaming and an embeddable player. */
+const RESERVED_RENDERED_PATHS = ["stream", "player"];
+
+/** A ThumbHash as the PNG the placeholder resource serves. */
+const mockPlaceholderPng = (thumbhash: string) =>
+  Uint8Array.from(atob(placeholderHashToDataURL(thumbhash).split(",", 2)[1]!), (char) =>
+    char.charCodeAt(0),
+  );
+
+/** Removing or withholding content removes its rendered file and preview, as the API does. */
+const NO_RENDERING = { rendered: null, preview: null } as const;
+
+/** The size of the waveform the API makes as an audio asset's preview. */
+const WAVEFORM_SIZE = { width: 1200, height: 300 } as const;
+
+/** Audio and video formats browsers play as uploaded, so the API serves them as stored (Asset.ts). */
+const BROWSER_SAFE_MEDIA_FORMATS: readonly string[] = [
+  "video/mp4",
+  "audio/mpeg",
+  "audio/aac",
+  "audio/mp4",
+  "audio/x-m4a",
+  "audio/ogg",
+];
+
+/** Spreadsheets, which have no rendered file or preview (Asset.ts). */
+const SPREADSHEET_MIME_TYPES: readonly string[] = [
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel.sheet.macroenabled.12",
+  "application/vnd.ms-excel",
+  "application/vnd.oasis.opendocument.spreadsheet",
+];
+
+/** Whether browsers play an audio or video upload's format as it is, so it is served as stored. */
+const isBrowserSafeMediaFormat = (format: string | null) =>
+  BROWSER_SAFE_MEDIA_FORMATS.includes(normalizeUploadMimeType(format ?? ""));
+
+/**
+ * The rendered file and preview the API reports for an asset with its content held (Asset.ts,
+ * getAssetRendered and getAssetPreview). Once uploaded, an image renders as itself with a preview
+ * that has no ThumbHash yet, and a PDF and browser-safe audio and video render as uploaded. Once
+ * processed, a website renders as its screenshot; a document or presentation as a PDF, with its
+ * first page as the preview; video and audio as a browser-safe file (MP4 or M4A unless browsers
+ * play the upload), audio with a waveform preview and video with no poster; and every preview has
+ * its ThumbHash. Text, spreadsheets and other files have neither. The mock decodes nothing, so
+ * sizes are unknown and audio has no peaks.
+ */
+const mockRendering = (
+  asset: Asset,
+  processed: boolean,
+): Pick<Asset["content"], "rendered" | "preview"> => {
+  const format = asset.content.format;
+  const mimeType = normalizeUploadMimeType(format ?? "");
+  const browserSafe = isBrowserSafeMediaFormat(format);
+  const preview = (size: { width: number | null; height: number | null }) => ({
+    ...size,
+    thumbhash: processed ? MOCK_THUMBHASH : null,
+    averageColor: processed ? "#7f7f7f" : null,
+  });
+  const unsized = { width: null, height: null };
+  const rendersOnUpload =
+    asset.type === "image" ||
+    mimeType === "application/pdf" ||
+    ((asset.type === "video" || asset.type === "audio") && browserSafe);
+  if (!processed && !rendersOnUpload) return NO_RENDERING;
+  switch (asset.type) {
+    case "image":
+      return {
+        rendered: { kind: "image", format: format ?? "image/png", ...unsized },
+        preview: preview(unsized),
+      };
+    case "website":
+      return {
+        rendered: { kind: "image", format: "image/png", ...unsized },
+        preview: preview(unsized),
+      };
+    case "multimedia-document":
+      if (SPREADSHEET_MIME_TYPES.includes(mimeType)) return NO_RENDERING;
+      return {
+        rendered: { kind: "pdf", format: "application/pdf", ...unsized },
+        preview: processed ? preview(unsized) : null,
+      };
+    case "video":
+      return {
+        rendered: { kind: "video", format: browserSafe ? format! : "video/mp4", ...unsized },
+        preview: null,
+      };
+    case "audio":
+      return {
+        rendered: {
+          kind: "audio",
+          format: browserSafe ? format! : "audio/mp4",
+          ...unsized,
+          ...(processed && { peaks: [] }),
+        },
+        preview: processed ? preview(WAVEFORM_SIZE) : null,
+      };
+    default:
+      return NO_RENDERING;
+  }
+};
 
 /** An asset's type from its content type, or `website` for a URL. */
 const inferAssetType = (contentType: string | undefined): AssetType => {
@@ -414,6 +514,9 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
         if (query.get("queue") === "true") return ["assets.create"];
         return isTextUpload(request) ? ["assets.classify", "text.classify"] : ["assets.classify"];
     }
+    if (segments[2] === "assets" && segments[4] === "timeline" && segments.length === 5) {
+      return ["assets.listTimeline"];
+    }
     if (segments[2] === "policies" && segments[3] !== undefined) {
       if (segments[4] === "preset") return ["policies.applyPreset"];
       if (segments[4] === "automatic-updates") return ["policies.setAutomaticUpdates"];
@@ -465,8 +568,6 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
       return ["assets.deleteContent"];
     case "children":
       return ["assets.listChildren", "assets.iterateChildren"];
-    case "timeline":
-      return ["assets.listTimeline"];
     case "signed-url":
       return ["assets.createSignedUrl"];
     case "part":
@@ -1017,19 +1118,28 @@ export class MockCalmLensApi {
         case "PUT policy":
           return [200, this.assignPolicy(this.json(request))];
       }
-      const [, , collection, policyId, policyAction, ...more] = segments;
-      if (collection === "policies" && policyId !== undefined && more.length === 0) {
-        switch (`${method} ${policyAction ?? ""}`) {
+      const [, , collection, itemId, itemAction, ...more] = segments;
+      if (
+        collection === "assets" &&
+        itemId !== undefined &&
+        itemAction === "timeline" &&
+        more.length === 0 &&
+        method === "GET"
+      ) {
+        return [200, await this.listTimeline(itemId, request.query)];
+      }
+      if (collection === "policies" && itemId !== undefined && more.length === 0) {
+        switch (`${method} ${itemAction ?? ""}`) {
           case "GET ":
-            return [200, this.toPolicy(this.findPolicy(policyId))];
+            return [200, this.toPolicy(this.findPolicy(itemId))];
           case "PATCH ":
-            return [200, this.updatePolicy(policyId, this.json(request))];
+            return [200, this.updatePolicy(itemId, this.json(request))];
           case "DELETE ":
-            return [200, this.deletePolicy(policyId)];
+            return [200, this.deletePolicy(itemId)];
           case "POST preset":
-            return [200, this.applyPolicyPreset(policyId, this.json(request))];
+            return [200, this.applyPolicyPreset(itemId, this.json(request))];
           case "PUT automatic-updates":
-            return [200, this.setPolicyAutomaticUpdates(policyId, this.json(request))];
+            return [200, this.setPolicyAutomaticUpdates(itemId, this.json(request))];
         }
       }
     }
@@ -1046,8 +1156,6 @@ export class MockCalmLensApi {
           return [200, await this.deleteAsset(id)];
         case "GET children":
           return [200, await this.listChildren(id, request.query)];
-        case "GET timeline":
-          return [200, await this.listTimeline(id, request.query)];
         case "POST part":
           return [200, await this.uploadPart(id, request)];
         case "POST signed-url":
@@ -1360,10 +1468,10 @@ export class MockCalmLensApi {
       });
     }
     if (assetId) {
-      const image = (await this.findOwnAsset(assetId)).content.image;
-      if (!image?.perceptualHash) throw fail(API_ERROR_CODES.HASH_LIST_ASSET_NOT_HASHED);
-      hash = image.perceptualHash;
-      quality = image.perceptualHashQuality ?? null;
+      const { content } = await this.findOwnAsset(assetId);
+      if (!content.perceptualHash) throw fail(API_ERROR_CODES.HASH_LIST_ASSET_NOT_HASHED);
+      hash = content.perceptualHash;
+      quality = content.perceptualHashQuality ?? null;
     }
     if (!/^[0-9a-f]{64}$/.test(hash!)) {
       throw fail(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, {
@@ -1513,26 +1621,18 @@ export class MockCalmLensApi {
   }
 
   /**
-   * An asset's findings timeline, a page at a time, as the API lists it: its report's segments in
-   * time order, with a cursor naming the next one's position.
+   * An asset's findings timeline, as the API lists it (publicGetAssetTimeline.ts): refused while a
+   * safety hold is on. The mock analyses no audio or video, so it keeps no segments: every
+   * timeline is empty, and no cursor continues one.
    */
   private async listTimeline(assetId: string, query: URLSearchParams) {
     const asset = await this.findOwnAsset(assetId);
     const pageSize = this.integer(query, "pageSize", DEFAULT_PAGE_SIZE);
     if (pageSize < 1) throw invalidField("validation/too-small", "pageSize");
     if (pageSize > 100) throw invalidField("validation/too-big", "pageSize");
-    const cursor = query.get("cursor");
-    const offset = cursor === null ? 0 : Number(/^timeline:(\d+)$/.exec(cursor)?.[1] ?? Number.NaN);
-    if (!Number.isSafeInteger(offset)) throw fail(API_ERROR_CODES.INVALID_CURSOR);
-    const segments = asset.classification.moderation.raw?.timeline?.segments ?? [];
-    const hasMore = offset + pageSize < segments.length;
-    return {
-      items: segments.slice(offset, offset + pageSize),
-      nextCursor: hasMore ? `timeline:${offset + pageSize}` : null,
-      pageSize,
-      hasMore,
-      ordering: [],
-    };
+    if (asset.content.safetyHold) throw fail(API_ERROR_CODES.ASSET_SAFETY_HELD);
+    if (query.get("cursor") !== null) throw fail(API_ERROR_CODES.INVALID_CURSOR);
+    return { items: [], nextCursor: null, pageSize, hasMore: false, ordering: [] };
   }
 
   private async updateAsset(assetId: string, body: Record<string, unknown>): Promise<Asset> {
@@ -1576,9 +1676,12 @@ export class MockCalmLensApi {
         );
       }
     }
+    const resource = (body.resource as string | undefined) ?? "rendered";
+    if (!(SIGNED_CDN_RESOURCES as readonly string[]).includes(resource)) {
+      throw invalidField("validation/invalid-value", "resource");
+    }
     const asset = await this.findOwnAsset(assetId);
     const expiresInSeconds = (body.expiresInSeconds as number | undefined) ?? 60 * 15;
-    const resource = (body.resource as string | undefined) ?? "rendered";
     // Like the API, the URL carries the viewer claims its signature covers.
     const selector =
       (body.lens ? `&lens=${encodeURIComponent(String(body.lens))}` : "") +
@@ -1688,10 +1791,10 @@ export class MockCalmLensApi {
     await this.imageStorage.deleteContent(asset.id);
     let removed = asset;
     if (asset.content.status === "removed") {
-      if (asset.content.image?.thumbhash) {
+      if (asset.content.rendered || asset.content.preview) {
         removed = await this.databaseStorage.updateAsset({
           ...asset,
-          content: { ...asset.content, image: withoutPlaceholder(asset.content.image) },
+          content: { ...asset.content, ...NO_RENDERING },
         });
       }
     } else {
@@ -1705,8 +1808,8 @@ export class MockCalmLensApi {
           removalReason: "requested",
           updatedAt: now,
           extractedText: null,
-          fileMetadata: null,
-          image: withoutPlaceholder(asset.content.image),
+          metadata: null,
+          ...NO_RENDERING,
         },
         updatedAt: now,
       });
@@ -1870,9 +1973,17 @@ export class MockCalmLensApi {
         extension: null,
         sizeInBytes: hasContent ? bytes.byteLength : null,
         checksums: null,
-        image: null,
+        // The mock decodes nothing, so the file's own details are unknown.
+        width: null,
+        height: null,
+        durationSeconds: null,
+        pageCount: null,
+        perceptualHash: null,
+        perceptualHashQuality: null,
+        metadata: null,
         extractedText: null,
-        fileMetadata: null,
+        // Like the API, the rendered file and preview come with processing.
+        ...NO_RENDERING,
       },
       upload: {
         status: isOpenUpload ? "uploading" : "completed",
@@ -1888,7 +1999,13 @@ export class MockCalmLensApi {
         // The mock never reads test inputs.
         progress: null,
         testInput: false,
-        moderation: { status: "pending", manualReviews: [], flaggedCategories: [], regions: [] },
+        moderation: {
+          status: "pending",
+          manualReviews: [],
+          flaggedCategories: [],
+          regions: [],
+          timeline: null,
+        },
       },
     } as Asset;
 
@@ -1907,6 +2024,7 @@ export class MockCalmLensApi {
     }
 
     if (isOpenUpload) return this.databaseStorage.createAsset(asset);
+    if (hasContent) asset.content = { ...asset.content, ...mockRendering(asset, false) };
     const decision = await this.decisionFor(asset, "upload", queue, hasContent ? bytes : null);
     const stored = await this.databaseStorage.createAsset(
       decision.status === "pending" ? asset : await this.decided(asset, decision),
@@ -2127,8 +2245,8 @@ export class MockCalmLensApi {
   /**
    * Moves an asset to `outcome` like the pipeline would: a decision finishes processing, `purged`
    * deletes the content (with `purgeReason`, `policy` for the pipeline), and finished processing
-   * removes content kept only temporarily (`keepContentAfterProcessing` off). A classified image
-   * gets a ThumbHash for its placeholder, which goes with purged content.
+   * removes content kept only temporarily (`keepContentAfterProcessing` off). A decided asset gets
+   * its rendered file and preview (with a ThumbHash for its placeholder), which go with its content.
    */
   private async applyOutcome(
     asset: Asset,
@@ -2147,23 +2265,13 @@ export class MockCalmLensApi {
     const removeContent =
       purge || (classificationStatus === "completed" && asset.content.status === "temporary");
     if (removeContent) await this.imageStorage.deleteContent(asset.id);
-    const classifiedImage =
-      decided && asset.type === "image" && asset.content.status !== "removed" && !purge;
-    // Like the API, removing content (when processing finishes or by purging) removes the
-    // ThumbHash and average colour with it, so no placeholder outlives the content.
-    const image = classifiedImage
-      ? {
-          width: null,
-          height: null,
-          perceptualHash: null,
-          perceptualHashQuality: null,
-          ...asset.content.image,
-          thumbhash: MOCK_THUMBHASH,
-          averageColor: asset.content.image?.averageColor ?? "#7f7f7f",
-        }
-      : outcome === "purged"
-        ? withoutPlaceholder(asset.content.image)
-        : asset.content.image;
+    // Like the API, an asset whose content is held has its rendered file and preview, completed by
+    // its decision, and removing content (when processing finishes or by purging) removes them
+    // with it, so no placeholder outlives the content. A safety hold withholds them.
+    const rendering =
+      asset.content.status !== "removed" && !purge && !asset.content.safetyHold
+        ? mockRendering(asset, decided)
+        : NO_RENDERING;
     return {
       ...asset,
       updatedAt: now,
@@ -2175,10 +2283,10 @@ export class MockCalmLensApi {
             removalReason: purge ? purgeReason : "retention",
             updatedAt: now,
             extractedText: null,
-            fileMetadata: null,
-            image: withoutPlaceholder(image),
+            metadata: null,
+            ...NO_RENDERING,
           }
-        : { ...asset.content, image },
+        : { ...asset.content, ...rendering },
       upload: { ...asset.upload, status: "completed", updatedAt: now },
       classification: {
         ...asset.classification,
@@ -2546,31 +2654,45 @@ export class MockCalmLensApi {
   // ---- CDN ---------------------------------------------------------------------------------
 
   /**
-   * Serves stored content like the CDN (`/assets/:projectId/:asset/:resource`): `200` with
+   * Serves an asset's resources like the CDN (`/assets/:projectId/:asset/:resource`): `200` with
    * `Content-Type`, `Content-Length`, `Cache-Control`, `Cache-Tag`, the CDN's protection headers
-   * and, for images, `ETag` and `Expires`; or a JSON error body with `404`/`403`. A
-   * `placeholder` is the asset's ThumbHash as a PNG.
+   * and, for still images, `ETag` and `Expires`; or a JSON error body with `400`, `403` or `404`.
+   * `original` is the upload; `rendered` the image, PDF, video or audio file `content.rendered`
+   * describes; `preview` the still `content.preview` describes; and `placeholder` its ThumbHash as a
+   * PNG. The mock converts nothing: an upload stands in for its rendered file, an image for its own
+   * preview, and the placeholder PNG for a screenshot, page, poster or waveform.
    */
   private async serveCdn(request: MockRequest): Promise<Response> {
     const { url, segments, query } = request;
     const [root, projectId, assetIdentifier, resource] = segments;
+    const selectorPath = request.rawSegments.slice(4);
     const notFound = () =>
       this.jsonResponse(404, { code: "asset/not-found", message: "Asset not found" }, url);
-    // Like the CDN, the selector after the resource is read first (AssetTransformParser.ts), and
-    // lenses and transforms apply only to the rendered resource.
+    const noRenderedVersion = () =>
+      this.jsonResponse(
+        404,
+        { code: "asset/no-rendered-version", message: "This asset has no such resource" },
+        url,
+      );
     const invalidTransform = () =>
       this.jsonResponse(
         400,
         { code: "asset/invalid-transform", message: "Invalid transform selector" },
         url,
       );
+    // Like the CDN (serveAssetResource.ts), `/rendered/stream` and `/rendered/player` are reserved,
+    // then the selector after the resource is read (AssetTransformParser.ts); the original takes none.
+    if (resource === "rendered" && RESERVED_RENDERED_PATHS.includes(selectorPath[0] ?? "")) {
+      return noRenderedVersion();
+    }
     let selector: ReturnType<typeof parseTransformSelector>;
     try {
-      selector = parseTransformSelector(request.rawSegments.slice(4).join("/"));
+      selector = parseTransformSelector(selectorPath.join("/"));
     } catch {
       return invalidTransform();
     }
-    if (resource === "original" && (selector.lens || selector.options)) return invalidTransform();
+    const hasSelector = Boolean(selector.lens || selector.options);
+    if (resource === "original" && hasSelector) return invalidTransform();
     if (root !== "assets" || projectId !== this.projectId || !assetIdentifier) return notFound();
     const assets = await this.databaseStorage.listAssets(this.projectId);
     const asset = assets.find(
@@ -2588,18 +2710,17 @@ export class MockCalmLensApi {
     const canDownload = () => permits(grants, "assets:download", asset.folderId ?? null, folders);
     const status = asset.classification.moderation.status;
     const isHead = request.method === "HEAD";
+    const { rendered, preview } = asset.content;
+    // Like the CDN, a safety hold refuses every resource.
+    if (asset.content.safetyHold) return notAvailable();
 
     if (resource === "placeholder") {
-      // Like the CDN's placeholder handler: an image's ThumbHash, public whatever the asset's
+      // Like the CDN's placeholder handler: the preview's ThumbHash, public whatever the asset's
       // visibility or moderation status; refused for purged assets and assets without one (not
-      // yet classified, or content removed).
-      const thumbhash = asset.content.image?.thumbhash;
+      // yet processed, without a preview, or content removed).
+      const thumbhash = preview?.thumbhash;
       if (!thumbhash || status === "purged") return notAvailable();
-      const png = Uint8Array.from(
-        atob(placeholderHashToDataURL(thumbhash).split(",", 2)[1]!),
-        (char) => char.charCodeAt(0),
-      );
-      return this.cdnResponse(isHead, png, url, {
+      return this.cdnResponse(isHead, mockPlaceholderPng(thumbhash), url, {
         "Content-Type": "image/png",
         "Cache-Control": "public, max-age=3600",
         "Cache-Tag": `asset-${asset.id}`,
@@ -2616,7 +2737,7 @@ export class MockCalmLensApi {
       status === "blocked" ||
       asset.classification.status === "failed" ||
       asset.content.status === "removed" ||
-      !storedContent
+      (resource === "original" && !storedContent)
     ) {
       return notAvailable();
     }
@@ -2644,6 +2765,15 @@ export class MockCalmLensApi {
       );
     }
 
+    // Then whether the asset has the resource, and whether it is a still image that takes a lens
+    // or transform: the preview always is, the rendered file only when it is an image.
+    if ((resource === "rendered" && !rendered) || (resource === "preview" && !preview)) {
+      return noRenderedVersion();
+    }
+    const stillImage =
+      resource === "preview" || (resource === "rendered" && rendered?.kind === "image");
+    if (!stillImage && hasSelector) return invalidTransform();
+
     // Then the options, checked against the transform schema once the asset may be served.
     if (selector.options) {
       const { unknownKeys, invalidKeys } = checkTransformOptions(selector.options);
@@ -2659,28 +2789,45 @@ export class MockCalmLensApi {
       }
     }
 
-    const parts = [...storedContent.parts.entries()]
-      .sort(([left], [right]) => left - right)
-      .map(([, value]) => value);
-    const bytes = new Uint8Array(parts.reduce((sum, value) => sum + value.byteLength, 0));
-    let offset = 0;
-    for (const part of parts) {
-      bytes.set(part, offset);
-      offset += part.byteLength;
+    // The bytes: the upload, which stands in for its own rendered file and an image's preview,
+    // or the placeholder PNG for a still the mock doesn't make.
+    const servesUpload =
+      resource === "original" ||
+      (resource === "rendered" && rendered?.kind !== "image") ||
+      asset.type === "image";
+    let bytes: Uint8Array<ArrayBuffer>;
+    let contentType: string;
+    if (servesUpload) {
+      if (!storedContent) return notAvailable();
+      const parts = [...storedContent.parts.entries()]
+        .sort(([left], [right]) => left - right)
+        .map(([, value]) => value);
+      bytes = new Uint8Array(parts.reduce((sum, value) => sum + value.byteLength, 0));
+      let offset = 0;
+      for (const part of parts) {
+        bytes.set(part, offset);
+        offset += part.byteLength;
+      }
+      contentType =
+        resource === "rendered" && rendered
+          ? rendered.format
+          : (storedContent.type ?? "application/octet-stream");
+    } else {
+      bytes = mockPlaceholderPng(preview?.thumbhash ?? MOCK_THUMBHASH);
+      contentType = "image/png";
     }
-    const contentType = storedContent.type ?? "application/octet-stream";
-    const isImage = asset.type === "image";
+    const immutable = stillImage || (resource === "original" && asset.type === "image");
     return this.cdnResponse(isHead, bytes, url, {
       "Content-Type": contentType,
-      // Like the CDN: an image's bytes are immutable for a year, other content is kept for
+      // Like the CDN: a still image's bytes are immutable for a year, other content is kept for
       // an hour, publicly only when delivery is public.
       "Cache-Control": Object.keys(claims).length
         ? "private, no-store"
         : `${isPrivate ? "private" : "public"}, ${
-            isImage ? "max-age=31536000, immutable" : "max-age=3600"
+            immutable ? "max-age=31536000, immutable" : "max-age=3600"
           }`,
       "Cache-Tag": `asset-${asset.id}`,
-      ...(isImage
+      ...(immutable
         ? {
             ETag: `"${asset.id}"`,
             Expires: new Date(this.now() + 31536000 * 1000).toUTCString(),

@@ -5,7 +5,11 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { plugin } from "bun";
 
-GlobalRegistrator.register({ url: "http://localhost/" });
+// Frames stay empty: happy-dom would otherwise fetch an embedded PDF's URL over the network.
+GlobalRegistrator.register({
+  url: "http://localhost/",
+  settings: { navigation: { disableChildFrameNavigation: true } },
+});
 
 // Waits for DOM changes allow for a busy machine, so a slow render isn't reported as a failure.
 const { configure } = await import("@testing-library/dom");

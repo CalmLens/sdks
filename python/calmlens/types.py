@@ -38,10 +38,10 @@ __all__ = [
     "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage",
+    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetPreview", "AssetModerationTimeline", "SignedCdnResource",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensType",
-    "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions", "MediaClassificationReport",
+    "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions",
     "MediaClassificationSegment", "MediaSegmentSource", "MetadataItem", "ClassifyTextOptions", "ModerationAction",
     "ModerationQualifier", "MoveAssetOptions", "MoveFolderOptions", "NotEvaluatedCategoryResult",
     "NotEvaluatedFeatureResult", "NotEvaluatedQualifierResult", "NotEvaluatedReason", "OcrFeatureOptions",
@@ -110,11 +110,16 @@ MediaSegmentSource = Union[Literal["frame", "speech", "frame-text", "clip"], str
 ProcessingFeatureStage = Union[Literal["beta", "ga"], str]
 #: Asset type a lens applies to (request values).
 LensType = Literal["image", "video", "audio", "document", "website"]
-#: Which CDN resource of an asset to address. ``rendered`` (the default) is the asset rendered through
-#: a lens or transform; ``original`` is the original file and takes no lens or transform.
-#: ``placeholder`` is a small blurred PNG, served publicly for every asset whatever its visibility or moderation status;
-#: it takes no lens or transform, and needs no age confirmation.
-CdnResource = Literal["original", "rendered", "placeholder"]
+#: The CDN resources a signed URL can be created for: ``original`` (the exact upload), ``rendered``
+#: (the displayable file: an image in the best format the client accepts, a PDF, or browser-safe
+#: video or audio) or ``preview`` (a still image that stands for the asset).
+SignedCdnResource = Literal["original", "rendered", "preview"]
+#: Which CDN resource of an asset to address: a signed resource, or ``placeholder``, a small blurred
+#: PNG made from the preview that is served publicly for every asset whatever its visibility or
+#: moderation status, without age confirmation. Defaults to ``rendered``. Lenses and transforms
+#: apply to ``preview``, and to ``rendered`` when it is an image; the CDN refuses them on other
+#: resources with ``asset/invalid-transform``.
+CdnResource = Literal["original", "rendered", "preview", "placeholder"]
 #: How ``assets.search`` matches.
 SearchMode = Literal["keyword", "semantic", "hybrid"]
 #: Fields a search result matched on. New fields may be added.
@@ -254,7 +259,7 @@ class ProcessingOptions(TypedDict, total=False):
     keepContentAfterProcessing: Optional[bool]
     #: Overrides the project's ``storeSensitiveMetadata`` setting for this upload. When false,
     #: embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
-    #: and ``fileMetadata`` leaves out the creator and location. When true, the image is stored as
+    #: and ``content.metadata`` leaves out the creator and location. When true, the image is stored as
     #: uploaded.
     storeSensitiveMetadata: Optional[bool]
     features: Optional[ProcessingFeatures]
@@ -337,20 +342,6 @@ class MediaClassificationSegment(TypedDict):
     startSeconds: float
     endSeconds: float
     categories: ClassificationCategories
-
-
-class _MediaClassificationReportRequired(TypedDict):
-    durationSeconds: float
-    sampledFrames: int
-    audioTranscribed: bool
-    segments: list[MediaClassificationSegment]
-
-
-class MediaClassificationReport(_MediaClassificationReportRequired, total=False):
-    frameIntervalSeconds: float
-    #: How many segments the full timeline holds, when ``segments`` is shortened; list them all
-    #: with ``assets.list_timeline``.
-    segmentCount: int
 
 
 #: One stretch of an audio or video asset's findings: its source, times and scores.
@@ -623,20 +614,41 @@ class Checksums(TypedDict, total=False):
     sha512: Optional[str]
 
 
-class AssetImage(TypedDict):
-    """The picture CalmLens serves at the rendered resource: the original for image assets, or a
-    generated image for documents and websites. It remains after the content is removed, so check
-    the content ``status`` before loading it; ``thumbhash`` and ``averageColor`` are ``None`` then.
-    Width and height are the original's for image assets (a converted HEIC is served smaller at the
-    same aspect ratio)."""
+#: What the rendered resource serves: an ``image`` (images, and a website's screenshot), a ``pdf``
+#: (PDFs, and documents and presentations converted to PDF), or browser-safe ``video`` or ``audio``.
+AssetRenderedKind = Literal["image", "pdf", "video", "audio"]
+
+
+class _AssetRenderedRequired(TypedDict):
+    kind: AssetRenderedKind
+    #: MIME type of the rendered file. An image is served in the best format the client accepts,
+    #: such as AVIF or WebP, unless a transform sets one.
+    format: str
+    #: Width in pixels of the full view, for images and video, before any transform; ``None`` when
+    #: unknown or for PDFs and audio.
     width: Optional[int]
     height: Optional[int]
+
+
+class AssetRendered(_AssetRenderedRequired, total=False):
+    """The displayable file of the asset, served at the ``rendered`` resource."""
+    #: Audio only, once processing has measured them: up to 512 loudness peaks from 0 to 1, evenly
+    #: spaced over the audio, for drawing a waveform.
+    peaks: list[float]
+
+
+class AssetPreview(TypedDict):
+    """A still image for the asset, served at the ``preview`` resource: the image itself, a
+    document's first page or slide, a website's first screen, a video's poster frame or an audio
+    waveform."""
+    #: Width in pixels of the source still image, before the preview is sized or transformed.
+    width: Optional[int]
+    height: Optional[int]
+    #: ThumbHash placeholder you can render while any view of the asset loads (also served as a PNG
+    #: at the ``placeholder`` resource).
     thumbhash: Optional[str]
+    #: Average color of the source still image.
     averageColor: Optional[str]
-    perceptualHash: Optional[str]
-    #: How much detail ``perceptualHash`` captured, from 0 to 100. Hashes below 50 come from flat or
-    #: featureless images and are never matched.
-    perceptualHashQuality: Optional[int]
 
 
 class _SafetyHoldRequired(TypedDict):
@@ -733,11 +745,20 @@ class HashMatch(TypedDict):
     action: Union[HashListAction, str]
 
 
+class AssetModerationTimeline(TypedDict):
+    """Summary of an audio or video asset's findings timeline."""
+    #: How many segments the timeline holds; page through them with ``assets.list_timeline``.
+    segmentCount: int
+
+
 class _AssetModerationRequired(TypedDict):
     manualReviews: List[AssetReview]
     status: AssetModerationStatus
     flaggedCategories: List[str]
     regions: List[RegionalDecision]
+    #: For audio and video, a summary of the findings timeline; ``None`` for other assets, before
+    #: there are findings and while a safety or copyright hold withholds the content.
+    timeline: Optional[AssetModerationTimeline]
 
 class TestRegionalAction(TypedDict):
     region: str
@@ -749,7 +770,6 @@ class _ModerationRawRequired(TypedDict):
 
 
 class ModerationRaw(_ModerationRawRequired, total=False):
-    timeline: MediaClassificationReport
     hashMatches: List[HashMatch]
 
 
@@ -815,12 +835,32 @@ class AssetContent(TypedDict):
     extension: Optional[str]
     sizeInBytes: Optional[int]
     checksums: Optional[Checksums]
-    image: Optional[AssetImage]
-    extractedText: Optional[ExtractedText]
+    #: Width in pixels of the uploaded image or video; ``None`` when unknown, for other types and
+    #: while the asset is held.
+    width: Optional[int]
+    height: Optional[int]
+    #: Length in seconds of audio and video once analysed; otherwise ``None``.
+    durationSeconds: Optional[float]
+    #: Number of pages or slides of a document or presentation, when known.
+    pageCount: Optional[int]
+    #: PDQ perceptual hash of an image asset, as 64 hexadecimal characters; ``None`` while held.
+    perceptualHash: Optional[str]
+    #: How much detail ``perceptualHash`` captured, from 0 to 100. Hashes below 50 come from flat or
+    #: featureless images and match unrelated pictures, so leave them out of comparisons.
+    perceptualHashQuality: Optional[int]
     #: Metadata embedded in an uploaded image, such as its capture time, camera and software.
     #: Read-only and separate from the asset's own ``metadata``; ``None`` when the image declares
     #: none, for other asset types, once the content is removed and while the asset is held.
-    fileMetadata: Optional[FileMetadata]
+    metadata: Optional[FileMetadata]
+    extractedText: Optional[ExtractedText]
+    #: The displayable file, served at the ``rendered`` resource: an image, a PDF, or browser-safe
+    #: video or audio. ``None`` when the asset has none, once the content is removed and while the
+    #: asset is held.
+    rendered: Optional[AssetRendered]
+    #: A still image for the asset, served at the ``preview`` resource (and its blurred placeholder
+    #: at ``placeholder``). ``None`` when the asset has none, once the content is removed and while
+    #: the asset is held.
+    preview: Optional[AssetPreview]
 
 
 class _AssetRequired(TypedDict):
@@ -1508,7 +1548,7 @@ class UpdateAssetOptions(AssetIdOptions, total=False):
 class SignedUrlOptions(AssetIdOptions, total=False):
     viewerClaims: ViewerClaims
     #: Defaults to ``rendered`` on the server. ``original`` takes no lens or transform.
-    resource: Literal["original", "rendered"]
+    resource: SignedCdnResource
     expiresInSeconds: int
     lens: str
     transform: CdnTransform

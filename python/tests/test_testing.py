@@ -44,8 +44,8 @@ class MockTests(unittest.TestCase):
         c.transport = recording
         hashed = c.assets.classify(name="a.png", content={"data": b"png", "type": "image/png"})
         unhashed = c.assets.classify(name="b.png", content={"data": b"png", "type": "image/png"})
-        c.database_storage.assets[hashed["id"]]["content"]["image"].update(perceptualHash="ab" * 32,
-                                                                            perceptualHashQuality=87)
+        c.database_storage.assets[hashed["id"]]["content"].update(perceptualHash="ab" * 32,
+                                                                   perceptualHashQuality=87)
         hash_list = c.hash_lists.create(name="Removed", action="block")
         added = c.hash_lists.add_entry(hash_list_id=hash_list["id"], asset_id=hashed["id"], label="Report 1")
         self.assertEqual((statuses[-1], added["hash"], added["quality"], added["sourceAssetId"], added["label"]),
@@ -71,6 +71,47 @@ class MockTests(unittest.TestCase):
         with self.assertRaises(CalmLensAPIError) as raised:
             c.hash_lists.remove_entry(entry_id=added["id"])
         self.assertEqual(raised.exception.code, error_codes.HASH_LIST_ENTRY_NOT_FOUND)
+
+    def test_previews_get_their_thumbhash_at_decision_and_media_renders_as_processing_makes_it(self):
+        c = MockCalmLensServerClient()
+        keep = {"keepContentAfterProcessing": True}
+        image = c.assets.create(name="a.png", content={"data": b"png", "type": "image/png"}, processing_options=keep)
+        self.assertEqual((image["content"]["rendered"], image["content"]["preview"]),
+                         ({"kind": "image", "format": "image/png", "width": None, "height": None},
+                          {"width": None, "height": None, "thumbhash": None, "averageColor": None}))
+        decided = c.complete_processing(image["id"])
+        self.assertEqual((decided["content"]["preview"]["thumbhash"] is not None,
+                          decided["content"]["preview"]["averageColor"]), (True, "#7f7f7f"))
+        audio = c.assets.create(name="a.wav", content={"data": b"wav", "type": "audio/wav"}, processing_options=keep,
+                                visibility="public")
+        self.assertEqual((audio["content"]["rendered"], audio["content"]["preview"]), (None, None))
+        audio = c.complete_processing(audio["id"])
+        self.assertEqual((audio["content"]["rendered"]["format"], audio["content"]["rendered"]["peaks"],
+                          audio["content"]["preview"]["width"], audio["content"]["preview"]["height"]),
+                         ("audio/mp4", [], 1200, 300))
+        with c.cdn.serve(asset_identifier=audio["id"], resource="rendered") as rendered:
+            self.assertEqual((rendered.status, rendered.content_type, rendered.read()), (200, "audio/mp4", b"wav"))
+        with c.cdn.serve(asset_identifier=audio["id"], resource="preview", transform={"width": 10}) as preview:
+            self.assertEqual((preview.status, preview.content_type), (200, "image/png"))
+        removed = c.assets.delete_content(asset_id=image["id"])
+        self.assertEqual((removed["content"]["rendered"], removed["content"]["preview"], removed["content"]["metadata"]),
+                         (None, None, None))
+
+    def test_a_safety_hold_withholds_every_resource_and_the_timeline(self):
+        c = MockCalmLensServerClient()
+        asset = c.assets.classify(name="a.png", content={"data": b"png", "type": "image/png"},
+                                  processing_options={"keepContentAfterProcessing": True}, visibility="public")
+        with self.assertRaises(CalmLensAPIError) as raised:
+            c.assets.list_timeline(asset_id=asset["id"], cursor="anything")
+        self.assertEqual(raised.exception.code, error_codes.INVALID_CURSOR)
+        c.database_storage.assets[asset["id"]]["content"]["safetyHold"] = {"placedAt": 1, "reason": "suspected-illegal-content"}
+        with self.assertRaises(CalmLensAPIError) as raised:
+            c.assets.list_timeline(asset_id=asset["id"])
+        self.assertEqual(raised.exception.code, error_codes.ASSET_SAFETY_HELD)
+        for resource in ("original", "rendered", "preview", "placeholder"):
+            with c.cdn.serve(asset_identifier=asset["id"], resource=resource) as response:
+                self.assertEqual((resource, response.status, json.loads(response.read())["code"]),
+                                 (resource, 403, "asset/not-available"))
 
     def test_unknown_mock_options_and_a_moderate_that_is_not_a_function_are_configuration_errors(self):
         for options in ({"moderate": "blocked"}, {"queued_outcome": "pending"}):
@@ -133,10 +174,11 @@ class MockTests(unittest.TestCase):
                 self.assertEqual(body["details"], {"mimeType": mime_type})
                 self.assertEqual(self.client.database_storage.assets, {})
 
-    def test_refuses_null_for_fields_the_api_refuses_null_for_before_the_asset_lookup(self):
+    def test_refuses_null_and_unsigned_resources_where_the_api_does_before_the_asset_lookup(self):
         # The client leaves these out, so the requests go straight to the mock's transport.
         cases = [("POST", "signed-url", {"viewerClaims": None}, "validation/invalid-type", "viewerClaims"),
                  ("POST", "signed-url", {"resource": None}, "validation/invalid-value", "resource"),
+                 ("POST", "signed-url", {"resource": "placeholder"}, "validation/invalid-value", "resource"),
                  ("POST", "signed-url", {"expiresInSeconds": None}, "validation/invalid-type", "expiresInSeconds"),
                  ("PATCH", "", {"name": None}, "validation/invalid-type", "name")]
         for method, suffix, body, code, path in cases:

@@ -15,7 +15,7 @@ failure = asset['classification']['failureReason']
 reviews = asset['classification']['moderation']['manualReviews'].map { |review| [review['decision'], review['reviewerName']] }
 removal = asset['content']['removalReason']
 format = asset['content']['format']
-camera = asset['content']['fileMetadata']&.[]('cameraModel')
+camera = asset['content']['metadata']&.[]('cameraModel')
 sexual = asset.dig('moderation', 'report', 'categories', 'sexual')
 score = sexual && sexual['status'] == 'evaluated' ? sexual['score'] : nil
 faces = asset.dig('classification', 'faceDetection', 'faces') || []

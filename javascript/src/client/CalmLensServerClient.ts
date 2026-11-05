@@ -391,12 +391,13 @@ export default class CalmLensServerClient {
       },
 
       /**
-       * Lists one page of an audio or video asset's findings timeline, in time order. A long
-       * asset's report keeps a shortened timeline; this lists every segment.
+       * Lists one page of an audio or video asset's findings timeline, in time order.
+       * `classification.moderation.timeline.segmentCount` says how many segments there are.
        */
       listTimeline: async (options: ListAssetTimelineOptions): Promise<AssetTimelinePage> => {
         const { assetId, ...query } = checked("assets.listTimeline", options);
-        return this.request("GET", `/assets/${requireId(assetId, "Asset ID")}/timeline`, {
+        const assetPath = `${this.projectPath}/assets/${requireId(assetId, "Asset ID")}`;
+        return this.request("GET", `${assetPath}/timeline`, {
           query,
         });
       },

@@ -64,6 +64,7 @@ var surfaceConstants = map[string]string{
 	"ResourceOriginal":               calmlens.ResourceOriginal,
 	"ResourceRendered":               calmlens.ResourceRendered,
 	"ResourcePlaceholder":            calmlens.ResourcePlaceholder,
+	"ResourcePreview":                calmlens.ResourcePreview,
 }
 
 var surfaceTypes = map[string]reflect.Type{

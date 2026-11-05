@@ -1121,10 +1121,13 @@ impl AssetsClient<'_> {
     pub async fn list_children(&self, options: ListChildren) -> Result<AssetPage> {
         self.0.children_page(&options).await
     }
-    /// One page of an audio or video asset's findings timeline, in time order. A long asset's
-    /// report keeps a shortened timeline; this lists every segment.
+    /// One page of an audio or video asset's findings timeline, in time order, in the client's
+    /// project. `classification.moderation.timeline.segment_count` says how many segments there
+    /// are; pass each page's `next_cursor` back unchanged, as cursors are opaque.
     pub async fn list_timeline(&self, options: ListTimeline) -> Result<AssetTimelinePage> {
-        let path = format!("/assets/{}/timeline", id(&options.asset_id)?);
+        let path = self
+            .0
+            .project_path(&format!("assets/{}/timeline", id(&options.asset_id)?))?;
         let mut query = Query::default();
         query.opt("cursor", options.cursor.as_deref());
         query.opt("pageSize", options.page_size);
@@ -1268,24 +1271,24 @@ impl AssetsClient<'_> {
         let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
         self.0.call(request).await
     }
-    /// Creates a signed URL for an asset's rendered (the API's default) or original resource
-    /// (15 minutes by default).
+    /// Creates a signed URL for an asset's rendered (the API's default), original or preview
+    /// resource (15 minutes by default). The original takes no lens or transform.
     pub async fn create_signed_url(&self, options: SignedUrlOptions) -> Result<SignedUrl> {
         let path = format!("/assets/{}/signed-url", id(&options.asset_id)?);
-        match &options.resource {
-            None | Some(SignedUrlResource::Rendered) => {}
-            Some(SignedUrlResource::Original) => {
-                if options.lens.is_some() || options.transform.is_some() {
-                    return Err(invalid_argument(
-                        "Lenses and transforms apply only to the rendered resource",
-                    ));
-                }
-            }
-            Some(_) => {
-                return Err(invalid_argument(
-                    "A signed URL's resource must be original or rendered",
-                ))
-            }
+        let resource = options
+            .resource
+            .as_ref()
+            .map_or("rendered", SignedUrlResource::as_str);
+        if !SIGNED_CDN_RESOURCES.contains(&resource) {
+            return Err(invalid_argument(format!(
+                "A signed URL's resource must be one of {}",
+                SIGNED_CDN_RESOURCES.join(", ")
+            )));
+        }
+        if resource == "original" && (options.lens.is_some() || options.transform.is_some()) {
+            return Err(invalid_argument(
+                "The original resource takes no lens or transform",
+            ));
         }
         if options
             .expires_in_seconds
@@ -1726,27 +1729,28 @@ impl TextClient<'_> {
 #[derive(Debug, Clone, Copy)]
 pub struct CdnClient<'a>(&'a ServerClient);
 impl CdnClient<'_> {
-    /// The CDN URL of an asset's rendered (default), original or placeholder resource, with
-    /// serialized viewer assertions from [`CdnRequest::viewer_claims`]. Only the
-    /// rendered resource takes a lens or transform.
+    /// The CDN URL of an asset's rendered (default), original, preview or placeholder resource,
+    /// with serialized viewer assertions from [`CdnRequest::viewer_claims`]. The original and the
+    /// placeholder take no lens or transform. Lenses and transforms apply to the preview, and to
+    /// the rendered resource when it is an image; the CDN refuses them on rendered PDFs, video and
+    /// audio with `asset/invalid-transform`.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
         let resource = options
             .resource
             .as_ref()
             .map_or("rendered", |value| value.as_str());
-        if !["original", "rendered", "placeholder"].contains(&resource) {
-            return Err(invalid_argument(
-                "Resource must be original, rendered or placeholder",
-            ));
+        if !SIGNED_CDN_RESOURCES.contains(&resource) && resource != "placeholder" {
+            return Err(invalid_argument(format!(
+                "Resource must be one of {}, placeholder",
+                SIGNED_CDN_RESOURCES.join(", ")
+            )));
         }
-        let transformed = options.lens.is_some() || options.transform.is_some();
-        if resource == "original" && transformed {
-            return Err(invalid_argument(
-                "Lenses and transforms apply only to the rendered resource",
-            ));
-        }
-        if resource == "placeholder" && transformed {
-            return Err(invalid_argument("A placeholder takes no lens or transform"));
+        if ["original", "placeholder"].contains(&resource)
+            && (options.lens.is_some() || options.transform.is_some())
+        {
+            return Err(invalid_argument(format!(
+                "The {resource} resource takes no lens or transform"
+            )));
         }
         let config = &self.0.inner.config;
         let mut url = format!(

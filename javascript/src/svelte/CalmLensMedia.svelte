@@ -1,12 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { renderFileIconSvg } from "../file-icons.js";
   import {
     getMediaAspectRatio,
     getMediaLoadKey,
     getMediaState,
     getMediaUnavailableMessage,
+    getPeakHeights,
+    getPlayedPercent,
+    getShownPlaceholder,
+    MEDIA_FILE_ICON_SIZE,
     type MediaOptions,
     type MediaProps,
+    MediaUrlSigner,
     resolveMediaProps,
     resolveMessages,
   } from "../ui.js";
@@ -34,12 +40,20 @@
   const view = $derived(
     resolveMediaProps({ ...(options as MediaOptions), width, height, averageColor }),
   );
-  const state = $derived(getMediaState(view));
+  let signed = $state(0);
+  const signer = new MediaUrlSigner(() => {
+    signed++;
+  });
+  const state = $derived.by(() => {
+    void signed;
+    return getMediaState(view, signer.urls(view));
+  });
   const loadKey = $derived(getMediaLoadKey(state));
   const ratio = $derived(
     getMediaAspectRatio({ aspectRatio, width: view.width, height: view.height }),
   );
   let load: "loading" | "loaded" | "error" = $state("loading");
+  let played = $state(0);
   let image: HTMLImageElement | undefined = $state();
 
   $effect.pre(() => {
@@ -54,13 +68,14 @@
   const onError = () => {
     load = "error";
   };
-  const placeholderUrl = $derived(
-    state.kind === "audio" || state.kind === "unavailable" ? undefined : state.placeholderUrl,
-  );
-  const showPlaceholder = $derived(
-    placeholderUrl && (state.kind === "gated" || (state.kind === "image" && load !== "loaded")),
-  );
+  const onMediaError = (event: Event) => {
+    if (!signer.recoverElement(event.currentTarget as HTMLMediaElement)) load = "error";
+  };
+  const onLoadedMetadata = (event: Event) =>
+    signer.loaded(event.currentTarget as HTMLMediaElement);
   const failed = $derived(load === "error");
+  const placeholderUrl = $derived(failed ? undefined : getShownPlaceholder(state, load === "loaded"));
+  const heights = $derived(state.kind === "audio" && state.peaks ? getPeakHeights(state.peaks) : []);
 </script>
 
 <figure
@@ -73,7 +88,7 @@
   style:--calmlens-fit={fit}
   style:--calmlens-position={position}
 >
-  {#if showPlaceholder}
+  {#if placeholderUrl}
     <img class="calmlens-media__placeholder" src={placeholderUrl} alt="" aria-hidden="true" />
   {/if}
   {#if state.kind === "image" && !failed}
@@ -100,13 +115,41 @@
     <video
       class="calmlens-media__content"
       src={state.src}
+      poster={state.poster}
       {controls}
       playsinline
       preload="metadata"
       aria-label={alt || undefined}
-      onerror={() => (load = "error")}
+      onloadedmetadata={onLoadedMetadata}
+      onerror={onMediaError}
     ></video>
   {:else if state.kind === "audio" && !failed}
+    {#if state.waveformUrl || state.peaks}
+      <div class="calmlens-media__waveform">
+        {#if state.waveformUrl}
+          <img class="calmlens-media__wave" src={state.waveformUrl} alt="" aria-hidden="true" />
+        {/if}
+        {#if state.peaks}
+          <!-- Decorative: the audio element's own controls report its progress. -->
+          <div
+            class="calmlens-media__progress"
+            role="progressbar"
+            aria-hidden="true"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={played}
+            style:--calmlens-played={`${played}%`}
+          >
+            <div class="calmlens-media__peaks">
+              {#each heights as height}<span style:height={`${height}%`}></span>{/each}
+            </div>
+            <div class="calmlens-media__peaks" data-played="">
+              {#each heights as height}<span style:height={`${height}%`}></span>{/each}
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
     <!-- biome-ignore lint/a11y/useMediaCaption: audio has no captions track to add here -->
     <audio
       class="calmlens-media__content"
@@ -114,8 +157,25 @@
       {controls}
       preload="metadata"
       aria-label={alt || undefined}
-      onerror={() => (load = "error")}
+      onloadedmetadata={onLoadedMetadata}
+      ontimeupdate={(event) => (played = getPlayedPercent(event.currentTarget))}
+      onerror={onMediaError}
     ></audio>
+  {:else if state.kind === "pdf"}
+    <iframe class="calmlens-media__content" src={state.src} title={alt || messages.pdfTitle}></iframe>
+    <a
+      class="calmlens-button calmlens-media__open"
+      href={state.src}
+      target="_blank"
+      rel="noopener noreferrer">{messages.openPdf}</a
+    >
+  {:else if state.kind === "file"}
+    <span
+      class="calmlens-media__file"
+      role="img"
+      aria-label={alt || undefined}
+      aria-hidden={alt ? undefined : "true"}
+    >{@html renderFileIconSvg({ family: state.icon, extension: "" }, MEDIA_FILE_ICON_SIZE)}</span>
   {/if}
   {#if state.kind === "gated"}
     <figcaption class="calmlens-media__notice">

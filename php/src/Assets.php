@@ -62,14 +62,14 @@ final class Assets extends Resource
 
     /**
      * One page of an audio or video asset's findings timeline, in time order: each segment's
-     * `source`, `startSeconds`, `endSeconds` and `categories`. Pass the page's `nextCursor` as
-     * `cursor` for the next page; `pageSize` is 1 to 100 (50 by default). Assets without a
-     * timeline return an empty page.
+     * `source`, `startSeconds`, `endSeconds` and `categories`. Pass the page's opaque `nextCursor`
+     * as `cursor` for the next page; `pageSize` is 1 to 100 (50 by default).
+     * `classification.moderation.timeline.segmentCount` says how many segments there are.
      */
     public function listTimeline(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
-        $path = $this->path($api, 'assets', 'assetId');
+        $path = $this->session->project(ltrim($this->path($api, 'assets', 'assetId'), '/'));
         return $this->session->request('GET', $path . '/timeline', query: $api, options: $request);
     }
 
@@ -195,14 +195,14 @@ final class Assets extends Resource
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'assets', 'assetId');
-        // As the API checks: a placeholder needs no signature, and only the rendered resource
-        // takes a lens or transform.
+        // As the API checks: the original, rendered and preview resources are signed (a
+        // placeholder needs no signature), and the original takes no lens or transform.
         $resource = $api['resource'] ?? 'rendered';
-        if (!in_array($resource, ['original', 'rendered'], true)) {
-            Values::invalid("A signed URL's resource must be original or rendered");
+        if (!in_array($resource, Cdn::SIGNED_RESOURCES, true)) {
+            Values::invalid("A signed URL's resource must be one of " . implode(', ', Cdn::SIGNED_RESOURCES));
         }
         if ($resource === 'original' && (isset($api['lens']) || isset($api['transform']))) {
-            Values::invalid('Lenses and transforms apply only to the rendered resource');
+            Values::invalid('The original resource takes no lens or transform');
         }
         $expires = $api['expiresInSeconds'] ?? self::DEFAULT_SIGNED_URL_SECONDS;
         if (!is_int($expires) || $expires < 1 || $expires > self::MAX_SIGNED_URL_SECONDS) {

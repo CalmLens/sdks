@@ -89,7 +89,7 @@ func TestMockLifecycle(t *testing.T) {
 		t.Fatal(res.StatusCode)
 	}
 	c.DatabaseStorage.Assets[a.ID]["visibility"] = "public"
-	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID}})
+	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: calmlens.ResourceOriginal}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,43 +295,164 @@ func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
 	}
 }
 
-func TestMockPagesAnAssetsTimelineInTimeOrder(t *testing.T) {
+func TestMockRendersEachTypeAtUploadAndAtDecision(t *testing.T) {
 	c, _ := NewServerClient(Options{})
 	ctx := context.Background()
-	a, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "clip.mp4", Content: &calmlens.Content{Type: "video/mp4", Bytes: []byte("video")}})
+	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	submit := func(queued bool, options calmlens.SubmitAssetOptions) *calmlens.Asset {
+		t.Helper()
+		options.ProcessingOptions, options.Visibility = keep, calmlens.VisibilityPublic
+		submit := c.Assets.Classify
+		if queued {
+			submit = c.Assets.Create
+		}
+		a, err := submit(ctx, options)
+		if err != nil {
+			t.Fatal(options.Name, err)
+		}
+		return a
+	}
+	file := func(name, mime string) calmlens.SubmitAssetOptions {
+		return calmlens.SubmitAssetOptions{Name: name, Content: &calmlens.Content{Type: mime, Bytes: []byte("hello")}}
+	}
+	type rendering struct {
+		kind, format string
+		peaks        bool
+		preview      bool
+	}
+	check := func(a *calmlens.Asset, want *rendering, decided bool) {
+		t.Helper()
+		r, p := a.Content.Rendered, a.Content.Preview
+		if want == nil {
+			if r != nil || p != nil {
+				t.Fatalf("%s: rendered %+v, preview %+v", a.Name, r, p)
+			}
+			return
+		}
+		if r == nil || string(r.Kind) != want.kind || r.Format != want.format || (r.Peaks != nil) != want.peaks || len(r.Peaks) != 0 {
+			t.Fatalf("%s: rendered %+v", a.Name, r)
+		}
+		if (p != nil) != want.preview {
+			t.Fatalf("%s: preview %+v", a.Name, p)
+		}
+		if p != nil && (p.Thumbhash != nil) != decided || p != nil && decided && *p.AverageColor != mockAverageColor {
+			t.Fatalf("%s: preview %+v", a.Name, p)
+		}
+	}
+	// At upload: an image, a PDF and browser-safe media render as uploaded; nothing else yet.
+	for _, tc := range []struct {
+		options calmlens.SubmitAssetOptions
+		want    *rendering
+	}{
+		{file("a.png", "image/png"), &rendering{kind: "image", format: "image/png", preview: true}},
+		{file("a.pdf", "application/pdf"), &rendering{kind: "pdf", format: "application/pdf"}},
+		{file("a.ogg", "audio/ogg"), &rendering{kind: "audio", format: "audio/ogg"}},
+		{file("a.mov", "video/quicktime"), nil},
+		{file("a.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), nil},
+		{calmlens.SubmitAssetOptions{Name: "site", URL: "https://example.com"}, nil},
+	} {
+		check(submit(true, tc.options), tc.want, false)
+	}
+	// At decision, every type has its rendered file and preview, with the preview's ThumbHash.
+	for _, tc := range []struct {
+		options calmlens.SubmitAssetOptions
+		want    *rendering
+	}{
+		{file("b.png", "image/png"), &rendering{kind: "image", format: "image/png", preview: true}},
+		{calmlens.SubmitAssetOptions{Name: "site", URL: "https://example.com"}, &rendering{kind: "image", format: "image/png", preview: true}},
+		{file("b.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), &rendering{kind: "pdf", format: "application/pdf", preview: true}},
+		{file("b.xlsx", "application/vnd.ms-excel"), nil},
+		{file("b.mov", "video/quicktime"), &rendering{kind: "video", format: "video/mp4"}},
+		{file("b.mp4", "video/mp4"), &rendering{kind: "video", format: "video/mp4"}},
+		{file("b.wav", "audio/wav"), &rendering{kind: "audio", format: "audio/mp4", peaks: true, preview: true}},
+		{file("b.txt", "text/plain"), nil},
+		{file("b.bin", "application/json"), nil},
+	} {
+		a := submit(false, tc.options)
+		check(a, tc.want, true)
+		if a.Type == calmlens.AssetTypeAudio && (*a.Content.Preview.Width != waveformWidth || *a.Content.Preview.Height != waveformHeight) {
+			t.Fatalf("waveform preview: %+v", a.Content.Preview)
+		}
+	}
+}
+
+func TestMockServesStandInBytesForRenderedFilesAndPreviews(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "b.wav", Visibility: calmlens.VisibilityPublic,
+		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)},
+		Content:           &calmlens.Content{Type: "audio/wav", Bytes: []byte("hello")}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	segments := []any{}
-	for i := range 3 {
-		segments = append(segments, calmlens.JSON{"source": calmlens.SegmentSourceFrame, "startSeconds": i, "endSeconds": i + 1, "categories": calmlens.JSON{}})
+	placeholder, err := placeholderPNG(mockThumbHash)
+	if err != nil {
+		t.Fatal(err)
 	}
-	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["raw"] = calmlens.JSON{"categories": calmlens.JSON{}, "timeline": calmlens.JSON{"segments": segments}}
-	starts := []float64{}
-	cursor := ""
-	for {
-		page, err := c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID, Cursor: cursor, PageSize: 2})
+	for _, tc := range []struct {
+		resource, transform, contentType, body, cache string
+	}{
+		{calmlens.ResourceOriginal, "", "audio/wav", "hello", "public, max-age=3600"},
+		{calmlens.ResourceRendered, "", "audio/mp4", "hello", "public, max-age=3600"},
+		{calmlens.ResourcePreview, "width=10", "image/png", string(placeholder), "public, max-age=31536000, immutable"},
+	} {
+		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: tc.resource, Transform: tc.transform}})
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, segment := range page.Items {
-			starts = append(starts, segment.StartSeconds)
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if res.StatusCode != 200 || res.Header.Get("Content-Type") != tc.contentType || string(body) != tc.body || res.Header.Get("Cache-Control") != tc.cache {
+			t.Fatalf("%s: %d %s %q %s", tc.resource, res.StatusCode, res.Header.Get("Content-Type"), body, res.Header.Get("Cache-Control"))
 		}
-		if !page.HasMore {
-			if page.NextCursor != "" {
-				t.Fatal("last page has a next cursor", page.NextCursor)
-			}
-			break
+		if immutable := strings.Contains(tc.cache, "immutable"); (res.Header.Get("ETag") != "") != immutable || (res.Header.Get("Expires") != "") != immutable {
+			t.Fatalf("%s: ETag %q, Expires %q", tc.resource, res.Header.Get("ETag"), res.Header.Get("Expires"))
 		}
-		cursor = page.NextCursor
 	}
-	if !slices.Equal(starts, []float64{0, 1, 2}) {
-		t.Fatal(starts)
+	if _, err = c.Assets.CreateSignedURL(ctx, calmlens.SignedURLOptions{AssetID: a.ID, Resource: calmlens.ResourcePreview, Lens: "thumb"}); err != nil {
+		t.Fatal("signed preview:", err)
 	}
-	for pageSize, code := range map[int]string{-1: "validation/too-small", 101: "validation/too-big"} {
-		if _, err = c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID, PageSize: pageSize}); calmlens.ErrorCode(err) != code {
-			t.Fatal(pageSize, err)
+	// Like the API, a resource outside the signed list is refused before the asset is looked up.
+	_, err = c.dispatch("POST", []string{"assets", "asset_00000000000000000000", "signed-url"}, nil, []byte(`{"resource":"placeholder"}`), http.Header{"Content-Type": {"application/json"}})
+	if refused, ok := err.(*apiError); !ok || refused.code != "validation/invalid-value" || refused.details["path"] != "resource" {
+		t.Fatal(err)
+	}
+}
+
+func TestMockSafetyHoldWithholdsEveryResourceAndTheTimeline(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "a.png", Visibility: calmlens.VisibilityPublic,
+		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)},
+		Content:           &calmlens.Content{Type: "image/png", Bytes: []byte("hello")}})
+	if err != nil || a.Content.Preview == nil || a.Content.Preview.Thumbhash == nil {
+		t.Fatal(a, err)
+	}
+	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
+		db.Assets[a.ID]["content"].(calmlens.JSON)["safetyHold"] = calmlens.JSON{"placedAt": 1, "reason": calmlens.SafetyHoldReasonSuspectedIllegalContent}
+	})
+	for _, resource := range []string{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview, calmlens.ResourcePlaceholder} {
+		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: resource}})
+		if err != nil {
+			t.Fatal(err)
 		}
+		var body struct{ Code string }
+		_ = json.NewDecoder(res.Body).Decode(&body)
+		res.Body.Close()
+		if res.StatusCode != http.StatusForbidden || body.Code != "asset/not-available" {
+			t.Fatalf("%s: %d %s", resource, res.StatusCode, body.Code)
+		}
+	}
+	// The page size is checked first, then the hold.
+	if _, err = c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID, PageSize: 101}); calmlens.ErrorCode(err) != "validation/too-big" {
+		t.Fatal(err)
+	}
+	if _, err = c.Assets.ListTimeline(ctx, calmlens.ListAssetTimelineOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetSafetyHeld {
+		t.Fatal(err)
+	}
+	// A decision while held keeps the rendered file and preview withheld.
+	if a, err = c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: a.ID, Decision: calmlens.ModerationStatusBlocked, Note: "Held"}); err != nil || a.Content.Rendered != nil || a.Content.Preview != nil {
+		t.Fatal(a, err)
 	}
 }
 
@@ -440,7 +561,8 @@ func TestMockHashListEntriesFromAssetsPagesAndCascade(t *testing.T) {
 	}
 	hash := strings.Repeat("ab", 32)
 	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
-		db.Assets[a.ID]["content"].(calmlens.JSON)["image"] = calmlens.JSON{"perceptualHash": hash, "perceptualHashQuality": float64(73)}
+		content := db.Assets[a.ID]["content"].(calmlens.JSON)
+		content["perceptualHash"], content["perceptualHashQuality"] = hash, float64(73)
 	})
 	fromAsset, err := c.HashLists.AddEntry(ctx, calmlens.AddHashListEntryOptions{HashListID: list.ID, AssetID: a.ID, Label: calmlens.Ptr("Report 1")})
 	if err != nil || fromAsset.Hash != hash || fromAsset.Quality == nil || *fromAsset.Quality != 73 || fromAsset.SourceAssetID == nil || *fromAsset.SourceAssetID != a.ID || *fromAsset.Label != "Report 1" || c.lastStatus != http.StatusCreated {

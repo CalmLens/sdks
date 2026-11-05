@@ -542,7 +542,7 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	NO_RENDERED_VERSION: new ErrorCode({
 		id: "asset/no-rendered-version",
-		defaultMessage: "This asset has no rendered version, such as a document whose page image hasn't been generated or a text asset. Request its original resource instead.",
+		defaultMessage: "This asset has no such resource: text and spreadsheets have no rendered version or preview, and documents, audio and video get theirs once processing makes them. Check the asset's `content.rendered` and `content.preview`, or request its original resource instead.",
 		status: 404
 	}),
 	ASSET_NOT_FOUND: new ErrorCode({

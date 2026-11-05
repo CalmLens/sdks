@@ -251,6 +251,9 @@ type AssetModeration struct {
 	ExplanationComplete *bool                          `json:"explanationComplete,omitempty"`
 	Categories          map[string]CategoryPolicyScore `json:"categories,omitempty"`
 	Raw                 *ModerationRaw                 `json:"raw,omitempty"`
+	// Timeline is the audio or video asset's findings timeline, listed by
+	// AssetsService.ListTimeline; nil for assets without one.
+	Timeline *ModerationTimeline `json:"timeline"`
 	// LinkSafety (preview) is what the policy's link-safety settings made of the asset's links;
 	// nil when the policy doesn't act on links.
 	LinkSafety *LinkSafetyDecision `json:"linkSafety,omitempty"`
@@ -289,11 +292,16 @@ type LinkSafetyOffPlatformLinks struct {
 	AllowedDomains []string `json:"allowedDomains"`
 }
 
+// ModerationTimeline summarises an audio or video asset's findings timeline.
+type ModerationTimeline struct {
+	// SegmentCount is the number of segments AssetsService.ListTimeline lists.
+	SegmentCount int `json:"segmentCount"`
+}
+
 // ModerationRaw contains detection findings before policy evaluation.
 type ModerationRaw struct {
-	Categories  map[string]CategoryResult  `json:"categories"`
-	Timeline    *MediaClassificationReport `json:"timeline,omitempty"`
-	HashMatches []HashMatch                `json:"hashMatches,omitempty"`
+	Categories  map[string]CategoryResult `json:"categories"`
+	HashMatches []HashMatch               `json:"hashMatches,omitempty"`
 }
 
 // HashMatchSourceHashList is the HashMatch.Source of a match against a project hash list.
@@ -330,14 +338,71 @@ type AssetContent struct {
 	Extension   *string    `json:"extension"`
 	SizeInBytes *int64     `json:"sizeInBytes"`
 	Checksums   *Checksums `json:"checksums"`
-	// Image is the picture CalmLens serves at the rendered resource, nil when the asset has none.
-	Image         *AssetImage    `json:"image"`
-	ExtractedText *ExtractedText `json:"extractedText"`
-	// FileMetadata is the metadata embedded in an uploaded image, such as its capture time,
-	// camera and software. It is read-only and separate from the asset's own Metadata; nil when
-	// the image declares none, for other asset types, once the content is removed and while the
+	// Width and Height are the uploaded file's size in pixels, for images and video; nil when
+	// unknown or not applicable.
+	Width  *int `json:"width"`
+	Height *int `json:"height"`
+	// DurationSeconds is the length of audio or video; nil when unknown or not applicable.
+	DurationSeconds *float64 `json:"durationSeconds"`
+	// PageCount is the number of pages or slides in a document; nil when unknown or not applicable.
+	PageCount *int `json:"pageCount"`
+	// PerceptualHash matches visually similar images, for image assets.
+	PerceptualHash *string `json:"perceptualHash"`
+	// PerceptualHashQuality is how much detail PerceptualHash captured, from 0 to 100. Hashes
+	// below 50 come from flat or featureless images and match less reliably.
+	PerceptualHashQuality *int `json:"perceptualHashQuality"`
+	// Metadata is the metadata embedded in an uploaded image, such as its capture time, camera
+	// and software. It is read-only and separate from the asset's own Metadata; nil when the
+	// image declares none, for other asset types, once the content is removed and while the
 	// asset is held.
-	FileMetadata *FileMetadata `json:"fileMetadata"`
+	Metadata      *FileMetadata  `json:"metadata"`
+	ExtractedText *ExtractedText `json:"extractedText"`
+	// Rendered is the displayable file CalmLens serves at ResourceRendered; nil when the asset
+	// has none (yet), once the content is removed and while a safety hold is on.
+	Rendered *AssetRendered `json:"rendered"`
+	// Preview is the still image CalmLens serves at ResourcePreview; nil when the asset has none
+	// (yet), once the content is removed and while a safety hold is on.
+	Preview *AssetPreview `json:"preview"`
+}
+
+// AssetRenderedKind is what kind of file AssetRendered is. It is a string type so kinds added
+// later still decode.
+type AssetRenderedKind string
+
+// AssetRendered kinds.
+const (
+	AssetRenderedKindImage AssetRenderedKind = "image"
+	AssetRenderedKindPDF   AssetRenderedKind = "pdf"
+	AssetRenderedKindVideo AssetRenderedKind = "video"
+	AssetRenderedKindAudio AssetRenderedKind = "audio"
+)
+
+// AssetRendered is the displayable file CalmLens serves for an asset: an image (an uploaded
+// image or a website's screenshot), a PDF (a document or presentation), or browser-safe video or
+// audio.
+type AssetRendered struct {
+	// Kind is one of the AssetRenderedKind constants.
+	Kind AssetRenderedKind `json:"kind"`
+	// Format is the MIME type of the rendered file.
+	Format string `json:"format"`
+	// Width and Height are in pixels, when known.
+	Width  *int `json:"width"`
+	Height *int `json:"height"`
+	// Peaks are an audio waveform's normalised peak levels, for rendered audio.
+	Peaks []float64 `json:"peaks,omitempty"`
+}
+
+// AssetPreview is the still image that stands for an asset: the image itself, a document's
+// first page or slide, a website's first screen, a video's poster frame or an audio waveform.
+type AssetPreview struct {
+	// Width and Height are in pixels, when known.
+	Width  *int `json:"width"`
+	Height *int `json:"height"`
+	// Thumbhash is a ThumbHash placeholder to render while the preview loads; nil until
+	// processing makes it.
+	Thumbhash *string `json:"thumbhash"`
+	// AverageColor is the preview's average colour; nil until processing makes it.
+	AverageColor *string `json:"averageColor"`
 }
 
 // Checksums holds digests of the uploaded content. Each is nil when not computed.
@@ -347,25 +412,6 @@ type Checksums struct {
 	SHA256 *string `json:"sha256,omitempty"`
 	SHA384 *string `json:"sha384,omitempty"`
 	SHA512 *string `json:"sha512,omitempty"`
-}
-
-// AssetImage is the picture CalmLens can show for an asset: the original for image assets, or a
-// generated image for documents and websites. It remains after the content is removed, so check
-// Content.Status before loading it.
-type AssetImage struct {
-	// Width and Height are in pixels: the original's for image assets (a converted HEIC is served
-	// smaller at the same aspect ratio), and the generated image's for documents and websites.
-	Width  *int `json:"width"`
-	Height *int `json:"height"`
-	// Thumbhash is a ThumbHash placeholder to render while the image loads; nil once it is removed.
-	Thumbhash *string `json:"thumbhash"`
-	// AverageColor is the image's average colour; nil once it is removed.
-	AverageColor *string `json:"averageColor"`
-	// PerceptualHash matches visually similar images, for image assets.
-	PerceptualHash *string `json:"perceptualHash"`
-	// PerceptualHashQuality is how much detail PerceptualHash captured, from 0 to 100. Hashes
-	// below 50 come from flat or featureless images and match less reliably.
-	PerceptualHashQuality *int `json:"perceptualHashQuality"`
 }
 
 // SafetyHoldReasonSuspectedIllegalContent is the SafetyHold.Reason for suspected illegal
@@ -445,7 +491,7 @@ type ProcessingOptions struct {
 	KeepContentAfterProcessing *bool `json:"keepContentAfterProcessing,omitempty"`
 	// StoreSensitiveMetadata overrides the project's storeSensitiveMetadata setting for this
 	// upload. When false, embedded image metadata (EXIF, XMP and IPTC) is removed from the file
-	// before it is stored, and FileMetadata leaves out the creator and location. When true, the
+	// before it is stored, and Content.Metadata leaves out the creator and location. When true, the
 	// image is stored as uploaded.
 	StoreSensitiveMetadata *bool `json:"storeSensitiveMetadata,omitempty"`
 	// Features chooses optional analyses. Link detection runs unless turned off here; every other
@@ -744,18 +790,6 @@ type BoundingBox struct {
 type AgeRange struct {
 	Low  int `json:"low"`
 	High int `json:"high"`
-}
-
-// MediaClassificationReport describes audio and video analysis.
-type MediaClassificationReport struct {
-	DurationSeconds      float64  `json:"durationSeconds"`
-	FrameIntervalSeconds *float64 `json:"frameIntervalSeconds,omitempty"`
-	SampledFrames        int      `json:"sampledFrames"`
-	AudioTranscribed     bool     `json:"audioTranscribed"`
-	// SegmentCount is set on long media analysed in sections, whose report keeps a shortened
-	// timeline: the number of segments on its full timeline, listed by AssetsService.ListTimeline.
-	SegmentCount *int                         `json:"segmentCount,omitempty"`
-	Segments     []MediaClassificationSegment `json:"segments"`
 }
 
 // Media segment sources. Source is a plain string so sources added later still decode.
@@ -1074,16 +1108,25 @@ type MoveAssetOptions struct {
 const (
 	// ResourceOriginal is the asset's original file. It takes no Lens, Transform or TransformOptions.
 	ResourceOriginal = "original"
-	// ResourceRendered is the default: the asset rendered through a Lens, Transform or
-	// TransformOptions, or its default rendition when none is given.
+	// ResourceRendered is the default: the asset's displayable file (an image in the best format
+	// the client accepts, a PDF, or browser-safe video or audio). It takes a Lens, Transform or
+	// TransformOptions only when it is an image; the CDN refuses them otherwise with
+	// asset/invalid-transform.
 	ResourceRendered = "rendered"
+	// ResourcePreview is a still image that stands for the asset, such as a document's first page
+	// or an audio waveform. It takes a Lens, Transform or TransformOptions.
+	ResourcePreview = "preview"
 	// ResourcePlaceholder is a small blurred PNG, public for every asset whatever its visibility
 	// or moderation status. It takes no Lens, Transform or TransformOptions, and needs no age confirmation.
 	ResourcePlaceholder = "placeholder"
 )
 
-// SignedURLOptions requests a signed CDN URL. Resource is ResourceRendered (the server's
-// default when empty) or ResourceOriginal, which takes no lens or transform. ExpiresInSeconds
+// SignedCDNResources are the CDN resources a signed URL can be created for.
+var SignedCDNResources = []string{ResourceOriginal, ResourceRendered, ResourcePreview}
+
+// SignedURLOptions requests a signed CDN URL. Resource is one of SignedCDNResources:
+// ResourceRendered (the server's default when empty), ResourcePreview or ResourceOriginal, which
+// takes no lens or transform. ExpiresInSeconds
 // defaults to 900. Transform (options such as "format=png,width=1024") or TransformOptions
 // (ImageTransformOptions, serialized to the same selector) applies in one pass; with a Lens, its
 // options replace the lens's. Supply only one transform representation.

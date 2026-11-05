@@ -1657,6 +1657,10 @@ fn values() -> BTreeMap<&'static str, String> {
             CdnResource::Rendered.as_str().to_owned(),
         ),
         (
+            "CdnResource::Preview",
+            CdnResource::Preview.as_str().to_owned(),
+        ),
+        (
             "CdnResource::Placeholder",
             CdnResource::Placeholder.as_str().to_owned(),
         ),

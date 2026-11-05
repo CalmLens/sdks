@@ -898,6 +898,9 @@
                 }
               }
             }
+          },
+          "timeline": {
+            "segmentCount": 2
           }
         }
       }
@@ -985,7 +988,7 @@
     },
     "request": {
       "method": "GET",
-      "path": "/v1/assets/asset-1/timeline",
+      "path": "/v1/projects/project-1/assets/asset-1/timeline",
       "query": {},
       "body": null
     },
@@ -1005,7 +1008,7 @@
         }
       ],
       "hasMore": true,
-      "nextCursor": "timeline:1",
+      "nextCursor": "opaque+/timeline=",
       "pageSize": 1,
       "ordering": []
     }
@@ -1015,14 +1018,14 @@
     "options": {
       "assetId": "asset-1",
       "pageSize": 50,
-      "cursor": "timeline:50"
+      "cursor": "opaque+/timeline="
     },
     "request": {
       "method": "GET",
-      "path": "/v1/assets/asset-1/timeline",
+      "path": "/v1/projects/project-1/assets/asset-1/timeline",
       "query": {
         "pageSize": "50",
-        "cursor": "timeline:50"
+        "cursor": "opaque+/timeline="
       },
       "body": null
     },
@@ -1042,7 +1045,7 @@
         }
       ],
       "hasMore": true,
-      "nextCursor": "timeline:1",
+      "nextCursor": "opaque+/timeline=",
       "pageSize": 1,
       "ordering": []
     }
@@ -1351,6 +1354,30 @@
         "expiresInSeconds": 900,
         "lens": "thumb",
         "transform": "format=avif"
+      }
+    },
+    "response": {
+      "url": "https://cdn.calmlens.com/signed",
+      "expiresAt": 1760000900000
+    }
+  },
+  {
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "resource": "preview",
+      "lens": "thumb",
+      "transform": "width=320"
+    },
+    "request": {
+      "method": "POST",
+      "path": "/v1/assets/asset-1/signed-url",
+      "query": {},
+      "body": {
+        "resource": "preview",
+        "expiresInSeconds": 900,
+        "lens": "thumb",
+        "transform": "width=320"
       }
     },
     "response": {
@@ -2675,174 +2702,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -2852,6 +2711,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -2980,19 +2842,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -3006,6 +2862,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -3326,174 +3201,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -3503,6 +3210,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -3631,19 +3341,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -3657,6 +3361,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -4016,174 +3739,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -4193,6 +3748,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -4321,19 +3879,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -4347,6 +3899,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -4693,174 +4264,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -4870,6 +4273,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -4998,19 +4404,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -5024,6 +4424,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -5403,174 +4822,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -5580,6 +4831,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -5708,19 +4962,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -5734,6 +4982,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -6064,174 +5331,6 @@
                       }
                     }
                   },
-                  "timeline": {
-                    "durationSeconds": 1.5,
-                    "frameIntervalSeconds": 1.5,
-                    "sampledFrames": 1,
-                    "audioTranscribed": true,
-                    "segmentCount": 1,
-                    "segments": [
-                      {
-                        "source": "frame",
-                        "startSeconds": 1.5,
-                        "endSeconds": 1.5,
-                        "categories": {
-                          "sexual": {
-                            "status": "evaluated",
-                            "likelihood": "very-unlikely",
-                            "score": 0.5,
-                            "qualifiers": {
-                              "sexual-pornographic-media": {
-                                "status": "evaluated",
-                                "someScore": 0.5,
-                                "allScore": 0.5,
-                                "likelihood": "very-unlikely"
-                              }
-                            },
-                            "policyConditions": {
-                              "example": {
-                                "status": "evaluated",
-                                "score": 0.5
-                              }
-                            }
-                          },
-                          "violence": {
-                            "status": "evaluated",
-                            "likelihood": "very-unlikely",
-                            "score": 0.5,
-                            "qualifiers": {
-                              "sexual-pornographic-media": {
-                                "status": "evaluated",
-                                "someScore": 0.5,
-                                "allScore": 0.5,
-                                "likelihood": "very-unlikely"
-                              }
-                            },
-                            "policyConditions": {
-                              "example": {
-                                "status": "evaluated",
-                                "score": 0.5
-                              }
-                            }
-                          },
-                          "self-harm": {
-                            "status": "evaluated",
-                            "likelihood": "very-unlikely",
-                            "score": 0.5,
-                            "qualifiers": {
-                              "sexual-pornographic-media": {
-                                "status": "evaluated",
-                                "someScore": 0.5,
-                                "allScore": 0.5,
-                                "likelihood": "very-unlikely"
-                              }
-                            },
-                            "policyConditions": {
-                              "example": {
-                                "status": "evaluated",
-                                "score": 0.5
-                              }
-                            }
-                          },
-                          "harassment": {
-                            "status": "evaluated",
-                            "likelihood": "very-unlikely",
-                            "score": 0.5,
-                            "qualifiers": {
-                              "sexual-pornographic-media": {
-                                "status": "evaluated",
-                                "someScore": 0.5,
-                                "allScore": 0.5,
-                                "likelihood": "very-unlikely"
-                              }
-                            },
-                            "policyConditions": {
-                              "example": {
-                                "status": "evaluated",
-                                "score": 0.5
-                              }
-                            }
-                          },
-                          "hate": {
-                            "status": "evaluated",
-                            "likelihood": "very-unlikely",
-                            "score": 0.5,
-                            "qualifiers": {
-                              "sexual-pornographic-media": {
-                                "status": "evaluated",
-                                "someScore": 0.5,
-                                "allScore": 0.5,
-                                "likelihood": "very-unlikely"
-                              }
-                            },
-                            "policyConditions": {
-                              "example": {
-                                "status": "evaluated",
-                                "score": 0.5
-                              }
-                            }
-                          },
-                          "criminal-activity": {
-                            "status": "evaluated",
-                            "likelihood": "very-unlikely",
-                            "score": 0.5,
-                            "qualifiers": {
-                              "sexual-pornographic-media": {
-                                "status": "evaluated",
-                                "someScore": 0.5,
-                                "allScore": 0.5,
-                                "likelihood": "very-unlikely"
-                              }
-                            },
-                            "policyConditions": {
-                              "example": {
-                                "status": "evaluated",
-                                "score": 0.5
-                              }
-                            }
-                          },
-                          "personal-information": {
-                            "status": "evaluated",
-                            "likelihood": "very-unlikely",
-                            "score": 0.5,
-                            "qualifiers": {
-                              "sexual-pornographic-media": {
-                                "status": "evaluated",
-                                "someScore": 0.5,
-                                "allScore": 0.5,
-                                "likelihood": "very-unlikely"
-                              }
-                            },
-                            "policyConditions": {
-                              "example": {
-                                "status": "evaluated",
-                                "score": 0.5
-                              }
-                            }
-                          },
-                          "profanity": {
-                            "status": "evaluated",
-                            "likelihood": "very-unlikely",
-                            "score": 0.5,
-                            "qualifiers": {
-                              "sexual-pornographic-media": {
-                                "status": "evaluated",
-                                "someScore": 0.5,
-                                "allScore": 0.5,
-                                "likelihood": "very-unlikely"
-                              }
-                            },
-                            "policyConditions": {
-                              "example": {
-                                "status": "evaluated",
-                                "score": 0.5
-                              }
-                            }
-                          }
-                        }
-                      }
-                    ]
-                  },
                   "hashMatches": [
                     {
                       "source": "hash-list",
@@ -6241,6 +5340,9 @@
                       "action": "flag"
                     }
                   ]
+                },
+                "timeline": {
+                  "segmentCount": 1
                 },
                 "testCategoryActions": {
                   "sexual": "allow"
@@ -6369,19 +5471,13 @@
                 "sha384": "example",
                 "sha512": "example"
               },
-              "image": {
-                "width": 1,
-                "height": 1,
-                "thumbhash": "example",
-                "averageColor": "example",
-                "perceptualHash": "example",
-                "perceptualHashQuality": 1
-              },
-              "extractedText": {
-                "type": "string",
-                "content": "example"
-              },
-              "fileMetadata": {
+              "width": 1,
+              "height": 1,
+              "durationSeconds": 1.5,
+              "pageCount": 1,
+              "perceptualHash": "example",
+              "perceptualHashQuality": 1,
+              "metadata": {
                 "capturedAt": "example",
                 "cameraMake": "example",
                 "cameraModel": "example",
@@ -6395,6 +5491,25 @@
                   "latitude": 1.5,
                   "longitude": 1.5
                 }
+              },
+              "extractedText": {
+                "type": "string",
+                "content": "example"
+              },
+              "rendered": {
+                "kind": "image",
+                "format": "example",
+                "width": 1,
+                "height": 1,
+                "peaks": [
+                  0.5
+                ]
+              },
+              "preview": {
+                "width": 1,
+                "height": 1,
+                "thumbhash": "example",
+                "averageColor": "example"
               }
             }
           },
@@ -6731,174 +5846,6 @@
                     }
                   }
                 },
-                "timeline": {
-                  "durationSeconds": 1.5,
-                  "frameIntervalSeconds": 1.5,
-                  "sampledFrames": 1,
-                  "audioTranscribed": true,
-                  "segmentCount": 1,
-                  "segments": [
-                    {
-                      "source": "frame",
-                      "startSeconds": 1.5,
-                      "endSeconds": 1.5,
-                      "categories": {
-                        "sexual": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "violence": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "self-harm": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "harassment": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "hate": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "criminal-activity": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "personal-information": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "profanity": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        }
-                      }
-                    }
-                  ]
-                },
                 "hashMatches": [
                   {
                     "source": "hash-list",
@@ -6908,6 +5855,9 @@
                     "action": "flag"
                   }
                 ]
+              },
+              "timeline": {
+                "segmentCount": 1
               },
               "testCategoryActions": {
                 "sexual": "allow"
@@ -7036,19 +5986,13 @@
               "sha384": "example",
               "sha512": "example"
             },
-            "image": {
-              "width": 1,
-              "height": 1,
-              "thumbhash": "example",
-              "averageColor": "example",
-              "perceptualHash": "example",
-              "perceptualHashQuality": 1
-            },
-            "extractedText": {
-              "type": "string",
-              "content": "example"
-            },
-            "fileMetadata": {
+            "width": 1,
+            "height": 1,
+            "durationSeconds": 1.5,
+            "pageCount": 1,
+            "perceptualHash": "example",
+            "perceptualHashQuality": 1,
+            "metadata": {
               "capturedAt": "example",
               "cameraMake": "example",
               "cameraModel": "example",
@@ -7062,6 +6006,25 @@
                 "latitude": 1.5,
                 "longitude": 1.5
               }
+            },
+            "extractedText": {
+              "type": "string",
+              "content": "example"
+            },
+            "rendered": {
+              "kind": "image",
+              "format": "example",
+              "width": 1,
+              "height": 1,
+              "peaks": [
+                0.5
+              ]
+            },
+            "preview": {
+              "width": 1,
+              "height": 1,
+              "thumbhash": "example",
+              "averageColor": "example"
             }
           }
         }
@@ -7404,174 +6367,6 @@
                     }
                   }
                 },
-                "timeline": {
-                  "durationSeconds": 1.5,
-                  "frameIntervalSeconds": 1.5,
-                  "sampledFrames": 1,
-                  "audioTranscribed": true,
-                  "segmentCount": 1,
-                  "segments": [
-                    {
-                      "source": "frame",
-                      "startSeconds": 1.5,
-                      "endSeconds": 1.5,
-                      "categories": {
-                        "sexual": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "violence": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "self-harm": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "harassment": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "hate": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "criminal-activity": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "personal-information": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        },
-                        "profanity": {
-                          "status": "evaluated",
-                          "likelihood": "very-unlikely",
-                          "score": 0.5,
-                          "qualifiers": {
-                            "sexual-pornographic-media": {
-                              "status": "evaluated",
-                              "someScore": 0.5,
-                              "allScore": 0.5,
-                              "likelihood": "very-unlikely"
-                            }
-                          },
-                          "policyConditions": {
-                            "example": {
-                              "status": "evaluated",
-                              "score": 0.5
-                            }
-                          }
-                        }
-                      }
-                    }
-                  ]
-                },
                 "hashMatches": [
                   {
                     "source": "hash-list",
@@ -7581,6 +6376,9 @@
                     "action": "flag"
                   }
                 ]
+              },
+              "timeline": {
+                "segmentCount": 1
               },
               "testCategoryActions": {
                 "sexual": "allow"
@@ -7709,19 +6507,13 @@
               "sha384": "example",
               "sha512": "example"
             },
-            "image": {
-              "width": 1,
-              "height": 1,
-              "thumbhash": "example",
-              "averageColor": "example",
-              "perceptualHash": "example",
-              "perceptualHashQuality": 1
-            },
-            "extractedText": {
-              "type": "string",
-              "content": "example"
-            },
-            "fileMetadata": {
+            "width": 1,
+            "height": 1,
+            "durationSeconds": 1.5,
+            "pageCount": 1,
+            "perceptualHash": "example",
+            "perceptualHashQuality": 1,
+            "metadata": {
               "capturedAt": "example",
               "cameraMake": "example",
               "cameraModel": "example",
@@ -7735,6 +6527,25 @@
                 "latitude": 1.5,
                 "longitude": 1.5
               }
+            },
+            "extractedText": {
+              "type": "string",
+              "content": "example"
+            },
+            "rendered": {
+              "kind": "image",
+              "format": "example",
+              "width": 1,
+              "height": 1,
+              "peaks": [
+                0.5
+              ]
+            },
+            "preview": {
+              "width": 1,
+              "height": 1,
+              "thumbhash": "example",
+              "averageColor": "example"
             }
           }
         }
@@ -8071,174 +6882,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -8248,6 +6891,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -8376,19 +7022,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -8402,6 +7042,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -8414,7 +7073,7 @@
     },
     "request": {
       "method": "GET",
-      "path": "/v1/assets/asset-1/timeline",
+      "path": "/v1/projects/project-1/assets/asset-1/timeline",
       "query": {},
       "body": null
     },
@@ -8907,174 +7566,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -9084,6 +7575,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -9212,19 +7706,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -9238,6 +7726,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -9558,174 +8065,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -9735,6 +8074,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -9863,19 +8205,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -9889,6 +8225,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -10214,174 +8569,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -10391,6 +8578,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -10519,19 +8709,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -10545,6 +8729,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -10865,174 +9068,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -11042,6 +9077,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -11170,19 +9208,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -11196,6 +9228,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -11519,174 +9570,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -11696,6 +9579,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -11824,19 +9710,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -11850,6 +9730,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },
@@ -12205,174 +10104,6 @@
                 }
               }
             },
-            "timeline": {
-              "durationSeconds": 1.5,
-              "frameIntervalSeconds": 1.5,
-              "sampledFrames": 1,
-              "audioTranscribed": true,
-              "segmentCount": 1,
-              "segments": [
-                {
-                  "source": "frame",
-                  "startSeconds": 1.5,
-                  "endSeconds": 1.5,
-                  "categories": {
-                    "sexual": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "violence": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "self-harm": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "harassment": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "hate": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "criminal-activity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "personal-information": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    },
-                    "profanity": {
-                      "status": "evaluated",
-                      "likelihood": "very-unlikely",
-                      "score": 0.5,
-                      "qualifiers": {
-                        "sexual-pornographic-media": {
-                          "status": "evaluated",
-                          "someScore": 0.5,
-                          "allScore": 0.5,
-                          "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
-                      }
-                    }
-                  }
-                }
-              ]
-            },
             "hashMatches": [
               {
                 "source": "hash-list",
@@ -12382,6 +10113,9 @@
                 "action": "flag"
               }
             ]
+          },
+          "timeline": {
+            "segmentCount": 1
           },
           "testCategoryActions": {
             "sexual": "allow"
@@ -12510,19 +10244,13 @@
           "sha384": "example",
           "sha512": "example"
         },
-        "image": {
-          "width": 1,
-          "height": 1,
-          "thumbhash": "example",
-          "averageColor": "example",
-          "perceptualHash": "example",
-          "perceptualHashQuality": 1
-        },
-        "extractedText": {
-          "type": "string",
-          "content": "example"
-        },
-        "fileMetadata": {
+        "width": 1,
+        "height": 1,
+        "durationSeconds": 1.5,
+        "pageCount": 1,
+        "perceptualHash": "example",
+        "perceptualHashQuality": 1,
+        "metadata": {
           "capturedAt": "example",
           "cameraMake": "example",
           "cameraModel": "example",
@@ -12536,6 +10264,25 @@
             "latitude": 1.5,
             "longitude": 1.5
           }
+        },
+        "extractedText": {
+          "type": "string",
+          "content": "example"
+        },
+        "rendered": {
+          "kind": "image",
+          "format": "example",
+          "width": 1,
+          "height": 1,
+          "peaks": [
+            0.5
+          ]
+        },
+        "preview": {
+          "width": 1,
+          "height": 1,
+          "thumbhash": "example",
+          "averageColor": "example"
         }
       }
     },

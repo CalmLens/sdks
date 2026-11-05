@@ -172,6 +172,8 @@ public final class MockDecision {
     report.addProperty("source", "policy");
     report.addProperty("automatedAction", STATUS_ACTION.get(status));
     report.add("regions", new JsonArray());
+    // The mock analyses no audio or video, so a decision has no findings timeline.
+    report.add("timeline", JsonNull.INSTANCE);
     report.add("flaggedCategories", flagged);
     report.add("categories", policyCategories);
     report.addProperty("explanationComplete", true);

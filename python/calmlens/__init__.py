@@ -6,7 +6,7 @@
 from . import error_codes
 from ._version import __version__
 from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT,
-                     USER_AGENT, CalmLensServerClient, CDNResponse, Transport, TransportResponse)
+                     SIGNED_CDN_RESOURCES, USER_AGENT, CalmLensServerClient, CDNResponse, Transport, TransportResponse)
 from .moderation_context import (MODERATION_CONTEXT_USED_CHARACTERS, MODERATION_CONTEXT_USED_ITEMS,
                                  select_moderation_context_items)
 from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError,
@@ -19,10 +19,10 @@ from .types import (
     CreateFolderOptions, DetectedFace, DetectedPerson, EnsureLensesOptions,
     EvaluatedCategoryResult, EvaluatedFaceDetectionResult, EvaluatedPersonDetectionResult, EvaluatedQualifierResult,
     Event, EventAsset, EventAssetContent, EventAssetModeration, EventAssetClassification, EventAssetUpload, AssetUpload, EventFact, EventFactKey, EventFactValue, EventSeverity, EventType, EventsPage, ExtractedText,
-    FaceDetectionFeatureOptions, FaceDetectionResult, FileMetadata, FileMetadataLocation, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, AssetImage,
+    FaceDetectionFeatureOptions, FaceDetectionResult, FileMetadata, FileMetadataLocation, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, AssetRendered, AssetRenderedKind, AssetPreview, AssetModerationTimeline, SignedCdnResource,
     ImageTransformBorder, ImageTransformGravityPoint, ImageTransformOptions, ImageTransformTrim,
     ImageTransformTrimBorder, InlineExtractedText, Lens, LensDefinition, LensType, Likelihood,
-    ListAssetsOptions, ListChildrenOptions, ListTimelineOptions, ListEventsOptions, MediaClassificationReport, MediaClassificationSegment,
+    ListAssetsOptions, ListChildrenOptions, ListTimelineOptions, ListEventsOptions, MediaClassificationSegment,
     MediaSegmentSource, MetadataItem, ClassifyTextOptions, ModerationAction, ModerationContext, ModerationContextItem, ModerationQualifier, MoveAssetOptions,
     ExplainAssetOptions, AssetBatchOperation, BatchAssetsOptions, BatchAssetsResponse,
     MoveFolderOptions, NotEvaluatedCategoryResult, NotEvaluatedFeatureResult, NotEvaluatedQualifierResult,
@@ -54,7 +54,7 @@ from .webhooks import (WEBHOOK_DELIVERY_HEADER, WEBHOOK_SIGNATURE_HEADER, WEBHOO
 __all__ = ["ViewerClaims",
     "__version__", "error_codes", "USER_AGENT", "DEFAULT_TIMEOUT", "DEFAULT_CONNECT_TIMEOUT", "DEFAULT_MAX_RETRIES",
     "DEFAULT_MAX_RESPONSE_BYTES",
-    "CalmLensServerClient", "CDNResponse", "Transport", "TransportResponse",
+    "CalmLensServerClient", "CDNResponse", "Transport", "TransportResponse", "SIGNED_CDN_RESOURCES",
     "CalmLensError", "CalmLensAPIError", "CalmLensTransportError", "CalmLensTimeoutError", "CalmLensValidationError",
     "WebhookVerificationError",
     "select_moderation_context_items", "MODERATION_CONTEXT_USED_ITEMS", "MODERATION_CONTEXT_USED_CHARACTERS",
@@ -72,10 +72,10 @@ __all__ = ["ViewerClaims",
     "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetImage",
+    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetPreview", "AssetModerationTimeline", "SignedCdnResource",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensType",
-    "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions", "MediaClassificationReport",
+    "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions",
     "MediaClassificationSegment", "MediaSegmentSource", "MetadataItem", "ClassifyTextOptions", "ModerationAction",
     "ModerationContext", "ModerationContextItem",
     "ModerationQualifier", "MoveAssetOptions", "ExplainAssetOptions", "AssetBatchOperation", "BatchAssetsOptions",

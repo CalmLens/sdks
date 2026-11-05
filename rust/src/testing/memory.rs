@@ -431,28 +431,25 @@ fn check_metadata(metadata: Option<&Value>) -> Outcome<()> {
     Ok(())
 }
 /// A whole number from `low` to `high` in query parameter `path`, or the schema's error.
-/// An asset's findings timeline, a page at a time, as the API lists it: its report's segments in
-/// time order, with a cursor naming the next one's position.
+/// An asset's findings timeline, as the API lists it: refused while a safety hold is on. The
+/// mock analyses no audio or video, so it keeps no segments: every timeline is empty, and no
+/// cursor continues one.
 fn timeline_page(asset: &Value, q: &HashMap<String, String>) -> Outcome<Value> {
     let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
-    let offset = match q.get("cursor") {
-        None => 0,
-        Some(cursor) => cursor
-            .strip_prefix("timeline:")
-            .filter(|digits| !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()))
-            .and_then(|digits| digits.parse::<usize>().ok())
-            .ok_or_else(|| fail(ErrorCode::InvalidCursor, "Invalid cursor"))?,
-    };
-    let segments = asset["classification"]["moderation"]["raw"]["timeline"]["segments"]
-        .as_array()
-        .map_or(&[][..], Vec::as_slice);
-    let has_more = offset.saturating_add(size) < segments.len();
-    let items: Vec<Value> = segments.iter().skip(offset).take(size).cloned().collect();
+    if !asset["content"]["safetyHold"].is_null() {
+        return Err(fail(
+            ErrorCode::AssetSafetyHeld,
+            "This asset is under a safety hold",
+        ));
+    }
+    if q.contains_key("cursor") {
+        return Err(fail(ErrorCode::InvalidCursor, "Invalid cursor"));
+    }
     Ok(json!({
-        "items": items,
-        "nextCursor": if has_more { json!(format!("timeline:{}", offset + size)) } else { Value::Null },
+        "items": [],
+        "nextCursor": null,
         "pageSize": size,
-        "hasMore": has_more,
+        "hasMore": false,
         "ordering": [],
     }))
 }
@@ -635,27 +632,119 @@ pub(super) fn percent_decode(segment: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// The ThumbHash the mock gives every classified image, standing in for one computed from its
-/// pixels. The `placeholder` resource serves it as a PNG, like the CDN.
+/// The ThumbHash the mock gives every processed asset's preview, standing in for one computed
+/// from its pixels. The `placeholder` resource serves it as a PNG, like the CDN.
 const MOCK_THUMBHASH: &str = "1QcSHQRnh493V4dIh4eXh1h4kJUI";
 
-/// `image` without its placeholder: removing content removes the ThumbHash and average colour.
-fn without_placeholder(image: &Value) -> Value {
-    match image {
-        Value::Object(image) => {
-            let mut image = image.clone();
-            image.insert("thumbhash".into(), Value::Null);
-            image.insert("averageColor".into(), Value::Null);
-            Value::Object(image)
-        }
-        other => other.clone(),
+/// The size of the waveform the API makes as an audio asset's preview.
+const WAVEFORM_SIZE: (u32, u32) = (1200, 300);
+
+/// Audio and video formats browsers play as uploaded, so the API serves them as stored.
+const BROWSER_SAFE_MEDIA_FORMATS: [&str; 6] = [
+    "video/mp4",
+    "audio/mpeg",
+    "audio/aac",
+    "audio/mp4",
+    "audio/x-m4a",
+    "audio/ogg",
+];
+
+/// Spreadsheets, which have no rendered file or preview.
+const SPREADSHEET_MIME_TYPES: [&str; 4] = [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel.sheet.macroenabled.12",
+    "application/vnd.ms-excel",
+    "application/vnd.oasis.opendocument.spreadsheet",
+];
+
+/// Paths beneath `/rendered/` the CDN reserves for streaming and an embeddable player.
+const RESERVED_RENDERED_PATHS: [&str; 2] = ["stream", "player"];
+
+/// The rendered file and preview the API reports for an asset with its content held, as
+/// `(rendered, preview)`. Once uploaded, an image renders as itself with a preview that has no
+/// ThumbHash yet, and a PDF and browser-safe audio and video render as uploaded. Once processed,
+/// a website renders as its screenshot; a document or presentation as a PDF, with its first page
+/// as the preview; video and audio as a browser-safe file (MP4 or M4A unless browsers play the
+/// upload), audio with a waveform preview and video with no poster; and every preview has its
+/// ThumbHash. Text, spreadsheets and other files have neither. The mock decodes nothing, so sizes
+/// are unknown and audio has no peaks.
+fn mock_rendering(asset: &Value, processed: bool) -> (Value, Value) {
+    let format = asset["content"]["format"].as_str();
+    let mime = normalize_mime(format.unwrap_or(""));
+    let browser_safe = BROWSER_SAFE_MEDIA_FORMATS.contains(&mime.as_str());
+    let preview = |width: Value, height: Value| {
+        json!({
+            "width": width,
+            "height": height,
+            "thumbhash": if processed { json!(MOCK_THUMBHASH) } else { Value::Null },
+            "averageColor": if processed { json!("#7f7f7f") } else { Value::Null },
+        })
+    };
+    let rendered = |kind: &str, format: &str| json!({"kind": kind, "format": format, "width": null, "height": null});
+    let kind = text(&asset["type"]);
+    let renders_on_upload = kind == "image"
+        || mime == "application/pdf"
+        || ((kind == "video" || kind == "audio") && browser_safe);
+    if !processed && !renders_on_upload {
+        return (Value::Null, Value::Null);
     }
+    let media_format = |fallback: &str| {
+        if browser_safe {
+            format.unwrap_or(fallback).to_owned()
+        } else {
+            fallback.to_owned()
+        }
+    };
+    match kind {
+        "image" => (
+            rendered("image", format.unwrap_or("image/png")),
+            preview(Value::Null, Value::Null),
+        ),
+        "website" => (
+            rendered("image", "image/png"),
+            preview(Value::Null, Value::Null),
+        ),
+        "multimedia-document" if SPREADSHEET_MIME_TYPES.contains(&mime.as_str()) => {
+            (Value::Null, Value::Null)
+        }
+        "multimedia-document" => (
+            rendered("pdf", "application/pdf"),
+            if processed {
+                preview(Value::Null, Value::Null)
+            } else {
+                Value::Null
+            },
+        ),
+        "video" => (rendered("video", &media_format("video/mp4")), Value::Null),
+        "audio" => {
+            let mut audio = rendered("audio", &media_format("audio/mp4"));
+            if processed {
+                audio["peaks"] = json!([]);
+            }
+            (
+                audio,
+                if processed {
+                    preview(WAVEFORM_SIZE.0.into(), WAVEFORM_SIZE.1.into())
+                } else {
+                    Value::Null
+                },
+            )
+        }
+        _ => (Value::Null, Value::Null),
+    }
+}
+
+/// Sets an asset's rendered file and preview.
+fn set_rendering(content: &mut Map<String, Value>, (rendered, preview): (Value, Value)) {
+    content.insert("rendered".into(), rendered);
+    content.insert("preview".into(), preview);
 }
 
 /// Moves `asset` to `outcome` like the pipeline: a decision completes processing, `purged`
 /// removes the content (with `purge_reason`), and completed processing removes content held
-/// only temporarily (reason `retention`). A classified image gets a ThumbHash for its
-/// placeholder, which goes with its content.
+/// only temporarily (reason `retention`). An asset whose content is held has its rendered file
+/// and preview, completed by its decision (with a ThumbHash for its placeholder); removing the
+/// content removes them with it, and a safety hold withholds them.
 fn apply_outcome(
     asset: &mut Value,
     content: &mut HashMap<String, StoredContent>,
@@ -672,24 +761,10 @@ fn apply_outcome(
     let removed = asset["content"]["status"] == "removed";
     let purge = outcome == "purged" && !removed;
     let remove = purge || (status == "completed" && asset["content"]["status"] == "temporary");
-    let classified_image = decided && asset["type"] == "image" && !removed && !purge;
-    let image = asset["content"]["image"].clone();
-    let image = if classified_image {
-        let mut fields = json!({"width": null, "height": null, "perceptualHash": null});
-        if let Value::Object(old) = &image {
-            for (key, value) in old {
-                fields[key] = value.clone();
-            }
-        }
-        fields["thumbhash"] = MOCK_THUMBHASH.into();
-        if fields["averageColor"].is_null() {
-            fields["averageColor"] = "#7f7f7f".into();
-        }
-        fields
-    } else if outcome == "purged" {
-        without_placeholder(&image)
+    let rendering = if !removed && !purge && asset["content"]["safetyHold"].is_null() {
+        mock_rendering(asset, decided)
     } else {
-        image
+        (Value::Null, Value::Null)
     };
     let stored = section(asset, "content");
     if remove {
@@ -700,10 +775,10 @@ fn apply_outcome(
         );
         stored.insert("updatedAt".into(), now.into());
         stored.insert("extractedText".into(), Value::Null);
-        stored.insert("fileMetadata".into(), Value::Null);
-        stored.insert("image".into(), without_placeholder(&image));
+        stored.insert("metadata".into(), Value::Null);
+        set_rendering(stored, (Value::Null, Value::Null));
     } else {
-        stored.insert("image".into(), image);
+        set_rendering(stored, rendering);
     }
     if remove {
         content.remove(text(&asset["id"]));
@@ -725,9 +800,9 @@ fn apply_outcome(
         "completedAt".into(),
         if decided { now.into() } else { Value::Null },
     );
-    let moderation = classification
-        .entry("moderation")
-        .or_insert_with(|| json!({"manualReviews": [], "flaggedCategories": [], "regions": []}));
+    let moderation = classification.entry("moderation").or_insert_with(
+        || json!({"manualReviews": [], "flaggedCategories": [], "regions": [], "timeline": null}),
+    );
     moderation["status"] = if decided { outcome } else { "pending" }.into();
     let upload = section(asset, "upload");
     upload.insert("status".into(), "completed".into());
@@ -933,22 +1008,21 @@ impl Backend {
     }
 
     /// Removes an asset's content like the API: the record and report stay; stored content,
-    /// extracted text and the placeholder go. Content already removed keeps its reason, and an
+    /// extracted text, metadata, the rendered file and the preview go. Content already removed keeps its reason, and an
     /// `asset.content-removed` event is recorded either way.
     fn remove_content(&mut self, mut asset: Value, now: u64) -> Value {
         let id = text(&asset["id"]).to_owned();
         self.storage.content.remove(&id);
-        let image = without_placeholder(&asset["content"]["image"]);
         if asset["content"]["status"] != "removed" {
             let content = section(&mut asset, "content");
             content.insert("status".into(), "removed".into());
             content.insert("removalReason".into(), "requested".into());
             content.insert("updatedAt".into(), now.into());
             content.insert("extractedText".into(), Value::Null);
-            content.insert("fileMetadata".into(), Value::Null);
+            content.insert("metadata".into(), Value::Null);
             asset["updatedAt"] = now.into();
         }
-        asset["content"]["image"] = image;
+        set_rendering(section(&mut asset, "content"), (Value::Null, Value::Null));
         asset["context"] = Value::Null;
         self.storage.assets.insert(id, asset.clone());
         self.record_lifecycle_event("asset.content-removed", &asset);
@@ -1191,6 +1265,13 @@ impl Backend {
                         })
                     }
                     ("GET", "assets/search") => self.search(q),
+                    ("GET", _) if matches!(route, [assets, _, timeline] if assets == "assets" && timeline == "timeline") =>
+                    {
+                        let asset = self
+                            .owned(&self.storage.assets, &route[1])
+                            .ok_or_else(|| fail(ErrorCode::AssetNotFound, "Asset not found"))?;
+                        timeline_page(asset, q)
+                    }
                     ("POST", "assets/batch") => self.batch(body, now),
                     (_, "policy") => self.policy_route(method, route, body),
                     (_, path) if path.split('/').next() == Some("policies") => {
@@ -1792,15 +1873,15 @@ impl Backend {
             let asset = self
                 .owned(&self.storage.assets, asset_id)
                 .ok_or_else(|| fail(ErrorCode::AssetNotFound, "Asset not found"))?;
-            let image = &asset["content"]["image"];
-            let Some(perceptual) = image["perceptualHash"].as_str() else {
+            let content = &asset["content"];
+            let Some(perceptual) = content["perceptualHash"].as_str() else {
                 return Err(fail(
                     ErrorCode::HashListAssetNotHashed,
                     "This asset has no perceptual hash",
                 ));
             };
             hash = Some(perceptual.to_owned());
-            quality = image
+            quality = content
                 .get("perceptualHashQuality")
                 .filter(|value| value.is_number())
                 .cloned();
@@ -1953,8 +2034,13 @@ impl Backend {
             "content": {
                 "status": if keep { "stored" } else { "temporary" }, "removalReason": null,
                 "updatedAt": now, "safetyHold": null, "format": null, "extension": null,
-                "sizeInBytes": null, "checksums": null, "image": null, "extractedText": null,
-                "fileMetadata": null,
+                "sizeInBytes": null, "checksums": null,
+                // The mock decodes nothing, so the file's own details are unknown.
+                "width": null, "height": null, "durationSeconds": null, "pageCount": null,
+                "perceptualHash": null, "perceptualHashQuality": null, "metadata": null,
+                "extractedText": null,
+                // Like the API, the rendered file and preview come with processing.
+                "rendered": null, "preview": null,
             },
             "upload": {
                 "status": if open { "uploading" } else { "completed" }, "updatedAt": now,
@@ -1965,7 +2051,10 @@ impl Backend {
                 "updatedAt": now, "completedAt": null, "progress": null,
                 // The mock never reads test inputs.
                 "testInput": false,
-                "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": []},
+                "moderation": {
+                    "status": "pending", "manualReviews": [], "flaggedCategories": [],
+                    "regions": [], "timeline": null,
+                },
             },
         });
         for key in [
@@ -2002,6 +2091,10 @@ impl Backend {
             );
         }
         if !open {
+            if !website {
+                let rendering = mock_rendering(&asset, false);
+                set_rendering(section(&mut asset, "content"), rendering);
+            }
             return self.finish_upload(asset, queue, now).inspect_err(|_| {
                 self.storage.content.remove(&id);
             });
@@ -2062,6 +2155,10 @@ impl Backend {
                         return Err(validation(issue, key));
                     }
                 }
+                let resource = body.get("resource").map_or("rendered", text);
+                if !crate::models::SIGNED_CDN_RESOURCES.contains(&resource) {
+                    return Err(validation("invalid-value", "resource"));
+                }
             }
             _ => {}
         }
@@ -2082,7 +2179,6 @@ impl Backend {
             ("GET", "children") => {
                 return self.page(q, id, |child| child["parentId"] == id);
             }
-            ("GET", "timeline") => return timeline_page(&asset, q),
             ("POST", "signed-url") => {
                 let expires = body
                     .get("expiresInSeconds")
@@ -2372,11 +2468,16 @@ impl Backend {
         Ok(json!({"query": query, "items": items, "semanticStatus": "disabled"}))
     }
 
-    /// A CDN request, served like the CDN: stored bytes with `Content-Type`, `Content-Length`,
-    /// `Cache-Control`, `Cache-Tag`, the protection headers and, for images, `ETag` and
-    /// `Expires`; or a JSON error. Delivery checks come first and refuse everyone (content
-    /// uploading or removed, blocked, purged or failed assets); then private and age-restricted
-    /// assets need the download permission. A `placeholder` is the image's ThumbHash as a PNG.
+    /// A CDN request, served like the CDN: `200` with `Content-Type`, `Content-Length`,
+    /// `Cache-Control`, `Cache-Tag`, the protection headers and, for still images, `ETag` and
+    /// `Expires`; or a JSON error with `400`, `403` or `404`. `original` is the upload;
+    /// `rendered` the image, PDF, video or audio file `content.rendered` describes; `preview` the
+    /// still `content.preview` describes; and `placeholder` its ThumbHash as a PNG. A safety hold
+    /// refuses every resource; delivery checks then refuse everyone (content uploading or
+    /// removed, blocked, purged or failed assets), and private and age-restricted assets need the
+    /// download permission. The mock converts nothing: an upload stands in for its rendered file
+    /// and an image for its own preview, and the placeholder PNG for a screenshot, page or
+    /// waveform.
     fn serve(
         &self,
         parts: &[String],
@@ -2388,23 +2489,41 @@ impl Backend {
             || custom(ErrorCode::AssetNotFound.as_str(), 404, "Asset not found").response();
         let not_available =
             || custom("asset/not-available", 403, "Asset is not available").response();
-        // Like the CDN, the selector after the resource (as sent, still percent-encoded) is read
-        // first, and lenses and transforms apply only to the rendered resource.
+        let no_rendered_version = || {
+            custom(
+                ErrorCode::NoRenderedVersion.as_str(),
+                404,
+                "This asset has no such resource",
+            )
+            .response()
+        };
         let invalid_transform =
             || custom("asset/invalid-transform", 400, "Invalid transform selector").response();
-        let selector = raw_parts.get(4..).unwrap_or_default().join("/");
-        let Some(selector) = parse_transform_selector(&selector) else {
+        let resource = parts.get(3).map_or("", String::as_str);
+        let selector_parts = raw_parts.get(4..).unwrap_or_default();
+        // Like the CDN, `/rendered/stream` and `/rendered/player` are reserved, then the selector
+        // after the resource (as sent, still percent-encoded) is read; the original takes none.
+        if resource == "rendered"
+            && selector_parts
+                .first()
+                .is_some_and(|part| RESERVED_RENDERED_PATHS.contains(part))
+        {
+            return no_rendered_version();
+        }
+        let Some(selector) = parse_transform_selector(&selector_parts.join("/")) else {
             return invalid_transform();
         };
-        if parts.get(3).is_some_and(|resource| resource == "original")
-            && (selector.lens.is_some() || selector.options.is_some())
-        {
+        let has_selector = selector.lens.is_some() || selector.options.is_some();
+        if resource == "original" && has_selector {
             return invalid_transform();
         }
-        let [scope, project, identifier, resource, ..] = parts else {
+        let [scope, project, identifier, _, ..] = parts else {
             return not_found();
         };
-        if scope != "assets" || *project != self.options.project_id {
+        if scope != "assets"
+            || *project != self.options.project_id
+            || !["original", "rendered", "preview", "placeholder"].contains(&resource)
+        {
             return not_found();
         }
         let Some(asset) = self.storage.assets.values().find(|asset| {
@@ -2419,11 +2538,17 @@ impl Backend {
         let public = asset["visibility"] == "public";
         let can_download =
             || self.can_download(text(&asset["folderId"]), header(headers, "x-api-key"));
+        let rendered = &asset["content"]["rendered"];
+        let preview = &asset["content"]["preview"];
+        // Like the CDN, a safety hold refuses every resource.
+        if !asset["content"]["safetyHold"].is_null() {
+            return not_available();
+        }
         if resource == "placeholder" {
-            // Like the CDN's placeholder handler: an image's ThumbHash, public whatever the
+            // Like the CDN's placeholder handler: the preview's ThumbHash, public whatever the
             // asset's visibility or moderation; refused for purged assets and assets without one
-            // (not yet classified, or content removed).
-            let thumbhash = text(&asset["content"]["image"]["thumbhash"]);
+            // (not yet processed, without a preview, or content removed).
+            let thumbhash = text(&preview["thumbhash"]);
             if thumbhash.is_empty() || status == "purged" {
                 return not_available();
             }
@@ -2441,15 +2566,15 @@ impl Backend {
             );
         }
         let stored = self.storage.content.get(id);
-        let Some(stored) = stored.filter(|_| {
-            asset["upload"]["status"] != "uploading"
-                && status != "blocked"
-                && status != "purged"
-                && asset["classification"]["status"] != "failed"
-                && asset["content"]["status"] != "removed"
-        }) else {
+        if asset["upload"]["status"] == "uploading"
+            || status == "blocked"
+            || status == "purged"
+            || asset["classification"]["status"] == "failed"
+            || asset["content"]["status"] == "removed"
+            || (resource == "original" && stored.is_none())
+        {
             return not_available();
-        };
+        }
         let claims: Value =
             serde_json::from_str(q.get("viewerClaims").map(String::as_str).unwrap_or("{}"))
                 .unwrap_or(Value::Null);
@@ -2470,6 +2595,18 @@ impl Backend {
             )
             .response();
         }
+        // Then whether the asset has the resource, and whether it is a still image that takes a
+        // lens or transform: the preview always is, the rendered file only when it is an image.
+        if (resource == "rendered" && rendered.is_null())
+            || (resource == "preview" && preview.is_null())
+        {
+            return no_rendered_version();
+        }
+        let still_image =
+            resource == "preview" || (resource == "rendered" && rendered["kind"] == "image");
+        if !still_image && has_selector {
+            return invalid_transform();
+        }
         // Then the options, checked against the transform schema once the asset may be served.
         if let Some(options) = selector.options {
             let (unknown, invalid) = check_transform_options(&Value::Object(options));
@@ -2483,17 +2620,38 @@ impl Backend {
                 .response();
             }
         }
-        // Like the CDN: an image's bytes are immutable for a year, other content is kept for an
-        // hour, by shared caches only when delivery is public.
-        let image = asset["type"] == "image";
+        // The bytes: the upload, which stands in for its own rendered file and an image's
+        // preview, or the placeholder PNG for a still the mock doesn't make.
+        let serves_upload = resource == "original"
+            || (resource == "rendered" && rendered["kind"] != "image")
+            || asset["type"] == "image";
+        let (body, content_type) = if serves_upload {
+            let Some(stored) = stored else {
+                return not_available();
+            };
+            let content_type = match rendered["format"].as_str() {
+                Some(format) if resource == "rendered" => format.to_owned(),
+                _ => stored.content_type.clone(),
+            };
+            (stored.bytes(), content_type)
+        } else {
+            let thumbhash = preview["thumbhash"].as_str().unwrap_or(MOCK_THUMBHASH);
+            let Some(png) = super::placeholder::placeholder_png(thumbhash) else {
+                return not_available();
+            };
+            (png, "image/png".to_owned())
+        };
+        // Like the CDN: a still image's bytes are immutable for a year, other content is kept
+        // for an hour, by shared caches only when delivery is public.
+        let immutable = still_image || (resource == "original" && asset["type"] == "image");
         let access = if restricted { "private" } else { "public" };
-        let lifetime = if image {
+        let lifetime = if immutable {
             "max-age=31536000, immutable"
         } else {
             "max-age=3600"
         };
         let mut response_headers = vec![
-            ("content-type", stored.content_type.clone()),
+            ("content-type", content_type.clone()),
             (
                 "cache-control",
                 if claims.as_object().is_some_and(|c| !c.is_empty()) {
@@ -2504,7 +2662,7 @@ impl Backend {
             ),
             ("cache-tag", format!("asset-{id}")),
         ];
-        if image {
+        if immutable {
             response_headers.push(("etag", format!("\"{id}\"")));
             response_headers.push(("expires", http_date(self.now() / 1000 + 31_536_000)));
         }
@@ -2513,10 +2671,10 @@ impl Backend {
             "content-security-policy",
             "sandbox; default-src 'none'".into(),
         ));
-        if is_active_content_type(&stored.content_type) {
+        if is_active_content_type(&content_type) {
             response_headers.push(("content-disposition", "attachment".into()));
         }
-        cdn_response(stored.bytes(), &response_headers)
+        cdn_response(body, &response_headers)
     }
 
     fn can_download(&self, folder: &str, api_key: &str) -> bool {
@@ -2596,6 +2754,7 @@ impl Backend {
             ("POST", ["projects", _, "folders"]) => "folders.create",
             ("GET", ["projects", _, "assets"]) => "assets.list",
             ("GET", ["projects", _, "assets", "search"]) => "assets.search",
+            ("GET", ["projects", _, "assets", _, "timeline"]) => "assets.listTimeline",
             ("POST", ["projects", _, "assets", "batch"]) => "assets.batch",
             ("POST", ["projects", _, "assets"]) if queue => "assets.create",
             ("POST", ["projects", _, "assets"]) => "assets.classify",
@@ -2603,7 +2762,6 @@ impl Backend {
             ("PATCH", ["assets", _]) => "assets.update",
             ("DELETE", ["assets", _]) => "assets.delete",
             ("GET", ["assets", _, "children"]) => "assets.listChildren",
-            ("GET", ["assets", _, "timeline"]) => "assets.listTimeline",
             ("DELETE", ["assets", _, "content"]) => "assets.deleteContent",
             ("POST", ["assets", _, "signed-url"]) => "assets.createSignedUrl",
             ("POST", ["assets", _, "retry"]) => "assets.retry",

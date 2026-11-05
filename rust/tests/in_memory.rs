@@ -98,44 +98,94 @@ async fn storage_keeps_only_kept_content_and_drops_purged_content() {
     assert!(!purging.with_storage(|storage| storage.content.contains_key(&purged.id)));
 }
 
+/// The shared scenarios cover an empty timeline and opaque cursors; these are the page size
+/// bound and a safety hold, which withholds the timeline, every CDN resource (the public
+/// placeholder too) and the rendered file and preview a later decision would make.
 #[tokio::test]
-async fn timeline_pages_through_the_report_segments_in_order() {
+async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
     let mock = MockServerClient::in_memory(options()).unwrap();
-    let asset = mock.assets().classify(kept("v.png", b"png")).await.unwrap();
-    let segment = |start: f64| json!({"source": "clip", "startSeconds": start, "endSeconds": start + 10.0, "categories": {}});
-    mock.with_storage(|storage| {
-        storage.assets.get_mut(&asset.id).unwrap()["classification"]["moderation"]["raw"] =
-            json!({"categories": {}, "timeline": {"segments": [segment(0.0), segment(10.0), segment(20.0)]}});
-    });
-    let page = |cursor: Option<String>| ListTimeline {
-        asset_id: asset.id.clone(),
-        cursor,
-        page_size: Some(2),
-    };
-    let first = mock.assets().list_timeline(page(None)).await.unwrap();
-    let starts = |page: &AssetTimelinePage| -> Vec<f64> {
-        page.items.iter().map(|item| item.start_seconds).collect()
-    };
-    assert_eq!(starts(&first), [0.0, 10.0]);
-    assert_eq!(first.has_more, Some(true));
-    assert_eq!(first.next_cursor.as_deref(), Some("timeline:2"));
-    let last = mock
-        .assets()
-        .list_timeline(page(first.next_cursor))
-        .await
-        .unwrap();
-    assert_eq!(starts(&last), [20.0]);
-    assert_eq!(last.has_more, Some(false));
-    assert_eq!(last.next_cursor, None);
+    let decided = mock.assets().classify(kept("v.png", b"png")).await.unwrap();
+    assert_eq!(
+        decided
+            .content
+            .preview
+            .as_ref()
+            .unwrap()
+            .average_color
+            .as_deref(),
+        Some("#7f7f7f")
+    );
     let error = mock
         .assets()
         .list_timeline(ListTimeline {
+            asset_id: decided.id.clone(),
             page_size: Some(101),
-            ..page(None)
+            ..Default::default()
         })
         .await
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::TooBig);
+    let hold = json!({"placedAt": 1, "reason": "suspected-illegal-content", "disposedAt": null});
+    mock.with_storage(|storage| {
+        storage.assets.get_mut(&decided.id).unwrap()["content"]["safetyHold"] = hold.clone();
+    });
+    let error = mock
+        .assets()
+        .list_timeline(ListTimeline {
+            asset_id: decided.id.clone(),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::AssetSafetyHeld);
+    for resource in [
+        CdnResource::Original,
+        CdnResource::Rendered,
+        CdnResource::Preview,
+        CdnResource::Placeholder,
+    ] {
+        let response = mock
+            .cdn()
+            .serve(CdnRequest {
+                asset_identifier: decided.id.clone(),
+                resource: Some(resource.clone()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(response.status().as_u16(), 403, "{resource:?}");
+        let body: serde_json::Value =
+            serde_json::from_slice(&response.bytes().await.unwrap()).unwrap();
+        assert_eq!(body["code"], "asset/not-available", "{resource:?}");
+    }
+
+    let queued = mock
+        .assets()
+        .create(SubmitAsset {
+            processing_options: Some(ProcessingOptions {
+                keep_content_after_processing: Some(true),
+                ..Default::default()
+            }),
+            ..SubmitAsset::new("song.mp3", Content::bytes(&b"mp3"[..], "audio/mpeg"))
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        queued.content.rendered.as_ref().map(|r| r.format.as_str()),
+        Some("audio/mpeg")
+    );
+    mock.with_storage(|storage| {
+        storage.assets.get_mut(&queued.id).unwrap()["content"]["safetyHold"] = hold.clone();
+    });
+    let held = mock.complete_processing(&queued.id, None).unwrap();
+    assert_eq!(
+        held.classification.status,
+        AssetClassificationStatus::Completed
+    );
+    assert_eq!(
+        (&held.content.rendered, &held.content.preview),
+        (&None, &None)
+    );
 }
 
 #[tokio::test]
@@ -502,8 +552,9 @@ async fn hash_list_entries_come_from_assets_and_go_with_their_list() {
     let unhashed = mock.assets().create(kept("b.png", b"png")).await.unwrap();
     let perceptual = "ab".repeat(32);
     mock.with_storage(|storage| {
-        storage.assets.get_mut(&hashed.id).unwrap()["content"]["image"] =
-            json!({"perceptualHash": perceptual, "perceptualHashQuality": 87});
+        let content = &mut storage.assets.get_mut(&hashed.id).unwrap()["content"];
+        content["perceptualHash"] = json!(perceptual);
+        content["perceptualHashQuality"] = json!(87);
     });
     let lists = mock.hash_lists();
     let list = lists

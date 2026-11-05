@@ -109,9 +109,9 @@ class StatefulMockTest {
     Models.Asset hashed = mock.client.assets.classify(kept("hashed.png"));
     Models.Asset unhashed = mock.client.assets.classify(kept("unhashed.png"));
     mock.withStorage(storage -> {
-      var image = storage.assets.get(hashed.id()).getAsJsonObject("content").getAsJsonObject("image");
-      image.addProperty("perceptualHash", hash);
-      image.addProperty("perceptualHashQuality", 80);
+      var content = storage.assets.get(hashed.id()).getAsJsonObject("content");
+      content.addProperty("perceptualHash", hash);
+      content.addProperty("perceptualHashQuality", 80);
     });
     Models.HashList list = mock.client.hashLists.create(new Models.CreateHashList("Removed", Models.HashListAction.BLOCK));
 
@@ -179,5 +179,34 @@ class StatefulMockTest {
     JsonObject signed = raw(api, "POST", "/assets/asset_missing/signed-url", java.util.Map.of(), null, "{\"resource\":null}");
     assertEquals("validation/invalid-value", signed.get("code").getAsString());
     assertEquals("resource", signed.getAsJsonObject("details").get("path").getAsString());
+    // A resource outside the signed ones is refused before the asset lookup too.
+    JsonObject placeholder = raw(api, "POST", "/assets/asset_missing/signed-url", java.util.Map.of(), null, "{\"resource\":\"placeholder\"}");
+    assertEquals("validation/invalid-value", placeholder.get("code").getAsString());
+    assertEquals("resource", placeholder.getAsJsonObject("details").get("path").getAsString());
+  }
+
+  /** No shared scenario can place a safety hold, so this one is placed in storage. */
+  @Test void aSafetyHoldWithholdsTheRenderingAndRefusesEveryResourceAndTheTimeline() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    Models.Asset asset = mock.client.assets.classify(kept("held.png").visibility(Models.Visibility.PUBLIC));
+    assertEquals(MockApi.MOCK_THUMBHASH, asset.content().preview().thumbhash());
+    mock.withStorage(storage -> {
+      JsonObject hold = new JsonObject();
+      hold.addProperty("reason", "suspected-illegal-content");
+      hold.addProperty("placedAt", 1_700_000_000_000L);
+      storage.assets.get(asset.id()).getAsJsonObject("content").add("safetyHold", hold);
+    });
+    for (String resource : List.of("original", "rendered", "preview", "placeholder")) {
+      try (CdnResponse served = mock.client.cdn.serve(new Models.CdnRequest(asset.id()).resource(resource))) {
+        assertEquals(403, served.status(), resource);
+        assertEquals("asset/not-available", JsonParser.parseString(new String(served.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8))
+            .getAsJsonObject().get("code").getAsString(), resource);
+      }
+    }
+    assertEquals(ErrorCodes.ASSET_SAFETY_HELD, assertThrows(ApiException.class,
+        () -> mock.client.assets.listTimeline(new Models.ListTimeline(asset.id()))).getCode());
+    Models.Asset decided = mock.decide(asset.id(), Outcome.LIMITED);
+    assertNull(decided.content().rendered());
+    assertNull(decided.content().preview());
   }
 }

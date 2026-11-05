@@ -332,7 +332,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "asset/no-rendered-version": {
     status: 404,
-    message: "This asset has no rendered version, such as a document whose page image hasn't been generated or a text asset. Request its original resource instead.",
+    message: "This asset has no such resource: text and spreadsheets have no rendered version or preview, and documents, audio and video get theirs once processing makes them. Check the asset's `content.rendered` and `content.preview`, or request its original resource instead.",
   },
   "asset/not-found": {
     status: 404,

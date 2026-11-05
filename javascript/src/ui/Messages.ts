@@ -45,6 +45,12 @@ export interface CalmLensMessages {
   sensitiveTitle: string;
   sensitiveBody: string;
   reveal: string;
+  /** The link that opens a PDF on its own, for browsers that don't show it in the page. */
+  openPdf: string;
+  /** Names a PDF without `alt`. */
+  pdfTitle: string;
+  /** React Native: opens a video or audio without `renderPlayer` in the device's player. */
+  play: string;
   unavailable: string;
   /** A viewer-specific regional block reported by the asset API. */
   regionalUnavailable: string;
@@ -83,6 +89,9 @@ export const DEFAULT_MESSAGES: CalmLensMessages = {
   sensitiveTitle: "Sensitive content",
   sensitiveBody: "This may not be suitable for everyone.",
   reveal: "View",
+  openPdf: "Open PDF",
+  pdfTitle: "PDF document",
+  play: "Play",
   unavailable: "Unavailable",
   regionalUnavailable: "Unavailable in your region",
 };

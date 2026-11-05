@@ -1,5 +1,6 @@
 import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, o as backfill, s as updatedAt, t as EXAMPLE_IDS } from "./Ids-D2XfVlL6.js";
 import { t as CLASSIFICATION_CATEGORIES } from "./ModerationCategories-CHFRoeWV.js";
+import "./Media-CEXv4NuY.js";
 import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
 import "./SharedConstants-DxUCZwLZ.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
@@ -536,6 +537,17 @@ const CLASSIFICATION_LABEL_SCHEMA = zod.object({
 	likelihood: LIKELIHOOD_SCHEMA,
 	knowledgeBaseId: saneStringField().nullish()
 });
+zod.object({
+	source: zod.enum([
+		"frame",
+		"speech",
+		"frame-text",
+		"clip"
+	]),
+	startSeconds: zod.number().nonnegative(),
+	endSeconds: zod.number().nonnegative(),
+	categories: CATEGORIES_SCHEMA
+}).strict();
 const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 	testInput: zod.literal(true).optional().describe("Set when the findings come from one of the project's authenticated test inputs."),
 	testCategoryActions: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, zod.enum([
@@ -554,22 +566,8 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 			frameIntervalSeconds: zod.number().positive().optional(),
 			sampledFrames: zod.number().int().nonnegative(),
 			audioTranscribed: zod.boolean(),
-			/**
-			* Set on long media analysed in sections, whose report keeps a shortened timeline:
-			* the number of segments on its full timeline (the asset's timeline endpoint).
-			*/
-			segmentCount: zod.number().int().nonnegative().optional(),
-			segments: zod.array(zod.object({
-				source: zod.enum([
-					"frame",
-					"speech",
-					"frame-text",
-					"clip"
-				]),
-				startSeconds: zod.number().nonnegative(),
-				endSeconds: zod.number().nonnegative(),
-				categories: CATEGORIES_SCHEMA
-			}).strict())
+			/** How many segments the asset's timeline holds; they are stored beside the asset. */
+			segmentCount: zod.number().int().nonnegative()
 		}).strict().optional(),
 		hashMatches: zod.array(HASH_MATCH_SCHEMA).optional().describe("Entries in the project's hash lists that the image matched, blocking matches first and then the closest. Absent when nothing matched.")
 	}).strict().describe("Detection findings before policy evaluation."),
@@ -750,18 +748,46 @@ const PREVIEW_IMAGE_SCHEMA = zod.object({
 	width: zod.number().int().positive().nullable().describe("Preview width in pixels"),
 	height: zod.number().int().positive().nullable().describe("Preview height in pixels")
 });
+const pixels = (description) => zod.number().int().positive().nullable().describe(description);
 /**
-* The picture CalmLens can show for an asset, as the API returns it. For image assets it is the
-* original upload; for documents and websites it is the page image CalmLens generates.
+* A browser-safe copy of an audio or video asset that processing stores, served at the rendered
+* resource in place of the upload. Stored only; the API describes it as `content.rendered`.
 */
-const ASSET_IMAGE_SCHEMA = zod.object({
-	width: zod.number().int().positive().nullable().describe("Width in pixels: the original's for image assets (a converted HEIC is served smaller at the same aspect ratio), and the generated image's for documents and websites"),
-	height: zod.number().int().positive().nullable().describe("Height in pixels, like `width`"),
-	thumbhash: saneStringField().nullable().describe("ThumbHash placeholder you can render while the image loads; `null` once the image is removed"),
-	averageColor: saneStringField().nullable().describe("Average color of the image; `null` once the image is removed"),
-	perceptualHash: zod.string().nullable().describe("PDQ perceptual hash used to match visually similar images, as 64 hexadecimal characters, for image assets. Hashes 31 or fewer bits apart are usually the same picture."),
-	perceptualHashQuality: zod.number().int().min(0).max(100).nullable().describe("How much detail `perceptualHash` captured, from 0 to 100. Hashes below 50 come from flat or featureless images and match unrelated pictures, so leave them out of comparisons.")
+const RENDERED_MEDIA_SCHEMA = zod.object({
+	storageId: saneStringField().describe("Internal storage key of the browser-safe copy"),
+	format: saneStringField().describe("MIME type of the copy, such as `video/mp4`"),
+	kind: zod.enum(["video", "audio"]),
+	width: zod.number().int().positive().nullish(),
+	height: zod.number().int().positive().nullish(),
+	peaks: zod.array(zod.number().min(0).max(1)).max(512).nullish()
 });
+const ASSET_RENDERED_KIND_SCHEMA = zod.enum([
+	"image",
+	"pdf",
+	"video",
+	"audio"
+]).describe("What the rendered resource serves: an `image` (images, and a website's screenshot), a `pdf` (PDFs, and documents and presentations converted to PDF), or browser-safe `video` or `audio`");
+/** The one displayable file of the asset, as the CDN's `rendered` resource serves it. */
+const ASSET_RENDERED_SCHEMA = zod.object({
+	kind: ASSET_RENDERED_KIND_SCHEMA,
+	format: zod.string().describe("MIME type of the rendered file. An image is served in the best format the client accepts, such as AVIF or WebP, unless a transform sets one."),
+	width: pixels("Width in pixels of the full view, for images and video, before any transform; `null` when unknown or for PDFs and audio"),
+	height: pixels("Height in pixels of the full view, like `width`"),
+	peaks: zod.array(zod.number().min(0).max(1)).max(512).optional().describe(`Audio only, once processing has measured them: up to 512 loudness peaks from 0 to 1 (3 decimal places), evenly spaced over the audio, for drawing a waveform`)
+}).meta(metaStore([docPropertyInfo({
+	description: "The displayable file of the asset, served at the rendered resource",
+	namedType: "AssetRendered"
+})]));
+/** The still image that stands for the asset, as the CDN's `preview` resource serves it. */
+const ASSET_PREVIEW_SCHEMA = zod.object({
+	width: pixels("Width in pixels of the source still image, before the preview is sized or transformed"),
+	height: pixels("Height in pixels of the source still image, like `width`"),
+	thumbhash: saneStringField().nullable().describe("ThumbHash placeholder you can render while any view of the asset loads (also served as a PNG at the placeholder resource)"),
+	averageColor: saneStringField().nullable().describe("Average color of the source still image, a placeholder for any view of the asset")
+}).meta(metaStore([docPropertyInfo({
+	description: "A still image for the asset, served at the preview resource: the image itself, a document's first page or slide, a website's first screen, a video's poster frame or an audio waveform",
+	namedType: "AssetPreview"
+})]));
 const METADATA_ITEM_SCHEMA = zod.object({
 	id: saneStringField().meta(metaStore([docPropertyInfo({
 		description: "Identifier for the metadata item",
@@ -827,7 +853,8 @@ const STORED_ASSET_SCHEMA = zod.object({
 	})])),
 	authorId: MODERATION_AUTHOR_ID_SCHEMA.nullish(),
 	context: USED_MODERATION_CONTEXT_SCHEMA.nullish(),
-	previewImage: PREVIEW_IMAGE_SCHEMA.nullish().describe("Browser-friendly preview generated for images, documents and websites"),
+	previewImage: PREVIEW_IMAGE_SCHEMA.nullish().describe("The still image served at the preview resource: an image's own picture (or its converted HEIC), a document's first page, a website's screenshot, a video's poster or an audio waveform"),
+	renderedMedia: RENDERED_MEDIA_SCHEMA.nullish().describe("Browser-safe copy of an audio or video upload, served at the rendered resource; `null` until processing makes one"),
 	storageId: saneStringField().nullish().describe("Internal storage key of the retained content; `null` when nothing is stored"),
 	uploadPartsReceived: zod.number().int().nullish().describe("Number of parts received so far for a multipart upload"),
 	type: ASSET_TYPE_SCHEMA.describe("Asset type, detected from the content's MIME type"),
@@ -877,6 +904,10 @@ const ASSET_UPLOAD_SCHEMA = zod.object({
 	description: "Upload state",
 	namedType: "AssetUpload"
 })]));
+const ASSET_MODERATION_TIMELINE_SCHEMA = zod.object({ segmentCount: zod.number().int().nonnegative().describe("How many segments the asset's findings timeline holds") }).meta(metaStore([docPropertyInfo({
+	description: "Summary of an audio or video asset's findings timeline",
+	namedType: "AssetModerationTimeline"
+})]));
 /** Findings and the policy/reviewer decision for the moderation capability. */
 const ASSET_MODERATION_SCHEMA = zod.object({
 	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `limited` (delivered normally, marked for reduced reach), `age-restricted` (served only with `viewerClaims.ageConfirmed: true` and any required private-asset access), `blocked` or `purged`. A reviewer's decision takes precedence."),
@@ -884,7 +915,8 @@ const ASSET_MODERATION_SCHEMA = zod.object({
 	...MODERATION_ASSESSMENT_FIELDS_SCHEMA.partial().shape,
 	flaggedCategories: MODERATION_ASSESSMENT_SCHEMA.shape.flaggedCategories,
 	regions: MODERATION_ASSESSMENT_SCHEMA.shape.regions,
-	raw: CLASSIFICATION_REPORT_SCHEMA.shape.raw.optional(),
+	raw: CLASSIFICATION_REPORT_SCHEMA.shape.raw.omit({ timeline: true }).optional(),
+	timeline: ASSET_MODERATION_TIMELINE_SCHEMA.nullable().describe("For audio and video: a summary of the findings timeline, which lists findings for each stretch of the media. Page through it with `GET /v1/projects/:projectId/assets/:assetId/timeline`. `null` for other assets, before there are findings and while a safety or copyright hold withholds the asset's content."),
 	testCategoryActions: CLASSIFICATION_REPORT_SCHEMA.shape.testCategoryActions,
 	testRegionalActions: CLASSIFICATION_REPORT_SCHEMA.shape.testRegionalActions
 }).refine(hasValidModerationRule, {
@@ -918,13 +950,20 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	removalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullable().describe("Why the content was removed: your `policy` purged it, `retention` because `keepContentAfterProcessing` was off, `requested` through the API or portal, `parent-removed` with its parent asset's content, or `disposed` after a safety hold. `null` while content is held."),
 	updatedAt: epoch("When the content status last changed"),
 	safetyHold: ASSET_SAFETY_HOLD_SCHEMA.nullable().describe("Set while CalmLens holds the asset for suspected illegal content: its content isn't delivered and the asset can't be changed or deleted until the hold ends, so such requests return `asset/safety-held`. `null` when there is no hold."),
-	format: zod.string().nullable().describe("MIME type of the content"),
-	extension: zod.string().nullable().describe("File extension of the content"),
-	sizeInBytes: zod.number().int().nullable().describe("Size of the uploaded content in bytes"),
-	checksums: CHECKSUMS_SCHEMA.nullable().describe("Digests of the content as stored: for an image, after embedded metadata is removed unless `storeSensitiveMetadata` is on"),
-	image: ASSET_IMAGE_SCHEMA.nullable().describe("The picture CalmLens serves at the rendered resource: the original image for image assets, or a generated image for documents and websites. It remains after the content is removed, so check `status` before loading it; `null` when the asset has no image."),
-	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document"),
-	fileMetadata: FILE_METADATA_SCHEMA.nullable().describe("Metadata embedded in an uploaded image, such as its capture time, camera and software, read before any of it is removed for `storeSensitiveMetadata`. Read-only and separate from your own `metadata`. `null` when the image declares none, for other asset types, once the content is removed and while the asset is held.")
+	format: zod.string().nullable().describe("MIME type of the uploaded file"),
+	extension: zod.string().nullable().describe("File extension of the uploaded file"),
+	sizeInBytes: zod.number().int().nullable().describe("Size of the uploaded file in bytes"),
+	checksums: CHECKSUMS_SCHEMA.nullable().describe("Digests of the file as stored: for an image, after embedded metadata is removed unless `storeSensitiveMetadata` is on"),
+	width: pixels("Width in pixels of the uploaded image or video; `null` when unknown, for other types and while the asset is held"),
+	height: pixels("Height in pixels of the uploaded image or video, like `width`"),
+	durationSeconds: zod.number().positive().nullable().describe("Length in seconds of audio and video once analysed; otherwise `null`"),
+	pageCount: zod.number().int().positive().nullable().describe("Number of pages or slides of a document or presentation, when known"),
+	perceptualHash: zod.string().nullable().describe("PDQ perceptual hash used to match visually similar images, as 64 hexadecimal characters, for image assets. Hashes 31 or fewer bits apart are usually the same picture. `null` while the asset is held."),
+	perceptualHashQuality: zod.number().int().min(0).max(100).nullable().describe("How much detail `perceptualHash` captured, from 0 to 100. Hashes below 50 come from flat or featureless images and match unrelated pictures, so leave them out of comparisons."),
+	metadata: FILE_METADATA_SCHEMA.nullable().describe("Metadata embedded in an uploaded image, such as its capture time, camera and software, read before any of it is removed for `storeSensitiveMetadata`. Read-only and separate from the asset's own `metadata`. `null` when the image declares none, for other asset types, once the content is removed and while the asset is held."),
+	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document. `null` while the asset is held."),
+	rendered: ASSET_RENDERED_SCHEMA.nullable().describe("The displayable file, served at `/rendered`: an image, a PDF, or browser-safe video or audio. `null` when the asset has none (text, spreadsheets and other files, or media not yet made browser-safe), once the content is removed and while the asset is held."),
+	preview: ASSET_PREVIEW_SCHEMA.nullable().describe("A still image for the asset, served at `/preview` (and its blurred placeholder at `/placeholder`). `null` when the asset has none (text, spreadsheets and other files, or a document, video or audio whose still isn't made yet), once the content is removed and while the asset is held.")
 }).meta(metaStore([docPropertyInfo({
 	description: "Content state",
 	namedType: "AssetContent"
@@ -973,12 +1012,14 @@ STORED_ASSET_SCHEMA.pick({
 			failureReason: null,
 			updatedAt: 1767225601e3,
 			completedAt: 1767225601e3,
+			progress: null,
 			testInput: false,
 			moderation: {
 				status: "allowed",
 				manualReviews: [],
 				flaggedCategories: [],
-				regions: []
+				regions: [],
+				timeline: null
 			}
 		},
 		content: {
@@ -990,9 +1031,13 @@ STORED_ASSET_SCHEMA.pick({
 			extension: "jpg",
 			sizeInBytes: 245760,
 			checksums: null,
-			image: null,
-			extractedText: null,
-			fileMetadata: {
+			width: 1200,
+			height: 900,
+			durationSeconds: null,
+			pageCount: null,
+			perceptualHash: null,
+			perceptualHashQuality: null,
+			metadata: {
 				capturedAt: "2026-05-01T12:30:00+01:00",
 				cameraMake: "Canon",
 				cameraModel: "EOS R5",
@@ -1003,7 +1048,20 @@ STORED_ASSET_SCHEMA.pick({
 				digitalSourceType: null,
 				containsLocation: false,
 				location: null
-			}
+			},
+			rendered: {
+				kind: "image",
+				format: "image/jpeg",
+				width: 1200,
+				height: 900
+			},
+			preview: {
+				width: 1200,
+				height: 900,
+				thumbhash: null,
+				averageColor: null
+			},
+			extractedText: null
 		}
 	}
 })])).extend({

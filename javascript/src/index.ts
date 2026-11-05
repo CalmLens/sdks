@@ -90,6 +90,7 @@ export type {
   RetryAssetOptions,
   SearchAssetsOptions,
   SetPolicyAutomaticUpdatesOptions,
+  SignedCdnResource,
   SignedUploadToken,
   SignedUrl,
   SignUploadTokenOptions,
@@ -107,10 +108,12 @@ export type {
   WebhookHeadersInput,
   WebhookPayloadInput,
 } from "./client/CalmLensTypes";
-export { DEFAULT_CDN_BASE_URL, getAssetUrl } from "./client/CalmLensUtils";
+export { DEFAULT_CDN_BASE_URL, getAssetUrl, SIGNED_CDN_RESOURCES } from "./client/CalmLensUtils";
 export { SDK_VERSION } from "./client/CalmLensVersion";
 export type {
-  AssetImage,
+  AssetPreview,
+  AssetRendered,
+  AssetRenderedKind,
   AssetSafetyHold,
   AssetSafetyHoldReason,
   ExtractedText,

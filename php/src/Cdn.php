@@ -12,8 +12,24 @@ final class Cdn extends Resource
 {
     protected const OPERATIONS = 'cdn';
 
+    /** The CDN resources a signed URL can be created for, as the API accepts them. */
+    public const SIGNED_RESOURCES = ['original', 'rendered', 'preview'];
+
+    /** Every CDN resource: the signed ones and the public `placeholder`. */
+    public const RESOURCES = [...self::SIGNED_RESOURCES, 'placeholder'];
+
+    /** The resources that take no lens or transform: the exact upload and the public placeholder. */
+    private const UNSELECTABLE_RESOURCES = ['original', 'placeholder'];
+
     /**
      * Builds a CDN URL for an asset's content, without a request.
+     *
+     * `resource` is `rendered` (default: the displayable file, an image in the best format the
+     * client accepts, a PDF, or browser-safe video or audio), `original` (the exact upload),
+     * `preview` (a still image for the asset) or `placeholder` (a small blurred PNG served publicly
+     * for every asset whatever its visibility or moderation status). Lenses and transforms apply to
+     * `preview`, and to `rendered` when it is an image; the CDN refuses them on rendered PDFs, video
+     * and audio with `asset/invalid-transform`.
      *
      * `viewerClaims` takes `region` and `ageConfirmed`. `ageConfirmed` is your platform's
      * confirmation that the viewer passed its age check: your platform confirms the viewer's age,
@@ -27,17 +43,11 @@ final class Cdn extends Resource
     {
         Values::knownOptions($options, 'cdn.getAssetUrl');
         $resource = $options['resource'] ?? 'rendered';
-        if (!in_array($resource, ['original', 'rendered', 'placeholder'], true)) {
-            Values::invalid('Resource must be original, rendered or placeholder');
+        if (!in_array($resource, self::RESOURCES, true)) {
+            Values::invalid('Resource must be one of ' . implode(', ', self::RESOURCES));
         }
-        // Only the rendered resource takes a lens or transform.
-        $transformed = isset($options['lens']) || isset($options['transform']);
-        if ($resource === 'original' && $transformed) {
-            Values::invalid('Lenses and transforms apply only to the rendered resource');
-        }
-        // A placeholder is a small blurred PNG, public for every asset whatever its visibility or moderation.
-        if ($resource === 'placeholder' && $transformed) {
-            Values::invalid('A placeholder takes no lens or transform');
+        if (in_array($resource, self::UNSELECTABLE_RESOURCES, true) && (isset($options['lens']) || isset($options['transform']))) {
+            Values::invalid("The $resource resource takes no lens or transform");
         }
         $url = $this->session->cdnBaseUrl . '/assets/' . Values::segment($this->session->projectId)
             . '/' . Values::segment($options['assetIdentifier'] ?? null) . '/' . $resource;

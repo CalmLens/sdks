@@ -132,23 +132,42 @@ final class MockServerClientTest extends TestCase
         self::assertSame([$cat['id'], 'child'], array_column($client->assets->list()['items'], 'id'));
     }
 
-    public function testTimelinePagesThroughTheReportsSegmentsWithPositionCursors(): void
+    public function testTimelineChecksPageSizeThenRefusesASafetyHeldAsset(): void
     {
         $mock = new MockServerClient();
         $client = $mock->client();
-        $clip = $client->text->classify(['name' => 'clip', 'text' => 'hi']);
-        self::assertSame([true, null], [array_key_exists('progress', $clip['classification']), $clip['classification']['progress']]);
-        $segments = array_map(fn (int $i) => ['source' => 'clip', 'startSeconds' => $i * 30, 'endSeconds' => $i * 30 + 30, 'categories' => []], range(0, 2));
-        $mock->assets[$clip['id']]['classification']['moderation']['raw'] = ['timeline' => ['segments' => $segments]];
-        $first = $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => 2]);
-        self::assertSame([array_slice($segments, 0, 2), 'timeline:2', 2, true, []],
-            [$first['items'], $first['nextCursor'], $first['pageSize'], $first['hasMore'], $first['ordering']]);
-        $last = $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => 2, 'cursor' => $first['nextCursor']]);
-        self::assertSame([[$segments[2]], null, false], [$last['items'], $last['nextCursor'], $last['hasMore']]);
+        $clip = $client->assets->classify(['name' => 'clip.mp4', 'content' => ['data' => 'mp4-bytes', 'type' => 'video/mp4'],
+            'processingOptions' => ['keepContentAfterProcessing' => true]]);
+        self::assertSame([null, null], [$clip['classification']['progress'], $clip['classification']['moderation']['timeline']]);
+        $mock->assets[$clip['id']]['content']['safetyHold'] = ['placedAt' => 1, 'reason' => 'suspected-illegal-content', 'disposedAt' => null];
         self::assertSame('validation/too-big', self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => 101])));
         self::assertSame('validation/too-small', self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => 0])));
+        self::assertSame(ErrorCodes::ASSET_SAFETY_HELD, self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id'], 'cursor' => 'x'])));
         $mock->failNextRequest('misc/internal-error', 'assets.listTimeline');
         self::assertSame('misc/internal-error', self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id']])));
+    }
+
+    public function testASafetyHoldWithholdsTheRenderingAndRefusesEveryCdnResource(): void
+    {
+        $mock = new MockServerClient();
+        $client = $mock->client();
+        $photo = $client->assets->classify(['name' => 'photo.png', 'visibility' => 'public',
+            'content' => ['data' => 'png-bytes', 'type' => 'image/png'], 'processingOptions' => ['keepContentAfterProcessing' => true]]);
+        $queued = self::image($mock);
+        self::assertSame(['image', MockServerClient::THUMBHASH], [$photo['content']['rendered']['kind'], $photo['content']['preview']['thumbhash']]);
+        foreach (['original', 'rendered', 'preview', 'placeholder'] as $resource) {
+            self::assertSame(200, $client->cdn->serve(['assetIdentifier' => $photo['id'], 'resource' => $resource])->getStatusCode(), $resource);
+        }
+        $mock->assets[$photo['id']]['content']['safetyHold'] = ['placedAt' => 1, 'reason' => 'suspected-illegal-content', 'disposedAt' => null];
+        foreach (['original', 'rendered', 'preview', 'placeholder'] as $resource) {
+            $response = $client->cdn->serve(['assetIdentifier' => $photo['id'], 'resource' => $resource]);
+            self::assertSame([403, 'asset/not-available'], [$response->getStatusCode(), json_decode((string) $response->getBody(), true)['code']], $resource);
+        }
+        // A decision while a hold is on reports neither a rendered file nor a preview.
+        self::assertSame('image', $queued['content']['rendered']['kind']);
+        $mock->assets[$queued['id']]['content']['safetyHold'] = ['placedAt' => 1, 'reason' => 'suspected-illegal-content', 'disposedAt' => null];
+        $held = $mock->completeProcessing($queued['id'], 'allowed');
+        self::assertSame([null, null], [$held['content']['rendered'], $held['content']['preview']]);
     }
 
     public function testFiltersSupportOrWildcardsAndValueLists(): void
@@ -252,7 +271,7 @@ final class MockServerClientTest extends TestCase
             self::assertSame(ErrorCodes::HASH_LIST_ASSET_NOT_HASHED, $error->errorCode);
         }
         $hash = str_repeat('ab', 32);
-        $mock->assets[$unhashed['id']]['content']['image'] = ['perceptualHash' => $hash, 'perceptualHashQuality' => 87];
+        $mock->assets[$unhashed['id']]['content'] = ['perceptualHash' => $hash, 'perceptualHashQuality' => 87] + $mock->assets[$unhashed['id']]['content'];
         $entry = $client->hashLists->addEntry(['hashListId' => $list['id'], 'assetId' => $unhashed['id'], 'label' => 'Report 1042']);
         self::assertSame(201, $status());
         self::assertSame([$hash, 87, $unhashed['id'], 'Report 1042'], [$entry['hash'], $entry['quality'], $entry['sourceAssetId'], $entry['label']]);

@@ -861,6 +861,8 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 			return []string{"assets.search"}
 		case route == "assets/batch":
 			return []string{"assets.batch"}
+		case len(parts) == 5 && parts[2] == "assets" && parts[4] == "timeline":
+			return []string{"assets.listTimeline"}
 		case route == "assets" && q.Get("queue") == "false":
 			return []string{"assets.classify", "text.classify"}
 		case route == "assets":
@@ -910,8 +912,6 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 		return []string{"assets.deleteContent"}
 	case suffix == "children":
 		return []string{"assets.listChildren", "assets.iterateChildren"}
-	case suffix == "timeline":
-		return []string{"assets.listTimeline"}
 	case suffix == "signed-url":
 		return []string{"assets.createSignedUrl"}
 	case suffix == "part":
@@ -1143,6 +1143,8 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 			return m.search(q)
 		case route == "assets/batch" && method == "POST":
 			return m.batchAssets(body, now)
+		case len(parts) == 5 && parts[2] == "assets" && parts[4] == "timeline" && method == "GET":
+			return m.listTimeline(parts[3], q)
 		case route == "assets" && method == "POST":
 			return m.createAsset(headers.Get("X-CalmLens-Upload"), headers.Get("Content-Type"), body, q, raw, now)
 		case parts[2] == "policies", parts[2] == "policy":
@@ -1176,35 +1178,25 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 	return nil, errUnknownRoute
 }
 
-// listTimeline lists an asset's findings timeline a page at a time, as the API does: its
-// report's segments in time order, with a "timeline:<offset>" cursor naming the next one's
-// position.
-func listTimeline(a calmlens.JSON, q url.Values) (any, error) {
+// listTimeline lists an asset's findings timeline like the API (publicGetAssetTimeline.ts):
+// refused while a safety hold is on. The mock analyses no audio or video, so it keeps no
+// segments: every timeline is empty, and no cursor continues one.
+func (m *MockServerClient) listTimeline(id string, q url.Values) (any, error) {
+	a, err := m.asset(id)
+	if err != nil {
+		return nil, err
+	}
 	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
 	if err != nil {
 		return nil, err
 	}
-	offset := 0
+	if section(a, "content")["safetyHold"] != nil {
+		return nil, fail(calmlens.CodeAssetSafetyHeld)
+	}
 	if q.Has("cursor") {
-		digits, ok := strings.CutPrefix(q.Get("cursor"), "timeline:")
-		parsed, err := strconv.Atoi(digits)
-		if !ok || err != nil || strings.Trim(digits, "0123456789") != "" {
-			return nil, fail(calmlens.CodeInvalidCursor)
-		}
-		offset = parsed
+		return nil, fail(calmlens.CodeInvalidCursor)
 	}
-	segments := []any{}
-	if value := lookup(a, "classification.moderation.raw.timeline.segments"); value != nil {
-		encoded, _ := json.Marshal(value)
-		_ = json.Unmarshal(encoded, &segments)
-	}
-	start := min(offset, len(segments))
-	end := min(offset+size, len(segments))
-	var next any
-	if end < len(segments) {
-		next = fmt.Sprintf("timeline:%d", end)
-	}
-	return calmlens.JSON{"items": segments[start:end], "nextCursor": next, "pageSize": size, "hasMore": end < len(segments), "ordering": []any{}}, nil
+	return calmlens.JSON{"items": []any{}, "nextCursor": nil, "pageSize": size, "hasMore": false, "ordering": []any{}}, nil
 }
 
 // listEvents reads the feed like the API: without cursor, no events and a nextCursor for now;
@@ -1422,13 +1414,17 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 	}
 	content := calmlens.JSON{
 		"status": contentStatus, "removalReason": nil, "updatedAt": now, "safetyHold": nil,
-		"format": nil, "extension": nil, "sizeInBytes": nil, "checksums": nil, "image": nil,
-		"extractedText": nil, "fileMetadata": nil,
+		"format": nil, "extension": nil, "sizeInBytes": nil, "checksums": nil,
+		// The mock decodes nothing, so the file's own details are unknown.
+		"width": nil, "height": nil, "durationSeconds": nil, "pageCount": nil,
+		"perceptualHash": nil, "perceptualHashQuality": nil, "metadata": nil, "extractedText": nil,
+		// Like the API, the rendered file and preview come with processing.
+		"rendered": nil, "preview": nil,
 	}
 	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
 	// The mock never reads test inputs.
 	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil, "progress": nil,
-		"testInput": false, "moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{}, "flaggedCategories": []any{}, "regions": []any{}}}
+		"testInput": false, "moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{}, "flaggedCategories": []any{}, "regions": []any{}, "timeline": nil}}
 	if open {
 		uploadState["status"] = "uploading"
 		uploadState["partsReceived"] = 1
@@ -1450,6 +1446,7 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 	var stored []byte
 	if options["url"] == nil {
 		stored = raw
+		setRendering(a, false)
 	}
 	decision, err := m.decisionFor(a, TriggerUpload, queue, stored)
 	if err != nil {
@@ -1662,24 +1659,101 @@ func section(a calmlens.JSON, name string) calmlens.JSON {
 	return object
 }
 
-// withoutPlaceholder drops an image's ThumbHash and average colour, which go with its content.
-func withoutPlaceholder(image any) any {
-	object, ok := image.(map[string]any)
-	if !ok {
-		return image
+// waveformSize is the size of the waveform the API makes as an audio asset's preview.
+const waveformWidth, waveformHeight = 1200, 300
+
+// browserSafeMediaFormats are audio and video formats browsers play as uploaded, so the API
+// serves them as stored (Asset.ts).
+var browserSafeMediaFormats = []string{"video/mp4", "audio/mpeg", "audio/aac", "audio/mp4", "audio/x-m4a", "audio/ogg"}
+
+// spreadsheetMimeTypes are spreadsheets, which have no rendered file or preview (Asset.ts).
+var spreadsheetMimeTypes = []string{
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	"application/vnd.ms-excel.sheet.macroenabled.12",
+	"application/vnd.ms-excel",
+	"application/vnd.oasis.opendocument.spreadsheet",
+}
+
+// normalizedMimeType lower-cases a MIME type and drops its parameters, as the API does.
+func normalizedMimeType(mime string) string {
+	return strings.TrimSpace(strings.ToLower(strings.Split(mime, ";")[0]))
+}
+
+// clearRendering removes an asset's rendered file and preview, which go with its content and
+// are withheld while a safety hold is on.
+func clearRendering(content calmlens.JSON) {
+	content["rendered"], content["preview"] = nil, nil
+}
+
+// setRendering sets the rendered file and preview the API reports for an asset whose content
+// is held (Asset.ts, getAssetRendered and getAssetPreview). Once uploaded, an image renders as
+// itself with a preview that has no ThumbHash yet, and a PDF and browser-safe audio and video
+// render as uploaded. Once processed, a website renders as its screenshot; a document or
+// presentation as a PDF, with its first page as the preview; video and audio as a browser-safe
+// file (MP4 or M4A unless browsers play the upload), audio with a waveform preview and video
+// with no poster; and every preview has its ThumbHash. Text, spreadsheets and other files have
+// neither. The mock decodes nothing, so sizes are unknown and audio has no peaks.
+func setRendering(a calmlens.JSON, processed bool) {
+	content := section(a, "content")
+	clearRendering(content)
+	format := text(content["format"])
+	mime := normalizedMimeType(format)
+	kind := text(a["type"])
+	browserSafe := contains(browserSafeMediaFormats, mime)
+	preview := func(width, height any) calmlens.JSON {
+		result := calmlens.JSON{"width": width, "height": height, "thumbhash": nil, "averageColor": nil}
+		if processed {
+			result["thumbhash"], result["averageColor"] = mockThumbHash, mockAverageColor
+		}
+		return result
 	}
-	copied := calmlens.JSON{}
-	for key, value := range object {
-		copied[key] = value
+	rendered := func(kind calmlens.AssetRenderedKind, format string) calmlens.JSON {
+		return calmlens.JSON{"kind": string(kind), "format": format, "width": nil, "height": nil}
 	}
-	copied["thumbhash"], copied["averageColor"] = nil, nil
-	return copied
+	rendersOnUpload := kind == calmlens.AssetTypeImage || mime == "application/pdf" ||
+		(kind == calmlens.AssetTypeVideo || kind == calmlens.AssetTypeAudio) && browserSafe
+	if !processed && !rendersOnUpload {
+		return
+	}
+	switch kind {
+	case calmlens.AssetTypeImage:
+		if format == "" {
+			format = "image/png"
+		}
+		content["rendered"], content["preview"] = rendered(calmlens.AssetRenderedKindImage, format), preview(nil, nil)
+	case calmlens.AssetTypeWebsite:
+		content["rendered"], content["preview"] = rendered(calmlens.AssetRenderedKindImage, "image/png"), preview(nil, nil)
+	case calmlens.AssetTypeMultimediaDocument:
+		if contains(spreadsheetMimeTypes, mime) {
+			return
+		}
+		content["rendered"] = rendered(calmlens.AssetRenderedKindPDF, "application/pdf")
+		if processed {
+			content["preview"] = preview(nil, nil)
+		}
+	case calmlens.AssetTypeVideo:
+		if !browserSafe {
+			format = "video/mp4"
+		}
+		content["rendered"] = rendered(calmlens.AssetRenderedKindVideo, format)
+	case calmlens.AssetTypeAudio:
+		if !browserSafe {
+			format = "audio/mp4"
+		}
+		audio := rendered(calmlens.AssetRenderedKindAudio, format)
+		if processed {
+			audio["peaks"] = []any{}
+			content["preview"] = preview(waveformWidth, waveformHeight)
+		}
+		content["rendered"] = audio
+	}
 }
 
 // applyOutcome moves an asset to outcome like the pipeline: a decision finishes processing,
 // OutcomePurged deletes the content (with purgeReason), and finished processing removes content
-// kept only temporarily (keepContentAfterProcessing off). A classified image gets a ThumbHash
-// for its placeholder, which goes with its content. A report's fields replace the moderation's.
+// kept only temporarily (keepContentAfterProcessing off). A decided asset gets its rendered file
+// and preview (with a ThumbHash for its placeholder), which go with its content and are withheld
+// while a safety hold is on. A report's fields replace the moderation's.
 func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason string, report calmlens.JSON) {
 	now := m.options.Now()
 	decided := outcome != OutcomePending && outcome != OutcomeFailed
@@ -1687,22 +1761,11 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason st
 	removed := content["status"] == calmlens.ContentStatusRemoved
 	purge := outcome == OutcomePurged && !removed
 	removeContent := purge || decided && content["status"] == calmlens.ContentStatusTemporary
-	image := content["image"]
-	switch {
-	case decided && a["type"] == calmlens.AssetTypeImage && !removed && !purge:
-		classified := calmlens.JSON{"width": nil, "height": nil, "perceptualHash": nil, "perceptualHashQuality": nil}
-		for key, value := range asJSON(image) {
-			classified[key] = value
-		}
-		classified["thumbhash"] = mockThumbHash
-		if classified["averageColor"] == nil {
-			classified["averageColor"] = mockAverageColor
-		}
-		image = classified
-	case outcome == OutcomePurged:
-		image = withoutPlaceholder(image)
+	if !removed && !purge && content["safetyHold"] == nil {
+		setRendering(a, decided)
+	} else {
+		clearRendering(content)
 	}
-	content["image"] = image
 	if removeContent {
 		reason := calmlens.ContentRemovalReasonRetention
 		if purge {
@@ -1735,7 +1798,7 @@ func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason st
 }
 
 // removeContent deletes the asset's stored bytes and marks its content removed for reason; the
-// extracted text, file metadata and the image's placeholder go with it.
+// extracted text, file metadata, rendered file and preview go with it.
 func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int64) {
 	delete(m.ImageStorage.Content, text(a["id"]))
 	a["context"] = nil
@@ -1747,20 +1810,18 @@ func (m *MockServerClient) removeContent(a calmlens.JSON, reason string, now int
 	content["removalReason"] = reason
 	content["updatedAt"] = now
 	content["extractedText"] = nil
-	content["fileMetadata"] = nil
-	content["image"] = withoutPlaceholder(content["image"])
+	content["metadata"] = nil
+	clearRendering(content)
 }
 
 // requestContentRemoval removes an asset's content on request, like the API: the record and
-// report stay; stored content, extracted text and the placeholder go. Content already removed
+// report stay; stored content, extracted text, the rendered file and preview go. Content already removed
 // keeps its reason, and an asset.content-removed event is recorded either way.
 func (m *MockServerClient) requestContentRemoval(a calmlens.JSON, now int64) {
 	content := section(a, "content")
 	if content["status"] == calmlens.ContentStatusRemoved {
 		delete(m.ImageStorage.Content, text(a["id"]))
-		if asJSON(content["image"])["thumbhash"] != nil {
-			content["image"] = withoutPlaceholder(content["image"])
-		}
+		clearRendering(content)
 	} else {
 		m.removeContent(a, calmlens.ContentRemovalReasonRequested, now)
 		a["updatedAt"] = now
@@ -1888,6 +1949,9 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 				return nil, validation(code, key)
 			}
 		}
+		if resource, ok := body["resource"]; ok && !contains(calmlens.SignedCDNResources, text(resource)) {
+			return nil, validation("validation/invalid-value", "resource")
+		}
 	}
 	a, err := m.asset(id)
 	if err != nil {
@@ -1918,8 +1982,6 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		m.requestContentRemoval(a, now)
 	case method == "GET" && suffix == "children":
 		return m.page(func(child calmlens.JSON) bool { return child["parentId"] == id }, q, "children:"+id)
-	case method == "GET" && suffix == "timeline":
-		return listTimeline(a, q)
 	case method == "POST" && suffix == "signed-url":
 		params := url.Values{"expiresInSeconds": {fmt.Sprint(body["expiresInSeconds"])}}
 		for _, key := range []string{"lens", "transform"} {
@@ -2456,22 +2518,44 @@ func contains(values []string, value string) bool {
 	return false
 }
 
-// serve answers a CDN request like the CDN: a placeholder PNG, or the stored content with its
-// type, length, cache and protection headers; or a JSON error body.
+// reservedRenderedPaths are the paths beneath /rendered/ the CDN reserves for streaming and an
+// embeddable player.
+var reservedRenderedPaths = []string{"stream", "player"}
+
+// serve answers a CDN request like the CDN (/assets/:projectId/:asset/:resource): original is
+// the upload; rendered the image, PDF, video or audio file content.rendered describes; preview
+// the still content.preview describes; and placeholder its ThumbHash as a PNG. The mock converts
+// nothing: an upload stands in for its rendered file, an image for its own preview, and the
+// placeholder PNG for a screenshot, page or waveform. Errors are JSON bodies with 400, 403 or 404.
 func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, header http.Header) (int, []byte, string) {
 	errorBody := func(status int, code, message string) (int, []byte, string) {
 		data, _ := json.Marshal(calmlens.JSON{"code": code, "message": message})
 		return status, data, "application/json"
 	}
-	// Like the CDN, the selector after the resource (as sent, still percent-encoded) is read
-	// first, and lenses and transforms apply only to the rendered resource.
-	var selector []string
-	if len(escaped) > 4 {
-		selector = escaped[4:]
+	noRenderedVersion := func() (int, []byte, string) {
+		return errorBody(http.StatusNotFound, calmlens.CodeNoRenderedVersion, "This asset has no such resource")
 	}
-	lens, transform, ok := contract.ParseTransformSelector(strings.Join(selector, "/"))
-	if !ok || len(parts) >= 4 && parts[3] == calmlens.ResourceOriginal && (lens != "" || transform != nil) {
-		return errorBody(http.StatusBadRequest, "asset/invalid-transform", "Invalid transform selector")
+	invalidTransform := func() (int, []byte, string) {
+		return errorBody(http.StatusBadRequest, calmlens.CodeInvalidTransform, "Invalid transform selector")
+	}
+	resource := ""
+	if len(parts) >= 4 {
+		resource = parts[3]
+	}
+	var selectorPath []string
+	if len(escaped) > 4 {
+		selectorPath = escaped[4:]
+	}
+	// Like the CDN (serveAssetResource.ts), /rendered/stream and /rendered/player are reserved,
+	// then the selector after the resource (as sent, still percent-encoded) is read; the original
+	// takes none.
+	if resource == calmlens.ResourceRendered && len(selectorPath) > 0 && contains(reservedRenderedPaths, selectorPath[0]) {
+		return noRenderedVersion()
+	}
+	lens, transform, ok := contract.ParseTransformSelector(strings.Join(selectorPath, "/"))
+	hasSelector := lens != "" || transform != nil
+	if !ok || resource == calmlens.ResourceOriginal && hasSelector {
+		return invalidTransform()
 	}
 	if len(parts) < 4 || parts[0] != "assets" || parts[1] != m.options.ProjectID {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
@@ -2493,11 +2577,17 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	canDownload := func() bool { return m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key")) }
 	moderation := section(section(asset, "classification"), "moderation")["status"]
 	tag := "asset-" + text(asset["id"])
-	if parts[3] == calmlens.ResourcePlaceholder {
-		// Like the CDN's placeholder handler: an image's ThumbHash, public whatever the asset's
+	content := section(asset, "content")
+	rendered, preview := asJSON(content["rendered"]), asJSON(content["preview"])
+	// Like the CDN, a safety hold refuses every resource.
+	if content["safetyHold"] != nil {
+		return notAvailable()
+	}
+	if resource == calmlens.ResourcePlaceholder {
+		// Like the CDN's placeholder handler: the preview's ThumbHash, public whatever the asset's
 		// visibility or moderation status; refused for purged assets and assets without one (not
-		// yet classified, or content removed).
-		thumbhash := text(contentImage(asset)["thumbhash"])
+		// yet processed, without a preview, or content removed).
+		thumbhash := text(preview["thumbhash"])
 		if thumbhash == "" || moderation == calmlens.ModerationStatusPurged {
 			return notAvailable()
 		}
@@ -2511,12 +2601,12 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 		return http.StatusOK, png, "image/png"
 	}
 	// Like the CDN, delivery checks come first and refuse everyone: content still uploading,
-	// blocked or purged, failed processing or removed content.
+	// blocked or purged, failed processing or removed content, and an original with no bytes.
 	stored := m.ImageStorage.Content[text(asset["id"])]
-	if stored == nil || section(asset, "upload")["status"] == "uploading" ||
+	if resource == calmlens.ResourceOriginal && stored == nil || section(asset, "upload")["status"] == "uploading" ||
 		moderation == calmlens.ModerationStatusBlocked || moderation == calmlens.ModerationStatusPurged ||
 		section(asset, "classification")["status"] == calmlens.ClassificationStatusFailed ||
-		section(asset, "content")["status"] == calmlens.ContentStatusRemoved {
+		content["status"] == calmlens.ContentStatusRemoved {
 		return notAvailable()
 	}
 	// Then access: an age-restricted asset needs viewerClaims.ageConfirmed=true whatever the key,
@@ -2530,6 +2620,17 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	if restricted && !canDownload() {
 		return errorBody(http.StatusForbidden, "asset/api-key-missing-permission", "This API key needs assets:download permission for this asset's folder.")
 	}
+	// Then whether the asset has the resource, and whether it is a still image that takes a lens
+	// or transform: the preview always is, the rendered file only when it is an image.
+	if resource == calmlens.ResourceRendered && content["rendered"] == nil || resource == calmlens.ResourcePreview && content["preview"] == nil ||
+		!contains([]string{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview}, resource) {
+		return noRenderedVersion()
+	}
+	renderedImage := rendered["kind"] == string(calmlens.AssetRenderedKindImage)
+	still := resource == calmlens.ResourcePreview || resource == calmlens.ResourceRendered && renderedImage
+	if !still && hasSelector {
+		return invalidTransform()
+	}
 	// Then the options, checked against the transform schema once the asset may be served.
 	if transform != nil {
 		unknownKeys, invalidKeys := contract.CheckTransformOptions(transform)
@@ -2537,14 +2638,49 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 			return errorBody(http.StatusBadRequest, calmlens.CodeInvalidTransformOptions, "Invalid transform options: "+strings.Join(keys, ", "))
 		}
 	}
-	// Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
-	// by shared caches only when delivery is public.
+	// The bytes: the upload, which stands in for its own rendered file and an image's preview,
+	// or the placeholder PNG for a still the mock doesn't make.
+	servesUpload := resource == calmlens.ResourceOriginal || resource == calmlens.ResourceRendered && !renderedImage ||
+		asset["type"] == calmlens.AssetTypeImage
+	var data []byte
+	var contentType string
+	if servesUpload {
+		if stored == nil {
+			return notAvailable()
+		}
+		indices := []int{}
+		for index := range stored.Parts {
+			indices = append(indices, index)
+		}
+		sort.Ints(indices)
+		for _, index := range indices {
+			data = append(data, stored.Parts[index]...)
+		}
+		contentType = stored.Type
+		if resource == calmlens.ResourceRendered {
+			contentType = text(rendered["format"])
+		}
+		if contentType == "" {
+			contentType = defaultContentType
+		}
+	} else {
+		thumbhash := text(preview["thumbhash"])
+		if thumbhash == "" {
+			thumbhash = mockThumbHash
+		}
+		png, err := placeholderPNG(thumbhash)
+		if err != nil {
+			return notAvailable()
+		}
+		data, contentType = png, "image/png"
+	}
+	// Like the CDN: a still image's bytes are immutable for a year, other content is kept for an
+	// hour, by shared caches only when delivery is public.
 	access, lifetime := "public", "max-age=3600"
 	if restricted {
 		access = "private"
 	}
-	image := asset["type"] == calmlens.AssetTypeImage
-	if image {
+	if still || resource == calmlens.ResourceOriginal && asset["type"] == calmlens.AssetTypeImage {
 		lifetime = fmt.Sprintf("max-age=%d, immutable", imageCacheLifetime)
 		header.Set("ETag", strconv.Quote(text(asset["id"])))
 		header.Set("Expires", time.UnixMilli(m.options.Now()).Add(imageCacheLifetime*time.Second).UTC().Format(http.TimeFormat))
@@ -2557,28 +2693,10 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	header.Set("Cache-Tag", tag)
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Content-Security-Policy", cdnProtectionPolicy)
-	contentType := stored.Type
-	if contentType == "" {
-		contentType = defaultContentType
-	}
 	if activeContentType(contentType) {
 		header.Set("Content-Disposition", "attachment")
 	}
-	indices := []int{}
-	for index := range stored.Parts {
-		indices = append(indices, index)
-	}
-	sort.Ints(indices)
-	var data []byte
-	for _, index := range indices {
-		data = append(data, stored.Parts[index]...)
-	}
 	return http.StatusOK, data, contentType
-}
-
-// contentImage returns the asset's content.image object (empty when it has none).
-func contentImage(asset calmlens.JSON) calmlens.JSON {
-	return asJSON(section(asset, "content")["image"])
 }
 
 // activeContentType reports content a browser could run as a document, which the CDN serves as
@@ -2768,11 +2886,11 @@ func (m *MockServerClient) addHashListEntry(id string, body calmlens.JSON, now i
 		if err != nil {
 			return nil, err
 		}
-		image := asJSON(section(a, "content")["image"])
-		if text(image["perceptualHash"]) == "" {
+		content := section(a, "content")
+		if text(content["perceptualHash"]) == "" {
 			return nil, fail(calmlens.CodeHashListAssetNotHashed)
 		}
-		hash, quality, source = text(image["perceptualHash"]), image["perceptualHashQuality"], assetID
+		hash, quality, source = text(content["perceptualHash"]), content["perceptualHashQuality"], assetID
 	}
 	if !pdqHash.MatchString(hash) {
 		return nil, fail(calmlens.CodeInvalidUploadPayload)

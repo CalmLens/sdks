@@ -165,6 +165,8 @@ export class MockDecision {
       source: "policy",
       automatedAction: STATUS_ACTION[status],
       regions: [],
+      // The mock analyses no audio or video, so a decision has no findings timeline.
+      timeline: null,
       flaggedCategories: evaluated
         .filter(([, score]) => action(score) !== "allow")
         .map(([category]) => category),

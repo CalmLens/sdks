@@ -4,7 +4,7 @@ use serde_json::json;
 
 #[test]
 fn asset_nested_fields_decode_into_typed_models() {
-    let wire = json!({"id":"asset-1","type":"image","processingOptions":{"keepContentAfterProcessing":true},"content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"image":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000","perceptualHash":"ph","perceptualHashQuality":87},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","reviewedAt":7,"appliedToAsset":true}],"status":"age-restricted","flaggedCategories":[],"regions":[],"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"timeline":{"durationSeconds":3,"sampledFrames":1,"audioTranscribed":false,"segments":[{"source":"frame-text","startSeconds":0,"endSeconds":1,"categories":{"hate":{"status":"partial","likelihood":"unlikely","score":0.1}}}]},"hashMatches":[{"source":"hash-list","listId":"list-1","entryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[1],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","stage":"beta","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"labels":[{"description":"beach","score":0.7,"likelihood":"very-likely"}]}});
+    let wire = json!({"id":"asset-1","type":"image","processingOptions":{"keepContentAfterProcessing":true},"content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"width":10,"height":20,"durationSeconds":null,"pageCount":null,"perceptualHash":"ph","perceptualHashQuality":87,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","cameraModel":null,"lensModel":null,"software":null,"creator":null,"copyright":null,"digitalSourceType":null,"containsLocation":true,"location":null},"rendered":{"kind":"image","format":"image/webp","width":10,"height":20},"preview":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000"},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","reviewedAt":7,"appliedToAsset":true}],"status":"age-restricted","flaggedCategories":[],"regions":[],"timeline":{"segmentCount":3},"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"hashMatches":[{"source":"hash-list","listId":"list-1","entryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[1],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","stage":"beta","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"labels":[{"description":"beach","score":0.7,"likelihood":"very-likely"}]}});
     let asset: Asset = serde_json::from_value(wire).unwrap();
 
     assert_eq!(asset.asset_type, Some(AssetType::Image));
@@ -58,24 +58,33 @@ fn asset_nested_fields_decode_into_typed_models() {
         (checksums.sha256.as_deref(), checksums.md5.as_deref()),
         (Some("abc"), None)
     );
-    let image = content.image.as_ref().unwrap();
     assert_eq!(
         (
-            image.width,
-            image.height,
-            image.thumbhash.as_deref(),
-            image.average_color.as_deref(),
-            image.perceptual_hash.as_deref(),
-            image.perceptual_hash_quality
+            content.width,
+            content.height,
+            content.perceptual_hash.as_deref(),
+            content.perceptual_hash_quality
         ),
+        (Some(10), Some(20), Some("ph"), Some(87))
+    );
+    let metadata = content.metadata.as_ref().unwrap();
+    assert_eq!(
+        (metadata.camera_make.as_deref(), metadata.contains_location),
+        (Some("Canon"), true)
+    );
+    let rendered = content.rendered.as_ref().unwrap();
+    assert_eq!(
+        (&rendered.kind, rendered.format.as_str(), rendered.width),
+        (&AssetRenderedKind::Image, "image/webp", Some(10))
+    );
+    let preview = content.preview.as_ref().unwrap();
+    assert_eq!(
         (
-            Some(10),
-            Some(20),
-            Some("th"),
-            Some("#000"),
-            Some("ph"),
-            Some(87)
-        )
+            preview.height,
+            preview.thumbhash.as_deref(),
+            preview.average_color.as_deref()
+        ),
+        (Some(20), Some("th"), Some("#000"))
     );
     assert_eq!(
         content.safety_hold.as_ref().unwrap().reason,
@@ -204,7 +213,9 @@ fn asset_nested_fields_decode_into_typed_models() {
     let region = &asset.classification.text_regions.as_ref().unwrap()[0];
     assert!(region.personal_information);
     assert_eq!(region.bounding_box.left, 0.5);
-    let segment = &report.timeline.as_ref().unwrap().segments[0];
+    assert_eq!(moderation.timeline.as_ref().unwrap().segment_count, 3);
+    let page: AssetTimelinePage = serde_json::from_value(json!({"items":[{"source":"frame-text","startSeconds":0,"endSeconds":1,"categories":{"hate":{"status":"partial","likelihood":"unlikely","score":0.1}}}],"nextCursor":null,"pageSize":50,"hasMore":false,"ordering":[]})).unwrap();
+    let segment = &page.items[0];
     assert_eq!(segment.source, MediaSegmentSource::FrameText);
     assert_eq!(
         segment.categories[&ClassificationCategory::Hate].status,

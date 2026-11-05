@@ -185,7 +185,7 @@ final class Transforms
     }
 
     /**
-     * Reads a CDN selector, the path segment after `/rendered` as sent (still percent-encoded), as
+     * Reads a CDN selector, the path segment after the resource as sent (still percent-encoded), as
      * the CDN does: an optional first `@lens`, then `key=value` options with dotted keys for nested
      * ones (a bare key is true). Values are numbers, true, false, hex colours (`#` added) for colour
      * options, or text. Returns null for anything the CDN refuses as `asset/invalid-transform`.

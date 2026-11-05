@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class ModelsTest {
   @Test void assetNestedObjectsDecodeIntoTypedRecords() {
     Models.Asset asset = Json.GSON.fromJson("""
-        {"id":"asset-1","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"retention","updatedAt":1700000000400,"safetyHold":null,"format":"image/png","extension":"png","sizeInBytes":9007199254740993,"checksums":{"sha256":"abc","md5":null},"image":{"width":4,"height":3,"thumbhash":"t","averageColor":"#fff","perceptualHash":"p","perceptualHashQuality":90},"extractedText":null},"processingOptions":{"keepContentAfterProcessing":true},"upload":{"status":"completed","updatedAt":1700000000100,"partsReceived":3},"classification":{"status":"completed","updatedAt":1700000000100,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"fine","reviewedAt":1700000000200,"appliedToAsset":true}],"status":"age-restricted","flaggedCategories":[],"regions":[],"raw":{"categories":{"harassment":{"status":"evaluated","score":0.7}},"hashMatches":[{"source":"hash-list","listId":"list-1","entryId":"entry-1","distance":12,"action":"block"}]}},"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4},"personalInformation":true}],"completedAt":1700000000300}}
+        {"id":"asset-1","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"retention","updatedAt":1700000000400,"safetyHold":null,"format":"image/png","extension":"png","sizeInBytes":9007199254740993,"checksums":{"sha256":"abc","md5":null},"width":4,"height":3,"durationSeconds":12.5,"pageCount":2,"perceptualHash":"p","perceptualHashQuality":90,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","containsLocation":true,"location":{"latitude":51.5,"longitude":-0.1}},"extractedText":null,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"preview":{"width":1200,"height":300,"thumbhash":"t","averageColor":"#fff"}},"processingOptions":{"keepContentAfterProcessing":true},"upload":{"status":"completed","updatedAt":1700000000100,"partsReceived":3},"classification":{"status":"completed","updatedAt":1700000000100,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"fine","reviewedAt":1700000000200,"appliedToAsset":true}],"status":"age-restricted","flaggedCategories":[],"regions":[],"timeline":{"segmentCount":7},"raw":{"categories":{"harassment":{"status":"evaluated","score":0.7}},"hashMatches":[{"source":"hash-list","listId":"list-1","entryId":"entry-1","distance":12,"action":"block"}]}},"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4},"personalInformation":true}],"completedAt":1700000000300}}
         """, Models.Asset.class);
     assertEquals("preset-1", asset.uploadPresetId());
     assertSame(Models.AssetClassificationStatus.COMPLETED, asset.classification().status());
@@ -33,7 +33,15 @@ class ModelsTest {
     assertEquals("png", content.extension());
     assertEquals(9007199254740993L, content.sizeInBytes());
     assertEquals(new Models.Checksums(null, null, "abc", null, null), content.checksums());
-    assertEquals(new Models.AssetImage(4, 3, "t", "#fff", "p", 90), content.image());
+    assertEquals(List.of(4, 3, 2, 90), List.of(content.width(), content.height(), content.pageCount(), content.perceptualHashQuality()));
+    assertEquals(12.5, content.durationSeconds());
+    assertEquals("p", content.perceptualHash());
+    assertEquals(new Models.FileMetadata("2026-05-01T12:30:00", "Canon", null, null, null, null, null, null, true,
+        new Models.FileMetadataLocation(51.5, -0.1)), content.metadata());
+    assertSame(Models.AssetRenderedKind.AUDIO, content.rendered().kind());
+    assertEquals(new Models.AssetRendered(Models.AssetRenderedKind.AUDIO, "audio/mp4", null, null, List.of(0.25, 1.0)), content.rendered());
+    assertEquals(new Models.AssetPreview(1200, 300, "t", "#fff"), content.preview());
+    assertEquals(new Models.ModerationTimeline(7), moderation.timeline());
     Models.BoundingBox box = new Models.BoundingBox(0.1, 0.2, 0.3, 0.4);
     assertEquals(List.of(new Models.HashMatch("hash-list", "list-1", "entry-1", 12, Models.HashListAction.BLOCK)), moderation.raw().hashMatches());
     assertEquals(new Models.LinkDetectionResult("evaluated", "beta", null, List.of(new Models.DetectedQrCode("https://example.com", box)),

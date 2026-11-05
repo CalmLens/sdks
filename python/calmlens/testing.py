@@ -29,7 +29,7 @@ import uuid
 import zlib
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal, TypedDict, Union, cast
+from typing import Any, Literal, Optional, TypedDict, Union, cast
 from urllib.parse import parse_qsl, quote, unquote, urlsplit
 from urllib.request import Request
 
@@ -39,7 +39,8 @@ from ._mock_classification import CATEGORIES, QUALIFIERS
 from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_PART_SIZE_BYTES, DEFAULT_TIMEOUT,
                      CalmLensServerClient,
                      _HEX_COLOUR, _UNSET, _check_transform_options, _invalid, _invalid_upload_mime_type,
-                     _is_accepted_upload_mime_type, _json, _merge, _sign_upload_token)
+                     _is_accepted_upload_mime_type, _json, _merge, _normalize_upload_mime_type,
+                     _sign_upload_token, SIGNED_CDN_RESOURCES)
 from ._signed_test_inputs import (MEDIA_TEST_SIGNALS, TEST_INPUT_PRESETS, TEXT_TEST_SIGNALS, ClassificationTestSignal,
                                   PaintedTestImage, SignedTestAction, SignedTestDetectedFace,
                                   SignedTestDetectedPerson, SignedTestDetections, SignedTestFaceAge,
@@ -168,7 +169,8 @@ class MockDecision:
         return {"raw": {"categories": categories},
             "categories": {category: {"score": value, "action": action(value)} for category, value in evaluated},
             "explanationComplete": True, "source": "policy", "automatedAction": _STATUS_ACTION[status],
-            "regions": [], "flaggedCategories": [category for category, value in evaluated if action(value) != "allow"]}
+            # The mock analyses no audio or video, so a decision has no findings timeline.
+            "regions": [], "timeline": None, "flaggedCategories": [category for category, value in evaluated if action(value) != "allow"]}
 
 
 
@@ -574,8 +576,8 @@ class MockOptions(TypedDict, total=False):
     signed_url_base_url: str
 
 
-#: The ThumbHash the mock gives every classified image, standing in for one computed from its
-#: pixels. The ``placeholder`` resource serves it as a PNG, like the CDN.
+#: The ThumbHash the mock gives every processed asset's preview, standing in for one computed from
+#: its pixels. The ``placeholder`` resource serves it as a PNG, like the CDN.
 _MOCK_THUMBHASH = "1QcSHQRnh493V4dIh4eXh1h4kJUI"
 _MAX_SEARCH_LIMIT = 20
 _MAX_SEARCH_QUERY_LENGTH = 200
@@ -684,9 +686,59 @@ def _thumbhash_png(hash_base64: str) -> bytes:
             + chunk(b"IEND", b""))
 
 
-def _without_placeholder(image: Any) -> Any:
-    """Removing content removes the ThumbHash and average colour with it."""
-    return {**image, "thumbhash": None, "averageColor": None} if isinstance(image, dict) else image
+#: Paths beneath ``/rendered/`` the CDN reserves for streaming and an embeddable player.
+_RESERVED_RENDERED_PATHS = ("stream", "player")
+#: Removing or withholding content removes its rendered file and preview, as the API does.
+_NO_RENDERING: dict[str, Any] = {"rendered": None, "preview": None}
+#: The size of the waveform the API makes as an audio asset's preview.
+_WAVEFORM_SIZE = {"width": 1200, "height": 300}
+#: Audio and video formats browsers play as uploaded, so the API serves them as stored.
+_BROWSER_SAFE_MEDIA_FORMATS = ("video/mp4", "audio/mpeg", "audio/aac", "audio/mp4", "audio/x-m4a", "audio/ogg")
+#: Spreadsheets, which have no rendered file or preview.
+_SPREADSHEET_MIME_TYPES = ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                           "application/vnd.ms-excel.sheet.macroenabled.12", "application/vnd.ms-excel",
+                           "application/vnd.oasis.opendocument.spreadsheet")
+
+
+def _mock_rendering(asset: Mapping[str, Any], processed: bool) -> dict[str, Any]:
+    """The rendered file and preview the API reports for an asset with its content held. Once
+    uploaded, an image renders as itself with a preview that has no ThumbHash yet, and a PDF and
+    browser-safe audio and video render as uploaded. Once processed, a website renders as its
+    screenshot; a document or presentation as a PDF, with its first page as the preview; video and
+    audio as a browser-safe file (MP4 or M4A unless browsers play the upload), audio with a waveform
+    preview and video with no poster; and every preview has its ThumbHash. Text, spreadsheets and
+    other files have neither. The mock decodes nothing, so sizes are unknown and audio has no peaks."""
+    fmt = asset["content"].get("format")
+    mime = _normalize_upload_mime_type(fmt or "")
+    browser_safe = mime in _BROWSER_SAFE_MEDIA_FORMATS
+    kind = asset["type"]
+    unsized: dict[str, Any] = {"width": None, "height": None}
+
+    def preview(size: Mapping[str, Any]) -> dict[str, Any]:
+        return {**size, "thumbhash": _MOCK_THUMBHASH if processed else None,
+                "averageColor": "#7f7f7f" if processed else None}
+    renders_on_upload = (kind == "image" or mime == "application/pdf"
+                         or (kind in ("video", "audio") and browser_safe))
+    if not processed and not renders_on_upload:
+        return dict(_NO_RENDERING)
+    if kind == "image":
+        return {"rendered": {"kind": "image", "format": fmt or "image/png", **unsized}, "preview": preview(unsized)}
+    if kind == "website":
+        return {"rendered": {"kind": "image", "format": "image/png", **unsized}, "preview": preview(unsized)}
+    if kind == "multimedia-document":
+        if mime in _SPREADSHEET_MIME_TYPES:
+            return dict(_NO_RENDERING)
+        return {"rendered": {"kind": "pdf", "format": "application/pdf", **unsized},
+                "preview": preview(unsized) if processed else None}
+    if kind == "video":
+        return {"rendered": {"kind": "video", "format": fmt if browser_safe else "video/mp4", **unsized},
+                "preview": None}
+    if kind == "audio":
+        rendered: dict[str, Any] = {"kind": "audio", "format": fmt if browser_safe else "audio/mp4", **unsized}
+        if processed:
+            rendered["peaks"] = []
+        return {"rendered": rendered, "preview": preview(_WAVEFORM_SIZE) if processed else None}
+    return dict(_NO_RENDERING)
 
 
 #: The ``asset.<status>`` events, whose asset snapshot carries the moderation status they announce.
@@ -1161,6 +1213,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return ["policies." + {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}.get(method, "")]
             if route in ("assets/search", "assets/batch"):
                 return ["assets." + parts[3]]
+            if len(parts) == 5 and parts[2] == "assets" and parts[4] == "timeline":
+                return ["assets.listTimeline"]
             if route == "assets":
                 if method == "GET":
                     return ["assets.list", "assets.iterate"]
@@ -1189,7 +1243,6 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return ["assets.retrieve", "assets.waitForDecision"] if method == "GET" \
                 else ["assets." + by_method.get(method, "")]
         return {"content": ["assets.deleteContent"], "children": ["assets.listChildren", "assets.iterateChildren"],
-                "timeline": ["assets.listTimeline"],
                 "signed-url": ["assets.createSignedUrl"], "part": ["assets.uploadPart"], "move": ["assets.move"],
                 "retry": ["assets.retry"], "explain": ["assets.explain"],
                 "decision": ["assets.decide"]}.get(suffix, [])
@@ -1363,6 +1416,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._page(lists, query, [self.project_id])
             return self._create_hash_list(body, now)
         suffix = parts[1] if len(parts) > 1 else ""
+        if len(parts) == 3 and parts[2] == "timeline" and method == "GET":
+            return self._timeline(self._asset(parts[1]), query)
         if suffix == "batch":
             return self._batch(body, now)
         if suffix == "search":
@@ -1453,20 +1508,27 @@ class MockCalmLensServerClient(CalmLensServerClient):
             "visibility": options.get("visibility", "private"),
             "content": {"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
                         "safetyHold": None, "format": mime or None, "extension": None, "sizeInBytes": size,
-                        "checksums": None, "image": None, "extractedText": None,
-                        "fileMetadata": None},
+                        "checksums": None,
+                        # The mock decodes nothing, so the file's own details are unknown.
+                        "width": None, "height": None, "durationSeconds": None, "pageCount": None,
+                        "perceptualHash": None, "perceptualHashQuality": None, "metadata": None,
+                        # Like the API, the rendered file and preview come with processing.
+                        "extractedText": None, **_NO_RENDERING},
             "upload": {"status": "completed" if final else "uploading", "updatedAt": now,
                        "partsReceived": None if final else 1},
             "classification": {"status": "processing" if final else "pending", "failureReason": None, "updatedAt": now,
                                # The mock never reads test inputs.
                                "completedAt": None, "progress": None, "testInput": False,
-                               "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": []}},
+                               "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": [],
+                                              "timeline": None}},
         }
         if not final:
             self._uploads[asset["id"]] = {"queue": queue, "total": total}
             self.database_storage.assets[asset["id"]] = cast(Asset, asset)
             self.image_storage.content[asset["id"]] = {"type": mime, "parts": {1: raw or b""}}
             return asset
+        if "url" not in options:
+            asset["content"].update(_mock_rendering(asset, False))
         # Like the API: moderated as uploaded, then stored and recorded as uploaded and decided.
         decision = self._decision_for(asset, "upload", queue, (raw or b"") if raw_upload else None)
         uploaded = _event_asset(asset)
@@ -1564,25 +1626,25 @@ class MockCalmLensServerClient(CalmLensServerClient):
                        report: Mapping[str, Any] | None = None) -> None:
         """Move ``asset`` to ``outcome`` like the pipeline would: a decision finishes processing,
         ``purged`` deletes the content (``purge_reason``: ``policy`` for the pipeline, ``requested``
-        for a reviewer), and finished processing removes content kept only temporarily. A classified
-        image gets a ThumbHash for its placeholder, which goes with removed content."""
+        for a reviewer), and finished processing removes content kept only temporarily. A decided
+        asset gets its rendered file and preview (with a ThumbHash for its placeholder), which go
+        with its content."""
         now = self.now()
         decided = outcome not in ("pending", "failed")
         status = "completed" if decided else "failed" if outcome == "failed" else "processing"
         content = asset["content"]
         purge = outcome == "purged" and content["status"] != "removed"
         remove = purge or (status == "completed" and content["status"] == "temporary")
-        if decided and asset["type"] == "image" and content["status"] != "removed" and not purge:
-            content["image"] = {"width": None, "height": None, "perceptualHash": None,
-                                "perceptualHashQuality": None, **(content.get("image") or {}),
-                                "thumbhash": _MOCK_THUMBHASH,
-                                "averageColor": (content.get("image") or {}).get("averageColor") or "#7f7f7f"}
-        elif outcome == "purged":
-            content["image"] = _without_placeholder(content.get("image"))
+        # Like the API, an asset whose content is held has its rendered file and preview, completed
+        # by its decision, and removing content (when processing finishes or by purging) removes
+        # them with it, so no placeholder outlives the content. A safety hold withholds them.
+        content.update(_mock_rendering(asset, decided)
+                       if content["status"] != "removed" and not purge and not content.get("safetyHold")
+                       else _NO_RENDERING)
         if remove:
             self.image_storage.content.pop(asset["id"], None)
             content.update(status="removed", removalReason=purge_reason if purge else "retention", updatedAt=now,
-                           extractedText=None, fileMetadata=None, image=_without_placeholder(content.get("image")))
+                           extractedText=None, metadata=None, **_NO_RENDERING)
             asset["context"] = None
         asset["classification"].update(status=status, updatedAt=now, completedAt=now if decided else None,
                                        failureReason="processing-error" if outcome == "failed" else None)
@@ -1636,11 +1698,13 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if "name" in body and body["name"] is None:
                 raise _invalid_field("validation/invalid-type", "name")
         if suffix == "signed-url":
-            # None of these fields takes null.
+            # None of these fields takes null, and the resource must be one a signed URL serves.
             for key in ("viewerClaims", "resource", "lens", "transform", "expiresInSeconds"):
                 if key in body and body[key] is None:
                     raise _invalid_field("validation/invalid-value" if key == "resource" else "validation/invalid-type",
                                          key)
+            if body.get("resource", "rendered") not in SIGNED_CDN_RESOURCES:
+                raise _invalid_field("validation/invalid-value", "resource")
         asset = self._asset(identifier)
         if method == "DELETE":
             if suffix == "content":
@@ -1654,8 +1718,6 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if suffix == "children":
                 return self._page([a for a in self._project_assets() if a.get("parentId") == identifier], query,
                                   identifier)
-            if suffix == "timeline":
-                return self._timeline(asset, query)
             return asset
         if suffix == "signed-url":
             expires = body["expiresInSeconds"]
@@ -1760,10 +1822,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self.image_storage.content.pop(asset["id"], None)
         content = asset["content"]
         if content["status"] == "removed":
-            content["image"] = _without_placeholder(content.get("image"))
+            content.update(_NO_RENDERING)
         else:
             content.update(status="removed", removalReason="requested", updatedAt=now, extractedText=None,
-                           fileMetadata=None, image=_without_placeholder(content.get("image")))
+                           metadata=None, **_NO_RENDERING)
             asset["context"] = None
             asset["updatedAt"] = now
         self._lifecycle_event("asset.content-removed", asset)
@@ -1852,10 +1914,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if (hash_value is None) == (asset_id is None):
             raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "Send either hash or assetId")
         if asset_id is not None:
-            image = self._asset(asset_id)["content"].get("image") or {}
-            if not image.get("perceptualHash"):
+            content = self._asset(asset_id)["content"]
+            if not content.get("perceptualHash"):
                 raise _Failure(error_codes.HASH_LIST_ASSET_NOT_HASHED)
-            hash_value, quality = image["perceptualHash"], image.get("perceptualHashQuality")
+            hash_value, quality = content["perceptualHash"], content.get("perceptualHashQuality")
         if not _PDQ_HASH.fullmatch(cast(str, hash_value)):
             raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "Use a PDQ hash of 64 hexadecimal characters")
         entries = self.database_storage.hash_list_entries
@@ -2020,22 +2082,15 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     @staticmethod
     def _timeline(asset: dict[str, Any], query: dict[str, Any]) -> dict[str, Any]:
-        # An asset's findings timeline, a page at a time, as the API lists it: its report's
-        # segments in time order, with a cursor naming the next one's position.
+        # An asset's findings timeline, as the API lists it: refused while a safety hold is on.
+        # The mock analyses no audio or video, so it keeps no segments: every timeline is empty,
+        # and no cursor continues one.
         size = _bounded_int(query.get("pageSize", _DEFAULT_PAGE_SIZE), "pageSize", _MAX_PAGE_SIZE)
-        cursor = query.get("cursor")
-        offset = 0
-        if cursor is not None:
-            found = re.fullmatch(r"timeline:([0-9]+)", str(cursor))
-            if not found:
-                raise _Failure(error_codes.INVALID_CURSOR)
-            offset = int(found.group(1))
-        raw = asset["classification"]["moderation"].get("raw") or {}
-        segments = (raw.get("timeline") or {}).get("segments") or []
-        more = offset + size < len(segments)
-        return {"items": copy.deepcopy(segments[offset:offset + size]),
-                "nextCursor": f"timeline:{offset + size}" if more else None,
-                "pageSize": size, "hasMore": more, "ordering": []}
+        if asset["content"].get("safetyHold"):
+            raise _Failure(error_codes.ASSET_SAFETY_HELD)
+        if query.get("cursor") is not None:
+            raise _Failure(error_codes.INVALID_CURSOR)
+        return {"items": [], "nextCursor": None, "pageSize": size, "hasMore": False, "ordering": []}
 
     def _search(self, query: dict[str, Any]) -> dict[str, Any]:
         # Keyword search like the API's; the mock has no semantic index, so every mode is
@@ -2128,14 +2183,19 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if len(segments) < 4 or segments[0] != "assets":
             return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
         project, identifier, resource = unquote(segments[1]), unquote(segments[2]), segments[3]
-        # Like the CDN, the selector after the resource is read first, and lenses and transforms
-        # apply only to the rendered resource.
+        selector_path = segments[4:]
+        no_rendered_version = _Failure("asset/no-rendered-version", "This asset has no such resource", 404)
         invalid_transform = _Failure("asset/invalid-transform", "Invalid transform selector", 400)
+        # Like the CDN, ``/rendered/stream`` and ``/rendered/player`` are reserved, then the
+        # selector after the resource is read; the original takes none.
+        if resource == "rendered" and selector_path and selector_path[0] in _RESERVED_RENDERED_PATHS:
+            return self._failure_response(no_rendered_version)
         try:
-            lens, transform_options = _parse_transform_selector("/".join(segments[4:]))
+            lens, transform_options = _parse_transform_selector("/".join(selector_path))
         except _InvalidSelector:
             return self._failure_response(invalid_transform)
-        if resource == "original" and (lens is not None or transform_options is not None):
+        has_selector = lens is not None or transform_options is not None
+        if resource == "original" and has_selector:
             return self._failure_response(invalid_transform)
         not_available = _Failure("asset/not-available", "Asset is not available", 403)
         with self._state_lock:
@@ -2145,11 +2205,17 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if asset is None:
                 return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
             status = asset["classification"]["moderation"].get("status")
+            rendered = cast(Optional[dict[str, Any]], asset["content"].get("rendered"))
+            preview = cast(Optional[dict[str, Any]], asset["content"].get("preview"))
+            # Like the CDN, a safety hold refuses every resource.
+            if asset["content"].get("safetyHold"):
+                return self._failure_response(not_available)
             if resource == "placeholder":
-                # Like the CDN's placeholder handler: an image's ThumbHash, served publicly for every
-                # asset whatever its visibility or moderation status; refused for purged assets and
-                # assets without one (not yet classified, or content removed).
-                thumbhash = cast(dict[str, Any], asset["content"].get("image") or {}).get("thumbhash")
+                # Like the CDN's placeholder handler: the preview's ThumbHash, served publicly for
+                # every asset whatever its visibility or moderation status; refused for purged
+                # assets and assets without one (not yet processed, without a preview, or content
+                # removed).
+                thumbhash = (preview or {}).get("thumbhash")
                 if not thumbhash or status == "purged":
                     return self._failure_response(not_available)
                 return self._cdn_response(method, _thumbhash_png(thumbhash), {
@@ -2160,7 +2226,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             stored = self.image_storage.content.get(asset["id"])
             if (asset["upload"]["status"] == "uploading" or status in ("blocked", "purged")
                     or asset["classification"]["status"] == "failed"
-                    or asset["content"]["status"] == "removed" or stored is None):
+                    or asset["content"]["status"] == "removed" or (resource == "original" and stored is None)):
                 return self._failure_response(not_available)
             # Then access: age-restricted assets need ``viewerClaims.ageConfirmed=true`` whatever
             # the key, and private assets need the download permission for the asset's folder.
@@ -2172,6 +2238,13 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._failure_response(_Failure(
                     "asset/api-key-missing-permission",
                     "This API key needs assets:download permission for this asset’s folder.", 403))
+            # Then whether the asset has the resource, and whether it is a still image that takes a
+            # lens or transform: the preview always is, the rendered file only when it is an image.
+            if (resource == "rendered" and not rendered) or (resource == "preview" and not preview):
+                return self._failure_response(no_rendered_version)
+            still_image = resource == "preview" or (resource == "rendered" and (rendered or {}).get("kind") == "image")
+            if not still_image and has_selector:
+                return self._failure_response(invalid_transform)
             # Then the options, checked against the transform schema once the asset may be served.
             if transform_options is not None:
                 unknown_keys, invalid_keys = _check_transform_options(transform_options)
@@ -2179,16 +2252,27 @@ class MockCalmLensServerClient(CalmLensServerClient):
                     return self._failure_response(_Failure(
                         "asset/invalid-transform-options",
                         f"Invalid transform options: {', '.join([*unknown_keys, *invalid_keys])}", 400))
-            content = b"".join(v for _, v in sorted(stored["parts"].items()))
-            content_type = stored["type"] or "application/octet-stream"
-            image = asset["type"] == "image"
-            # Like the CDN: an image's bytes are immutable for a year, other content is kept for an
-            # hour, by shared caches only when delivery is public.
+            # The bytes: the upload, which stands in for its own rendered file and an image's
+            # preview, or the placeholder PNG for a still the mock doesn't make.
+            serves_upload = (resource == "original" or (resource == "rendered" and (rendered or {}).get("kind") != "image")
+                             or asset["type"] == "image")
+            if serves_upload:
+                if stored is None:
+                    return self._failure_response(not_available)
+                content = b"".join(v for _, v in sorted(stored["parts"].items()))
+                content_type = (rendered["format"] if resource == "rendered" and rendered
+                                else stored["type"] or "application/octet-stream")
+            else:
+                content = _thumbhash_png((preview or {}).get("thumbhash") or _MOCK_THUMBHASH)
+                content_type = "image/png"
+            immutable = still_image or (resource == "original" and asset["type"] == "image")
+            # Like the CDN: a still image's bytes are immutable for a year, other content is kept
+            # for an hour, by shared caches only when delivery is public.
             headers = {"Content-Type": content_type,
                        "Cache-Control": f"{'private' if private else 'public'}, "
-                                        f"{'max-age=31536000, immutable' if image else 'max-age=3600'}",
+                                        f"{'max-age=31536000, immutable' if immutable else 'max-age=3600'}",
                        "Cache-Tag": f"asset-{asset['id']}"}
-            if image:
+            if immutable:
                 headers["ETag"] = f'"{asset["id"]}"'
                 headers["Expires"] = email.utils.formatdate(self.now() / 1000 + 31536000, usegmt=True)
             if claims:

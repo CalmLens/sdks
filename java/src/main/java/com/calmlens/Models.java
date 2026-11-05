@@ -35,8 +35,8 @@ import java.util.Objects;
  * accepts any JSON, are untyped: {@code String}, {@code Long}, {@code Double}, {@code Boolean},
  * {@code List} and {@code Map}. Unknown
  * response fields are ignored, and unknown {@link AssetClassificationStatus}, {@link
- * AssetModerationStatus}, {@link AssetModerationDecision}, {@link AssetContentStatus} or {@link
- * Visibility} values keep their raw
+ * AssetModerationStatus}, {@link AssetModerationDecision}, {@link AssetContentStatus}, {@link
+ * AssetRenderedKind} or {@link Visibility} values keep their raw
  * value instead of failing.
  */
 public final class Models {
@@ -279,6 +279,53 @@ public final class Models {
     static final class Adapter extends TypeAdapter<AssetContentStatus> {
       @Override public void write(JsonWriter out, AssetContentStatus status) throws IOException { if (status == null) out.nullValue(); else out.value(status.value); }
       @Override public AssetContentStatus read(JsonReader in) throws IOException {
+        if (in.peek() == JsonToken.NULL) { in.nextNull(); return null; }
+        return of(in.nextString());
+      }
+    }
+  }
+
+  /**
+   * What an asset's rendered file is ({@code content.rendered.kind}): an image, a PDF, video or
+   * audio. Unknown values are kept like {@link AssetClassificationStatus}.
+   */
+  @JsonAdapter(AssetRenderedKind.Adapter.class)
+  public static final class AssetRenderedKind {
+    /** A still image; it takes lenses and transforms. */
+    public static final AssetRenderedKind IMAGE = new AssetRenderedKind("image");
+    /** A PDF. */
+    public static final AssetRenderedKind PDF = new AssetRenderedKind("pdf");
+    /** Browser-safe video. */
+    public static final AssetRenderedKind VIDEO = new AssetRenderedKind("video");
+    /** Browser-safe audio. */
+    public static final AssetRenderedKind AUDIO = new AssetRenderedKind("audio");
+    private static final Map<String, AssetRenderedKind> KNOWN = Map.of("image", IMAGE, "pdf", PDF, "video", VIDEO, "audio", AUDIO);
+    private final String value;
+
+    private AssetRenderedKind(String value) { this.value = value; }
+
+    /**
+     * @param value the API value, such as {@code "pdf"}
+     * @return the matching constant, or a new instance keeping an unknown value
+     */
+    public static AssetRenderedKind of(String value) {
+      AssetRenderedKind known = KNOWN.get(Objects.requireNonNull(value, "value"));
+      return known != null ? known : new AssetRenderedKind(value);
+    }
+
+    /** @return the API value, such as {@code "pdf"} */
+    public String value() { return value; }
+
+    /** @return whether this SDK version knows the value */
+    public boolean isKnown() { return KNOWN.containsKey(value); }
+
+    @Override public boolean equals(Object other) { return other instanceof AssetRenderedKind kind && kind.value.equals(value); }
+    @Override public int hashCode() { return value.hashCode(); }
+    @Override public String toString() { return value; }
+
+    static final class Adapter extends TypeAdapter<AssetRenderedKind> {
+      @Override public void write(JsonWriter out, AssetRenderedKind kind) throws IOException { if (kind == null) out.nullValue(); else out.value(kind.value); }
+      @Override public AssetRenderedKind read(JsonReader in) throws IOException {
         if (in.peek() == JsonToken.NULL) { in.nextNull(); return null; }
         return of(in.nextString());
       }
@@ -532,7 +579,7 @@ public final class Models {
    * @param keepContentAfterProcessing whether stored content is kept after classification
    * @param storeSensitiveMetadata overrides the project's {@code storeSensitiveMetadata} setting
    *     for this upload: when false, embedded image metadata (EXIF, XMP and IPTC) is removed from
-   *     the file before it is stored, and {@code fileMetadata} leaves out the creator and
+   *     the file before it is stored, and {@code content.metadata} leaves out the creator and
    *     location; when true, the image is stored as uploaded
    * @param features optional analyses to run, such as OCR
    */
@@ -1480,7 +1527,7 @@ public final class Models {
     /** @param assetId the asset */
     public SignedUrlOptions(String assetId) { this.assetId = assetId; }
     public SignedUrlOptions assetId(String value) { assetId = value; return this; }
-    /** @param value {@code rendered} (the API's default) or {@code original} (no lens or transform) @return these options */
+    /** @param value {@code rendered} (the API's default), {@code preview} or {@code original} (no lens or transform); see {@link CalmLensServerClient#SIGNED_CDN_RESOURCES} @return these options */
     public SignedUrlOptions resource(String value) { resource = value; return this; }
     public SignedUrlOptions lens(String value) { lens = value; return this; }
     /**
@@ -1638,7 +1685,7 @@ public final class Models {
     /** @param assetIdentifier an asset ID or external ID */
     public CdnRequest(String assetIdentifier) { this.assetIdentifier = assetIdentifier; }
     public CdnRequest assetIdentifier(String value) { assetIdentifier = value; return this; }
-    /** @param value {@code rendered} (default), {@code original} (no lens or transform) or {@code placeholder} (no lens or transform) @return these options */
+    /** @param value {@code rendered} (default), {@code preview}, {@code original} (no lens or transform) or {@code placeholder} (no lens or transform); see {@link CalmLensServerClient#CDN_RESOURCES} @return these options */
     public CdnRequest resource(String value) { resource = value; return this; }
     public CdnRequest lens(String value) { lens = value; return this; }
     /**
@@ -1895,12 +1942,14 @@ public final class Models {
    * @param status the moderation decision in force, which also decides delivery
    * @param linkSafety (preview) what the policy's link safety settings made of the asset's links;
    *     null when the policy doesn't act on links
+   * @param timeline the audio or video asset's findings timeline, which {@code assets.listTimeline}
+   *     pages through; null for other assets and before analysis
    */
   public record AssetModeration(AssetModerationStatus status, List<AssetReview> manualReviews,
       String automatedAction, String source, String rule, List<String> flaggedCategories,
       LinkSafetyDecision linkSafety,
       List<RegionalDecision> regions, Boolean explanationComplete,
-      Map<String, CategoryPolicyScore> categories, ModerationRaw raw,
+      Map<String, CategoryPolicyScore> categories, ModerationRaw raw, ModerationTimeline timeline,
       Map<String, String> testCategoryActions, List<TestRegionalAction> testRegionalActions) {
     public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); flaggedCategories = listOrEmpty(flaggedCategories); regions = listOrEmpty(regions); testCategoryActions = map(testCategoryActions); testRegionalActions = list(testRegionalActions); }
   }
@@ -1946,9 +1995,15 @@ public final class Models {
     public OffPlatformLinks { allowedDomains = list(allowedDomains); }
   }
 
+  /**
+   * An audio or video asset's findings timeline, listed with {@code assets.listTimeline}.
+   *
+   * @param segmentCount how many segments the timeline has
+   */
+  public record ModerationTimeline(int segmentCount) {}
+
   /** Detection findings before policy evaluation. */
-  public record ModerationRaw(Map<String, CategoryResult> categories,
-      MediaClassificationReport timeline, List<HashMatch> hashMatches) {
+  public record ModerationRaw(Map<String, CategoryResult> categories, List<HashMatch> hashMatches) {
     public ModerationRaw { categories = map(categories); hashMatches = list(hashMatches); }
   }
 
@@ -1964,17 +2019,57 @@ public final class Models {
    * @param extension file extension of the content
    * @param sizeInBytes size of the uploaded content
    * @param checksums digests of the uploaded content
-   * @param image the picture served at the rendered resource; null when the asset has none
-   * @param extractedText text extracted from the content
-   * @param fileMetadata metadata embedded in an uploaded image, such as its capture time, camera
-   *     and software; read-only and separate from the asset's own {@code metadata}. Null when the
+   * @param width the upload's width in pixels, for images, video and websites; null when unknown
+   * @param height the upload's height in pixels, like {@code width}
+   * @param durationSeconds the length of audio and video; null for other assets
+   * @param pageCount the number of pages of a document; null for other assets
+   * @param perceptualHash perceptual hash for matching similar images, for image assets
+   * @param perceptualHashQuality the perceptual hash's quality from 0 to 100; low values match
+   *     less reliably
+   * @param metadata metadata embedded in an uploaded image, such as its capture time, camera and
+   *     software; read-only and separate from the asset's own {@code metadata}. Null when the
    *     image declares none, for other asset types, once the content is removed and while the
    *     asset is held
+   * @param extractedText text extracted from the content
+   * @param rendered the displayable file the CDN's {@code rendered} resource serves; null when the
+   *     asset has none (text, spreadsheets, other files, before processing makes one, once the
+   *     content is removed and while a safety hold is on)
+   * @param preview the still image the CDN's {@code preview} resource serves; null when the asset
+   *     has none, like {@code rendered}
    */
   public record AssetContent(AssetContentStatus status, String removalReason,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       SafetyHold safetyHold, String format, String extension, Long sizeInBytes, Checksums checksums,
-      AssetImage image, ExtractedText extractedText, FileMetadata fileMetadata) {}
+      Integer width, Integer height, Double durationSeconds, Integer pageCount,
+      String perceptualHash, Integer perceptualHashQuality, FileMetadata metadata,
+      ExtractedText extractedText, AssetRendered rendered, AssetPreview preview) {}
+
+  /**
+   * The one displayable file of an asset, as the CDN's {@code rendered} resource serves it.
+   *
+   * @param kind {@code image}, {@code pdf}, {@code video} or {@code audio}; only an image takes
+   *     lenses and transforms
+   * @param format the file's MIME type
+   * @param width width in pixels; null when unknown or not visual
+   * @param height height in pixels, like {@code width}
+   * @param peaks audio waveform peaks from 0 to 1; null for other kinds and before processing
+   */
+  public record AssetRendered(AssetRenderedKind kind, String format, Integer width, Integer height, List<Double> peaks) {
+    /** Copies collections so the record stays immutable. */
+    public AssetRendered { peaks = list(peaks); }
+  }
+
+  /**
+   * The still image that stands for an asset, as the CDN's {@code preview} resource serves it: the
+   * image itself, a website's screenshot, a document's first page or an audio waveform.
+   *
+   * @param width width in pixels; null when unknown
+   * @param height height in pixels; null when unknown
+   * @param thumbhash ThumbHash placeholder to render while the preview loads; null until
+   *     processed
+   * @param averageColor average colour of the preview; null until processed
+   */
+  public record AssetPreview(Integer width, Integer height, String thumbhash, String averageColor) {}
 
 
   /**
@@ -2132,23 +2227,6 @@ public final class Models {
   public record AgeRange(Integer low, Integer high) {}
 
   /**
-   * Audio and video classification.
-   *
-   * @param durationSeconds media duration
-   * @param frameIntervalSeconds frame sampling interval
-   * @param sampledFrames frames sampled
-   * @param audioTranscribed whether audio was transcribed
-   * @param segmentCount how many segments the full timeline has, when {@code segments} is
-   *     shortened; list them all with {@code assets.listTimeline}
-   * @param segments per-segment results
-   */
-  public record MediaClassificationReport(Double durationSeconds, Double frameIntervalSeconds, Integer sampledFrames,
-      Boolean audioTranscribed, Integer segmentCount, List<MediaClassificationSegment> segments) {
-    /** Copies collections so the record stays immutable. */
-    public MediaClassificationReport { segments = list(segments); }
-  }
-
-  /**
    * One stretch of an audio or video asset's findings: its source, times and scores.
    *
    * @param source {@code clip}, {@code frame}, {@code frame-text} or {@code speech}
@@ -2160,22 +2238,6 @@ public final class Models {
     /** Copies collections so the record stays immutable. */
     public MediaClassificationSegment { categories = map(categories); }
   }
-
-  /**
-   * The picture CalmLens can show for an asset: the original for image assets, or a generated
-   * image for documents and websites. It remains after the content is removed, so check the
-   * content status before loading it.
-   *
-   * @param width width in pixels: the original's for image assets (a converted HEIC is served
-   *     smaller at the same aspect ratio), and the generated image's otherwise
-   * @param height height in pixels, like {@code width}
-   * @param thumbhash ThumbHash placeholder to render while the image loads; null once removed
-   * @param averageColor average colour of the image; null once removed
-   * @param perceptualHash perceptual hash for matching similar images, for image assets
-   * @param perceptualHashQuality the perceptual hash's quality from 0 to 100; low values match less reliably
-   */
-  public record AssetImage(
-      Integer width, Integer height, String thumbhash, String averageColor, String perceptualHash, Integer perceptualHashQuality) {}
 
   /**
    * Digests of an asset's uploaded content. Each is null when not computed.

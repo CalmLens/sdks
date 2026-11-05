@@ -1,5 +1,5 @@
 import { i as EventFacts } from "./EventCatalog-DI7W0zqj.js";
-import { n as EventAsset, r as TypedEvent, t as Event } from "./Event-BTZxn4gb.js";
+import { n as EventAsset, r as TypedEvent, t as Event } from "./Event-DD-9baX7.js";
 import * as zod from "zod";
 export declare const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
 export declare const WEBHOOK_TIMESTAMP_HEADER = "x-calmlens-timestamp";

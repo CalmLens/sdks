@@ -67,6 +67,16 @@ public final class CalmLensServerClient implements AutoCloseable {
   public static final String DEFAULT_BASE_URL = "https://api.calmlens.com/v1";
   /** The production CDN. */
   public static final String DEFAULT_CDN_BASE_URL = "https://cdn.calmlens.com/v1";
+  /**
+   * The CDN resources a signed URL can be created for, as the API accepts them: the exact
+   * {@code original} upload, the {@code rendered} file for display (an image, a PDF, or
+   * browser-safe video or audio) and the {@code preview}, a still image that stands for the asset.
+   */
+  public static final List<String> SIGNED_CDN_RESOURCES = List.of("original", "rendered", "preview");
+  /** Every CDN resource: the signed ones and the public {@code placeholder}. */
+  public static final List<String> CDN_RESOURCES = List.of("original", "rendered", "preview", "placeholder");
+  /** The resources that take no lens or transform: the exact upload and the public placeholder. */
+  private static final List<String> UNSELECTABLE_CDN_RESOURCES = List.of("original", "placeholder");
 
   /** Header carrying {@code v1=<hex>} HMAC-SHA256 signatures (comma-separated during secret rotation). */
   public static final String WEBHOOK_SIGNATURE_HEADER = "x-calmlens-signature";
@@ -1513,8 +1523,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Lists one page of an audio or video asset's findings timeline, in time order. A long asset's
-     * report keeps a shortened timeline; this lists every segment.
+     * Lists one page of an audio or video asset's findings timeline, in time order.
+     * {@code classification.moderation.timeline.segmentCount} says how many segments there are.
      *
      * @param options the asset and page
      * @return one page of timeline segments
@@ -1523,7 +1533,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       JsonObject o = Models.encode(options);
       JsonObject query = new JsonObject();
       without(o, "assetId").entrySet().forEach(entry -> query.add(entry.getKey(), entry.getValue()));
-      return decode(json("GET", "/assets/" + id(str(o, "assetId", null)) + "/timeline", query, null), Models.AssetTimelinePage.class);
+      return decode(json("GET", project("assets/" + id(str(o, "assetId", null)) + "/timeline"), query, null), Models.AssetTimelinePage.class);
     }
 
     /** @param options the parent asset, page size and filter @return a lazy iterable over every child */
@@ -1552,7 +1562,8 @@ public final class CalmLensServerClient implements AutoCloseable {
 
     /**
      * Creates a short-lived signed CDN URL for a private asset. The API signs the {@code rendered}
-     * resource unless the options ask for {@code original}; the expiry defaults to 900 seconds.
+     * resource unless the options ask for {@code original} or {@code preview}; the expiry defaults
+     * to 900 seconds.
      *
      * @param options the asset, resource, lens or transform and expiry
      * @return the URL
@@ -1560,12 +1571,13 @@ public final class CalmLensServerClient implements AutoCloseable {
     public Models.SignedUrl createSignedUrl(Models.SignedUrlOptions options) {
       JsonObject o = Models.encode(options);
       String path = "/assets/" + id(str(o, "assetId", null)) + "/signed-url";
-      // As the API checks: a placeholder needs no signature, and only the rendered resource takes
-      // a lens or transform.
+      // As the API checks: a placeholder needs no signature, and the original takes no lens or
+      // transform.
       String resource = str(o, "resource", "rendered");
-      if (!resource.equals("original") && !resource.equals("rendered")) throw argument("A signed URL's resource must be original or rendered");
+      if (!SIGNED_CDN_RESOURCES.contains(resource))
+        throw argument("A signed URL's resource must be one of " + String.join(", ", SIGNED_CDN_RESOURCES));
       if (resource.equals("original") && (o.has("lens") || options.transformValue() != null))
-        throw argument("Lenses and transforms apply only to the rendered resource");
+        throw argument("The original resource takes no lens or transform");
       if (o.has("expiresInSeconds")) {
         long seconds = o.get("expiresInSeconds").getAsLong();
         if (seconds < 1 || seconds > MAX_SIGNED_URL_SECONDS) throw argument("expiresInSeconds must be from 1 to 86400");
@@ -1907,9 +1919,13 @@ public final class CalmLensServerClient implements AutoCloseable {
     private Cdn() {}
 
     /**
-     * Builds the CDN URL of an asset's {@code rendered} (default), {@code original} or {@code placeholder}
-     * resource, with optional {@code viewerClaims} encoded in its query. Only the rendered resource takes a lens or transform. A placeholder is a small blurred PNG,
-     * public whatever the asset's visibility or moderation status; it needs no age confirmation either.
+     * Builds the CDN URL of an asset's resource, with optional {@code viewerClaims} encoded in its
+     * query: {@code rendered} (default: the displayable file, an image in the best format the
+     * client accepts, a PDF, or browser-safe video or audio), {@code original} (the exact upload),
+     * {@code preview} (a still image for the asset) or {@code placeholder} (a small blurred PNG,
+     * public whatever the asset's visibility or moderation status, without age confirmation).
+     * Lenses and transforms apply to {@code preview}, and to {@code rendered} when it is an image;
+     * the CDN refuses them on rendered PDFs, video and audio with {@code asset/invalid-transform}.
      *
      * @param options the asset and selector
      * @return the URL
@@ -1918,10 +1934,9 @@ public final class CalmLensServerClient implements AutoCloseable {
       JsonObject o = Models.encode(options);
       Object transform = options.transformValue();
       String resource = str(o, "resource", "rendered");
-      if (!List.of("original", "rendered", "placeholder").contains(resource)) throw argument("Resource must be original, rendered or placeholder");
+      if (!CDN_RESOURCES.contains(resource)) throw argument("Resource must be one of " + String.join(", ", CDN_RESOURCES));
       boolean transformed = o.has("lens") && !o.get("lens").isJsonNull() || transform != null;
-      if (resource.equals("original") && transformed) throw argument("Lenses and transforms apply only to the rendered resource");
-      if (resource.equals("placeholder") && transformed) throw argument("A placeholder takes no lens or transform");
+      if (UNSELECTABLE_CDN_RESOURCES.contains(resource) && transformed) throw argument("The " + resource + " resource takes no lens or transform");
       String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + resource;
       List<String> selector = new ArrayList<>();
       if (o.has("lens") && !o.get("lens").isJsonNull()) selector.add("@" + id(o.get("lens").getAsString()));

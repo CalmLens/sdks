@@ -136,8 +136,25 @@ export const CALMLENS_STYLES = `
 .calmlens-media__content { opacity: 0; transition: opacity 250ms; }
 .calmlens-media[data-state="loaded"] .calmlens-media__content { opacity: 1; }
 .calmlens-media[data-kind="video"] .calmlens-media__content, .calmlens-media[data-kind="audio"] .calmlens-media__content { opacity: 1; }
-.calmlens-media[data-kind="audio"] { background: none; }
+.calmlens-media[data-kind="pdf"] .calmlens-media__content { opacity: 1; border: 0; background: var(--calmlens-background); }
+.calmlens-media[data-kind="pdf"]:not([data-sized]) .calmlens-media__content { height: 480px; }
+.calmlens-media__open { position: absolute; right: 8px; bottom: 8px; text-decoration: none; }
+.calmlens-media__file { position: absolute; inset: 0; display: grid; place-items: center; }
+.calmlens-media:not([data-sized])[data-kind="file"], .calmlens-media:not([data-sized])[data-kind="pending"] { min-height: 160px; }
+.calmlens-media[data-kind="audio"] { background: none; display: grid; gap: 8px; }
 .calmlens-media[data-kind="audio"] .calmlens-media__content { position: static; height: auto; }
+/* Audio's waveform: the preview still, with the played part of its peaks in the accent colour. */
+.calmlens-media__waveform {
+  position: relative; height: var(--calmlens-waveform-height, 64px); border-radius: var(--calmlens-media-radius, 0);
+  overflow: hidden; background: var(--calmlens-surface);
+}
+.calmlens-media__wave { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.calmlens-media__progress, .calmlens-media__peaks { position: absolute; inset: 0; pointer-events: none; }
+.calmlens-media__peaks { display: flex; align-items: center; gap: 1px; }
+.calmlens-media__peaks > span { flex: 1 1 0; min-width: 1px; border-radius: 1px; background: var(--calmlens-border); }
+.calmlens-media__wave ~ .calmlens-media__progress .calmlens-media__peaks:not([data-played]) { visibility: hidden; }
+.calmlens-media__peaks[data-played] { clip-path: inset(0 calc(100% - var(--calmlens-played, 0%)) 0 0); }
+.calmlens-media__peaks[data-played] > span { background: var(--calmlens-accent); }
 .calmlens-media__notice {
   position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px;
   padding: 12px; text-align: center; color: #fff; background: rgba(0, 0, 0, 0.45);

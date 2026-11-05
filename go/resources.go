@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -242,13 +243,15 @@ func (s *AssetsService) ListChildren(ctx context.Context, options ListAssetChild
 	return &result, nil
 }
 
-// ListTimeline returns one page of an audio or video asset's findings timeline, in time order.
-// A long asset's report keeps a shortened timeline; this lists every segment.
+// ListTimeline returns one page of an audio or video asset's findings timeline, in time order,
+// from the client's project. Classification.Moderation.Timeline.SegmentCount says how many
+// segments there are. Pass each page's NextCursor back unchanged; cursors are opaque.
 func (s *AssetsService) ListTimeline(ctx context.Context, options ListAssetTimelineOptions) (*AssetTimelinePage, error) {
-	path, err := resourcePath("assets", options.AssetID, "/timeline")
+	asset, err := resourcePath("assets", options.AssetID, "/timeline")
 	if err != nil {
 		return nil, err
 	}
+	path := s.c.project(strings.TrimPrefix(asset, "/"))
 	params, err := query(struct {
 		Cursor   string `json:"cursor,omitempty"`
 		PageSize int    `json:"pageSize,omitempty"`
@@ -279,11 +282,11 @@ func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOp
 	if err != nil {
 		return nil, err
 	}
-	if options.Resource != "" && options.Resource != ResourceOriginal && options.Resource != ResourceRendered {
-		return nil, invalid(CodeSDKInvalidArgument, "a signed URL's resource must be original or rendered")
+	if options.Resource != "" && !slices.Contains(SignedCDNResources, options.Resource) {
+		return nil, invalid(CodeSDKInvalidArgument, "a signed URL's resource must be one of "+strings.Join(SignedCDNResources, ", "))
 	}
 	if options.Resource == ResourceOriginal && (options.Lens != "" || transform != "") {
-		return nil, invalid(CodeSDKInvalidArgument, "lenses and transforms apply only to the rendered resource")
+		return nil, invalid(CodeSDKInvalidArgument, "the original resource takes no lens or transform")
 	}
 	if options.ExpiresInSeconds < 0 || options.ExpiresInSeconds > MaxSignedURLSeconds {
 		return nil, invalid(CodeSDKInvalidArgument, "ExpiresInSeconds must be from 1 to 86400 (0 for the default)")
@@ -384,14 +387,11 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if options.Resource == "" {
 		options.Resource = ResourceRendered
 	}
-	if options.Resource != ResourceOriginal && options.Resource != ResourceRendered && options.Resource != ResourcePlaceholder {
-		return "", invalid(CodeSDKInvalidArgument, "resource must be original, rendered or placeholder")
+	if options.Resource != ResourcePlaceholder && !slices.Contains(SignedCDNResources, options.Resource) {
+		return "", invalid(CodeSDKInvalidArgument, "resource must be one of "+strings.Join(SignedCDNResources, ", ")+", "+ResourcePlaceholder)
 	}
-	if options.Resource == ResourceOriginal && transformed {
-		return "", invalid(CodeSDKInvalidArgument, "lenses and transforms apply only to the rendered resource")
-	}
-	if options.Resource == ResourcePlaceholder && (options.Lens != "" || options.Transform != "" || options.TransformOptions != nil) {
-		return "", invalid(CodeSDKInvalidArgument, "a placeholder takes no lens or transform")
+	if (options.Resource == ResourceOriginal || options.Resource == ResourcePlaceholder) && transformed {
+		return "", invalid(CodeSDKInvalidArgument, "the "+options.Resource+" resource takes no lens or transform")
 	}
 	asset, err := segment(options.AssetIdentifier)
 	if err != nil {

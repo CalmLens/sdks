@@ -6,6 +6,7 @@ namespace CalmLens\Testing;
 
 use CalmLens\Assets;
 use CalmLens\CalmLensException;
+use CalmLens\Cdn;
 use CalmLens\ErrorCodes;
 use CalmLens\Internal\Session;
 use CalmLens\Internal\Transforms;
@@ -36,18 +37,25 @@ use Psr\Http\Message\ResponseInterface;
  * `completeProcessing` finishes a queued one. A decided asset gets the decision's full report.
  * Content is kept only with `keepContentAfterProcessing: true`; otherwise it is removed once
  * classification completes, as in the API. A `purged` decision removes the content with reason
- * `policy`; a reviewer's purge (`decide`) with reason `requested`. A classified image gets a
- * ThumbHash for its placeholder, which goes with its content. Like the API, a completed upload adds
+ * `policy`; a reviewer's purge (`decide`) with reason `requested`. Like the API, an asset whose
+ * content is held reports its `content.rendered` file and `content.preview` (see `rendering`), a
+ * decided one's preview with a ThumbHash for its placeholder, and both go with its content or
+ * while a safety hold is on. Like the API, a completed upload adds
  * `asset.uploaded`, then `asset.classified` and the automated `asset.<status>` once decided, or
  * `asset.failed`; deleting an asset, removing its content and retrying it add `asset.deleted`,
  * `asset.content-removed` and `asset.retried`. The project starts on the organisation's own
  * General preset policy; the mock's presets have one release (version 1) and no settings, and policies never decide uploads.
  *
- * Like the CDN, it checks delivery first: blocked, purged and failed assets, and assets whose
+ * Like the CDN, a safety hold refuses every resource, the placeholder included, with 403
+ * `asset/not-available`. Then it checks delivery: blocked, purged and failed assets, and assets whose
  * content was removed or is still uploading, return 403 `asset/not-available` whatever the key.
  * Then access: an age-restricted asset requested without `'viewerClaims' => ['ageConfirmed' => true]`
  * returns 403 `viewer/age-confirmation-required` whatever the key, and a private asset needs an
- * `assets:download` grant for its folder. The default
+ * `assets:download` grant for its folder. Then whether the asset has the resource (404
+ * `asset/no-rendered-version`), and lenses and transforms only on a still image: the preview, or a
+ * rendered image. The mock converts nothing: an upload stands in for its rendered file and an
+ * image's preview, and the placeholder PNG for a website screenshot, document page or audio
+ * waveform. The default
  * key has no grants, like a real key without `assets:download`; pass an `apiKey` from
  * `createApiKey()`, or call `setApiKeyGrants()`, to grant downloads.
  *
@@ -65,8 +73,19 @@ final class MockServerClient
     /** The moderation status each `asset.<status>` event announces. */
     private const ANNOUNCED_STATUSES = ['asset.allowed' => 'allowed', 'asset.limited' => 'limited',
         'asset.age-restricted' => 'age-restricted', 'asset.blocked' => 'blocked', 'asset.purged' => 'purged'];
-    /** The ThumbHash the mock gives every classified image, standing in for one computed from its pixels. */
+    /** The ThumbHash the mock gives every processed asset's preview, standing in for one computed from its pixels. */
     public const THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI';
+    /** Audio and video formats browsers play as uploaded, so the API serves them as stored. */
+    private const BROWSER_SAFE_MEDIA_FORMATS = ['video/mp4', 'audio/mpeg', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/ogg'];
+    /** Spreadsheets, which have no rendered file or preview. */
+    private const SPREADSHEET_MIME_TYPES = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel.sheet.macroenabled.12', 'application/vnd.ms-excel', 'application/vnd.oasis.opendocument.spreadsheet'];
+    /** Removing or withholding content removes its rendered file and preview, as the API does. */
+    private const NO_RENDERING = ['rendered' => null, 'preview' => null];
+    /** The size of the waveform the API makes as an audio asset's preview. */
+    private const WAVEFORM_SIZE = ['width' => 1200, 'height' => 300];
+    /** Paths beneath `/rendered/` the CDN reserves for streaming and an embeddable player. */
+    private const RESERVED_RENDERED_PATHS = ['stream', 'player'];
     private const MIB = 1024 * 1024;
     /** Like the API: an upload has at most this many parts. */
     private const MAX_UPLOAD_PARTS = 10000;
@@ -399,6 +418,9 @@ final class MockServerClient
                     'PUT automatic-updates' => 'setAutomaticUpdates'][$method . ' ' . ($parts[4] ?? '')] ?? null;
                 return $name === null ? [] : ["policies.$name"];
             }
+            if (self::isTimelineRoute($method, $parts)) {
+                return ['assets.listTimeline'];
+            }
             $route = $method . ' ' . implode('/', array_slice($parts, 2));
             return match ($route) {
                 'GET events' => ['events.list'],
@@ -427,7 +449,7 @@ final class MockServerClient
             return $method === 'DELETE' && $suffix === '' ? ['hashLists.removeEntry'] : [];
         }
         $names = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'POST move' => 'move',
-            'GET children' => 'listChildren', 'GET timeline' => 'listTimeline', 'DELETE content' => 'deleteContent', 'POST retry' => 'retry',
+            'GET children' => 'listChildren', 'DELETE content' => 'deleteContent', 'POST retry' => 'retry',
             'POST explain' => 'explain', 'POST decision' => 'decide', 'POST part' => 'uploadPart', 'POST signed-url' => 'createSignedUrl'];
         $name = $names[$method . ' ' . $suffix] ?? null;
         if ($name === null || !in_array($resource, ['assets', 'folders'], true)) {
@@ -594,6 +616,9 @@ final class MockServerClient
             if (($parts[2] ?? null) === 'policies' && isset($parts[3]) && count($parts) <= 5) {
                 return $this->policyRoute($method, $parts[3], $parts[4] ?? '', $json);
             }
+            if (self::isTimelineRoute($method, $parts)) {
+                return $this->timeline($parts[3], $query);
+            }
             $route = $method . ' ' . implode('/', array_slice($parts, 2));
             return match (true) {
                 $route === 'GET events' => $this->listEvents($query),
@@ -646,14 +671,15 @@ final class MockServerClient
                 }
             }
         }
+        if ($route === 'POST signed-url' && !in_array($json['resource'] ?? 'rendered', Cdn::SIGNED_RESOURCES, true)) {
+            self::invalid('validation/invalid-value', 'resource');
+        }
         $asset = $this->assets[$id] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
         switch ($route) {
             case 'GET ':
                 return $asset;
             case 'GET children':
                 return $this->page(array_filter($this->assets, fn ($child) => $child['parentId'] === $id), $query, $id);
-            case 'GET timeline':
-                return self::timeline($asset, $query);
             case 'PATCH ':
                 $fields = array_diff_key($json, array_flip(['id', 'projectId', 'upload', 'classification', 'content']));
                 // Like the API: an externalId stays unique in the project; null clears a field.
@@ -728,9 +754,52 @@ final class MockServerClient
 
     private static function flag(mixed $value): bool { return $value === 'true' || $value === true; }
 
-    private static function withoutPlaceholder(?array $image): ?array
+    /** `GET /projects/:projectId/assets/:assetId/timeline`. */
+    private static function isTimelineRoute(string $method, array $parts): bool
     {
-        return $image === null ? null : ['thumbhash' => null, 'averageColor' => null] + $image;
+        return $method === 'GET' && count($parts) === 5 && $parts[2] === 'assets' && $parts[4] === 'timeline';
+    }
+
+    /** A MIME type lower-cased without its parameters. */
+    private static function baseMimeType(?string $type): string
+    {
+        return trim(explode(';', strtolower($type ?? ''), 2)[0]);
+    }
+
+    /**
+     * The rendered file and preview the API reports for an asset with its content held. Once
+     * uploaded, an image renders as itself with a preview that has no ThumbHash yet, and a PDF and
+     * browser-safe audio and video render as uploaded. Once processed, a website renders as its
+     * screenshot; a document or presentation as a PDF, with its first page as the preview; video
+     * and audio as a browser-safe file (MP4 or M4A unless browsers play the upload), audio with a
+     * waveform preview and video with no poster; and every preview has its ThumbHash. Text,
+     * spreadsheets and other files have neither. The mock decodes nothing, so sizes are unknown and
+     * audio has no peaks.
+     *
+     * @return array{rendered: ?array, preview: ?array}
+     */
+    private static function rendering(array $asset, bool $processed): array
+    {
+        $format = $asset['content']['format'] ?? null;
+        $mime = self::baseMimeType($format);
+        $browserSafe = in_array($mime, self::BROWSER_SAFE_MEDIA_FORMATS, true);
+        $unsized = ['width' => null, 'height' => null];
+        $preview = fn (array $size) => $size + ['thumbhash' => $processed ? self::THUMBHASH : null, 'averageColor' => $processed ? '#7f7f7f' : null];
+        $type = $asset['type'];
+        $rendersOnUpload = $type === 'image' || $mime === 'application/pdf' || (in_array($type, ['video', 'audio'], true) && $browserSafe);
+        if (!$processed && !$rendersOnUpload) {
+            return self::NO_RENDERING;
+        }
+        return match ($type) {
+            'image' => ['rendered' => ['kind' => 'image', 'format' => $format ?? 'image/png'] + $unsized, 'preview' => $preview($unsized)],
+            'website' => ['rendered' => ['kind' => 'image', 'format' => 'image/png'] + $unsized, 'preview' => $preview($unsized)],
+            'multimedia-document' => in_array($mime, self::SPREADSHEET_MIME_TYPES, true) ? self::NO_RENDERING
+                : ['rendered' => ['kind' => 'pdf', 'format' => 'application/pdf'] + $unsized, 'preview' => $processed ? $preview($unsized) : null],
+            'video' => ['rendered' => ['kind' => 'video', 'format' => $browserSafe ? $format : 'video/mp4'] + $unsized, 'preview' => null],
+            'audio' => ['rendered' => ['kind' => 'audio', 'format' => $browserSafe ? $format : 'audio/mp4'] + $unsized + ($processed ? ['peaks' => []] : []),
+                'preview' => $processed ? $preview(self::WAVEFORM_SIZE) : null],
+            default => self::NO_RENDERING,
+        };
     }
 
     /** Like the API: image uploads in parts total at most 20 MiB, at any size below that. */
@@ -807,13 +876,20 @@ final class MockServerClient
             'visibility' => $options['visibility'] ?? 'private',
             'content' => ['status' => $keep ? 'stored' : 'temporary', 'removalReason' => null, 'updatedAt' => $now,
                 'safetyHold' => null, 'format' => $mime === '' ? null : $mime, 'extension' => null, 'sizeInBytes' => $size,
-                'checksums' => null, 'image' => null, 'extractedText' => null, 'fileMetadata' => null],
+                // The mock decodes nothing, so the file's own details are unknown.
+                'checksums' => null, 'width' => null, 'height' => null, 'durationSeconds' => null, 'pageCount' => null,
+                'perceptualHash' => null, 'perceptualHashQuality' => null, 'metadata' => null, 'extractedText' => null,
+                // Like the API, the rendered file and preview come with processing.
+                ...self::NO_RENDERING],
             'upload' => ['status' => $final ? 'completed' : 'uploading', 'updatedAt' => $now, 'partsReceived' => $final ? null : 1],
             'classification' => ['status' => $final ? 'processing' : 'pending', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
                 // The mock analyses nothing in sections, and never reads test inputs.
                 'progress' => null, 'testInput' => false,
-                'moderation' => ['status' => 'pending', 'manualReviews' => [], 'flaggedCategories' => [], 'regions' => []]],
+                'moderation' => ['status' => 'pending', 'manualReviews' => [], 'flaggedCategories' => [], 'regions' => [], 'timeline' => null]],
         ];
+        if ($bytes !== null && $final) {
+            $asset['content'] = array_replace($asset['content'], self::rendering($asset, false));
+        }
         $this->assets[$asset['id']] = $asset;
         if ($bytes !== null) {
             $this->content[$asset['id']] = ['type' => $mime, 'bytes' => $bytes];
@@ -957,8 +1033,10 @@ final class MockServerClient
     /**
      * Moves an asset to an outcome like the pipeline would, and stores it: a decision finishes
      * processing (with its `$report`, when moderation made it), `purged` removes the content (with
-     * `$purgeReason`), finished processing removes content kept only temporarily, and a classified
-     * image gets a ThumbHash for its placeholder, which goes with its content.
+     * `$purgeReason`), and finished processing removes content kept only temporarily. Like the API,
+     * an asset whose content is held has its rendered file and preview, completed by its decision
+     * (with a ThumbHash for its placeholder); removing the content removes them with it, and a
+     * safety hold withholds them.
      */
     private function applyOutcome(array $asset, string $outcome, string $purgeReason = 'policy', ?array $report = null): array
     {
@@ -967,14 +1045,8 @@ final class MockServerClient
         $status = $decided ? 'completed' : ($outcome === 'failed' ? 'failed' : 'processing');
         $purge = $outcome === 'purged' && $asset['content']['status'] !== 'removed';
         $remove = $purge || ($status === 'completed' && $asset['content']['status'] === 'temporary');
-        $image = $asset['content']['image'] ?? null;
-        if ($decided && $asset['type'] === 'image' && $asset['content']['status'] !== 'removed' && !$purge) {
-            $image = ['thumbhash' => self::THUMBHASH, 'averageColor' => $image['averageColor'] ?? '#7f7f7f']
-                + ($image ?? []) + ['width' => null, 'height' => null, 'perceptualHash' => null, 'perceptualHashQuality' => null];
-        } elseif ($outcome === 'purged') {
-            $image = self::withoutPlaceholder($image);
-        }
-        $asset['content']['image'] = $image;
+        $held = $asset['content']['status'] !== 'removed' && !$purge && ($asset['content']['safetyHold'] ?? null) === null;
+        $asset['content'] = array_replace($asset['content'], $held ? self::rendering($asset, $decided) : self::NO_RENDERING);
         if ($remove) {
             $asset = $this->removeContent($asset, $purge ? $purgeReason : 'retention');
         }
@@ -990,7 +1062,7 @@ final class MockServerClient
 
     /**
      * DELETE /assets/:id/content, like the API: the record and report stay; stored content,
-     * extracted text and the placeholder go. Content already removed keeps its reason, and an
+     * extracted text, metadata, the rendered file and the preview go. Content already removed keeps its reason, and an
      * `asset.content-removed` event is recorded either way.
      */
     /**
@@ -1053,8 +1125,8 @@ final class MockServerClient
         unset($this->content[$asset['id']]);
         if ($asset['content']['status'] !== 'removed') {
             $asset = $this->touch($this->removeContent($asset, 'requested'));
-        } elseif (isset($asset['content']['image']['thumbhash'])) {
-            $asset['content']['image'] = self::withoutPlaceholder($asset['content']['image']);
+        } else {
+            $asset['content'] = array_replace($asset['content'], self::NO_RENDERING);
         }
         $this->assets[$asset['id']] = $asset;
         $this->lifecycleEvent('asset.content-removed', $asset);
@@ -1122,7 +1194,7 @@ final class MockServerClient
         unset($this->content[$asset['id']]);
         $asset['context'] = null;
         $asset['content'] = ['status' => 'removed', 'removalReason' => $reason, 'updatedAt' => ($this->now)(), 'extractedText' => null,
-            'fileMetadata' => null, 'image' => self::withoutPlaceholder($asset['content']['image'] ?? null)] + $asset['content'];
+            'metadata' => null, ...self::NO_RENDERING] + $asset['content'];
         return $asset;
     }
 
@@ -1172,23 +1244,21 @@ final class MockServerClient
     }
 
     /**
-     * GET /assets/:id/timeline, like the API: the report's timeline segments in time order, a page
-     * at a time, with a cursor naming the next page's position; empty without a timeline.
+     * GET /projects/:projectId/assets/:assetId/timeline, like the API: refused while a safety hold
+     * is on. The mock analyses no audio or video, so it keeps no segments: every timeline is empty,
+     * and no cursor continues one.
      */
-    private static function timeline(array $asset, array $query): array
+    private function timeline(string $assetId, array $query): array
     {
+        $asset = $this->assets[$assetId] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
         $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
-        $offset = 0;
-        if (isset($query['cursor'])) {
-            if (!is_string($query['cursor']) || !preg_match('/^timeline:(\d+)$/D', $query['cursor'], $match) || strlen($match[1]) > 15) {
-                self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
-            }
-            $offset = (int) $match[1];
+        if (($asset['content']['safetyHold'] ?? null) !== null) {
+            self::fail(ErrorCodes::ASSET_SAFETY_HELD);
         }
-        $segments = $asset['classification']['moderation']['raw']['timeline']['segments'] ?? [];
-        $more = $offset + $size < count($segments);
-        return ['items' => array_slice($segments, $offset, $size), 'nextCursor' => $more ? 'timeline:' . ($offset + $size) : null,
-            'pageSize' => $size, 'hasMore' => $more, 'ordering' => []];
+        if (array_key_exists('cursor', $query)) {
+            self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
+        }
+        return ['items' => [], 'nextCursor' => null, 'pageSize' => $size, 'hasMore' => false, 'ordering' => []];
     }
 
     /**
@@ -1730,12 +1800,12 @@ final class MockServerClient
             self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'Send either hash or assetId');
         }
         if ($assetId !== null) {
-            $image = ($this->assets[$assetId] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found'))['content']['image'] ?? null;
-            if (!is_string($image['perceptualHash'] ?? null) || $image['perceptualHash'] === '') {
+            $content = ($this->assets[$assetId] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found'))['content'];
+            if (!is_string($content['perceptualHash'] ?? null) || $content['perceptualHash'] === '') {
                 self::fail(ErrorCodes::HASH_LIST_ASSET_NOT_HASHED, null, 'This asset has no perceptual hash.');
             }
-            $hash = $image['perceptualHash'];
-            $quality = $image['perceptualHashQuality'] ?? null;
+            $hash = $content['perceptualHash'];
+            $quality = $content['perceptualHashQuality'] ?? null;
         }
         if (!preg_match('/^[0-9a-f]{64}$/D', $hash)) {
             self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'Use a PDQ hash of 64 hexadecimal characters');
@@ -1970,15 +2040,27 @@ final class MockServerClient
         return false;
     }
 
-    /** Serves stored content and placeholders like the CDN, with its headers. */
+    /**
+     * Serves an asset's resources like the CDN, with its headers: `original` is the upload;
+     * `rendered` the image, PDF, video or audio file `content.rendered` describes; `preview` the
+     * still `content.preview` describes; and `placeholder` its ThumbHash as a PNG. The mock converts
+     * nothing: an upload stands in for its rendered file and an image's preview, and the placeholder
+     * PNG for a website screenshot, document page or audio waveform.
+     */
     private function serve(string $method, array $segments, array $query, string $selector): Response
     {
         [, $project, $identifier, $resource] = $segments + [null, null, null, null];
-        // Like the CDN, the selector after the resource is read first, and lenses and transforms
-        // apply only to the rendered resource.
+        $noRenderedVersion = fn () => $this->json(404, ['code' => 'asset/no-rendered-version', 'message' => 'This asset has no such resource']);
+        $invalidTransform = fn () => $this->json(400, ['code' => 'asset/invalid-transform', 'message' => 'Invalid transform selector']);
+        // Like the CDN, `/rendered/stream` and `/rendered/player` are reserved, then the selector
+        // after the resource is read; the original takes none.
+        if ($resource === 'rendered' && in_array(explode('/', $selector)[0], self::RESERVED_RENDERED_PATHS, true)) {
+            return $noRenderedVersion();
+        }
         $transform = Transforms::parse($selector);
-        if ($transform === null || ($resource === 'original' && ($transform['lens'] !== null || $transform['options'] !== null))) {
-            return $this->json(400, ['code' => 'asset/invalid-transform', 'message' => 'Invalid transform selector']);
+        $selected = $transform !== null && ($transform['lens'] !== null || $transform['options'] !== null);
+        if ($transform === null || ($resource === 'original' && $selected)) {
+            return $invalidTransform();
         }
         $asset = null;
         foreach ($this->assets as $candidate) {
@@ -1986,15 +2068,22 @@ final class MockServerClient
                 $asset = $candidate;
             }
         }
-        if ($project !== $this->projectId || $asset === null || !in_array($resource, ['original', 'rendered', 'placeholder'], true)) {
+        if ($project !== $this->projectId || $asset === null || !in_array($resource, Cdn::RESOURCES, true)) {
             return $this->json(404, ['code' => 'asset/not-found', 'message' => 'Asset not found']);
         }
         $notAvailable = fn () => $this->json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
         $status = $asset['classification']['moderation']['status'];
+        $rendered = $asset['content']['rendered'] ?? null;
+        $preview = $asset['content']['preview'] ?? null;
+        // Like the CDN, a safety hold refuses every resource.
+        if (($asset['content']['safetyHold'] ?? null) !== null) {
+            return $notAvailable();
+        }
         if ($resource === 'placeholder') {
-            // Like the CDN: an image's ThumbHash, public whatever the asset's visibility or
-            // moderation status; refused for purged assets and assets without one.
-            $thumbhash = $asset['content']['image']['thumbhash'] ?? null;
+            // Like the CDN: the preview's ThumbHash, public whatever the asset's visibility or
+            // moderation status; refused for purged assets and assets without one (not yet
+            // processed, without a preview, or content removed).
+            $thumbhash = $preview['thumbhash'] ?? null;
             if ($thumbhash === null || $status === 'purged') {
                 return $notAvailable();
             }
@@ -2004,8 +2093,9 @@ final class MockServerClient
         }
         // Delivery checks come first and refuse everyone, like the CDN.
         $stored = $this->content[$asset['id']] ?? null;
-        if ($stored === null || $asset['upload']['status'] === 'uploading' || in_array($status, ['blocked', 'purged'], true)
-            || $asset['classification']['status'] === 'failed' || $asset['content']['status'] === 'removed') {
+        if ($asset['upload']['status'] === 'uploading' || in_array($status, ['blocked', 'purged'], true)
+            || $asset['classification']['status'] === 'failed' || $asset['content']['status'] === 'removed'
+            || ($resource === 'original' && $stored === null)) {
             return $notAvailable();
         }
         // Age-restricted assets need `viewerClaims.ageConfirmed=true` whatever the key.
@@ -2015,6 +2105,15 @@ final class MockServerClient
         if ($private && !$this->canDownload($asset['folderId'] ?? null)) {
             return $this->json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'This API key needs assets:download permission for this asset’s folder.']);
         }
+        // Then whether the asset has the resource, and whether it is a still image that takes a
+        // lens or transform: the preview always is, the rendered file only when it is an image.
+        if (($resource === 'rendered' && $rendered === null) || ($resource === 'preview' && $preview === null)) {
+            return $noRenderedVersion();
+        }
+        $still = $resource === 'preview' || ($resource === 'rendered' && $rendered['kind'] === 'image');
+        if (!$still && $selected) {
+            return $invalidTransform();
+        }
         // Then the options, checked against the transform schema once the asset may be served.
         if ($transform['options'] !== null) {
             ['unknownKeys' => $unknown, 'invalidKeys' => $invalid] = Transforms::check($transform['options']);
@@ -2023,15 +2122,26 @@ final class MockServerClient
                     'message' => 'Invalid transform options: ' . implode(', ', [...$unknown, ...$invalid])]);
             }
         }
-        $type = $stored['type'] === '' ? 'application/octet-stream' : $stored['type'];
-        $image = $asset['type'] === 'image';
+        // The bytes: the upload, which stands in for its own rendered file and an image's preview,
+        // or the placeholder PNG for a still the mock doesn't make.
+        if ($resource === 'original' || ($resource === 'rendered' && $rendered['kind'] !== 'image') || $asset['type'] === 'image') {
+            if ($stored === null) {
+                return $notAvailable();
+            }
+            $bytes = $stored['bytes'];
+            $type = $resource === 'rendered' ? $rendered['format'] : ($stored['type'] === '' ? 'application/octet-stream' : $stored['type']);
+        } else {
+            $bytes = Placeholder::png($preview['thumbhash'] ?? self::THUMBHASH);
+            $type = 'image/png';
+        }
+        $immutable = $still || ($resource === 'original' && $asset['type'] === 'image');
         $base = strtolower(trim(explode(';', $type)[0]));
-        // Like the CDN: an image's bytes are immutable for a year, other content is kept for an hour,
-        // by shared caches only when delivery is public.
-        return $this->cdnResponse($method, $stored['bytes'], ['Content-Type' => $type,
-            'Cache-Control' => $claims ? 'private, no-store' : ($private ? 'private' : 'public') . ', ' . ($image ? 'max-age=31536000, immutable' : 'max-age=3600'),
+        // Like the CDN: a still image's bytes are immutable for a year, other content is kept for
+        // an hour, by shared caches only when delivery is public.
+        return $this->cdnResponse($method, $bytes, ['Content-Type' => $type,
+            'Cache-Control' => $claims ? 'private, no-store' : ($private ? 'private' : 'public') . ', ' . ($immutable ? 'max-age=31536000, immutable' : 'max-age=3600'),
             'Cache-Tag' => 'asset-' . $asset['id']]
-            + ($image ? ['ETag' => '"' . $asset['id'] . '"', 'Expires' => gmdate('D, d M Y H:i:s', intdiv(($this->now)(), 1000) + 31536000) . ' GMT'] : [])
+            + ($immutable ? ['ETag' => '"' . $asset['id'] . '"', 'Expires' => gmdate('D, d M Y H:i:s', intdiv(($this->now)(), 1000) + 31536000) . ' GMT'] : [])
             + ['X-Content-Type-Options' => 'nosniff', 'Content-Security-Policy' => "sandbox; default-src 'none'"]
             // Content a browser could run as a document is served as a download.
             + (in_array($base, self::ACTIVE_CONTENT_TYPES, true) || str_ends_with($base, '+xml') ? ['Content-Disposition' => 'attachment'] : []));

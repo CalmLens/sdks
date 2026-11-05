@@ -1,11 +1,14 @@
-import { afterEach, describe, expect, it, test } from "bun:test";
+import { afterEach, describe, expect, it, mock, test } from "bun:test";
 import { getFileIcon, renderFileIconSvg } from "../src/file-icons";
 import { MockCalmLensAppClient } from "../src/testing";
 import {
   type CalmLensUpload,
   createUploadController,
   getMediaState,
+  getPlayedPercent,
+  getSignedMediaResources,
   isFileAccepted,
+  MediaUrlSigner,
   pickMediaSource,
   resolveMediaProps,
   resolveTheme,
@@ -106,26 +109,69 @@ describe("getMediaState", () => {
     );
   });
 
-  it("takes the source, status, type and preview from an API asset", () => {
+  it("takes the source, status, kind and preview from an API asset", () => {
     const asset = {
       id: "v1",
       projectId: PROJECT_ID,
       type: "video",
       classification: { moderation: { status: "age-restricted" as const } },
       content: {
-        image: { thumbhash: null, averageColor: "#112233", width: 1280, height: 720 },
+        rendered: { kind: "video" as const, width: 1280, height: 720 },
+        preview: { thumbhash: null, averageColor: "#112233", width: 640, height: 360 },
       },
     };
-    // The CDN draws placeholders only for images, so a gated video has none.
-    expect(getMediaState({ asset })).toEqual({ kind: "gated" });
+    // The placeholder is drawn from the video's preview still.
+    expect(getMediaState({ asset })).toEqual({
+      kind: "gated",
+      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/v1/placeholder`,
+    });
     expect(resolveMediaProps({ asset, viewerClaims: { ageConfirmed: true } })).toMatchObject({
       projectId: PROJECT_ID,
       assetId: "v1",
       status: "age-restricted",
       type: "video",
+      hasPreview: true,
       averageColor: "#112233",
       width: 1280,
       height: 720,
+    });
+  });
+
+  it("sizes audio by nothing, as its preview is a waveform", () => {
+    const asset = {
+      id: "s1",
+      projectId: PROJECT_ID,
+      content: {
+        rendered: { kind: "audio" as const, width: null, height: null, peaks: [0.5] },
+        preview: { thumbhash: null, averageColor: null, width: 1200, height: 200 },
+      },
+    };
+    expect(resolveMediaProps({ asset })).toMatchObject({ type: "audio", peaks: [0.5] });
+    expect(resolveMediaProps({ asset }).width).toBeUndefined();
+  });
+
+  it("shows an asset without a rendered file as its preview still, or as a file icon", () => {
+    const asset = (preview: boolean) => ({
+      id: "d1",
+      projectId: PROJECT_ID,
+      type: "plaintext-document",
+      content: {
+        rendered: null,
+        preview: preview ? { thumbhash: null, averageColor: null, width: 600, height: 800 } : null,
+      },
+    });
+    expect(getMediaState({ asset: asset(true), lens: "card" })).toEqual({
+      kind: "image",
+      src: `${CDN}/assets/${PROJECT_ID}/d1/preview/@card`,
+      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/d1/placeholder`,
+    });
+    expect(getMediaState({ asset: asset(false) })).toEqual({ kind: "file", icon: "documents" });
+  });
+
+  it("shows a PDF's rendered file", () => {
+    expect(getMediaState({ projectId: PROJECT_ID, assetId: "p1", type: "pdf" })).toEqual({
+      kind: "pdf",
+      src: `${CDN}/assets/${PROJECT_ID}/p1/rendered`,
     });
   });
 
@@ -135,7 +181,7 @@ describe("getMediaState", () => {
       projectId: PROJECT_ID,
       type: "image",
       classification: { moderation: { status: "allowed" as const } },
-      content: { status: "removed", image: { thumbhash: null, width: 640, height: 480 } },
+      content: { status: "removed", rendered: null, preview: null },
     };
     expect(getMediaState({ asset })).toEqual({ kind: "unavailable" });
   });
@@ -153,10 +199,132 @@ describe("getMediaState", () => {
     });
   });
 
-  it("plays a video's original file, without a lens or a rendered poster", () => {
+  it("plays a video's rendered file without a lens, with its preview still as the poster", () => {
+    const options = { projectId: PROJECT_ID, assetId: "v1", type: "video" as const, lens: "card" };
+    expect(getMediaState(options)).toEqual({
+      kind: "video",
+      src: `${CDN}/assets/${PROJECT_ID}/v1/rendered`,
+    });
+    expect(getMediaState({ ...options, hasPreview: true })).toMatchObject({
+      poster: `${CDN}/assets/${PROJECT_ID}/v1/preview`,
+    });
+  });
+
+  it("plays audio's rendered file with its waveform and peaks", () => {
     expect(
-      getMediaState({ projectId: PROJECT_ID, assetId: "v1", type: "video", lens: "card" }),
-    ).toEqual({ kind: "video", src: `${CDN}/assets/${PROJECT_ID}/v1/original` });
+      getMediaState({
+        projectId: PROJECT_ID,
+        assetId: "s1",
+        type: "audio",
+        hasPreview: true,
+        peaks: [0.1, 0.7],
+      }),
+    ).toEqual({
+      kind: "audio",
+      src: `${CDN}/assets/${PROJECT_ID}/s1/rendered`,
+      waveformUrl: `${CDN}/assets/${PROJECT_ID}/s1/preview`,
+      peaks: [0.1, 0.7],
+    });
+  });
+
+  it("requests no unsigned preview beside a signed URL given as it is", () => {
+    const url = "https://cdn.calmlens.com/v1/assets/p/v1/rendered?exp=1&sig=abc";
+    expect(
+      getMediaState({ projectId: PROJECT_ID, assetId: "v1", type: "video", hasPreview: true, url }),
+    ).toEqual({
+      kind: "video",
+      src: url,
+      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/v1/placeholder`,
+    });
+  });
+});
+
+describe("signed media URLs", () => {
+  const getSignedUrl = async (resource: string) => `https://signed.example/${resource}`;
+  const video = {
+    projectId: PROJECT_ID,
+    assetId: "v1",
+    type: "video" as const,
+    hasPreview: true,
+    getSignedUrl,
+  };
+
+  it("asks for each resource the state shows, and none for gated or blocked assets", () => {
+    expect(getSignedMediaResources(video).sort()).toEqual(["preview", "rendered"]);
+    expect(getSignedMediaResources({ ...video, type: "image", resource: "original" })).toEqual([
+      "original",
+    ]);
+    expect(getSignedMediaResources({ ...video, status: "age-restricted" })).toEqual([]);
+    expect(getSignedMediaResources({ ...video, status: "blocked" })).toEqual([]);
+    expect(getSignedMediaResources({ ...video, getSignedUrl: undefined })).toEqual([]);
+  });
+
+  it("waits for every signed URL, then shows them; a failed file is unavailable", () => {
+    expect(getMediaState(video, { rendered: "https://signed.example/r" })).toEqual({
+      kind: "pending",
+      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/v1/placeholder`,
+    });
+    expect(
+      getMediaState(video, {
+        rendered: "https://signed.example/r",
+        preview: "https://signed.example/p",
+      }),
+    ).toMatchObject({
+      kind: "video",
+      src: "https://signed.example/r",
+      poster: "https://signed.example/p",
+    });
+    expect(
+      getMediaState(video, { rendered: "https://signed.example/r", preview: null }),
+    ).toMatchObject({
+      kind: "video",
+      src: "https://signed.example/r",
+      poster: undefined,
+    });
+    expect(getMediaState(video, { rendered: null, preview: "https://signed.example/p" })).toEqual({
+      kind: "unavailable",
+    });
+  });
+
+  it("fetches each resource once per asset, and again for a new asset", async () => {
+    const fetch = mock(getSignedUrl);
+    const changed = mock(() => {});
+    const signer = new MediaUrlSigner(changed);
+    signer.urls({ ...video, getSignedUrl: fetch });
+    signer.urls({ ...video, getSignedUrl: fetch });
+    await Bun.sleep(0);
+    expect(fetch.mock.calls.map(([resource]) => resource).sort()).toEqual(["preview", "rendered"]);
+    expect(signer.urls({ ...video, getSignedUrl: fetch })).toEqual({
+      rendered: "https://signed.example/rendered",
+      preview: "https://signed.example/preview",
+    });
+
+    expect(signer.urls({ ...video, assetId: "v2", getSignedUrl: fetch })).toEqual({});
+    await Bun.sleep(0);
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("refreshes a failed file once until it loads again", async () => {
+    const fetch = mock(getSignedUrl);
+    const signer = new MediaUrlSigner(() => {});
+    signer.urls({ ...video, hasPreview: false, getSignedUrl: fetch });
+    const playback = { position: 30, playing: true };
+
+    expect(signer.recover(playback)).toBe(true);
+    expect(signer.recover(playback)).toBe(false);
+    signer.loaded();
+    expect(signer.recover(playback)).toBe(true);
+    await Bun.sleep(0);
+    expect(fetch.mock.calls).toEqual([["rendered"], ["rendered"], ["rendered"]]);
+    expect(new MediaUrlSigner(() => {}).recover(playback)).toBe(false);
+  });
+});
+
+describe("audio progress", () => {
+  it("measures the played part of a media element", () => {
+    expect(getPlayedPercent({ currentTime: 10, duration: 40 })).toBe(25);
+    expect(getPlayedPercent({ currentTime: 50, duration: 40 })).toBe(100);
+    expect(getPlayedPercent({ currentTime: 3, duration: Number.NaN })).toBe(0);
   });
 });
 

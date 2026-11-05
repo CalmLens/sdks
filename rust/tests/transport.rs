@@ -304,7 +304,7 @@ async fn binary_uploads_are_not_cut_off_by_the_api_call_timeout() {
 #[test]
 fn unknown_enum_values_and_fields_decode() {
     let asset: Asset = serde_json::from_str(
-        r#"{"id":"asset","visibility":"unlisted","newField":{"a":1},"content":{"status":"temporary","extractedText":{"content":"document text"},"futureContent":true},"classification":{"moderation":{"futureScore":2,"status":"quarantined","flaggedCategories":[],"regions":[],"raw":{"timeline":{"segments":[{"source":"frame"}]}}},"labels":[{"description":"cat"}]}}"#,
+        r#"{"id":"asset","visibility":"unlisted","newField":{"a":1},"content":{"status":"temporary","extractedText":{"content":"document text"},"futureContent":true},"classification":{"moderation":{"futureScore":2,"status":"quarantined","flaggedCategories":[],"regions":[],"timeline":{"segmentCount":2,"futureCount":1}},"labels":[{"description":"cat"}]}}"#,
     )
     .unwrap();
     assert_eq!(
@@ -323,10 +323,7 @@ fn unknown_enum_values_and_fields_decode() {
     );
     let report = asset.classification.moderation;
     assert_eq!(asset.classification.labels.unwrap()[0].description, "cat");
-    assert_eq!(
-        report.raw.unwrap().timeline.unwrap().segments[0].source,
-        "frame"
-    );
+    assert_eq!(report.timeline.as_ref().unwrap().extra["futureCount"], 1);
     assert_eq!(report.extra["futureScore"], 2);
     let round_trip = serde_json::to_value(Asset::new(
         "a",

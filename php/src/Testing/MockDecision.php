@@ -106,7 +106,8 @@ final class MockDecision
         return ['raw' => ['categories' => $categories],
             'categories' => array_map(fn ($score) => ['score' => $score, 'action' => $action($score)], $evaluated),
             'explanationComplete' => true, 'source' => 'policy', 'automatedAction' => self::ACTIONS[$status],
-            'regions' => [], 'flaggedCategories' => $flagged];
+            // The mock analyses no audio or video, so a decision has no findings timeline.
+            'regions' => [], 'timeline' => null, 'flaggedCategories' => $flagged];
     }
 
     /** The likelihood the API reports for a score. */

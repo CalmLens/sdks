@@ -5,14 +5,28 @@
 export type { IconName } from "./ui/Icons";
 export { ICON_ATTRIBUTES, ICONS } from "./ui/Icons";
 export type {
+  GetSignedMediaUrl,
   MediaAsset,
   MediaImageSource,
+  MediaKind,
   MediaOptions,
+  MediaPlayback,
+  MediaRenderedKind,
   MediaSettings,
   MediaSource,
   MediaState,
+  SignedMediaUrls,
 } from "./ui/Media";
-export { getMediaState, pickMediaSource, resolveMediaProps } from "./ui/Media";
+export {
+  getMediaState,
+  getPeakHeights,
+  getPlayedPercent,
+  getSignedMediaKey,
+  getSignedMediaResources,
+  MediaUrlSigner,
+  pickMediaSource,
+  resolveMediaProps,
+} from "./ui/Media";
 export type { CalmLensMessages, UploaderView, UploadItemView } from "./ui/Messages";
 export {
   DEFAULT_MESSAGES,
@@ -33,7 +47,12 @@ export type {
   UploaderDisplayOptions,
   UploaderProps,
 } from "./ui/Props";
-export { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
+export {
+  getMediaAspectRatio,
+  getMediaLoadKey,
+  getShownPlaceholder,
+  MEDIA_FILE_ICON_SIZE,
+} from "./ui/Props";
 export { CALMLENS_STYLES } from "./ui/Styles";
 export type { CalmLensTheme } from "./ui/Theme";
 export { CALMLENS_THEME, resolveTheme } from "./ui/Theme";

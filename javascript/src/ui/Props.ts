@@ -22,7 +22,10 @@ export type UploaderProps<F extends UploadFile = UploadFile> = UploadControllerO
 
 /** Props every framework's media component takes, on top of the media options. */
 export interface MediaDisplayOptions {
-  /** Describes the image. Leave it empty only for decorative images. */
+  /**
+   * Describes the image, and labels a video, audio, PDF or file icon. Leave it empty only for
+   * decorative images.
+   */
   alt?: string;
   /** Width divided by height, which you store with the upload, so the box keeps its size. */
   aspectRatio?: number;
@@ -31,7 +34,7 @@ export interface MediaDisplayOptions {
   height?: number;
   /** The `sizes` attribute for `widths`, such as `(min-width: 768px) 50vw, 100vw`. */
   sizes?: string;
-  /** The asset's `content.image.averageColor`, shown behind the media while it loads. */
+  /** The asset's `content.preview.averageColor`, shown behind the media while it loads. */
   averageColor?: string;
   /** How the media fills its box: `cover` (default) or `contain`. */
   fit?: "cover" | "contain";
@@ -57,11 +60,33 @@ export const getMediaAspectRatio = ({ aspectRatio, width, height }: MediaDisplay
   aspectRatio ?? (width && height ? width / height : undefined);
 
 /** A key that changes whenever a media component must load something new. */
-export const getMediaLoadKey = (state: MediaState): string =>
-  state.kind === "image"
-    ? `${state.src} ${state.srcSet ?? ""}`
-    : state.kind === "video" || state.kind === "audio"
-      ? state.src
-      : state.kind === "unavailable" && state.reason === "regional"
-        ? "unavailable-regional"
-        : state.kind;
+export const getMediaLoadKey = (state: MediaState): string => {
+  switch (state.kind) {
+    case "image":
+      return `${state.src} ${state.srcSet ?? ""}`;
+    case "video":
+      return `${state.src} ${state.poster ?? ""}`;
+    case "audio":
+      return `${state.src} ${state.waveformUrl ?? ""} ${state.peaks?.length ?? 0}`;
+    case "pdf":
+      return state.src;
+    case "file":
+      return `file ${state.icon}`;
+    case "unavailable":
+      return state.reason === "regional" ? "unavailable-regional" : state.kind;
+    default:
+      return state.kind;
+  }
+};
+
+/**
+ * The blurred placeholder a media component shows, if any: behind the age notice, while signed
+ * URLs load, and until an image loads.
+ */
+export const getShownPlaceholder = (state: MediaState, loaded: boolean): string | undefined =>
+  state.kind === "gated" || state.kind === "pending" || (state.kind === "image" && !loaded)
+    ? state.placeholderUrl
+    : undefined;
+
+/** The size of the file icon shown for an asset with nothing else to show. */
+export const MEDIA_FILE_ICON_SIZE = 64;

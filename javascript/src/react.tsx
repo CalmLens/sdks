@@ -17,15 +17,28 @@ import type {
   UploaderProps,
   UseCalmLensUploadResult,
 } from "./ui/BrowserUpload";
+import { renderFileIconSvg } from "./ui/FileIcons";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
-import { getMediaState, resolveMediaProps } from "./ui/Media";
+import {
+  getMediaState,
+  getPeakHeights,
+  getPlayedPercent,
+  MediaUrlSigner,
+  resolveMediaProps,
+} from "./ui/Media";
 import {
   describeUploader,
   describeUploadItem,
   getMediaUnavailableMessage,
   resolveMessages,
 } from "./ui/Messages";
-import { getMediaAspectRatio, getMediaLoadKey, type MediaProps } from "./ui/Props";
+import {
+  getMediaAspectRatio,
+  getMediaLoadKey,
+  getShownPlaceholder,
+  MEDIA_FILE_ICON_SIZE,
+  type MediaProps,
+} from "./ui/Props";
 import {
   useOwnController,
   useCalmLensUpload as useSharedCalmLensUpload,
@@ -289,9 +302,49 @@ export type CalmLensMediaProps = MediaProps &
 
 type LoadState = "loading" | "loaded" | "error";
 
+/** Audio's waveform: the preview still, with the played part of its peaks drawn over it. */
+const Waveform = ({
+  url,
+  peaks,
+  played,
+}: {
+  url: string | undefined;
+  peaks: readonly number[] | undefined;
+  played: number;
+}) => {
+  if (!url && !peaks) return null;
+  const heights = peaks ? getPeakHeights(peaks) : [];
+  const bars = heights.map((height, index) => (
+    <span key={index} style={{ height: `${height}%` }} />
+  ));
+  return (
+    <div className="calmlens-media__waveform">
+      {url && <img className="calmlens-media__wave" src={url} alt="" aria-hidden="true" />}
+      {peaks && (
+        // Decorative: the audio element's own controls report its progress.
+        <div
+          className="calmlens-media__progress"
+          role="progressbar"
+          aria-hidden="true"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={played}
+          style={{ "--calmlens-played": `${played}%` } as CSSProperties}
+        >
+          <div className="calmlens-media__peaks">{bars}</div>
+          <div className="calmlens-media__peaks" data-played="">
+            {bars}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /**
- * Shows an asset from the CalmLens CDN with responsive widths and a blurred placeholder while
- * it loads. Age-restricted assets stay behind the placeholder and a reveal button until
+ * Shows an asset from the CalmLens CDN: an image with responsive widths and a blurred placeholder
+ * while it loads, a video with its poster, audio with its waveform, a PDF, or a file's preview
+ * still or icon. Age-restricted assets stay behind the placeholder and a reveal button until
  * `ageConfirmed` is set; blocked and purged assets show an unavailable notice.
  */
 export function CalmLensMedia(input: CalmLensMediaProps) {
@@ -302,11 +355,14 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     status,
     contentRemoved,
     type,
+    hasPreview,
+    peaks,
     resource,
     lens,
     transform,
     widths,
     url,
+    getSignedUrl,
     placeholder,
     placeholderHash,
     placeholderUrl: customPlaceholderUrl,
@@ -331,30 +387,37 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     ...attributes
   } = resolveMediaProps(input);
   const messages = useMemo(() => resolveMessages(overrides), [overrides]);
-  const state = getMediaState({
+  const options = {
     asset: _asset,
     projectId,
     assetId,
     status,
     contentRemoved,
     type,
+    hasPreview,
+    peaks,
     resource,
     lens,
     transform,
     widths,
     url,
+    getSignedUrl,
     placeholder,
     placeholderHash,
     placeholderUrl: customPlaceholderUrl,
     cdnBaseUrl,
     viewerClaims,
-  });
+  };
+  const [, setSigned] = useState(0);
+  const [signer] = useState(() => new MediaUrlSigner(() => setSigned((count) => count + 1)));
+  const state = getMediaState(options, signer.urls(options));
   const loadKey = getMediaLoadKey(state);
   const [load, setLoad] = useState<{ key: string; state: LoadState }>({
     key: loadKey,
     state: "loading",
   });
   const current = load.key === loadKey ? load : { key: loadKey, state: "loading" as const };
+  const [played, setPlayed] = useState(0);
   const image = useRef<HTMLImageElement>(null);
 
   // An image that loaded before hydration fires no load event.
@@ -365,12 +428,14 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
   }, [loadKey]);
 
   const ratio = getMediaAspectRatio({ aspectRatio, width, height });
-  const kind = current.state === "error" ? "unavailable" : state.kind;
-  const placeholderUrl =
-    state.kind === "audio" || state.kind === "unavailable" ? undefined : state.placeholderUrl;
-  const showPlaceholder =
-    placeholderUrl &&
-    (state.kind === "gated" || (state.kind === "image" && current.state !== "loaded"));
+  const failed = current.state === "error";
+  const kind = failed ? "unavailable" : state.kind;
+  const placeholderUrl = failed
+    ? undefined
+    : getShownPlaceholder(state, current.state === "loaded");
+  const onMediaError = (media: HTMLMediaElement) => {
+    if (!signer.recoverElement(media)) setLoad({ key: loadKey, state: "error" });
+  };
 
   return (
     <figure
@@ -390,7 +455,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
       }
     >
       <CalmLensStyles unstyled={unstyled} />
-      {showPlaceholder && (
+      {placeholderUrl && (
         <img
           className="calmlens-media__placeholder"
           src={placeholderUrl}
@@ -398,7 +463,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
           aria-hidden="true"
         />
       )}
-      {state.kind === "image" && current.state !== "error" && (
+      {state.kind === "image" && !failed && (
         <img
           key={loadKey}
           ref={image}
@@ -416,27 +481,62 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
           onError={() => setLoad({ key: loadKey, state: "error" })}
         />
       )}
-      {state.kind === "video" && current.state !== "error" && (
+      {state.kind === "video" && !failed && (
         // biome-ignore lint/a11y/useMediaCaption: captions come from your app, as <track> children are not supported here
         <video
           className="calmlens-media__content"
           src={state.src}
+          poster={state.poster}
           controls={controls}
           playsInline
           preload="metadata"
           aria-label={alt || undefined}
-          onError={() => setLoad({ key: loadKey, state: "error" })}
+          onLoadedMetadata={(event) => signer.loaded(event.currentTarget)}
+          onError={(event) => onMediaError(event.currentTarget)}
         />
       )}
-      {state.kind === "audio" && current.state !== "error" && (
-        // biome-ignore lint/a11y/useMediaCaption: audio has no captions track to add here
-        <audio
-          className="calmlens-media__content"
-          src={state.src}
-          controls={controls}
-          preload="metadata"
+      {state.kind === "audio" && !failed && (
+        <>
+          <Waveform url={state.waveformUrl} peaks={state.peaks} played={played} />
+          {/* biome-ignore lint/a11y/useMediaCaption: audio has no captions track to add here */}
+          <audio
+            className="calmlens-media__content"
+            src={state.src}
+            controls={controls}
+            preload="metadata"
+            aria-label={alt || undefined}
+            onLoadedMetadata={(event) => signer.loaded(event.currentTarget)}
+            onTimeUpdate={(event) => setPlayed(getPlayedPercent(event.currentTarget))}
+            onError={(event) => onMediaError(event.currentTarget)}
+          />
+        </>
+      )}
+      {state.kind === "pdf" && (
+        <>
+          <iframe
+            className="calmlens-media__content"
+            src={state.src}
+            title={alt || messages.pdfTitle}
+          />
+          <a
+            className="calmlens-button calmlens-media__open"
+            href={state.src}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {messages.openPdf}
+          </a>
+        </>
+      )}
+      {state.kind === "file" && (
+        <span
+          className="calmlens-media__file"
+          role="img"
           aria-label={alt || undefined}
-          onError={() => setLoad({ key: loadKey, state: "error" })}
+          aria-hidden={alt ? undefined : "true"}
+          dangerouslySetInnerHTML={{
+            __html: renderFileIconSvg({ family: state.icon, extension: "" }, MEDIA_FILE_ICON_SIZE),
+          }}
         />
       )}
       {state.kind === "gated" && (

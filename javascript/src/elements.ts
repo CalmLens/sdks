@@ -9,8 +9,18 @@ import type {
   UploadItem,
   UploadSnapshot,
 } from "./ui/BrowserUpload";
+import { renderFileIconSvg } from "./ui/FileIcons";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
-import { getMediaState, type MediaAsset, type MediaOptions, resolveMediaProps } from "./ui/Media";
+import {
+  type GetSignedMediaUrl,
+  getMediaState,
+  getPeakHeights,
+  getPlayedPercent,
+  type MediaAsset,
+  type MediaOptions,
+  MediaUrlSigner,
+  resolveMediaProps,
+} from "./ui/Media";
 import {
   type CalmLensMessages,
   describeUploader,
@@ -18,7 +28,12 @@ import {
   getMediaUnavailableMessage,
   resolveMessages,
 } from "./ui/Messages";
-import { getMediaAspectRatio, getMediaLoadKey } from "./ui/Props";
+import {
+  getMediaAspectRatio,
+  getMediaLoadKey,
+  getShownPlaceholder,
+  MEDIA_FILE_ICON_SIZE,
+} from "./ui/Props";
 import { createUploadController, type UploadController } from "./ui/UploadController";
 
 export * from "./ui";
@@ -435,13 +450,16 @@ export class CalmLensUploaderElement extends BaseElement {
 
 /**
  * `<calmlens-media project-id="…" asset-id="…" status="allowed" alt="…">` shows an asset from the
- * CalmLens CDN with a blurred placeholder while it loads. Age-restricted assets show the
- * placeholder and a reveal button, which dispatches `calmlens-reveal`, until `age-confirmed` is set.
- * Attributes: `project-id`, `asset-id`, `status`, `age-confirmed`, `type`, `resource`, `lens`,
- * `transform`, `widths` (comma-separated), `url`, `no-placeholder`, `placeholder-hash`,
- * `placeholder-url`, `average-color`, `cdn-base-url`, `alt`, `aspect-ratio`, `width`, `height`,
- * `sizes`, `fit`, `position`, `eager`, `fetch-priority` and `no-controls`. Set the
- * `asset` property to an API asset instead of `project-id` and `asset-id`.
+ * CalmLens CDN: an image with a blurred placeholder while it loads, a video with its poster,
+ * audio with its waveform, a PDF, or a file's preview still or icon. Age-restricted assets show
+ * the placeholder and a reveal button, which dispatches `calmlens-reveal`, until `viewer-claims`
+ * confirms the viewer's age. Attributes: `project-id`, `asset-id`, `status`, `content-removed`,
+ * `type`, `has-preview`, `peaks` (comma-separated), `resource`, `lens`, `transform`, `widths`
+ * (comma-separated), `url`, `no-placeholder`, `placeholder-hash`, `placeholder-url`,
+ * `average-color`, `cdn-base-url`, `viewer-claims` (JSON), `alt`, `aspect-ratio`, `width`,
+ * `height`, `sizes`, `fit`, `position`, `eager`, `fetch-priority` and `no-controls`. Set the
+ * `asset` property to an API asset instead of `project-id` and `asset-id`, and the `getSignedUrl`
+ * property to fetch signed URLs for a private asset.
  */
 export class CalmLensMediaElement extends BaseElement {
   static observedAttributes = [
@@ -450,6 +468,8 @@ export class CalmLensMediaElement extends BaseElement {
     "status",
     "content-removed",
     "type",
+    "has-preview",
+    "peaks",
     "resource",
     "lens",
     "transform",
@@ -475,7 +495,9 @@ export class CalmLensMediaElement extends BaseElement {
 
   #messages?: Partial<CalmLensMessages>;
   #asset?: MediaAsset;
+  #getSignedUrl?: GetSignedMediaUrl;
   #loadKey?: string;
+  #signer = new MediaUrlSigner(() => this.#render());
 
   get messages(): Partial<CalmLensMessages> | undefined {
     return this.#messages;
@@ -498,8 +520,20 @@ export class CalmLensMediaElement extends BaseElement {
     this.#render();
   }
 
+  /**
+   * Fetches signed URLs for a private asset from your server, once per resource shown, and again
+   * when a video or audio URL expires mid-playback.
+   */
+  get getSignedUrl(): GetSignedMediaUrl | undefined {
+    return this.#getSignedUrl;
+  }
+  set getSignedUrl(value: GetSignedMediaUrl | undefined) {
+    this.#getSignedUrl = value;
+    this.#render();
+  }
+
   connectedCallback() {
-    upgradeProperties(this, ["messages", "asset"]);
+    upgradeProperties(this, ["messages", "asset", "getSignedUrl"]);
     this.classList.add("calmlens-media");
     this.setAttribute("role", "figure");
     this.#render();
@@ -522,11 +556,14 @@ export class CalmLensMediaElement extends BaseElement {
       status: (this.getAttribute("status") as AssetModerationStatus | null) ?? undefined,
       contentRemoved: this.hasAttribute("content-removed") ? true : undefined,
       type: (this.getAttribute("type") as MediaOptions["type"] | null) ?? undefined,
+      hasPreview: this.hasAttribute("has-preview") ? true : undefined,
+      peaks: list("peaks")?.map(Number),
       resource: (this.getAttribute("resource") as MediaOptions["resource"] | null) ?? undefined,
       lens: this.getAttribute("lens") ?? undefined,
       transform: this.getAttribute("transform") ?? undefined,
       widths: list("widths")?.map(Number),
       url: this.getAttribute("url") ?? undefined,
+      getSignedUrl: this.#getSignedUrl,
       placeholder: !this.hasAttribute("no-placeholder"),
       placeholderHash: this.getAttribute("placeholder-hash") ?? undefined,
       placeholderUrl: this.getAttribute("placeholder-url") ?? undefined,
@@ -544,7 +581,7 @@ export class CalmLensMediaElement extends BaseElement {
     if (!this.isConnected) return;
     const options = this.#mediaOptions();
     if (!options.projectId || !options.assetId) return;
-    const state = getMediaState(options);
+    const state = getMediaState(options, this.#signer.urls(options));
     const loadKey = `${getMediaLoadKey(state)} ${this.getAttribute("alt")} ${this.getAttribute("sizes")} ${options.viewerClaims?.ageConfirmed}`;
     const ratio = getMediaAspectRatio({
       aspectRatio: numberAttribute(this, "aspect-ratio"),
@@ -564,15 +601,15 @@ export class CalmLensMediaElement extends BaseElement {
     const messages = resolveMessages(this.#messages);
     const alt = this.getAttribute("alt") ?? "";
     const sizes = this.getAttribute("sizes") ?? undefined;
-    const placeholder =
-      state.kind !== "audio" && state.kind !== "unavailable" && state.placeholderUrl
-        ? el("img", {
-            class: "calmlens-media__placeholder",
-            src: state.placeholderUrl,
-            alt: "",
-            "aria-hidden": "true",
-          })
-        : undefined;
+    const placeholderUrl = getShownPlaceholder(state, false);
+    const placeholder = placeholderUrl
+      ? el("img", {
+          class: "calmlens-media__placeholder",
+          src: placeholderUrl,
+          alt: "",
+          "aria-hidden": "true",
+        })
+      : undefined;
     const notice = (children: Child[]) => el("div", { class: "calmlens-media__notice" }, children);
     const unavailable = () =>
       notice([
@@ -588,6 +625,13 @@ export class CalmLensMediaElement extends BaseElement {
       this.replaceChildren(unavailable());
     };
     const controls = !this.hasAttribute("no-controls");
+    const playable = (media: HTMLMediaElement) => {
+      media.addEventListener("loadedmetadata", () => this.#signer.loaded(media));
+      media.addEventListener("error", () => {
+        if (!this.#signer.recoverElement(media)) fail();
+      });
+      return media;
+    };
 
     if (state.kind === "unavailable") {
       this.replaceChildren(unavailable());
@@ -604,6 +648,8 @@ export class CalmLensMediaElement extends BaseElement {
           reveal,
         ]),
       );
+    } else if (state.kind === "pending") {
+      this.replaceChildren(...[placeholder].filter((node) => node !== undefined));
     } else if (state.kind === "image") {
       const image = el("img", {
         class: "calmlens-media__content",
@@ -623,20 +669,113 @@ export class CalmLensMediaElement extends BaseElement {
       });
       image.addEventListener("error", fail);
       this.replaceChildren(...[placeholder, image].filter((node) => node !== undefined));
+    } else if (state.kind === "video") {
+      this.replaceChildren(
+        playable(
+          el("video", {
+            class: "calmlens-media__content",
+            src: state.src,
+            poster: state.poster,
+            controls,
+            playsinline: true,
+            preload: "metadata",
+            "aria-label": alt || undefined,
+          }),
+        ),
+      );
+    } else if (state.kind === "audio") {
+      const audio = playable(
+        el("audio", {
+          class: "calmlens-media__content",
+          src: state.src,
+          controls,
+          preload: "metadata",
+          "aria-label": alt || undefined,
+        }),
+      );
+      const progress = state.peaks && waveformProgress(state.peaks);
+      if (progress) {
+        audio.addEventListener("timeupdate", () => {
+          const played = getPlayedPercent(audio);
+          progress.setAttribute("aria-valuenow", String(played));
+          progress.style.setProperty("--calmlens-played", `${played}%`);
+        });
+      }
+      const waveform =
+        state.waveformUrl || progress
+          ? el("div", { class: "calmlens-media__waveform" }, [
+              state.waveformUrl &&
+                el("img", {
+                  class: "calmlens-media__wave",
+                  src: state.waveformUrl,
+                  alt: "",
+                  "aria-hidden": "true",
+                }),
+              progress,
+            ])
+          : undefined;
+      this.replaceChildren(...[waveform, audio].filter((node) => node !== undefined));
+    } else if (state.kind === "pdf") {
+      this.replaceChildren(
+        el("iframe", {
+          class: "calmlens-media__content",
+          src: state.src,
+          title: alt || messages.pdfTitle,
+        }),
+        el(
+          "a",
+          {
+            class: "calmlens-button calmlens-media__open",
+            href: state.src,
+            target: "_blank",
+            rel: "noopener noreferrer",
+          },
+          [messages.openPdf],
+        ),
+      );
     } else {
-      const media = el(state.kind, {
-        class: "calmlens-media__content",
-        src: state.src,
-        controls,
-        playsinline: state.kind === "video",
-        preload: "metadata",
+      const file = el("span", {
+        class: "calmlens-media__file",
+        role: "img",
         "aria-label": alt || undefined,
+        "aria-hidden": alt ? undefined : "true",
       });
-      media.addEventListener("error", fail);
-      this.replaceChildren(media);
+      file.innerHTML = renderFileIconSvg(
+        { family: state.icon, extension: "" },
+        MEDIA_FILE_ICON_SIZE,
+      );
+      this.replaceChildren(file);
     }
   }
 }
+
+/** Audio's progress drawn over its waveform; decorative, as the audio's own controls report it. */
+const waveformProgress = (peaks: readonly number[]) => {
+  const bars = (played: boolean) =>
+    el(
+      "div",
+      { class: "calmlens-media__peaks", "data-played": played },
+      getPeakHeights(peaks).map((height) => {
+        const bar = el("span");
+        bar.style.height = `${height}%`;
+        return bar;
+      }),
+    );
+  const progress = el(
+    "div",
+    {
+      class: "calmlens-media__progress",
+      role: "progressbar",
+      "aria-hidden": "true",
+      "aria-valuemin": 0,
+      "aria-valuemax": 100,
+      "aria-valuenow": 0,
+    },
+    [bars(false), bars(true)],
+  );
+  progress.style.setProperty("--calmlens-played", "0%");
+  return progress;
+};
 
 /** Defines `<calmlens-uploader>` and `<calmlens-media>`, if they aren't defined yet. */
 export const defineCalmLensElements = (): void => {

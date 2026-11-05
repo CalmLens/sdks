@@ -565,14 +565,22 @@ string_enum! {
 }
 
 string_enum! {
-    /// Which CDN resource of an asset to serve or sign.
+    /// Which CDN resource of an asset to serve. Lenses and transforms apply to `Preview`, and to
+    /// `Rendered` when it is an image; the CDN refuses them on other resources with
+    /// `asset/invalid-transform`.
     CdnResource {
-        /// The asset's original file. It takes no lens or transform.
+        /// The asset's original file, exactly as uploaded. It takes no lens or transform.
         Original = "original",
-        /// The asset rendered through a lens or transform, or its default rendition (the default).
+        /// The asset's displayable file (the default): an image in the best format the client
+        /// accepts, a PDF, or browser-safe video or audio, as `content.rendered` describes.
         Rendered = "rendered",
-        /// A small blurred PNG, public whatever the asset's visibility or moderation. Only
-        /// for CDN URLs, without a lens or transform; it needs no age confirmation.
+        /// A still image that stands for the asset, as `content.preview` describes: the image
+        /// itself, a document's first page or slide, a website's first screen, a video's poster
+        /// frame or an audio waveform.
+        Preview = "preview",
+        /// A small blurred PNG made from the preview, public whatever the asset's visibility or
+        /// moderation. Only for CDN URLs, without a lens or transform; it needs no age
+        /// confirmation.
         Placeholder = "placeholder",
     }
 }
@@ -580,12 +588,17 @@ string_enum! {
 string_enum! {
     /// Which CDN resource of an asset a signed URL serves. Placeholders need no signature.
     SignedUrlResource {
-        /// The asset's original file. It takes no lens or transform.
+        /// The asset's original file, exactly as uploaded. It takes no lens or transform.
         Original = "original",
-        /// The asset rendered through a lens or transform, or its default rendition (the default).
+        /// The asset's displayable file (the default).
         Rendered = "rendered",
+        /// A still image that stands for the asset.
+        Preview = "preview",
     }
 }
+
+/// The CDN resources a signed URL can be created for, as the API accepts them.
+pub const SIGNED_CDN_RESOURCES: [&str; 3] = ["original", "rendered", "preview"];
 
 /// Processing options for an asset.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -596,7 +609,7 @@ pub struct ProcessingOptions {
     pub keep_content_after_processing: Option<bool>,
     /// Overrides the project's `storeSensitiveMetadata` setting for this upload. When false,
     /// embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
-    /// and `file_metadata` leaves out the creator and location. When true, the image is stored as
+    /// and `metadata` leaves out the creator and location. When true, the image is stored as
     /// uploaded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub store_sensitive_metadata: Option<bool>,
@@ -1377,7 +1390,8 @@ pub struct SignedUrlOptions {
     /// The asset ID.
     #[serde(skip_serializing)]
     pub asset_id: String,
-    /// `rendered` (the API's default) or `original`, which takes no lens or transform.
+    /// `rendered` (the API's default), `original` or `preview`. The original takes no lens or
+    /// transform.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource: Option<SignedUrlResource>,
     /// A lens identifier.
@@ -1469,7 +1483,7 @@ pub struct EnsureLenses {
     pub lenses: Vec<LensDefinition>,
 }
 
-/// A CDN request for an asset's rendered, original or placeholder resource.
+/// A CDN request for an asset's rendered, original, preview or placeholder resource.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CdnRequest {
@@ -1478,7 +1492,8 @@ pub struct CdnRequest {
     pub viewer_claims: Option<ViewerClaims>,
     /// The asset ID or external ID.
     pub asset_identifier: String,
-    /// `rendered` (default), `original` or `placeholder`. Only `rendered` takes a lens or transform.
+    /// `rendered` (default), `original`, `preview` or `placeholder`. Lenses and transforms apply
+    /// to `preview`, and to `rendered` when it is an image.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource: Option<CdnResource>,
     /// A lens identifier.
@@ -1769,6 +1784,11 @@ pub struct AssetModeration {
     /// Detection findings before policy evaluation.
     #[serde(default)]
     pub raw: Option<ModerationRaw>,
+    /// Summary of an audio or video asset's findings timeline; `None` for other assets and when
+    /// there is none. List its segments with
+    /// [`AssetsClient::list_timeline`](crate::AssetsClient::list_timeline).
+    #[serde(default)]
+    pub timeline: Option<AssetModerationTimeline>,
     /// Preview. What the policy's link-safety section made of the asset's links; `None` when
     /// the policy doesn't act on links.
     #[serde(default)]
@@ -1815,22 +1835,69 @@ pub struct AssetContent {
     /// The uploaded size in bytes.
     #[serde(default)]
     pub size_in_bytes: Option<u64>,
-    /// Digests of the uploaded content.
+    /// Digests of the file as stored: for an image, after embedded metadata is removed unless
+    /// `store_sensitive_metadata` is on.
     #[serde(default)]
     pub checksums: Option<Checksums>,
-    /// The picture served at the rendered resource, `None` when the asset has none.
+    /// The width in pixels of the uploaded image or video; `None` when unknown, for other types
+    /// and while the asset is held.
     #[serde(default)]
-    pub image: Option<AssetImage>,
-    /// Text extracted from the content.
+    pub width: Option<u32>,
+    /// The height in pixels of the uploaded image or video, like `width`.
     #[serde(default)]
-    pub extracted_text: Option<ExtractedText>,
+    pub height: Option<u32>,
+    /// The length in seconds of audio and video once analysed; otherwise `None`.
+    #[serde(default)]
+    pub duration_seconds: Option<f64>,
+    /// The number of pages or slides of a document or presentation, when known.
+    #[serde(default)]
+    pub page_count: Option<u32>,
+    /// The PDQ perceptual hash used to match visually similar images, as 64 hexadecimal
+    /// characters, for image assets. Hashes 31 or fewer bits apart are usually the same picture.
+    /// `None` while the asset is held.
+    #[serde(default)]
+    pub perceptual_hash: Option<String>,
+    /// How much detail `perceptual_hash` captured, from 0 to 100. Hashes below 50 come from flat
+    /// or featureless images and match unrelated pictures, so leave them out of comparisons.
+    #[serde(default)]
+    pub perceptual_hash_quality: Option<u32>,
     /// Metadata embedded in an uploaded image, such as its capture time, camera and software.
     /// Read-only and separate from the asset's own `metadata`; `None` when the image declares
     /// none, for other asset types, once the content is removed and while the asset is held.
     #[serde(default)]
-    pub file_metadata: Option<FileMetadata>,
+    pub metadata: Option<FileMetadata>,
+    /// Text extracted from the content.
+    #[serde(default)]
+    pub extracted_text: Option<ExtractedText>,
+    /// The displayable file, served at the rendered resource: an image, a PDF, or browser-safe
+    /// video or audio. `None` when the asset has none (text, spreadsheets and other files, or
+    /// media not yet made browser-safe), once the content is removed and while the asset is held.
+    #[serde(default)]
+    pub rendered: Option<AssetRendered>,
+    /// A still image for the asset, served at the preview resource (and its blurred placeholder
+    /// at the placeholder resource). `None` when the asset has none (text, spreadsheets and other
+    /// files, or a document, video or audio whose still isn't made yet), once the content is
+    /// removed and while the asset is held.
+    #[serde(default)]
+    pub preview: Option<AssetPreview>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetContent, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Summary of an audio or video asset's findings timeline.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetModerationTimeline {
+    /// How many segments the asset's findings timeline holds.
+    #[serde(default)]
+    pub segment_count: u32,
+    /// Fields this SDK version does not know.
+    #[serde(
+        flatten,
+        deserialize_with = "extra_fields::<AssetModerationTimeline, _>"
+    )]
     pub extra: HashMap<String, Value>,
 }
 
@@ -1842,9 +1909,6 @@ pub struct ModerationRaw {
     /// Raw category scores, qualifiers and conditions.
     #[serde(default)]
     pub categories: HashMap<ClassificationCategory, CategoryResult>,
-    /// Timed findings from audio or video.
-    #[serde(default)]
-    pub timeline: Option<MediaClassificationReport>,
     /// Matches against project hash lists.
     #[serde(default)]
     pub hash_matches: Option<Vec<HashMatch>>,
@@ -2564,38 +2628,6 @@ pub struct ClassificationLabel {
     pub extra: HashMap<String, Value>,
 }
 
-/// Audio and video moderation results.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct MediaClassificationReport {
-    /// The media duration.
-    #[serde(default)]
-    pub duration_seconds: f64,
-    /// The interval between sampled frames.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub frame_interval_seconds: Option<f64>,
-    /// The number of sampled frames.
-    #[serde(default)]
-    pub sampled_frames: u32,
-    /// Whether the audio was transcribed.
-    #[serde(default)]
-    pub audio_transcribed: bool,
-    /// Results by time segment. A long asset's report may keep a shortened timeline; list every
-    /// segment with [`AssetsClient::list_timeline`](crate::AssetsClient::list_timeline).
-    #[serde(default)]
-    pub segments: Vec<MediaClassificationSegment>,
-    /// The number of segments in the full timeline, when it differs from `segments`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub segment_count: Option<u32>,
-    /// Fields this SDK version does not know.
-    #[serde(
-        flatten,
-        deserialize_with = "extra_fields::<MediaClassificationReport, _>"
-    )]
-    pub extra: HashMap<String, Value>,
-}
-
 /// A time segment's results.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -3061,34 +3093,71 @@ pub struct SignedUrl {
     pub extra: HashMap<String, Value>,
 }
 
-/// The picture CalmLens can show for an asset: the original for image assets, or a generated
-/// image for documents and websites. It remains after the content is removed, so check the content
-/// `status` before loading it.
+string_enum! {
+    /// What the rendered resource serves.
+    AssetRenderedKind {
+        /// An image: an image asset, or a website's screenshot.
+        Image = "image",
+        /// A PDF: a PDF, or a document or presentation converted to PDF.
+        Pdf = "pdf",
+        /// Browser-safe video.
+        Video = "video",
+        /// Browser-safe audio.
+        Audio = "audio",
+    }
+}
+
+/// The one displayable file of an asset, as the CDN's rendered resource serves it.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct AssetImage {
-    /// The width in pixels: the original's for image assets (a converted HEIC is served smaller at
-    /// the same aspect ratio), and the generated image's for documents and websites.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+pub struct AssetRendered {
+    /// What the rendered resource serves.
+    #[serde(default)]
+    pub kind: AssetRenderedKind,
+    /// The MIME type of the rendered file. An image is served in the best format the client
+    /// accepts, such as AVIF or WebP, unless a transform sets one.
+    #[serde(default)]
+    pub format: String,
+    /// The width in pixels of the full view, for images and video, before any transform; `None`
+    /// when unknown or for PDFs and audio.
+    #[serde(default)]
     pub width: Option<u32>,
-    /// The height in pixels, like `width`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// The height in pixels of the full view, like `width`.
+    #[serde(default)]
     pub height: Option<u32>,
-    /// A ThumbHash placeholder to render while the image loads; `None` once it is removed.
+    /// Audio only, once processing has measured them: loudness peaks from 0 to 1, evenly spaced
+    /// over the audio, for drawing a waveform.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thumbhash: Option<String>,
-    /// The average colour; `None` once the image is removed.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub average_color: Option<String>,
-    /// The perceptual hash, for matching similar image assets.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub perceptual_hash: Option<String>,
-    /// The perceptual hash's quality from 0 to 100; low values match less reliably.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub perceptual_hash_quality: Option<i64>,
+    pub peaks: Option<Vec<f64>>,
     /// Fields this SDK version does not know.
-    #[serde(flatten, deserialize_with = "extra_fields::<AssetImage, _>")]
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetRendered, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A still image for an asset, as the CDN's preview resource serves it: the image itself, a
+/// document's first page or slide, a website's first screen, a video's poster frame or an audio
+/// waveform.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetPreview {
+    /// The width in pixels of the source still image, before the preview is sized or
+    /// transformed.
+    #[serde(default)]
+    pub width: Option<u32>,
+    /// The height in pixels of the source still image, like `width`.
+    #[serde(default)]
+    pub height: Option<u32>,
+    /// A ThumbHash placeholder you can render while any view of the asset loads (also served as
+    /// a PNG at the placeholder resource).
+    #[serde(default)]
+    pub thumbhash: Option<String>,
+    /// The average colour of the source still image, a placeholder for any view of the asset.
+    #[serde(default)]
+    pub average_color: Option<String>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetPreview, _>")]
     pub extra: HashMap<String, Value>,
 }
 

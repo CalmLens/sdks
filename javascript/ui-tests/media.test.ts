@@ -11,6 +11,33 @@ const messages = {
   regionalUnavailable: "msg:regional-unavailable",
   unavailable: "msg:unavailable",
   reveal: "msg:reveal",
+  openPdf: "msg:open-pdf",
+  pdfTitle: "msg:pdf-title",
+  play: "msg:play",
+};
+const url = (resource: string, assetId = "a1") =>
+  `${CDN}/assets/${PROJECT_ID}/${assetId}/${resource}`;
+/** An API asset whose rendered resource serves `kind`, with or without a preview still. */
+const apiAsset = (
+  kind: "image" | "video" | "audio" | "pdf" | null,
+  { preview = true, peaks }: { preview?: boolean; peaks?: number[] } = {},
+) => ({
+  id: "a1",
+  projectId: PROJECT_ID,
+  type: kind === "pdf" ? "multimedia-document" : (kind ?? "plaintext-document"),
+  classification: { moderation: { status: "allowed" as const } },
+  content: {
+    status: "stored",
+    rendered: kind
+      ? { kind, width: kind === "audio" ? null : 640, height: kind === "audio" ? null : 360, peaks }
+      : null,
+    preview: preview ? { width: 640, height: 360, thumbhash: null, averageColor: "#223344" } : null,
+  },
+});
+/** A `getSignedUrl` that signs each resource with a counter, so each fetch has its own URL. */
+const signer = () => {
+  let count = 0;
+  return mock(async (resource: string) => `https://signed.example/${resource}?n=${++count}`);
 };
 
 let mounted: Mounted | undefined;
@@ -164,13 +191,207 @@ for (const binding of BINDINGS) {
     );
 
     it.skipIf(!binding.playsMedia)(
-      "plays a video's original file with no poster, as the CDN renders no still for video",
+      "plays a video's rendered file with its preview still as the poster",
       async () => {
-        mounted = binding.mountMedia({ ...asset, type: "video", messages });
+        mounted = binding.mountMedia({ asset: apiAsset("video"), alt: asset.alt, messages });
         const video = await view().findByLabelText(asset.alt);
 
-        expect(video.getAttribute("src")).toBe(`${CDN}/assets/${PROJECT_ID}/a1/original`);
-        expect(video.getAttribute("poster")).toBeNull();
+        expect(video.tagName).toBe("VIDEO");
+        expect(video.getAttribute("src")).toBe(url("rendered"));
+        expect(video.getAttribute("poster")).toBe(url("preview"));
+      },
+    );
+
+    it.skipIf(!binding.playsMedia)("requests no poster for a video without a preview", async () => {
+      mounted = binding.mountMedia({
+        asset: apiAsset("video", { preview: false }),
+        alt: asset.alt,
+        messages,
+      });
+      const video = await view().findByLabelText(asset.alt);
+
+      expect(video.getAttribute("src")).toBe(url("rendered"));
+      expect(video.getAttribute("poster")).toBeNull();
+    });
+
+    it.skipIf(!binding.playsMedia)(
+      "plays audio with native controls under its waveform, and highlights the played peaks",
+      async () => {
+        mounted = binding.mountMedia({
+          asset: apiAsset("audio", { peaks: [0.2, 0.9, 0.5, 0.1] }),
+          alt: asset.alt,
+          messages,
+        });
+        const audio = (await view().findByLabelText(asset.alt)) as HTMLAudioElement;
+
+        expect(audio.tagName).toBe("AUDIO");
+        expect(audio.hasAttribute("controls")).toBe(true);
+        expect(audio.getAttribute("src")).toBe(url("rendered"));
+        expect(decorative()).toEqual([url("preview")]);
+        const progress = view().getByRole("progressbar", { hidden: true });
+        expect(progress.getAttribute("aria-hidden")).toBe("true");
+        expect(progress.getAttribute("aria-valuenow")).toBe("0");
+
+        Object.defineProperty(audio, "duration", { configurable: true, value: 40 });
+        audio.currentTime = 10;
+        audio.dispatchEvent(new Event("timeupdate"));
+        await waitFor(() => expect(progress.getAttribute("aria-valuenow")).toBe("25"));
+      },
+    );
+
+    it.skipIf(!binding.playsMedia)("draws no progress for audio without peaks", async () => {
+      mounted = binding.mountMedia({ asset: apiAsset("audio"), alt: asset.alt, messages });
+      await view().findByLabelText(asset.alt);
+
+      expect(decorative()).toEqual([url("preview")]);
+      expect(view().queryByRole("progressbar", { hidden: true })).toBeNull();
+    });
+
+    it.skipIf(!binding.playsMedia)(
+      "shows a PDF in the page with a link that opens it in a new tab",
+      async () => {
+        mounted = binding.mountMedia({ asset: apiAsset("pdf"), messages });
+        const frame = await view().findByTitle(messages.pdfTitle);
+        const link = view().getByRole("link", { name: messages.openPdf });
+
+        expect(frame.tagName).toBe("IFRAME");
+        expect(frame.getAttribute("src")).toBe(url("rendered"));
+        expect(link.getAttribute("href")).toBe(url("rendered"));
+        expect(link.getAttribute("target")).toBe("_blank");
+      },
+    );
+
+    it("shows the preview still of an asset with no rendered file", async () => {
+      mounted = binding.mountMedia({ asset: apiAsset(null), alt: asset.alt, messages });
+      const image = await view().findByRole("img", { name: asset.alt });
+
+      expect(image.getAttribute("src")).toBe(url("preview"));
+    });
+
+    it("shows a file icon, requesting nothing, for an asset with no rendered file or preview", async () => {
+      mounted = binding.mountMedia({
+        asset: apiAsset(null, { preview: false }),
+        alt: asset.alt,
+        messages,
+      });
+
+      await view().findByRole("img", { name: asset.alt });
+      expect(requested()).toEqual([]);
+    });
+
+    it.skipIf(!binding.playsMedia)(
+      "fetches a signed URL for each resource a private video shows",
+      async () => {
+        const getSignedUrl = signer();
+        mounted = binding.mountMedia({
+          asset: apiAsset("video"),
+          getSignedUrl,
+          alt: asset.alt,
+          messages,
+        });
+        const video = await view().findByLabelText(asset.alt);
+
+        expect(getSignedUrl.mock.calls.map(([resource]) => resource).sort()).toEqual([
+          "preview",
+          "rendered",
+        ]);
+        expect(video.getAttribute("src")).toMatch(/^https:\/\/signed\.example\/rendered\?n=\d$/);
+        expect(video.getAttribute("poster")).toMatch(/^https:\/\/signed\.example\/preview\?n=\d$/);
+        expect(requested().filter((src) => src?.startsWith(CDN))).toEqual([]);
+      },
+    );
+
+    it("fetches a signed URL for a private image and shows it", async () => {
+      const getSignedUrl = signer();
+      mounted = binding.mountMedia({ ...asset, getSignedUrl, messages });
+      const image = await view().findByRole("img", { name: asset.alt });
+
+      expect(getSignedUrl.mock.calls).toEqual([["rendered"]]);
+      expect(image.getAttribute("src")).toBe("https://signed.example/rendered?n=1");
+    });
+
+    it("asks for no signed URL while an asset is behind the age notice", async () => {
+      const getSignedUrl = signer();
+      mounted = binding.mountMedia({
+        ...asset,
+        status: "age-restricted",
+        onReveal: () => {},
+        getSignedUrl,
+        messages,
+      });
+
+      await view().findByRole("button", { name: messages.reveal });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(getSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it("says the media is unavailable when its signed URL can't be fetched", async () => {
+      const getSignedUrl = mock(async () => {
+        throw new Error("offline");
+      });
+      mounted = binding.mountMedia({ ...asset, getSignedUrl, messages });
+
+      expect(await view().findByText(messages.unavailable)).toBeTruthy();
+      expect(view().queryByRole("img", { name: asset.alt })).toBeNull();
+    });
+
+    it.skipIf(!binding.playsMedia)(
+      "fetches a fresh signed URL when a video's expires mid-playback, and resumes where it stopped",
+      async () => {
+        const play = mock(async () => {});
+        const originalPlay = HTMLMediaElement.prototype.play;
+        HTMLMediaElement.prototype.play = play;
+        try {
+          const getSignedUrl = signer();
+          mounted = binding.mountMedia({
+            asset: apiAsset("video", { preview: false }),
+            getSignedUrl,
+            alt: asset.alt,
+            messages,
+          });
+          const first = (await view().findByLabelText(asset.alt)) as HTMLVideoElement;
+          expect(first.getAttribute("src")).toBe("https://signed.example/rendered?n=1");
+          first.currentTime = 42;
+          Object.defineProperty(first, "paused", { configurable: true, value: false });
+          first.dispatchEvent(new Event("error"));
+
+          await waitFor(() =>
+            expect(view().getByLabelText(asset.alt).getAttribute("src")).toBe(
+              "https://signed.example/rendered?n=2",
+            ),
+          );
+          expect(getSignedUrl.mock.calls).toEqual([["rendered"], ["rendered"]]);
+          const fresh = view().getByLabelText(asset.alt) as HTMLVideoElement;
+          fresh.currentTime = 0;
+          fresh.dispatchEvent(new Event("loadedmetadata"));
+          expect(fresh.currentTime).toBe(42);
+          expect(play).toHaveBeenCalledTimes(1);
+        } finally {
+          HTMLMediaElement.prototype.play = originalPlay;
+        }
+      },
+    );
+
+    it.skipIf(!binding.playsMedia)(
+      "says the audio is unavailable when its fresh signed URL fails before loading too",
+      async () => {
+        const getSignedUrl = signer();
+        mounted = binding.mountMedia({
+          asset: apiAsset("audio", { preview: false }),
+          getSignedUrl,
+          alt: asset.alt,
+          messages,
+        });
+        (await view().findByLabelText(asset.alt)).dispatchEvent(new Event("error"));
+        await waitFor(() =>
+          expect(view().getByLabelText(asset.alt).getAttribute("src")).toBe(
+            "https://signed.example/rendered?n=2",
+          ),
+        );
+        view().getByLabelText(asset.alt).dispatchEvent(new Event("error"));
+
+        expect(await view().findByText(messages.unavailable)).toBeTruthy();
+        expect(getSignedUrl).toHaveBeenCalledTimes(2);
       },
     );
 
@@ -182,7 +403,8 @@ for (const binding of BINDINGS) {
           type: "image",
           classification: { moderation: { status: "age-restricted" } },
           content: {
-            image: { thumbhash: "1QcSHQRnh493V4dIh4eXh1h4kJUI", width: 800, height: 600 },
+            rendered: { kind: "image", width: 800, height: 600 },
+            preview: { thumbhash: "1QcSHQRnh493V4dIh4eXh1h4kJUI", width: 400, height: 300 },
           },
         },
         viewerClaims: { ageConfirmed: true },

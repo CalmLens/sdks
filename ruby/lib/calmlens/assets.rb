@@ -89,8 +89,9 @@ module CalmLens
       end
     end
 
-    # Lists one page of an audio or video asset's findings timeline, in time order. A long asset's
-    # report keeps a shortened timeline; this lists every segment.
+    # Lists one page of an audio or video asset's findings timeline, in time order.
+    # `classification.moderation.timeline.segmentCount` says how many segments there are. Pass each
+    # page's `nextCursor` back unchanged; cursors are opaque.
     # @option options [String] :asset_id
     # @option options [String] :cursor
     # @option options [Integer] :page_size
@@ -98,7 +99,7 @@ module CalmLens
     def list_timeline(options)
       call(options, __method__) do |api, request|
         query = without(api, 'assetId')
-        request('GET', "/assets/#{Internal.segment(api['assetId'])}/timeline", query: query, request_options: request)
+        request('GET', project("assets/#{Internal.segment(api['assetId'])}/timeline"), query: query, request_options: request)
       end
     end
 
@@ -253,7 +254,8 @@ module CalmLens
 
     # Creates a time-limited URL that delivers private content without an API key.
     # @option options [String] :asset_id
-    # @option options [String] :resource `rendered` (the API's default) or `original`, which takes no lens or transform
+    # @option options [String] :resource one of {CDN::SIGNED_RESOURCES}: `rendered` (the API's default),
+    #   `original`, which takes no lens or transform, or `preview`
     # @option options [Integer] :expires_in_seconds default 900
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash] :transform a selector String or structured options, as for
@@ -510,9 +512,11 @@ module CalmLens
 
     def check_signed_url(body)
       resource = body.fetch('resource', 'rendered')
-      raise Internal.invalid("A signed URL's resource must be original or rendered") unless %w[original rendered].include?(resource)
+      unless CDN::SIGNED_RESOURCES.include?(resource)
+        raise Internal.invalid("A signed URL's resource must be one of #{CDN::SIGNED_RESOURCES.join(', ')}")
+      end
       if resource == 'original' && (body.key?('lens') || body.key?('transform'))
-        raise Internal.invalid('Lenses and transforms apply only to the rendered resource')
+        raise Internal.invalid('The original resource takes no lens or transform')
       end
 
       expires = body['expiresInSeconds']

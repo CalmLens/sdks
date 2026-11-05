@@ -6,15 +6,23 @@ module CalmLens
     # The prefix of this resource's operations in Internal::OPTION_KEYS.
     OPERATIONS = 'cdn'
 
-    RESOURCES = %w[original rendered placeholder].freeze
-    private_constant :RESOURCES
+    # The CDN resources a signed URL can be created for ({Assets#create_signed_url}), as the API accepts them.
+    SIGNED_RESOURCES = %w[original rendered preview].freeze
 
-    # Builds the CDN URL of an asset's rendered, original or placeholder resource. Private assets need the API key
-    # ({#serve}) or a signed URL ({Assets#create_signed_url}).
+    RESOURCES = [*SIGNED_RESOURCES, 'placeholder'].freeze
+    # The resources that take no lens or transform: the exact upload and the public placeholder.
+    UNSELECTABLE_RESOURCES = %w[original placeholder].freeze
+    private_constant :RESOURCES, :UNSELECTABLE_RESOURCES
+
+    # Builds the CDN URL of an asset's resource. Private assets need the API key ({#serve}) or a signed URL
+    # ({Assets#create_signed_url}).
     # @option options [String] :asset_identifier the asset ID or external ID
-    # @option options [String] :resource `rendered` (default), `original` or `placeholder`. Only `rendered`
-    #   takes a lens or transform. A placeholder is a small blurred PNG that the CDN serves publicly for every
-    #   asset whatever its visibility or moderation status; it needs no age confirmation.
+    # @option options [String] :resource `rendered` (default: the displayable file, an image in the best format
+    #   the client accepts, a PDF, or browser-safe video or audio), `original` (the exact upload), `preview` (a
+    #   still image for the asset) or `placeholder` (a small blurred PNG that the CDN serves publicly for every
+    #   asset whatever its visibility or moderation status, without age confirmation). Lenses and transforms
+    #   apply to `preview`, and to `rendered` when it is an image; the CDN refuses them on rendered PDFs, video
+    #   and audio with `asset/invalid-transform`.
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash] :transform options applied in one pass: a selector such as
     #   `width=200,fit=cover`, or structured options such as `{width: 200, fit: 'cover'}`. With a lens,
@@ -66,11 +74,12 @@ module CalmLens
 
     def url(api)
       resource = api.fetch('resource', 'rendered')
-      raise Internal.invalid('Resource must be original, rendered or placeholder') unless RESOURCES.include?(resource)
+      raise Internal.invalid("Resource must be one of #{RESOURCES.join(', ')}") unless RESOURCES.include?(resource)
 
       transformed = !api['lens'].nil? || !api['transform'].nil?
-      raise Internal.invalid('Lenses and transforms apply only to the rendered resource') if resource == 'original' && transformed
-      raise Internal.invalid('A placeholder takes no lens or transform') if resource == 'placeholder' && transformed
+      if UNSELECTABLE_RESOURCES.include?(resource) && transformed
+        raise Internal.invalid("The #{resource} resource takes no lens or transform")
+      end
 
       url = "#{@session.cdn_base_url}/assets/#{Internal.segment(@session.project_id)}/" \
             "#{Internal.segment(api['assetIdentifier'])}/#{resource}"

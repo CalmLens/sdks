@@ -6,6 +6,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import {
   Image,
   type LayoutChangeEvent,
+  Linking,
   PixelRatio,
   Pressable,
   type StyleProp,
@@ -15,7 +16,14 @@ import {
   type ViewStyle,
 } from "react-native";
 import { FILE_ICON_COLORS, getFileIcon, getFileIconLabel } from "./ui/FileIcons";
-import { getMediaState, type MediaOptions, pickMediaSource, resolveMediaProps } from "./ui/Media";
+import {
+  getMediaState,
+  type MediaOptions,
+  type MediaPlayback,
+  MediaUrlSigner,
+  pickMediaSource,
+  resolveMediaProps,
+} from "./ui/Media";
 import {
   describeUploader,
   describeUploadItem,
@@ -25,6 +33,7 @@ import {
 import {
   getMediaAspectRatio,
   getMediaLoadKey,
+  getShownPlaceholder,
   type MediaDisplayOptions,
   type UploaderProps,
 } from "./ui/Props";
@@ -364,10 +373,24 @@ export function CalmLensUploader<F extends UploadFile = UploadFile>({
 /** A video or audio file for your app's player to play. */
 export interface MediaPlayerSource {
   kind: "video" | "audio";
-  /** The asset's original file. */
+  /** The asset's rendered file, which plays in every browser and on phones. */
   src: string;
+  /** The preview still, if the asset has one: a video's poster or an audio waveform. */
+  poster?: string;
+  /** Audio's waveform peaks from 0 to 1, for drawing its progress. */
+  peaks?: readonly number[];
   /** Describes the media, from the component's `alt`. */
   alt: string;
+  /** Where to resume after `onError` fetched a fresh signed URL, which is now `src`. */
+  resumeFrom?: MediaPlayback;
+  /**
+   * Call when the player fails, with where it was. With `getSignedUrl`, the component fetches a
+   * fresh URL (once until `onLoad`) and renders the player again with it and `resumeFrom`;
+   * otherwise, or when that fails too, it shows the unavailable notice.
+   */
+  onError: (playback?: MediaPlayback) => void;
+  /** Call once the player has loaded `src`, so a later expiry can fetch a fresh URL again. */
+  onLoad: () => void;
 }
 
 export type CalmLensMediaProps = MediaOptions &
@@ -375,7 +398,8 @@ export type CalmLensMediaProps = MediaOptions &
   ThemeOptions & {
     /**
      * Renders video and audio, which React Native has no built-in player for, such as `expo-video`.
-     * Without it, video and audio assets show their placeholder.
+     * Without it, video and audio show their preview still with a button that opens the file in
+     * the device's player.
      */
     renderPlayer?: (source: MediaPlayerSource) => ReactNode;
     style?: StyleProp<ViewStyle>;
@@ -403,14 +427,28 @@ const mediaStyles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   revealText: { fontSize: 14, fontWeight: "500", color: "#111" },
+  open: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
+  file: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
+  fileIcon: {
+    width: 48,
+    height: 60,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingBottom: 8,
+    borderWidth: 1.5,
+    borderRadius: 6,
+  },
+  fileIconLabel: { fontSize: 11, fontWeight: "700", fontFamily: "monospace" },
 });
 
 type LoadState = "loading" | "loaded" | "error";
 
 /**
  * Shows an asset from the CalmLens CDN, at the width in `widths` that covers its measured size,
- * with a blurred placeholder while it loads. Age-restricted assets stay behind the placeholder and
- * a reveal button until `ageConfirmed` is set; blocked and purged assets show an unavailable notice.
+ * with a blurred placeholder while it loads. Video and audio play in `renderPlayer`'s player; PDFs
+ * show their placeholder with a button that opens them; other files show their preview still or
+ * a file icon. Age-restricted assets stay behind the placeholder and a reveal button until
+ * `ageConfirmed` is set; blocked and purged assets show an unavailable notice.
  */
 export function CalmLensMedia(input: CalmLensMediaProps) {
   const {
@@ -420,11 +458,14 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     status,
     contentRemoved,
     type,
+    hasPreview,
+    peaks,
     resource,
     lens,
     transform,
     widths,
     url,
+    getSignedUrl,
     placeholder,
     placeholderHash,
     placeholderUrl: customPlaceholderUrl,
@@ -444,46 +485,79 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
   } = resolveMediaProps(input);
   const messages = useMemo(() => resolveMessages(overrides), [overrides]);
   const theme = useMemo(() => resolveTheme(themeOverrides), [themeOverrides]);
-  const state = getMediaState({
+  const options = {
     asset: _asset,
     projectId,
     assetId,
     status,
     contentRemoved,
     type,
+    hasPreview,
+    peaks,
     resource,
     lens,
     transform,
     widths,
     url,
+    getSignedUrl,
     placeholder,
     placeholderHash,
     placeholderUrl: customPlaceholderUrl,
     cdnBaseUrl,
     viewerClaims,
-  });
+  };
+  const [, setSigned] = useState(0);
+  const [signer] = useState(() => new MediaUrlSigner(() => setSigned((count) => count + 1)));
+  const state = getMediaState(options, signer.urls(options));
   const [layoutWidth, setLayoutWidth] = useState<number>();
-  const src = state.kind === "image" ? pickMediaSource(state, layoutWidth) : undefined;
+  // Video and audio without a player show their still in place of the file.
+  const still =
+    state.kind === "video" && !renderPlayer
+      ? state.poster
+      : state.kind === "audio" && !renderPlayer
+        ? state.waveformUrl
+        : undefined;
+  const src = state.kind === "image" ? pickMediaSource(state, layoutWidth) : still;
   const loadKey = src ?? getMediaLoadKey(state);
   const [load, setLoad] = useState<{ key: string; state: LoadState }>({
     key: loadKey,
     state: "loading",
   });
   const current = load.key === loadKey ? load.state : "loading";
+  const [resumeFrom, setResumeFrom] = useState<MediaPlayback>();
 
   const ratio = getMediaAspectRatio({ aspectRatio, width, height });
   const unavailable = state.kind === "unavailable" || current === "error";
-  const placeholderUrl =
-    state.kind === "audio" || state.kind === "unavailable" ? undefined : state.placeholderUrl;
-  const showPlaceholder =
-    placeholderUrl &&
-    !unavailable &&
-    (state.kind !== "image" || current !== "loaded") &&
-    !(state.kind === "video" && renderPlayer);
+  const placeholderUrl = unavailable
+    ? undefined
+    : state.kind === "pdf"
+      ? state.placeholderUrl
+      : state.kind === "video" && !renderPlayer
+        ? current === "loaded"
+          ? undefined
+          : state.placeholderUrl
+        : getShownPlaceholder(state, current === "loaded");
+  const playable = state.kind === "video" || state.kind === "audio";
   const player =
-    (state.kind === "video" || state.kind === "audio") && !unavailable
-      ? renderPlayer?.({ kind: state.kind, src: state.src, alt })
+    playable && !unavailable
+      ? renderPlayer?.({
+          kind: state.kind,
+          src: state.src,
+          poster: state.kind === "video" ? state.poster : state.waveformUrl,
+          peaks: state.kind === "audio" ? state.peaks : undefined,
+          alt,
+          resumeFrom,
+          onError: (playback) => {
+            const from = playback ?? { position: 0, playing: false };
+            if (signer.recover(from)) setResumeFrom(from);
+            else setLoad({ key: loadKey, state: "error" });
+          },
+          onLoad: () => signer.loaded(),
+        })
       : undefined;
+  const openLabel = state.kind === "pdf" ? messages.openPdf : messages.play;
+  const opens =
+    !unavailable && (state.kind === "pdf" || (playable && !renderPlayer)) ? state.src : undefined;
 
   return (
     <View
@@ -498,7 +572,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
         style,
       ]}
     >
-      {showPlaceholder && (
+      {placeholderUrl && (
         <Image
           source={{ uri: placeholderUrl }}
           aria-hidden
@@ -513,13 +587,42 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
           source={{ uri: src }}
           aria-label={alt || undefined}
           accessible={Boolean(alt)}
-          resizeMode={fit}
+          resizeMode={state.kind === "audio" ? "stretch" : fit}
           onLoad={() => setLoad({ key: loadKey, state: "loaded" })}
           onError={() => setLoad({ key: loadKey, state: "error" })}
           style={[mediaStyles.fill, { opacity: current === "loaded" ? 1 : 0 }]}
         />
       )}
       {player}
+      {state.kind === "file" && (
+        <View
+          style={mediaStyles.file}
+          aria-label={alt || undefined}
+          role={alt ? "img" : undefined}
+          accessible={Boolean(alt)}
+        >
+          <View
+            aria-hidden
+            style={[mediaStyles.fileIcon, { borderColor: FILE_ICON_COLORS[state.icon] }]}
+          >
+            <Text style={[mediaStyles.fileIconLabel, { color: FILE_ICON_COLORS[state.icon] }]}>
+              {getFileIconLabel("").text}
+            </Text>
+          </View>
+        </View>
+      )}
+      {opens && (
+        <View style={mediaStyles.open}>
+          <Pressable
+            role="link"
+            aria-label={openLabel}
+            onPress={() => void Linking.openURL(opens)}
+            style={mediaStyles.revealButton}
+          >
+            <Text style={mediaStyles.revealText}>{openLabel}</Text>
+          </Pressable>
+        </View>
+      )}
       {state.kind === "gated" && (
         <View style={mediaStyles.notice}>
           <Text style={mediaStyles.noticeTitle}>{messages.sensitiveTitle}</Text>

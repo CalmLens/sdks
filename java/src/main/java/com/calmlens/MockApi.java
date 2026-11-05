@@ -82,10 +82,23 @@ final class MockApi {
   private static final int DEFAULT_PAGE_SIZE = 50;
   private static final int MAX_PAGE_SIZE = 100, MAX_EVENTS_PAGE_SIZE = 100, MAX_FOLDER_PAGE_SIZE = 100;
   /**
-   * The ThumbHash the mock gives every classified image, standing in for one computed from its
-   * pixels. The {@code placeholder} resource serves it as a PNG, like the CDN.
+   * The ThumbHash the mock gives every processed asset's preview, standing in for one computed
+   * from its pixels. The {@code placeholder} resource serves it as a PNG, like the CDN.
    */
   static final String MOCK_THUMBHASH = "1QcSHQRnh493V4dIh4eXh1h4kJUI";
+  /** Paths beneath {@code /rendered/} the CDN reserves for streaming and an embeddable player. */
+  private static final Set<String> RESERVED_RENDERED_PATHS = Set.of("stream", "player");
+  /** The size of the waveform the API makes as an audio asset's preview. */
+  private static final int WAVEFORM_WIDTH = 1200, WAVEFORM_HEIGHT = 300;
+  /** Audio and video formats browsers play as uploaded, so the API serves them as stored. */
+  private static final Set<String> BROWSER_SAFE_MEDIA_FORMATS = Set.of(
+      "video/mp4", "audio/mpeg", "audio/aac", "audio/mp4", "audio/x-m4a", "audio/ogg");
+  /** Spreadsheets, which have no rendered file or preview. */
+  private static final Set<String> SPREADSHEET_MIME_TYPES = Set.of(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel.sheet.macroenabled.12",
+      "application/vnd.ms-excel",
+      "application/vnd.oasis.opendocument.spreadsheet");
 
   final MockCalmLensServerClient.Storage storage = new MockCalmLensServerClient.Storage();
   private final MockCalmLensServerClient.Options options;
@@ -178,6 +191,8 @@ final class MockApi {
           default -> Set.of();
         };
       }
+      if (parts.size() == 5 && parts.get(2).equals("assets") && parts.get(4).equals("timeline") && method.equals("GET"))
+        return Set.of("assets.listTimeline");
       return switch (route) {
         case "GET events" -> Set.of("events.list", "events.pages");
         case "PUT lenses" -> Set.of("ensureLens", "ensureLenses");
@@ -202,7 +217,6 @@ final class MockApi {
       case "assets PATCH " -> Set.of("assets.update");
       case "assets DELETE " -> Set.of("assets.delete");
       case "assets GET children" -> Set.of("assets.listChildren", "assets.iterateChildren");
-      case "assets GET timeline" -> Set.of("assets.listTimeline");
       case "assets DELETE content" -> Set.of("assets.deleteContent");
       case "assets POST retry" -> Set.of("assets.retry");
       case "assets POST explain" -> Set.of("assets.explain");
@@ -421,6 +435,8 @@ final class MockApi {
         case "POST assets/batch": return batch(body, now);
         default: break;
       }
+      if (parts.size() == 5 && parts.get(2).equals("assets") && parts.get(4).equals("timeline") && method.equals("GET"))
+        return timeline(asset(parts.get(3)), q);
       if (parts.get(2).equals("policies") && (parts.size() == 4 || parts.size() == 5))
         return policyRoute(method, parts.get(3), parts.size() == 5 ? parts.get(4) : "", body, now);
     } else if (parts.size() == 2 || parts.size() == 3) {
@@ -545,9 +561,12 @@ final class MockApi {
     content.add("extension", JsonNull.INSTANCE);
     content.add("sizeInBytes", rawUpload ? new JsonPrimitive(size) : JsonNull.INSTANCE);
     content.add("checksums", JsonNull.INSTANCE);
-    content.add("image", JsonNull.INSTANCE);
+    // The mock decodes nothing, so the file's own details are unknown.
+    for (String unknown : List.of("width", "height", "durationSeconds", "pageCount", "perceptualHash", "perceptualHashQuality", "metadata"))
+      content.add(unknown, JsonNull.INSTANCE);
     content.add("extractedText", JsonNull.INSTANCE);
-    content.add("fileMetadata", JsonNull.INSTANCE);
+    // Like the API, the rendered file and preview come with processing.
+    withoutRendering(content);
     asset.add("content", content);
     JsonObject uploadState = new JsonObject();
     uploadState.addProperty("status", last ? "completed" : "uploading");
@@ -560,6 +579,7 @@ final class MockApi {
     moderation.add("manualReviews", new JsonArray());
     moderation.add("flaggedCategories", new JsonArray());
     moderation.add("regions", new JsonArray());
+    moderation.add("timeline", JsonNull.INSTANCE);
     JsonObject classification = new JsonObject();
     classification.addProperty("status", last ? "processing" : "pending");
     classification.add("failureReason", JsonNull.INSTANCE);
@@ -585,6 +605,7 @@ final class MockApi {
       storage.assets.put(id, asset);
       return asset;
     }
+    applyRendering(asset, false);
     MockDecision decision;
     try {
       decision = decisionFor(asset, MockCalmLensServerClient.Trigger.UPLOAD, queue);
@@ -708,8 +729,8 @@ final class MockApi {
   /**
    * Moves an asset to an outcome like the pipeline: a decision finishes processing, {@code purged}
    * removes the content (with {@code purgeReason}, {@code policy} for the pipeline), and finished
-   * processing removes content held only temporarily. A classified image gets a ThumbHash for its
-   * placeholder, which goes with removed content.
+   * processing removes content held only temporarily. A decided asset gets its rendered file and
+   * preview (with a ThumbHash for its placeholder), which go with its content.
    */
   void applyOutcome(JsonObject asset, MockCalmLensServerClient.Outcome outcome, String purgeReason, long now, JsonObject report) {
     boolean decided = outcome != MockCalmLensServerClient.Outcome.PENDING && outcome != MockCalmLensServerClient.Outcome.FAILED;
@@ -717,20 +738,6 @@ final class MockApi {
     String contentStatus = str(content, "status");
     boolean purge = outcome == MockCalmLensServerClient.Outcome.PURGED && !"removed".equals(contentStatus);
     boolean remove = purge || decided && "temporary".equals(contentStatus);
-    JsonElement image = content.get("image");
-    if (decided && "image".equals(str(asset, "type")) && !"removed".equals(contentStatus) && !purge) {
-      JsonObject classified = new JsonObject();
-      classified.add("width", JsonNull.INSTANCE);
-      classified.add("height", JsonNull.INSTANCE);
-      classified.add("perceptualHash", JsonNull.INSTANCE);
-      classified.add("perceptualHashQuality", JsonNull.INSTANCE);
-      if (image != null && image.isJsonObject()) image.getAsJsonObject().entrySet().forEach(e -> classified.add(e.getKey(), e.getValue()));
-      classified.addProperty("thumbhash", MOCK_THUMBHASH);
-      if (str(classified, "averageColor") == null) classified.addProperty("averageColor", "#7f7f7f");
-      image = classified;
-    } else if (outcome == MockCalmLensServerClient.Outcome.PURGED) {
-      image = withoutPlaceholder(image);
-    }
     if (remove) {
       storage.content.remove(str(asset, "id"));
       content.addProperty("status", "removed");
@@ -738,10 +745,16 @@ final class MockApi {
       asset.add("context", JsonNull.INSTANCE);
       content.addProperty("updatedAt", now);
       content.add("extractedText", JsonNull.INSTANCE);
-      content.add("fileMetadata", JsonNull.INSTANCE);
-      image = withoutPlaceholder(image);
+      content.add("metadata", JsonNull.INSTANCE);
+      withoutRendering(content);
+    } else if (!"removed".equals(contentStatus) && !purge && !held(asset)) {
+      // Like the API, an asset whose content is held has its rendered file and preview, completed
+      // by its decision; removing content removes them with it, so no placeholder outlives the
+      // content, and a safety hold withholds them.
+      applyRendering(asset, decided);
+    } else {
+      withoutRendering(content);
     }
-    content.add("image", image == null ? JsonNull.INSTANCE : image);
     JsonObject classification = asset.getAsJsonObject("classification");
     classification.addProperty("status", decided ? "completed" : outcome == MockCalmLensServerClient.Outcome.FAILED ? "failed" : "processing");
     // Like the API, a failure carries its reason; the mock never decodes content, so it fails processing.
@@ -756,13 +769,80 @@ final class MockApi {
     asset.addProperty("updatedAt", now);
   }
 
-  /** Removing content removes the placeholder and average colour with it. */
-  private static JsonElement withoutPlaceholder(JsonElement image) {
-    if (image == null || !image.isJsonObject()) return image;
-    JsonObject copy = image.getAsJsonObject().deepCopy();
-    copy.add("thumbhash", JsonNull.INSTANCE);
-    copy.add("averageColor", JsonNull.INSTANCE);
-    return copy;
+  /** Whether a safety hold is on the asset. */
+  private static boolean held(JsonObject asset) {
+    JsonElement hold = asset.getAsJsonObject("content").get("safetyHold");
+    return hold != null && !hold.isJsonNull();
+  }
+
+  /** Removing or withholding content removes its rendered file and preview, as the API does. */
+  private static void withoutRendering(JsonObject content) {
+    content.add("rendered", JsonNull.INSTANCE);
+    content.add("preview", JsonNull.INSTANCE);
+  }
+
+  /** A preview of the given size, with the mock ThumbHash and average colour once processed. */
+  private static JsonObject mockPreview(Integer width, Integer height, boolean processed) {
+    JsonObject preview = new JsonObject();
+    preview.add("width", width == null ? JsonNull.INSTANCE : new JsonPrimitive(width));
+    preview.add("height", height == null ? JsonNull.INSTANCE : new JsonPrimitive(height));
+    preview.add("thumbhash", processed ? new JsonPrimitive(MOCK_THUMBHASH) : JsonNull.INSTANCE);
+    preview.add("averageColor", processed ? new JsonPrimitive("#7f7f7f") : JsonNull.INSTANCE);
+    return preview;
+  }
+
+  /** A rendered file of unknown size. */
+  private static JsonObject mockRendered(String kind, String format) {
+    JsonObject rendered = new JsonObject();
+    rendered.addProperty("kind", kind);
+    rendered.addProperty("format", format);
+    rendered.add("width", JsonNull.INSTANCE);
+    rendered.add("height", JsonNull.INSTANCE);
+    return rendered;
+  }
+
+  /**
+   * Sets the rendered file and preview the API reports for an asset with its content held. Once
+   * uploaded, an image renders as itself with a preview that has no ThumbHash yet, and a PDF and
+   * browser-safe audio and video render as uploaded. Once processed, a website renders as its
+   * screenshot; a document or presentation as a PDF, with its first page as the preview; video and
+   * audio as a browser-safe file (MP4 or M4A unless browsers play the upload), audio with a
+   * waveform preview and video with no poster; and every preview has its ThumbHash. Text,
+   * spreadsheets and other files have neither. The mock decodes nothing, so sizes are unknown and
+   * audio has no peaks.
+   */
+  private static void applyRendering(JsonObject asset, boolean processed) {
+    JsonObject content = asset.getAsJsonObject("content");
+    String type = str(asset, "type"), format = str(content, "format");
+    String mime = format == null ? "" : format.toLowerCase(Locale.ROOT).split(";", 2)[0].strip();
+    boolean browserSafe = BROWSER_SAFE_MEDIA_FORMATS.contains(mime);
+    boolean rendersOnUpload = "image".equals(type) || mime.equals("application/pdf")
+        || ("video".equals(type) || "audio".equals(type)) && browserSafe;
+    withoutRendering(content);
+    if (!processed && !rendersOnUpload) return;
+    switch (type) {
+      case "image" -> {
+        content.add("rendered", mockRendered("image", format == null ? "image/png" : format));
+        content.add("preview", mockPreview(null, null, processed));
+      }
+      case "website" -> {
+        content.add("rendered", mockRendered("image", "image/png"));
+        content.add("preview", mockPreview(null, null, processed));
+      }
+      case "multimedia-document" -> {
+        if (SPREADSHEET_MIME_TYPES.contains(mime)) return;
+        content.add("rendered", mockRendered("pdf", "application/pdf"));
+        if (processed) content.add("preview", mockPreview(null, null, true));
+      }
+      case "video" -> content.add("rendered", mockRendered("video", browserSafe ? format : "video/mp4"));
+      case "audio" -> {
+        JsonObject rendered = mockRendered("audio", browserSafe ? format : "audio/mp4");
+        if (processed) rendered.add("peaks", new JsonArray());
+        content.add("rendered", rendered);
+        if (processed) content.add("preview", mockPreview(WAVEFORM_WIDTH, WAVEFORM_HEIGHT, true));
+      }
+      default -> {}
+    }
   }
 
   private void uploadPart(JsonObject asset, JsonObject q, byte[] raw, long now) throws Failure {
@@ -919,11 +999,11 @@ final class MockApi {
       content.addProperty("removalReason", "requested");
       content.addProperty("updatedAt", now);
       content.add("extractedText", JsonNull.INSTANCE);
-      content.add("fileMetadata", JsonNull.INSTANCE);
-      content.add("image", Objects.requireNonNullElse(withoutPlaceholder(content.get("image")), JsonNull.INSTANCE));
+      content.add("metadata", JsonNull.INSTANCE);
+      withoutRendering(content);
       asset.addProperty("updatedAt", now);
-    } else if (content.get("image") instanceof JsonObject image && str(image, "thumbhash") != null) {
-      content.add("image", withoutPlaceholder(image));
+    } else {
+      withoutRendering(content);
     }
     lifecycle("asset.content-removed", asset);
     return asset;
@@ -987,11 +1067,13 @@ final class MockApi {
       for (String key : List.of("viewerClaims", "resource", "lens", "transform", "expiresInSeconds"))
         if (body.has(key) && body.get(key).isJsonNull())
           throw Failure.validation(key.equals("resource") ? "validation/invalid-value" : "validation/invalid-type", key);
+    if (method.equals("POST") && suffix.equals("signed-url") && body.has("resource")
+        && !(body.get("resource").isJsonPrimitive() && CalmLensServerClient.SIGNED_CDN_RESOURCES.contains(body.get("resource").getAsString())))
+      throw Failure.validation("validation/invalid-value", "resource");
     JsonObject asset = asset(id);
     switch (method + " " + suffix) {
       case "GET ": return asset;
       case "GET children": return page(projectAssets().stream().filter(child -> id.equals(str(child, "parentId"))).collect(Collectors.toList()), q, Json.write(new JsonPrimitive(id)));
-      case "GET timeline": return timeline(asset, q);
       case "DELETE ":
         storage.assets.remove(id);
         storage.content.remove(id);
@@ -1248,28 +1330,19 @@ final class MockApi {
   }
 
   /**
-   * An asset's findings timeline, a page at a time, as the API lists it: its report's segments in
-   * time order, with a cursor naming the next one's position.
+   * An asset's findings timeline, as the API lists it: refused while a safety hold is on. The mock
+   * analyses no audio or video, so it keeps no segments: every timeline is empty, and no cursor
+   * continues one.
    */
   private JsonObject timeline(JsonObject asset, JsonObject q) throws Failure {
     int pageSize = (int) bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    String cursor = str(q, "cursor");
-    int offset = 0;
-    if (cursor != null) {
-      java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("timeline:(\\d{1,9})").matcher(cursor);
-      if (!matcher.matches()) throw new Failure(ErrorCodes.INVALID_CURSOR, "The cursor is invalid or belongs to a different query.");
-      offset = Integer.parseInt(matcher.group(1));
-    }
-    JsonElement segments = path(asset, "classification.moderation.raw.timeline.segments");
-    JsonArray all = segments != null && segments.isJsonArray() ? segments.getAsJsonArray() : new JsonArray();
-    JsonArray items = new JsonArray();
-    for (int i = offset; i < all.size() && i < (long) offset + pageSize; i++) items.add(all.get(i).deepCopy());
-    boolean hasMore = (long) offset + pageSize < all.size();
+    if (held(asset)) throw new Failure(ErrorCodes.ASSET_SAFETY_HELD);
+    if (q.has("cursor")) throw new Failure(ErrorCodes.INVALID_CURSOR, "The cursor is invalid or belongs to a different query.");
     JsonObject page = new JsonObject();
-    page.add("items", items);
-    page.add("nextCursor", hasMore ? new JsonPrimitive("timeline:" + (offset + pageSize)) : JsonNull.INSTANCE);
+    page.add("items", new JsonArray());
+    page.add("nextCursor", JsonNull.INSTANCE);
     page.addProperty("pageSize", pageSize);
-    page.addProperty("hasMore", hasMore);
+    page.addProperty("hasMore", false);
     page.add("ordering", new JsonArray());
     return page;
   }
@@ -1657,12 +1730,12 @@ final class MockApi {
         String assetId = str(body, "assetId");
         if ((hash == null) == (assetId == null)) throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "Send either hash or assetId");
         if (assetId != null) {
-          JsonElement image = path(asset(assetId), "content.image");
-          String perceptualHash = image != null && image.isJsonObject() ? str(image.getAsJsonObject(), "perceptualHash") : null;
+          JsonObject content = asset(assetId).getAsJsonObject("content");
+          String perceptualHash = str(content, "perceptualHash");
           if (perceptualHash == null) throw new Failure(ErrorCodes.HASH_LIST_ASSET_NOT_HASHED, "This asset has no perceptual hash.");
           hash = perceptualHash;
-          JsonElement imageQuality = image.getAsJsonObject().get("perceptualHashQuality");
-          quality = imageQuality == null ? JsonNull.INSTANCE : imageQuality;
+          JsonElement hashQuality = content.get("perceptualHashQuality");
+          quality = hashQuality == null ? JsonNull.INSTANCE : hashQuality;
         }
         if (!PDQ_HASH.matcher(hash).matches()) throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "Use a PDQ hash of 64 hexadecimal characters");
         for (JsonObject existing : storage.hashListEntries.values())
@@ -1967,20 +2040,32 @@ final class MockApi {
     return Set.of("image/svg+xml", "application/xhtml+xml", "text/html", "application/xml", "text/xml").contains(normalized) || normalized.endsWith("+xml");
   }
 
+  /**
+   * Serves an asset's resources like the CDN: {@code original} is the upload; {@code rendered} the
+   * image, PDF, video or audio file {@code content.rendered} describes; {@code preview} the still
+   * {@code content.preview} describes; and {@code placeholder} its ThumbHash as a PNG. The mock
+   * converts nothing: an upload stands in for its rendered file, an image for its own preview, and
+   * the placeholder PNG for a screenshot, page or waveform.
+   */
   private Transport.Response cdn(MockCalmLensServerClient.Request request, List<String> parts) {
     String identifier = parts.get(2), resource = parts.get(3);
-    // Like the CDN, the selector after the resource is read first, as sent (still percent-encoded),
-    // and lenses and transforms apply only to the rendered resource.
     List<String> raw = new ArrayList<>();
     for (String part : request.url().split("\\?", 2)[0].substring(cdnBase.length()).split("/")) if (!part.isEmpty()) raw.add(part);
+    List<String> selectorPath = raw.subList(4, raw.size());
     Failure invalidTransform = new Failure("asset/invalid-transform", 400, "Invalid transform selector");
+    Failure noRenderedVersion = new Failure(ErrorCodes.NO_RENDERED_VERSION, 404, "This asset has no such resource");
+    // Like the CDN, /rendered/stream and /rendered/player are reserved, then the selector after the
+    // resource is read as sent (still percent-encoded); the original takes none.
+    if (resource.equals("rendered") && !selectorPath.isEmpty() && RESERVED_RENDERED_PATHS.contains(selectorPath.get(0)))
+      return error(noRenderedVersion);
     CalmLensServerClient.TransformSelector selector;
     try {
-      selector = CalmLensServerClient.parseTransformSelector(String.join("/", raw.subList(4, raw.size())));
+      selector = CalmLensServerClient.parseTransformSelector(String.join("/", selectorPath));
     } catch (IllegalArgumentException invalid) {
       return error(invalidTransform);
     }
-    if (resource.equals("original") && (selector.lens() != null || selector.options() != null)) return error(invalidTransform);
+    boolean hasSelector = selector.lens() != null || selector.options() != null;
+    if (resource.equals("original") && hasSelector) return error(invalidTransform);
     JsonObject asset = parts.get(1).equals(projectId) ? projectAssets().stream()
         .filter(a -> identifier.equals(str(a, "id")) || identifier.equals(str(a, "externalId"))).findFirst().orElse(null) : null;
     if (asset == null) return error(new Failure(ErrorCodes.ASSET_NOT_FOUND, 404, "Asset not found"));
@@ -1988,21 +2073,26 @@ final class MockApi {
     String status = str(asset.getAsJsonObject("classification").getAsJsonObject("moderation"), "status");
     boolean isPublic = "public".equals(str(asset, "visibility"));
     String apiKey = request.header("X-Api-Key");
+    JsonObject content = asset.getAsJsonObject("content");
+    JsonObject rendered = content.get("rendered") instanceof JsonObject value ? value : null;
+    JsonObject preview = content.get("preview") instanceof JsonObject value ? value : null;
+    // Like the CDN, a safety hold refuses every resource.
+    if (held(asset)) return error(notAvailable);
     if (resource.equals("placeholder")) {
-      // Like the CDN's placeholder handler: an image's ThumbHash, public whatever the asset's
+      // Like the CDN's placeholder handler: the preview's ThumbHash, public whatever the asset's
       // visibility or moderation status; refused for purged assets and assets without one (not yet
-      // classified, or content removed).
-      String thumbhash = str(asset.getAsJsonObject("content").get("image") instanceof JsonObject image ? image : null, "thumbhash");
+      // processed, without a preview, or content removed).
+      String thumbhash = str(preview, "thumbhash");
       if (thumbhash == null || "purged".equals(status)) return error(notAvailable);
       return served(request, Thumbhash.toPng(Base64.getDecoder().decode(thumbhash)), "image/png", "Cache-Control",
           "public, max-age=3600", "Cache-Tag", "asset-" + str(asset, "id"), "ETag", "\"" + thumbhash + "\"");
     }
     // Like the CDN, delivery checks come first and refuse everyone: content still uploading,
-    // blocked or purged, failed processing or removed content.
+    // blocked or purged, failed processing or removed content, and an original without its bytes.
     MockCalmLensServerClient.StoredContent stored = storage.content.get(str(asset, "id"));
     if ("uploading".equals(str(asset.getAsJsonObject("upload"), "status")) || "purged".equals(status) || "blocked".equals(status)
         || "failed".equals(str(asset.getAsJsonObject("classification"), "status"))
-        || "removed".equals(str(asset.getAsJsonObject("content"), "status")) || stored == null)
+        || "removed".equals(str(content, "status")) || resource.equals("original") && stored == null)
       return error(notAvailable);
     // Then access: age-restricted assets need viewerClaims.ageConfirmed whatever the key, and
     // private assets need an API key with assets:download for the asset's folder.
@@ -2012,6 +2102,12 @@ final class MockApi {
     boolean isPrivate = !isPublic;
     if (isPrivate && !canDownload(str(asset, "folderId"), apiKey))
       return error(new Failure("asset/api-key-missing-permission", 403, "This API key needs assets:download permission for this asset’s folder."));
+    // Then whether the asset has the resource, and whether it is a still image that takes a lens
+    // or transform: the preview always is, the rendered file only when it is an image.
+    if (resource.equals("rendered") && rendered == null || resource.equals("preview") && preview == null) return error(noRenderedVersion);
+    boolean renderedImage = rendered != null && "image".equals(str(rendered, "kind"));
+    boolean stillImage = resource.equals("preview") || resource.equals("rendered") && renderedImage;
+    if (!stillImage && hasSelector) return error(invalidTransform);
     // Then the options, checked against the transform schema once the asset may be served.
     if (selector.options() != null) {
       CalmLensServerClient.TransformProblems problems = CalmLensServerClient.checkTransformOptions(selector.options());
@@ -2021,20 +2117,35 @@ final class MockApi {
         return error(new Failure("asset/invalid-transform-options", 400, "Invalid transform options: " + String.join(", ", keys)));
       }
     }
-    String type = stored.type() == null || stored.type().isEmpty() ? "application/octet-stream" : stored.type();
+    // The bytes: the upload, which stands in for its own rendered file and an image's preview, or
+    // the placeholder PNG for a still the mock doesn't make.
     boolean image = "image".equals(str(asset, "type"));
+    boolean servesUpload = resource.equals("original") || resource.equals("rendered") && !renderedImage || image;
+    byte[] bytes;
+    String type;
+    if (servesUpload) {
+      if (stored == null) return error(notAvailable);
+      bytes = stored.bytes();
+      type = resource.equals("rendered") && rendered != null ? str(rendered, "format")
+          : stored.type() == null || stored.type().isEmpty() ? "application/octet-stream" : stored.type();
+    } else {
+      String thumbhash = str(preview, "thumbhash");
+      bytes = Thumbhash.toPng(Base64.getDecoder().decode(thumbhash == null ? MOCK_THUMBHASH : thumbhash));
+      type = "image/png";
+    }
+    boolean immutable = stillImage || resource.equals("original") && image;
     List<String> headers = new ArrayList<>(List.of(
-        // Like the CDN: an image's bytes are immutable for a year, other content is kept for an
-        // hour, publicly only when delivery is public.
-        "Cache-Control", !claims.isEmpty() ? "private, no-store" : (isPrivate ? "private" : "public") + ", " + (image ? "max-age=31536000, immutable" : "max-age=3600"),
+        // Like the CDN: a still image's bytes are immutable for a year, other content is kept for
+        // an hour, publicly only when delivery is public.
+        "Cache-Control", !claims.isEmpty() ? "private, no-store" : (isPrivate ? "private" : "public") + ", " + (immutable ? "max-age=31536000, immutable" : "max-age=3600"),
         "Cache-Tag", "asset-" + str(asset, "id")));
-    if (image) {
+    if (immutable) {
       headers.addAll(List.of("ETag", "\"" + str(asset, "id") + "\"",
           "Expires", DateTimeFormatter.RFC_1123_DATE_TIME.format(Instant.ofEpochMilli(now() + 31536000L * 1000).atOffset(ZoneOffset.UTC))));
     }
     headers.addAll(List.of("X-Content-Type-Options", "nosniff", "Content-Security-Policy", "sandbox; default-src 'none'"));
     if (isActiveContentType(type)) headers.addAll(List.of("Content-Disposition", "attachment"));
-    return served(request, stored.bytes(), type, headers.toArray(String[]::new));
+    return served(request, bytes, type, headers.toArray(String[]::new));
   }
 
   /** A 200 CDN response with its length and request ID; {@code HEAD} gets no body. */

@@ -361,6 +361,24 @@
     {
       "options": {
         "assetIdentifier": "asset-1",
+        "resource": "preview"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/preview"
+    },
+    {
+      "options": {
+        "assetIdentifier": "a/b c",
+        "resource": "preview",
+        "lens": "thumbnail",
+        "transform": {
+          "width": 320
+        }
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/a%2Fb%20c/preview/@thumbnail,width=320"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
         "resource": "placeholder"
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/placeholder"
