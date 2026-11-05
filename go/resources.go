@@ -287,8 +287,8 @@ func (s *AssetsService) CreateSignedURL(ctx context.Context, options SignedURLOp
 	if options.Resource != "" && !slices.Contains(SignedCDNResources, options.Resource) {
 		return nil, invalid(CodeSDKInvalidArgument, "a signed URL's resource must be one of "+strings.Join(SignedCDNResources, ", "))
 	}
-	if options.Resource == ResourceOriginal && (options.Lens != "" || transform != "") {
-		return nil, invalid(CodeSDKInvalidArgument, "the original resource takes no lens or transform")
+	if unselectableCDNResource(options.Resource) && (options.Lens != "" || transform != "") {
+		return nil, invalid(CodeSDKInvalidArgument, "the "+options.Resource+" resource takes no lens or transform")
 	}
 	if options.ExpiresInSeconds < 0 || options.ExpiresInSeconds > MaxSignedURLSeconds {
 		return nil, invalid(CodeSDKInvalidArgument, "ExpiresInSeconds must be from 1 to 86400 (0 for the default)")
@@ -381,6 +381,28 @@ func (s *EventsService) List(ctx context.Context, options ListEventsOptions) (*E
 	return &result, nil
 }
 
+// cdnResourcePaths are where each resource is served beneath an asset's CDN path. The adaptive
+// stream is its HLS master playlist; its media playlists and segments are the other files
+// beneath hls/.
+var cdnResourcePaths = map[string]string{
+	ResourceOriginal:    "original",
+	ResourceRendered:    "rendered",
+	ResourcePreview:     "preview",
+	ResourceHLS:         "hls/index.m3u8",
+	ResourceEmbed:       "embed",
+	ResourcePlaceholder: "placeholder",
+}
+
+// unselectableCDNResource reports the resources that take no lens or transform: the exact
+// upload, the adaptive stream, the embed page and the public placeholder.
+func unselectableCDNResource(resource string) bool {
+	switch resource {
+	case ResourceOriginal, ResourceHLS, ResourceEmbed, ResourcePlaceholder:
+		return true
+	}
+	return false
+}
+
 // GetAssetURL builds a CDN URL without sending a request.
 func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if options.AssetIdentifier == "" {
@@ -394,17 +416,18 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	if options.Resource == "" {
 		options.Resource = ResourceRendered
 	}
-	if options.Resource != ResourcePlaceholder && !slices.Contains(SignedCDNResources, options.Resource) {
+	cdnPath, ok := cdnResourcePaths[options.Resource]
+	if !ok {
 		return "", invalid(CodeSDKInvalidArgument, "resource must be one of "+strings.Join(SignedCDNResources, ", ")+", "+ResourcePlaceholder)
 	}
-	if (options.Resource == ResourceOriginal || options.Resource == ResourcePlaceholder) && transformed {
+	if unselectableCDNResource(options.Resource) && transformed {
 		return "", invalid(CodeSDKInvalidArgument, "the "+options.Resource+" resource takes no lens or transform")
 	}
 	asset, err := segment(options.AssetIdentifier)
 	if err != nil {
 		return "", err
 	}
-	endpoint := s.c.options.CDNBaseURL + "/assets/" + component(s.c.options.ProjectID) + "/" + asset + "/" + options.Resource
+	endpoint := s.c.options.CDNBaseURL + "/assets/" + component(s.c.options.ProjectID) + "/" + asset + "/" + cdnPath
 	var selector []string
 	if options.Lens != "" {
 		lens, err := segment(options.Lens)

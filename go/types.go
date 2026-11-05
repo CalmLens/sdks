@@ -375,6 +375,10 @@ type AssetContent struct {
 	// Rendered is the displayable file CalmLens serves at ResourceRendered; nil when the asset
 	// has none (yet), once the content is removed and while a safety hold is on.
 	Rendered *AssetRendered `json:"rendered"`
+	// HLS (preview) is the adaptive stream of video or audio CalmLens serves at ResourceHLS and
+	// the embed page plays, once streaming has prepared it from the rendered file; nil for other
+	// assets, until a stream is prepared, once the content is removed and while a safety hold is on.
+	HLS *AssetHls `json:"hls"`
 	// Preview is the still image CalmLens serves at ResourcePreview; nil when the asset has none
 	// (yet), once the content is removed and while a safety hold is on.
 	Preview *AssetPreview `json:"preview"`
@@ -405,6 +409,39 @@ type AssetRendered struct {
 	Height *int `json:"height"`
 	// Peaks are an audio waveform's normalised peak levels, for rendered audio.
 	Peaks []float64 `json:"peaks,omitempty"`
+}
+
+// AssetHls is the adaptive (HLS) stream of audio or video, with fragmented MP4 (CMAF) segments,
+// served at ResourceHLS.
+type AssetHls struct {
+	// Renditions lists every rendition, video from the largest down, then audio.
+	Renditions []AssetHlsRendition `json:"renditions"`
+}
+
+// AssetHlsRenditionKind is what an AssetHlsRendition carries. It is a string type so kinds added
+// later still decode.
+type AssetHlsRenditionKind string
+
+// AssetHlsRendition kinds.
+const (
+	// AssetHlsRenditionKindVideo is a picture size; video renditions carry no sound and play with
+	// the audio rendition.
+	AssetHlsRenditionKindVideo AssetHlsRenditionKind = "video"
+	AssetHlsRenditionKindAudio AssetHlsRenditionKind = "audio"
+)
+
+// AssetHlsRendition is one rendition of the adaptive stream, as the HLS master playlist lists it.
+type AssetHlsRendition struct {
+	// Kind is one of the AssetHlsRenditionKind constants.
+	Kind AssetHlsRenditionKind `json:"kind"`
+	// Width and Height are the picture size in pixels; nil for audio.
+	Width  *int `json:"width"`
+	Height *int `json:"height"`
+	// Bandwidth is the peak bit rate in bits per second, counting the audio a video rendition
+	// plays with.
+	Bandwidth int `json:"bandwidth"`
+	// Codecs are the rendition's codecs as RFC 6381 names, such as "avc1.64001f".
+	Codecs string `json:"codecs"`
 }
 
 // AssetPreview is the still image that stands for an asset: the image itself, a document's
@@ -527,6 +564,16 @@ type ProcessingFeatures struct {
 	// It runs unless set with Enabled false; results are in AssetClassification.LinkDetection.
 	// With OCR on, links in the extracted text are listed too.
 	LinkDetection *LinkDetectionFeatureOptions `json:"linkDetection,omitempty"`
+	// Streaming (preview) prepares an adaptive (HLS) stream of audio or video once it is decided
+	// and made browser-safe, served at ResourceHLS and played by ResourceEmbed. It needs
+	// KeepContentAfterProcessing and is billed per started minute of media. Left nil, the
+	// project's streaming setting decides; Enabled false turns it off for this upload.
+	Streaming *StreamingFeatureOptions `json:"streaming,omitempty"`
+}
+
+// StreamingFeatureOptions configures streaming (preview).
+type StreamingFeatureOptions struct {
+	Enabled bool `json:"enabled"`
 }
 
 // OCRFeatureOptions configures OCR.
@@ -1127,17 +1174,25 @@ const (
 	// ResourcePreview is a still image that stands for the asset, such as a document's first page
 	// or an audio waveform. It takes a Lens, Transform or TransformOptions.
 	ResourcePreview = "preview"
+	// ResourceHLS (preview) is the adaptive stream of audio or video, its HLS master playlist at
+	// hls/index.m3u8, once Content.HLS is set; one signature covers every playlist and segment
+	// beneath hls/. It takes no Lens, Transform or TransformOptions.
+	ResourceHLS = "hls"
+	// ResourceEmbed (preview) is an HTML page that shows the asset, for an iframe: a player for
+	// audio and video, or the viewer for its type. It takes no Lens, Transform or
+	// TransformOptions.
+	ResourceEmbed = "embed"
 	// ResourcePlaceholder is a small blurred PNG, public for every asset whatever its visibility
 	// or moderation status. It takes no Lens, Transform or TransformOptions, and needs no age confirmation.
 	ResourcePlaceholder = "placeholder"
 )
 
 // SignedCDNResources are the CDN resources a signed URL can be created for.
-var SignedCDNResources = []string{ResourceOriginal, ResourceRendered, ResourcePreview}
+var SignedCDNResources = []string{ResourceOriginal, ResourceRendered, ResourcePreview, ResourceHLS, ResourceEmbed}
 
 // SignedURLOptions requests a signed CDN URL. Resource is one of SignedCDNResources:
-// ResourceRendered (the server's default when empty), ResourcePreview or ResourceOriginal, which
-// takes no lens or transform. ExpiresInSeconds
+// ResourceRendered (the server's default when empty), ResourcePreview, or ResourceOriginal,
+// ResourceHLS or ResourceEmbed, which take no lens or transform. ExpiresInSeconds
 // defaults to 900. Transform (options such as "format=png,width=1024") or TransformOptions
 // (ImageTransformOptions, serialized to the same selector) applies in one pass; with a Lens, its
 // options replace the lens's. Supply only one transform representation.
@@ -1433,9 +1488,9 @@ type EventsPage struct {
 }
 
 // CDNAssetURLOptions identifies CDN content. AssetIdentifier is an asset ID or external
-// ID; Resource is "rendered" (default), "original" or "placeholder". Only "rendered" takes a
-// lens or transform, applied in one pass; transform options replace the lens's same-named
-// options. Supply Transform (options such as "format=png,width=1024") or TransformOptions
+// ID; Resource is ResourceRendered (default), ResourceOriginal, ResourcePreview, ResourceHLS,
+// ResourceEmbed or ResourcePlaceholder. Only ResourcePreview and ResourceRendered take a lens or
+// transform, applied in one pass; transform options replace the lens's same-named options. Supply Transform (options such as "format=png,width=1024") or TransformOptions
 // (ImageTransformOptions, or any value that encodes as a JSON object with the same option
 // names; one with no options is rejected), not both.
 type CDNAssetURLOptions struct {

@@ -10,7 +10,7 @@ import (
 
 func TestAssetTypedFieldsDecode(t *testing.T) {
 	var a Asset
-	err := json.Unmarshal([]byte(`{"id":"a","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"policy","updatedAt":1760000000600,"format":"image/png","extension":"png","sizeInBytes":2048,"checksums":{"sha256":"abc","md5":null},"width":640,"height":480,"perceptualHash":"ph","perceptualHashQuality":88,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"preview":{"width":1200,"height":300,"thumbhash":"th","averageColor":"#fff"},"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":1760000000500,"partsReceived":3},"classification":{"status":"completed","updatedAt":1760000000500,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"Fine","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":1760000000700,"applied":true}],"status":"age-restricted","categories":{},"explanationComplete":true,"source":"hash-list","flaggedCategories":[],"automatedStatus":"allowed","regions":[{"region":"DE","status":"blocked","rule":"de-jugendschutz","category":"violence"}],"raw":{"categories":{"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},"sexual-fictional":{"status":"not-evaluated","reason":"not-supported"}}},"hate":{"status":"not-evaluated","reason":"unavailable"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]}},"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"completedAt":1760000000700}}`), &a)
+	err := json.Unmarshal([]byte(`{"id":"a","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"policy","updatedAt":1760000000600,"format":"image/png","extension":"png","sizeInBytes":2048,"checksums":{"sha256":"abc","md5":null},"width":640,"height":480,"perceptualHash":"ph","perceptualHashQuality":88,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"hls":{"renditions":[{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]},"preview":{"width":1200,"height":300,"thumbhash":"th","averageColor":"#fff"},"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":1760000000500,"partsReceived":3},"classification":{"status":"completed","updatedAt":1760000000500,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"Fine","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":1760000000700,"applied":true}],"status":"age-restricted","categories":{},"explanationComplete":true,"source":"hash-list","flaggedCategories":[],"automatedStatus":"allowed","regions":[{"region":"DE","status":"blocked","rule":"de-jugendschutz","category":"violence"}],"raw":{"categories":{"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},"sexual-fictional":{"status":"not-evaluated","reason":"not-supported"}}},"hate":{"status":"not-evaluated","reason":"unavailable"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]}},"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"completedAt":1760000000700}}`), &a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,6 +41,9 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	}
 	if r := content.Rendered; r.Kind != AssetRenderedKindAudio || r.Format != "audio/mp4" || r.Width != nil || len(r.Peaks) != 2 || r.Peaks[1] != 1 {
 		t.Fatalf("rendered: %+v", r)
+	}
+	if h := content.HLS; len(h.Renditions) != 1 || h.Renditions[0] != (AssetHlsRendition{Kind: AssetHlsRenditionKindAudio, Bandwidth: 128000, Codecs: "mp4a.40.2"}) {
+		t.Fatalf("hls: %+v", h)
 	}
 	if p := content.Preview; *p.Width != 1200 || *p.Height != 300 || *p.Thumbhash != "th" || *p.AverageColor != "#fff" {
 		t.Fatalf("preview: %+v", p)
@@ -93,14 +96,14 @@ func TestExtractedTextInlineDecode(t *testing.T) {
 func TestProcessingOptionsEncodeOnlySetFields(t *testing.T) {
 	c, h := setup(t)
 	options := &ProcessingOptions{
-		Features: &ProcessingFeatures{OCR: &OCRFeatureOptions{Enabled: true}, PersonDetection: &PersonDetectionFeatureOptions{Enabled: false}},
+		Features: &ProcessingFeatures{OCR: &OCRFeatureOptions{Enabled: true}, PersonDetection: &PersonDetectionFeatureOptions{Enabled: false}, Streaming: &StreamingFeatureOptions{Enabled: false}},
 	}
 	_, err := c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "n", UploadPresetID: Ptr("preset-1"), ProcessingOptions: options, Content: &Content{Type: "text/plain", PlainText: Ptr("x")}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	q := h.last().URL.Query()
-	want := `{"features":{"ocr":{"enabled":true},"personDetection":{"enabled":false}}}`
+	want := `{"features":{"ocr":{"enabled":true},"personDetection":{"enabled":false},"streaming":{"enabled":false}}}`
 	if q.Get("processingOptions") != want || q.Get("uploadPresetId") != "preset-1" {
 		t.Fatalf("got %s and %q", q.Get("processingOptions"), q.Get("uploadPresetId"))
 	}

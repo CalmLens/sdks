@@ -419,6 +419,70 @@ func TestMockServesStandInBytesForRenderedFilesAndPreviews(t *testing.T) {
 	}
 }
 
+func TestMockServesTheEmbedPageOfAnyAssetButNoHLSStream(t *testing.T) {
+	c, _ := NewServerClient(Options{})
+	ctx := context.Background()
+	// The shared scenarios cover video and images; the embed page also shows other types.
+	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "b.txt", Visibility: calmlens.VisibilityPublic,
+		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)},
+		Content:           &calmlens.Content{Type: "text/plain", Bytes: []byte("hello")}})
+	if err != nil || a.Content.Rendered != nil {
+		t.Fatal(a, err)
+	}
+	res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: calmlens.ResourceEmbed}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "text/html; charset=utf-8" || !strings.HasPrefix(string(body), "<!doctype html>") {
+		t.Fatalf("embed: %d %s %q", res.StatusCode, res.Header.Get("Content-Type"), body)
+	}
+	audio, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "b.wav", Visibility: calmlens.VisibilityPublic,
+		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true),
+			Features: &calmlens.ProcessingFeatures{Streaming: &calmlens.StreamingFeatureOptions{Enabled: true}}},
+		Content: &calmlens.Content{Type: "audio/wav", Bytes: []byte("hello")}})
+	if err != nil || audio.Content.Rendered == nil || audio.Content.Rendered.Kind != calmlens.AssetRenderedKindAudio || audio.Content.HLS != nil {
+		t.Fatal(audio, err)
+	}
+	m := c
+	for _, tc := range []struct {
+		path   string
+		status int
+		code   string
+	}{
+		// A selector after the embed page is refused before the asset is looked up.
+		{"/missing/embed/width=10", http.StatusBadRequest, calmlens.CodeInvalidTransform},
+		// The mock prepares no stream, so neither its master playlist nor anything beneath it is served.
+		{"/" + audio.ID + "/hls/index.m3u8", http.StatusNotFound, calmlens.CodeNoRenderedVersion},
+		{"/" + audio.ID + "/hls/video-0/index.m3u8", http.StatusNotFound, calmlens.CodeNoRenderedVersion},
+	} {
+		req, _ := http.NewRequest("GET", m.options.CDNBaseURL+"/assets/"+m.options.ProjectID+tc.path, nil)
+		res, err := transport{m}.RoundTrip(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var refused struct{ Code string }
+		_ = json.NewDecoder(res.Body).Decode(&refused)
+		res.Body.Close()
+		if res.StatusCode != tc.status || refused.Code != tc.code {
+			t.Fatalf("%s: %d %s", tc.path, res.StatusCode, refused.Code)
+		}
+	}
+	// Like other resources, the embed page of blocked content is refused.
+	if _, err = c.Assets.Decide(ctx, calmlens.DecideAssetOptions{AssetID: a.ID, Decision: calmlens.ModerationStatusBlocked, Note: "Blocked"}); err != nil {
+		t.Fatal(err)
+	}
+	res, err = c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: calmlens.ResourceEmbed}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("blocked embed: %d", res.StatusCode)
+	}
+}
+
 func TestMockSafetyHoldWithholdsEveryResourceAndTheTimeline(t *testing.T) {
 	c, _ := NewServerClient(Options{})
 	ctx := context.Background()
@@ -431,7 +495,7 @@ func TestMockSafetyHoldWithholdsEveryResourceAndTheTimeline(t *testing.T) {
 	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
 		db.Assets[a.ID]["content"].(calmlens.JSON)["safetyHold"] = calmlens.JSON{"placedAt": 1, "reason": calmlens.SafetyHoldReasonSuspectedIllegalContent}
 	})
-	for _, resource := range []string{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview, calmlens.ResourcePlaceholder} {
+	for _, resource := range []string{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview, calmlens.ResourceHLS, calmlens.ResourceEmbed, calmlens.ResourcePlaceholder} {
 		res, err := c.CDN.Serve(ctx, calmlens.CDNServeOptions{CDNAssetURLOptions: calmlens.CDNAssetURLOptions{AssetIdentifier: a.ID, Resource: resource}})
 		if err != nil {
 			t.Fatal(err)

@@ -1476,7 +1476,7 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 		"width": nil, "height": nil, "durationSeconds": nil, "pageCount": nil,
 		"perceptualHash": nil, "perceptualHashQuality": nil, "metadata": nil, "extractedText": nil,
 		// Like the API, the rendered file and preview come with processing.
-		"rendered": nil, "preview": nil,
+		"rendered": nil, "hls": nil, "preview": nil,
 	}
 	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
 	// The mock never reads test inputs.
@@ -1738,7 +1738,7 @@ func normalizedMimeType(mime string) string {
 // clearRendering removes an asset's rendered file and preview, which go with its content and
 // are withheld while a safety hold is on.
 func clearRendering(content calmlens.JSON) {
-	content["rendered"], content["preview"] = nil, nil
+	content["rendered"], content["hls"], content["preview"] = nil, nil, nil
 }
 
 // setRendering sets the rendered file and preview the API reports for an asset whose content
@@ -1748,7 +1748,8 @@ func clearRendering(content calmlens.JSON) {
 // presentation as a PDF, with its first page as the preview; video and audio as a browser-safe
 // file (MP4 or M4A unless browsers play the upload), audio with a waveform preview and video
 // with no poster; and every preview has its ThumbHash. Text, spreadsheets and other files have
-// neither. The mock decodes nothing, so sizes are unknown and audio has no peaks.
+// neither. The mock decodes nothing, so sizes are unknown, audio has no peaks, and audio and
+// video never get an adaptive stream.
 func setRendering(a calmlens.JSON, processed bool) {
 	content := section(a, "content")
 	clearRendering(content)
@@ -2577,9 +2578,8 @@ func contains(values []string, value string) bool {
 	return false
 }
 
-// reservedRenderedPaths are the paths beneath /rendered/ the CDN reserves for streaming and an
-// embeddable player.
-var reservedRenderedPaths = []string{"stream", "player"}
+// mockEmbedHTML is the page the mock serves at /embed, standing in for the CDN's embed page.
+const mockEmbedHTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Embed</title></head><body></body></html>`
 
 // serve answers a CDN request like the CDN (/assets/:projectId/:asset/:resource): original is
 // the upload; rendered the image, PDF, video or audio file content.rendered describes; preview
@@ -2605,15 +2605,16 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	if len(escaped) > 4 {
 		selectorPath = escaped[4:]
 	}
-	// Like the CDN (serveAssetResource.ts), /rendered/stream and /rendered/player are reserved,
-	// then the selector after the resource (as sent, still percent-encoded) is read; the original
-	// takes none.
-	if resource == calmlens.ResourceRendered && len(selectorPath) > 0 && contains(reservedRenderedPaths, selectorPath[0]) {
-		return noRenderedVersion()
+	// Like the CDN (serveAssetResource.ts), the selector after the resource (as sent, still
+	// percent-encoded) is read; the original and the embed page take none. Beneath /hls/ are the
+	// stream's playlists and segments, not a selector.
+	selectorText := strings.Join(selectorPath, "/")
+	if resource == calmlens.ResourceHLS {
+		selectorText = ""
 	}
-	lens, transform, ok := contract.ParseTransformSelector(strings.Join(selectorPath, "/"))
+	lens, transform, ok := contract.ParseTransformSelector(selectorText)
 	hasSelector := lens != "" || transform != nil
-	if !ok || resource == calmlens.ResourceOriginal && hasSelector {
+	if !ok || (resource == calmlens.ResourceOriginal || resource == calmlens.ResourceEmbed) && hasSelector {
 		return invalidTransform()
 	}
 	if len(parts) < 4 || parts[0] != "assets" || parts[1] != m.options.ProjectID {
@@ -2679,8 +2680,23 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	if restricted && !canDownload() {
 		return errorBody(http.StatusForbidden, calmlens.CodePermissionDenied, "This API key needs assets:download permission for this asset's folder.")
 	}
-	// Then whether the asset has the resource, and whether it is a still image that takes a lens
-	// or transform: the preview always is, the rendered file only when it is an image.
+	// The embed page shows any asset that may be delivered, as its viewer for the asset's type or
+	// a notice that the type has none.
+	if resource == calmlens.ResourceEmbed {
+		header.Set("Cache-Control", "public, max-age=3600")
+		if restricted {
+			header.Set("Cache-Control", "private, max-age=3600")
+		}
+		if len(claims) > 0 {
+			header.Set("Cache-Control", "private, no-store")
+		}
+		header.Set("Cache-Tag", tag)
+		header.Set("X-Content-Type-Options", "nosniff")
+		return http.StatusOK, []byte(mockEmbedHTML), "text/html; charset=utf-8"
+	}
+	// Then whether the asset has the resource (the mock prepares no HLS stream), and whether it is
+	// a still image that takes a lens or transform: the preview always is, the rendered file only
+	// when it is an image.
 	if resource == calmlens.ResourceRendered && content["rendered"] == nil || resource == calmlens.ResourcePreview && content["preview"] == nil ||
 		!contains([]string{calmlens.ResourceOriginal, calmlens.ResourceRendered, calmlens.ResourcePreview}, resource) {
 		return noRenderedVersion()

@@ -65,6 +65,8 @@ var surfaceConstants = map[string]string{
 	"ResourceRendered":               calmlens.ResourceRendered,
 	"ResourcePlaceholder":            calmlens.ResourcePlaceholder,
 	"ResourcePreview":                calmlens.ResourcePreview,
+	"ResourceHLS":                    calmlens.ResourceHLS,
+	"ResourceEmbed":                  calmlens.ResourceEmbed,
 }
 
 var surfaceTypes = map[string]reflect.Type{
@@ -77,6 +79,7 @@ type surfaceCapability struct {
 	ID            string
 	Kind          string
 	Value         string
+	Path          string
 	Names         struct{ Go string }
 	NotApplicable map[string]string
 }
@@ -222,7 +225,7 @@ func TestSurface(t *testing.T) {
 			value, ok := surfaceConstants[name]
 			if ok && value == capability.Value {
 				url, err := client.CDN.GetAssetURL(calmlens.CDNAssetURLOptions{AssetIdentifier: "asset-1", Resource: value})
-				present = err == nil && strings.HasSuffix(url, "/asset-1/"+value)
+				present = err == nil && strings.HasSuffix(url, "/asset-1/"+capability.Path)
 			}
 		case "error-field":
 			field := reflect.ValueOf(raised).Elem().FieldByName(name)
