@@ -610,6 +610,13 @@ impl MockServerClient {
     pub fn client(&self) -> ServerClient {
         self.client.clone()
     }
+    /// Fetches a CDN URL as a browser would, with a GET and without the API key: a signed asset
+    /// URL from `cdn().sign_asset_url` (with a resource appended), or a public one from
+    /// `cdn().get_asset_url`. The request is recorded like any other, and the response is returned
+    /// whatever its status.
+    pub async fn fetch_cdn(&self, url: &str) -> Result<crate::CdnResponse> {
+        self.client.cdn().fetch_unauthenticated(url).await
+    }
     /// A [`blocking::ServerClient`](crate::blocking::ServerClient) answered by this mock's queue.
     #[cfg(feature = "blocking")]
     pub fn blocking(&self) -> Result<crate::blocking::ServerClient> {

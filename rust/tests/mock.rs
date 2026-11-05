@@ -45,7 +45,7 @@ async fn api_errors_have_a_message_and_queued_api_errors_their_status() {
     let response = mock
         .cdn()
         .serve(CdnRequest {
-            asset_identifier: "asset-1".into(),
+            asset_id: Some("asset-1".into()),
             ..Default::default()
         })
         .await
@@ -247,7 +247,7 @@ async fn mock_simulates_transport_failures() {
     let reset = mock
         .cdn()
         .serve(CdnRequest {
-            asset_identifier: "a".into(),
+            asset_id: Some("a".into()),
             ..Default::default()
         })
         .await
@@ -682,4 +682,66 @@ async fn oversized_one_request_uploads_are_refused_before_the_transport() {
         );
     }
     assert!(mock.requests().is_empty());
+}
+
+/// `get_asset_info` reads `{url}/info` without the API key, keeping only the viewer claims of the
+/// URL's query unless the options give their own, and refuses a body that isn't asset info.
+#[tokio::test]
+async fn asset_info_is_read_without_the_api_key_and_with_the_urls_viewer_claims() {
+    let mock = MockServerClient::new().unwrap();
+    let info = json!({
+        "id": "asset-1", "projectId": "project-1", "type": "image", "externalUrl": null,
+        "content": {}, "availability": "age-restricted",
+    });
+    let signed = "https://cdn.calmlens.com/v1/assets/project-1/sig_ab/?viewerClaims=%7B%22region%22%3A%22DE%22%7D&other=1#top";
+    mock.enqueue(200, &info);
+    let read = mock
+        .cdn()
+        .get_asset_info(signed, GetAssetInfoOptions::default())
+        .await
+        .unwrap();
+    assert_eq!(read.availability, AssetAvailability::AgeRestricted);
+    let request = mock.last_request().unwrap();
+    assert_eq!(request.header("x-api-key"), None);
+    assert_eq!(
+        request.url,
+        "https://cdn.calmlens.com/v1/assets/project-1/sig_ab/info?viewerClaims=%7B%22region%22%3A%22DE%22%7D"
+    );
+
+    mock.enqueue(200, &info);
+    let claims = ViewerClaims {
+        age_confirmed: Some(true),
+        ..Default::default()
+    };
+    let options = GetAssetInfoOptions {
+        viewer_claims: Some(claims),
+    };
+    mock.cdn().get_asset_info(signed, options).await.unwrap();
+    assert_eq!(
+        mock.last_request().unwrap().query,
+        vec![(
+            "viewerClaims".to_owned(),
+            "{\"ageConfirmed\":true}".to_owned()
+        )]
+    );
+
+    mock.enqueue(
+        200,
+        json!({"id": "asset-1", "projectId": "project-1", "type": "image"}),
+    );
+    let error = mock
+        .cdn()
+        .get_asset_info(signed, GetAssetInfoOptions::default())
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::InvalidResponse);
+    assert_eq!(mock.requests().len(), 3);
+
+    let error = mock
+        .cdn()
+        .get_asset_info("/assets/project-1/asset-1", GetAssetInfoOptions::default())
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::InvalidArgument);
+    assert_eq!(mock.requests().len(), 3);
 }

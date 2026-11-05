@@ -117,9 +117,13 @@ fn serve_once(listener: TcpListener, response: String) -> thread::JoinHandle<Val
     })
 }
 
-/// The result a request fixture's operation returns: the response, `null` for deletes and the
-/// lenses for `ensureLenses`.
+/// The result a request fixture's operation returns: its `result` when the method returns
+/// something other than the response, `null` for deletes, the lenses for `ensureLenses`, else the
+/// response.
 fn expected_result(fixture: &Value) -> Value {
+    if let Some(result) = fixture.get("result") {
+        return result.clone();
+    }
     match fixture["operation"].as_str().unwrap() {
         "ensureLenses" => fixture["response"]["lenses"].clone(),
         "hashLists.removeEntry" => Value::Null,
@@ -958,9 +962,8 @@ async fn refuses_transform_options_the_cdn_refuses() {
             }
             let options = decoded.unwrap_or_else(|cause| panic!("{label}: {cause}"));
             let request = CdnRequest {
-                asset_identifier: "asset-1".into(),
                 transform: Some(options.into()),
-                ..Default::default()
+                ..CdnRequest::asset("asset-1").resource(CdnResource::Rendered)
             };
             let error = client.cdn().get_asset_url(&request).unwrap_err();
             assert_eq!(error.code(), &ErrorCode::InvalidArgument, "{label}");
@@ -1047,10 +1050,9 @@ async fn validation_and_urls() {
         &ErrorCode::InvalidUploadPayload
     );
     let both = CdnRequest {
-        asset_identifier: "x".into(),
         lens: Some("one".into()),
         transform: Some("format=avif".into()),
-        ..Default::default()
+        ..CdnRequest::asset("x").resource(CdnResource::Rendered)
     };
     assert_eq!(
         client.cdn().get_asset_url(&both).unwrap(),
@@ -1273,32 +1275,8 @@ async fn run_step(
             mock.fail_next_request(failure, options)?;
             Ok(Value::Null)
         }
-        "cdn.serve" => {
-            use base64::Engine;
-            let response = mock.cdn().serve(input(args)?).await?;
-            let status = response.status().as_u16();
-            // HTTP header names are lowercase; expectations name them case-insensitively.
-            let headers: Map<String, Value> = response
-                .headers()
-                .iter()
-                .map(|(name, value)| (name.as_str().to_owned(), json!(value.to_str().unwrap())))
-                .collect();
-            let json = response
-                .headers()
-                .get("content-type")
-                .is_some_and(|value| value == "application/json");
-            let body = response.bytes().await?;
-            let code = if json {
-                serde_json::from_slice::<Value>(&body).unwrap()["code"].clone()
-            } else {
-                Value::Null
-            };
-            Ok(json!({
-                "status": status, "code": code, "body": String::from_utf8_lossy(&body),
-                "bodyBase64": base64::engine::general_purpose::STANDARD.encode(&body),
-                "headers": headers,
-            }))
-        }
+        "cdn.serve" => cdn_result(mock.cdn().serve(input(args)?).await?).await,
+        "mock.fetchCdn" => cdn_result(mock.fetch_cdn(args["url"].as_str().unwrap()).await?).await,
         "assets.waitForDecision" => {
             let mut request = WaitForDecision::new(args["assetId"].as_str().unwrap());
             if let Some(timeout) = args["timeoutMs"].as_u64() {
@@ -1312,6 +1290,33 @@ async fn run_step(
         "events.pages" => collect(mock.events().pages(input(args)?)).await,
         _ => invoke(mock, operation, args).await,
     }
+}
+
+/// A CDN response as scenarios expect it: its status, error code, body and headers.
+async fn cdn_result(response: calmlens::CdnResponse) -> calmlens::Result<Value> {
+    use base64::Engine;
+    let status = response.status().as_u16();
+    // HTTP header names are lowercase; expectations name them case-insensitively.
+    let headers: Map<String, Value> = response
+        .headers()
+        .iter()
+        .map(|(name, value)| (name.as_str().to_owned(), json!(value.to_str().unwrap())))
+        .collect();
+    let json = response
+        .headers()
+        .get("content-type")
+        .is_some_and(|value| value == "application/json");
+    let body = response.bytes().await?;
+    let code = if json {
+        serde_json::from_slice::<Value>(&body).unwrap()["code"].clone()
+    } else {
+        Value::Null
+    };
+    Ok(json!({
+        "status": status, "code": code, "body": String::from_utf8_lossy(&body),
+        "bodyBase64": base64::engine::general_purpose::STANDARD.encode(&body),
+        "headers": headers,
+    }))
 }
 
 /// Whether `actual` holds every key of `wanted` with deep-equal values (other keys are free).
@@ -1575,7 +1580,6 @@ fn references() -> BTreeSet<&'static str> {
         "assets().retry" => ServerClient::assets, AssetsClient::retry;
         "assets().decide" => ServerClient::assets, AssetsClient::decide;
         "assets().explain" => ServerClient::assets, AssetsClient::explain;
-        "assets().create_signed_url" => ServerClient::assets, AssetsClient::create_signed_url;
         "assets().classify" => ServerClient::assets, AssetsClient::classify;
         "assets().update" => ServerClient::assets, AssetsClient::update;
         "assets().wait_for_decision" => ServerClient::assets, AssetsClient::wait_for_decision;
@@ -1588,6 +1592,8 @@ fn references() -> BTreeSet<&'static str> {
         "text().classify" => ServerClient::text, TextClient::classify;
         "upload_tokens().sign" => ServerClient::upload_tokens, UploadTokensClient::sign;
         "cdn().get_asset_url" => ServerClient::cdn, CdnClient::get_asset_url;
+        "cdn().sign_asset_url" => ServerClient::cdn, CdnClient::sign_asset_url;
+        "cdn().get_asset_info" => ServerClient::cdn, CdnClient::get_asset_info;
         "cdn().serve" => ServerClient::cdn, CdnClient::serve;
         "verify_webhook_signature" => |body: &[u8]| calmlens::verify_webhook_signature(body, "", "", "", 0, 0);
         "construct_webhook_event" => |body: &[u8], headers: &http::HeaderMap| calmlens::construct_webhook_event(body, headers, "");
@@ -1598,6 +1604,7 @@ fn references() -> BTreeSet<&'static str> {
         "models::WebhookEventPayload::is_test" => WebhookEventPayload::is_test;
         "testing::sign_upload_token" => testing::sign_upload_token;
         "CdnRequest::viewer_claims" => |request: &CdnRequest| request.viewer_claims.clone();
+        "CdnRequest::external_id" => |request: &CdnRequest| request.external_id.clone();
         "testing::MockServerClient::in_memory" => MockServerClient::in_memory;
         "MockOptions::moderate" => MockOptions::moderate::<fn(&MockModerationInput) -> MockOutcome, MockOutcome>;
         "testing::MockDecision::new" => MockDecision::new;
@@ -1679,6 +1686,7 @@ fn values() -> BTreeMap<&'static str, String> {
             "CdnResource::Placeholder",
             CdnResource::Placeholder.as_str().to_owned(),
         ),
+        ("CdnResource::Info", CdnResource::Info.as_str().to_owned()),
     ])
 }
 
@@ -1743,9 +1751,8 @@ async fn offers_every_capability() {
                 "constant" => values.get(name).map(String::as_str) == value,
                 "cdn-resource" => {
                     let request = CdnRequest {
-                        asset_identifier: "asset-1".into(),
                         resource: value.map(CdnResource::from),
-                        ..Default::default()
+                        ..CdnRequest::asset("asset-1")
                     };
                     values.get(name).map(String::as_str) == value
                         && client.cdn().get_asset_url(&request).is_ok_and(|url| {
@@ -1837,14 +1844,10 @@ async fn retryable_follows_code_and_status() {
 // rejections.json: every request the API would reject is refused before anything is sent.
 
 /// Fixture options a Rust type cannot hold, so the type already refuses the request.
-const REJECTED_BY_TYPE: [(&str, &str); 3] = [
-    (
-        "signed URL lifetime below 1 second",
-        "SignedUrlOptions::expires_in_seconds is a u64",
-    ),
+const REJECTED_BY_TYPE: [(&str, &str); 2] = [
     (
         "signed URL lifetime of a fraction of a second",
-        "SignedUrlOptions::expires_in_seconds is a u64",
+        "SignAssetUrlOptions::expires_in is a u64",
     ),
     (
         "batch with an unknown operation",
@@ -1861,9 +1864,9 @@ async fn reject(
         serde_json::from_value(options)
     }
     Ok(match operation {
-        "assets.createSignedUrl" => client
-            .assets()
-            .create_signed_url(decode(options)?)
+        "cdn.signAssetUrl" => client
+            .cdn()
+            .sign_asset_url(decode(options)?)
             .await
             .map(drop),
         "text.classify" => client.text().classify(decode(options)?).await.map(drop),

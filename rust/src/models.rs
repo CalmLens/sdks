@@ -579,14 +579,15 @@ string_enum! {
 }
 
 string_enum! {
-    /// Which CDN resource of an asset to serve. Lenses and transforms apply to `Preview`, and to
-    /// `Rendered` when it is an image; the CDN refuses them on rendered PDFs, video and audio with
-    /// `transform/invalid`, and the original, hls, embed and placeholder take none.
+    /// A CDN resource beneath an asset URL. Only `Rendered` and `Preview` take a lens or
+    /// transform, and the CDN refuses them on rendered PDFs, video and audio with
+    /// `transform/invalid`.
     CdnResource {
-        /// The asset's original file, exactly as uploaded. It takes no lens or transform.
+        /// The asset's original file, exactly as uploaded. Beneath a signed asset URL only when it
+        /// was signed with `original`.
         Original = "original",
-        /// The asset's displayable file (the default): an image in the best format the client
-        /// accepts, a PDF, or browser-safe video or audio, as `content.rendered` describes.
+        /// The asset's displayable file: an image in the best format the client accepts, a PDF,
+        /// or browser-safe video or audio, as `content.rendered` describes.
         Rendered = "rendered",
         /// A still image that stands for the asset, as `content.preview` describes: the image
         /// itself, a document's first page or slide, a website's first screen, a video's poster
@@ -594,38 +595,19 @@ string_enum! {
         Preview = "preview",
         /// Preview. The adaptive stream of audio or video, its HLS master playlist (served at
         /// `hls/index.m3u8`, with its playlists and segments beneath `hls/`), once `content.hls`
-        /// is set. It takes no lens or transform.
+        /// is set.
         Hls = "hls",
         /// Preview. An HTML page that shows the asset, for an iframe: a player for audio and
-        /// video, or the viewer for its type. It takes no lens or transform.
+        /// video, or the viewer for its type.
         Embed = "embed",
         /// A small blurred PNG made from the preview, public whatever the asset's visibility or
-        /// moderation. Only for CDN URLs, without a lens or transform; it needs no age
-        /// confirmation.
+        /// moderation; it needs no age confirmation.
         Placeholder = "placeholder",
+        /// The asset's display info as JSON ([`AssetInfo`]), read with
+        /// [`CdnClient::get_asset_info`](crate::CdnClient::get_asset_info).
+        Info = "info",
     }
 }
-
-string_enum! {
-    /// Which CDN resource of an asset a signed URL serves. Placeholders need no signature.
-    SignedUrlResource {
-        /// The asset's original file, exactly as uploaded. It takes no lens or transform.
-        Original = "original",
-        /// The asset's displayable file (the default).
-        Rendered = "rendered",
-        /// A still image that stands for the asset.
-        Preview = "preview",
-        /// Preview. The adaptive stream of audio or video; one signature covers every playlist
-        /// and segment beneath its master playlist. It takes no lens or transform.
-        Hls = "hls",
-        /// Preview. An HTML page that shows the asset, for an iframe. It takes no lens or
-        /// transform.
-        Embed = "embed",
-    }
-}
-
-/// The CDN resources a signed URL can be created for, as the API accepts them.
-pub const SIGNED_CDN_RESOURCES: [&str; 5] = ["original", "rendered", "preview", "hls", "embed"];
 
 /// Processing options for an asset.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -1429,29 +1411,55 @@ pub struct UploadPart {
     pub idempotency_key: Option<String>,
 }
 
-/// Options for a signed asset URL.
+/// Options for [`CdnClient::sign_asset_url`](crate::CdnClient::sign_asset_url). Name the asset by
+/// exactly one of `asset_id` and `external_id`.
+///
+/// `resource`, `lens`, `transform` and `viewer_claims` aren't part of the grant: they are appended
+/// to the signed URL exactly as [`CdnClient::get_asset_url`](crate::CdnClient::get_asset_url)
+/// appends them, and can be changed later without signing again.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SignedUrlOptions {
+pub struct SignAssetUrlOptions {
+    /// The project; defaults to the client's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// Optional customer assertions for this CDN request.
-    pub viewer_claims: Option<ViewerClaims>,
+    pub project_id: Option<String>,
     /// The asset ID.
-    #[serde(skip_serializing)]
-    pub asset_id: String,
-    /// `rendered` (the API's default), `original` or `preview`. The original takes no lens or
-    /// transform.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub resource: Option<SignedUrlResource>,
-    /// A lens identifier.
+    pub asset_id: Option<String>,
+    /// The external ID the asset was uploaded with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
+    /// The lifetime in whole seconds, from 1 to
+    /// [`MAX_SIGNED_URL_EXPIRES_IN`](crate::MAX_SIGNED_URL_EXPIRES_IN); defaults to
+    /// [`DEFAULT_SIGNED_URL_EXPIRES_IN`](crate::DEFAULT_SIGNED_URL_EXPIRES_IN).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_in: Option<u64>,
+    /// Grants the original resource, the exact upload, which the URL refuses otherwise with
+    /// `signed-url/original-not-granted`. Defaults to false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original: Option<bool>,
+    /// A resource to return the URL of, beneath the signed asset URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource: Option<CdnResource>,
+    /// A lens identifier, for the rendered or preview resource.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lens: Option<String>,
-    /// A transform: a selector string or structured options, sent as a selector string.
+    /// A transform, for the rendered or preview resource: a selector such as `width=320` or
+    /// structured options.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<CdnTransform>,
-    /// Lifetime in seconds; defaults to 900.
+    /// The viewer's region and age confirmation, appended to the URL unsigned.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expires_in_seconds: Option<u64>,
+    pub viewer_claims: Option<ViewerClaims>,
+}
+
+/// Options for [`CdnClient::get_asset_info`](crate::CdnClient::get_asset_info).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetAssetInfoOptions {
+    /// The viewer claims to read the info for; `None` keeps those the URL carries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewer_claims: Option<ViewerClaims>,
 }
 
 /// Options for creating a folder.
@@ -1540,17 +1548,27 @@ pub struct EnsureLenses {
     pub lenses: Vec<LensDefinition>,
 }
 
-/// A CDN request for an asset's rendered, original, preview or placeholder resource.
+/// An asset URL, or a resource beneath it, for
+/// [`CdnClient::get_asset_url`](crate::CdnClient::get_asset_url) and
+/// [`CdnClient::serve`](crate::CdnClient::serve). Name the asset by exactly one of `asset_id` and
+/// `external_id`.
+///
+/// Without a `resource`, `get_asset_url` returns the asset URL itself, which takes no lens or
+/// transform; `serve` fetches the rendered resource. Only the rendered and preview resources take
+/// a `lens` or `transform`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CdnRequest {
+    /// The project; defaults to the client's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    /// Optional customer assertions for this CDN request.
-    pub viewer_claims: Option<ViewerClaims>,
-    /// The asset ID or external ID.
-    pub asset_identifier: String,
-    /// `rendered` (default), `original`, `preview` or `placeholder`. Lenses and transforms apply
-    /// to `preview`, and to `rendered` when it is an image.
+    pub project_id: Option<String>,
+    /// The asset ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset_id: Option<String>,
+    /// The external ID the asset was uploaded with, sent as `ext:` and the URL-encoded ID.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
+    /// The resource beneath the asset URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource: Option<CdnResource>,
     /// A lens identifier.
@@ -1559,9 +1577,36 @@ pub struct CdnRequest {
     /// A transform: a selector such as `width=320` or structured options.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<CdnTransform>,
-    /// The HTTP method and headers, e.g. `HEAD` or a `Range` header.
+    /// The viewer's region and age confirmation, appended as the `viewerClaims` query, leaving out
+    /// the defaults (no region, age not confirmed). They are your app's unsigned assertions:
+    /// CalmLens doesn't verify them, and anyone holding the URL can add them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewer_claims: Option<ViewerClaims>,
+    /// The HTTP method and headers [`CdnClient::serve`](crate::CdnClient::serve) sends, e.g.
+    /// `HEAD` or a `Range` header.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub init: Option<HttpOptions>,
+}
+impl CdnRequest {
+    /// A request for the asset with this ID.
+    pub fn asset(asset_id: impl Into<String>) -> Self {
+        Self {
+            asset_id: Some(asset_id.into()),
+            ..Self::default()
+        }
+    }
+    /// A request for the asset uploaded with this external ID.
+    pub fn external(external_id: impl Into<String>) -> Self {
+        Self {
+            external_id: Some(external_id.into()),
+            ..Self::default()
+        }
+    }
+    /// This request for `resource`.
+    pub fn resource(mut self, resource: CdnResource) -> Self {
+        self.resource = Some(resource);
+        self
+    }
 }
 
 /// HTTP method and headers for a CDN request. The SDK always sends its own API key.
@@ -3146,18 +3191,93 @@ pub struct Lens {
     pub extra: HashMap<String, Value>,
 }
 
-/// A signed URL.
+/// A signed asset URL, or a resource URL beneath it, from
+/// [`CdnClient::sign_asset_url`](crate::CdnClient::sign_asset_url).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct SignedUrl {
+pub struct SignedAssetUrl {
     /// The URL.
     pub url: String,
     /// When it expires, in milliseconds since the Unix epoch.
-    #[serde(default)]
-    pub expires_at: Option<u64>,
+    pub expires_at: u64,
     /// Fields this SDK version does not know.
-    #[serde(flatten, deserialize_with = "extra_fields::<SignedUrl, _>")]
+    #[serde(flatten, deserialize_with = "extra_fields::<SignedAssetUrl, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+string_enum! {
+    /// Whether the viewer an asset URL's claims describe can see the content now.
+    AssetAvailability {
+        /// The viewer can see the content.
+        Available = "available",
+        /// The content needs the viewer's age confirmed ([`ViewerClaims::age_confirmed`]).
+        AgeRestricted = "age-restricted",
+        /// The viewer can't see the content: it is held, blocked in the viewer's region, not yet
+        /// moderated or removed.
+        Unavailable = "unavailable",
+    }
+}
+
+/// An asset's display info, the CDN's info resource: the public asset fields a viewer needs, with
+/// the same names as on [`Asset`], and whether this viewer can see it now. It never holds
+/// moderation results, metadata, names, tags or extracted text.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetInfo {
+    /// The asset ID.
+    pub id: String,
+    /// The owning project.
+    pub project_id: String,
+    /// The asset type (`type` on the wire).
+    #[serde(rename = "type")]
+    pub asset_type: AssetType,
+    /// A website's page, which a viewer links to.
+    #[serde(default)]
+    pub external_url: Option<String>,
+    /// The content's display details.
+    #[serde(default)]
+    pub content: AssetInfoContent,
+    /// Whether the viewer the request's claims describe can see the content. The CDN's resources
+    /// refuse exactly what it refuses.
+    pub availability: AssetAvailability,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetInfo, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// The part of [`AssetContent`] that [`AssetInfo`] carries.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetInfoContent {
+    /// The MIME type; it tells a spreadsheet from other documents.
+    #[serde(default)]
+    pub format: Option<String>,
+    /// The width in pixels of an image or video.
+    #[serde(default)]
+    pub width: Option<u32>,
+    /// The height in pixels of an image or video.
+    #[serde(default)]
+    pub height: Option<u32>,
+    /// The length in seconds of audio and video.
+    #[serde(default)]
+    pub duration_seconds: Option<f64>,
+    /// The number of pages or slides of a document or presentation.
+    #[serde(default)]
+    pub page_count: Option<u32>,
+    /// The displayable file, served at [`CdnResource::Rendered`].
+    #[serde(default)]
+    pub rendered: Option<AssetRendered>,
+    /// The still image, served at [`CdnResource::Preview`].
+    #[serde(default)]
+    pub preview: Option<AssetPreview>,
+    /// Preview. The adaptive stream, served at [`CdnResource::Hls`].
+    #[serde(default)]
+    pub hls: Option<AssetHls>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetInfoContent, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -4380,9 +4500,9 @@ pub struct ViewerClaims {
     pub region: Option<String>,
     /// Your platform's confirmation that the viewer passed its age check. Defaults to false,
     /// including authenticated requests. Your platform confirms the viewer's age; CalmLens does
-    /// not verify this claim. Anyone requesting a public asset's URL can set it, so it doesn't
-    /// restrict access: to control who loads an age-restricted asset, make it private and include
-    /// the claim in a signed URL, whose signature covers it.
+    /// not verify this claim. Anyone holding an asset URL, public or signed, can add it, so it
+    /// doesn't restrict access: to control who loads an age-restricted asset, make it private and
+    /// sign its URL only for viewers whose age your platform confirmed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub age_confirmed: Option<bool>,
 }

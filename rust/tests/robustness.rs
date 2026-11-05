@@ -170,7 +170,7 @@ fn truncated_cdn_stream_is_transport_error() {
     let response = client(&url, Duration::from_secs(5))
         .cdn()
         .serve(CdnRequest {
-            asset_identifier: "asset".into(),
+            asset_id: Some("asset".into()),
             ..Default::default()
         })
         .unwrap();
@@ -189,7 +189,7 @@ fn stalled_cdn_stream_is_timeout() {
     let response = client(&url, Duration::from_millis(300))
         .cdn()
         .serve(CdnRequest {
-            asset_identifier: "asset".into(),
+            asset_id: Some("asset".into()),
             ..Default::default()
         })
         .unwrap();

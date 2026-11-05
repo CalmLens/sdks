@@ -155,7 +155,7 @@ fn blocking_iterators_and_reads() {
     let mut response = client
         .cdn()
         .serve(CdnRequest {
-            asset_identifier: "a".into(),
+            asset_id: Some("a".into()),
             ..Default::default()
         })
         .unwrap();
@@ -185,7 +185,7 @@ fn streaming_cdn_preserves_range_method_and_headers() {
     let mut response = client
         .cdn()
         .serve(CdnRequest {
-            asset_identifier: "asset".into(),
+            asset_id: Some("asset".into()),
             init: Some(HttpOptions {
                 method: Some("GET".into()),
                 headers: [

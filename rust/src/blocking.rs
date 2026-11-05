@@ -271,8 +271,6 @@ blocking_methods!(AssetsClient => assets {
     fn batch(options: BatchAssets) -> Result<BatchAssetsResponse>;
     /// See [`crate::AssetsClient::move_asset`].
     fn move_asset(options: MoveAsset) -> Result<Asset>;
-    /// See [`crate::AssetsClient::create_signed_url`].
-    fn create_signed_url(options: SignedUrlOptions) -> Result<SignedUrl>;
 });
 impl AssetsClient<'_> {
     /// Every asset from `options.cursor` on, fetching pages as the iterator is read.
@@ -380,13 +378,22 @@ impl UploadTokensClient<'_> {
     }
 }
 
-/// CDN URLs and downloads. See [`crate::CdnClient`].
+/// CDN URLs, signed asset URLs, display info and downloads. See [`crate::CdnClient`].
 #[derive(Debug, Clone, Copy)]
 pub struct CdnClient<'a>(&'a ServerClient);
 impl CdnClient<'_> {
     /// See [`crate::CdnClient::get_asset_url`].
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
         self.0.client.cdn().get_asset_url(options)
+    }
+    /// See [`crate::CdnClient::sign_asset_url`].
+    pub fn sign_asset_url(&self, options: SignAssetUrlOptions) -> Result<SignedAssetUrl> {
+        self.0.wait(self.0.client.cdn().sign_asset_url(options))
+    }
+    /// See [`crate::CdnClient::get_asset_info`].
+    pub fn get_asset_info(&self, url: &str, options: GetAssetInfoOptions) -> Result<AssetInfo> {
+        self.0
+            .wait(self.0.client.cdn().get_asset_info(url, options))
     }
     /// Fetches an asset through the CDN; the response implements [`std::io::Read`].
     pub fn serve(&self, options: CdnRequest) -> Result<CdnResponse> {

@@ -583,8 +583,8 @@ fn defaults_match_javascript() {
             json!(calmlens::DEFAULT_MAX_RESPONSE_BYTES),
         ),
         (
-            "signedUrlExpiresInSeconds",
-            json!(calmlens::DEFAULT_SIGNED_URL_SECONDS),
+            "signedUrlExpiresIn",
+            json!(calmlens::DEFAULT_SIGNED_URL_EXPIRES_IN),
         ),
         (
             "uploadTokenExpiresInSeconds",

@@ -12,8 +12,10 @@ error_codes! {
     RegionalEvidenceRequired = "asset/regional-evidence-required", 403;
     /// `signed-url/expired` (HTTP 403): The signed URL has expired. Create a new one on your server.
     SignedUrlExpired = "signed-url/expired", 403;
-    /// `signed-url/invalid` (HTTP 403): The signed URL's signature doesn't match its asset, resource, lens, transform, expiry or viewer claims. Use the URL exactly as created.
+    /// `signed-url/invalid` (HTTP 403): The signed asset URL's grant wasn't signed for this project, or was changed after signing. Use the URL as created, adding only resources, selectors and viewer claims.
     SignedUrlInvalid = "signed-url/invalid", 403;
+    /// `signed-url/original-not-granted` (HTTP 403): This signed asset URL doesn't grant the original file. Sign it with original access.
+    SignedUrlOriginalNotGranted = "signed-url/original-not-granted", 403;
     /// `validation/invalid-request` (HTTP 400): The request's parameters, query or body are invalid. details.issues lists each problem, with its path and issue code.
     InvalidRequest = "validation/invalid-request", 400;
     /// `validation/invalid-type` (HTTP 400): Issue code in details.issues: a field has the wrong type.

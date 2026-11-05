@@ -48,8 +48,15 @@ pub async fn invoke(
         "assets.listChildren" => output(client.assets().list_children(input(options)?).await),
         "assets.listTimeline" => output(client.assets().list_timeline(input(options)?).await),
         "assets.uploadPart" => output(client.assets().upload_part(input(options)?).await),
-        "assets.createSignedUrl" => {
-            output(client.assets().create_signed_url(input(options)?).await)
+        "cdn.signAssetUrl" => output(client.cdn().sign_asset_url(input(options)?).await),
+        "cdn.getAssetUrl" => output(client.cdn().get_asset_url(&input(options)?)),
+        "cdn.getAssetInfo" => {
+            let url = options["url"].as_str().unwrap_or_default().to_owned();
+            let mut info = options;
+            if let Some(info) = info.as_object_mut() {
+                info.remove("url");
+            }
+            output(client.cdn().get_asset_info(&url, input(info)?).await)
         }
         "folders.list" => output(client.folders().list(input(options)?).await),
         "folders.create" => output(client.folders().create(input(options)?).await),

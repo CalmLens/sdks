@@ -85,7 +85,7 @@ let publishable = matches!(
 - Moderate replies with their conversation: [Conversations](https://calmlens.com/docs/sdk/rust/reference#conversations)
 - Sign upload tokens for browser uploads through a preset: [Upload tokens](https://calmlens.com/docs/sdk/rust/reference#upload-tokens), [Upload presets](https://calmlens.com/docs/guides/upload-presets)
 - Manage assets, folders and batches, and record reviewer decisions: [Methods](https://calmlens.com/docs/sdk/rust#methods), [Reviewer decisions](https://calmlens.com/docs/sdk/rust/reference#reviewer-decisions), [Batch operations](https://calmlens.com/docs/sdk/rust/reference#batch-operations)
-- Build CDN URLs with lenses and transforms, and stream content: [CDN URLs](https://calmlens.com/docs/sdk/rust/reference#cdn-urls), [Delivering assets](https://calmlens.com/docs/guides/delivering-assets)
+- Build asset URLs with lenses and transforms, sign private assets' URLs, read their display info and stream content: [CDN URLs](https://calmlens.com/docs/sdk/rust/reference#cdn-urls), [Delivering assets](https://calmlens.com/docs/guides/delivering-assets)
 - Block known images with hash lists: [Hash lists](https://calmlens.com/docs/sdk/rust/reference#hash-lists)
 - Page through assets and poll the events feed: [Pagination](https://calmlens.com/docs/sdk/rust#pagination), [Events](https://calmlens.com/docs/api/events)
 - Verify webhooks with axum or actix-web: [Webhooks](https://calmlens.com/docs/sdk/rust#webhooks), [Webhook helpers](https://calmlens.com/docs/sdk/rust/reference#webhook-helpers)

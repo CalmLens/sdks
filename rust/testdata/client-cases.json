@@ -442,7 +442,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "asset-1"
+            "assetId": "asset-1"
           },
           "expect": {
             "error": {
@@ -4087,13 +4087,13 @@
       ]
     },
     {
-      "name": "assets.createSignedUrl sends the default lifetime",
+      "name": "cdn.signAssetUrl sends the default lifetime and no original access",
       "area": "options",
       "responses": [
         {
           "status": 200,
           "body": {
-            "url": "https://cdn.calmlens.com/signed",
+            "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
             "expiresAt": 1760000900000
           },
           "headers": {
@@ -4104,13 +4104,13 @@
       ],
       "steps": [
         {
-          "operation": "assets.createSignedUrl",
+          "operation": "cdn.signAssetUrl",
           "args": {
             "assetId": "asset-1"
           },
           "expect": {
             "result": {
-              "url": "https://cdn.calmlens.com/signed",
+              "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
               "expiresAt": 1760000900000
             }
           }
@@ -4120,7 +4120,7 @@
         {
           "method": "POST",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/assets/asset-1/signed-url",
+          "path": "/v1/projects/project-1/signed-asset-urls",
           "rawQuery": "",
           "query": [],
           "headers": {
@@ -4134,19 +4134,21 @@
             "content-type": "application/json"
           },
           "body": {
-            "expiresInSeconds": 900
+            "assetId": "asset-1",
+            "expiresIn": 900,
+            "original": false
           }
         }
       ]
     },
     {
-      "name": "assets.createSignedUrl sends the original resource and a lifetime",
+      "name": "cdn.signAssetUrl sends the external ID, original access and a lifetime, and appends the resource",
       "area": "options",
       "responses": [
         {
           "status": 200,
           "body": {
-            "url": "https://cdn.calmlens.com/signed",
+            "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ",
             "expiresAt": 1760000060000
           },
           "headers": {
@@ -4157,15 +4159,16 @@
       ],
       "steps": [
         {
-          "operation": "assets.createSignedUrl",
+          "operation": "cdn.signAssetUrl",
           "args": {
-            "assetId": "asset-1",
-            "resource": "original",
-            "expiresInSeconds": 60
+            "externalId": "post/1 ✓",
+            "original": true,
+            "expiresIn": 60,
+            "resource": "original"
           },
           "expect": {
             "result": {
-              "url": "https://cdn.calmlens.com/signed",
+              "url": "https://cdn.calmlens.com/v1/assets/project-1/sig_Z3JhbnQ/original",
               "expiresAt": 1760000060000
             }
           }
@@ -4175,7 +4178,7 @@
         {
           "method": "POST",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/assets/asset-1/signed-url",
+          "path": "/v1/projects/project-1/signed-asset-urls",
           "rawQuery": "",
           "query": [],
           "headers": {
@@ -4189,8 +4192,74 @@
             "content-type": "application/json"
           },
           "body": {
-            "resource": "original",
-            "expiresInSeconds": 60
+            "externalId": "post/1 ✓",
+            "expiresIn": 60,
+            "original": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "cdn.signAssetUrl signs for another project and appends the selector and viewer claims",
+      "area": "options",
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "url": "https://cdn.calmlens.com/v1/assets/project-2/sig_Z3JhbnQ",
+            "expiresAt": 1760000900000
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "cdn.signAssetUrl",
+          "args": {
+            "projectId": "project-2",
+            "assetId": "asset-1",
+            "resource": "preview",
+            "lens": "thumbnail",
+            "transform": {
+              "width": 320
+            },
+            "viewerClaims": {
+              "region": "GB",
+              "ageConfirmed": true
+            }
+          },
+          "expect": {
+            "result": {
+              "url": "https://cdn.calmlens.com/v1/assets/project-2/sig_Z3JhbnQ/preview/@thumbnail,width=320?viewerClaims=%7B%22region%22%3A%22GB%22%2C%22ageConfirmed%22%3Atrue%7D",
+              "expiresAt": 1760000900000
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-2/signed-asset-urls",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
+          },
+          "body": {
+            "assetId": "asset-1",
+            "expiresIn": 900,
+            "original": false
           }
         }
       ]
@@ -7068,7 +7137,7 @@
       ]
     },
     {
-      "name": "assets.createSignedUrl is not retried: it carries no Idempotency-Key",
+      "name": "cdn.signAssetUrl is not retried: it carries no Idempotency-Key",
       "area": "retries",
       "client": {
         "maxRetries": 2
@@ -7086,7 +7155,7 @@
       ],
       "steps": [
         {
-          "operation": "assets.createSignedUrl",
+          "operation": "cdn.signAssetUrl",
           "args": {
             "assetId": "asset-1"
           },
@@ -7105,7 +7174,7 @@
         {
           "method": "POST",
           "origin": "https://api.calmlens.com",
-          "path": "/v1/assets/asset-1/signed-url",
+          "path": "/v1/projects/project-1/signed-asset-urls",
           "rawQuery": "",
           "query": [],
           "headers": {
@@ -7119,7 +7188,9 @@
             "content-type": "application/json"
           },
           "body": {
-            "expiresInSeconds": 900
+            "assetId": "asset-1",
+            "expiresIn": 900,
+            "original": false
           }
         }
       ]
@@ -7844,7 +7915,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "asset-1"
+            "assetId": "asset-1"
           },
           "expect": {
             "error": {
@@ -16356,7 +16427,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "asset-1"
+            "assetId": "asset-1"
           },
           "expect": {
             "cdn": {
@@ -16416,7 +16487,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "a/b c",
+            "assetId": "a/b c",
             "lens": "thumb",
             "transform": {
               "width": 320
@@ -16495,7 +16566,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "asset-1",
+            "assetId": "asset-1",
             "resource": "original"
           },
           "expect": {
@@ -16564,7 +16635,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "asset-1"
+            "assetId": "asset-1"
           },
           "expect": {
             "cdn": {
@@ -16658,7 +16729,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "asset-1"
+            "assetId": "asset-1"
           },
           "expect": {
             "cdn": {
@@ -16744,7 +16815,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "asset-1"
+            "assetId": "asset-1"
           },
           "expect": {
             "cdn": {
@@ -16807,7 +16878,7 @@
         {
           "operation": "cdn.serve",
           "args": {
-            "assetIdentifier": "asset-1"
+            "assetId": "asset-1"
           },
           "expect": {
             "cdn": {

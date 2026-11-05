@@ -23,16 +23,16 @@ pub const DEFAULT_BASE_URL: &str = "https://api.calmlens.com/v1";
 pub const DEFAULT_CDN_BASE_URL: &str = "https://cdn.calmlens.com/v1";
 /// The most lens definitions [`ServerClient::ensure_lenses`] sends in one request.
 pub const ENSURE_LENSES_MAX_PER_REQUEST: usize = 100;
-/// The longest signed URL lifetime the API accepts, in seconds: 24 hours.
-pub const MAX_SIGNED_URL_SECONDS: u64 = 24 * 60 * 60;
+/// The longest signed asset URL lifetime the API accepts, in seconds: 24 hours.
+pub const MAX_SIGNED_URL_EXPIRES_IN: u64 = 24 * 60 * 60;
 /// The default timeout of each API call attempt.
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(120);
 /// The default timeout of each binary upload attempt: none.
 pub const DEFAULT_UPLOAD_TIMEOUT: Option<Duration> = None;
 /// How many times a repeatable request is retried by default.
 pub const DEFAULT_MAX_RETRIES: u32 = 2;
-/// A signed URL's lifetime in seconds when the options give none: 15 minutes.
-pub const DEFAULT_SIGNED_URL_SECONDS: u64 = 15 * 60;
+/// A signed asset URL's lifetime in seconds when the options give none: 15 minutes.
+pub const DEFAULT_SIGNED_URL_EXPIRES_IN: u64 = 15 * 60;
 /// An upload token's lifetime in seconds when the options give none: 10 minutes.
 pub const DEFAULT_UPLOAD_TOKEN_SECONDS: u32 = 10 * 60;
 /// Content larger than this many bytes is uploaded in parts of this size by default: 8 MiB.
@@ -1298,52 +1298,6 @@ impl AssetsClient<'_> {
         let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
         self.0.call(request).await
     }
-    /// Creates a signed URL for an asset's rendered (the API's default), original, preview, hls
-    /// or embed resource (15 minutes by default). The original, hls and embed take no lens or
-    /// transform; an hls signature covers every playlist and segment beneath `hls/`.
-    pub async fn create_signed_url(&self, options: SignedUrlOptions) -> Result<SignedUrl> {
-        let path = format!("/assets/{}/signed-url", id(&options.asset_id)?);
-        let resource = options
-            .resource
-            .as_ref()
-            .map_or("rendered", SignedUrlResource::as_str);
-        if !SIGNED_CDN_RESOURCES.contains(&resource) {
-            return Err(invalid_argument(format!(
-                "A signed URL's resource must be one of {}",
-                SIGNED_CDN_RESOURCES.join(", ")
-            )));
-        }
-        if UNSELECTABLE_CDN_RESOURCES.contains(&resource)
-            && (options.lens.is_some() || options.transform.is_some())
-        {
-            return Err(invalid_argument(format!(
-                "The {resource} resource takes no lens or transform"
-            )));
-        }
-        if options
-            .expires_in_seconds
-            .is_some_and(|seconds| !(1..=MAX_SIGNED_URL_SECONDS).contains(&seconds))
-        {
-            return Err(invalid_argument(
-                "expires_in_seconds must be from 1 to 86400",
-            ));
-        }
-        let transform = match options.transform {
-            Some(transform) => Some(CdnTransform::Selector(transform.selector()?)),
-            None => None,
-        };
-        let options = SignedUrlOptions {
-            transform,
-            expires_in_seconds: Some(
-                options
-                    .expires_in_seconds
-                    .unwrap_or(DEFAULT_SIGNED_URL_SECONDS),
-            ),
-            ..options
-        };
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
-        self.0.call(request).await
-    }
 }
 
 /// The cursor of the page after `page`, or `None` when the iteration ends there.
@@ -1758,105 +1712,278 @@ impl TextClient<'_> {
     }
 }
 
-/// The resources that take no lens or transform: the exact upload, the adaptive stream, the embed
-/// page and the public placeholder.
-const UNSELECTABLE_CDN_RESOURCES: [&str; 4] = ["original", "hls", "embed", "placeholder"];
+/// The resources beneath an asset URL, in the order messages list them, with the path each is
+/// served at. The adaptive stream is its HLS master playlist; its media playlists and segments
+/// are the other files beneath `hls/`.
+const CDN_RESOURCE_PATHS: [(&str, &str); 7] = [
+    ("original", "original"),
+    ("rendered", "rendered"),
+    ("preview", "preview"),
+    ("placeholder", "placeholder"),
+    ("hls", "hls/index.m3u8"),
+    ("embed", "embed"),
+    ("info", "info"),
+];
 
-/// Where a resource is served beneath an asset's CDN path. The adaptive stream is its HLS master
-/// playlist; its media playlists and segments are the other files beneath `hls/`.
-fn cdn_resource_path(resource: &str) -> Option<&'static str> {
-    Some(match resource {
-        "original" => "original",
-        "rendered" => "rendered",
-        "preview" => "preview",
-        "hls" => "hls/index.m3u8",
-        "embed" => "embed",
-        "placeholder" => "placeholder",
-        _ => return None,
-    })
+/// The asset segment that names an asset by its external ID starts with this.
+const EXTERNAL_ID_SEGMENT_PREFIX: &str = "ext:";
+
+/// The ISO 3166-1 alpha-2 countries a viewer's region can be. EU is not a viewer country.
+const VIEWER_COUNTRIES: &str = "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW";
+
+/// The asset segment of an asset URL: the path-encoded asset ID, or `ext:` and the URL-encoded
+/// external ID. Exactly one of them must be given.
+fn asset_segment(asset_id: Option<&str>, external_id: Option<&str>) -> Result<String> {
+    match (asset_id, external_id) {
+        (Some(asset_id), None) => id(asset_id),
+        (None, Some("")) => Err(invalid_argument("External ID is required")),
+        (None, Some(external_id)) => Ok(format!(
+            "{EXTERNAL_ID_SEGMENT_PREFIX}{}",
+            percent_encode(external_id, b"-_.!~*'()")
+        )),
+        _ => Err(invalid_argument("Pass either asset_id or external_id")),
+    }
 }
 
-/// CDN URLs and downloads. Get it from [`ServerClient::cdn`].
+/// The `?viewerClaims=` query of a URL with these claims, or an empty string for the defaults:
+/// no region and an unconfirmed age are left out, so default URLs stay cacheable.
+fn viewer_claims_query(claims: Option<&ViewerClaims>) -> Result<String> {
+    let Some(claims) = claims else {
+        return Ok(String::new());
+    };
+    let mut sent = Vec::new();
+    if let Some(region) = &claims.region {
+        if !VIEWER_COUNTRIES.split(' ').any(|country| country == region) {
+            return Err(invalid_argument(
+                "viewer_claims.region must be an ISO 3166-1 alpha-2 country code, such as DE",
+            ));
+        }
+        // A viewer country needs no JSON escaping.
+        sent.push(format!("\"region\":\"{region}\""));
+    }
+    if claims.age_confirmed == Some(true) {
+        sent.push("\"ageConfirmed\":true".to_owned());
+    }
+    if sent.is_empty() {
+        return Ok(String::new());
+    }
+    let json = format!("{{{}}}", sent.join(","));
+    Ok(format!("?viewerClaims={}", percent_encode(&json, b"-._~")))
+}
+
+/// What follows an asset URL: a resource, its selector and the viewer claims.
+struct AssetLocation<'a> {
+    resource: Option<&'a CdnResource>,
+    lens: Option<&'a str>,
+    transform: Option<&'a CdnTransform>,
+    viewer_claims: Option<&'a ViewerClaims>,
+}
+impl AssetLocation<'_> {
+    /// The asset URL (public or signed) with the location appended. Without a resource the URL
+    /// stays the asset URL, which takes no selector.
+    fn append(&self, asset_url: &str) -> Result<String> {
+        let selected = self.lens.is_some() || self.transform.is_some();
+        let mut url = asset_url.to_owned();
+        match self.resource {
+            None if selected => {
+                return Err(invalid_argument(
+                    "A lens or transform needs a resource, such as rendered",
+                ))
+            }
+            None => {}
+            Some(resource) => {
+                let resource = resource.as_str();
+                let Some((_, path)) = CDN_RESOURCE_PATHS
+                    .iter()
+                    .find(|(name, _)| *name == resource)
+                else {
+                    let names: Vec<&str> =
+                        CDN_RESOURCE_PATHS.iter().map(|(name, _)| *name).collect();
+                    return Err(invalid_argument(format!(
+                        "Resource must be one of {}",
+                        names.join(", ")
+                    )));
+                };
+                if !matches!(resource, "rendered" | "preview") && selected {
+                    return Err(invalid_argument(format!(
+                        "The {resource} resource takes no lens or transform"
+                    )));
+                }
+                url.push('/');
+                url.push_str(path);
+                let mut selector = Vec::new();
+                if let Some(lens) = self.lens {
+                    selector.push(format!("@{}", id(lens)?));
+                }
+                if let Some(value) = self.transform.filter(|value| !value.is_empty()) {
+                    selector.push(match value {
+                        CdnTransform::Selector(_) => encode_selector(&value.selector()?),
+                        // Already path-safe: unreserved characters, percent escapes, `=`, `,`
+                        // and `.`.
+                        CdnTransform::Options(_) => value.selector()?,
+                    });
+                }
+                if !selector.is_empty() {
+                    url.push('/');
+                    url.push_str(&selector.join(","));
+                }
+            }
+        }
+        url.push_str(&viewer_claims_query(self.viewer_claims)?);
+        Ok(url)
+    }
+}
+
+/// CDN URLs, signed asset URLs, display info and downloads. Get it from [`ServerClient::cdn`].
+///
+/// Every asset has one URL, `{cdn_base_url}/assets/{projectId}/{asset}`, and each resource
+/// ([`CdnResource`]) is a path beneath it. The asset segment is the asset ID, or `ext:` and the
+/// URL-encoded external ID, for a public asset, or a signed grant for a private one: use
+/// [`sign_asset_url`](Self::sign_asset_url) if the asset is private and
+/// [`get_asset_url`](Self::get_asset_url) otherwise, and add viewer claims to either.
 #[derive(Debug, Clone, Copy)]
 pub struct CdnClient<'a>(&'a ServerClient);
 impl CdnClient<'_> {
-    /// The CDN URL of an asset's rendered (default), original, preview, hls, embed or
-    /// placeholder resource, with serialized viewer assertions from [`CdnRequest::viewer_claims`].
-    /// The hls resource is the HLS master playlist at `hls/index.m3u8` and the embed page the
-    /// HTML page at `embed`. The original, hls, embed and placeholder take no
-    /// lens or transform. Lenses and transforms apply to the preview, and to
-    /// the rendered resource when it is an image; the CDN refuses them on rendered PDFs, video and
-    /// audio with `transform/invalid`.
+    /// The path-encoded project, the client's when `project_id` is `None`.
+    fn project_segment(&self, project_id: Option<&str>) -> Result<String> {
+        id(project_id.unwrap_or(&self.0.inner.config.project_id))
+    }
+    /// Builds an asset's CDN URL without sending a request: the asset URL, which every resource
+    /// is a path beneath, or a resource URL when [`CdnRequest::resource`] is set, with its lens
+    /// or transform and the viewer claims. Use it for public assets; private ones need
+    /// [`sign_asset_url`](Self::sign_asset_url). Only the rendered and preview resources take a
+    /// lens or transform; the CDN refuses them on rendered PDFs, video and audio with
+    /// `transform/invalid`. Viewer claims are your app's unsigned assertions: CalmLens doesn't
+    /// verify an age confirmation, and anyone holding the URL can add it.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
-        let resource = options
-            .resource
-            .as_ref()
-            .map_or("rendered", |value| value.as_str());
-        let Some(path) = cdn_resource_path(resource) else {
-            return Err(invalid_argument(format!(
-                "Resource must be one of {}, placeholder",
-                SIGNED_CDN_RESOURCES.join(", ")
-            )));
+        let project = self.project_segment(options.project_id.as_deref())?;
+        let asset = asset_segment(options.asset_id.as_deref(), options.external_id.as_deref())?;
+        let location = AssetLocation {
+            resource: options.resource.as_ref(),
+            lens: options.lens.as_deref(),
+            transform: options.transform.as_ref(),
+            viewer_claims: options.viewer_claims.as_ref(),
         };
-        if UNSELECTABLE_CDN_RESOURCES.contains(&resource)
-            && (options.lens.is_some() || options.transform.is_some())
+        location.append(&format!(
+            "{}/assets/{project}/{asset}",
+            self.0.inner.config.cdn_base_url
+        ))
+    }
+    /// Signs a private asset's URL on your server (`POST /projects/:projectId/signed-asset-urls`),
+    /// so browsers and apps can load it without an API key until it expires (15 minutes by
+    /// default). Every resource is a path beneath it, as beneath a public asset URL; the original
+    /// only when signed with `original`. With a `resource`, it returns that resource's URL beneath
+    /// the grant. The options are checked before anything is sent. Not retried: it carries no
+    /// `Idempotency-Key`.
+    pub async fn sign_asset_url(&self, options: SignAssetUrlOptions) -> Result<SignedAssetUrl> {
+        if options
+            .expires_in
+            .is_some_and(|seconds| !(1..=MAX_SIGNED_URL_EXPIRES_IN).contains(&seconds))
         {
             return Err(invalid_argument(format!(
-                "The {resource} resource takes no lens or transform"
+                "expires_in must be a whole number of seconds from 1 to {MAX_SIGNED_URL_EXPIRES_IN}"
             )));
         }
-        let config = &self.0.inner.config;
-        let mut url = format!(
-            "{}/assets/{}/{}/{path}",
-            config.cdn_base_url,
-            id(&config.project_id)?,
-            id(&options.asset_identifier)?
+        asset_segment(options.asset_id.as_deref(), options.external_id.as_deref())?;
+        let location = AssetLocation {
+            resource: options.resource.as_ref(),
+            lens: options.lens.as_deref(),
+            transform: options.transform.as_ref(),
+            viewer_claims: options.viewer_claims.as_ref(),
+        };
+        // The location is appended to the signed URL: check it before signing.
+        location.append("")?;
+        let project = self.project_segment(options.project_id.as_deref())?;
+        let mut body = serde_json::Map::new();
+        match (&options.asset_id, &options.external_id) {
+            (Some(asset_id), _) => body.insert("assetId".into(), asset_id.clone().into()),
+            (_, external_id) => body.insert("externalId".into(), external_id.clone().into()),
+        };
+        body.insert(
+            "expiresIn".into(),
+            options
+                .expires_in
+                .unwrap_or(DEFAULT_SIGNED_URL_EXPIRES_IN)
+                .into(),
         );
-        let mut selector = Vec::new();
-        if let Some(lens) = options.lens.as_deref().filter(|v| !v.is_empty()) {
-            selector.push(format!("@{}", id(lens)?));
+        body.insert("original".into(), options.original.unwrap_or(false).into());
+        let path = format!("/projects/{project}/signed-asset-urls");
+        let request = self.0.prepare(Method::POST, &path, &[])?.json(&body)?;
+        let signed: SignedAssetUrl = self.0.call(request).await?;
+        if signed.url.is_empty() {
+            return Err(Error::new(
+                ErrorCode::InvalidResponse,
+                "The API returned no signed asset URL",
+            ));
         }
-        if let Some(value) = options.transform.as_ref().filter(|v| !v.is_empty()) {
-            selector.push(match value {
-                CdnTransform::Selector(_) => encode_selector(&value.selector()?),
-                // Already path-safe: unreserved characters, percent escapes, `=`, `,` and `.`.
-                CdnTransform::Options(_) => value.selector()?,
-            });
-        }
-        if !selector.is_empty() {
-            url.push('/');
-            url.push_str(&selector.join(","));
-        }
-        let mut query = Query::default();
-        if let Some(claims) = options.viewer_claims.as_ref() {
-            query.push(
-                "viewerClaims",
-                &serde_json::to_string(claims)
-                    .map_err(|_| invalid_argument("Invalid viewer claims"))?,
+        Ok(SignedAssetUrl {
+            url: location.append(&signed.url)?,
+            ..signed
+        })
+    }
+    /// Fetches the display info of an asset URL, public or signed (`{url}/info`): its type,
+    /// size, rendered file, preview and stream, and whether the viewer its claims describe can see
+    /// it ([`AssetInfo::availability`]). The claims are `options.viewer_claims`, else those the
+    /// URL carries. It sends no API key, as a browser would. A refusal fails with the CDN's code,
+    /// such as `signed-url/expired` or `asset/not-available`.
+    pub async fn get_asset_info(
+        &self,
+        url: &str,
+        options: GetAssetInfoOptions,
+    ) -> Result<AssetInfo> {
+        let parsed = reqwest::Url::parse(url)
+            .ok()
+            .filter(|parsed| parsed.has_host())
+            .ok_or_else(|| invalid_argument("url must be an absolute asset URL"))?;
+        let without_fragment = url.split('#').next().unwrap_or_default();
+        let base = without_fragment.split('?').next().unwrap_or_default();
+        let claims = match options.viewer_claims {
+            Some(claims) => Some(claims),
+            None => match parsed.query_pairs().find(|(key, _)| key == "viewerClaims") {
+                Some((_, raw)) => {
+                    Some(serde_json::from_str::<ViewerClaims>(&raw).map_err(|cause| {
+                        invalid_argument("The asset URL's viewerClaims are not valid JSON")
+                            .with_source(cause)
+                    })?)
+                }
+                None => None,
+            },
+        };
+        let info_url = format!(
+            "{}/info{}",
+            base.trim_end_matches('/'),
+            viewer_claims_query(claims.as_ref())?
+        );
+        let mut request = self.0.prepare_url(Method::GET, &info_url, &[])?;
+        request.headers.remove("x-api-key");
+        request.headers.insert(
+            http::header::ACCEPT,
+            HeaderValue::from_static("application/json"),
+        );
+        let options = self.0.options();
+        let exchange = execute(&self.0.inner.transport, request, options, true).await?;
+        let (status, headers) = (exchange.status, exchange.headers.clone());
+        let body = exchange.read(options.max_response_bytes).await?;
+        let info: AssetInfo = decode(status, &headers, &body)?;
+        if info.id.is_empty()
+            || info.project_id.is_empty()
+            || matches!(info.availability, AssetAvailability::Unknown(_))
+        {
+            return Err(
+                Error::new(ErrorCode::InvalidResponse, "The CDN returned no asset info")
+                    .with_status(status),
             );
         }
-        if !query.0.is_empty() {
-            url.push('?');
-            url.push_str(
-                &query
-                    .0
-                    .iter()
-                    .map(|(key, value)| {
-                        format!(
-                            "{}={}",
-                            percent_encode(key, b"-._~"),
-                            percent_encode(value, b"-._~")
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join("&"),
-            );
-        }
-        Ok(url)
+        Ok(info)
     }
     /// Fetches an asset through the CDN with the API key, returning the response whatever
-    /// its status. The body streams; it is not subject to the API call timeout.
+    /// its status. The resource defaults to [`CdnResource::Rendered`]. The body streams; it is
+    /// not subject to the API call timeout.
     pub async fn serve(&self, options: CdnRequest) -> Result<CdnResponse> {
+        let options = CdnRequest {
+            resource: Some(options.resource.clone().unwrap_or(CdnResource::Rendered)),
+            ..options
+        };
         let url = self.get_asset_url(&options)?;
         let init = options.init.unwrap_or_default();
         let method = Method::from_bytes(init.method.as_deref().unwrap_or("GET").as_bytes())
@@ -1872,6 +1999,16 @@ impl CdnClient<'_> {
                 .map_err(|_| invalid_argument(format!("Invalid {name} header value")))?;
             request.headers.insert(name, value);
         }
+        self.fetch(request).await
+    }
+    /// Fetches a CDN URL with a GET and without the API key, as a browser would.
+    #[cfg(feature = "testing")]
+    pub(crate) async fn fetch_unauthenticated(&self, url: &str) -> Result<CdnResponse> {
+        let mut request = self.0.prepare_url(Method::GET, url, &[])?;
+        request.headers.remove("x-api-key");
+        self.fetch(request).await
+    }
+    async fn fetch(&self, mut request: Prepared) -> Result<CdnResponse> {
         request.deadline = Deadline::Headers;
         let exchange: Exchange =
             execute(&self.0.inner.transport, request, self.0.options(), false).await?;

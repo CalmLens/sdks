@@ -157,7 +157,7 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
         let response = mock
             .cdn()
             .serve(CdnRequest {
-                asset_identifier: decided.id.clone(),
+                asset_id: Some(decided.id.clone()),
                 resource: Some(resource.clone()),
                 ..Default::default()
             })
@@ -229,7 +229,7 @@ async fn serves_the_embed_page_of_any_asset_and_no_hls_stream_until_it_is_blocke
     let cdn = mock.cdn();
     let serve = |resource: CdnResource| {
         cdn.serve(CdnRequest {
-            asset_identifier: asset.id.clone(),
+            asset_id: Some(asset.id.clone()),
             resource: Some(resource),
             ..Default::default()
         })
@@ -249,7 +249,7 @@ async fn serves_the_embed_page_of_any_asset_and_no_hls_stream_until_it_is_blocke
     for identifier in [&asset.id, &note.id] {
         let embed = cdn
             .serve(CdnRequest {
-                asset_identifier: identifier.clone(),
+                asset_id: Some(identifier.clone()),
                 resource: Some(CdnResource::Embed),
                 ..Default::default()
             })
@@ -561,22 +561,6 @@ async fn update_patches_and_search_matches_keywords() {
         vec![SearchMatchField::Name, SearchMatchField::Tags]
     );
     assert_eq!(results.semantic_status, SemanticStatus::Disabled);
-
-    let signed = mock
-        .assets()
-        .create_signed_url(SignedUrlOptions {
-            asset_id: asset.id.clone(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-    assert_eq!(
-        signed.url,
-        format!(
-            "https://mock.calmlens.invalid/assets/{}/rendered?expiresInSeconds=900",
-            asset.id
-        )
-    );
 }
 
 #[tokio::test]
@@ -711,7 +695,7 @@ async fn mock_options_set_the_base_urls() {
     let response = mock
         .cdn()
         .serve(CdnRequest {
-            asset_identifier: asset.id.clone(),
+            asset_id: Some(asset.id.clone()),
             ..Default::default()
         })
         .await

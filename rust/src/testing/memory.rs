@@ -22,7 +22,10 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+mod cdn;
 mod policies;
+
+use cdn::{serve_info, MockGrant, EXTERNAL_ID_PREFIX};
 
 pub(super) const API_BASE_URL: &str = "https://api.calmlens.invalid/v1";
 pub(super) const CDN_BASE_URL: &str = "https://cdn.calmlens.invalid/v1";
@@ -118,7 +121,7 @@ pub(super) struct QueuedFailure {
 
 /// The operation names [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
 /// takes: the JavaScript SDK's method paths.
-pub(super) const OPERATIONS: [&str; 48] = [
+pub(super) const OPERATIONS: [&str; 49] = [
     "assets.create",
     "assets.classify",
     "text.classify",
@@ -134,7 +137,6 @@ pub(super) const OPERATIONS: [&str; 48] = [
     "assets.iterateChildren",
     "assets.listTimeline",
     "assets.removeContent",
-    "assets.createSignedUrl",
     "assets.retry",
     "assets.explain",
     "assets.move",
@@ -167,6 +169,8 @@ pub(super) const OPERATIONS: [&str; 48] = [
     "ensureLens",
     "ensureLenses",
     "cdn.serve",
+    "cdn.getAssetInfo",
+    "cdn.signAssetUrl",
 ];
 
 /// Options for [`MockServerClient::in_memory`](super::MockServerClient::in_memory).
@@ -188,7 +192,6 @@ pub struct MockOptions {
     moderate: Option<Moderate>,
     create_id: CreateId,
     now: Now,
-    signed_url_base_url: String,
 }
 impl Default for MockOptions {
     fn default() -> Self {
@@ -204,7 +207,6 @@ impl Default for MockOptions {
             moderate: None,
             create_id: Arc::new(crate::transport::new_id),
             now: monotonic_clock(),
-            signed_url_base_url: "https://mock.calmlens.invalid".into(),
         }
     }
 }
@@ -231,7 +233,6 @@ impl fmt::Debug for MockOptions {
             .field("upload_timeout", &self.upload_timeout)
             .field("max_response_bytes", &self.max_response_bytes)
             .field("part_size_bytes", &self.part_size_bytes)
-            .field("signed_url_base_url", &self.signed_url_base_url)
             .finish_non_exhaustive()
     }
 }
@@ -261,7 +262,8 @@ impl MockOptions {
         self
     }
     /// The CDN base URL the mock client uses and the in-memory CDN answers. It must differ
-    /// from the API base URL.
+    /// from the API base URL. `cdn().sign_asset_url` returns asset URLs beneath it, which only
+    /// the in-memory CDN accepts.
     pub fn cdn_base_url(mut self, value: impl Into<String>) -> Self {
         self.cdn_base_url = value.into();
         self
@@ -314,11 +316,6 @@ impl MockOptions {
     /// The clock, in milliseconds since the Unix epoch.
     pub fn now(mut self, value: impl Fn() -> u64 + Send + Sync + 'static) -> Self {
         self.now = Arc::new(value);
-        self
-    }
-    /// The origin of signed URLs.
-    pub fn signed_url_base_url(mut self, value: impl Into<String>) -> Self {
-        self.signed_url_base_url = value.into();
         self
     }
 }
@@ -1331,6 +1328,7 @@ impl Backend {
                         timeline_page(asset, q)
                     }
                     ("POST", "assets/batch") => self.batch(body, now),
+                    ("POST", "signed-asset-urls") => self.sign_asset_url(body, now),
                     (_, "policy") => self.policy_route(method, route, body),
                     (_, path) if path.split('/').next() == Some("policies") => {
                         self.policy_route(method, route, body)
@@ -2228,37 +2226,11 @@ impl Backend {
         now: u64,
     ) -> Outcome<Value> {
         // Like the API, the body's schema is checked before the asset is looked up.
-        match (method, suffix) {
-            ("PATCH", "") => {
-                check_metadata(body.get("metadata"))?;
-                if body.get("name").is_some_and(Value::is_null) {
-                    return Err(validation("invalid-type", "name"));
-                }
+        if (method, suffix) == ("PATCH", "") {
+            check_metadata(body.get("metadata"))?;
+            if body.get("name").is_some_and(Value::is_null) {
+                return Err(validation("invalid-type", "name"));
             }
-            ("POST", "signed-url") => {
-                // None of these fields takes null.
-                for key in [
-                    "viewerClaims",
-                    "resource",
-                    "lens",
-                    "transform",
-                    "expiresInSeconds",
-                ] {
-                    if body.get(key).is_some_and(Value::is_null) {
-                        let issue = if key == "resource" {
-                            "invalid-value"
-                        } else {
-                            "invalid-type"
-                        };
-                        return Err(validation(issue, key));
-                    }
-                }
-                let resource = body.get("resource").map_or("rendered", text);
-                if !crate::models::SIGNED_CDN_RESOURCES.contains(&resource) {
-                    return Err(validation("invalid-value", "resource"));
-                }
-            }
-            _ => {}
         }
         let mut asset = self
             .owned(&self.storage.assets, id)
@@ -2276,31 +2248,6 @@ impl Backend {
             }
             ("GET", "children") => {
                 return self.page(q, id, |child| child["parentId"] == id);
-            }
-            ("POST", "signed-url") => {
-                let expires = body
-                    .get("expiresInSeconds")
-                    .and_then(Value::as_u64)
-                    .unwrap_or(900);
-                let resource = body.get("resource").map_or("rendered", text);
-                let mut url = reqwest::Url::parse(&format!(
-                    "{}/assets/{id}/{resource}",
-                    self.options.signed_url_base_url
-                ))
-                .map_err(|_| invalid("Invalid signed URL base"))?;
-                url.query_pairs_mut()
-                    .append_pair("expiresInSeconds", &expires.to_string());
-                for key in ["lens", "transform"] {
-                    if let Some(value) = body.get(key).and_then(Value::as_str) {
-                        url.query_pairs_mut().append_pair(key, value);
-                    }
-                }
-                // Like the API, the URL carries the viewer claims its signature covers.
-                if let Some(claims) = body.get("viewerClaims").filter(|claims| claims.is_object()) {
-                    url.query_pairs_mut()
-                        .append_pair("viewerClaims", &claims.to_string());
-                }
-                return Ok(json!({"url": url.as_str(), "expiresAt": now + expires * 1000}));
             }
             ("POST", "retry") => {
                 if asset["classification"]["status"] != "failed"
@@ -2617,10 +2564,10 @@ impl Backend {
             return invalid_transform();
         };
         let has_selector = selector.lens.is_some() || selector.options.is_some();
-        if (resource == "original" || resource == "embed") && has_selector {
+        if matches!(resource, "original" | "embed" | "info") && has_selector {
             return invalid_transform();
         }
-        let [scope, project, identifier, _, ..] = parts else {
+        let [scope, project, _, _, ..] = parts else {
             return not_found();
         };
         if scope != "assets"
@@ -2632,23 +2579,71 @@ impl Backend {
                 "hls",
                 "embed",
                 "placeholder",
+                "info",
             ]
             .contains(&resource)
         {
             return not_found();
         }
-        let Some(asset) = self.storage.assets.values().find(|asset| {
-            asset["projectId"] == project.as_str()
-                && (asset["id"] == identifier.as_str()
-                    || asset["externalId"] == identifier.as_str())
-        }) else {
+        // Like the CDN (CdnUtils.ts), the asset is `ext:` and its URL-encoded external ID, a
+        // grant (`sig_…`) or its ID.
+        let find = |field: &str, value: &str| {
+            self.storage
+                .assets
+                .values()
+                .find(|asset| asset["projectId"] == project.as_str() && asset[field] == value)
+        };
+        let segment = raw_parts[2];
+        let mut grant = None;
+        let found = if segment.starts_with("sig_") {
+            let Some(decoded) = MockGrant::decode(segment) else {
+                return custom(
+                    ErrorCode::SignedUrlInvalid.as_str(),
+                    403,
+                    "The signed asset URL's grant is invalid",
+                )
+                .response();
+            };
+            if decoded.expires_at <= self.now() {
+                return custom(
+                    ErrorCode::SignedUrlExpired.as_str(),
+                    403,
+                    "The signed URL has expired",
+                )
+                .response();
+            }
+            let found = find("id", &decoded.asset_id);
+            grant = Some(decoded);
+            found
+        } else if let Some(external) = segment.strip_prefix(EXTERNAL_ID_PREFIX) {
+            Some(percent_decode(external))
+                .filter(|external| !external.is_empty())
+                .and_then(|external| find("externalId", &external))
+        } else {
+            find("id", &parts[2])
+        };
+        let Some(asset) = found else {
             return not_found();
         };
+        if resource == "original" && grant.as_ref().is_some_and(|grant| !grant.original) {
+            return custom(
+                ErrorCode::SignedUrlOriginalNotGranted.as_str(),
+                403,
+                "This signed asset URL doesn't grant the original file",
+            )
+            .response();
+        }
         let id = text(&asset["id"]);
         let status = text(&asset["classification"]["moderation"]["status"]);
         let public = asset["visibility"] == "public";
-        let can_download =
-            || self.can_download(text(&asset["folderId"]), header(headers, "x-api-key"));
+        // A grant authorises a private asset without the API key.
+        let can_download = || {
+            grant.is_some()
+                || self.can_download(text(&asset["folderId"]), header(headers, "x-api-key"))
+        };
+        if resource == "info" {
+            return serve_info(asset, can_download(), q);
+        }
         let rendered = &asset["content"]["rendered"];
         let preview = &asset["content"]["preview"];
         // Like the CDN, a safety hold refuses every resource.
@@ -2875,8 +2870,13 @@ impl Backend {
     }
     /// The operation a request belongs to, by its route: an operation name in [`OPERATIONS`].
     fn operation(&self, method: &Method, url: &reqwest::Url) -> Option<&'static str> {
-        if under(url, &self.options.cdn_base_url).is_some() {
-            return Some("cdn.serve");
+        if let Some(rest) = under(url, &self.options.cdn_base_url) {
+            let info = rest.split('/').filter(|part| !part.is_empty()).nth(3) == Some("info");
+            return Some(if info {
+                "cdn.getAssetInfo"
+            } else {
+                "cdn.serve"
+            });
         }
         let rest = under(url, &self.options.api_base_url)?;
         let parts: Vec<&str> = rest.split('/').filter(|part| !part.is_empty()).collect();
@@ -2892,6 +2892,7 @@ impl Backend {
             ("GET", ["projects", _, "assets", "search"]) => "assets.search",
             ("GET", ["projects", _, "assets", _, "timeline"]) => "assets.listTimeline",
             ("POST", ["projects", _, "assets", "batch"]) => "assets.batch",
+            ("POST", ["projects", _, "signed-asset-urls"]) => "cdn.signAssetUrl",
             ("POST", ["projects", _, "assets"]) if queue => "assets.create",
             ("POST", ["projects", _, "assets"]) => "assets.classify",
             ("GET", ["assets", _]) => "assets.retrieve",
@@ -2899,7 +2900,6 @@ impl Backend {
             ("DELETE", ["assets", _]) => "assets.delete",
             ("GET", ["assets", _, "children"]) => "assets.listChildren",
             ("DELETE", ["assets", _, "content"]) => "assets.removeContent",
-            ("POST", ["assets", _, "signed-url"]) => "assets.createSignedUrl",
             ("POST", ["assets", _, "retry"]) => "assets.retry",
             ("POST", ["assets", _, "explain"]) => "assets.explain",
             ("POST", ["assets", _, "decision"]) => "assets.decide",
