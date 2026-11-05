@@ -15,8 +15,8 @@ module CalmLens
     # The prefix of this resource's operations in Internal::OPTION_KEYS.
     OPERATIONS = 'assets'
 
-    SUBMIT_QUERY_KEYS = %w[name description processingOptions visibility metadata authorId context externalId externalUrl
-                           folderId uploadPresetId].freeze
+    SUBMIT_QUERY_KEYS = %w[name description processingOptions visibility metadata tags authorId context externalId
+                           externalUrl folderId uploadPresetId].freeze
     MAX_MULTIPART_IMAGE_BYTES = 20 * 1024 * 1024
     # The API's limits for one-request uploads: images up to 10 MiB (larger ones are uploaded in
     # parts), audio and video up to 50 MiB and other files up to 5,000 MiB.
@@ -28,11 +28,9 @@ module CalmLens
     MAX_LONG_MEDIA_BYTES = 2 * 1024 * 1024 * 1024
     # The longest `idempotency_key` of an upload sent in parts: each part's key adds `:part-<n>`.
     MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH = 240
-    # The moderation status before a decision; {#wait_for_decision} returns once an asset has any
-    # other, or once its classification status is in {FINISHED_PROCESSING_STATUSES}.
-    PENDING_MODERATION_STATUS = 'pending'
-    # Processing statuses after which no decision will arrive without a retry.
-    FINISHED_PROCESSING_STATUSES = %w[failed].freeze
+    # The classification statuses of a settled asset: `completed` (with its decision in
+    # `classification.moderation.status`) or `failed`. {#wait_for_decision} returns at the first.
+    SETTLED_STATUSES = %w[completed failed].freeze
     DECISION_POLL_FIRST_DELAY = 0.5
     # Each wait between decision checks is this many times the one before, up to DECISION_POLL_MAX_DELAY.
     DECISION_POLL_FACTOR = 1.5
@@ -127,18 +125,19 @@ module CalmLens
       end
     end
 
-    # Waits until an asset's `classification.moderation.status` is no longer `pending` (`allowed`,
-    # `limited`, `age-restricted`, `blocked` or `purged`), or its `classification.status` is `failed`, and returns
-    # the asset. It retrieves the asset, waiting 0.5 seconds before the second check and 1.5 times
-    # longer each time after that, up to 2 seconds.
+    # Waits until an asset is settled, its `classification.status` `completed` (with its decision in
+    # `classification.moderation.status`) or `failed`, and returns the asset. A `queued` or `processing`
+    # asset is still waiting, even when a reviewer has already decided it. It retrieves the asset,
+    # waiting 0.5 seconds before the second check and 1.5 times longer each time after that, up to 2
+    # seconds.
     # Webhooks report decisions without polling.
     #
     # `timeout:` is the whole wait in seconds; `request_options: {timeout:}` still limits each request.
     # To stop waiting early, run the call in a thread you can stop: it only sleeps and sends requests.
     # @option options [String] :asset_id
     # @option options [Numeric] :timeout seconds to wait for a decision (default 60)
-    # @return [Hash] the decided asset
-    # @raise [TimeoutError] `sdk/timeout` when no decision arrives in time; `details` holds
+    # @return [Hash] the settled asset
+    # @raise [TimeoutError] `sdk/timeout` when the asset isn't settled in time; `details` holds
     #   `'assetId'` and the last `'classificationStatus'` and `'moderationStatus'`.
     def wait_for_decision(options)
       call(options, __method__) do |api, request|
@@ -172,7 +171,7 @@ module CalmLens
 
     # Records a reviewer's decision, replacing the policy's: `classification.moderation.status`
     # becomes the decision, the decision and note join `classification.moderation.manualReviews` and
-    # the matching `asset.<status>` event is sent with `decided-by: reviewer`. An asset still pending
+    # the matching `asset.<status>` event is sent with the API key as its `actor`. An asset still pending
     # moderation can only be blocked or purged. Purging needs `confirm_purge: true` and the
     # `assets:delete` permission, and permanently deletes the stored content. Not retried: it carries
     # no `Idempotency-Key`.
@@ -206,7 +205,7 @@ module CalmLens
     # `requested`); the record and classification results are kept.
     # @option options [String] :asset_id
     # @return [Hash] the asset
-    def delete_content(options)
+    def remove_content(options)
       call(options, __method__) do |api, request|
         request('DELETE', "/assets/#{Internal.segment(api['assetId'])}/content", request_options: request)
       end
@@ -226,10 +225,11 @@ module CalmLens
     # (`'remove-content'`) in one request. Every asset must exist in the project and the key needs
     # `assets:delete` for its folder, or nothing is queued. Returns once the operation is queued; the
     # work runs in the background and records `asset.deleted` or `asset.content-removed` for each
-    # asset. Assets under a safety hold are skipped. Not retried: it carries no `Idempotency-Key`.
+    # asset, with a `batch-id` fact naming `batchId`. Assets under a safety hold are skipped. Not
+    # retried: it carries no `Idempotency-Key`.
     # @option options [Array<String>] :asset_ids 1 to 500 asset IDs
     # @option options [String] :operation one of {BATCH_OPERATIONS}
-    # @return [Hash] `{'queued' => true}`
+    # @return [Hash] `{'batchId', 'status' => 'queued', 'assetCount'}`
     def batch(options)
       call(options, __method__) do |api, request|
         ids = api['assetIds']
@@ -301,6 +301,7 @@ module CalmLens
     # @option options [Hash] :part `{type:, data:, is_final:}` for the first multipart part
     # @option options [Integer] :total_size_in_bytes the whole file's size, for multipart uploads
     # @option options [String] :url
+    # @option options [Array<String>] :tags tags for the asset, such as `['catalogue', 'backpacks']`
     # @option options [String] :author_id your identifier for who wrote the content; CalmLens only
     #   compares it with the author IDs in `context`, to tell which posts share a speaker.
     # @option options [Hash] :context `{items: [{text:, author_id:}]}`, earlier posts in the
@@ -362,12 +363,12 @@ module CalmLens
         asset = retrieve('assetId' => asset_id, 'request_options' => request_options)
         processing = asset.dig('classification', 'status')
         moderation = asset.dig('classification', 'moderation', 'status')
-        return asset if moderation != PENDING_MODERATION_STATUS || FINISHED_PROCESSING_STATUSES.include?(processing)
+        return asset if SETTLED_STATUSES.include?(processing)
 
         remaining = deadline - @session.monotonic
         unless remaining.positive?
           raise TimeoutError.new(SdkErrorCodes::TIMEOUT,
-                                 "Asset #{asset['id']} had no moderation decision after #{timeout}s " \
+                                 "Asset #{asset['id']} was not settled after #{timeout}s " \
                                  "(processing #{processing}, moderation #{moderation})",
                                  details: { 'assetId' => asset['id'], 'classificationStatus' => processing,
                                             'moderationStatus' => moderation })
@@ -536,10 +537,10 @@ module CalmLens
     def check_mime(type)
       mime = type.to_s.split(';').first.to_s.strip.downcase
       unless Internal.accepted_upload_mime_type?(mime)
-        raise InvalidArgumentError.new(ErrorCodes::INVALID_UPLOAD_MIME_TYPE,
+        raise InvalidArgumentError.new(ErrorCodes::UNSUPPORTED_UPLOAD_TYPE,
                                        "#{mime} is not a valid upload file type. Uploads must use a concrete file MIME " \
                                        'type that CalmLens can store and process, such as image/png, image/jpeg, ' \
-                                       'application/pdf, or text/plain.', details: { 'mimeType' => type })
+                                       'application/pdf, or text/plain.', details: { 'mimeType' => type, 'source' => 'calmlens' })
       end
       raise Internal.invalid('Content type cannot contain line breaks') unless type.match?(Internal::HEADER_VALUE)
 
@@ -560,7 +561,7 @@ module CalmLens
                        else
                          [MAX_FILE_BYTES, 'Files can be at most 5,000 MiB']
                        end
-      raise Internal.invalid(message, ErrorCodes::FILE_TOO_LARGE) if size > limit
+      raise too_large(message, limit) if size > limit
     end
 
     # Images in parts total at most 20 MiB, at any size below that; a declared total is checked
@@ -568,7 +569,12 @@ module CalmLens
     def check_image_size(size)
       return unless size > MAX_MULTIPART_IMAGE_BYTES
 
-      raise Internal.invalid('Multipart image uploads cannot exceed 20MB.', ErrorCodes::MULTIPART_IMAGE_TOO_LARGE)
+      raise too_large('Multipart image uploads cannot exceed 20 MiB.', MAX_MULTIPART_IMAGE_BYTES)
+    end
+
+    # `upload/too-large` for content over the plan's `limit` bytes, as the API answers it.
+    def too_large(message, limit)
+      InvalidArgumentError.new(ErrorCodes::UPLOAD_TOO_LARGE, message, details: { 'limitBytes' => limit, 'source' => 'plan' })
     end
   end
 end

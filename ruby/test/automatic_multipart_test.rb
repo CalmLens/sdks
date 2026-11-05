@@ -99,7 +99,7 @@ class AutomaticMultipartTest < Minitest::Test
       next Errno::ECONNRESET.new if index == 1
       # Part 3's response was lost before: the API asks for part 4.
       if request.query['partNumber'] == '3'
-        next api_error('upload/invalid-part-number', 409, 'expectedPartNumber' => 4, 'receivedPartNumber' => 3)
+        next api_error('upload-part/invalid-number', 409, 'expectedPartNumber' => 4, 'receivedPartNumber' => 3)
       end
 
       upload_response(request)
@@ -141,7 +141,7 @@ class AutomaticMultipartTest < Minitest::Test
     error = assert_raises(CalmLens::InvalidArgumentError) do
       client.assets.create(name: 'huge.png', content: { data: file_of(21 * MIB), type: 'image/png' })
     end
-    assert_equal CalmLens::ErrorCodes::MULTIPART_IMAGE_TOO_LARGE, error.code
+    assert_equal [CalmLens::ErrorCodes::UPLOAD_TOO_LARGE, { 'limitBytes' => 20 * MIB, 'source' => 'plan' }], [error.code, error.details]
     assert_empty sent
   end
 

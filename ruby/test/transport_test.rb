@@ -142,7 +142,7 @@ class TransportTest < Minitest::Test
           client.assets.create(name: 'pipe.txt', content: { data: StringIO.new('abc'), size_in_bytes: 10, type: 'text/plain' })
         end
       end
-      assert_equal 'upload/invalid-payload', error.code
+      assert_equal 'upload-payload/invalid', error.code
     end
   end
 

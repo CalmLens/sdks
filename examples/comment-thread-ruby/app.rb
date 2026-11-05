@@ -52,15 +52,17 @@ module Calmthread
   FIELD_LABELS = { name: 'display name', text: 'reply' }.freeze
 
   # Registered fact keys and labels from packages/shared/src/EventCatalog.ts that
-  # this app shows. Other keys (such as the hidden reviewer-user-id) are not shown.
+  # this app shows. Other keys are not shown.
   FACT_LABELS = {
     'asset-name' => 'Asset',
     'reviewer-name' => 'Reviewer',
     'note' => 'Note'
   }.freeze
-  # Only reviewer decisions change a reply: moderation status events whose `decided-by` fact is
-  # `reviewer`. Automated outcomes (`decided-by` `automated`) and other asset events are skipped,
-  # since the app already acted on the automated result at upload.
+  # Only reviewer decisions change a reply: moderation status events whose `actor` is a `user` (a
+  # reviewer in the portal) or an `api-key` (a decision through the API). Automated outcomes (actor
+  # `automated`) and other asset events are skipped, since the app already acted on the automated
+  # result at upload.
+  REVIEWER_ACTORS = %w[user api-key].freeze
   EVENT_LABELS = {
     'asset.allowed' => 'Allowed by a reviewer',
     'asset.limited' => 'Limited by a reviewer',
@@ -336,7 +338,8 @@ module Calmthread
         return :test
       end
       asset_id = event['assetId']
-      reviewed = facts.any? { |fact| fact['key'] == 'decided-by' && fact['value'] == 'reviewer' }
+      actor = event['actor']
+      reviewed = actor.is_a?(Hash) && REVIEWER_ACTORS.include?(actor['type'])
       reply = EVENT_LABELS.key?(event['type']) && reviewed && asset_id.is_a?(String) && @discussion.find_by_asset(asset_id)
       # A removed reply has no content left to act on, and can never come back.
       return :ignored unless reply && reply[:state] != :removed
@@ -372,7 +375,7 @@ module Calmthread
     # Deletes the stored content of every field first; the record and report stay in
     # CalmLens. The reply is dropped locally only after that succeeded, so a failure retries.
     def remove(reply, client, review)
-      reply[:asset_ids].each_value { |id| client.assets.delete_content(asset_id: id) }
+      reply[:asset_ids].each_value { |id| client.assets.remove_content(asset_id: id) }
       @discussion.remove(reply[:id], review)
       :removed
     end

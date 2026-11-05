@@ -63,7 +63,7 @@ class ContractTest < Minitest::Test
     error = assert_raises(CalmLens::Error, type) do
       client.assets.create(name: 'x', content: { base64: 'aGVsbG8=', type: type })
     end
-    assert_equal ['upload/invalid-mime-type', { 'mimeType' => type }], [error.code, error.details]
+    assert_equal ['upload/unsupported-type', { 'mimeType' => type, 'source' => 'calmlens' }], [error.code, error.details]
   end
   each_case('refused_upload_type', fixture('upload-mime-types')['refused']) { |type| type }
 
@@ -192,10 +192,26 @@ class ContractTest < Minitest::Test
   def check_error(wanted, error, saved, label)
     assert_equal wanted.slice('code', 'status'), { 'code' => error.code, 'status' => error.status }, label
     assert_equal wanted['retryAfter'], error.retry_after, "#{label}: retryAfter" if wanted.key?('retryAfter')
+    # `details` lists only the keys to compare, and objects in them (such as each of a validation
+    # error's `issues`) only the fields to compare.
     wanted.fetch('details', {}).each do |key, value|
       expected = resolve(value, saved)
       actual = error.details&.fetch(key, nil)
-      expected.nil? ? assert_nil(actual, "#{label}: details.#{key}") : assert_equal(expected, actual, "#{label}: details.#{key}")
+      if expected.nil?
+        assert_nil(actual, "#{label}: details.#{key}")
+      else
+        assert_equal(expected, listed_fields(expected, actual), "#{label}: details.#{key}")
+      end
+    end
+  end
+
+  # `actual` with each Hash in it narrowed to the keys `expected` lists, so comparing the two
+  # checks only those fields; Arrays keep their length and order.
+  def listed_fields(expected, actual)
+    case expected
+    when Hash then actual.is_a?(Hash) ? expected.to_h { |key, value| [key, listed_fields(value, actual[key])] } : actual
+    when Array then actual.is_a?(Array) ? actual.each_with_index.map { |item, index| listed_fields(expected[index], item) } : actual
+    else actual
     end
   end
 

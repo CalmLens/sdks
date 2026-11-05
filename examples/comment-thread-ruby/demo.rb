@@ -77,11 +77,10 @@ module Calmthread
           moderation = client.state.assets.fetch(id)['classification']['moderation']
           moderation['status'] = status
           moderation['manualReviews'] << { 'id' => "rev_#{SecureRandom.alphanumeric(20)}", 'decision' => status, 'note' => note,
-                                           'reviewerName' => 'Demo reviewer',
-                                           'reviewedAt' => (Time.now.to_f * 1000).to_i, 'appliedToAsset' => true }
-          client.enqueue_event(type: type, asset_id: id, title: EVENT_LABELS[type], facts: [
+                                           'decidedBy' => { 'type' => 'user', 'id' => nil },
+                                           'reviewedAt' => (Time.now.to_f * 1000).to_i, 'applied' => true }
+          client.enqueue_event(type: type, asset_id: id, title: EVENT_LABELS[type], actor: { type: 'user', id: nil }, facts: [
                                  { key: 'asset-type', value: 'text' },
-                                 { key: 'decided-by', value: 'reviewer' },
                                  { key: 'reviewer-name', value: 'Demo reviewer' },
                                  { key: 'note', value: note }
                                ])

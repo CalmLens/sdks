@@ -41,16 +41,10 @@ module TestHelpers
       'content' => { 'status' => 'stored' } }
   end
 
-  # Moderation status events default to a reviewer's decision; pass decided_by: 'automated'
-  # for an automated outcome.
-  def decision_facts(type, facts, decided_by)
-    return facts unless Calmthread::EVENT_LABELS.key?(type)
-
-    [{ 'key' => 'decided-by', 'value' => decided_by }, *facts]
-  end
-
-  def event(id, type, asset_id, facts = [], snapshot: nil, decided_by: 'reviewer')
-    { 'id' => id, 'type' => type, 'assetId' => asset_id, 'createdAt' => 1, 'facts' => decision_facts(type, facts, decided_by),
+  # Events default to a reviewer's decision in the portal; pass actor: 'automated' for an
+  # automated outcome or 'api-key' for a decision through the API.
+  def event(id, type, asset_id, facts = [], snapshot: nil, actor: 'user')
+    { 'id' => id, 'type' => type, 'assetId' => asset_id, 'createdAt' => 1, 'actor' => { 'type' => actor, 'id' => nil }, 'facts' => facts,
       'asset' => snapshot && event_asset(asset_id, snapshot) }.compact
   end
 
@@ -292,9 +286,9 @@ class ReviewTest < Minitest::Test
     assert_equal 'c1', app.feed.cursor
   end
 
-  def test_reviewer_limiting_releases_the_reply_like_allowing
+  def test_reviewer_limiting_through_the_api_releases_the_reply_like_allowing
     app, mock = held_app
-    mock.enqueue(body: page_of(event('e1', 'asset.limited', 'text-1', snapshot: 'blocked')))
+    mock.enqueue(body: page_of(event('e1', 'asset.limited', 'text-1', snapshot: 'blocked', actor: 'api-key')))
         .enqueue(body: asset('text-1', 'limited')).enqueue(body: asset('name-1', 'allowed'))
     sync(app)
     assert_equal [:published], app.discussion.replies.map { |reply| reply[:state] }
@@ -347,8 +341,8 @@ class ReviewTest < Minitest::Test
 
   def test_automated_decisions_neither_delete_nor_release_a_held_reply
     app, mock = held_app
-    mock.enqueue(body: page_of(event('a1', 'asset.blocked', 'text-1', snapshot: 'blocked', decided_by: 'automated'),
-                               event('a2', 'asset.allowed', 'name-1', snapshot: 'allowed', decided_by: 'automated')))
+    mock.enqueue(body: page_of(event('a1', 'asset.blocked', 'text-1', snapshot: 'blocked', actor: 'automated'),
+                               event('a2', 'asset.allowed', 'name-1', snapshot: 'allowed', actor: 'automated')))
     before = mock.requests.size
     sync(app)
     assert_equal before + 1, mock.requests.size, 'only the events page was requested'
@@ -402,7 +396,7 @@ class ReviewTest < Minitest::Test
     mock = CalmLens::MockServerClient.new
     gate = Object.new
     gate.define_singleton_method(:events) { entered << true; release.pop; mock.events }
-    feed = Calmthread::ReviewFeed.new(Calmthread::Discussion.new(Calmthread::Moderator.new(client: mock)), cursor: 'mock_0')
+    feed = Calmthread::ReviewFeed.new(Calmthread::Discussion.new(Calmthread::Moderator.new(client: mock)), cursor: mock.events.list['nextCursor'])
     first = Thread.new { feed.sync(gate) }
     entered.pop
     assert_equal :busy, feed.sync(mock)
@@ -455,10 +449,10 @@ class WebhookTest < Minitest::Test
                                                           CalmLens::WEBHOOK_DELIVERY_HEADER => delivery })
   end
 
-  def delivery(id, type, asset_id, facts = [], decided_by: 'reviewer')
-    JSON.generate('id' => id, 'projectId' => 'project-1', 'type' => type, 'severity' => 'low',
-                  'title' => 'Asset event', 'description' => nil, 'assetId' => asset_id,
-                  'asset' => event_asset(asset_id, 'allowed'), 'facts' => decision_facts(type, facts, decided_by),
+  def delivery(id, type, asset_id, facts = [], actor: 'user')
+    JSON.generate('id' => id, 'projectId' => 'project-1', 'actor' => { 'type' => actor, 'id' => nil }, 'type' => type,
+                  'severity' => 'low', 'title' => 'Asset event', 'description' => nil, 'assetId' => asset_id,
+                  'asset' => event_asset(asset_id, 'allowed'), 'facts' => facts,
                   'createdAt' => 1)
   end
 
@@ -546,7 +540,6 @@ class RequestTest < Minitest::Test
                                        { 'key' => 'note', 'value' => 'See', 'url' => 'https://portal.example/assets/1' },
                                        { 'key' => 'reviewer-name', 'value' => 'Sam', 'url' => 'javascript:alert(1)' },
                                        { 'key' => 'asset-name', 'value' => 'Calmthread reply', 'url' => '/portal/assets/1' },
-                                       { 'key' => 'reviewer-user-id', 'value' => 'hidden-id' },
                                        { 'key' => 'unregistered', 'value' => 'x' }
                                      ])
     assert_equal [['Note', 'See', 'https://portal.example/assets/1'], ['Reviewer', 'Sam', nil],

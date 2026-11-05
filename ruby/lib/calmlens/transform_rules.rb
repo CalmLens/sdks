@@ -58,7 +58,7 @@ module CalmLens
     # Reads a CDN selector, the path text after the resource as sent (still percent-encoded), as the
     # CDN does: an optional first `@lens`, then `key=value` options with dotted keys for nested ones (a
     # bare key is `true`). Values are numbers, `true`, `false`, hex colours (`#` added) for colour
-    # options, or text. Raises ArgumentError on anything the CDN refuses as `asset/invalid-transform`.
+    # options, or text. Raises ArgumentError on anything the CDN refuses as `transform/invalid`.
     # Used by the mock CDN.
     # @return [Array(String, Hash)] the lens and the options, each nil when absent
     def parse_selector(selector)

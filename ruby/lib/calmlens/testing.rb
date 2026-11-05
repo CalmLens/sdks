@@ -22,7 +22,7 @@ module CalmLens
   # A `purged` outcome removes the content with reason `policy`. The CDN answers like the real one:
   # `asset/not-available` (403) for blocked, purged, failed or removed content,
   # `viewer/age-confirmation-required` (403) for an age-restricted asset without
-  # `viewer_claims: {age_confirmed: true}`, whatever the key, and `asset/api-key-missing-permission` (403)
+  # `viewer_claims: {age_confirmed: true}`, whatever the key, and `auth/permission-denied` (403)
   # for a private asset unless `api_key` comes from {.create_api_key} with an `assets:download`
   # grant. The default key has no grants. {#decide} applies a reviewer's decision, and
   # {Assets#wait_for_decision} takes no real time: a pending asset times out at once.
@@ -61,7 +61,7 @@ module CalmLens
     REQUEST_FAILURES = %w[transport-error timeout].freeze
     # The methods {#fail_next_request} can target, by resource. Iterators are their list calls.
     OPERATIONS = { assets: %i[search list retrieve list_children list_timeline update create classify upload_part create_signed_url move
-                              retry explain wait_for_decision delete_content delete batch],
+                              retry explain wait_for_decision remove_content delete batch],
                    folders: %i[list retrieve create update delete move],
                    hash_lists: %i[list retrieve create update delete list_entries add_entry remove_entry],
                    policies: %i[list retrieve create update apply_preset set_automatic_updates delete assign],
@@ -174,8 +174,9 @@ module CalmLens
     end
 
     # Applies a reviewer's decision to a stored asset, as the portal or API would: the moderation
-    # status changes (`purged` also removes the content), the review joins `manualReviews`, and an
-    # `asset.<decision>` event with a `decided-by: reviewer` fact joins the events feed.
+    # status changes (`purged` also removes the content), the review joins `manualReviews` with
+    # `decidedBy` the mock API key (`{ 'type' => 'api-key', 'id' => nil }`) and `applied: true`, and an
+    # `asset.<decision>` event whose `actor` is a `user` joins the events feed.
     # @param asset_id [String]
     # @param decision [String] `allowed`, `limited`, `age-restricted`, `blocked` or `purged`
     # @return [Hash] the asset
@@ -275,7 +276,9 @@ module CalmLens
     end
 
     # Adds an event to the mock's events feed. Fields you omit (`id`, `projectId`, `createdAt`,
-    # `severity`, `title`, `facts`, and nil `description` and `assetId`) are filled in. An event
+    # `severity`, `title`, `facts`, and nil `description` and `assetId`) are filled in, and `actor`
+    # is the mock API key (`{ 'type' => 'api-key', 'id' => nil }`) unless you pass one, such as
+    # `actor: { type: 'user', id: nil }`. An event
     # with the `asset_id` of a stored asset carries that asset's snapshot as it is now, unless you
     # pass `asset`.
     # @param event [Hash] at least `type:`; snake_case keys are converted.

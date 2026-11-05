@@ -104,8 +104,9 @@ the moderation policies guide in the CalmLens docs.
 ## Review decisions
 
 The app follows reviewer decisions: `asset.allowed`, `asset.limited`, `asset.age-restricted`,
-`asset.blocked` and `asset.purged` events whose `decided-by` fact is `reviewer`. CalmLens also sends these
-events for automated moderation (`decided-by` is `automated`); the app skips those, because it
+`asset.blocked` and `asset.purged` events whose `actor` is a `user` (a reviewer in the portal) or an
+`api-key` (a decision through the API). CalmLens also sends these events for automated moderation
+(`actor.type` is `automated`); the app skips those, because it
 already acted on the automated result when the reply was posted. Other events, such as
 `asset.classified`, are skipped.
 
@@ -117,7 +118,7 @@ the event's snapshot:
   published only when every field is allowed or limited.
 - Status `age-restricted`, `blocked` or `purged` after an event other than `asset.allowed` or
   `asset.limited`: the
-  app calls `client.assets.delete_content(asset_id:)` for each field, then forgets the reply. A
+  app calls `client.assets.remove_content(asset_id:)` for each field, then forgets the reply. A
   later `allowed` decision on the same asset cannot bring it back.
 - Anything else, or a response for a different asset or another reply's field (checked with
   its `externalId`): nothing changes.
@@ -157,7 +158,7 @@ attempts, the next events-feed check applies the same event. Webhooks need live 
 
 The **Moderation log** shows each decision with how it arrived (events feed, verified webhook
 or, in demo mode, a simulated decision) and its registered facts, such as **Reviewer** and
-**Note**. Labels follow the event catalog. The hidden reviewer ID and unknown keys are not
+**Note**. Labels follow the event catalog. Unknown keys are not
 shown. Only absolute HTTP(S) fact URLs become links. A test send (fact
 `{ key: "test", value: true }`) is logged and changes nothing.
 

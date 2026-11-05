@@ -7,7 +7,7 @@ module CalmLens
     # Asset list filters as the API reads them (zodbase/rsql with @rsql/parser): comparisons joined
     # by `;` or `and` (binding tighter), `,` or `or`, and grouped with parentheses. A filter names
     # only {MockAssetFilters::FIELDS}, each with only its own operators; anything else, or
-    # bad syntax, answers 400 `validation/invalid-filter`. A number field's value must be a number,
+    # bad syntax, answers 400 `filter/invalid`. A number field's value must be a number,
     # and `null` is a missing value only on a nullable field. `*` in an `==` or `!=` text value
     # matches any run of characters regardless of case; without it `==` is exact. As in SQL, a
     # comparison never matches a missing value.
@@ -15,7 +15,7 @@ module CalmLens
     module RSQL
       module_function
 
-      # A filter the API refuses, answered as `validation/invalid-filter`.
+      # A filter the API refuses, answered as `filter/invalid`.
       class Invalid < StandardError; end
 
       def filter(items, expression)

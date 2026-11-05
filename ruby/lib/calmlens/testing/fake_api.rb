@@ -44,7 +44,7 @@ module CalmLens
     # @api private
     class FakeAPI
       JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize limit processingOptions metadata
-                      context].freeze
+                      tags context].freeze
       # Keyword search fields, in the order matches are reported, and where each value sits in the asset.
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
                         'description' => %w[description], 'tags' => %w[tags], 'type' => %w[type],
@@ -60,6 +60,14 @@ module CalmLens
       # The moderation status each `asset.<status>` event announces.
       ANNOUNCED_STATUSES = REVIEW_DECISIONS.to_h { |status| ["asset.#{status}", status] }.freeze
       MAX_DECISION_NOTE_LENGTH = 1499
+      # The actor of events the mock's API key causes: mock keys have no ID.
+      API_KEY_ACTOR = { 'type' => 'api-key', 'id' => nil }.freeze
+      # The actor of a reviewer's decision through {MockServerClient#decide}.
+      REVIEWER_ACTOR = { 'type' => 'user', 'id' => nil }.freeze
+      # The actor of the pipeline's processing events.
+      AUTOMATED_ACTOR = { 'type' => 'automated', 'id' => nil }.freeze
+      # An event type's shape (`resource.action`), as the mock checks `types` without the catalog.
+      EVENT_TYPE_PATTERN = /\A[a-z][a-z-]*\.[a-z][a-z-]*\z/
       # The resources an asset's CDN path names.
       RESOURCES = %w[original rendered preview hls embed placeholder].freeze
       # The page the mock serves at `/embed`, standing in for the CDN's embed page.
@@ -112,12 +120,16 @@ module CalmLens
         @request_count = 0
         # Each asset's latest `assetSequence`, which the API keeps on the asset row.
         @asset_event_sequences = Hash.new(0)
+        # The processing options each asset was uploaded with, which the API keeps but doesn't return.
+        @processing_options = {}
       end
 
-      # Adds an event to the feed, filling the fields the API always sets.
+      # Adds an event to the feed, filling the fields the API always sets. Its `actor` is the mock's
+      # API key unless the event names another.
       def add_event(event)
         time = @now.call
-        record = { 'id' => @create_id.call('evt'), 'projectId' => @project_id, 'severity' => 'low', 'description' => nil,
+        record = { 'id' => @create_id.call('evt'), 'projectId' => @project_id, 'actor' => deep_copy(API_KEY_ACTOR),
+                   'severity' => 'low', 'description' => nil,
                    'assetId' => nil, 'assetSequence' => nil, 'asset' => nil, 'facts' => [],
                    'createdAt' => time }.merge(event)
         record['title'] ||= record['type']
@@ -202,29 +214,29 @@ module CalmLens
       end
 
       # Applies a reviewer's decision like `decideAssetManually` in the API: the status and the review,
-      # then (for `purged`) the content removal and its event, then `asset.<decision>`.
+      # then (for `purged`) the content removal and its event, then `asset.<decision>`. Either way the
+      # review is the mock API key's, which has no ID. A decision through the API (with
+      # `reviewer_name`) has the API key as its events' actor and names the reviewer in the event;
+      # the test hook's is a reviewer's (a `user`).
       def record_decision(item, decision, note, reviewer_name)
         apply_outcome(item, decision, 'requested')
         review = { 'id' => @create_id.call('rev'), 'decision' => decision, 'note' => note,
-                   'reviewedAt' => @now.call, 'appliedToAsset' => true }
-        reviewer_facts = []
-        if reviewer_name
-          review.merge!('reviewerName' => reviewer_name, 'reviewerEmail' => nil)
-          reviewer_facts = [{ 'key' => 'reviewer-user-id', 'value' => nil }, { 'key' => 'reviewer-name', 'value' => reviewer_name }]
-        end
+                   'decidedBy' => { 'type' => 'api-key', 'id' => nil }, 'reviewedAt' => @now.call, 'applied' => true }
+        actor = reviewer_name ? API_KEY_ACTOR : REVIEWER_ACTOR
+        reviewer_facts = reviewer_name ? [{ 'key' => 'reviewer-name', 'value' => reviewer_name }] : []
         item['classification']['moderation']['manualReviews'] << review
-        lifecycle_event('asset.content-removed', item) if decision == 'purged'
+        lifecycle_event('asset.content-removed', item, actor: actor) if decision == 'purged'
         # Like the event catalog: only allowing and limiting are low severity.
         add_event('type' => "asset.#{decision}", 'severity' => %w[allowed limited].include?(decision) ? 'low' : 'high',
                   'title' => "asset.#{decision}", 'assetId' => item['id'], 'asset' => snapshot(item),
-                  'facts' => [{ 'key' => 'decided-by', 'value' => reviewer_name ? 'api-key' : 'reviewer' },
-                              { 'key' => 'asset-type', 'value' => item['type'] },
+                  'actor' => deep_copy(actor),
+                  'facts' => [{ 'key' => 'asset-type', 'value' => item['type'] },
                               { 'key' => 'asset-name', 'value' => item['name'], 'url' => "https://calmlens.com/go/asset/#{item['id']}" },
                               *reviewer_facts, { 'key' => 'note', 'value' => note }])
       end
 
-      # `POST /assets/:id/decision` as the API validates and applies it. The mock's key is unnamed, so the
-      # review and its event name the reviewer `An API key`. An asset still uploading or processing is
+      # `POST /assets/:id/decision` as the API validates and applies it. The mock's key is unnamed, so its
+      # event names the reviewer `An API key`. An asset still uploading or processing is
       # refused with `asset/processing`.
       def decide_request(item, json)
         decision = json['decision']
@@ -255,21 +267,29 @@ module CalmLens
           'content' => { 'status' => item['content']['status'] } }
       end
 
-      # The `asset.deleted`, `asset.content-removed` and `asset.retried` events the API records.
-      def lifecycle_event(type, item)
+      # The `asset.deleted`, `asset.content-removed` and `asset.retried` events the API records, with
+      # the `batch-id` fact of the batch that caused them, if any.
+      def lifecycle_event(type, item, batch_id: nil, actor: API_KEY_ACTOR)
         name = { 'key' => 'asset-name', 'value' => item['name'] }
         # A deleted asset has no portal page to link to.
         name['url'] = "https://calmlens.com/go/asset/#{item['id']}" unless type == 'asset.deleted'
+        facts = [name, { 'key' => 'asset-type', 'value' => item['type'] }]
+        facts << { 'key' => 'batch-id', 'value' => batch_id } if batch_id
         add_event('type' => type, 'severity' => 'low', 'assetId' => item['id'], 'asset' => snapshot(item),
-                  'facts' => [name, { 'key' => 'asset-type', 'value' => item['type'] }])
+                  'actor' => deep_copy(actor), 'facts' => facts)
       end
 
       def fail!(code, message = nil, details: nil) = raise(Failure.new(code, message, details: details))
 
       def route_not_found!(method, parts) = fail!(ErrorCodes::ROUTE_NOT_FOUND, "No route for #{method} /#{parts.join('/')}")
 
-      # A request the API's schema refuses: `validation/<issue>` with HTTP 400 and the field.
-      def invalid!(code, path) = raise(Failure.new(code, "Invalid #{path}", details: { 'path' => path }, status: 400))
+      # A request the API's schema refuses: `validation/invalid-request` with HTTP 400, listing the
+      # field and its issue code (such as `validation/too-big`) in `details.issues`.
+      def invalid!(code, path)
+        message = "Invalid #{path}"
+        raise Failure.new(ErrorCodes::INVALID_REQUEST, message,
+                          details: { 'issues' => [{ 'path' => path, 'message' => message, 'code' => code }] }, status: 400)
+      end
 
       # Like the API's schema (METADATA_ITEM_SCHEMA): metadata is nil or a list of `{id, value}`
       # Hashes with a String `id` and any JSON `value`.
@@ -304,14 +324,14 @@ module CalmLens
       end
 
       # Like the API: an upload's metadata is checked, then its MIME type, which must be one the
-      # API can moderate (`upload/invalid-mime-type` with `details.mimeType`).
+      # API can moderate (`upload/unsupported-type` with `details.mimeType` and `details.source`).
       def check_upload(options)
         check_metadata(options['metadata'])
         type = options['contentType']
         return if type.nil? || Internal.accepted_upload_mime_type?(type)
 
-        fail!(ErrorCodes::INVALID_UPLOAD_MIME_TYPE, "#{type} is not a valid upload file type",
-              details: { 'mimeType' => type })
+        fail!(ErrorCodes::UNSUPPORTED_UPLOAD_TYPE, "#{type} is not a valid upload file type",
+              details: { 'mimeType' => type, 'source' => 'calmlens' })
       end
 
       # Like the API's query schema: an integer from 1 to `max`.
@@ -413,7 +433,8 @@ module CalmLens
       # (`asset/not-found`) before anything happens. The operation then runs at once, in request
       # order, rather than in the background: `delete` deletes each asset with its stored child
       # assets and records `asset.deleted` with the asset as it was; `remove-content` removes the
-      # content like DELETE /assets/:id/content. Mock assets carry no safety holds.
+      # content like DELETE /assets/:id/content. Each event carries the batch's `batch-id` fact. Mock
+      # assets carry no safety holds.
       def batch(json)
         ids = json['assetIds']
         invalid!('validation/invalid-type', 'assetIds') unless ids.is_a?(Array)
@@ -428,15 +449,16 @@ module CalmLens
           fail!(ErrorCodes::ASSET_NOT_FOUND) unless item && item['projectId'] == @project_id
           item
         end
+        batch_id = @create_id.call('batch')
         items.each do |item|
           if json['operation'] == 'delete'
             delete_tree(item)
-            lifecycle_event('asset.deleted', item)
+            lifecycle_event('asset.deleted', item, batch_id: batch_id)
           else
-            delete_content(item)
+            remove_content(item, batch_id)
           end
         end
-        respond(202, { 'queued' => true })
+        respond(202, { 'batchId' => batch_id, 'status' => 'queued', 'assetCount' => items.size })
       end
 
       # Deletes an asset, its stored child assets and their content.
@@ -451,6 +473,7 @@ module CalmLens
         deleting.each do |id|
           @state.assets.delete(id)
           @state.content.delete(id)
+          @processing_options.delete(id)
         end
       end
 
@@ -489,20 +512,37 @@ module CalmLens
       def project_folders = @state.folders.values.select { |item| item['projectId'] == @project_id }
 
       # Like the API: without a cursor, no events and a `nextCursor` for now; with one, up to `pageSize`
-      # events added since, oldest first. `nextCursor` is never nil. The mock's key holds every permission,
-      # so no event type is excluded.
+      # events added since, oldest first, of the `types` (comma-separated) and `assetId` asked for.
+      # `nextCursor` is never nil, and a cursor belongs to the filters it was issued with. The mock's
+      # key holds every permission, so no event type is excluded.
       def events(query)
         size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
+        types = query.key?('types') ? query['types'].to_s.split(',', -1) : []
+        if query.key?('types') && (types.empty? || types.any? { |type| !type.match?(EVENT_TYPE_PATTERN) })
+          invalid!('validation/invalid-value', 'types')
+        end
+        asset_id = query['assetId']
+        invalid!('validation/invalid-format', 'assetId') if asset_id && !asset_id.match?(ASSET_ID_PATTERN)
+        filter = [JSON.generate([types.uniq.sort, asset_id])].pack('m0')
+        matches = ->(event) { (types.empty? || types.include?(event['type'])) && (asset_id.nil? || event['assetId'] == asset_id) }
         feed = @state.events
-        return { 'items' => [], 'nextCursor' => "mock_#{feed.size}", 'hasMore' => false, 'excludedTypes' => [] } unless query['cursor']
+        unless query['cursor']
+          return { 'items' => [], 'nextCursor' => "mock_#{feed.size}~#{filter}", 'hasMore' => false, 'excludedTypes' => [] }
+        end
 
-        match = query['cursor'].to_s.match(/\Amock_(\d+)\z/)
-        position = match && Integer(match[1], 10)
+        match = query['cursor'].to_s.match(/\Amock_(\d+)~(.*)\z/)
+        position = match && match[2] == filter ? Integer(match[1], 10) : nil
         fail!(ErrorCodes::INVALID_CURSOR) unless position && position <= feed.size
 
-        taken = feed[position, size]
-        following = position + taken.size
-        { 'items' => taken, 'nextCursor' => "mock_#{following}", 'hasMore' => following < feed.size, 'excludedTypes' => [] }
+        taken = []
+        following = position
+        while following < feed.size && taken.size < size
+          event = feed[following]
+          following += 1
+          taken << event if matches.call(event)
+        end
+        { 'items' => taken, 'nextCursor' => "mock_#{following}~#{filter}", 'hasMore' => feed.drop(following).any?(&matches),
+          'excludedTypes' => [] }
       end
 
       # Saves lenses in order, like the API: an unchanged definition returns the stored lens, a
@@ -602,10 +642,11 @@ module CalmLens
                   'externalId' => options['externalId'], 'externalUrl' => url || options['externalUrl'],
                   'type' => kind(mime, url), 'metadata' => options['metadata'], 'authorId' => options['authorId'],
                   # Like the API, only the posts CalmLens uses are kept, and only while the content is held.
-                  'context' => context.empty? ? nil : { 'items' => context }, 'tags' => nil,
-                  'processingOptions' => processing, 'visibility' => options.fetch('visibility', 'private'),
+                  'context' => context.empty? ? nil : { 'items' => context }, 'tags' => options['tags'],
+                  'visibility' => options.fetch('visibility', 'private'),
                   **sections(now: now, open: open, keep: keep, format: mime, size: data&.bytesize) }
         @state.assets[asset['id']] = asset
+        @processing_options[asset['id']] = processing
         if data
           @state.content[asset['id']] = { 'type' => mime, 'parts' => { 1 => data } }
           asset['content'].merge!(rendering(asset, false)) unless open
@@ -624,7 +665,7 @@ module CalmLens
                          'perceptualHashQuality' => nil, 'metadata' => nil, 'extractedText' => nil, **NO_RENDERING },
           # Like the API, only an open upload counts the parts received.
           'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
-          'classification' => { 'status' => open ? 'pending' : 'processing', 'failureReason' => nil, 'updatedAt' => now,
+          'classification' => { 'status' => open ? 'queued' : 'processing', 'failureReason' => nil, 'updatedAt' => now,
                                 # The mock never reads test inputs.
                                 'completedAt' => nil, 'progress' => nil, 'testInput' => false,
                                 'moderation' => { 'status' => 'pending', 'manualReviews' => [],
@@ -634,7 +675,7 @@ module CalmLens
 
       # Like the API: image uploads in parts total at most 20 MiB, at any size below that.
       def image_size_error(type, size, _final)
-        ErrorCodes::MULTIPART_IMAGE_TOO_LARGE if type == 'image' && size > MAX_MULTIPART_IMAGE
+        ErrorCodes::UPLOAD_TOO_LARGE if type == 'image' && size > MAX_MULTIPART_IMAGE
       end
 
       # Like the API: the parts may not overshoot a declared total, and must reach it at the end.
@@ -642,6 +683,12 @@ module CalmLens
         return if total.nil?
 
         ErrorCodes::UPLOAD_SIZE_MISMATCH if received > total || (final && received != total)
+      end
+
+      # The failure for a size error code, with the limit `upload/too-large` carries.
+      def size_failure!(code)
+        details = code == ErrorCodes::UPLOAD_TOO_LARGE ? { 'limitBytes' => MAX_MULTIPART_IMAGE, 'source' => 'plan' } : nil
+        fail!(code, details: details)
       end
 
       def check_part_size(size, final)
@@ -660,7 +707,7 @@ module CalmLens
         size = data.to_s.bytesize
         code = (total && image_size_error(type, total, true)) ||
                (final ? total_size_error(total, size, true) || image_size_error(type, size, true) : nil)
-        fail!(code) if code
+        size_failure!(code) if code
         check_part_size(size, final)
         fail!(total_size_error(total, size, false)) if !final && total_size_error(total, size, false)
 
@@ -708,7 +755,8 @@ module CalmLens
         classification = asset['classification']
         return asset unless classification['status'] == 'completed' && asset['type'] == 'image'
 
-        features = asset['processingOptions'].is_a?(Hash) ? asset['processingOptions']['features'] : nil
+        processing = @processing_options[asset['id']]
+        features = processing.is_a?(Hash) ? processing['features'] : nil
         enabled = ->(name) { features.is_a?(Hash) && features[name].is_a?(Hash) && features[name]['enabled'] == true }
         { 'personDetection' => 'people', 'faceDetection' => 'faces' }.each do |feature, list|
           classification[feature] = { 'status' => 'evaluated', 'stage' => 'beta', list => [] } if enabled.call(feature)
@@ -736,6 +784,7 @@ module CalmLens
 
         if decision.status == 'failed'
           return add_event('type' => 'asset.failed', 'severity' => 'high', 'assetId' => item['id'], 'asset' => snapshot(item),
+                           'actor' => deep_copy(AUTOMATED_ACTOR),
                            'facts' => [asset_name_fact(item), { 'key' => 'asset-type', 'value' => item['type'] },
                                        { 'key' => 'previous-status', 'value' => 'processing' },
                                        { 'key' => 'failure-reason',
@@ -744,13 +793,14 @@ module CalmLens
 
         flagged = decision.report['flaggedCategories']
         add_event('type' => 'asset.classified', 'severity' => 'low', 'assetId' => item['id'], 'asset' => snapshot(item),
+                  'actor' => deep_copy(AUTOMATED_ACTOR),
                   'facts' => [{ 'key' => 'flagged-categories', 'value' => flagged },
                               { 'key' => 'moderation-status', 'value' => decision.status },
                               { 'key' => 'asset-type', 'value' => item['type'] }, asset_name_fact(item)])
         # Like the event catalog: only allowing and limiting are low severity.
         add_event('type' => "asset.#{decision.status}", 'severity' => %w[allowed limited].include?(decision.status) ? 'low' : 'high',
-                  'assetId' => item['id'], 'asset' => snapshot(item),
-                  'facts' => [{ 'key' => 'decided-by', 'value' => 'automated' }, { 'key' => 'flagged-categories', 'value' => flagged },
+                  'assetId' => item['id'], 'asset' => snapshot(item), 'actor' => deep_copy(AUTOMATED_ACTOR),
+                  'facts' => [{ 'key' => 'flagged-categories', 'value' => flagged },
                               { 'key' => 'asset-type', 'value' => item['type'] }, asset_name_fact(item)])
       end
 
@@ -851,9 +901,10 @@ module CalmLens
         in ['DELETE', nil]
           @state.assets.delete(id)
           @state.content.delete(id)
+          @processing_options.delete(id)
           lifecycle_event('asset.deleted', item)
           nil
-        in ['DELETE', 'content'] then delete_content(item)
+        in ['DELETE', 'content'] then remove_content(item)
         in ['GET', 'children'] then page(project_assets.select { |child| child['parentId'] == id }, query, id)
         in ['POST', 'retry'] then retry_asset(item)
         in ['POST', 'explain'] then explain(item, json['rerun'])
@@ -882,8 +933,8 @@ module CalmLens
 
       # Like the API: the record and report stay; stored content, extracted text, metadata, the
       # rendered file and the preview go. Content already removed keeps its reason, and an `asset.content-removed` event is
-      # recorded either way.
-      def delete_content(item)
+      # recorded either way, with the `batch-id` fact of the batch that removed it, if any.
+      def remove_content(item, batch_id = nil)
         forget_content(item)
         content = item['content']
         if content['status'] == 'removed'
@@ -894,7 +945,7 @@ module CalmLens
                          'metadata' => nil, **NO_RENDERING)
           item['updatedAt'] = now
         end
-        lifecycle_event('asset.content-removed', item)
+        lifecycle_event('asset.content-removed', item, batch_id: batch_id)
         item
       end
 
@@ -953,7 +1004,7 @@ module CalmLens
         received = item['content']['sizeInBytes'].to_i + size
         upload = @state.uploads[item['id']] || {}
         code = image_size_error(item['type'], received, final) || total_size_error(upload['total'], received, final)
-        fail!(code) if code
+        size_failure!(code) if code
         check_part_size(size, final)
 
         stored = (@state.content[item['id']] ||= { 'type' => item['content']['format'].to_s, 'parts' => {} })
@@ -1211,7 +1262,7 @@ module CalmLens
 
         entry = { 'id' => @create_id.call('hle'), 'projectId' => @project_id, 'hashListId' => list['id'], 'hash' => hash,
                   'quality' => quality, 'label' => json['label'].is_a?(String) ? json['label'] : nil,
-                  'sourceAssetId' => asset_id, 'createdAt' => @now.call }
+                  'assetId' => asset_id, 'createdAt' => @now.call }
         @state.hash_list_entries[entry['id']] = entry
         respond(201, deep_copy(entry))
       end
@@ -1232,7 +1283,7 @@ module CalmLens
         item = own_asset(id)
         fail!(ErrorCodes::ASSET_NOT_FOUND) unless item
         size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
-        fail!(ErrorCodes::ASSET_SAFETY_HELD) if item['content']['safetyHold']
+        fail!(ErrorCodes::ASSET_HELD, details: { 'hold' => 'safety' }) if item['content']['safetyHold']
         fail!(ErrorCodes::INVALID_CURSOR) if query.key?('cursor')
 
         { 'items' => [], 'nextCursor' => nil, 'pageSize' => size, 'hasMore' => false, 'ordering' => [] }
@@ -1375,7 +1426,7 @@ module CalmLens
         return invalid_transform if !still && selector
 
         refused = selector ? TransformRules.check(selector).flatten : []
-        return error('asset/invalid-transform-options', "Invalid transform options: #{refused.join(', ')}", status: 400) if refused.any?
+        return error(ErrorCodes::INVALID_TRANSFORM_OPTIONS, "Invalid transform options: #{refused.join(', ')}", status: 400) if refused.any?
 
         bytes, type = resource_body(item, resource, stored)
         return not_available unless bytes
@@ -1398,7 +1449,7 @@ module CalmLens
         end
         return if item['visibility'] == 'public' || can_download?(item['folderId'])
 
-        error('asset/api-key-missing-permission', 'This API key needs assets:download permission for this asset’s folder.', status: 403)
+        error(ErrorCodes::PERMISSION_DENIED, 'This API key needs assets:download permission for this asset’s folder.', status: 403)
       end
 
       # A resource's bytes and Content-Type: the upload, which stands in for its own rendered file
@@ -1437,7 +1488,7 @@ module CalmLens
                                            'cache-tag' => "asset-#{item['id']}", 'x-content-type-options' => 'nosniff' })
       end
 
-      def invalid_transform = error('asset/invalid-transform', 'Invalid transform selector', status: 400)
+      def invalid_transform = error(ErrorCodes::INVALID_TRANSFORM, 'Invalid transform selector', status: 400)
 
       def no_rendered_version = error('asset/no-rendered-version', 'This asset has no such resource', status: 404)
 

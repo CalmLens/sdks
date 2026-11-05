@@ -148,10 +148,8 @@ module CalmLens
   end
 
   class Assets < Resource
-    # The moderation status before a decision.
-    PENDING_MODERATION_STATUS: String
-    # Processing statuses after which no decision arrives without a retry.
-    FINISHED_PROCESSING_STATUSES: Array[String]
+    # The classification statuses of a settled asset; wait_for_decision returns at the first.
+    SETTLED_STATUSES: Array[String]
     DECISION_POLL_FIRST_DELAY: Float
     DECISION_POLL_FACTOR: Float
     DECISION_POLL_MAX_DELAY: Float
@@ -175,7 +173,7 @@ module CalmLens
     def retry: (asset_id_options options) -> asset
     def decide: (decide_asset_options options) -> asset
     def explain: (explain_asset_options options) -> asset
-    def delete_content: (asset_id_options options) -> asset
+    def remove_content: (asset_id_options options) -> asset
     def delete: (asset_id_options options) -> nil
     def batch: (batch_assets_options options) -> batch_assets_response
     def move: (move_asset_options options) -> asset
@@ -183,6 +181,8 @@ module CalmLens
     def create: (upload_options options) -> asset
     def classify: (upload_options options) -> asset
     def upload_part: (upload_part_options options) -> asset
+    # Waits between decision checks; a mock client's waits take no real time.
+    private def sleep: (Numeric seconds) -> void
   end
 
   class Folders < Resource
@@ -250,6 +250,8 @@ module CalmLens
   class WebhookEvent < Struct[untyped]
     attr_accessor id: String
     attr_accessor project_id: String
+    # nil for a delivery without one.
+    attr_accessor actor: actor?
     # New types may appear: ignore unknown ones.
     attr_accessor type: event_type | String
     attr_accessor severity: event_severity?

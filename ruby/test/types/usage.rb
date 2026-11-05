@@ -12,7 +12,12 @@ asset = client.text.classify(text: 'Hello', name: 'greeting', external_id: 'post
 status = asset['classification']['moderation']['status']
 processing = asset['classification']['status']
 failure = asset['classification']['failureReason']
-reviews = asset['classification']['moderation']['manualReviews'].map { |review| [review['decision'], review['reviewerName']] }
+reviews = asset['classification']['moderation']['manualReviews'].map do |review|
+  [review['decision'], review['decidedBy']['type'], review['decidedBy']['id'], review['applied']]
+end
+automated = asset['classification']['moderation']['automatedStatus']
+regional = asset['classification']['moderation']['regions'].map { |decision| [decision['region'], decision['status']] }
+flagged_links = asset.dig('classification', 'moderation', 'linkSafety', 'links')&.map { |link| link['finalUrl'] }
 removal = asset['content']['removalReason']
 format = asset['content']['format']
 camera = asset['content']['metadata']&.[]('cameraModel')
@@ -22,7 +27,8 @@ faces = asset.dig('classification', 'faceDetection', 'faces') || []
 ages = faces.map { |face| face['ageRange']&.fetch('low') }
 
 uploaded = client.assets.create(name: 'photo.jpg', content: { type: 'image/jpeg', data: File.open('photo.jpg', 'rb') },
-                                metadata: [{ id: 'author', value: { 'name' => 'Ada' } }], visibility: 'private',
+                                metadata: [{ id: 'author', value: { 'name' => 'Ada' } }], tags: %w[catalogue backpacks],
+                                visibility: 'private',
                                 processing_options: { features: { face_detection: { enabled: true, age_estimation: true },
                                                                   ocr: { enabled: true }, streaming: { enabled: true } } },
                                 request_options: { idempotency_key: 'upload-1', timeout: 60 })
@@ -52,7 +58,7 @@ client.assets.explain(asset_id: updated['id'], rerun: true)
 client.assets.decide(asset_id: updated['id'], decision: 'blocked', note: 'Spam')
 client.assets.decide(asset_id: updated['id'], decision: 'purged', note: 'Illegal', confirm_purge: true)
 client.assets.wait_for_decision(asset_id: uploaded['id'], timeout: 30)['classification']['moderation']['status']
-client.assets.delete_content(asset_id: updated['id'])['content']['updatedAt']
+client.assets.remove_content(asset_id: updated['id'])['content']['updatedAt']
 signed = client.assets.create_signed_url(asset_id: updated['id'],
                                          transform: { width: 200, fit: 'cover' })
 expires = signed['expiresAt']
@@ -95,6 +101,8 @@ end
 
 cursor = client.events.list['nextCursor']
 client.events.each_page(cursor: cursor, page_size: 10) { |events_page| events_page['nextCursor'] }
+client.events.list(cursor: cursor, types: %w[asset.blocked asset.purged], asset_id: 'asset-1')['items'].map { |item| item['actor']['type'] }
+batched = client.assets.batch(asset_ids: ['asset-1'], operation: 'delete')['batchId']
 client.events.each(cursor: cursor) do |event|
   case event['type']
   when 'asset.blocked', 'asset.purged'
@@ -111,8 +119,10 @@ end
 webhook = CalmLens.parse_webhook_event(payload: '{}', signature: 'v1=x', timestamp: '1', secret: 'whsec')
 webhook_status = webhook.asset&.dig('classification', 'moderation', 'status')
 webhook_test = webhook.test?
+webhook_actor = webhook.actor&.fetch('type')
 client.close
 
+# @type var moderate: ^(CalmLens::MockModerationInput) -> (CalmLens::MockDecision::status | CalmLens::MockDecision)
 moderate = lambda do |input|
   next 'pending' if input.queued? && input.trigger == 'upload'
 
@@ -122,9 +132,9 @@ end
 mock = CalmLens::MockServerClient.new(moderate: moderate)
 completed = mock.complete_processing('asset-1', CalmLens::MockDecision.of('age-restricted').not_evaluated('profanity'))
 mock.complete_processing('asset-2')
-mock.fail_next_request('upload/website-rate-limit-exceeded', operation: 'assets.create', details: { 'reason' => 'busy' }, retry_after: 30)
+mock.fail_next_request('upload/website-rate-limit-reached', operation: 'assets.create', details: { 'reason' => 'busy' }, retry_after: 30)
 mock.enqueue_event(type: 'asset.allowed', asset_id: 'asset-1',
-                   facts: [{ key: 'asset-name', value: 'beach.jpg' }, { key: 'decided-by', value: 'automated' }],
+                   actor: { type: 'automated', id: nil }, facts: [{ key: 'asset-name', value: 'beach.jpg' }],
                    asset: { id: 'asset-1', upload: { status: 'completed' },
                             classification: { status: 'completed', moderation: { status: 'allowed' } },
                             content: { status: 'removed' } })
@@ -135,9 +145,10 @@ answered = mock.clear_requests.requests.map(&:status)
 test_input_key = ENV.fetch('CALMLENS_TEST_INPUT_KEY')
 mixed = CalmLens::TestInputs::PRESETS.fetch(:mixed)
 signed = CalmLens::TestInputs.generate_text_code(mixed, test_input_key)
-scored = CalmLens::TestInputs.generate_text_code({ instances: [{ category: 'violence', score: 0.9, qualifiers: [] }] }, test_input_key)
+scored = CalmLens::TestInputs.generate_text_code({ instances: [{ category: 'violence', score: 0.9, qualifiers: ['violence-threat'] }] },
+                                                 test_input_key)
 phrase = CalmLens::TestInputs.generate_media_code('violence', test_input_key)
 
 [status, processing, failure, reviews, removal, format, camera, score, ages, names, more, children, matched, expires, lens_width, url,
  renditions, embed, hls, bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered, signed, scored,
- phrase]
+ phrase, automated, regional, flagged_links, batched, webhook_actor]

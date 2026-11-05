@@ -28,7 +28,7 @@ module CalmLens
     #   asset, a viewer for its type, for an iframe) or `placeholder` (a small blurred PNG that
     #   the CDN serves publicly for every asset whatever its visibility or moderation status, without age
     #   confirmation). Lenses and transforms apply to `preview`, and to `rendered` when it is an image; the CDN
-    #   refuses them on rendered PDFs, video and audio with `asset/invalid-transform`, and the SDK refuses them on
+    #   refuses them on rendered PDFs, video and audio with `transform/invalid`, and the SDK refuses them on
     #   `original`, `hls`, `embed` and `placeholder`.
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash] :transform options applied in one pass: a selector such as

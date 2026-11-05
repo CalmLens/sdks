@@ -128,6 +128,12 @@ class ServerClientTest < Minitest::Test
     assert_equal({ 'items' => [{ 'text' => newest }] }, JSON.parse(query['context']))
   end
 
+  def test_a_raw_uploads_tags_are_sent_as_a_json_array_in_the_query
+    client, sent = scripted([200, OK])
+    client.assets.create(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, tags: %w[catalogue backpacks])
+    assert_equal '["catalogue","backpacks"]', URI.decode_www_form(URI(sent.first.url).query).to_h['tags']
+  end
+
   def test_structured_transform_numbers_match_javascript_and_other_values_are_rejected
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: ->(_) { flunk 'sent a request' })
     url = client.cdn.get_asset_url(asset_identifier: 'a',
@@ -157,6 +163,15 @@ class ServerClientTest < Minitest::Test
                  JSON.parse(sent.first.body))
   end
 
+  def test_an_empty_types_list_filters_nothing_and_types_must_be_strings
+    client, sent = scripted([200, '{"items":[],"nextCursor":"c","hasMore":false}'])
+    client.events.list(cursor: 'c', types: [])
+    assert_equal 'cursor=c', URI.parse(sent.first.url).query
+    error = assert_raises(CalmLens::InvalidArgumentError) { client.events.list(cursor: 'c', types: 'asset.blocked') }
+    assert_equal CalmLens::SdkErrorCodes::INVALID_ARGUMENT, error.code
+    assert_equal 1, sent.size
+  end
+
   def test_oversized_one_request_uploads_are_refused_before_sending
     # With the largest part size, none of these is split into parts.
     client, sent = scripted([200, OK], part_size_bytes: 64 * 1024 * 1024)
@@ -165,7 +180,7 @@ class ServerClientTest < Minitest::Test
       error = assert_raises(CalmLens::InvalidArgumentError, type) do
         client.assets.create(name: 'big', content: { data: StringIO.new(''), size_in_bytes: size, type: type })
       end
-      assert_equal CalmLens::ErrorCodes::FILE_TOO_LARGE, error.code
+      assert_equal [CalmLens::ErrorCodes::UPLOAD_TOO_LARGE, { 'limitBytes' => size - 1, 'source' => 'plan' }], [error.code, error.details]
     end
     assert_empty sent
     client.assets.create(name: 'x.png', content: { data: 'x' * (10 * mib), type: 'image/png' })
@@ -213,6 +228,17 @@ class ServerClientTest < Minitest::Test
                  client.assets.wait_for_decision(asset_id: 'asset-1'))
     assert_equal(['/v1/assets/asset-1'] * 9, sent.map { |request| URI(request.url).path })
     assert_equal [0.5, 0.75, 1.125, 1.6875, 2.0, 2.0, 2.0, 2.0], delays
+  end
+
+  def test_wait_for_decision_keeps_waiting_while_queued_or_processing_even_once_a_reviewer_decided
+    asset = lambda { |processing, moderation|
+      [200, JSON.generate('id' => 'asset-1', 'classification' => { 'status' => processing, 'moderation' => { 'status' => moderation } })]
+    }
+    client, sent = scripted(asset.call('queued', 'pending'), asset.call('processing', 'blocked'), asset.call('completed', 'blocked'))
+    client.assets.define_singleton_method(:sleep) { |_seconds| nil }
+    settled = client.assets.wait_for_decision(asset_id: 'asset-1')
+    assert_equal %w[completed blocked], [settled.dig('classification', 'status'), settled.dig('classification', 'moderation', 'status')]
+    assert_equal 3, sent.size
   end
 
   def test_asset_pages_are_fetched_only_as_items_are_needed

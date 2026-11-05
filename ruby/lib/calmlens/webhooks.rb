@@ -15,11 +15,13 @@ module CalmLens
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 300
 
   # A verified webhook delivery. The body has the shape of an {Events#list} item:
-  # `{id, projectId, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt}`.
+  # `{id, projectId, actor, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt}`.
   # Fields CalmLens adds later are kept in {#payload}, as are unknown asset and fact fields.
   #
   # @!attribute id [String] the event ID.
   # @!attribute project_id [String]
+  # @!attribute actor [Hash, nil] who caused the event: `{'type', 'id'}`, with `type` `user`, `api-key`,
+  #   `automated` or `system`, and `id` the user's or API key's ID, or nil when it was not recorded.
   # @!attribute type [String] such as `asset.allowed`. New types may appear: ignore unknown ones.
   # @!attribute severity [String, nil] `low` or `high`.
   # @!attribute title [String, nil]
@@ -31,7 +33,7 @@ module CalmLens
   # @!attribute facts [Array<Hash>] `{'key', 'value', 'url'?}` entries registered for the event type.
   # @!attribute created_at [Integer] milliseconds since the epoch.
   # @!attribute payload [Hash{String => Object}] the delivery body as received, with every field.
-  WebhookEvent = Struct.new(:id, :project_id, :type, :severity, :title, :description, :asset_id, :asset_sequence, :asset,
+  WebhookEvent = Struct.new(:id, :project_id, :actor, :type, :severity, :title, :description, :asset_id, :asset_sequence, :asset,
                             :facts, :created_at, :payload, keyword_init: true) do
     # @return [Boolean] true for a test send from the portal or CLI.
     def test? = Webhooks.test_event?(self)
@@ -100,16 +102,20 @@ module CalmLens
     end
 
     # Converts an event from {Events#list} to the JSON body of its webhook delivery, which has the
-    # same fields: `description`, `assetId`, `assetSequence` and `asset` are nil when absent.
+    # same fields: `description`, `assetId`, `assetSequence` and `asset` are nil when absent, and
+    # `actor` is left out when the event has none.
     # @param event [Hash] an event with string keys, as {Events#list} returns it
-    # @return [Hash] `{ 'id', 'projectId', 'type', 'severity', 'title', 'description', 'assetId', 'assetSequence',
-    #   'asset', 'facts', 'createdAt' }`
+    # @return [Hash] `{ 'id', 'projectId', 'actor', 'type', 'severity', 'title', 'description', 'assetId',
+    #   'assetSequence', 'asset', 'facts', 'createdAt' }`
     def to_payload(event)
       raise Internal.invalid('event must be a Hash') unless event.is_a?(Hash)
 
-      { 'id' => event['id'], 'projectId' => event['projectId'], 'type' => event['type'], 'severity' => event['severity'],
-        'title' => event['title'], 'description' => event['description'], 'assetId' => event['assetId'],
-        'assetSequence' => event['assetSequence'], 'asset' => event['asset'], 'facts' => event['facts'], 'createdAt' => event['createdAt'] }
+      payload = { 'id' => event['id'], 'projectId' => event['projectId'] }
+      payload['actor'] = event['actor'] if event.key?('actor')
+      payload.merge('type' => event['type'], 'severity' => event['severity'], 'title' => event['title'],
+                    'description' => event['description'], 'assetId' => event['assetId'],
+                    'assetSequence' => event['assetSequence'], 'asset' => event['asset'], 'facts' => event['facts'],
+                    'createdAt' => event['createdAt'])
     end
 
     # Checks a delivery's signature and freshness in constant time. Pass the `signature` and
@@ -170,7 +176,7 @@ module CalmLens
       body = JSON.parse(payload.dup.force_encoding(Encoding::UTF_8))
       raise WebhookVerificationError.new(SdkErrorCodes::INVALID_WEBHOOK_PAYLOAD, 'Webhook body is not a CalmLens event') unless event?(body)
 
-      WebhookEvent.new(id: body['id'], project_id: body['projectId'], type: body['type'], severity: body['severity'],
+      WebhookEvent.new(id: body['id'], project_id: body['projectId'], actor: body['actor'], type: body['type'], severity: body['severity'],
                        title: body['title'], description: body['description'], asset_id: body['assetId'],
                        asset_sequence: body['assetSequence'], asset: body['asset'], facts: body.fetch('facts', []),
                        created_at: body['createdAt'], payload: body)
@@ -185,9 +191,16 @@ module CalmLens
                           body['projectId'].is_a?(String) && body['createdAt'].is_a?(Numeric)
 
       optional = ->(key, *types) { !body.key?(key) || types.any? { |type| type.nil? ? body[key].nil? : body[key].is_a?(type) } }
-      asset = body['asset']
       optional.call('severity', String) && optional.call('title', String) && optional.call('description', String, nil) &&
-        optional.call('assetId', String, nil) && optional.call('assetSequence', Numeric, nil) &&
+        optional.call('assetId', String, nil) && optional.call('assetSequence', Numeric, nil) && nested?(body)
+    end
+
+    # The nested fields, when present: `actor` is `{type, id}` with a String type and a String or null
+    # ID, `asset` has a String `id` and `facts` lists `{key, value, url?}` entries.
+    def nested?(body)
+      actor = body.fetch('actor', { 'type' => '' })
+      asset = body['asset']
+      actor.is_a?(Hash) && actor['type'].is_a?(String) && (actor['id'].nil? || actor['id'].is_a?(String)) &&
         (asset.nil? || (asset.is_a?(Hash) && asset['id'].is_a?(String))) &&
         (!body.key?('facts') || (body['facts'].is_a?(Array) && body['facts'].all? { |fact| fact?(fact) }))
     end
@@ -214,7 +227,7 @@ module CalmLens
       raise Internal.invalid("Webhook payload must be the raw body String, not a #{payload.class}. " \
                              'Read request.raw_post (Rails) or request.body.read (Rack, Sinatra) before parsing.')
     end
-    private_class_method :decode_event, :event?, :fact?, :header, :raw_body
+    private_class_method :decode_event, :event?, :nested?, :fact?, :header, :raw_body
   end
 
   # @see Webhooks.signature_header

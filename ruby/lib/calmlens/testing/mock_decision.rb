@@ -82,7 +82,7 @@ module CalmLens
     end
 
     # The report a decided asset gets, as the API sends it: every category (unflagged ones
-    # evaluated with score 0), the policy's actions and `flaggedCategories`.
+    # evaluated with score 0), the policy's actions, the automated status and `flaggedCategories`.
     # @return [Hash{String => Object}, nil] `categories`, `score` and `policy`; nil for `pending` and `failed`
     def report
       return if undecided?
@@ -90,7 +90,7 @@ module CalmLens
       evaluated = (MockClassification::CATEGORIES - @not_evaluated).map { |category| [category, @flags.dig(category, :score) || 0] }
       { 'raw' => { 'categories' => MockClassification::CATEGORIES.to_h { |category| [category, category_report(category)] } },
         'categories' => evaluated.to_h { |category, value| [category, { 'score' => value, 'action' => action(value) }] },
-        'explanationComplete' => true, 'source' => 'policy', 'automatedAction' => STATUS_ACTIONS[@status],
+        'explanationComplete' => true, 'source' => 'policy', 'automatedStatus' => @status,
         'regions' => [], 'flaggedCategories' => evaluated.reject { |_, value| action(value) == 'allow' }.map(&:first) }
     end
 

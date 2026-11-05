@@ -8,11 +8,17 @@ module CalmLens
 
     # Lists events after a cursor, oldest first. Without `cursor`, returns no events and a
     # `nextCursor` for the current time: save it, then pass each response's `nextCursor` as `cursor`.
+    # `types` and `asset_id` narrow the feed to some event types or one asset's events. A cursor
+    # belongs to the filters it was issued with, so pass the same ones with each `cursor`.
     # @option options [String] :cursor the `nextCursor` of a previous response
     # @option options [Integer] :page_size 1 to 100, default 50
+    # @option options [Array<String>] :types event types to list, such as `asset.blocked`
+    # @option options [String] :asset_id list only this asset's events
     # @return [Hash] `{'items', 'nextCursor', 'hasMore'}`; `nextCursor` is never nil
     def list(options = {})
-      call(options, __method__) { |api, request| request('GET', project('events'), query: api, request_options: request) }
+      call(options, __method__) do |api, request|
+        request('GET', project('events'), query: feed_query(api), request_options: request)
+      end
     end
 
     # Iterates pages from `cursor` until `hasMore` is false. Persist each page's `nextCursor` once its
@@ -47,6 +53,17 @@ module CalmLens
       return enum_for(:each, options) unless block
 
       each_page(options) { |page| page['items'].each(&block) }
+    end
+
+    private
+
+    # The API takes the types as one comma-separated value; an empty list filters nothing.
+    def feed_query(api)
+      types = api['types']
+      return api unless api.key?('types')
+      raise Internal.invalid('types must be an Array of event type Strings') unless types.is_a?(Array) && types.all?(String)
+
+      api.merge('types' => types.empty? ? nil : types.join(','))
     end
   end
 end
