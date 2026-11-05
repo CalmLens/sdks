@@ -1065,7 +1065,7 @@ final class ContractTest extends TestCase
                 return property_exists($error, $name) && $error->{$name} === $want;
             case 'cdn-resource':
                 $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'resource' => $name]);
-                return str_ends_with($url, '/asset-1/' . $capability['value']);
+                return str_ends_with($url, '/asset-1/' . $capability['path']);
             case 'cdn-option':
                 $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', $name => ['ageConfirmed' => true]]);
                 return str_ends_with($url, '?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D');

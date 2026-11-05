@@ -633,7 +633,7 @@ def _present(capability: dict[str, Any]) -> bool:
         return bool(getattr(_raised_error(), name, None) == want)
     if kind == "cdn-resource":
         url = _client().cdn.get_asset_url({"assetIdentifier": "asset-1", "resource": name})
-        return url.endswith(f"/asset-1/{capability['value']}")
+        return url.endswith(f"/asset-1/{capability['path']}")
     if kind == "cdn-option":
         get_asset_url = _client().cdn.get_asset_url
         return (name in inspect.signature(get_asset_url).parameters

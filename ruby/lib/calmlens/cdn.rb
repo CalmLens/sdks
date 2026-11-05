@@ -7,22 +7,29 @@ module CalmLens
     OPERATIONS = 'cdn'
 
     # The CDN resources a signed URL can be created for ({Assets#create_signed_url}), as the API accepts them.
-    SIGNED_RESOURCES = %w[original rendered preview].freeze
+    SIGNED_RESOURCES = %w[original rendered preview hls embed].freeze
 
-    RESOURCES = [*SIGNED_RESOURCES, 'placeholder'].freeze
-    # The resources that take no lens or transform: the exact upload and the public placeholder.
-    UNSELECTABLE_RESOURCES = %w[original placeholder].freeze
-    private_constant :RESOURCES, :UNSELECTABLE_RESOURCES
+    # Where each resource is served beneath an asset's CDN path: the signed ones and the public placeholder. The
+    # adaptive stream is its HLS master playlist; its media playlists and segments are the other files beneath
+    # `hls/`.
+    RESOURCE_PATHS = {
+      'original' => 'original', 'rendered' => 'rendered', 'preview' => 'preview',
+      'hls' => 'hls/index.m3u8', 'embed' => 'embed', 'placeholder' => 'placeholder'
+    }.freeze
+    private_constant :RESOURCE_PATHS
 
     # Builds the CDN URL of an asset's resource. Private assets need the API key ({#serve}) or a signed URL
     # ({Assets#create_signed_url}).
     # @option options [String] :asset_identifier the asset ID or external ID
     # @option options [String] :resource `rendered` (default: the displayable file, an image in the best format
     #   the client accepts, a PDF, or browser-safe video or audio), `original` (the exact upload), `preview` (a
-    #   still image for the asset) or `placeholder` (a small blurred PNG that the CDN serves publicly for every
-    #   asset whatever its visibility or moderation status, without age confirmation). Lenses and transforms
-    #   apply to `preview`, and to `rendered` when it is an image; the CDN refuses them on rendered PDFs, video
-    #   and audio with `asset/invalid-transform`.
+    #   still image for the asset), `hls` (the HLS master playlist of audio or video, at
+    #   `hls/index.m3u8`, once `content.hls` is set), `embed` (an HTML page that shows the
+    #   asset, a viewer for its type, for an iframe) or `placeholder` (a small blurred PNG that
+    #   the CDN serves publicly for every asset whatever its visibility or moderation status, without age
+    #   confirmation). Lenses and transforms apply to `preview`, and to `rendered` when it is an image; the CDN
+    #   refuses them on rendered PDFs, video and audio with `asset/invalid-transform`, and the SDK refuses them on
+    #   `original`, `hls`, `embed` and `placeholder`.
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash] :transform options applied in one pass: a selector such as
     #   `width=200,fit=cover`, or structured options such as `{width: 200, fit: 'cover'}`. With a lens,
@@ -74,15 +81,15 @@ module CalmLens
 
     def url(api)
       resource = api.fetch('resource', 'rendered')
-      raise Internal.invalid("Resource must be one of #{RESOURCES.join(', ')}") unless RESOURCES.include?(resource)
+      raise Internal.invalid("Resource must be one of #{RESOURCE_PATHS.keys.join(', ')}") unless RESOURCE_PATHS.key?(resource)
 
       transformed = !api['lens'].nil? || !api['transform'].nil?
-      if UNSELECTABLE_RESOURCES.include?(resource) && transformed
+      if Internal::UNSELECTABLE_CDN_RESOURCES.include?(resource) && transformed
         raise Internal.invalid("The #{resource} resource takes no lens or transform")
       end
 
       url = "#{@session.cdn_base_url}/assets/#{Internal.segment(@session.project_id)}/" \
-            "#{Internal.segment(api['assetIdentifier'])}/#{resource}"
+            "#{Internal.segment(api['assetIdentifier'])}/#{RESOURCE_PATHS.fetch(resource)}"
       transform = api['transform']
       selector = [("@#{Internal.segment(api['lens'])}" if api['lens']),
                   (Transforms.path(transform) unless transform.nil? || transform == '')].compact.join(',')

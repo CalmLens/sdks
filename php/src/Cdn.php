@@ -13,23 +13,38 @@ final class Cdn extends Resource
     protected const OPERATIONS = 'cdn';
 
     /** The CDN resources a signed URL can be created for, as the API accepts them. */
-    public const SIGNED_RESOURCES = ['original', 'rendered', 'preview'];
+    public const SIGNED_RESOURCES = ['original', 'rendered', 'preview', 'hls', 'embed'];
 
     /** Every CDN resource: the signed ones and the public `placeholder`. */
     public const RESOURCES = [...self::SIGNED_RESOURCES, 'placeholder'];
 
-    /** The resources that take no lens or transform: the exact upload and the public placeholder. */
-    private const UNSELECTABLE_RESOURCES = ['original', 'placeholder'];
+    /**
+     * Where each resource is served beneath an asset's CDN path. The adaptive stream is its HLS
+     * master playlist; its media playlists and segments are the other files beneath `hls/`.
+     */
+    private const RESOURCE_PATHS = ['original' => 'original', 'rendered' => 'rendered', 'preview' => 'preview',
+        'hls' => 'hls/index.m3u8', 'embed' => 'embed', 'placeholder' => 'placeholder'];
+
+    /**
+     * The resources that take no lens or transform: the exact upload, the adaptive stream, the
+     * embed page and the public placeholder.
+     *
+     * @internal
+     */
+    public const UNSELECTABLE_RESOURCES = ['original', 'hls', 'embed', 'placeholder'];
 
     /**
      * Builds a CDN URL for an asset's content, without a request.
      *
      * `resource` is `rendered` (default: the displayable file, an image in the best format the
      * client accepts, a PDF, or browser-safe video or audio), `original` (the exact upload),
-     * `preview` (a still image for the asset) or `placeholder` (a small blurred PNG served publicly
-     * for every asset whatever its visibility or moderation status). Lenses and transforms apply to
-     * `preview`, and to `rendered` when it is an image; the CDN refuses them on rendered PDFs, video
-     * and audio with `asset/invalid-transform`.
+     * `preview` (a still image for the asset), `hls` (the HLS master playlist of audio or video, at
+     * `hls/index.m3u8`, once `content.hls` is set), `embed` (an
+     * HTML page that shows the asset, a viewer for its type, for an iframe) or
+     * `placeholder` (a small blurred PNG served publicly for every asset whatever its visibility or
+     * moderation status). Lenses and transforms apply to `preview`, and to `rendered` when it is an
+     * image; the CDN refuses them on rendered PDFs, video and audio with `asset/invalid-transform`,
+     * and the client refuses them on `original`, `hls`, `embed` and `placeholder`.
      *
      * `viewerClaims` takes `region` and `ageConfirmed`. `ageConfirmed` is your platform's
      * confirmation that the viewer passed its age check: your platform confirms the viewer's age,
@@ -50,7 +65,7 @@ final class Cdn extends Resource
             Values::invalid("The $resource resource takes no lens or transform");
         }
         $url = $this->session->cdnBaseUrl . '/assets/' . Values::segment($this->session->projectId)
-            . '/' . Values::segment($options['assetIdentifier'] ?? null) . '/' . $resource;
+            . '/' . Values::segment($options['assetIdentifier'] ?? null) . '/' . self::RESOURCE_PATHS[$resource];
         // One path segment: the lens, then options that replace the lens's same-named options.
         $selector = [];
         if (isset($options['lens'])) {

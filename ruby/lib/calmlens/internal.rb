@@ -13,6 +13,9 @@ module CalmLens
     # ASCII characters without a space at either end) and answers `idempotency/invalid-key`.
     IDEMPOTENCY_KEY = /\A[^\r\n\0]+\z/
     HEADER_VALUE = /\A[^\r\n\0]*\z/
+    # The CDN resources that take no lens or transform: the exact upload, the adaptive stream, the embed page
+    # and the public placeholder.
+    UNSELECTABLE_CDN_RESOURCES = %w[original hls embed placeholder].freeze
 
     module_function
 

@@ -318,7 +318,7 @@ class ContractTest < Minitest::Test
       error = raised_error(spec)
       error.respond_to?(name) && error.public_send(name) == want
     when 'cdn-resource'
-      client.cdn.get_asset_url(asset_identifier: 'asset-1', resource: name).end_with?("/asset-1/#{capability['value']}")
+      client.cdn.get_asset_url(asset_identifier: 'asset-1', resource: name).end_with?("/asset-1/#{capability['path']}")
     when 'cdn-option'
       client.cdn.get_asset_url(asset_identifier: 'asset-1',
                                name.to_sym => { age_confirmed: true }).end_with?('?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D')
