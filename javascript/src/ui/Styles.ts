@@ -1,4 +1,5 @@
 import { CALMLENS_THEME } from "./Theme";
+import { VIEWER_STYLES } from "./viewers/ViewerStyles";
 
 /**
  * The components' stylesheet, also shipped as `calmlens/styles.css`. The React components
@@ -172,7 +173,7 @@ export const CALMLENS_STYLES = `
 .calmlens-media[data-state="error"] .calmlens-media__notice, .calmlens-media[data-kind="unavailable"] .calmlens-media__notice {
   color: inherit; background: var(--calmlens-surface);
 }
-`;
+${VIEWER_STYLES}`;
 
 /** Identifies the stylesheet, so React adds it once however many components render. */
 export const CALMLENS_STYLES_ID = "calmlens-styles";

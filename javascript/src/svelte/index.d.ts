@@ -5,9 +5,14 @@ import type {
   UploaderProps as CoreUploaderProps,
   UploadItem as CoreUploadItem,
   UploadSnapshot as CoreUploadSnapshot,
+  DocumentViewerOptions,
+  ImageViewerOptions,
   MediaProps,
+  SpreadsheetViewerOptions,
+  TextViewerOptions,
   UploadController,
   UploadFile,
+  WebsiteViewerOptions,
 } from "../ui.js";
 
 // The browser's files are `File`s, so the upload types default to `File` here.
@@ -33,5 +38,16 @@ export declare const CalmLensUploader: Component<UploaderProps>;
  * `ageConfirmed` is set; blocked and purged assets show an unavailable notice.
  */
 export declare const CalmLensMedia: Component<MediaProps>;
+
+/** Shows an image asset's rendered file, fitted to the element, over its placeholder (preview). */
+export declare const CalmLensImageViewer: Component<ImageViewerOptions>;
+/** Shows a website asset's screenshot with a link to the original page (preview). */
+export declare const CalmLensWebsiteViewer: Component<WebsiteViewerOptions>;
+/** Shows a text asset's text, escaped, in a scrolling region (preview). */
+export declare const CalmLensTextViewer: Component<TextViewerOptions>;
+/** Shows a PDF, or a document rendered as one, a page at a time with pdf.js (preview). */
+export declare const CalmLensDocumentViewer: Component<DocumentViewerOptions>;
+/** Shows a spreadsheet's sheets as tabs and paged tables, from its extracted text (preview). */
+export declare const CalmLensSpreadsheetViewer: Component<SpreadsheetViewerOptions>;
 
 export * from "../ui.js";

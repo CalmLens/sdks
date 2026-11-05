@@ -67,6 +67,7 @@ export type {
   UploadSnapshot,
 } from "./ui/BrowserUpload";
 export { createUploadController } from "./ui/BrowserUpload";
+export * from "./viewers/Vue";
 
 const icon = (name: IconName) => h("svg", ICON_ATTRIBUTES, [h("path", { d: ICONS[name] })]);
 

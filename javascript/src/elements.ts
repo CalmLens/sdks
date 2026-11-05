@@ -46,6 +46,7 @@ export type {
   UploadSnapshot,
 } from "./ui/BrowserUpload";
 export { createUploadController } from "./ui/BrowserUpload";
+export * from "./viewers/Elements";
 
 /** The `detail` of each event the elements dispatch. */
 export interface CalmLensElementEvents {

@@ -58,6 +58,7 @@ export type {
   UseCalmLensUploadResult,
 } from "./ui/BrowserUpload";
 export { createUploadController } from "./ui/BrowserUpload";
+export * from "./viewers/React";
 
 /**
  * Uploads files through an upload preset and re-renders as each one uploads and is checked. Use
