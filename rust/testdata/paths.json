@@ -430,6 +430,56 @@
     {
       "options": {
         "assetIdentifier": "asset-1",
+        "resource": "hls"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/hls/index.m3u8"
+    },
+    {
+      "options": {
+        "assetIdentifier": "a/b c",
+        "resource": "hls",
+        "viewerClaims": {
+          "ageConfirmed": true
+        }
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/a%2Fb%20c/hls/index.m3u8?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "hls",
+        "lens": "thumbnail"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "hls",
+        "transform": {
+          "width": 10
+        }
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "embed"
+      },
+      "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/embed"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
+        "resource": "embed",
+        "transform": "width=10"
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "options": {
+        "assetIdentifier": "asset-1",
         "resource": "original"
       },
       "url": "https://cdn.calmlens.com/v1/assets/project-1/asset-1/original"

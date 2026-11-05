@@ -1313,6 +1313,21 @@
           "operation": "cdn.serve",
           "args": {
             "assetIdentifier": {
+              "$ref": "blocked.id"
+            },
+            "resource": "embed"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
               "$ref": "other.id"
             },
             "resource": "original"
@@ -1421,6 +1436,21 @@
               "$ref": "purged.id"
             },
             "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "purged.id"
+            },
+            "resource": "embed"
           },
           "expect": {
             "cdn": {
@@ -8574,22 +8604,6 @@
           }
         },
         {
-          "operation": "cdn.serve",
-          "args": {
-            "assetIdentifier": {
-              "$ref": "video.id"
-            },
-            "resource": "rendered",
-            "transform": "stream"
-          },
-          "expect": {
-            "cdn": {
-              "status": 404,
-              "code": "asset/no-rendered-version"
-            }
-          }
-        },
-        {
           "operation": "assets.classify",
           "args": {
             "name": "song.mp3",
@@ -8712,6 +8726,134 @@
             "cdn": {
               "status": 200,
               "body": "hello"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "audio and video have no stream until one is prepared, and the embed page serves every asset",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "clip.mp4",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "video/mp4"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true,
+              "features": {
+                "streaming": {
+                  "enabled": true
+                }
+              }
+            },
+            "visibility": "public"
+          },
+          "save": "video",
+          "expect": {
+            "result": {
+              "content.rendered.kind": "video",
+              "content.hls": null
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "video.id"
+            },
+            "resource": "hls"
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/no-rendered-version"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "video.id"
+            },
+            "resource": "embed"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "text/html; charset=utf-8"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.createSignedUrl",
+          "args": {
+            "assetId": {
+              "$ref": "video.id"
+            },
+            "resource": "hls"
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.createSignedUrl",
+          "args": {
+            "assetId": {
+              "$ref": "video.id"
+            },
+            "resource": "embed"
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "image.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "image",
+          "expect": {
+            "result": {
+              "content.rendered.kind": "image",
+              "content.hls": null
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetIdentifier": {
+              "$ref": "image.id"
+            },
+            "resource": "embed"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "text/html; charset=utf-8"
+              }
             }
           }
         }

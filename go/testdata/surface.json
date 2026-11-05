@@ -971,6 +971,7 @@
       "kind": "cdn-resource",
       "description": "The CDN's original resource.",
       "value": "original",
+      "path": "original",
       "names": {
         "javascript": "original",
         "python": "original",
@@ -986,6 +987,7 @@
       "kind": "cdn-resource",
       "description": "The CDN's rendered resource.",
       "value": "rendered",
+      "path": "rendered",
       "names": {
         "javascript": "rendered",
         "python": "rendered",
@@ -1001,6 +1003,7 @@
       "kind": "cdn-resource",
       "description": "The CDN's preview resource.",
       "value": "preview",
+      "path": "preview",
       "names": {
         "javascript": "preview",
         "python": "preview",
@@ -1012,10 +1015,43 @@
       }
     },
     {
+      "id": "cdn.resource.hls",
+      "kind": "cdn-resource",
+      "description": "The CDN's hls resource.",
+      "value": "hls",
+      "path": "hls/index.m3u8",
+      "names": {
+        "javascript": "hls",
+        "python": "hls",
+        "go": "ResourceHLS",
+        "rust": "CdnResource::Hls",
+        "java": "hls",
+        "ruby": "hls",
+        "php": "hls"
+      }
+    },
+    {
+      "id": "cdn.resource.embed",
+      "kind": "cdn-resource",
+      "description": "The CDN's embed resource.",
+      "value": "embed",
+      "path": "embed",
+      "names": {
+        "javascript": "embed",
+        "python": "embed",
+        "go": "ResourceEmbed",
+        "rust": "CdnResource::Embed",
+        "java": "embed",
+        "ruby": "embed",
+        "php": "embed"
+      }
+    },
+    {
       "id": "cdn.resource.placeholder",
       "kind": "cdn-resource",
       "description": "The CDN's placeholder resource.",
       "value": "placeholder",
+      "path": "placeholder",
       "names": {
         "javascript": "placeholder",
         "python": "placeholder",

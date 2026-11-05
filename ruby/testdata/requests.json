@@ -2375,6 +2375,9 @@
           },
           "linkDetection": {
             "enabled": true
+          },
+          "streaming": {
+            "enabled": true
           }
         }
       }
@@ -2385,7 +2388,7 @@
       "query": {
         "name": "note.txt",
         "queue": "true",
-        "processingOptions": "{\"features\":{\"ocr\":{\"enabled\":true},\"personDetection\":{\"enabled\":true},\"faceDetection\":{\"enabled\":true,\"ageEstimation\":true},\"linkDetection\":{\"enabled\":true}}}",
+        "processingOptions": "{\"features\":{\"ocr\":{\"enabled\":true},\"personDetection\":{\"enabled\":true},\"faceDetection\":{\"enabled\":true,\"ageEstimation\":true},\"linkDetection\":{\"enabled\":true},\"streaming\":{\"enabled\":true}}}",
         "contentType": "text/plain",
         "sizeInBytes": "5"
       },
@@ -2797,6 +2800,17 @@
           "height": 1,
           "peaks": [
             0.5
+          ]
+        },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
           ]
         },
         "preview": {
@@ -3226,6 +3240,17 @@
           "height": 1,
           "peaks": [
             0.5
+          ]
+        },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
           ]
         },
         "preview": {
@@ -3696,6 +3721,17 @@
             0.5
           ]
         },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
+          ]
+        },
         "preview": {
           "width": 1,
           "height": 1,
@@ -4149,6 +4185,17 @@
           "height": 1,
           "peaks": [
             0.5
+          ]
+        },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
           ]
         },
         "preview": {
@@ -4639,6 +4686,17 @@
             0.5
           ]
         },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
+          ]
+        },
         "preview": {
           "width": 1,
           "height": 1,
@@ -5076,6 +5134,17 @@
                 "height": 1,
                 "peaks": [
                   0.5
+                ]
+              },
+              "hls": {
+                "renditions": [
+                  {
+                    "kind": "video",
+                    "width": 1,
+                    "height": 1,
+                    "bandwidth": 1,
+                    "codecs": "example"
+                  }
                 ]
               },
               "preview": {
@@ -5521,6 +5590,17 @@
               "height": 1,
               "peaks": [
                 0.5
+              ]
+            },
+            "hls": {
+              "renditions": [
+                {
+                  "kind": "video",
+                  "width": 1,
+                  "height": 1,
+                  "bandwidth": 1,
+                  "codecs": "example"
+                }
               ]
             },
             "preview": {
@@ -5974,6 +6054,17 @@
                 0.5
               ]
             },
+            "hls": {
+              "renditions": [
+                {
+                  "kind": "video",
+                  "width": 1,
+                  "height": 1,
+                  "bandwidth": 1,
+                  "codecs": "example"
+                }
+              ]
+            },
             "preview": {
               "width": 1,
               "height": 1,
@@ -6419,6 +6510,17 @@
             0.5
           ]
         },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
+          ]
+        },
         "preview": {
           "width": 1,
           "height": 1,
@@ -6458,12 +6560,6 @@
                   "allScore": 0.5,
                   "likelihood": "very-unlikely"
                 }
-              },
-              "policyConditions": {
-                "example": {
-                  "status": "evaluated",
-                  "score": 0.5
-                }
               }
             },
             "violence": {
@@ -6476,12 +6572,6 @@
                   "someScore": 0.5,
                   "allScore": 0.5,
                   "likelihood": "very-unlikely"
-                }
-              },
-              "policyConditions": {
-                "example": {
-                  "status": "evaluated",
-                  "score": 0.5
                 }
               }
             },
@@ -6496,12 +6586,6 @@
                   "allScore": 0.5,
                   "likelihood": "very-unlikely"
                 }
-              },
-              "policyConditions": {
-                "example": {
-                  "status": "evaluated",
-                  "score": 0.5
-                }
               }
             },
             "harassment": {
@@ -6514,12 +6598,6 @@
                   "someScore": 0.5,
                   "allScore": 0.5,
                   "likelihood": "very-unlikely"
-                }
-              },
-              "policyConditions": {
-                "example": {
-                  "status": "evaluated",
-                  "score": 0.5
                 }
               }
             },
@@ -6534,12 +6612,6 @@
                   "allScore": 0.5,
                   "likelihood": "very-unlikely"
                 }
-              },
-              "policyConditions": {
-                "example": {
-                  "status": "evaluated",
-                  "score": 0.5
-                }
               }
             },
             "criminal-activity": {
@@ -6552,12 +6624,6 @@
                   "someScore": 0.5,
                   "allScore": 0.5,
                   "likelihood": "very-unlikely"
-                }
-              },
-              "policyConditions": {
-                "example": {
-                  "status": "evaluated",
-                  "score": 0.5
                 }
               }
             },
@@ -6572,12 +6638,6 @@
                   "allScore": 0.5,
                   "likelihood": "very-unlikely"
                 }
-              },
-              "policyConditions": {
-                "example": {
-                  "status": "evaluated",
-                  "score": 0.5
-                }
               }
             },
             "profanity": {
@@ -6590,12 +6650,6 @@
                   "someScore": 0.5,
                   "allScore": 0.5,
                   "likelihood": "very-unlikely"
-                }
-              },
-              "policyConditions": {
-                "example": {
-                  "status": "evaluated",
-                  "score": 0.5
                 }
               }
             }
@@ -7033,6 +7087,17 @@
             0.5
           ]
         },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
+          ]
+        },
         "preview": {
           "width": 1,
           "height": 1,
@@ -7460,6 +7525,17 @@
           "height": 1,
           "peaks": [
             0.5
+          ]
+        },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
           ]
         },
         "preview": {
@@ -7896,6 +7972,17 @@
             0.5
           ]
         },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
+          ]
+        },
         "preview": {
           "width": 1,
           "height": 1,
@@ -8323,6 +8410,17 @@
           "height": 1,
           "peaks": [
             0.5
+          ]
+        },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
           ]
         },
         "preview": {
@@ -8755,6 +8853,17 @@
           "height": 1,
           "peaks": [
             0.5
+          ]
+        },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
           ]
         },
         "preview": {
@@ -9219,6 +9328,17 @@
           "height": 1,
           "peaks": [
             0.5
+          ]
+        },
+        "hls": {
+          "renditions": [
+            {
+              "kind": "video",
+              "width": 1,
+              "height": 1,
+              "bandwidth": 1,
+              "codecs": "example"
+            }
           ]
         },
         "preview": {

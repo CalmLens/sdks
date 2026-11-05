@@ -50,6 +50,26 @@
     "error": "sdk/invalid-argument"
   },
   {
+    "name": "signed URL for the HLS stream through a lens",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "resource": "hls",
+      "lens": "thumbnail"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "signed URL for the embed page with a transform",
+    "operation": "assets.createSignedUrl",
+    "options": {
+      "assetId": "asset-1",
+      "resource": "embed",
+      "transform": "width=10"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
     "name": "signed URL lifetime below 1 second",
     "operation": "assets.createSignedUrl",
     "options": {
@@ -766,6 +786,26 @@
       "assetIdentifier": "asset-1",
       "resource": "original",
       "transform": "width=10"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve the HLS stream with a transform",
+    "operation": "cdn.serve",
+    "options": {
+      "assetIdentifier": "asset-1",
+      "resource": "hls",
+      "transform": "width=10"
+    },
+    "error": "sdk/invalid-argument"
+  },
+  {
+    "name": "serve the embed page through a lens",
+    "operation": "cdn.serve",
+    "options": {
+      "assetIdentifier": "asset-1",
+      "resource": "embed",
+      "lens": "thumbnail"
     },
     "error": "sdk/invalid-argument"
   },
