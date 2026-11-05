@@ -146,7 +146,7 @@ def _error_fields(error: BaseException) -> dict[str, Any]:
     """The error fields every runner compares, ``None`` where there is none. Python's ``details``
     is always a dict: an API response's error always has the body's ``details`` object (empty or
     not), and an empty dict on an error raised before sending (an ``sdk/*`` code, or an API code
-    such as ``upload/file-too-large`` without a status) is no details."""
+    such as ``upload-payload/invalid`` without a status) is no details."""
     assert isinstance(error, CalmLensError), repr(error)
     has_details = bool(error.details) or (not error.code.startswith("sdk/") and error.status is not None)
     return {"code": error.code, "status": error.status, "requestId": error.request_id,
@@ -395,8 +395,8 @@ class UploadMimeTypeTests(unittest.TestCase):
             for mode in ("content", "part"):
                 with self.subTest(mime_type, mode=mode), self.assertRaises(CalmLensValidationError) as raised:
                     _client().assets.create(name="x", **{mode: {"base64": "aGVsbG8=", "type": mime_type}})
-                self.assertEqual(raised.exception.code, "upload/invalid-mime-type")
-                self.assertEqual(raised.exception.details, {"mimeType": mime_type})
+                self.assertEqual(raised.exception.code, "upload/unsupported-type")
+                self.assertEqual(raised.exception.details, {"mimeType": mime_type, "source": "calmlens"})
 
 
 # ---- client-cases.json ------------------------------------------------------------------------
@@ -870,6 +870,16 @@ def _at(value: Any, path: str) -> Any:
     return value
 
 
+def _only_listed(actual: Any, wanted: Any) -> Any:
+    """``actual`` with each object narrowed to the fields ``wanted`` lists, recursively, so that an
+    equality check compares only those fields (lists must still match item for item)."""
+    if isinstance(actual, dict) and isinstance(wanted, dict):
+        return {key: _only_listed(actual[key], wanted[key]) for key in wanted if key in actual}
+    if isinstance(actual, list) and isinstance(wanted, list) and len(actual) == len(wanted):
+        return [_only_listed(item, want) for item, want in zip(actual, wanted)]
+    return actual
+
+
 def _resolve(value: Any, saved: dict[str, Any]) -> Any:
     """Resolve ``$ref``, ``$concat`` and ``$base64Repeat`` values (see the README)."""
     if isinstance(value, dict) and "$ref" in value:
@@ -920,7 +930,8 @@ def _run(client: MockCalmLensServerClient, operation: str, args: dict[str, Any],
     if operation == "mock.decide":
         return _json(client.decide(args["assetId"], args["outcome"]))
     if operation == "mock.enqueueEvent":
-        return _json(client.enqueue_event(args["type"], asset_id=args.get("assetId"), facts=args.get("facts")))
+        return _json(client.enqueue_event(args["type"], asset_id=args.get("assetId"), facts=args.get("facts"),
+                                          actor=args.get("actor")))
     if operation == "mock.grant":
         client.set_api_key_grants(args["grants"])
         return None
@@ -998,8 +1009,11 @@ class MockScenarioTests(unittest.TestCase):
                     if "retryAfter" in want:
                         self.assertEqual(error.retry_after, want.pop("retryAfter"), f"{label}: retryAfter")
                     self.assertEqual({"code": error.code, "status": error.status}, want, label)
+                    # ``details`` lists only the keys to compare, and objects in them (such as each
+                    # of a validation error's ``issues``) only the fields to compare.
                     for key, value in wanted_details.items():
-                        self.assertEqual(_json(error.details.get(key)), _resolve(value, saved),
+                        wanted = _resolve(value, saved)
+                        self.assertEqual(_only_listed(_json(error.details.get(key)), wanted), wanted,
                                          f"{label}: details.{key}")
                     continue
                 statuses.clear()

@@ -26,16 +26,16 @@ class ViewerClaims(TypedDict, total=False):
 
 
 __all__ = [
-    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "RegionalDecision", "ViewerClaims", "CategoryPolicyScore",
+    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "CategoryPolicyDefaultSource", "CategoryPolicyRuleSource", "RegionalDecision", "ViewerClaims", "CategoryPolicyScore",
     "AgeRange", "Asset", "AssetClassificationFailureReason", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
-    "TestRegionalAction", "AssetReview", "AssetModeration", "ModerationRaw", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetTimelinePage", "AssetTimelineSegment", "AssetClassification", "ClassificationProgress", "AssetUpload",
+    "Actor", "ActorType", "ReviewActor", "AssetReview", "AssetModeration", "ModerationRaw", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetTimelinePage", "AssetTimelineSegment", "AssetClassification", "ClassificationProgress", "AssetUpload",
     "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
     "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
-    "ClassificationCategory", "ClassificationLabel", "Content", "CreateFolderOptions",
+    "ClassificationCategory", "Content", "CreateFolderOptions",
     "DetectedFace", "DetectedPerson", "EnsureLensesOptions",
     "EvaluatedCategoryResult", "EvaluatedFaceDetectionResult", "EvaluatedPersonDetectionResult",
-    "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
+    "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
     "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "StreamingFeatureOptions", "AssetPreview", "AssetModerationTimeline", "SignedCdnResource",
@@ -66,8 +66,11 @@ __all__ = [
 
 # ---- Enum-like values -----------------------------------------------------------------------
 
-#: Where an asset is in the pipeline (``classification.status``). New statuses may be added.
-AssetClassificationStatus = Union[Literal["pending", "processing", "completed", "failed"], str]
+#: Where an asset is in the pipeline (``classification.status``): ``queued`` while it waits for its
+#: content (a multipart upload still receiving parts) or its turn, ``processing``, then
+#: ``completed`` or ``failed``. The asset is settled once it is ``completed`` or ``failed``. New
+#: statuses may be added.
+AssetClassificationStatus = Union[Literal["queued", "processing", "completed", "failed"], str]
 #: The moderation decision in force, which also decides delivery (``classification.moderation.status``):
 #: ``pending``, then ``allowed``, ``limited`` (delivered like ``allowed``, but marked so your app can
 #: reduce its reach, such as keeping it out of recommendations, trending and notifications, ranking it
@@ -85,8 +88,8 @@ AssetContentRemovalReason = Union[Literal["policy", "retention", "requested", "p
 #: ``failed``. New reasons may be added.
 AssetClassificationFailureReason = Union[Literal["file-too-large", "duration-limit", "resolution-limit",
                                                  "unsupported-format", "undecodable-content", "multiple-tracks",
-                                                 "type-mismatch", "free-upload-limit", "media-limit",
-                                                 "spend-limit", "child-failed", "processing-error"], str]
+                                                 "type-mismatch", "free-uploads-exhausted", "media-limit",
+                                                 "uploads-paused", "child-failed", "processing-error"], str]
 #: Known asset types. New types may be added.
 AssetType = Union[Literal["image", "video", "audio", "plaintext-document", "multimedia-document", "website",
                           "file"], str]
@@ -121,7 +124,7 @@ SignedCdnResource = Literal["original", "rendered", "preview", "hls", "embed"]
 #: PNG made from the preview that is served publicly for every asset whatever its visibility or
 #: moderation status, without age confirmation. Defaults to ``rendered``. Lenses and transforms
 #: apply to ``preview``, and to ``rendered`` when it is an image; the CDN refuses them on rendered
-#: PDFs, video and audio with ``asset/invalid-transform``, and the SDK refuses them on
+#: PDFs, video and audio with ``transform/invalid``, and the SDK refuses them on
 #: ``original``, ``hls``, ``embed`` and ``placeholder``.
 CdnResource = Literal["original", "rendered", "preview", "hls", "embed", "placeholder"]
 #: How ``assets.search`` matches.
@@ -132,29 +135,32 @@ AssetSearchMatchField = Union[Literal["name", "id", "externalId", "description",
 #: State of the project's semantic search index. New values may be added.
 SemanticStatus = Union[Literal["disabled", "ready", "indexing", "unavailable"], str]
 #: Event types. New types may be added; ignore ones you don't handle.
-EventType = Union[Literal["asset.uploaded", "asset.classified", "asset.allowed", "asset.limited",
-                          "asset.age-restricted", "asset.blocked", "asset.purged", "asset.failed", "asset.deleted", "asset.content-removed",
-                          "asset.retried", "asset.link-flagged", "asset.processing-progress", "usage.limit-reached", "usage.spend-limit-reached",
-                          "upload-preset.daily-limit-reached", "project.member-joined",
-                          "project.member-removed", "project.member-role-changed",
-                          "project.invitation-sent", "api-key.created", "api-key.revoked",
-                          "connector.failing"], str]
+EventType = Union[Literal["asset.uploaded", "asset.classified", "asset.region-restricted", "asset.allowed",
+                          "asset.limited", "asset.age-restricted", "asset.blocked", "asset.purged", "asset.failed",
+                          "asset.progress-updated", "asset.deleted", "asset.content-removed", "asset.retried",
+                          "asset.review-requested", "asset.hash-matched", "asset.link-flagged",
+                          "usage.free-uploads-exhausted", "usage.uploads-paused", "upload-preset.daily-limit-reached",
+                          "project.member-joined", "project.member-removed", "project.member-left",
+                          "project.member-role-changed", "project.invitation-sent", "project.transferred",
+                          "api-key.created", "api-key.revoked", "api-key.deleted", "connector.disabled"], str]
 #: Default severity of an event type. New values may be added.
 EventSeverity = Union[Literal["low", "high"], str]
 #: Registered fact keys (kebab-case) across event types, plus ``test`` on test sends. Webhook,
 #: Slack and email deliveries and the public events feed leave out facts that hold personal or
 #: account data (names, email addresses, the organisation's ID).
 EventFactKey = Union[Literal[
-    "asset-name", "asset-type", "file-format", "decided-by", "moderation-status", "flagged-categories",
-    "reviewer-user-id", "reviewer-name", "note", "previous-status", "limit", "used", "organisation-id",
-    "member-user-id", "member-name", "role", "invited-by-user-id", "connector-id", "connector-name",
-    "connector-type", "consecutive-failures", "last-error", "resumes-on", "reason", "failure-reason", "preset-id", "preset-name",
-    "daily-limit", "left", "removed-by-user-id", "previous-role", "changed-by-user-id", "key-id",
-    "key-name", "action", "created-by-user-id", "revoked-by-user-id", "link-verdict", "link-url",
-    "link-final-url", "link-action", "completed-sections", "total-sections", "test",
+    "asset-name", "asset-type", "file-format", "parent-asset", "flagged-categories", "moderation-status",
+    "automated-status", "region", "rule", "status", "reviewer-name", "note", "previous-status", "failure-reason",
+    "completed-sections", "total-sections", "batch-id", "review-reason", "uncertain-categories", "hash-list-id",
+    "hash-list-name", "distance", "match-action", "link-verdict", "link-url", "link-final-url", "link-status",
+    "limit", "used", "organisation-id", "reason", "resumes-at", "preset-id", "preset-name", "daily-limit",
+    "member-user-id", "member-name", "role", "previous-role", "invitee-email", "previous-organisation-id",
+    "previous-organisation-name", "organisation-name", "method", "api-keys-revoked", "connectors-paused",
+    "key-id", "key-name", "created-by-name", "revoked-by-name", "deleted-by-name", "connector-id",
+    "connector-name", "connector-type", "consecutive-failures", "last-error", "test",
 ], str]
-#: A registered fact value: text, an integer count, a boolean, a list of values (such as
-#: ``flagged-categories``) or ``None``.
+#: A registered fact value: text, an integer count, a time in epoch milliseconds (such as
+#: ``resumes-at``), a boolean, a list of values (such as ``flagged-categories``) or ``None``.
 EventFactValue = Any
 
 #: What a hash list's matches do (request values): ``flag`` reports matches, ``block`` also blocks
@@ -269,7 +275,7 @@ class ProcessingFeatures(TypedDict, total=False):
 
 
 class ProcessingOptions(TypedDict, total=False):
-    """``processingOptions`` for an upload, as stored on the asset."""
+    """``processingOptions`` for an upload."""
     keepContentAfterProcessing: Optional[bool]
     #: Overrides the project's ``storeSensitiveMetadata`` setting for this upload. When false,
     #: embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
@@ -304,14 +310,6 @@ QualifierResult = Union[EvaluatedQualifierResult, NotEvaluatedQualifierResult]
 QualifierResults = Dict[ModerationQualifier, QualifierResult]
 
 
-class EvaluatedPolicyConditionResult(TypedDict):
-    status: Literal["evaluated"]
-    score: float
-
-
-PolicyConditionResult = Union[EvaluatedPolicyConditionResult, NotEvaluatedQualifierResult]
-
-
 class _EvaluatedCategoryRequired(TypedDict):
     status: Literal["evaluated"]
     likelihood: Likelihood
@@ -320,7 +318,6 @@ class _EvaluatedCategoryRequired(TypedDict):
 
 class EvaluatedCategoryResult(_EvaluatedCategoryRequired, total=False):
     qualifiers: QualifierResults
-    policyConditions: Dict[str, PolicyConditionResult]
 
 
 class _PartialCategoryRequired(TypedDict):
@@ -332,7 +329,6 @@ class _PartialCategoryRequired(TypedDict):
 class PartialCategoryResult(_PartialCategoryRequired, total=False):
     """Some of the content (for example a media segment) could not be assessed."""
     qualifiers: QualifierResults
-    policyConditions: Dict[str, PolicyConditionResult]
 
 
 class _NotEvaluatedCategoryRequired(TypedDict):
@@ -342,7 +338,6 @@ class _NotEvaluatedCategoryRequired(TypedDict):
 
 class NotEvaluatedCategoryResult(_NotEvaluatedCategoryRequired, total=False):
     qualifiers: QualifierResults
-    policyConditions: Dict[str, PolicyConditionResult]
 
 
 #: A category result; narrow on ``result["status"]`` before reading ``score``.
@@ -360,17 +355,6 @@ class MediaClassificationSegment(TypedDict):
 
 #: One stretch of an audio or video asset's findings: its source, times and scores.
 AssetTimelineSegment = MediaClassificationSegment
-
-
-class _ClassificationLabelRequired(TypedDict):
-    description: str
-    score: float
-    likelihood: Likelihood
-
-
-class ClassificationLabel(_ClassificationLabelRequired, total=False):
-    topicalityScore: Optional[float]
-    knowledgeBaseId: Optional[str]
 
 
 class BoundingBox(TypedDict):
@@ -554,8 +538,8 @@ class LinkSafetyDecision(TypedDict):
     """Preview. What the policy's link-safety section made of the asset's links."""
     #: The strongest action the asset's links take under the policy's link-safety settings.
     action: LinkSafetyAction
-    #: Indexes into ``classification.linkSafety["links"]`` of the links that take that action.
-    links: list[int]
+    #: The links that take that action, with where each leads and its verdict.
+    links: list[CheckedLink]
     #: The link-safety settings in force at decision time.
     settings: LinkSafetySettings
 
@@ -588,18 +572,30 @@ class CategoryPolicySettingsSnapshot(TypedDict):
     restrictions: List[PolicyRuleSnapshot]
 
 
-class _CategoryPolicySourceRequired(TypedDict):
-    kind: str
+class CategoryPolicyDefaultSource(TypedDict):
+    """The category's ``default`` action, or a policy score ``below-threshold``."""
+    kind: Literal["default", "below-threshold"]
 
 
-class CategoryPolicySource(_CategoryPolicySourceRequired, total=False):
-    index: int
+class CategoryPolicyRuleSource(TypedDict):
+    """The ``allowance`` or ``restriction`` rules that decided the category's action."""
+    kind: Literal["allowance", "restriction"]
+    #: Indexes into the category's ``settings["allowances"]`` or ``settings["restrictions"]`` of the
+    #: deciding rules, the decisive one first. Several allowances list every rule that covers the
+    #: content together.
     indexes: List[int]
+
+
+#: What decided a category's action; narrow on ``source["kind"]``.
+CategoryPolicySource = Union[CategoryPolicyDefaultSource, CategoryPolicyRuleSource]
 
 
 class _RegionalDecisionRequired(TypedDict):
     region: str
-    action: ModerationAction
+    #: The status in force in the region, stricter than ``moderation["status"]``: ``limited``,
+    #: ``age-restricted``, ``blocked`` or ``purged``.
+    status: AssetModerationDecision
+    #: The mandatory rule that sets it.
     rule: str
 
 
@@ -755,25 +751,31 @@ class AssetUpload(TypedDict):
     partsReceived: Optional[int]
 
 
-class _AssetReviewRequired(TypedDict):
+class ReviewActor(TypedDict):
+    """Who made a reviewer's decision: a ``user`` (a person, or an assistant's key acting for one)
+    or an ``api-key``."""
+    type: Union[Literal["user", "api-key"], str]
+    #: The user's or API key's ID; ``None`` when it was not recorded.
+    id: Optional[str]
+
+
+class AssetReview(TypedDict):
     id: str
     decision: AssetModerationDecision
     note: Optional[str]
+    decidedBy: ReviewActor
     reviewedAt: int
-    appliedToAsset: bool
-
-
-class AssetReview(_AssetReviewRequired, total=False):
-    reviewerName: Optional[str]
-    reviewerEmail: Optional[str]
+    #: Whether the decision was applied to the asset. ``False`` for a review queue decision
+    #: recorded without changing the asset's status.
+    applied: bool
 
 
 class HashMatch(TypedDict):
     """An entry in the project's hash lists that the image matched."""
     #: Where the matching hash came from. New sources may be added.
     source: Union[Literal["hash-list"], str]
-    listId: str
-    entryId: str
+    hashListId: str
+    hashListEntryId: str
     #: Number of bits that differ between the hashes, 0 to 256. 0 is the same picture.
     distance: int
     #: ``block`` when the match is close enough for a block list to block, otherwise ``flag``.
@@ -795,11 +797,6 @@ class _AssetModerationRequired(TypedDict):
     #: there are findings and while a safety or copyright hold withholds the content.
     timeline: Optional[AssetModerationTimeline]
 
-class TestRegionalAction(TypedDict):
-    region: str
-    action: str
-
-
 class _ModerationRawRequired(TypedDict):
     categories: ClassificationCategories
 
@@ -809,9 +806,9 @@ class ModerationRaw(_ModerationRawRequired, total=False):
 
 
 class AssetModeration(_AssetModerationRequired, total=False):
-    testCategoryActions: Dict[str, str]
-    testRegionalActions: List[TestRegionalAction]
-    automatedAction: ModerationAction
+    #: The status automated moderation decided; absent before a decision. Manual reviews can change
+    #: ``status`` without changing this, so the two differ when a reviewer overrode it.
+    automatedStatus: AssetModerationDecision
     source: str
     rule: str
     explanationComplete: bool
@@ -853,7 +850,6 @@ class AssetClassification(_AssetClassificationRequired, total=False):
     #: Where OCR found text, and personal information within it, in an image. Redaction
     #: transforms blur these regions.
     textRegions: List[TextRegion]
-    labels: Optional[list[ClassificationLabel]]
 
 
 class AssetContent(TypedDict):
@@ -928,7 +924,6 @@ class Asset(_AssetRequired, total=False):
     #: The earlier posts CalmLens used, or ``None`` when none were given or the content is removed.
     context: Optional[ModerationContext]
     tags: Optional[list[str]]
-    processingOptions: Optional[ProcessingOptions]
     visibility: Union[Visibility, str, None]
 
 
@@ -1015,7 +1010,7 @@ class _HashListEntryRequired(TypedDict):
 class HashListEntry(_HashListEntryRequired, total=False):
     label: Optional[str]
     #: The asset the hash was taken from, when it was added by ``assetId``.
-    sourceAssetId: Optional[str]
+    assetId: Optional[str]
 
 
 class HashListPage(TypedDict):
@@ -1279,10 +1274,24 @@ class EventAsset(_EventAssetRequired, total=False):
     uploadPresetId: Optional[str]
 
 
+#: Who caused an event: a ``user`` (a person in the portal, or an assistant acting for one), an
+#: ``api-key``, ``automated`` moderation or CalmLens itself (``system``). New types may be added.
+ActorType = Union[Literal["user", "api-key", "automated", "system"], str]
+
+
+class Actor(TypedDict):
+    """Who caused an event."""
+    type: ActorType
+    #: The user's or API key's ID; ``None`` for ``automated`` and ``system``, and when the ID was
+    #: not recorded.
+    id: Optional[str]
+
+
 class Event(TypedDict):
     """An event as ``events.list`` returns it and a webhook delivers it."""
     id: str
     projectId: str
+    actor: Actor
     type: EventType
     severity: EventSeverity
     title: str
@@ -1307,6 +1316,7 @@ class WebhookEventPayload(_WebhookEventPayloadRequired, total=False):
     """The JSON body of a webhook delivery: the event in the shape ``events.list`` returns it.
     ``type`` is a string so event types added later still parse; a received body may carry
     fields this SDK doesn't know."""
+    actor: Actor
     severity: str
     title: str
     description: Optional[str]
@@ -1506,8 +1516,14 @@ class BatchAssetsOptions(TypedDict):
 
 
 class BatchAssetsResponse(TypedDict):
-    """``assets.batch`` returns once the operation is queued: ``{"queued": True}``."""
-    queued: bool
+    """``assets.batch`` returns once the operation is queued: ``{"batchId", "status": "queued",
+    "assetCount"}``. The ``asset.deleted`` and ``asset.content-removed`` events it causes carry a
+    ``batch-id`` fact naming ``batchId``."""
+    batchId: str
+    #: ``queued``; new statuses may be added.
+    status: Union[Literal["queued"], str]
+    #: How many assets the batch covers.
+    assetCount: int
 
 
 class MoveFolderOptions(FolderIdOptions):
@@ -1608,6 +1624,10 @@ class ListEventsOptions(TypedDict, total=False):
     cursor: str
     #: 1 to 100, default 50.
     pageSize: int
+    #: Only these event types. Sent as one comma-separated value.
+    types: List[EventType]
+    #: Only events about this asset.
+    assetId: str
 
 
 class _LensRequired(TypedDict):

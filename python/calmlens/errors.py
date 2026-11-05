@@ -10,7 +10,7 @@ Every failure the SDK raises is a :class:`CalmLensError` (or a subclass), with a
   (``sdk/transport-error``); :class:`CalmLensTimeoutError` (``sdk/timeout``) when a
   connection or read timed out. The native exception is kept as ``__cause__``.
 * :class:`CalmLensValidationError`: the SDK rejected the call before sending anything,
-  for example ``sdk/invalid-argument``, ``sdk/invalid-config`` or ``upload/invalid-payload``.
+  for example ``sdk/invalid-argument``, ``sdk/invalid-config`` or ``upload-payload/invalid``.
 * :class:`WebhookVerificationError`: ``parse_webhook_event`` could not verify a delivery
   (``sdk/invalid-webhook-signature``) or parse its body (``sdk/invalid-webhook-payload``).
 """

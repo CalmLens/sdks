@@ -73,6 +73,8 @@ class ClientTests(ClientTestCase):
         self.assertEqual(json.loads(query["processingOptions"][0]), {"keepContentAfterProcessing": False})
         self.assertEqual(json.loads(query["metadata"][0]), [{"id": "snake_key", "value": 1}])
         self.assertEqual(self.calls[-1].data, b"hi")
+        self.client.text.classify(text="hi", tags=["catalogue", "backpacks"])
+        self.assertEqual(json.loads(self.query()["tags"][0]), ["catalogue", "backpacks"])
         with self.assertRaises(CalmLensValidationError) as raised:
             self.client.assets.retrieve({"assetId": "a"}, asset_id="b")
         self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
@@ -96,9 +98,32 @@ class ClientTests(ClientTestCase):
             self.assertEqual(self.bodies[-1], b"abc")
             self.assertEqual(self.query()["queue"], ["true"])
             self.assertEqual(self.calls[-1].headers["Content-length"], "3")
-        self.client.assets.classify({"name": "site", "url": "https://example.com", "metadata": [{"id": "a", "value": 1}]})
-        self.assertEqual(json.loads(self.calls[-1].data)["metadata"], [{"id": "a", "value": 1}])
+        self.client.assets.classify({"name": "site", "url": "https://example.com", "metadata": [{"id": "a", "value": 1}],
+                                     "tags": ["landing"]})
+        sent = json.loads(self.calls[-1].data)
+        self.assertEqual((sent["metadata"], sent["tags"]), ([{"id": "a", "value": 1}], ["landing"]))
         self.assertTrue(urlsplit(self.calls[-1].full_url).path.endswith("/assets"))
+
+    def test_event_pages_send_their_types_as_one_value_and_keep_the_filters_on_every_page(self):
+        page = {"items": [], "excludedTypes": []}
+        self.script = [({**page, "nextCursor": "c2", "hasMore": True},), ({**page, "nextCursor": "c3", "hasMore": False},)]
+        pages = list(self.client.events.iter_pages(cursor="c1", types=["asset.blocked", "asset.purged"],
+                                                   asset_id="asset_1"))
+        self.assertEqual(len(pages), 2)
+        for index, cursor in ((0, "c1"), (1, "c2")):
+            self.assertEqual(self.query(index), {"cursor": [cursor], "types": ["asset.blocked,asset.purged"],
+                                                 "assetId": ["asset_1"]})
+        # An empty list filters nothing, so nothing is sent for it.
+        self.result = {**page, "nextCursor": "c4", "hasMore": False}
+        self.client.events.list(cursor="c3", types=[])
+        self.assertEqual(self.query(), {"cursor": ["c3"]})
+
+    def test_event_types_must_be_a_list_of_strings(self):
+        for types in ("asset.blocked", ["asset.blocked", 1], {"asset.blocked"}):
+            with self.subTest(types=types), self.assertRaises(CalmLensValidationError) as raised:
+                self.client.events.list(types=types)  # type: ignore[arg-type]
+            self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
+        self.assertEqual(self.calls, [])
 
     def test_moderation_context_keeps_an_over_long_newest_post_and_needs_items(self):
         newest = "🌍" * 2001
@@ -168,12 +193,14 @@ class ClientTests(ClientTestCase):
             ("upload_part", {"assetId": "a", "part": {"data": b"x" * mib, "partNumber": 2}},
              error_codes.INVALID_UPLOAD_PAYLOAD),
             ("create", {"name": "x.png", "part": {"data": b"x" * (21 * mib), "type": "image/png"}},
-             error_codes.MULTIPART_IMAGE_TOO_LARGE),
+             error_codes.UPLOAD_TOO_LARGE),
         ]
         for method, options, code in cases:
             with self.subTest(code=code), self.assertRaises(CalmLensValidationError) as raised:
                 getattr(self.client.assets, method)(options)
             self.assertEqual((raised.exception.code, raised.exception.status), (code, None))
+            if code == error_codes.UPLOAD_TOO_LARGE:
+                self.assertEqual(raised.exception.details, {"limitBytes": 20 * mib, "source": "plan"})
         self.assertEqual(self.calls, [])
         # A small image may be sent as one final part.
         self.client.assets.create({"name": "x.png", "part": {"data": b"x" * mib, "isFinal": True, "type": "image/png"}})
@@ -181,13 +208,14 @@ class ClientTests(ClientTestCase):
 
     def test_oversized_one_request_uploads_are_refused_before_sending(self):
         mib = 1024 * 1024
-        for mime, size in [("image/png", 10 * mib + 1), ("video/mp4", 50 * mib + 1),
-                           ("application/pdf", 5000 * mib + 1)]:
+        for mime, limit in [("image/png", 10 * mib), ("video/mp4", 50 * mib), ("application/pdf", 5000 * mib)]:
+            size = limit + 1
             # A stream that can't be read again goes in one request; its declared size is refused first.
             content = {"data": Unseekable(b""), "sizeInBytes": size, "type": mime}
             with self.subTest(mime=mime), self.assertRaises(CalmLensValidationError) as raised:
                 self.client.assets.create(name="big", content=content)
-            self.assertEqual((raised.exception.code, raised.exception.status), (error_codes.FILE_TOO_LARGE, None))
+            self.assertEqual((raised.exception.code, raised.exception.status, raised.exception.details),
+                             (error_codes.UPLOAD_TOO_LARGE, None, {"limitBytes": limit, "source": "plan"}))
         self.assertEqual(self.calls, [])
         self.client.assets.create(name="x.png", content={"data": Unseekable(b"x" * 10 * mib), "sizeInBytes": 10 * mib,
                                                           "type": "image/png"})
@@ -315,6 +343,16 @@ class WaitForDecisionTests(ClientTestCase):
                          {"assetId": "asset-1", "classificationStatus": "processing", "moderationStatus": "pending"})
         self.assertEqual(self.sleeps, [0.5, 0.75, 1.125, 1.6875] + [2.0] * 7 + [1.9375])
         self.assertEqual(len(self.calls), 13)
+
+    def test_keeps_waiting_while_the_asset_is_queued_or_processing_even_once_a_reviewer_decided_it(self):
+        def asset(classification, moderation):
+            return ({"id": "asset-1", "upload": {"status": "completed"},
+                     "classification": {"status": classification, "moderation": {"status": moderation}}},)
+        self.script = [asset("queued", "pending"), asset("processing", "blocked"), asset("completed", "blocked")]
+        settled = self.client.assets.wait_for_decision(asset_id="asset-1")
+        self.assertEqual((settled["classification"]["status"], settled["classification"]["moderation"]["status"]),
+                         ("completed", "blocked"))
+        self.assertEqual(len(self.calls), 3)
 
     def test_invalid_arguments_are_rejected_before_sending(self):
         for options in ({}, {"assetId": "a", "timeout": -1}, {"assetId": "a", "timeout": float("nan")},
@@ -454,7 +492,8 @@ class AutomaticMultipartTests(ClientTestCase):
     def test_images_over_20_mib_are_refused_before_sending(self):
         with self.assertRaises(CalmLensValidationError) as raised:
             self.client.assets.create(name="x.png", content={"data": b"x" * (20 * MIB + 1), "type": "image/png"})
-        self.assertEqual((raised.exception.code, self.calls), (error_codes.MULTIPART_IMAGE_TOO_LARGE, []))
+        self.assertEqual((raised.exception.code, raised.exception.details, self.calls),
+                         (error_codes.UPLOAD_TOO_LARGE, {"limitBytes": 20 * MIB, "source": "plan"}, []))
 
 
 if __name__ == "__main__":

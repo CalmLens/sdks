@@ -35,7 +35,7 @@ from .errors import (CalmLensAPIError, CalmLensError, CalmLensTimeoutError, Calm
                      CalmLensValidationError, _parse_retry_after)
 from .moderation_context import select_moderation_context_items
 from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, AssetIdOptions, AssetPage, AssetTimelinePage, AssetSearchResponse, AssetUrlOptions, CdnResource, CdnTransform, SignedCdnResource,
-                    Content, CreateFolderOptions, EnsureLensesOptions, Event, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
+                    Content, CreateFolderOptions, EnsureLensesOptions, Event, EventType, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     ImageTransformOptions, LensDefinition, LensType, ListAssetsOptions, ListChildrenOptions, ListTimelineOptions, ListEventsOptions,
                     BatchAssetsOptions, BatchAssetsResponse,
                     MetadataItem, ModerationContext, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
@@ -716,9 +716,15 @@ def _payload(payload: object, multipart: bool = False, part_size: bool = True) -
     return body
 
 
+def _upload_too_large(limit: int, message: str) -> CalmLensValidationError:
+    """``upload/too-large`` for content over the plan's ``limit`` bytes, as the API answers."""
+    return CalmLensValidationError(error_codes.UPLOAD_TOO_LARGE, message, {"limitBytes": limit, "source": "plan"})
+
+
 def _image_size(size: int | None) -> None:
-    if size is not None and size > 20 * 1024 * 1024:
-        raise CalmLensValidationError(error_codes.MULTIPART_IMAGE_TOO_LARGE)
+    limit = 20 * 1024 * 1024
+    if size is not None and size > limit:
+        raise _upload_too_large(limit, "Multipart image uploads cannot exceed 20 MiB.")
 
 
 def _upload_size(mime: str, size: int | None, in_parts: bool = False) -> None:
@@ -737,7 +743,7 @@ def _upload_size(mime: str, size: int | None, in_parts: bool = False) -> None:
     else:
         limit, message = 5000 * 1024 * 1024, "Files can be at most 5,000 MiB"
     if size > limit:
-        raise CalmLensValidationError(error_codes.FILE_TOO_LARGE, message)
+        raise _upload_too_large(limit, message)
 
 
 def _normalize_upload_mime_type(mime_type: str) -> str:
@@ -747,7 +753,7 @@ def _normalize_upload_mime_type(mime_type: str) -> str:
 def _is_accepted_upload_mime_type(mime_type: str) -> bool:
     """Whether the API accepts an upload of this MIME type: an image, audio, video, text, document
     or website type, not a container such as ``application/octet-stream``. It refuses any other
-    type with ``upload/invalid-mime-type``."""
+    type with ``upload/unsupported-type``."""
     normalized = _normalize_upload_mime_type(mime_type)
     if normalized in UPLOAD_MIME_REJECTED:
         return False
@@ -758,10 +764,10 @@ def _is_accepted_upload_mime_type(mime_type: str) -> bool:
 def _invalid_upload_mime_type(mime_type: object) -> CalmLensValidationError:
     normalized = _normalize_upload_mime_type(mime_type) if isinstance(mime_type, str) else ""
     return CalmLensValidationError(
-        error_codes.INVALID_UPLOAD_MIME_TYPE,
+        error_codes.UNSUPPORTED_UPLOAD_TYPE,
         f"{normalized or 'A missing type'} is not a valid upload file type. Uploads must use a concrete file "
         "MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or "
-        "text/plain.", {"mimeType": mime_type})
+        "text/plain.", {"mimeType": mime_type, "source": "calmlens"})
 
 
 def _camel(key: str) -> str:
@@ -1204,7 +1210,7 @@ _CDN_RESOURCE_PATHS: dict[CdnResource, str] = {
 #: page and the public placeholder.
 _UNSELECTABLE_CDN_RESOURCES = ("original", "hls", "embed", "placeholder")
 
-_SUBMIT_QUERY_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "authorId", "context",
+_SUBMIT_QUERY_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "tags", "authorId", "context",
                       "externalId", "externalUrl", "folderId", "uploadPresetId")
 
 
@@ -1259,14 +1265,15 @@ class Assets:
 
     def wait_for_decision(self, options: WaitForDecisionOptions | None = None, /, *, asset_id: str = _UNSET,
                           timeout: float = _UNSET) -> Asset:
-        """Retrieve an asset until ``classification.moderation.status`` is no longer ``pending``
-        (``allowed``, ``limited``, ``age-restricted``, ``blocked`` or ``purged``), or ``classification.status`` is
-        ``failed``, and return that asset.
+        """Retrieve an asset until it is settled, its ``classification.status`` ``completed`` (with
+        its decision in ``classification.moderation.status``) or ``failed``, and return that asset.
+        A ``queued`` or ``processing`` asset is still waiting, even when a reviewer has already
+        decided it.
 
         Checks again after 0.5 seconds, then waits 1.5 times longer each time, up to 2
         seconds between checks. Raises :class:`CalmLensError` with ``sdk/timeout`` and
         ``details`` ``{"assetId", "classificationStatus", "moderationStatus"}`` (the last statuses
-        seen) when there is no decision within ``timeout`` seconds (default 60). Webhooks
+        seen) when it is not settled within ``timeout`` seconds (default 60). Webhooks
         report decisions without polling.
         """
         merged = _merge("assets.waitForDecision", options, asset_id=asset_id, timeout=timeout)
@@ -1281,7 +1288,7 @@ class Assets:
             asset = self.retrieve(wanted)
             classification_status = asset["classification"]["status"]
             moderation_status = asset["classification"]["moderation"]["status"]
-            if moderation_status != "pending" or classification_status == "failed":
+            if classification_status in ("completed", "failed"):
                 return asset
             remaining = deadline - self._c._clock()
             if remaining <= 0:
@@ -1338,12 +1345,12 @@ class Assets:
     def create(self, options: SubmitAssetOptions | None = None, /, *, name: str = _UNSET, content: Content = _UNSET,
                part: Content = _UNSET, url: str = _UNSET, description: str = _UNSET,
                processing_options: ProcessingOptions = _UNSET, visibility: Visibility = _UNSET,
-               metadata: List[MetadataItem] = _UNSET, author_id: str = _UNSET, context: ModerationContext = _UNSET,
-               external_id: str = _UNSET, external_url: str = _UNSET,
+               metadata: List[MetadataItem] = _UNSET, tags: List[str] = _UNSET, author_id: str = _UNSET,
+               context: ModerationContext = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
                folder_id: str | None = _UNSET, upload_preset_id: str = _UNSET,
                total_size_in_bytes: int = _UNSET, idempotency_key: str | None = None) -> Asset:
         """Upload content (or submit a ``url``) and queue classification; returns at once
-        with a ``pending`` asset.
+        with an asset that is not yet decided.
 
         Supply exactly one of ``content``, ``part`` (first part of a multipart upload) or
         ``url``. ``idempotency_key`` makes retries safe; one is generated per call when
@@ -1354,13 +1361,15 @@ class Assets:
         calling again with the same ``idempotency_key`` (at most 240 characters) resumes an
         interrupted upload instead of starting a new one.
 
+        ``tags`` are strings the asset keeps in ``tags``, such as ``["catalogue", "backpacks"]``.
+
         ``author_id`` is your label for who wrote the content. ``context`` holds earlier posts in
         the conversation, oldest first (``{"items": [{"text": ..., "authorId": ...}]}``); CalmLens
         moderates only the content and uses them to read it in context. Only the posts CalmLens
         uses are sent: the most recent 5 that fit in 2,000 characters.
         """
         merged = _merge("assets.create", options, name=name, content=content, part=part, url=url, description=description,
-                        processing_options=processing_options, visibility=visibility, metadata=metadata,
+                        processing_options=processing_options, visibility=visibility, metadata=metadata, tags=tags,
                         author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id,
                         upload_preset_id=upload_preset_id, total_size_in_bytes=total_size_in_bytes)
         return self._submit(merged, True, idempotency_key)
@@ -1368,14 +1377,14 @@ class Assets:
     def classify(self, options: SubmitAssetOptions | None = None, /, *, name: str = _UNSET, content: Content = _UNSET,
                  part: Content = _UNSET, url: str = _UNSET, description: str = _UNSET,
                  processing_options: ProcessingOptions = _UNSET, visibility: Visibility = _UNSET,
-                 metadata: List[MetadataItem] = _UNSET, author_id: str = _UNSET, context: ModerationContext = _UNSET,
-                 external_id: str = _UNSET, external_url: str = _UNSET,
+                 metadata: List[MetadataItem] = _UNSET, tags: List[str] = _UNSET, author_id: str = _UNSET,
+                 context: ModerationContext = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
                  folder_id: str | None = _UNSET, upload_preset_id: str = _UNSET,
                  total_size_in_bytes: int = _UNSET, idempotency_key: str | None = None) -> Asset:
         """Like :meth:`create`, but waits for the decision where supported (audio and video
-        are always asynchronous and return ``pending``)."""
+        are always asynchronous and return before moderation decides them)."""
         merged = _merge("assets.classify", options, name=name, content=content, part=part, url=url, description=description,
-                        processing_options=processing_options, visibility=visibility, metadata=metadata,
+                        processing_options=processing_options, visibility=visibility, metadata=metadata, tags=tags,
                         author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id,
                         upload_preset_id=upload_preset_id, total_size_in_bytes=total_size_in_bytes)
         payload = merged.get("content")
@@ -1562,7 +1571,7 @@ class Assets:
                note: str = _UNSET, confirm_purge: bool = _UNSET) -> Asset:
         """Record a reviewer's decision, replacing the policy's: ``classification.moderation.status``
         becomes ``decision``, the decision and ``note`` join ``classification.moderation.manualReviews``
-        and the matching ``asset.<status>`` event is sent with ``decided-by: reviewer``. An asset still
+        and the matching ``asset.<status>`` event is sent with the API key as its ``actor``. An asset still
         pending moderation can only be ``blocked`` or ``purged``. Purging needs ``confirm_purge=True``
         and the ``assets:delete`` permission, and permanently deletes the stored content. Not
         retried: it carries no ``Idempotency-Key``."""
@@ -1584,11 +1593,11 @@ class Assets:
         return cast(Asset, self._c._request(
             "POST", "/assets/" + _id(merged.get("assetId"), "assetId") + "/explain", body=body))
 
-    def delete_content(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> Asset:
+    def remove_content(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> Asset:
         """Remove stored content (source, preview and retained extracted text) but keep the
         asset record, metadata and classification results. The returned asset's ``content.status`` is
         ``removed`` and the CDN no longer serves its content."""
-        merged = _merge("assets.deleteContent", options, asset_id=asset_id)
+        merged = _merge("assets.removeContent", options, asset_id=asset_id)
         return cast(Asset, self._c._request("DELETE", "/assets/" + _id(merged.get("assetId"), "assetId") + "/content"))
 
     def delete(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> None:
@@ -1600,10 +1609,10 @@ class Assets:
               operation: AssetBatchOperation = _UNSET) -> BatchAssetsResponse:
         """Delete up to 500 assets (``operation="delete"``) or remove their stored content
         (``"remove-content"``) in one request. Every asset must exist in the project and the key needs
-        ``assets:delete`` for its folder, or nothing is queued. Returns ``{"queued": True}`` once
-        queued; the work runs in the background and records ``asset.deleted`` or
-        ``asset.content-removed`` for each asset. Assets under a safety hold are skipped. Not
-        retried: it carries no ``Idempotency-Key``."""
+        ``assets:delete`` for its folder, or nothing is queued. Returns ``{"batchId", "status": "queued",
+        "assetCount"}`` once queued; the work runs in the background and records ``asset.deleted`` or
+        ``asset.content-removed`` for each asset, with a ``batch-id`` fact naming ``batchId``. Assets
+        under a safety hold are skipped. Not retried: it carries no ``Idempotency-Key``."""
         merged = _merge("assets.batch", options, asset_ids=asset_ids, operation=operation)
         _validate_batch(merged)
         return cast(BatchAssetsResponse, self._c._request(
@@ -1809,19 +1818,31 @@ class Events:
         self._c = client
 
     def list(self, options: ListEventsOptions | None = None, /, *, cursor: str = _UNSET,
-             page_size: int = _UNSET) -> EventsPage:
+             page_size: int = _UNSET, types: List[EventType] = _UNSET, asset_id: str = _UNSET) -> EventsPage:
         """Events created after ``cursor`` (a previous response's ``nextCursor``), oldest first.
-        Without ``cursor`` it returns no events and a ``nextCursor`` for now."""
-        merged = _merge("events.list", options, cursor=cursor, page_size=page_size)
+        Without ``cursor`` it returns no events and a ``nextCursor`` for now. ``types`` and
+        ``asset_id`` narrow the feed to some event types or one asset's events; a cursor belongs to
+        the filters it was issued with, so pass the same ones with each ``cursor``."""
+        merged = _merge("events.list", options, cursor=cursor, page_size=page_size, types=types, asset_id=asset_id)
+        types_given = merged.pop("types", None)
+        if types_given is not None:
+            if isinstance(types_given, str) or not isinstance(types_given, (list, tuple)) \
+                    or not all(isinstance(t, str) for t in types_given):
+                raise _invalid("types must be a list of event types")
+            # The API takes the types as one comma-separated value.
+            if types_given:
+                merged["types"] = ",".join(types_given)
         return cast(EventsPage, self._c._request("GET", self._c._project("events"), query=merged))
 
     def iter_pages(self, options: ListEventsOptions | None = None, /, *, cursor: str = _UNSET,
-                   page_size: int = _UNSET) -> Iterator[EventsPage]:
+                   page_size: int = _UNSET, types: List[EventType] = _UNSET,
+                   asset_id: str = _UNSET) -> Iterator[EventsPage]:
         """Yield pages from ``cursor`` until one reports ``hasMore=False``. Persist the last
         page's ``nextCursor`` to resume later. Without ``cursor`` it yields one empty page whose
         ``nextCursor`` is now. Raises ``sdk/invalid-response`` (``details.cursor``) instead of looping
         when a page with more to follow returns a cursor already sent."""
-        merged = _merge("events.eachPage", options, cursor=cursor, page_size=page_size)
+        merged = _merge("events.eachPage", options, cursor=cursor, page_size=page_size, types=types,
+                        asset_id=asset_id)
         sent = {merged["cursor"]} if merged.get("cursor") is not None else set()
         while True:
             page = self.list(cast(ListEventsOptions, merged))
@@ -1833,9 +1854,9 @@ class Events:
             merged["cursor"] = page["nextCursor"]
 
     def iter(self, options: ListEventsOptions | None = None, /, *, cursor: str = _UNSET,
-             page_size: int = _UNSET) -> Iterator[Event]:
+             page_size: int = _UNSET, types: List[EventType] = _UNSET, asset_id: str = _UNSET) -> Iterator[Event]:
         """Yield every event currently waiting after ``cursor`` (see :meth:`iter_pages`)."""
-        for page in self.iter_pages(options, cursor=cursor, page_size=page_size):
+        for page in self.iter_pages(options, cursor=cursor, page_size=page_size, types=types, asset_id=asset_id):
             yield from page["items"]
 
 
@@ -1856,7 +1877,7 @@ class CDN:
         ``embed`` an HTML page that shows the asset (a viewer for its type), for an iframe.
         ``preview``, and ``rendered`` when it is an image, optionally go through a named ``lens``, a
         ``transform``, or both (the lens runs first); the CDN refuses them on rendered PDFs, video and
-        audio with ``asset/invalid-transform``, and ``original``, ``hls`` and ``embed`` take neither.
+        audio with ``transform/invalid``, and ``original``, ``hls`` and ``embed`` take neither.
         Private assets need an API key or a signed URL.
 
         ``placeholder`` is a small blurred PNG that the CDN serves publicly for every asset, whatever
@@ -1999,13 +2020,14 @@ class Text:
 
     def classify(self, options: ClassifyTextOptions | None = None, /, *, text: str = _UNSET, name: str = _UNSET,
                  description: str = _UNSET, processing_options: ProcessingOptions = _UNSET,
-                 metadata: List[MetadataItem] = _UNSET, author_id: str = _UNSET, context: ModerationContext = _UNSET,
-                 external_id: str = _UNSET, external_url: str = _UNSET,
+                 metadata: List[MetadataItem] = _UNSET, tags: List[str] = _UNSET, author_id: str = _UNSET,
+                 context: ModerationContext = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
                  folder_id: str | None = _UNSET, idempotency_key: str | None = None) -> Asset:
         """Classify UTF-8 text and wait for the decision (asset name defaults to ``text``).
         ``author_id`` and ``context`` work as in :meth:`Assets.create`."""
         merged = _merge("text.classify", options, text=text, name=name, description=description, processing_options=processing_options,
-                        metadata=metadata, author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id)
+                        metadata=metadata, tags=tags, author_id=author_id, context=context, external_id=external_id,
+                        external_url=external_url, folder_id=folder_id)
         value = merged.pop("text", None)
         if not isinstance(value, str) or not value.strip():
             raise _invalid("Text to classify must be a non-empty string")

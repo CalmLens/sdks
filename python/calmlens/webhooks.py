@@ -51,9 +51,12 @@ def to_webhook_event_payload(event: Event) -> WebhookEventPayload:
     """The JSON body a webhook connector delivers for an event, such as one returned by
     ``events.list``: the event in the same shape ``events.list`` returns it. Fields outside that
     shape are left out."""
-    return {
-        "id": event["id"],
-        "projectId": event["projectId"],
+    payload: dict[str, Any] = {"id": event["id"], "projectId": event["projectId"]}
+    # ``actor`` follows ``projectId``, as in the API's payloads; an event built without one
+    # (such as a hand-written test event) gets none.
+    if "actor" in event:
+        payload["actor"] = event["actor"]
+    payload.update({
         "type": event["type"],
         "severity": event["severity"],
         "title": event["title"],
@@ -63,7 +66,8 @@ def to_webhook_event_payload(event: Event) -> WebhookEventPayload:
         "asset": event.get("asset"),
         "facts": event["facts"],
         "createdAt": event["createdAt"],
-    }
+    })
+    return cast(WebhookEventPayload, payload)
 
 
 def create_webhook_signature_header(payload: str | bytes, timestamp: int | str, secret: str) -> str:

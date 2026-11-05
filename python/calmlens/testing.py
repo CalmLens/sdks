@@ -50,7 +50,7 @@ from ._signed_test_inputs import (MEDIA_TEST_SIGNALS, TEST_INPUT_PRESETS, TEXT_T
                                   signal_test_input)
 from .errors import CalmLensError
 from .moderation_context import select_moderation_context_items
-from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder,
+from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Actor, Asset, Event, EventAsset, EventFact, EventSeverity, EventType, Folder,
                     HashList, HashListEntry, SignedUploadToken, SignUploadTokenOptions)
 
 __all__ = ["MockCalmLensServerClient", "MOCK_PROJECT_ID", "MockRequest", "MockOptions", "MockAssetOutcome",
@@ -145,7 +145,7 @@ class MockDecision:
 
     def report(self) -> dict[str, Any] | None:
         """The report a decided asset gets, as the API sends it: every category (unflagged ones
-        evaluated with score 0), the policy's actions and
+        evaluated with score 0), the policy's actions, the automated status and
         ``flaggedCategories``. ``None`` for ``pending`` and ``failed``."""
         status = self.status
         if status in ("pending", "failed"):
@@ -168,7 +168,7 @@ class MockDecision:
                     for qualifier, some in qualifiers}
         return {"raw": {"categories": categories},
             "categories": {category: {"score": value, "action": action(value)} for category, value in evaluated},
-            "explanationComplete": True, "source": "policy", "automatedAction": _STATUS_ACTION[status],
+            "explanationComplete": True, "source": "policy", "automatedStatus": status,
             # The mock analyses no audio or video, so a decision has no findings timeline.
             "regions": [], "timeline": None, "flaggedCategories": [category for category, value in evaluated if action(value) != "allow"]}
 
@@ -223,7 +223,7 @@ def _to_decision(value: object) -> MockDecision:
 _MAX_UPLOAD_PARTS = 10_000
 _INT_QUERY = {"pageSize", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
 _BOOL_QUERY = {"queue", "isFinal"}
-_JSON_QUERY = {"metadata", "processingOptions", "context"}
+_JSON_QUERY = {"metadata", "tags", "processingOptions", "context"}
 _MIB = 1024 * 1024
 
 
@@ -401,7 +401,7 @@ def _unwrap_group(text: str) -> str | None:
 
 
 class _InvalidFilter(Exception):
-    """A filter the API refuses with ``validation/invalid-filter``."""
+    """A filter the API refuses with ``filter/invalid``."""
 
 
 def _wildcard(pattern: str) -> re.Pattern[str]:
@@ -583,6 +583,14 @@ _MAX_SEARCH_LIMIT = 20
 _MAX_SEARCH_QUERY_LENGTH = 200
 _REVIEW_DECISIONS = ("allowed", "limited", "age-restricted", "blocked", "purged")
 _MAX_DECISION_NOTE_LENGTH = 1499
+#: The actor of events the mock's API key causes: mock keys have no ID.
+_MOCK_API_KEY_ACTOR: Actor = {"type": "api-key", "id": None}
+#: The actor of a reviewer's decision through the ``decide`` test hook.
+_MOCK_REVIEWER_ACTOR: Actor = {"type": "user", "id": None}
+#: The actor of the events the pipeline's automated decisions cause.
+_AUTOMATED_ACTOR: Actor = {"type": "automated", "id": None}
+#: An event type's shape (``resource.action``), as the mock checks ``types`` without the catalog.
+_EVENT_TYPE_PATTERN = re.compile(r"[a-z][a-z-]*\.[a-z][a-z-]*")
 #: Every API cursor list returns this many items unless ``pageSize`` says otherwise.
 _DEFAULT_PAGE_SIZE = 50
 _MAX_PAGE_SIZE = 100
@@ -599,7 +607,7 @@ MOCK_PROJECT_ID = "project-1"
 
 #: What :meth:`MockCalmLensServerClient.fail_next_request` makes a request fail with:
 #: ``transport-error`` (``sdk/transport-error``), ``timeout`` (``sdk/timeout``), an API error code
-#: such as ``upload/limit-exceeded`` (that error with its HTTP status) or an exception to raise.
+#: such as ``usage/free-uploads-exhausted`` (that error with its HTTP status) or an exception to raise.
 MockFailure = Union[str, BaseException]
 
 #: The client methods ``fail_next_request`` can target, as JavaScript-style method paths.
@@ -607,7 +615,7 @@ _OPERATIONS = frozenset({
     "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
     "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.create", "assets.classify", "assets.uploadPart",
     "assets.createSignedUrl", "assets.move", "assets.retry", "assets.explain", "assets.decide",
-    "assets.deleteContent", "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list",
+    "assets.removeContent", "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list",
     "events.pages", "folders.list", "folders.retrieve", "folders.create", "folders.update", "folders.delete",
     "folders.move", "hashLists.list", "hashLists.retrieve", "hashLists.create", "hashLists.update",
     "hashLists.delete", "hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "policies.list",
@@ -795,8 +803,10 @@ def _new_id(prefix: str) -> str:
 
 
 def _invalid_field(code: str, path: str) -> _Failure:
-    """A request the API's schema refuses: ``validation/<issue>`` with HTTP 400 and the field."""
-    return _Failure(code, f"Invalid {path}", 400, {"path": path})
+    """A request the API's schema refuses: ``validation/invalid-request`` with HTTP 400, listing the
+    field and its issue ``code`` (such as ``validation/too-big``) in ``details.issues``."""
+    return _Failure(error_codes.INVALID_REQUEST, f"Invalid {path}", 400,
+                    {"issues": [{"path": path, "message": f"Invalid {path}", "code": code}]})
 
 
 def _check_metadata(metadata: Any) -> None:
@@ -821,7 +831,7 @@ _SELECTOR_NUMBER = re.compile(r"-?(?:0|[1-9]\d*)(?:\.\d+)?")
 
 
 class _InvalidSelector(Exception):
-    """A CDN selector the CDN refuses as ``asset/invalid-transform``."""
+    """A CDN selector the CDN refuses as ``transform/invalid``."""
 
 
 def _decode_selector_text(text: str) -> str:
@@ -839,7 +849,7 @@ def _parse_transform_selector(selector: str) -> tuple[str | None, dict[str, Any]
     does: an optional first ``@lens``, then ``key=value`` options with dotted keys for nested ones
     (a bare key is ``True``). Values are numbers, ``true``, ``false``, hex colours (``#`` added)
     for colour options, or text. Raises ``_InvalidSelector`` on anything the CDN refuses as
-    ``asset/invalid-transform``. Returns the lens and the options (each None when absent)."""
+    ``transform/invalid``. Returns the lens and the options (each None when absent)."""
     if not selector:
         return None, None
     if "/" in selector:
@@ -909,14 +919,14 @@ class MockCalmLensServerClient(CalmLensServerClient):
     """Stateful offline client accepting the real client's configuration (without
     ``transport``). Retries are off by default (``max_retries=0``) so enqueued failures
     surface; pass ``max_retries`` to exercise retry handling. Waits take no real time:
-    ``assets.wait_for_decision`` checks ``database_storage`` and returns a decided asset, or
-    raises ``sdk/timeout`` at once for one whose moderation stays ``pending``.
+    ``assets.wait_for_decision`` checks ``database_storage`` and returns a settled asset, or
+    raises ``sdk/timeout`` at once for one that stays ``queued`` or ``processing``.
 
     ``assets.search`` is the API's keyword search: every whitespace-separated word (at most 8,
     case-insensitive) must appear in a searchable field, and results carry the API's keyword
     ``score`` and ``matchedFields``, ranked by score and then newest first. Asset list filters take
     the API's fields and operators, with ``( … )`` groups and ``;`` binding tighter than ``,``, and
-    refuse others with ``validation/invalid-filter``; list cursors resume after the last
+    refuse others with ``filter/invalid``; list cursors resume after the last
     item returned and only continue the query they came from."""
 
     def __init__(self, *, api_key: str | None = None, project_id: str = MOCK_PROJECT_ID,
@@ -944,6 +954,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self._grants = _grants_of(self.api_key)
         self._idempotent: dict[str, tuple[str, int, bytes]] = {}
         self._uploads: dict[str, dict[str, Any]] = {}
+        # The processing options each asset was uploaded with, which the API keeps but doesn't return.
+        self._processing_options: dict[str, dict[str, Any]] = {}
         # Each asset's latest ``assetSequence``, which the API keeps on the asset row.
         self._asset_event_sequences: dict[str, int] = {}
         self._mock_lenses: dict[str, dict[str, Any]] = {}
@@ -962,7 +974,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             raise _invalid("mock_options['moderate'] must be a function", error_codes.SDK_INVALID_CONFIG)
         self.signed_url_base_url: str = options.get("signed_url_base_url", "https://mock.calmlens.invalid")
         # Waits (retry backoff, ``assets.wait_for_decision``) take no real time: sleeping only
-        # advances this client's clock, so a pending asset times out at once.
+        # advances this client's clock, so an unsettled asset times out at once.
         self._elapsed = 0.0
         self._sleep = self._advance
         self._clock = lambda: self._elapsed
@@ -1058,9 +1070,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     def enqueue_event(self, type: EventType, *, facts: list[EventFact] | None = None, severity: EventSeverity = "low",
                       title: str | None = None, description: str | None = None,
-                      asset_id: str | None = None) -> Event:
+                      asset_id: str | None = None, actor: Actor | None = None) -> Event:
         """Add an event to the feed returned by ``events.list`` (and ``events.iter``).
-        ``facts`` are ``{"key", "value", "url"?}`` entries registered for ``type``. When
+        ``facts`` are ``{"key", "value", "url"?}`` entries registered for ``type``. ``actor`` is who
+        caused it, by default the mock's API key, which has no ID (``{"type": "api-key", "id": None}``). When
         ``asset_id`` names a stored asset, the event carries a snapshot of its status, as
         the API's events do; an ``asset.<status>`` event's snapshot has the moderation status
         it announces."""
@@ -1069,14 +1082,16 @@ class MockCalmLensServerClient(CalmLensServerClient):
             asset = _event_asset(stored) if stored is not None else None
             if asset is not None and type in _ANNOUNCED_STATUSES:
                 # An ``asset.<status>`` event carries the status it announces.
-                asset["classification"]["moderation"]["status"] = type.removeprefix("asset.")  # type: ignore[typeddict-item]
+                asset["classification"]["moderation"]["status"] = type.removeprefix("asset.")
             now = self.now()
             # Like the API: each event about an asset takes the asset's next number; others have none.
             sequence: int | None = None
             if asset_id:
                 sequence = self._asset_event_sequences.get(asset_id, 0) + 1
                 self._asset_event_sequences[asset_id] = sequence
-            event: Event = {"id": self.create_id("evt"), "projectId": self.project_id, "type": type,
+            event: Event = {"id": self.create_id("evt"), "projectId": self.project_id,
+                            "actor": copy.deepcopy(_MOCK_API_KEY_ACTOR if actor is None else actor),
+                            "type": type,
                             "severity": severity, "title": title or type, "description": description,
                             "assetId": asset_id, "assetSequence": sequence, "asset": asset, "facts": copy.deepcopy(facts or []),
                             "createdAt": now}
@@ -1087,8 +1102,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         """Apply a reviewer's decision to a stored asset, as the portal or API would: the
         moderation status changes (``purged`` also removes the content, with reason
         ``requested`` and an ``asset.content-removed`` event), the review joins
-        ``manualReviews``, and an ``asset.<decision>`` event with a ``decided-by: reviewer`` fact
-        joins the events feed. Raises ``asset/not-found`` for an unknown asset."""
+        ``manualReviews``, and an ``asset.<decision>`` event whose ``actor`` is a ``user`` joins
+        the events feed. Raises ``asset/not-found`` for an unknown asset."""
         if decision not in _REVIEW_DECISIONS:
             raise _invalid(f"Unknown review decision {decision!r}")
         with self._state_lock:
@@ -1102,26 +1117,26 @@ class MockCalmLensServerClient(CalmLensServerClient):
     def _record_decision(self, record: dict[str, Any], decision: str, note: str | None,
                          reviewer_name: str | None) -> None:
         """Apply a reviewer's decision like ``decideAssetManually`` in the API: the status, the
-        review, then (for ``purged``) the content removal and its event, then ``asset.<decision>``."""
+        review, then (for ``purged``) the content removal and its event, then ``asset.<decision>``.
+        Either way the review is the mock API key's, which has no ID; only the event names the
+        reviewer."""
         self._apply_outcome(record, decision, "requested")
         now = self.now()
         review: dict[str, Any] = {"id": self.create_id("rev"), "decision": decision, "note": note,
-                                  "reviewedAt": now, "appliedToAsset": True}
+                                  "decidedBy": {"type": "api-key", "id": None}, "reviewedAt": now,
+                                  "applied": True}
         reviewer_facts: list[dict[str, Any]] = []
         if reviewer_name is not None:
-            review.update(reviewerName=reviewer_name, reviewerEmail=None)
-            reviewer_facts = [{"key": "reviewer-user-id", "value": None},
-                              {"key": "reviewer-name", "value": reviewer_name}]
+            reviewer_facts = [{"key": "reviewer-name", "value": reviewer_name}]
+        # A decision through the API is the API key's; the test hook's is a reviewer's.
+        actor = _MOCK_API_KEY_ACTOR if reviewer_name is not None else _MOCK_REVIEWER_ACTOR
         record["classification"]["moderation"].setdefault("manualReviews", []).append(review)
         if decision == "purged":
-            self._lifecycle_event("asset.content-removed", record)
+            self._lifecycle_event("asset.content-removed", record, actor=actor)
         # Like the event catalog: only allowing and limiting are low severity.
-        self.enqueue_event("asset." + decision, asset_id=record["id"],
+        self.enqueue_event("asset." + decision, asset_id=record["id"], actor=actor,
                            severity="low" if decision in ("allowed", "limited") else "high",
                            facts=cast(list[EventFact], [
-                               # A decision through the API is the API key's.
-                               {"key": "decided-by",
-                                "value": "reviewer" if reviewer_name is None else "api-key"},
                                {"key": "asset-type", "value": record["type"]},
                                {"key": "asset-name", "value": record["name"],
                                 "url": f"https://calmlens.com/go/asset/{record['id']}"},
@@ -1130,7 +1145,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     def _decide_request(self, asset: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
         """``POST /assets/:id/decision`` as the API validates and applies it. The mock's key is
-        unnamed, so the review and its event name the reviewer ``An API key``. An asset still
+        unnamed, so its event names the reviewer ``An API key``. An asset still
         uploading or processing is refused with ``asset/processing``."""
         decision = body.get("decision")
         if decision not in _REVIEW_DECISIONS:
@@ -1157,13 +1172,17 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self._record_decision(asset, decision, note, "An API key")
         return asset
 
-    def _lifecycle_event(self, type: str, asset: Mapping[str, Any]) -> None:
-        """An ``asset.deleted``, ``asset.content-removed`` or ``asset.retried`` event, like the API."""
+    def _lifecycle_event(self, type: str, asset: Mapping[str, Any], *, batch_id: str | None = None,
+                         actor: Actor = _MOCK_API_KEY_ACTOR) -> None:
+        """An ``asset.deleted``, ``asset.content-removed`` or ``asset.retried`` event, like the API,
+        with the ``batch-id`` fact when a batch caused it."""
         name: dict[str, Any] = {"key": "asset-name", "value": asset["name"]}
         if type != "asset.deleted":  # A deleted asset has no portal page to link to.
             name["url"] = f"https://calmlens.com/go/asset/{asset['id']}"
-        self.enqueue_event(type, asset_id=asset["id"],
-                           facts=cast(list[EventFact], [name, {"key": "asset-type", "value": asset["type"]}]))
+        facts: list[dict[str, Any]] = [name, {"key": "asset-type", "value": asset["type"]}]
+        if batch_id is not None:
+            facts.append({"key": "batch-id", "value": batch_id})
+        self.enqueue_event(type, asset_id=asset["id"], actor=actor, facts=cast(list[EventFact], facts))
         if type == "asset.deleted":
             # The asset is gone, so the snapshot comes from the record just deleted.
             self.database_storage.events[-1]["asset"] = _event_asset(asset)
@@ -1251,7 +1270,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if not suffix:
             return ["assets.retrieve", "assets.waitForDecision"] if method == "GET" \
                 else ["assets." + by_method.get(method, "")]
-        return {"content": ["assets.deleteContent"], "children": ["assets.listChildren", "assets.iterateChildren"],
+        return {"content": ["assets.removeContent"], "children": ["assets.listChildren", "assets.iterateChildren"],
                 "signed-url": ["assets.createSignedUrl"], "part": ["assets.uploadPart"], "move": ["assets.move"],
                 "retry": ["assets.retry"], "explain": ["assets.explain"],
                 "decision": ["assets.decide"]}.get(suffix, [])
@@ -1475,7 +1494,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if raw_upload and not (isinstance(mime, str) and _is_accepted_upload_mime_type(mime)):
             # Like the API: an upload of a type CalmLens can't moderate is refused before it is stored.
             refused = _invalid_upload_mime_type(mime)
-            raise _Failure(refused.code, refused.message, 400, refused.details)
+            raise _Failure(refused.code, refused.message, details=refused.details)
         kind = "website" if "url" in options else next(
             (k for k in ("image", "video", "audio") if mime.startswith(k + "/")),
             "plaintext-document" if mime.startswith("text/") else
@@ -1490,7 +1509,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 (self._total_size_error(total, cast(int, size), True) or self._image_size_error(kind, cast(int, size)))
                 if final else self._total_size_error(total, cast(int, size), False))
             if failure:
-                raise _Failure(failure)
+                raise self._size_failure(failure)
         if options.get("folderId"):
             self._folder(options["folderId"])
         external_id = options.get("externalId")
@@ -1513,7 +1532,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             "metadata": options.get("metadata"), "authorId": options.get("authorId"),
             # Like the API, only the posts CalmLens uses are kept, and only while the content is held.
             "context": {"items": context_items} if context_items else None,
-            "tags": None, "processingOptions": processing_options,
+            "tags": options.get("tags"),
             "visibility": options.get("visibility", "private"),
             "content": {"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
                         "safetyHold": None, "format": mime or None, "extension": None, "sizeInBytes": size,
@@ -1525,12 +1544,13 @@ class MockCalmLensServerClient(CalmLensServerClient):
                         "extractedText": None, **_NO_RENDERING},
             "upload": {"status": "completed" if final else "uploading", "updatedAt": now,
                        "partsReceived": None if final else 1},
-            "classification": {"status": "processing" if final else "pending", "failureReason": None, "updatedAt": now,
+            "classification": {"status": "processing" if final else "queued", "failureReason": None, "updatedAt": now,
                                # The mock never reads test inputs.
                                "completedAt": None, "progress": None, "testInput": False,
                                "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": [],
                                               "timeline": None}},
         }
+        self._processing_options[asset["id"]] = processing_options
         if not final:
             self._uploads[asset["id"]] = {"queue": queue, "total": total}
             self.database_storage.assets[asset["id"]] = cast(Asset, asset)
@@ -1553,7 +1573,14 @@ class MockCalmLensServerClient(CalmLensServerClient):
     @staticmethod
     def _image_size_error(kind: str, size: int) -> str | None:
         """Like the API: image uploads in parts total at most 20 MiB."""
-        return error_codes.MULTIPART_IMAGE_TOO_LARGE if kind == "image" and size > 20 * _MIB else None
+        return error_codes.UPLOAD_TOO_LARGE if kind == "image" and size > 20 * _MIB else None
+
+    @staticmethod
+    def _size_failure(code: str) -> _Failure:
+        """The failure for a size error code, with the limit ``upload/too-large`` carries."""
+        if code == error_codes.UPLOAD_TOO_LARGE:
+            return _Failure(code, details={"limitBytes": 20 * _MIB, "source": "plan"})
+        return _Failure(code)
 
     @staticmethod
     def _total_size_error(total: int | None, received: int, final: bool) -> str | None:
@@ -1582,7 +1609,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         classification = asset["classification"]
         if classification["status"] != "completed" or asset["type"] != "image":
             return
-        features = (asset.get("processingOptions") or {}).get("features") or {}
+        features = self._processing_options.get(asset["id"], {}).get("features") or {}
         if (features.get("personDetection") or {}).get("enabled") is True:
             classification["personDetection"] = {"status": "evaluated", "stage": "beta", "people": []}
         if (features.get("faceDetection") or {}).get("enabled") is True:
@@ -1613,21 +1640,20 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if status == "pending":
             return
         if status == "failed":
-            self.enqueue_event("asset.failed", asset_id=asset["id"], severity="high", facts=cast(list[EventFact], [
+            self.enqueue_event("asset.failed", asset_id=asset["id"], actor=_AUTOMATED_ACTOR, severity="high", facts=cast(list[EventFact], [
                 _asset_name_fact(asset), {"key": "asset-type", "value": asset["type"]},
                 {"key": "previous-status", "value": "processing"},
                 {"key": "failure-reason", "value": asset["classification"].get("failureReason") or "processing-error"}]))
             return
         report = decision.report() or {}
         flagged = list(report["flaggedCategories"]) if report else []
-        self.enqueue_event("asset.classified", asset_id=asset["id"], facts=cast(list[EventFact], [
+        self.enqueue_event("asset.classified", asset_id=asset["id"], actor=_AUTOMATED_ACTOR, facts=cast(list[EventFact], [
             {"key": "flagged-categories", "value": flagged}, {"key": "moderation-status", "value": status},
             {"key": "asset-type", "value": asset["type"]}, _asset_name_fact(asset)]))
         # Like the event catalog: only allowing and limiting are low severity.
-        self.enqueue_event("asset." + status, asset_id=asset["id"],
+        self.enqueue_event("asset." + status, asset_id=asset["id"], actor=_AUTOMATED_ACTOR,
                            severity="low" if status in ("allowed", "limited") else "high",
                            facts=cast(list[EventFact], [
-                               {"key": "decided-by", "value": "automated"},
                                {"key": "flagged-categories", "value": list(flagged)},
                                {"key": "asset-type", "value": asset["type"]}, _asset_name_fact(asset)]))
 
@@ -1677,7 +1703,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         failure = (self._image_size_error(asset["type"], received)
                    or self._total_size_error(upload["total"], received, final))
         if failure:
-            raise _Failure(failure)
+            raise self._size_failure(failure)
         if not final and len(raw or b"") < 5 * _MIB:
             raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "Multipart upload parts must be at least 5MiB except "
                                                                "the final part.")
@@ -1717,10 +1743,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
         asset = self._asset(identifier)
         if method == "DELETE":
             if suffix == "content":
-                return self._delete_content(asset, now)
+                return self._remove_content(asset, now)
             self.image_storage.content.pop(identifier, None)
             del assets[identifier]
             self._uploads.pop(identifier, None)
+            self._processing_options.pop(identifier, None)
             self._lifecycle_event("asset.deleted", asset)
             return None
         if method == "GET":
@@ -1790,7 +1817,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         every asset must exist before anything changes. The mock then applies the operation at once, in
         request order, instead of in the background: ``delete`` deletes each asset with its stored child
         assets and records ``asset.deleted`` with the asset as it was; ``remove-content`` removes the
-        content like ``delete_content``. Mock assets carry no safety holds, so none is skipped."""
+        content like ``remove_content``. Each event carries the batch's ``batch-id`` fact. Mock assets
+        carry no safety holds, so none is skipped."""
         asset_ids = body.get("assetIds")
         if not isinstance(asset_ids, list):
             raise _invalid_field("validation/invalid-type", "assetIds")
@@ -1805,9 +1833,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if operation not in ("delete", "remove-content"):
             raise _invalid_field("validation/invalid-value", "operation")
         assets = [self._asset(asset_id) for asset_id in dict.fromkeys(asset_ids)]
+        batch_id = self.create_id("batch")
         for asset in assets:
             if operation == "remove-content":
-                self._delete_content(asset, now)
+                self._remove_content(asset, now, batch_id)
                 continue
             deleting = {asset["id"]}
             added = True
@@ -1821,10 +1850,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 self.image_storage.content.pop(asset_id, None)
                 self.database_storage.assets.pop(asset_id, None)
                 self._uploads.pop(asset_id, None)
-            self._lifecycle_event("asset.deleted", asset)
-        return {"queued": True}
+                self._processing_options.pop(asset_id, None)
+            self._lifecycle_event("asset.deleted", asset, batch_id=batch_id)
+        return {"batchId": batch_id, "status": "queued", "assetCount": len(assets)}
 
-    def _delete_content(self, asset: dict[str, Any], now: int) -> dict[str, Any]:
+    def _remove_content(self, asset: dict[str, Any], now: int, batch_id: str | None = None) -> dict[str, Any]:
         # Like the API: the record and report stay; stored content, extracted text and the
         # placeholder go. Content already removed keeps its reason, and an asset.content-removed
         # event is recorded either way.
@@ -1837,7 +1867,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                            metadata=None, **_NO_RENDERING)
             asset["context"] = None
             asset["updatedAt"] = now
-        self._lifecycle_event("asset.content-removed", asset)
+        self._lifecycle_event("asset.content-removed", asset, batch_id=batch_id)
         return asset
 
     def _dispatch_folder(self, method: str, identifier: str, suffix: str, body: dict[str, Any]) -> Any:
@@ -1937,7 +1967,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         entry = {"id": self.create_id("hle"), "projectId": self.project_id, "hashListId": hash_list["id"],
                  "hash": hash_value, "quality": quality,
                  "label": body["label"] if isinstance(body.get("label"), str) else None,
-                 "sourceAssetId": asset_id, "createdAt": self.now()}
+                 "assetId": asset_id, "createdAt": self.now()}
         entries[entry["id"]] = cast(HashListEntry, entry)
         return _Answer(201, entry)
 
@@ -2072,22 +2102,40 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return {"lenses": result}
 
     def _events(self, query: dict[str, Any]) -> dict[str, Any]:
-        # Cursors are positions in the feed (``mock_<n>``), so events added later reach cursors
-        # taken before them. Like the API, ``nextCursor`` is never null. The mock's key holds every
-        # permission, so no event type is excluded.
+        # Cursors are positions in the feed (``mock_<n>~<filters>``), so events added later reach
+        # cursors taken before them. Like the API, ``nextCursor`` is never null and a cursor belongs
+        # to the filters it was issued with. The mock's key holds every permission, so no event
+        # type is excluded.
         size = _bounded_int(query.get("pageSize", _DEFAULT_PAGE_SIZE), "pageSize", _MAX_PAGE_SIZE)
+        # ``types`` is a comma-separated list of event types and ``assetId`` an asset ID, as the API takes.
+        types_value = query.get("types")
+        types = [] if types_value is None else str(types_value).split(",")
+        if types_value is not None and not all(_EVENT_TYPE_PATTERN.fullmatch(type) for type in types):
+            raise _invalid_field("validation/invalid-value", "types")
+        asset_id = query.get("assetId")
+        if asset_id is not None and not _ASSET_ID_PATTERN.fullmatch(str(asset_id)):
+            raise _invalid_field("validation/invalid-format", "assetId")
+        filters = base64.urlsafe_b64encode(json.dumps([sorted(set(types)), asset_id]).encode()).decode()
+
+        def matches(event: Mapping[str, Any]) -> bool:
+            return (not types or event["type"] in types) and (asset_id is None or event["assetId"] == asset_id)
+
         events = [e for e in self.database_storage.events if e["projectId"] == self.project_id]
         cursor = query.get("cursor")
         if not cursor:
-            return {"items": [], "nextCursor": f"mock_{len(events)}", "hasMore": False, "excludedTypes": []}
-        found = re.fullmatch(r"mock_([0-9]+)", str(cursor))
-        if not found or int(found.group(1)) > len(events):
+            return {"items": [], "nextCursor": f"mock_{len(events)}~{filters}", "hasMore": False, "excludedTypes": []}
+        found = re.fullmatch(r"mock_([0-9]+)~(.*)", str(cursor))
+        if not found or found.group(2) != filters or int(found.group(1)) > len(events):
             raise _Failure(error_codes.INVALID_CURSOR)
-        position = int(found.group(1))
-        page = events[position:position + size]
-        following = position + len(page)
-        return {"items": page, "nextCursor": f"mock_{following}", "hasMore": following < len(events),
-                "excludedTypes": []}
+        following = int(found.group(1))
+        page: list[Any] = []
+        while following < len(events) and len(page) < size:
+            event = events[following]
+            following += 1
+            if matches(event):
+                page.append(event)
+        return {"items": page, "nextCursor": f"mock_{following}~{filters}",
+                "hasMore": any(matches(event) for event in events[following:]), "excludedTypes": []}
 
     @staticmethod
     def _timeline(asset: dict[str, Any], query: dict[str, Any]) -> dict[str, Any]:
@@ -2096,7 +2144,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         # and no cursor continues one.
         size = _bounded_int(query.get("pageSize", _DEFAULT_PAGE_SIZE), "pageSize", _MAX_PAGE_SIZE)
         if asset["content"].get("safetyHold"):
-            raise _Failure(error_codes.ASSET_SAFETY_HELD)
+            raise _Failure(error_codes.ASSET_HELD, details={"hold": "safety"})
         if query.get("cursor") is not None:
             raise _Failure(error_codes.INVALID_CURSOR)
         return {"items": [], "nextCursor": None, "pageSize": size, "hasMore": False, "ordering": []}
@@ -2194,7 +2242,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         project, identifier, resource = unquote(segments[1]), unquote(segments[2]), segments[3]
         selector_path = segments[4:]
         no_rendered_version = _Failure("asset/no-rendered-version", "This asset has no such resource", 404)
-        invalid_transform = _Failure("asset/invalid-transform", "Invalid transform selector", 400)
+        invalid_transform = _Failure(error_codes.INVALID_TRANSFORM, "Invalid transform selector", 400)
         # Like the CDN, the adaptive stream's files sit beneath ``/hls/`` (its master playlist is
         # ``/hls/index.m3u8``); the mock prepares no stream, so it has none. Otherwise the selector
         # after the resource is read; the original and the embed page take none.
@@ -2245,7 +2293,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             private = asset["visibility"] != "public"
             if private and not self._can_download(asset.get("folderId")):
                 return self._failure_response(_Failure(
-                    "asset/api-key-missing-permission",
+                    error_codes.PERMISSION_DENIED,
                     "This API key needs assets:download permission for this asset’s folder.", 403))
             # The embed page shows any asset that may be delivered, as its viewer for the asset's
             # type or a notice that the type has none.
@@ -2268,7 +2316,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 unknown_keys, invalid_keys = _check_transform_options(transform_options)
                 if unknown_keys or invalid_keys:
                     return self._failure_response(_Failure(
-                        "asset/invalid-transform-options",
+                        error_codes.INVALID_TRANSFORM_OPTIONS,
                         f"Invalid transform options: {', '.join([*unknown_keys, *invalid_keys])}", 400))
             # The bytes: the upload, which stands in for its own rendered file and an image's
             # preview, or the placeholder PNG for a still the mock doesn't make.

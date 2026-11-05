@@ -32,6 +32,32 @@ class MockTests(unittest.TestCase):
         c.assets.list()["items"][0]["name"] = "changed"
         self.assertEqual(c.database_storage.assets[a["id"]]["name"], "text")
 
+    def test_stores_the_tags_an_upload_is_created_with_from_a_raw_upload_or_a_url(self):
+        c = self.client
+        uploaded = c.assets.create(name="photo.txt", content={"plainText": "hi", "type": "text/plain"},
+                                   tags=["catalogue", "backpacks"])
+        site = c.assets.create(name="site", url="https://example.com", tags=["landing"])
+        self.assertEqual(uploaded["tags"], ["catalogue", "backpacks"])
+        self.assertEqual(c.assets.retrieve(asset_id=site["id"])["tags"], ["landing"])
+
+    def test_a_decision_through_the_api_records_the_api_key_and_no_personal_data(self):
+        c = self.client
+        asset = c.assets.classify(name="text", content={"plainText": "hello", "type": "text/plain"})
+        blocked = c.assets.decide(asset_id=asset["id"], decision="blocked", note="  Spam  ")
+        [review] = blocked["classification"]["moderation"]["manualReviews"]
+        self.assertTrue(review.pop("id").startswith("rev_"))
+        self.assertEqual(review, {"decision": "blocked", "note": "Spam", "decidedBy": {"type": "api-key", "id": None},
+                                  "reviewedAt": 123, "applied": True})
+        # The automated decision stays as moderation made it.
+        self.assertEqual(blocked["classification"]["moderation"]["automatedStatus"], "allowed")
+
+    def test_processing_options_are_kept_for_features_but_not_returned(self):
+        c = self.client
+        asset = c.assets.classify(name="photo.png", content={"data": b"png", "type": "image/png"},
+                                  processing_options={"features": {"personDetection": {"enabled": True}}})
+        self.assertNotIn("processingOptions", asset)
+        self.assertEqual(asset["classification"]["personDetection"], {"status": "evaluated", "stage": "beta", "people": []})
+
     def test_hash_list_entries_come_from_assets_once_and_go_with_their_list(self):
         c = MockCalmLensServerClient()
         statuses = []
@@ -48,7 +74,7 @@ class MockTests(unittest.TestCase):
                                                                    perceptualHashQuality=87)
         hash_list = c.hash_lists.create(name="Removed", action="block")
         added = c.hash_lists.add_entry(hash_list_id=hash_list["id"], asset_id=hashed["id"], label="Report 1")
-        self.assertEqual((statuses[-1], added["hash"], added["quality"], added["sourceAssetId"], added["label"]),
+        self.assertEqual((statuses[-1], added["hash"], added["quality"], added["assetId"], added["label"]),
                          (201, "ab" * 32, 87, hashed["id"], "Report 1"))
         again = c.hash_lists.add_entry(hash_list_id=hash_list["id"], hash="AB" * 32)
         self.assertEqual((statuses[-1], again["id"]), (200, added["id"]))
@@ -93,7 +119,7 @@ class MockTests(unittest.TestCase):
             self.assertEqual((rendered.status, rendered.content_type, rendered.read()), (200, "audio/mp4", b"wav"))
         with c.cdn.serve(asset_identifier=audio["id"], resource="preview", transform={"width": 10}) as preview:
             self.assertEqual((preview.status, preview.content_type), (200, "image/png"))
-        removed = c.assets.delete_content(asset_id=image["id"])
+        removed = c.assets.remove_content(asset_id=image["id"])
         self.assertEqual((removed["content"]["rendered"], removed["content"]["preview"], removed["content"]["metadata"]),
                          (None, None, None))
 
@@ -107,7 +133,7 @@ class MockTests(unittest.TestCase):
         c.database_storage.assets[asset["id"]]["content"]["safetyHold"] = {"placedAt": 1, "reason": "suspected-illegal-content"}
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.list_timeline(asset_id=asset["id"])
-        self.assertEqual(raised.exception.code, error_codes.ASSET_SAFETY_HELD)
+        self.assertEqual((raised.exception.code, raised.exception.details), (error_codes.ASSET_HELD, {"hold": "safety"}))
         for resource in ("original", "rendered", "preview", "hls", "embed", "placeholder"):
             with c.cdn.serve(asset_identifier=asset["id"], resource=resource) as response:
                 self.assertEqual((resource, response.status, json.loads(response.read())["code"]),
@@ -123,7 +149,7 @@ class MockTests(unittest.TestCase):
         # The client builds only the master playlist's URL and refuses a selector on the embed page,
         # so these requests go straight to the mock's transport. The selector is refused before the
         # asset is looked up; the stream has neither a master nor a media playlist.
-        cases = [(f"{base}/missing/embed/@thumbnail", 400, "asset/invalid-transform"),
+        cases = [(f"{base}/missing/embed/@thumbnail", 400, "transform/invalid"),
                  (f"{base}/{video['id']}/hls/index.m3u8", 404, "asset/no-rendered-version"),
                  (f"{base}/{video['id']}/hls/video-720p.m3u8", 404, "asset/no-rendered-version")]
         for url, status, code in cases:
@@ -160,6 +186,40 @@ class MockTests(unittest.TestCase):
         # Nothing was queued, so the next request reaches the API.
         self.assertEqual(self.client.events.list()["items"], [])
 
+    def test_events_name_who_caused_them(self):
+        c = self.client
+        cursor = c.events.list()["nextCursor"]
+        asset = c.assets.classify(name="a.txt", content={"plainText": "hi", "type": "text/plain"})
+        c.decide(asset["id"], "blocked")
+        c.assets.decide(asset_id=asset["id"], decision="allowed", note="Fine")
+        c.enqueue_event("api-key.created")
+        c.enqueue_event("project.member-joined", actor={"type": "user", "id": "user-1"})
+        actors = [(event["type"], event["actor"]) for event in c.events.iter(cursor=cursor)]
+        self.assertEqual(actors, [
+            ("asset.uploaded", {"type": "api-key", "id": None}),
+            ("asset.classified", {"type": "automated", "id": None}),
+            ("asset.allowed", {"type": "automated", "id": None}),
+            ("asset.blocked", {"type": "user", "id": None}),
+            ("asset.allowed", {"type": "api-key", "id": None}),
+            ("api-key.created", {"type": "api-key", "id": None}),
+            ("project.member-joined", {"type": "user", "id": "user-1"})])
+
+    def test_filtered_event_pages_follow_their_filters_and_refuse_malformed_ones(self):
+        c = self.client
+        cursor = c.events.list(types=["asset.uploaded"])["nextCursor"]
+        for name in ("a.txt", "b.txt", "c.txt"):
+            c.assets.classify(name=name, content={"plainText": "hi", "type": "text/plain"})
+        pages = list(c.events.iter_pages(cursor=cursor, types=["asset.uploaded"], page_size=1))
+        self.assertEqual([([e["type"] for e in page["items"]], page["hasMore"]) for page in pages],
+                         [(["asset.uploaded"], True), (["asset.uploaded"], True), (["asset.uploaded"], False)])
+        for query, path, code in (({"types": ["blocked"]}, "types", "validation/invalid-value"),
+                                  ({"asset_id": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P"}, "assetId", "validation/invalid-format")):
+            with self.subTest(**query), self.assertRaises(CalmLensAPIError) as raised:
+                c.events.list(cursor=cursor, **query)
+            self.assertEqual((raised.exception.code,
+                              [(issue["path"], issue["code"]) for issue in raised.exception.details["issues"]]),
+                             (error_codes.INVALID_REQUEST, [(path, code)]))
+
     def test_explaining_completes_evidence_and_rerun_moderates_again(self):
         c = MockCalmLensServerClient(mock_options={"now": lambda: 7, "moderate": lambda moderation: (
             "blocked" if moderation.trigger == "upload" else default_moderate(moderation))})
@@ -192,10 +252,10 @@ class MockTests(unittest.TestCase):
                                   data=b"hello", method="POST",
                                   headers={"Content-Type": mime_type, "X-CalmLens-Upload": "content"})
                 with self.client.transport(request, 1) as response:
-                    self.assertEqual(response.status, 400)
+                    self.assertEqual(response.status, 415)
                     body = json.loads(response.read())
-                self.assertEqual(body["code"], error_codes.INVALID_UPLOAD_MIME_TYPE)
-                self.assertEqual(body["details"], {"mimeType": mime_type})
+                self.assertEqual(body["code"], error_codes.UNSUPPORTED_UPLOAD_TYPE)
+                self.assertEqual(body["details"], {"mimeType": mime_type, "source": "calmlens"})
                 self.assertEqual(self.client.database_storage.assets, {})
 
     def test_refuses_null_and_unsigned_resources_where_the_api_does_before_the_asset_lookup(self):
@@ -213,7 +273,8 @@ class MockTests(unittest.TestCase):
                 with self.client.transport(request, 1) as response:
                     self.assertEqual(response.status, 400)
                     answer = json.loads(response.read())
-                self.assertEqual((answer["code"], answer["details"]), (code, {"path": path}))
+                self.assertEqual((answer["code"], [(issue["path"], issue["code"]) for issue in answer["details"]["issues"]]),
+                                 (error_codes.INVALID_REQUEST, [(path, code)]))
 
     def test_errors_have_the_real_status_and_request_id(self):
         with self.assertRaises(CalmLensAPIError) as raised:
@@ -252,9 +313,11 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
 
     def test_captures_requests(self):
         c = MockCalmLensServerClient(project_id="p1", mock_options={"create_id": lambda prefix: "a1"})
+        cursor = c.events.list()["nextCursor"]
+        c.clear_requests()
         c.assets.classify(name="note", external_id="e1", content={"plain_text": "hi", "type": "text/plain"})
         c.assets.update({"assetId": "a1", "tags": ["x"]})
-        c.events.list(cursor="mock_0", page_size=5)
+        c.events.list(cursor=cursor, page_size=5)
         c.cdn.serve({"assetIdentifier": "a1", "lens": "thumb"}).close()
         upload, update, events, serve = c.requests
         self.assertEqual((upload.method, upload.path, upload.status), ("POST", "/projects/p1/assets", 200))
@@ -267,7 +330,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         self.assertNotIn(c.api_key, repr(upload))
         self.assertTrue(upload.url.startswith(c.base_url + "/projects/p1/assets?"))
         self.assertEqual((update.method, update.path, update.body), ("PATCH", "/assets/a1", {"tags": ["x"]}))
-        self.assertEqual(events.query, {"cursor": "mock_0", "pageSize": 5})
+        self.assertEqual(events.query, {"cursor": cursor, "pageSize": 5})
         self.assertEqual((serve.method, serve.path), ("GET", "/assets/p1/a1/rendered/@thumb"))
         c.requests[0].query["externalId"] = "changed"
         self.assertEqual(c.requests[0].query["externalId"], "e1")
