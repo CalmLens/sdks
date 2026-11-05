@@ -35,13 +35,13 @@ describe("multipart binary field names", () => {
           name: "note",
           part: { ...payload, type: "text/plain", partNumber: 1, isFinal: true, sizeInBytes: 6 },
         }),
-      ).rejects.toMatchObject({ code: "upload/invalid-payload" });
+      ).rejects.toMatchObject({ code: "upload-payload/invalid" });
       await expect(
         client.assets.uploadPart({
           assetId: "asset-1",
           part: { ...payload, partNumber: 2, isFinal: true, sizeInBytes: 6 },
         }),
-      ).rejects.toMatchObject({ code: "upload/invalid-payload" });
+      ).rejects.toMatchObject({ code: "upload-payload/invalid" });
     }
     expect(requests).toEqual([]);
   });
@@ -326,7 +326,7 @@ describe("multipart binary field names", () => {
           isFinal: true,
         },
       }),
-    ).rejects.toMatchObject({ code: "upload/multipart-image-too-large" });
+    ).rejects.toMatchObject({ code: "upload/too-large" });
     expect(urls).toHaveLength(1);
 
     const oneByteStream = () =>

@@ -9,8 +9,8 @@ const MESSAGES = {
   "age-restricted": "Uploaded. It will only be shown to people who can see sensitive content.",
   blocked: "This photo can't be used because it may break our community guidelines.",
   purged: "This photo can't be used because it breaks our community guidelines.",
-  "upload-preset/too-large": "Choose a smaller photo.",
-  "upload-preset/content-type-not-allowed": "Choose a JPEG, PNG or WebP photo.",
+  "upload/too-large": "Choose a smaller photo.",
+  "upload/unsupported-type": "Choose a JPEG, PNG or WebP photo.",
   failed: "We couldn't upload this photo. Please try again.",
 };
 

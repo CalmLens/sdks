@@ -82,7 +82,7 @@ describe("upload MIME types", () => {
       });
       await expect(
         client.assets.create({ name: "x", content: { base64: "aGVsbG8=", type } }),
-      ).rejects.toMatchObject({ code: "upload/invalid-mime-type", details: { mimeType: type } });
+      ).rejects.toMatchObject({ code: "upload/unsupported-type", details: { mimeType: type } });
     });
   }
 });
@@ -361,9 +361,15 @@ describe("shared mock scenarios", () => {
             if (wantRetryAfter !== undefined) {
               expect(retryAfter, `${label}: retryAfter`).toBe(wantRetryAfter);
             }
-            // `details` lists only the keys to compare.
+            // `details` lists only the keys to compare, and objects in them (such as each of a
+            // validation error's `issues`) only the fields to compare.
             for (const [key, value] of Object.entries(wantDetails ?? {})) {
-              expect(details?.[key], `${label}: details.${key}`).toEqual(resolveRefs(value, saved));
+              const wanted = resolveRefs(value, saved);
+              if (wanted !== null && typeof wanted === "object") {
+                expect(details?.[key], `${label}: details.${key}`).toMatchObject(wanted);
+              } else {
+                expect(details?.[key], `${label}: details.${key}`).toEqual(wanted);
+              }
             }
             continue;
           }

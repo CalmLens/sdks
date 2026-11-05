@@ -158,7 +158,7 @@ export interface MockCalmLensCall {
 /**
  * What a simulated request failure does: `"transport-error"` and `"timeout"` fail the request
  * like a network failure (`sdk/transport-error`) or a deadline (`sdk/timeout`); an API error
- * code, such as `"upload/limit-exceeded"`, answers with that API error and its HTTP status; a
+ * code, such as `"usage/free-uploads-exhausted"`, answers with that API error and its HTTP status; a
  * `CalmLensError` is thrown as is and any other `Error` as the cause of `sdk/transport-error`,
  * like an exception from `fetch`.
  */
@@ -441,9 +441,14 @@ const fail = (
     details,
   );
 
-/** A request the API's schema refuses: `validation/<zod issue>` with HTTP 400 and the field. */
+/**
+ * A request the API's schema refuses: `validation/invalid-request` with HTTP 400, listing the field
+ * and its issue code (such as `validation/too-big`) in `details.issues`.
+ */
 const invalidField = (code: string, path: string) =>
-  new ApiFailure(400, code, `Invalid ${path}`, { path });
+  new ApiFailure(400, API_ERROR_CODES.INVALID_REQUEST, `Invalid ${path}`, {
+    issues: [{ path, message: `Invalid ${path}`, code }],
+  });
 
 /**
  * Refuses `metadata` the API's schema refuses (METADATA_ITEM_SCHEMA): it is `null` or a list of
@@ -1516,7 +1521,7 @@ export class MockCalmLensApi {
       const body = JSON.parse(new TextDecoder().decode(request.bytes));
       return body && typeof body === "object" ? body : {};
     } catch {
-      throw new ApiFailure(400, "validation/invalid-json", "Invalid JSON body");
+      throw invalidField("validation/invalid-type", "");
     }
   }
 
@@ -1546,10 +1551,10 @@ export class MockCalmLensApi {
   }
 
   private pageFailure = (
-    code: "validation/too-small" | "validation/too-big" | "validation/invalid-cursor",
+    code: "validation/too-small" | "validation/too-big" | "cursor/invalid",
     path?: string,
   ): Error =>
-    (code === "validation/invalid-cursor"
+    (code === "cursor/invalid"
       ? fail(API_ERROR_CODES.INVALID_CURSOR)
       : invalidField(code, path ?? "pageSize")) as unknown as Error;
 
@@ -1643,7 +1648,9 @@ export class MockCalmLensApi {
     const pageSize = this.integer(query, "pageSize", DEFAULT_PAGE_SIZE);
     if (pageSize < 1) throw invalidField("validation/too-small", "pageSize");
     if (pageSize > 100) throw invalidField("validation/too-big", "pageSize");
-    if (asset.content.safetyHold) throw fail(API_ERROR_CODES.ASSET_SAFETY_HELD);
+    if (asset.content.safetyHold) {
+      throw fail(API_ERROR_CODES.ASSET_HELD, { details: { hold: "safety" } });
+    }
     if (query.get("cursor") !== null) throw fail(API_ERROR_CODES.INVALID_CURSOR);
     return { items: [], nextCursor: null, pageSize, hasMore: false, ordering: [] };
   }
@@ -1868,7 +1875,7 @@ export class MockCalmLensApi {
       try {
         return JSON.parse(raw);
       } catch {
-        throw invalidField("validation/invalid-json", name);
+        throw invalidField("validation/invalid-value", name);
       }
     };
     const total = query.get("totalSizeInBytes");
@@ -1910,9 +1917,9 @@ export class MockCalmLensApi {
     const { contentType, part } = fields;
     const bytes = fields.bytes ?? new Uint8Array(0);
     if (contentType !== undefined && !isAcceptedUploadMimeType(contentType)) {
-      throw fail(API_ERROR_CODES.INVALID_UPLOAD_MIME_TYPE, {
+      throw fail(API_ERROR_CODES.UNSUPPORTED_UPLOAD_TYPE, {
         message: getRejectedUploadMimeTypeError(contentType),
-        details: { mimeType: contentType },
+        details: { mimeType: contentType, source: "calmlens" },
       });
     }
     const type = inferAssetType(fields.url === undefined ? (contentType ?? "") : undefined);
@@ -1929,7 +1936,7 @@ export class MockCalmLensApi {
           ? (this.multipartTotalSizeError(part.totalSizeInBytes, partSize, true) ??
             this.multipartImageSizeError(type, partSize))
           : undefined);
-      if (sizeError) throw fail(sizeError);
+      if (sizeError) throw this.sizeFailure(sizeError);
       const validation = validateAssetPayload(
         { uint8Array: bytes },
         { multipart: true, isFinal: part.isFinal },
@@ -2069,7 +2076,7 @@ export class MockCalmLensApi {
     const sizeError =
       this.multipartImageSizeError(asset.type, received) ??
       this.multipartTotalSizeError(upload?.totalSizeInBytes, received, isFinal);
-    if (sizeError) throw fail(sizeError);
+    if (sizeError) throw this.sizeFailure(sizeError);
     const validation = validateAssetPayload({ uint8Array: bytes }, { multipart: true, isFinal });
     if (!validation.ok) {
       throw fail(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, { message: validation.error });
@@ -2101,8 +2108,18 @@ export class MockCalmLensApi {
   /** Like the API: image uploads in parts total at most 20 MiB, at any size below that. */
   private multipartImageSizeError(type: string, sizeInBytes: number): ApiErrorCode | undefined {
     if (type !== "image") return undefined;
-    if (sizeInBytes > MAX_IMAGE_UPLOAD_BYTES) return API_ERROR_CODES.MULTIPART_IMAGE_TOO_LARGE;
+    if (sizeInBytes > MAX_IMAGE_UPLOAD_BYTES) return API_ERROR_CODES.UPLOAD_TOO_LARGE;
     return undefined;
+  }
+
+  /** The failure for a size error code, with the limit `upload/too-large` carries. */
+  private sizeFailure(code: ApiErrorCode) {
+    return fail(
+      code,
+      code === API_ERROR_CODES.UPLOAD_TOO_LARGE
+        ? { details: { limitBytes: MAX_IMAGE_UPLOAD_BYTES, source: "plan" } }
+        : {},
+    );
   }
 
   /** Like the API: the parts may not overshoot a declared total, and must reach it at the end. */
@@ -2407,7 +2424,7 @@ export class MockCalmLensApi {
         preset.allowedContentTypes.join(","),
       )
     ) {
-      throw fail(API_ERROR_CODES.UPLOAD_PRESET_CONTENT_TYPE_NOT_ALLOWED);
+      throw fail(API_ERROR_CODES.UNSUPPORTED_UPLOAD_TYPE, { details: { source: "preset" } });
     }
     const size = fields.part?.totalSizeInBytes ?? fields.bytes?.byteLength;
     if (
@@ -2415,7 +2432,9 @@ export class MockCalmLensApi {
       size !== undefined &&
       size > preset.maxFileSizeInBytes
     ) {
-      throw fail(API_ERROR_CODES.UPLOAD_PRESET_TOO_LARGE);
+      throw fail(API_ERROR_CODES.UPLOAD_TOO_LARGE, {
+        details: { limitBytes: preset.maxFileSizeInBytes, source: "preset" },
+      });
     }
     const asset = await this.storeAsset(
       {
@@ -2706,7 +2725,7 @@ export class MockCalmLensApi {
     const invalidTransform = () =>
       this.jsonResponse(
         400,
-        { code: "asset/invalid-transform", message: "Invalid transform selector" },
+        { code: "transform/invalid", message: "Invalid transform selector" },
         url,
       );
     // Like the CDN (serveAssetResource.ts), everything beneath `/hls/` is the HLS stream's
@@ -2779,7 +2798,7 @@ export class MockCalmLensApi {
         query.get("viewerClaims") ?? request.headers.get("X-CalmLens-Viewer-Claims") ?? "{}",
       );
     } catch {
-      return this.jsonResponse(400, { code: "viewer/invalid-claims" }, url);
+      return this.jsonResponse(400, { code: "viewer-claims/invalid" }, url);
     }
     if (status === "age-restricted" && claims.ageConfirmed !== true)
       return this.jsonResponse(403, { code: "viewer/age-confirmation-required" }, url);
@@ -2788,7 +2807,7 @@ export class MockCalmLensApi {
       return this.jsonResponse(
         403,
         {
-          code: "asset/api-key-missing-permission",
+          code: "auth/permission-denied",
           message: "This API key needs assets:download permission for this asset’s folder.",
         },
         url,
@@ -2826,7 +2845,7 @@ export class MockCalmLensApi {
         return this.jsonResponse(
           400,
           {
-            code: "asset/invalid-transform-options",
+            code: "transform-options/invalid",
             message: `Invalid transform options: ${[...unknownKeys, ...invalidKeys].join(", ")}`,
           },
           url,

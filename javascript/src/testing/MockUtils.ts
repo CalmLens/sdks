@@ -14,11 +14,11 @@ const fromBase64Utf8 = (value: string) =>
 
 /**
  * Why a page request is refused, like the API: `validation/too-small` or `validation/too-big` for
- * a page size outside 1 to 100 (with the query field as `path`), and `validation/invalid-cursor`
+ * a page size outside 1 to 100 (with the query field as `path`), and `cursor/invalid`
  * for a cursor that does not decode or came from another query.
  */
 export type PageRequestFailure = (
-  code: "validation/too-small" | "validation/too-big" | "validation/invalid-cursor",
+  code: "validation/too-small" | "validation/too-big" | "cursor/invalid",
   path?: string,
 ) => Error;
 
@@ -81,7 +81,7 @@ export const createPage = <T extends { id: string }, Field extends string = "cre
       )
         throw new Error();
     } catch {
-      throw fail("validation/invalid-cursor");
+      throw fail("cursor/invalid");
     }
     remaining = remaining.filter((item) => {
       for (const [i, rule] of ordering.entries()) {
@@ -140,7 +140,7 @@ export const orderItems = <T>(items: T[], ordering: Ordering | null | undefined)
   });
 };
 
-/** Thrown for a filter the API refuses with `validation/invalid-filter`. */
+/** Thrown for a filter the API refuses with `filter/invalid`. */
 export class MockInvalidFilter extends Error {}
 
 type FilterValue = string | number | null;
@@ -361,7 +361,7 @@ const matchesNode = (item: Record<string, unknown>, node: FilterNode): boolean =
 /**
  * Applies an RSQL `filter` like the API (zodbase/rsql with MOCK_ASSET_FILTER_FIELDS): only the
  * listed fields, each with its own operators, `;` (and) binding tighter than `,` (or), and parentheses. Throws
- * `MockInvalidFilter` for any filter the API refuses with `validation/invalid-filter`.
+ * `MockInvalidFilter` for any filter the API refuses with `filter/invalid`.
  */
 export const filterAssets = <T>(items: T[], filter: string | null | undefined): T[] => {
   if (!filter) return items;

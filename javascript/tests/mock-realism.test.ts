@@ -133,7 +133,7 @@ describe("MockCalmLensServerClient events", () => {
     expect(rest.items[0]).toMatchObject({ assetId: "asset-1", description: null, asset: null });
 
     expect(await caught(client.events.list({ cursor: "bogus" }))).toMatchObject({
-      code: "validation/invalid-cursor",
+      code: "cursor/invalid",
       status: 400,
     });
   });
@@ -172,12 +172,19 @@ describe("MockCalmLensServerClient assets.decide", () => {
 
     expect(
       await caught(client.assets.decide({ assetId: asset.id, decision: "allowed", note: " " })),
-    ).toMatchObject({ code: "validation/too-small", status: 400, details: { path: "note" } });
+    ).toMatchObject({
+      code: "validation/invalid-request",
+      status: 400,
+      details: { issues: [{ path: "note", code: "validation/too-small" }] },
+    });
     expect(
       await caught(
         client.assets.decide({ assetId: asset.id, decision: "purged", note: "Illegal" } as never),
       ),
-    ).toMatchObject({ code: "validation/invalid-value", details: { path: "confirmPurge" } });
+    ).toMatchObject({
+      code: "validation/invalid-request",
+      details: { issues: [{ path: "confirmPurge", code: "validation/invalid-value" }] },
+    });
 
     await client.assets.decide({
       assetId: asset.id,
@@ -222,7 +229,7 @@ describe("MockCalmLensServerClient multipart and idempotency", () => {
         name: "bad.txt",
         part: { base64: "aGVsbG8=", type: "text/plain", isFinal: true, sizeInBytes: 6 },
       }),
-    ).rejects.toMatchObject({ code: "upload/invalid-payload" });
+    ).rejects.toMatchObject({ code: "upload-payload/invalid" });
     expect((await client.assets.list()).items).toEqual([]);
     const uploading = await client.assets.create({
       name: "doc.pdf",
@@ -233,7 +240,7 @@ describe("MockCalmLensServerClient multipart and idempotency", () => {
         assetId: uploading.id,
         part: { base64: "aGVsbG8=", partNumber: 2, isFinal: true, sizeInBytes: 6 },
       }),
-    ).rejects.toMatchObject({ code: "upload/invalid-payload" });
+    ).rejects.toMatchObject({ code: "upload-payload/invalid" });
     const unchanged = await client.assets.retrieve({ assetId: uploading.id });
     expect(unchanged.upload).toMatchObject({ status: "uploading", partsReceived: 1 });
   });
@@ -252,7 +259,7 @@ describe("MockCalmLensServerClient multipart and idempotency", () => {
           part: { uint8Array: [1], partNumber: 3, isFinal: true },
         }),
       ),
-    ).toMatchObject({ code: "upload/invalid-part-number", details: { expectedPartNumber: 2 } });
+    ).toMatchObject({ code: "upload-part/invalid-number", details: { expectedPartNumber: 2 } });
 
     const finished = await client.assets.uploadPart({
       assetId: started.id,

@@ -718,7 +718,7 @@ describe("UploadController", () => {
         .items.map(({ stage, status, errorCode }) => ({ stage, status, errorCode })),
     ).toEqual([
       { stage: "complete", status: "allowed", errorCode: undefined },
-      { stage: "failed", status: undefined, errorCode: "upload-preset/too-large" },
+      { stage: "failed", status: undefined, errorCode: "upload/too-large" },
     ]);
     expect(failed.map((item) => item.file.name)).toEqual(["big.png"]);
     expect(created).toHaveLength(2);

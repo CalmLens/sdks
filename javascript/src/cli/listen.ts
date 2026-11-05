@@ -45,9 +45,9 @@ const MAX_BACKOFF_MS = 30_000;
 
 /** Fatal errors stop the CLI instead of retrying: they need the user to change something. */
 const FATAL_ERROR_CODES = new Set([
-  "auth/missing-token",
-  "auth/invalid-api-key",
-  "auth/project-mismatch",
+  "api-key/missing",
+  "api-key/invalid",
+  "api-key/project-mismatch",
   "project/not-found",
 ]);
 

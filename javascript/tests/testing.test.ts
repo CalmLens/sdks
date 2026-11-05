@@ -347,8 +347,8 @@ describe("MockCalmLensServerClient", () => {
     ] as const) {
       const error = await client.assets.create(options as never).catch((caught) => caught);
       expect(error).toBeInstanceOf(CalmLensError);
-      expect(error.code).toBe(PUBLIC_ERROR_CODES.INVALID_UPLOAD_MIME_TYPE.getId());
-      expect(error.details).toEqual({ mimeType });
+      expect(error.code).toBe(PUBLIC_ERROR_CODES.UNSUPPORTED_UPLOAD_TYPE.getId());
+      expect(error.details).toEqual({ mimeType, source: "calmlens" });
     }
   });
 
@@ -1149,7 +1149,7 @@ describe("MockCalmLensAppClient", () => {
       },
     });
     expect(await codeOf(() => withToken.assets.create({ name: "a.png", content: photo }))).toBe(
-      "upload-preset/too-large",
+      "upload/too-large",
     );
     expect(
       await codeOf(() =>
@@ -1158,7 +1158,7 @@ describe("MockCalmLensAppClient", () => {
           content: { plainText: "hi", type: "text/plain" },
         }),
       ),
-    ).toBe("upload-preset/content-type-not-allowed");
+    ).toBe("upload/unsupported-type");
   });
 
   it("gives an upload the external ID its token was signed for, as the API does", async () => {

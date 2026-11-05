@@ -425,7 +425,7 @@ export type SignedCdnResource = (typeof SIGNED_CDN_RESOURCES)[number];
  * every asset whatever its visibility or moderation status. Defaults to `rendered`; ask for
  * `original` to download the exact file. Lenses and transforms apply to `preview`, and to
  * `rendered` when it is an image; the CDN refuses them on rendered PDFs, video and audio with
- * `asset/invalid-transform`, and the original, hls, embed and placeholder take none.
+ * `transform/invalid`, and the original, hls, embed and placeholder take none.
  */
 export type CdnResource = SignedCdnResource | "placeholder";
 

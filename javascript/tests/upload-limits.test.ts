@@ -34,7 +34,7 @@ describe("one-request upload size limits", () => {
         .assets.create({ name: "big", content } as never)
         .catch((error: unknown) => error);
       expect(error, content.type).toMatchObject({
-        code: PUBLIC_ERROR_CODES.FILE_TOO_LARGE.getId(),
+        code: PUBLIC_ERROR_CODES.UPLOAD_TOO_LARGE.getId(),
       });
     }
     expect(sent).toEqual([]);

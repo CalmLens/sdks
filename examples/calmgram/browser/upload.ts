@@ -18,8 +18,8 @@ const uploadPresetId = form?.dataset.uploadPresetId;
 
 // CalmLens error codes the visitor can do something about.
 const UPLOAD_ERRORS: Record<string, string> = {
-  "upload-preset/too-large": "Images must be smaller than 10MB.",
-  "upload-preset/content-type-not-allowed": "Use a JPEG, PNG, WebP, GIF or HEIC image.",
+  "upload/too-large": "Images must be smaller than 10MB.",
+  "upload/unsupported-type": "Use a JPEG, PNG, WebP, GIF or HEIC image.",
   "upload-preset/daily-limit-reached": "Uploads are paused for today. Please try again tomorrow.",
   "upload-token/expired": "That took too long. Please try again.",
 };

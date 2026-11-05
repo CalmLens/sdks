@@ -2,52 +2,48 @@
 
 /** Error codes the CalmLens API documents, by name. */
 export const API_ERROR_CODES = {
-  INVALID_VIEWER_CLAIMS: "viewer/invalid-claims",
+  INVALID_VIEWER_CLAIMS: "viewer-claims/invalid",
   AGE_CONFIRMATION_REQUIRED: "viewer/age-confirmation-required",
-  INVALID_VIEWER_REGION: "viewer/invalid-region",
+  INVALID_VIEWER_REGION: "viewer-region/invalid",
   VIEWER_REGION_REQUIRED: "viewer/region-required",
   REGIONAL_EVIDENCE_REQUIRED: "asset/regional-evidence-required",
   SIGNED_URL_EXPIRED: "signed-url/expired",
   SIGNED_URL_INVALID: "signed-url/invalid",
+  INVALID_REQUEST: "validation/invalid-request",
   INVALID_TYPE: "validation/invalid-type",
   TOO_SMALL: "validation/too-small",
   TOO_BIG: "validation/too-big",
   INVALID_FORMAT: "validation/invalid-format",
   INVALID_VALUE: "validation/invalid-value",
   UNKNOWN_FIELD: "validation/unknown-field",
-  UNSUPPORTED_CONTENT_TYPE: "validation/unsupported-content-type",
-  INVALID_FILTER: "validation/invalid-filter",
-  INVALID_ORDERING_FIELD: "validation/invalid-ordering-field",
-  ROUTE_NOT_FOUND: "misc/route-not-found",
-  INTERNAL_ERROR: "misc/internal-error",
+  UNSUPPORTED_CONTENT_TYPE: "request/unsupported-content-type",
+  INVALID_FILTER: "filter/invalid",
+  UNSUPPORTED_ORDERING_FIELD: "ordering/unsupported-field",
+  ROUTE_NOT_FOUND: "request/route-not-found",
+  INTERNAL_ERROR: "server/internal-error",
   UNAUTHENTICATED: "auth/unauthenticated",
-  TOKEN_EXPIRED: "auth/token-expired",
-  INVALID_TOKEN: "auth/invalid-token",
+  TOKEN_EXPIRED: "session-token/expired",
+  INVALID_TOKEN: "session-token/invalid",
   SEARCH_UNAVAILABLE: "search/unavailable",
-  INVALID_TRANSFORM: "asset/invalid-transform",
-  INVALID_TRANSFORM_OPTIONS: "asset/invalid-transform-options",
-  REMOTE_URL_REDIRECT_LIMIT: "asset/remote-url-redirect-limit",
-  COPYRIGHT_CONTENT_HELD: "copyright/content-held",
-  DOWNLOAD_PERMISSION_REQUIRED: "asset/api-key-missing-permission",
-  INVALID_CURSOR: "validation/invalid-cursor",
-  MISSING_TOKEN: "auth/missing-token",
-  INVALID_API_KEY: "auth/invalid-api-key",
-  API_KEY_PROJECT_MISMATCH: "auth/project-mismatch",
-  API_KEY_NOT_ACCEPTED: "auth/api-key-not-accepted",
+  INVALID_TRANSFORM: "transform/invalid",
+  INVALID_TRANSFORM_OPTIONS: "transform-options/invalid",
+  REMOTE_URL_TOO_MANY_REDIRECTS: "remote-url/too-many-redirects",
+  INVALID_CURSOR: "cursor/invalid",
+  MISSING_API_KEY: "api-key/missing",
+  INVALID_API_KEY: "api-key/invalid",
+  API_KEY_PROJECT_MISMATCH: "api-key/project-mismatch",
+  API_KEY_NOT_ACCEPTED: "api-key/not-accepted",
   PERMISSION_DENIED: "auth/permission-denied",
-  FILE_TOO_LARGE: "upload/file-too-large",
-  MULTIPART_IMAGE_TOO_LARGE: "upload/multipart-image-too-large",
-  IMAGE_EXCEEDED_MAX_DIMENSIONS: "upload/image-exceeded-max-dimensions",
-  IMAGE_INVALID_INPUT: "image/invalid-input",
-  IMAGE_UNSUPPORTED_FORMAT: "image/unsupported-format",
-  IMAGE_INPUT_LIMIT: "image/input-limit",
-  UPLOAD_LIMIT_EXCEEDED: "upload/limit-exceeded",
-  SPEND_LIMIT_REACHED: "upload/spend-limit-reached",
-  INVALID_UPLOAD_MIME_TYPE: "upload/invalid-mime-type",
-  INVALID_UPLOAD_PAYLOAD: "upload/invalid-payload",
+  UPLOAD_TOO_LARGE: "upload/too-large",
+  INVALID_IMAGE: "image/invalid",
+  IMAGE_TOO_LARGE: "image/too-large",
+  FREE_UPLOADS_EXHAUSTED: "usage/free-uploads-exhausted",
+  UPLOADS_PAUSED: "usage/uploads-paused",
+  UNSUPPORTED_UPLOAD_TYPE: "upload/unsupported-type",
+  INVALID_UPLOAD_PAYLOAD: "upload-payload/invalid",
   USE_UPLOAD_PART: "upload/use-upload-part",
   UPLOAD_NOT_OPEN: "upload/not-open",
-  INVALID_UPLOAD_PART_NUMBER: "upload/invalid-part-number",
+  INVALID_UPLOAD_PART_NUMBER: "upload-part/invalid-number",
   UPLOAD_MISSING: "upload/missing",
   UPLOAD_SIZE_MISMATCH: "upload/size-mismatch",
   INVALID_IDEMPOTENCY_KEY: "idempotency/invalid-key",
@@ -59,7 +55,7 @@ export const API_ERROR_CODES = {
   ASSET_REVIEW_CHANGED: "asset/review-changed",
   ASSET_REVIEW_NOTE_REQUIRED: "asset/review-note-required",
   ASSET_UPDATE_FAILED: "asset/update-failed",
-  ASSET_SAFETY_HELD: "asset/safety-held",
+  ASSET_HELD: "asset/held",
   ASSET_PROCESSING: "asset/processing",
   ASSET_DECISION_NOT_ALLOWED: "asset/decision-not-allowed",
   ASSET_DECISION_UNCHANGED: "asset/decision-unchanged",
@@ -69,7 +65,7 @@ export const API_ERROR_CODES = {
   ASSET_NOT_DECIDED: "asset/not-decided",
   ASSET_POLICY_CHANGED: "asset/policy-changed",
   ASSET_REVIEWED: "asset/reviewed",
-  SUPPORT_TICKET_NOT_FOUND: "support/ticket-not-found",
+  SUPPORT_TICKET_NOT_FOUND: "support-ticket/not-found",
   DUPLICATE_EXTERNAL_ID: "asset/duplicate-external-id",
   FOLDER_NOT_FOUND: "folder/not-found",
   DUPLICATE_FOLDER_NAME: "folder/duplicate-name",
@@ -78,9 +74,9 @@ export const API_ERROR_CODES = {
   LENS_VERSION_CONFLICT: "lens/version-conflict",
   LENS_IDENTIFIER_RESERVED: "lens/identifier-reserved",
   HASH_LIST_NOT_FOUND: "hash-list/not-found",
-  HASH_LIST_ENTRY_NOT_FOUND: "hash-list/entry-not-found",
+  HASH_LIST_ENTRY_NOT_FOUND: "hash-list-entry/not-found",
   HASH_LIST_LIMIT_REACHED: "hash-list/limit-reached",
-  HASH_LIST_ENTRY_LIMIT_REACHED: "hash-list/entry-limit-reached",
+  HASH_LIST_ENTRY_LIMIT_REACHED: "hash-list-entry/limit-reached",
   HASH_LIST_ASSET_NOT_HASHED: "hash-list/asset-not-hashed",
   POLICY_NOT_FOUND: "policy/not-found",
   POLICY_REVISION_CONFLICT: "policy/revision-conflict",
@@ -94,18 +90,16 @@ export const API_ERROR_CODES = {
   UPLOAD_PRESET_NOT_FOUND: "upload-preset/not-found",
   UPLOAD_PRESET_DISABLED: "upload-preset/disabled",
   UPLOAD_PRESET_TOKEN_REQUIRED: "upload-preset/token-required",
-  REMOTE_URL_NOT_ALLOWED: "upload/remote-url-not-allowed",
-  WEBSITE_RATE_LIMIT_EXCEEDED: "upload/website-rate-limit-exceeded",
-  UPLOAD_PRESET_CONTENT_TYPE_NOT_ALLOWED: "upload-preset/content-type-not-allowed",
-  UPLOAD_PRESET_TOO_LARGE: "upload-preset/too-large",
+  REMOTE_URL_NOT_ALLOWED: "remote-url/not-allowed",
+  WEBSITE_RATE_LIMIT_REACHED: "upload/website-rate-limit-reached",
   UPLOAD_PRESET_DAILY_LIMIT_REACHED: "upload-preset/daily-limit-reached",
   UPLOAD_PRESET_ORIGIN_NOT_ALLOWED: "upload-preset/origin-not-allowed",
   UPLOAD_PRESET_FIELD_NOT_ALLOWED: "upload-preset/field-not-allowed",
   UPLOAD_TOKEN_INVALID: "upload-token/invalid",
   UPLOAD_TOKEN_EXPIRED: "upload-token/expired",
   UPLOAD_TOKEN_USED: "upload-token/used",
-  INVALID_REMOTE_URL: "asset/invalid-remote-url",
-  REMOTE_URL_UNAVAILABLE: "asset/remote-url-unavailable",
+  INVALID_REMOTE_URL: "remote-url/invalid",
+  REMOTE_URL_UNAVAILABLE: "remote-url/unavailable",
   APPEAL_NOT_FOUND: "appeal/not-found",
   APPEAL_JUDGMENT_NOT_FOUND: "appeal/judgment-not-found",
   APPEAL_ASSET_NOT_FOUND: "appeal/asset-not-found",
@@ -113,7 +107,6 @@ export const API_ERROR_CODES = {
   APPEAL_ALREADY_REVIEWED: "appeal/already-reviewed",
   APPEAL_DECISION_CHANGED: "appeal/decision-changed",
   APPEAL_INVALID_ACTION: "appeal/invalid-action",
-  APPEAL_SAFETY_HELD: "appeal/safety-held",
   APPEAL_CONTENT_UNAVAILABLE: "appeal/content-unavailable",
 } as const;
 
@@ -126,7 +119,7 @@ export interface ApiErrorDefinition {
 
 /** The HTTP status and default message the API returns with each documented error code. */
 export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
-  "viewer/invalid-claims": {
+  "viewer-claims/invalid": {
     status: 400,
     message: "Supply a viewerClaims object with an optional region and boolean ageConfirmed.",
   },
@@ -134,7 +127,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 403,
     message: "Your application has not confirmed age-restricted delivery for this viewer.",
   },
-  "viewer/invalid-region": {
+  "viewer-region/invalid": {
     status: 400,
     message: "Supply the viewer's ISO country code, such as DE or GB.",
   },
@@ -154,47 +147,51 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 403,
     message: "The signed URL's signature doesn't match its asset, resource, lens, transform, expiry or viewer claims. Use the URL exactly as created.",
   },
+  "validation/invalid-request": {
+    status: 400,
+    message: "The request's parameters, query or body are invalid. details.issues lists each problem, with its path and issue code.",
+  },
   "validation/invalid-type": {
     status: 400,
-    message: "A field has the wrong type. details.issues lists each problem.",
+    message: "Issue code in details.issues: a field has the wrong type.",
   },
   "validation/too-small": {
     status: 400,
-    message: "A value is below its minimum. details.issues lists each problem.",
+    message: "Issue code in details.issues: a value is below its minimum.",
   },
   "validation/too-big": {
     status: 400,
-    message: "A value is above its maximum. details.issues lists each problem.",
+    message: "Issue code in details.issues: a value is above its maximum.",
   },
   "validation/invalid-format": {
     status: 400,
-    message: "A string is not in the required format, such as an ID or URL. details.issues lists each problem.",
+    message: "Issue code in details.issues: a string is not in the required format, such as an ID or URL.",
   },
   "validation/invalid-value": {
     status: 400,
-    message: "A field has a value it cannot take. details.issues lists each problem.",
+    message: "Issue code in details.issues: a field has a value it cannot take.",
   },
   "validation/unknown-field": {
     status: 400,
-    message: "The request has a field this endpoint does not accept.",
+    message: "Issue code in details.issues: the request has a field this endpoint does not accept.",
   },
-  "validation/unsupported-content-type": {
+  "request/unsupported-content-type": {
     status: 415,
     message: "Send the request body as application/json.",
   },
-  "validation/invalid-filter": {
+  "filter/invalid": {
     status: 400,
     message: "The filter has invalid syntax or names a field that can't be filtered.",
   },
-  "validation/invalid-ordering-field": {
+  "ordering/unsupported-field": {
     status: 400,
     message: "The list cannot be ordered by this field.",
   },
-  "misc/route-not-found": {
+  "request/route-not-found": {
     status: 404,
     message: "No endpoint matches this method and path.",
   },
-  "misc/internal-error": {
+  "server/internal-error": {
     status: 500,
     message: "An internal error occurred. Retry later, and quote requestId to support.",
   },
@@ -202,11 +199,11 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 401,
     message: "Authentication required.",
   },
-  "auth/token-expired": {
+  "session-token/expired": {
     status: 401,
     message: "The session token has expired. Sign in again.",
   },
-  "auth/invalid-token": {
+  "session-token/invalid": {
     status: 401,
     message: "The session token is invalid. Sign in again.",
   },
@@ -214,87 +211,67 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 503,
     message: "Search is temporarily unavailable. Retry later.",
   },
-  "asset/invalid-transform": {
+  "transform/invalid": {
     status: 400,
     message: "The transform names an unknown type or is not a valid selector.",
   },
-  "asset/invalid-transform-options": {
+  "transform-options/invalid": {
     status: 400,
     message: "The transform's options are invalid for its type.",
   },
-  "asset/remote-url-redirect-limit": {
+  "remote-url/too-many-redirects": {
     status: 400,
     message: "The remote URL redirected too many times.",
   },
-  "copyright/content-held": {
-    status: 409,
-    message: "The asset's content is held for a copyright claim and cannot be changed.",
-  },
-  "asset/api-key-missing-permission": {
-    status: 403,
-    message: "This API key needs assets:download permission for this asset's folder.",
-  },
-  "validation/invalid-cursor": {
+  "cursor/invalid": {
     status: 400,
     message: "The cursor is invalid or belongs to a different query.",
   },
-  "auth/missing-token": {
+  "api-key/missing": {
     status: 401,
     message: "Authentication required. Send your project API key in the X-Api-Key header.",
   },
-  "auth/invalid-api-key": {
+  "api-key/invalid": {
     status: 401,
     message: "The API key is invalid, revoked or expired. Create a key under Developer → API Keys.",
   },
-  "auth/project-mismatch": {
+  "api-key/project-mismatch": {
     status: 403,
     message: "This API key belongs to a different project. Use a key created for the project that owns this resource.",
   },
-  "auth/api-key-not-accepted": {
+  "api-key/not-accepted": {
     status: 403,
     message: "API keys are only accepted by the public API at /v1.",
   },
   "auth/permission-denied": {
     status: 403,
-    message: "This API key lacks a permission the request needs, such as assets:delete for an asset's folder, or the resource belongs to another project.",
+    message: "This API key lacks a permission the request needs (details.permission names it, such as assets:download for an asset's folder), or the resource belongs to another project.",
   },
-  "upload/file-too-large": {
-    status: 400,
-    message: "File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.",
+  "upload/too-large": {
+    status: 413,
+    message: "The file is larger than allowed. details.limitBytes is the limit, and details.source says whether it is the plan's (`plan`) or the upload preset's (`preset`).",
   },
-  "upload/multipart-image-too-large": {
-    status: 400,
-    message: "Multipart image uploads cannot exceed 20 MiB.",
-  },
-  "upload/image-exceeded-max-dimensions": {
-    status: 400,
-    message: "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",
-  },
-  "image/invalid-input": {
+  "image/invalid": {
     status: 422,
     message: "The image is corrupt or cannot be decoded. Upload a valid image file.",
   },
-  "image/unsupported-format": {
+  "image/too-large": {
     status: 422,
-    message: "This image format is not supported. Convert it to PNG, JPEG or WebP before uploading.",
+    message: "The image exceeds a processing limit: details.limit is `bytes`, `pixels` or `dimension`. Reduce its size before uploading.",
   },
-  "image/input-limit": {
-    status: 422,
-    message: "The image exceeds the processing byte or pixel limit. Reduce its size before uploading.",
-  },
-  "upload/limit-exceeded": {
+  "usage/free-uploads-exhausted": {
     status: 403,
-    message: "Upload limit exceeded. This project's organisation has used its free uploads. Set up billing to continue uploading.",
+    message: "This project's organisation has used its free uploads. Set up billing to continue uploading.",
   },
-  "upload/spend-limit-reached": {
+  "usage/uploads-paused": {
     status: 402,
     message: "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.",
   },
-  "upload/invalid-mime-type": {
-    status: 400,
-    message: "Upload file type is not supported. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.",
+  "upload/unsupported-type": {
+    status: 415,
+    message: "The file type is not accepted. details.source is `calmlens` when CalmLens cannot store and process it (use a concrete MIME type such as image/png, application/pdf or text/plain) or `preset` when the upload preset doesn't allow it.",
   },
-  "upload/invalid-payload": {
+  "upload-payload/invalid": {
     status: 400,
     message: "Upload payload is invalid.",
   },
@@ -306,7 +283,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 409,
     message: "Asset is not accepting additional parts",
   },
-  "upload/invalid-part-number": {
+  "upload-part/invalid-number": {
     status: 409,
     message: "Multipart upload part number is invalid.",
   },
@@ -354,9 +331,9 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 500,
     message: "Failed to update asset",
   },
-  "asset/safety-held": {
+  "asset/held": {
     status: 423,
-    message: "Asset access is restricted by a safety hold.",
+    message: "The asset is held and this request can't change or deliver it. details.hold is `safety` for a safety hold or `copyright` for a copyright claim.",
   },
   "asset/processing": {
     status: 409,
@@ -394,7 +371,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 409,
     message: "A reviewer has decided this asset, so its moderation can't be re-run.",
   },
-  "support/ticket-not-found": {
+  "support-ticket/not-found": {
     status: 404,
     message: "Support ticket not found.",
   },
@@ -430,7 +407,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 404,
     message: "Hash list not found. Check the list ID in the portal.",
   },
-  "hash-list/entry-not-found": {
+  "hash-list-entry/not-found": {
     status: 404,
     message: "Hash list entry not found.",
   },
@@ -438,7 +415,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 409,
     message: "This project has the most hash lists it can hold. Delete a list to add another.",
   },
-  "hash-list/entry-limit-reached": {
+  "hash-list-entry/limit-reached": {
     status: 409,
     message: "This project's hash lists hold the most entries they can. Remove entries to add more.",
   },
@@ -494,21 +471,13 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 401,
     message: "This upload preset only accepts uploads with an upload token. Sign one on your server with uploadTokens.sign and pass it to the client.",
   },
-  "upload/remote-url-not-allowed": {
+  "remote-url/not-allowed": {
     status: 403,
     message: "This project doesn't accept URLs from this domain. Change the allowed or blocked domains under Project settings.",
   },
-  "upload/website-rate-limit-exceeded": {
+  "upload/website-rate-limit-reached": {
     status: 429,
     message: "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
-  },
-  "upload-preset/content-type-not-allowed": {
-    status: 415,
-    message: "This upload preset doesn't accept this file type.",
-  },
-  "upload-preset/too-large": {
-    status: 413,
-    message: "This file is larger than the upload preset allows.",
   },
   "upload-preset/daily-limit-reached": {
     status: 429,
@@ -534,11 +503,11 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 409,
     message: "The upload token has already been used. Each token uploads one asset.",
   },
-  "asset/invalid-remote-url": {
+  "remote-url/invalid": {
     status: 400,
     message: "Remote URLs must use HTTP or HTTPS and cannot target private networks, localhost names or URL credentials.",
   },
-  "asset/remote-url-unavailable": {
+  "remote-url/unavailable": {
     status: 422,
     message: "The URL responded with an error status. Check that it is publicly reachable.",
   },
@@ -569,10 +538,6 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "appeal/invalid-action": {
     status: 400,
     message: "The decision's action is not valid for this appeal.",
-  },
-  "appeal/safety-held": {
-    status: 409,
-    message: "A safety hold prevents this appeal from being submitted or applied.",
   },
   "appeal/content-unavailable": {
     status: 409,

@@ -286,7 +286,7 @@ ErrorCode.DEFAULT_CODE;
 // packages/shared/src/PublicErrorCodes.ts
 const PUBLIC_ERROR_CODES = {
 	INVALID_VIEWER_CLAIMS: new ErrorCode({
-		id: "viewer/invalid-claims",
+		id: "viewer-claims/invalid",
 		defaultMessage: "Supply a viewerClaims object with an optional region and boolean ageConfirmed.",
 		status: 400
 	}),
@@ -296,7 +296,7 @@ const PUBLIC_ERROR_CODES = {
 		status: 403
 	}),
 	INVALID_VIEWER_REGION: new ErrorCode({
-		id: "viewer/invalid-region",
+		id: "viewer-region/invalid",
 		defaultMessage: "Supply the viewer's ISO country code, such as DE or GB.",
 		status: 400
 	}),
@@ -320,58 +320,63 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "The signed URL's signature doesn't match its asset, resource, lens, transform, expiry or viewer claims. Use the URL exactly as created.",
 		status: 403
 	}),
+	INVALID_REQUEST: new ErrorCode({
+		id: "validation/invalid-request",
+		defaultMessage: "The request's parameters, query or body are invalid. details.issues lists each problem, with its path and issue code.",
+		status: 400
+	}),
 	INVALID_TYPE: new ErrorCode({
 		id: "validation/invalid-type",
-		defaultMessage: "A field has the wrong type. details.issues lists each problem.",
+		defaultMessage: "Issue code in details.issues: a field has the wrong type.",
 		status: 400
 	}),
 	TOO_SMALL: new ErrorCode({
 		id: "validation/too-small",
-		defaultMessage: "A value is below its minimum. details.issues lists each problem.",
+		defaultMessage: "Issue code in details.issues: a value is below its minimum.",
 		status: 400
 	}),
 	TOO_BIG: new ErrorCode({
 		id: "validation/too-big",
-		defaultMessage: "A value is above its maximum. details.issues lists each problem.",
+		defaultMessage: "Issue code in details.issues: a value is above its maximum.",
 		status: 400
 	}),
 	INVALID_FORMAT: new ErrorCode({
 		id: "validation/invalid-format",
-		defaultMessage: "A string is not in the required format, such as an ID or URL. details.issues lists each problem.",
+		defaultMessage: "Issue code in details.issues: a string is not in the required format, such as an ID or URL.",
 		status: 400
 	}),
 	INVALID_VALUE: new ErrorCode({
 		id: "validation/invalid-value",
-		defaultMessage: "A field has a value it cannot take. details.issues lists each problem.",
+		defaultMessage: "Issue code in details.issues: a field has a value it cannot take.",
 		status: 400
 	}),
 	UNKNOWN_FIELD: new ErrorCode({
 		id: "validation/unknown-field",
-		defaultMessage: "The request has a field this endpoint does not accept.",
+		defaultMessage: "Issue code in details.issues: the request has a field this endpoint does not accept.",
 		status: 400
 	}),
 	UNSUPPORTED_CONTENT_TYPE: new ErrorCode({
-		id: "validation/unsupported-content-type",
+		id: "request/unsupported-content-type",
 		defaultMessage: "Send the request body as application/json.",
 		status: 415
 	}),
 	INVALID_FILTER: new ErrorCode({
-		id: "validation/invalid-filter",
+		id: "filter/invalid",
 		defaultMessage: "The filter has invalid syntax or names a field that can't be filtered.",
 		status: 400
 	}),
-	INVALID_ORDERING_FIELD: new ErrorCode({
-		id: "validation/invalid-ordering-field",
+	UNSUPPORTED_ORDERING_FIELD: new ErrorCode({
+		id: "ordering/unsupported-field",
 		defaultMessage: "The list cannot be ordered by this field.",
 		status: 400
 	}),
 	ROUTE_NOT_FOUND: new ErrorCode({
-		id: "misc/route-not-found",
+		id: "request/route-not-found",
 		defaultMessage: "No endpoint matches this method and path.",
 		status: 404
 	}),
 	INTERNAL_ERROR: new ErrorCode({
-		id: "misc/internal-error",
+		id: "server/internal-error",
 		defaultMessage: "An internal error occurred. Retry later, and quote requestId to support.",
 		status: 500
 	}),
@@ -381,12 +386,12 @@ const PUBLIC_ERROR_CODES = {
 		status: 401
 	}),
 	TOKEN_EXPIRED: new ErrorCode({
-		id: "auth/token-expired",
+		id: "session-token/expired",
 		defaultMessage: "The session token has expired. Sign in again.",
 		status: 401
 	}),
 	INVALID_TOKEN: new ErrorCode({
-		id: "auth/invalid-token",
+		id: "session-token/invalid",
 		defaultMessage: "The session token is invalid. Sign in again.",
 		status: 401
 	}),
@@ -396,107 +401,82 @@ const PUBLIC_ERROR_CODES = {
 		status: 503
 	}),
 	INVALID_TRANSFORM: new ErrorCode({
-		id: "asset/invalid-transform",
+		id: "transform/invalid",
 		defaultMessage: "The transform names an unknown type or is not a valid selector.",
 		status: 400
 	}),
 	INVALID_TRANSFORM_OPTIONS: new ErrorCode({
-		id: "asset/invalid-transform-options",
+		id: "transform-options/invalid",
 		defaultMessage: "The transform's options are invalid for its type.",
 		status: 400
 	}),
-	REMOTE_URL_REDIRECT_LIMIT: new ErrorCode({
-		id: "asset/remote-url-redirect-limit",
+	REMOTE_URL_TOO_MANY_REDIRECTS: new ErrorCode({
+		id: "remote-url/too-many-redirects",
 		defaultMessage: "The remote URL redirected too many times.",
 		status: 400
 	}),
-	COPYRIGHT_CONTENT_HELD: new ErrorCode({
-		id: "copyright/content-held",
-		defaultMessage: "The asset's content is held for a copyright claim and cannot be changed.",
-		status: 409
-	}),
-	DOWNLOAD_PERMISSION_REQUIRED: new ErrorCode({
-		id: "asset/api-key-missing-permission",
-		defaultMessage: "This API key needs assets:download permission for this asset's folder.",
-		status: 403
-	}),
 	INVALID_CURSOR: new ErrorCode({
-		id: "validation/invalid-cursor",
+		id: "cursor/invalid",
 		defaultMessage: "The cursor is invalid or belongs to a different query.",
 		status: 400
 	}),
-	MISSING_TOKEN: new ErrorCode({
-		id: "auth/missing-token",
+	MISSING_API_KEY: new ErrorCode({
+		id: "api-key/missing",
 		defaultMessage: "Authentication required. Send your project API key in the X-Api-Key header.",
 		status: 401
 	}),
 	INVALID_API_KEY: new ErrorCode({
-		id: "auth/invalid-api-key",
+		id: "api-key/invalid",
 		defaultMessage: "The API key is invalid, revoked or expired. Create a key under Developer → API Keys.",
 		status: 401
 	}),
 	API_KEY_PROJECT_MISMATCH: new ErrorCode({
-		id: "auth/project-mismatch",
+		id: "api-key/project-mismatch",
 		defaultMessage: "This API key belongs to a different project. Use a key created for the project that owns this resource.",
 		status: 403
 	}),
 	API_KEY_NOT_ACCEPTED: new ErrorCode({
-		id: "auth/api-key-not-accepted",
+		id: "api-key/not-accepted",
 		defaultMessage: "API keys are only accepted by the public API at /v1.",
 		status: 403
 	}),
 	PERMISSION_DENIED: new ErrorCode({
 		id: "auth/permission-denied",
-		defaultMessage: "This API key lacks a permission the request needs, such as assets:delete for an asset's folder, or the resource belongs to another project.",
+		defaultMessage: "This API key lacks a permission the request needs (details.permission names it, such as assets:download for an asset's folder), or the resource belongs to another project.",
 		status: 403
 	}),
-	FILE_TOO_LARGE: new ErrorCode({
-		id: "upload/file-too-large",
-		defaultMessage: "File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.",
-		status: 400
+	UPLOAD_TOO_LARGE: new ErrorCode({
+		id: "upload/too-large",
+		defaultMessage: "The file is larger than allowed. details.limitBytes is the limit, and details.source says whether it is the plan's (`plan`) or the upload preset's (`preset`).",
+		status: 413
 	}),
-	MULTIPART_IMAGE_TOO_LARGE: new ErrorCode({
-		id: "upload/multipart-image-too-large",
-		defaultMessage: "Multipart image uploads cannot exceed 20 MiB.",
-		status: 400
-	}),
-	IMAGE_EXCEEDED_MAX_DIMENSIONS: new ErrorCode({
-		id: "upload/image-exceeded-max-dimensions",
-		defaultMessage: "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",
-		status: 400
-	}),
-	IMAGE_INVALID_INPUT: new ErrorCode({
-		id: "image/invalid-input",
+	INVALID_IMAGE: new ErrorCode({
+		id: "image/invalid",
 		defaultMessage: "The image is corrupt or cannot be decoded. Upload a valid image file.",
 		status: 422
 	}),
-	IMAGE_UNSUPPORTED_FORMAT: new ErrorCode({
-		id: "image/unsupported-format",
-		defaultMessage: "This image format is not supported. Convert it to PNG, JPEG or WebP before uploading.",
+	IMAGE_TOO_LARGE: new ErrorCode({
+		id: "image/too-large",
+		defaultMessage: "The image exceeds a processing limit: details.limit is `bytes`, `pixels` or `dimension`. Reduce its size before uploading.",
 		status: 422
 	}),
-	IMAGE_INPUT_LIMIT: new ErrorCode({
-		id: "image/input-limit",
-		defaultMessage: "The image exceeds the processing byte or pixel limit. Reduce its size before uploading.",
-		status: 422
-	}),
-	UPLOAD_LIMIT_EXCEEDED: new ErrorCode({
-		id: "upload/limit-exceeded",
-		defaultMessage: "Upload limit exceeded. This project's organisation has used its free uploads. Set up billing to continue uploading.",
+	FREE_UPLOADS_EXHAUSTED: new ErrorCode({
+		id: "usage/free-uploads-exhausted",
+		defaultMessage: "This project's organisation has used its free uploads. Set up billing to continue uploading.",
 		status: 403
 	}),
-	SPEND_LIMIT_REACHED: new ErrorCode({
-		id: "upload/spend-limit-reached",
+	UPLOADS_PAUSED: new ErrorCode({
+		id: "usage/uploads-paused",
 		defaultMessage: "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.",
 		status: 402
 	}),
-	INVALID_UPLOAD_MIME_TYPE: new ErrorCode({
-		id: "upload/invalid-mime-type",
-		defaultMessage: "Upload file type is not supported. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.",
-		status: 400
+	UNSUPPORTED_UPLOAD_TYPE: new ErrorCode({
+		id: "upload/unsupported-type",
+		defaultMessage: "The file type is not accepted. details.source is `calmlens` when CalmLens cannot store and process it (use a concrete MIME type such as image/png, application/pdf or text/plain) or `preset` when the upload preset doesn't allow it.",
+		status: 415
 	}),
 	INVALID_UPLOAD_PAYLOAD: new ErrorCode({
-		id: "upload/invalid-payload",
+		id: "upload-payload/invalid",
 		defaultMessage: "Upload payload is invalid.",
 		status: 400
 	}),
@@ -511,7 +491,7 @@ const PUBLIC_ERROR_CODES = {
 		status: 409
 	}),
 	INVALID_UPLOAD_PART_NUMBER: new ErrorCode({
-		id: "upload/invalid-part-number",
+		id: "upload-part/invalid-number",
 		defaultMessage: "Multipart upload part number is invalid.",
 		status: 409
 	}),
@@ -570,9 +550,9 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "Failed to update asset",
 		status: 500
 	}),
-	ASSET_SAFETY_HELD: new ErrorCode({
-		id: "asset/safety-held",
-		defaultMessage: "Asset access is restricted by a safety hold.",
+	ASSET_HELD: new ErrorCode({
+		id: "asset/held",
+		defaultMessage: "The asset is held and this request can't change or deliver it. details.hold is `safety` for a safety hold or `copyright` for a copyright claim.",
 		status: 423
 	}),
 	ASSET_PROCESSING: new ErrorCode({
@@ -621,7 +601,7 @@ const PUBLIC_ERROR_CODES = {
 		status: 409
 	}),
 	SUPPORT_TICKET_NOT_FOUND: new ErrorCode({
-		id: "support/ticket-not-found",
+		id: "support-ticket/not-found",
 		defaultMessage: "Support ticket not found.",
 		status: 404
 	}),
@@ -666,7 +646,7 @@ const PUBLIC_ERROR_CODES = {
 		status: 404
 	}),
 	HASH_LIST_ENTRY_NOT_FOUND: new ErrorCode({
-		id: "hash-list/entry-not-found",
+		id: "hash-list-entry/not-found",
 		defaultMessage: "Hash list entry not found.",
 		status: 404
 	}),
@@ -676,7 +656,7 @@ const PUBLIC_ERROR_CODES = {
 		status: 409
 	}),
 	HASH_LIST_ENTRY_LIMIT_REACHED: new ErrorCode({
-		id: "hash-list/entry-limit-reached",
+		id: "hash-list-entry/limit-reached",
 		defaultMessage: "This project's hash lists hold the most entries they can. Remove entries to add more.",
 		status: 409
 	}),
@@ -746,24 +726,14 @@ const PUBLIC_ERROR_CODES = {
 		status: 401
 	}),
 	REMOTE_URL_NOT_ALLOWED: new ErrorCode({
-		id: "upload/remote-url-not-allowed",
+		id: "remote-url/not-allowed",
 		defaultMessage: "This project doesn't accept URLs from this domain. Change the allowed or blocked domains under Project settings.",
 		status: 403
 	}),
-	WEBSITE_RATE_LIMIT_EXCEEDED: new ErrorCode({
-		id: "upload/website-rate-limit-exceeded",
+	WEBSITE_RATE_LIMIT_REACHED: new ErrorCode({
+		id: "upload/website-rate-limit-reached",
 		defaultMessage: "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
 		status: 429
-	}),
-	UPLOAD_PRESET_CONTENT_TYPE_NOT_ALLOWED: new ErrorCode({
-		id: "upload-preset/content-type-not-allowed",
-		defaultMessage: "This upload preset doesn't accept this file type.",
-		status: 415
-	}),
-	UPLOAD_PRESET_TOO_LARGE: new ErrorCode({
-		id: "upload-preset/too-large",
-		defaultMessage: "This file is larger than the upload preset allows.",
-		status: 413
 	}),
 	UPLOAD_PRESET_DAILY_LIMIT_REACHED: new ErrorCode({
 		id: "upload-preset/daily-limit-reached",
@@ -796,12 +766,12 @@ const PUBLIC_ERROR_CODES = {
 		status: 409
 	}),
 	INVALID_REMOTE_URL: new ErrorCode({
-		id: "asset/invalid-remote-url",
+		id: "remote-url/invalid",
 		defaultMessage: "Remote URLs must use HTTP or HTTPS and cannot target private networks, localhost names or URL credentials.",
 		status: 400
 	}),
 	REMOTE_URL_UNAVAILABLE: new ErrorCode({
-		id: "asset/remote-url-unavailable",
+		id: "remote-url/unavailable",
 		defaultMessage: "The URL responded with an error status. Check that it is publicly reachable.",
 		status: 422
 	}),
@@ -840,11 +810,6 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "The decision's action is not valid for this appeal.",
 		status: 400
 	}),
-	APPEAL_SAFETY_HELD: new ErrorCode({
-		id: "appeal/safety-held",
-		defaultMessage: "A safety hold prevents this appeal from being submitted or applied.",
-		status: 409
-	}),
 	APPEAL_CONTENT_UNAVAILABLE: new ErrorCode({
 		id: "appeal/content-unavailable",
 		defaultMessage: "The appeal's content is unavailable, or the asset's content was purged, so it can only be blocked.",
@@ -852,6 +817,7 @@ const PUBLIC_ERROR_CODES = {
 	})
 };
 PUBLIC_ERROR_CODES.INVALID_TYPE, PUBLIC_ERROR_CODES.TOO_SMALL, PUBLIC_ERROR_CODES.TOO_BIG, PUBLIC_ERROR_CODES.INVALID_FORMAT, PUBLIC_ERROR_CODES.INVALID_VALUE, PUBLIC_ERROR_CODES.UNKNOWN_FIELD;
+PUBLIC_ERROR_CODES.INVALID_REQUEST;
 PUBLIC_ERROR_CODES.INTERNAL_ERROR;
-PUBLIC_ERROR_CODES.MISSING_TOKEN, PUBLIC_ERROR_CODES.INVALID_API_KEY, PUBLIC_ERROR_CODES.API_KEY_PROJECT_MISMATCH, PUBLIC_ERROR_CODES.PERMISSION_DENIED;
+PUBLIC_ERROR_CODES.MISSING_API_KEY, PUBLIC_ERROR_CODES.INVALID_API_KEY, PUBLIC_ERROR_CODES.API_KEY_PROJECT_MISMATCH, PUBLIC_ERROR_CODES.PERMISSION_DENIED;
 export { PUBLIC_ERROR_CODES };

@@ -2948,11 +2948,14 @@
           },
           "expect": {
             "error": {
-              "code": "upload/file-too-large",
+              "code": "upload/too-large",
               "status": null,
               "requestId": null,
               "retryAfter": null,
-              "details": null
+              "details": {
+                "limitBytes": 52428800,
+                "source": "plan"
+              }
             }
           }
         }
@@ -2982,11 +2985,14 @@
           },
           "expect": {
             "error": {
-              "code": "upload/file-too-large",
+              "code": "upload/too-large",
               "status": null,
               "requestId": null,
               "retryAfter": null,
-              "details": null
+              "details": {
+                "limitBytes": 2147483648,
+                "source": "plan"
+              }
             }
           }
         }
@@ -4966,7 +4972,7 @@
         {
           "status": 409,
           "body": {
-            "code": "upload/invalid-part-number",
+            "code": "upload-part/invalid-number",
             "message": "Multipart upload part number is invalid.",
             "requestId": "req-1",
             "details": {
@@ -5270,7 +5276,7 @@
         {
           "status": 429,
           "body": {
-            "code": "upload/website-rate-limit-exceeded",
+            "code": "upload/website-rate-limit-reached",
             "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
             "requestId": "req-1",
             "details": {}
@@ -5393,7 +5399,7 @@
         {
           "status": 429,
           "body": {
-            "code": "upload/website-rate-limit-exceeded",
+            "code": "upload/website-rate-limit-reached",
             "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
             "requestId": "req-1",
             "details": {}
@@ -5516,7 +5522,7 @@
         {
           "status": 429,
           "body": {
-            "code": "upload/website-rate-limit-exceeded",
+            "code": "upload/website-rate-limit-reached",
             "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
             "requestId": "req-1",
             "details": {}
@@ -5536,7 +5542,7 @@
           },
           "expect": {
             "error": {
-              "code": "upload/website-rate-limit-exceeded",
+              "code": "upload/website-rate-limit-reached",
               "status": 429,
               "requestId": "req-1",
               "retryAfter": 61,
@@ -5578,7 +5584,7 @@
         {
           "status": 429,
           "body": {
-            "code": "upload/website-rate-limit-exceeded",
+            "code": "upload/website-rate-limit-reached",
             "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
             "requestId": "req-1",
             "details": {}
@@ -5598,7 +5604,7 @@
           },
           "expect": {
             "error": {
-              "code": "upload/website-rate-limit-exceeded",
+              "code": "upload/website-rate-limit-reached",
               "status": 429,
               "requestId": "req-1",
               "retryAfter": {
@@ -7431,7 +7437,7 @@
         {
           "status": 500,
           "body": {
-            "code": "misc/internal-error",
+            "code": "server/internal-error",
             "message": "An internal error occurred. Retry later, and quote requestId to support.",
             "requestId": "req-1",
             "details": {}
@@ -8013,7 +8019,7 @@
         {
           "status": 500,
           "body": {
-            "code": "misc/internal-error",
+            "code": "server/internal-error",
             "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             "requestId": "r",
             "details": {}
@@ -8389,7 +8395,7 @@
         {
           "status": 400,
           "body": {
-            "code": "validation/invalid-ordering-field",
+            "code": "ordering/unsupported-field",
             "message": "Invalid ordering field",
             "requestId": "req-validation",
             "details": {
@@ -8421,7 +8427,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-ordering-field",
+              "code": "ordering/unsupported-field",
               "status": 400,
               "requestId": "req-validation",
               "retryAfter": 5,
@@ -8605,7 +8611,7 @@
           "status": 403,
           "body": {
             "code": "auth/permission-denied",
-            "message": "This API key lacks a permission the request needs, such as assets:delete for an asset's folder, or the resource belongs to another project.",
+            "message": "This API key lacks a permission the request needs (details.permission names it, such as assets:download for an asset's folder), or the resource belongs to another project.",
             "requestId": "req-1",
             "details": {}
           },

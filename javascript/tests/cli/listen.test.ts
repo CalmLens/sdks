@@ -246,12 +246,12 @@ describe("calmlens listen", () => {
     const client: EventSource = {
       events: {
         list: async () => {
-          throw new CalmLensError({ id: "auth/invalid-api-key" });
+          throw new CalmLensError({ id: "api-key/invalid" });
         },
       },
     };
     await expect(
       listen({ client, forwardTo: "http://localhost/hook", secret: "s", log: () => {} }),
-    ).rejects.toMatchObject({ code: "auth/invalid-api-key" });
+    ).rejects.toMatchObject({ code: "api-key/invalid" });
   });
 });

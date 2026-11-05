@@ -213,7 +213,7 @@ export const encodePathSegment = (value: unknown, name: string): string => {
 /**
  * Whether the API accepts an upload of this MIME type: an image, audio, video, text, document or
  * website type, not a container such as `application/octet-stream`. It refuses any other type with
- * `upload/invalid-mime-type`.
+ * `upload/unsupported-type`.
  */
 export const isAcceptedUploadMimeType = (mimeType: string): boolean => {
   const type = normalizeUploadMimeType(mimeType);
@@ -335,7 +335,7 @@ export const checkTransformOptions = (
  * CDN does (packages/shared/src/TransformSelector.ts): an optional first `@lens`, then `key=value`
  * options with dotted keys for nested ones (a bare key is `true`). Values are numbers, `true`,
  * `false`, hex colours (`#` added) for colour options, or text. Throws on anything the CDN refuses
- * as `asset/invalid-transform`. Used by the mock CDN.
+ * as `transform/invalid`. Used by the mock CDN.
  */
 export const parseTransformSelector = (
   selector: string,
@@ -537,7 +537,7 @@ export const validateSignedUrlOptions = (options: {
  * `placeholder` (a small blurred PNG that the CDN serves publicly for every asset whatever its
  * visibility or moderation status, without requiring age confirmation). Lenses
  * and transforms apply to `preview`, and to `rendered` when it is an image; the CDN refuses them
- * on rendered PDFs, video and audio with `asset/invalid-transform`, and the SDK refuses them on
+ * on rendered PDFs, video and audio with `transform/invalid`, and the SDK refuses them on
  * the original, hls, embed and placeholder.
  */
 export const getAssetUrl = ({

@@ -152,7 +152,7 @@
         "type": "application/zip"
       }
     },
-    "error": "upload/invalid-mime-type"
+    "error": "upload/unsupported-type"
   },
   {
     "name": "classification of an unknown type",
@@ -164,7 +164,7 @@
         "type": "application/x-made-up"
       }
     },
-    "error": "upload/invalid-mime-type"
+    "error": "upload/unsupported-type"
   },
   {
     "name": "empty text",

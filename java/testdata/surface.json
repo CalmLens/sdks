@@ -180,7 +180,7 @@
     {
       "id": "assets.listTimeline",
       "kind": "method",
-      "description": "Page through every segment of an audio or video asset's findings timeline, in time order. The asset's `classification.moderation.timeline.segmentCount` says how many there are. Lists nothing for other assets or while a copyright hold is on, and returns `asset/safety-held` while a safety hold is on",
+      "description": "Page through every segment of an audio or video asset's findings timeline, in time order. The asset's `classification.moderation.timeline.segmentCount` says how many there are. Lists nothing for other assets or while a copyright hold is on, and returns `asset/held` while a safety hold is on",
       "names": {
         "javascript": "assets.listTimeline",
         "python": "assets.list_timeline",
@@ -1380,13 +1380,13 @@
       "retry-after": "2"
     },
     "body": {
-      "code": "upload/website-rate-limit-exceeded",
+      "code": "upload/website-rate-limit-reached",
       "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
       "requestId": "req-surface",
       "details": {}
     },
     "expected": {
-      "code": "upload/website-rate-limit-exceeded",
+      "code": "upload/website-rate-limit-reached",
       "status": 429,
       "requestId": "req-surface",
       "retryAfterSeconds": 2
@@ -1479,7 +1479,7 @@
       "retryable": true
     },
     {
-      "code": "viewer/invalid-claims",
+      "code": "viewer-claims/invalid",
       "status": 400,
       "retryable": false
     },
@@ -1489,7 +1489,7 @@
       "retryable": false
     },
     {
-      "code": "viewer/invalid-region",
+      "code": "viewer-region/invalid",
       "status": 400,
       "retryable": false
     },
@@ -1511,6 +1511,11 @@
     {
       "code": "signed-url/invalid",
       "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "validation/invalid-request",
+      "status": 400,
       "retryable": false
     },
     {
@@ -1544,27 +1549,27 @@
       "retryable": false
     },
     {
-      "code": "validation/unsupported-content-type",
+      "code": "request/unsupported-content-type",
       "status": 415,
       "retryable": false
     },
     {
-      "code": "validation/invalid-filter",
+      "code": "filter/invalid",
       "status": 400,
       "retryable": false
     },
     {
-      "code": "validation/invalid-ordering-field",
+      "code": "ordering/unsupported-field",
       "status": 400,
       "retryable": false
     },
     {
-      "code": "misc/route-not-found",
+      "code": "request/route-not-found",
       "status": 404,
       "retryable": false
     },
     {
-      "code": "misc/internal-error",
+      "code": "server/internal-error",
       "status": 500,
       "retryable": true
     },
@@ -1574,12 +1579,12 @@
       "retryable": false
     },
     {
-      "code": "auth/token-expired",
+      "code": "session-token/expired",
       "status": 401,
       "retryable": false
     },
     {
-      "code": "auth/invalid-token",
+      "code": "session-token/invalid",
       "status": 401,
       "retryable": false
     },
@@ -1589,52 +1594,42 @@
       "retryable": true
     },
     {
-      "code": "asset/invalid-transform",
+      "code": "transform/invalid",
       "status": 400,
       "retryable": false
     },
     {
-      "code": "asset/invalid-transform-options",
+      "code": "transform-options/invalid",
       "status": 400,
       "retryable": false
     },
     {
-      "code": "asset/remote-url-redirect-limit",
+      "code": "remote-url/too-many-redirects",
       "status": 400,
       "retryable": false
     },
     {
-      "code": "copyright/content-held",
-      "status": 409,
-      "retryable": false
-    },
-    {
-      "code": "asset/api-key-missing-permission",
-      "status": 403,
-      "retryable": false
-    },
-    {
-      "code": "validation/invalid-cursor",
+      "code": "cursor/invalid",
       "status": 400,
       "retryable": false
     },
     {
-      "code": "auth/missing-token",
+      "code": "api-key/missing",
       "status": 401,
       "retryable": false
     },
     {
-      "code": "auth/invalid-api-key",
+      "code": "api-key/invalid",
       "status": 401,
       "retryable": false
     },
     {
-      "code": "auth/project-mismatch",
+      "code": "api-key/project-mismatch",
       "status": 403,
       "retryable": false
     },
     {
-      "code": "auth/api-key-not-accepted",
+      "code": "api-key/not-accepted",
       "status": 403,
       "retryable": false
     },
@@ -1644,52 +1639,37 @@
       "retryable": false
     },
     {
-      "code": "upload/file-too-large",
-      "status": 400,
+      "code": "upload/too-large",
+      "status": 413,
       "retryable": false
     },
     {
-      "code": "upload/multipart-image-too-large",
-      "status": 400,
-      "retryable": false
-    },
-    {
-      "code": "upload/image-exceeded-max-dimensions",
-      "status": 400,
-      "retryable": false
-    },
-    {
-      "code": "image/invalid-input",
+      "code": "image/invalid",
       "status": 422,
       "retryable": false
     },
     {
-      "code": "image/unsupported-format",
+      "code": "image/too-large",
       "status": 422,
       "retryable": false
     },
     {
-      "code": "image/input-limit",
-      "status": 422,
-      "retryable": false
-    },
-    {
-      "code": "upload/limit-exceeded",
+      "code": "usage/free-uploads-exhausted",
       "status": 403,
       "retryable": false
     },
     {
-      "code": "upload/spend-limit-reached",
+      "code": "usage/uploads-paused",
       "status": 402,
       "retryable": false
     },
     {
-      "code": "upload/invalid-mime-type",
-      "status": 400,
+      "code": "upload/unsupported-type",
+      "status": 415,
       "retryable": false
     },
     {
-      "code": "upload/invalid-payload",
+      "code": "upload-payload/invalid",
       "status": 400,
       "retryable": false
     },
@@ -1704,7 +1684,7 @@
       "retryable": false
     },
     {
-      "code": "upload/invalid-part-number",
+      "code": "upload-part/invalid-number",
       "status": 409,
       "retryable": false
     },
@@ -1764,7 +1744,7 @@
       "retryable": true
     },
     {
-      "code": "asset/safety-held",
+      "code": "asset/held",
       "status": 423,
       "retryable": false
     },
@@ -1814,7 +1794,7 @@
       "retryable": false
     },
     {
-      "code": "support/ticket-not-found",
+      "code": "support-ticket/not-found",
       "status": 404,
       "retryable": false
     },
@@ -1859,7 +1839,7 @@
       "retryable": false
     },
     {
-      "code": "hash-list/entry-not-found",
+      "code": "hash-list-entry/not-found",
       "status": 404,
       "retryable": false
     },
@@ -1869,7 +1849,7 @@
       "retryable": false
     },
     {
-      "code": "hash-list/entry-limit-reached",
+      "code": "hash-list-entry/limit-reached",
       "status": 409,
       "retryable": false
     },
@@ -1939,24 +1919,14 @@
       "retryable": false
     },
     {
-      "code": "upload/remote-url-not-allowed",
+      "code": "remote-url/not-allowed",
       "status": 403,
       "retryable": false
     },
     {
-      "code": "upload/website-rate-limit-exceeded",
+      "code": "upload/website-rate-limit-reached",
       "status": 429,
       "retryable": true
-    },
-    {
-      "code": "upload-preset/content-type-not-allowed",
-      "status": 415,
-      "retryable": false
-    },
-    {
-      "code": "upload-preset/too-large",
-      "status": 413,
-      "retryable": false
     },
     {
       "code": "upload-preset/daily-limit-reached",
@@ -1989,12 +1959,12 @@
       "retryable": false
     },
     {
-      "code": "asset/invalid-remote-url",
+      "code": "remote-url/invalid",
       "status": 400,
       "retryable": false
     },
     {
-      "code": "asset/remote-url-unavailable",
+      "code": "remote-url/unavailable",
       "status": 422,
       "retryable": false
     },
@@ -2031,11 +2001,6 @@
     {
       "code": "appeal/invalid-action",
       "status": 400,
-      "retryable": false
-    },
-    {
-      "code": "appeal/safety-held",
-      "status": 409,
       "retryable": false
     },
     {

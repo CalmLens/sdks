@@ -138,9 +138,9 @@ const setOptionalQueryValue = (params: URLSearchParams, key: string, value: unkn
 
 const assertValidUploadMimeType = (mimeType: string) => {
   if (!isAcceptedUploadMimeType(mimeType)) {
-    throw new CalmLensError(API_ERROR_CODES.INVALID_UPLOAD_MIME_TYPE, {
+    throw new CalmLensError(API_ERROR_CODES.UNSUPPORTED_UPLOAD_TYPE, {
       message: getRejectedUploadMimeTypeError(mimeType),
-      details: { mimeType },
+      details: { mimeType, source: "calmlens" },
     });
   }
 };
@@ -190,7 +190,12 @@ const assertUploadSize = (type: string, size: number | undefined, inParts: boole
           "Audio and video files can be at most 50 MiB in one request, or 2 GiB in parts",
         ]
       : [MAX_NON_IMAGE_UPLOAD_BYTES, "Files can be at most 5,000 MiB"];
-  if (size > limit) throw new CalmLensError(API_ERROR_CODES.FILE_TOO_LARGE, { message });
+  if (size > limit) {
+    throw new CalmLensError(API_ERROR_CODES.UPLOAD_TOO_LARGE, {
+      message,
+      details: { limitBytes: limit, source: "plan" },
+    });
+  }
 };
 
 /** Checks upload options before anything is sent. */
@@ -229,8 +234,9 @@ export const prepareSubmitAssetOptions = (
     }
     if (!deferUploadChecks && inParts && isImageMimeType(options.content.type)) {
       if ((getAssetPayloadByteLength(options.content) ?? 0) > MAX_IMAGE_UPLOAD_BYTES) {
-        throw new CalmLensError(API_ERROR_CODES.MULTIPART_IMAGE_TOO_LARGE, {
-          message: "Multipart image uploads cannot exceed 20MB.",
+        throw new CalmLensError(API_ERROR_CODES.UPLOAD_TOO_LARGE, {
+          message: "Multipart image uploads cannot exceed 20 MiB.",
+          details: { limitBytes: MAX_IMAGE_UPLOAD_BYTES, source: "plan" },
         });
       }
     } else if (!deferUploadChecks) {
@@ -251,8 +257,9 @@ export const prepareSubmitAssetOptions = (
     const partSizeInBytes = options.part.sizeInBytes ?? getAssetPayloadByteLength(options.part);
     if (!deferUploadChecks && isImageMimeType(options.part.type) && partSizeInBytes !== undefined) {
       if (partSizeInBytes > MAX_IMAGE_UPLOAD_BYTES) {
-        throw new CalmLensError(API_ERROR_CODES.MULTIPART_IMAGE_TOO_LARGE, {
-          message: "Multipart image uploads cannot exceed 20MB.",
+        throw new CalmLensError(API_ERROR_CODES.UPLOAD_TOO_LARGE, {
+          message: "Multipart image uploads cannot exceed 20 MiB.",
+          details: { limitBytes: MAX_IMAGE_UPLOAD_BYTES, source: "plan" },
         });
       }
     }

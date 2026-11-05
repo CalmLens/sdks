@@ -2,7 +2,7 @@
 
 After lower-casing and dropping parameters, a type in REJECTED is refused; otherwise one
 that starts with a PREFIXES entry, ends with a SUFFIXES entry or is in TYPES is accepted,
-and any other type is refused with upload/invalid-mime-type.
+and any other type is refused with upload/unsupported-type.
 """
 
 from typing import Tuple

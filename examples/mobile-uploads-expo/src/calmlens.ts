@@ -81,9 +81,9 @@ const MESSAGES: Record<string, string> = {
   [CALMLENS_ERROR_CODES.UPLOAD_PRESET_DISABLED]: "Uploads are paused right now. Try again later.",
   [CALMLENS_ERROR_CODES.UPLOAD_PRESET_TOKEN_REQUIRED]:
     "The upload preset requires a token, and none was sent.",
-  [CALMLENS_ERROR_CODES.UPLOAD_PRESET_CONTENT_TYPE_NOT_ALLOWED]:
+  [CALMLENS_ERROR_CODES.UNSUPPORTED_UPLOAD_TYPE]:
     "This type of file can't be uploaded here. Choose a photo.",
-  [CALMLENS_ERROR_CODES.UPLOAD_PRESET_TOO_LARGE]: "This photo is too large. Choose a smaller one.",
+  [CALMLENS_ERROR_CODES.UPLOAD_TOO_LARGE]: "This photo is too large. Choose a smaller one.",
   [CALMLENS_ERROR_CODES.UPLOAD_PRESET_DAILY_LIMIT_REACHED]:
     "Today's upload limit has been reached. Try again tomorrow.",
   [CALMLENS_ERROR_CODES.UPLOAD_PRESET_ORIGIN_NOT_ALLOWED]:

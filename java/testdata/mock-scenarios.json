@@ -1692,7 +1692,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "auth/permission-denied"
             }
           }
         },
@@ -1953,7 +1953,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "auth/permission-denied"
             }
           }
         }
@@ -3488,7 +3488,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3500,7 +3500,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3512,7 +3512,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3524,7 +3524,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3536,7 +3536,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3548,7 +3548,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3560,7 +3560,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3577,10 +3577,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-value",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "ordering.0.field"
+                "issues": [
+                  {
+                    "path": "ordering.0.field",
+                    "code": "validation/invalid-value"
+                  }
+                ]
               }
             }
           }
@@ -3761,7 +3766,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3773,7 +3778,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3785,7 +3790,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3797,7 +3802,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -3809,7 +3814,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-filter",
+              "code": "filter/invalid",
               "status": 400
             }
           }
@@ -4599,7 +4604,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-cursor",
+              "code": "cursor/invalid",
               "status": 400
             }
           }
@@ -5274,10 +5279,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-format",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "assetIds.1"
+                "issues": [
+                  {
+                    "path": "assetIds.1",
+                    "code": "validation/invalid-format"
+                  }
+                ]
               }
             }
           }
@@ -5828,10 +5838,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/too-big",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "pageSize"
+                "issues": [
+                  {
+                    "path": "pageSize",
+                    "code": "validation/too-big"
+                  }
+                ]
               }
             }
           }
@@ -5846,10 +5861,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/too-small",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "pageSize"
+                "issues": [
+                  {
+                    "path": "pageSize",
+                    "code": "validation/too-small"
+                  }
+                ]
               }
             }
           }
@@ -5861,7 +5881,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-cursor",
+              "code": "cursor/invalid",
               "status": 400
             }
           }
@@ -5963,7 +5983,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-cursor",
+              "code": "cursor/invalid",
               "status": 400
             }
           }
@@ -5983,7 +6003,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-cursor",
+              "code": "cursor/invalid",
               "status": 400
             }
           }
@@ -5995,7 +6015,7 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-cursor",
+              "code": "cursor/invalid",
               "status": 400
             }
           }
@@ -6021,10 +6041,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/too-big",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "pageSize"
+                "issues": [
+                  {
+                    "path": "pageSize",
+                    "code": "validation/too-big"
+                  }
+                ]
               }
             }
           }
@@ -6036,10 +6061,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/too-small",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "pageSize"
+                "issues": [
+                  {
+                    "path": "pageSize",
+                    "code": "validation/too-small"
+                  }
+                ]
               }
             }
           }
@@ -6150,10 +6180,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/too-big",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "limit"
+                "issues": [
+                  {
+                    "path": "limit",
+                    "code": "validation/too-big"
+                  }
+                ]
               }
             }
           }
@@ -6166,10 +6201,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/too-small",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "limit"
+                "issues": [
+                  {
+                    "path": "limit",
+                    "code": "validation/too-small"
+                  }
+                ]
               }
             }
           }
@@ -6181,10 +6221,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/too-small",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "query"
+                "issues": [
+                  {
+                    "path": "query",
+                    "code": "validation/too-small"
+                  }
+                ]
               }
             }
           }
@@ -6196,10 +6241,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/too-big",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "query"
+                "issues": [
+                  {
+                    "path": "query",
+                    "code": "validation/too-big"
+                  }
+                ]
               }
             }
           }
@@ -6327,7 +6377,7 @@
           },
           "expect": {
             "error": {
-              "code": "upload/invalid-part-number",
+              "code": "upload-part/invalid-number",
               "status": 409,
               "details": {
                 "expectedPartNumber": 2,
@@ -6350,7 +6400,7 @@
           },
           "expect": {
             "error": {
-              "code": "upload/invalid-payload",
+              "code": "upload-payload/invalid",
               "status": 400
             }
           }
@@ -6515,8 +6565,8 @@
           },
           "expect": {
             "error": {
-              "code": "upload/multipart-image-too-large",
-              "status": 400
+              "code": "upload/too-large",
+              "status": 413
             }
           }
         },
@@ -6897,7 +6947,7 @@
         {
           "operation": "mock.failNext",
           "args": {
-            "failure": "upload/limit-exceeded",
+            "failure": "usage/free-uploads-exhausted",
             "operation": "assets.create"
           }
         },
@@ -6922,7 +6972,7 @@
           },
           "expect": {
             "error": {
-              "code": "upload/limit-exceeded",
+              "code": "usage/free-uploads-exhausted",
               "status": 403
             }
           }
@@ -7500,10 +7550,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/too-big",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "pageSize"
+                "issues": [
+                  {
+                    "path": "pageSize",
+                    "code": "validation/too-big"
+                  }
+                ]
               }
             }
           }
@@ -7909,7 +7964,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "auth/permission-denied"
             }
           }
         },
@@ -7924,7 +7979,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "auth/permission-denied"
             }
           }
         },
@@ -7974,7 +8029,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "auth/permission-denied"
             }
           }
         },
@@ -8005,7 +8060,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "auth/permission-denied"
             }
           }
         },
@@ -8078,7 +8133,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "auth/permission-denied"
             }
           }
         }
@@ -8302,7 +8357,7 @@
           "expect": {
             "cdn": {
               "status": 403,
-              "code": "asset/api-key-missing-permission"
+              "code": "auth/permission-denied"
             }
           }
         },
@@ -8599,7 +8654,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform"
+              "code": "transform/invalid"
             }
           }
         },
@@ -8658,7 +8713,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform"
+              "code": "transform/invalid"
             }
           }
         },
@@ -9742,7 +9797,7 @@
         {
           "operation": "mock.failNext",
           "args": {
-            "failure": "upload/website-rate-limit-exceeded",
+            "failure": "upload/website-rate-limit-reached",
             "retryAfter": 1
           }
         },
@@ -9781,7 +9836,7 @@
         {
           "operation": "mock.failNext",
           "args": {
-            "failure": "upload/spend-limit-reached",
+            "failure": "usage/uploads-paused",
             "details": {
               "reason": "spend-limit"
             }
@@ -9798,7 +9853,7 @@
           },
           "expect": {
             "error": {
-              "code": "upload/spend-limit-reached",
+              "code": "usage/uploads-paused",
               "status": 402,
               "details": {
                 "reason": "spend-limit"
@@ -9809,7 +9864,7 @@
         {
           "operation": "mock.failNext",
           "args": {
-            "failure": "upload/website-rate-limit-exceeded",
+            "failure": "upload/website-rate-limit-reached",
             "retryAfter": 30
           }
         },
@@ -9818,7 +9873,7 @@
           "args": {},
           "expect": {
             "error": {
-              "code": "upload/website-rate-limit-exceeded",
+              "code": "upload/website-rate-limit-reached",
               "status": 429,
               "retryAfter": 30
             }
@@ -9845,10 +9900,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-type",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "metadata"
+                "issues": [
+                  {
+                    "path": "metadata",
+                    "code": "validation/invalid-type"
+                  }
+                ]
               }
             }
           }
@@ -9865,10 +9925,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-type",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "metadata"
+                "issues": [
+                  {
+                    "path": "metadata",
+                    "code": "validation/invalid-type"
+                  }
+                ]
               }
             }
           }
@@ -9887,10 +9952,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-type",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "metadata.0"
+                "issues": [
+                  {
+                    "path": "metadata.0",
+                    "code": "validation/invalid-type"
+                  }
+                ]
               }
             }
           }
@@ -9911,10 +9981,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-type",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "metadata.0.id"
+                "issues": [
+                  {
+                    "path": "metadata.0.id",
+                    "code": "validation/invalid-type"
+                  }
+                ]
               }
             }
           }
@@ -9936,10 +10011,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-type",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "metadata.0.id"
+                "issues": [
+                  {
+                    "path": "metadata.0.id",
+                    "code": "validation/invalid-type"
+                  }
+                ]
               }
             }
           }
@@ -9960,10 +10040,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-value",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "metadata.0.value"
+                "issues": [
+                  {
+                    "path": "metadata.0.value",
+                    "code": "validation/invalid-value"
+                  }
+                ]
               }
             }
           }
@@ -10012,10 +10097,15 @@
           },
           "expect": {
             "error": {
-              "code": "validation/invalid-type",
+              "code": "validation/invalid-request",
               "status": 400,
               "details": {
-                "path": "metadata"
+                "issues": [
+                  {
+                    "path": "metadata",
+                    "code": "validation/invalid-type"
+                  }
+                ]
               }
             }
           }
@@ -10208,7 +10298,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform-options"
+              "code": "transform-options/invalid"
             }
           }
         },
@@ -10224,7 +10314,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform-options"
+              "code": "transform-options/invalid"
             }
           }
         },
@@ -10240,7 +10330,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform-options"
+              "code": "transform-options/invalid"
             }
           }
         },
@@ -10256,7 +10346,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform-options"
+              "code": "transform-options/invalid"
             }
           }
         },
@@ -10272,7 +10362,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform-options"
+              "code": "transform-options/invalid"
             }
           }
         },
@@ -10288,7 +10378,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform"
+              "code": "transform/invalid"
             }
           }
         },
@@ -10304,7 +10394,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform"
+              "code": "transform/invalid"
             }
           }
         },
@@ -10320,7 +10410,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform"
+              "code": "transform/invalid"
             }
           }
         },
@@ -10334,7 +10424,7 @@
           "expect": {
             "cdn": {
               "status": 400,
-              "code": "asset/invalid-transform"
+              "code": "transform/invalid"
             }
           }
         }

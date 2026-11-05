@@ -1,6 +1,6 @@
 [
   {
-    "code": "viewer/invalid-claims",
+    "code": "viewer-claims/invalid",
     "status": 400,
     "operation": "assets.retrieve",
     "args": {
@@ -10,21 +10,21 @@
       "status": 400,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-viewer-invalid-claims"
+        "x-request-id": "req-viewer-claims-invalid"
       },
       "body": {
-        "code": "viewer/invalid-claims",
+        "code": "viewer-claims/invalid",
         "message": "Supply a viewerClaims object with an optional region and boolean ageConfirmed.",
-        "requestId": "req-viewer-invalid-claims",
+        "requestId": "req-viewer-claims-invalid",
         "details": {
           "reason": "invalid_viewer_claims"
         }
       }
     },
     "expected": {
-      "code": "viewer/invalid-claims",
+      "code": "viewer-claims/invalid",
       "status": 400,
-      "requestId": "req-viewer-invalid-claims",
+      "requestId": "req-viewer-claims-invalid",
       "retryAfter": null,
       "details": {
         "reason": "invalid_viewer_claims"
@@ -64,7 +64,7 @@
     }
   },
   {
-    "code": "viewer/invalid-region",
+    "code": "viewer-region/invalid",
     "status": 400,
     "operation": "assets.retrieve",
     "args": {
@@ -74,21 +74,21 @@
       "status": 400,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-viewer-invalid-region"
+        "x-request-id": "req-viewer-region-invalid"
       },
       "body": {
-        "code": "viewer/invalid-region",
+        "code": "viewer-region/invalid",
         "message": "Supply the viewer's ISO country code, such as DE or GB.",
-        "requestId": "req-viewer-invalid-region",
+        "requestId": "req-viewer-region-invalid",
         "details": {
           "reason": "invalid_viewer_region"
         }
       }
     },
     "expected": {
-      "code": "viewer/invalid-region",
+      "code": "viewer-region/invalid",
       "status": 400,
-      "requestId": "req-viewer-invalid-region",
+      "requestId": "req-viewer-region-invalid",
       "retryAfter": null,
       "details": {
         "reason": "invalid_viewer_region"
@@ -224,6 +224,38 @@
     }
   },
   {
+    "code": "validation/invalid-request",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-validation-invalid-request"
+      },
+      "body": {
+        "code": "validation/invalid-request",
+        "message": "The request's parameters, query or body are invalid. details.issues lists each problem, with its path and issue code.",
+        "requestId": "req-validation-invalid-request",
+        "details": {
+          "reason": "invalid_request"
+        }
+      }
+    },
+    "expected": {
+      "code": "validation/invalid-request",
+      "status": 400,
+      "requestId": "req-validation-invalid-request",
+      "retryAfter": null,
+      "details": {
+        "reason": "invalid_request"
+      }
+    }
+  },
+  {
     "code": "validation/invalid-type",
     "status": 400,
     "operation": "assets.retrieve",
@@ -238,7 +270,7 @@
       },
       "body": {
         "code": "validation/invalid-type",
-        "message": "A field has the wrong type. details.issues lists each problem.",
+        "message": "Issue code in details.issues: a field has the wrong type.",
         "requestId": "req-validation-invalid-type",
         "details": {
           "reason": "invalid_type"
@@ -270,7 +302,7 @@
       },
       "body": {
         "code": "validation/too-small",
-        "message": "A value is below its minimum. details.issues lists each problem.",
+        "message": "Issue code in details.issues: a value is below its minimum.",
         "requestId": "req-validation-too-small",
         "details": {
           "reason": "too_small"
@@ -302,7 +334,7 @@
       },
       "body": {
         "code": "validation/too-big",
-        "message": "A value is above its maximum. details.issues lists each problem.",
+        "message": "Issue code in details.issues: a value is above its maximum.",
         "requestId": "req-validation-too-big",
         "details": {
           "reason": "too_big"
@@ -334,7 +366,7 @@
       },
       "body": {
         "code": "validation/invalid-format",
-        "message": "A string is not in the required format, such as an ID or URL. details.issues lists each problem.",
+        "message": "Issue code in details.issues: a string is not in the required format, such as an ID or URL.",
         "requestId": "req-validation-invalid-format",
         "details": {
           "reason": "invalid_format"
@@ -366,7 +398,7 @@
       },
       "body": {
         "code": "validation/invalid-value",
-        "message": "A field has a value it cannot take. details.issues lists each problem.",
+        "message": "Issue code in details.issues: a field has a value it cannot take.",
         "requestId": "req-validation-invalid-value",
         "details": {
           "reason": "invalid_value"
@@ -398,7 +430,7 @@
       },
       "body": {
         "code": "validation/unknown-field",
-        "message": "The request has a field this endpoint does not accept.",
+        "message": "Issue code in details.issues: the request has a field this endpoint does not accept.",
         "requestId": "req-validation-unknown-field",
         "details": {
           "reason": "unknown_field"
@@ -416,7 +448,7 @@
     }
   },
   {
-    "code": "validation/unsupported-content-type",
+    "code": "request/unsupported-content-type",
     "status": 415,
     "operation": "assets.retrieve",
     "args": {
@@ -426,21 +458,21 @@
       "status": 415,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-validation-unsupported-content-type"
+        "x-request-id": "req-request-unsupported-content-type"
       },
       "body": {
-        "code": "validation/unsupported-content-type",
+        "code": "request/unsupported-content-type",
         "message": "Send the request body as application/json.",
-        "requestId": "req-validation-unsupported-content-type",
+        "requestId": "req-request-unsupported-content-type",
         "details": {
           "reason": "unsupported_content_type"
         }
       }
     },
     "expected": {
-      "code": "validation/unsupported-content-type",
+      "code": "request/unsupported-content-type",
       "status": 415,
-      "requestId": "req-validation-unsupported-content-type",
+      "requestId": "req-request-unsupported-content-type",
       "retryAfter": null,
       "details": {
         "reason": "unsupported_content_type"
@@ -448,7 +480,7 @@
     }
   },
   {
-    "code": "validation/invalid-filter",
+    "code": "filter/invalid",
     "status": 400,
     "operation": "assets.retrieve",
     "args": {
@@ -458,21 +490,21 @@
       "status": 400,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-validation-invalid-filter"
+        "x-request-id": "req-filter-invalid"
       },
       "body": {
-        "code": "validation/invalid-filter",
+        "code": "filter/invalid",
         "message": "The filter has invalid syntax or names a field that can't be filtered.",
-        "requestId": "req-validation-invalid-filter",
+        "requestId": "req-filter-invalid",
         "details": {
           "reason": "invalid_filter"
         }
       }
     },
     "expected": {
-      "code": "validation/invalid-filter",
+      "code": "filter/invalid",
       "status": 400,
-      "requestId": "req-validation-invalid-filter",
+      "requestId": "req-filter-invalid",
       "retryAfter": null,
       "details": {
         "reason": "invalid_filter"
@@ -480,7 +512,7 @@
     }
   },
   {
-    "code": "validation/invalid-ordering-field",
+    "code": "ordering/unsupported-field",
     "status": 400,
     "operation": "assets.retrieve",
     "args": {
@@ -490,29 +522,29 @@
       "status": 400,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-validation-invalid-ordering-field"
+        "x-request-id": "req-ordering-unsupported-field"
       },
       "body": {
-        "code": "validation/invalid-ordering-field",
+        "code": "ordering/unsupported-field",
         "message": "The list cannot be ordered by this field.",
-        "requestId": "req-validation-invalid-ordering-field",
+        "requestId": "req-ordering-unsupported-field",
         "details": {
-          "reason": "invalid_ordering_field"
+          "reason": "unsupported_ordering_field"
         }
       }
     },
     "expected": {
-      "code": "validation/invalid-ordering-field",
+      "code": "ordering/unsupported-field",
       "status": 400,
-      "requestId": "req-validation-invalid-ordering-field",
+      "requestId": "req-ordering-unsupported-field",
       "retryAfter": null,
       "details": {
-        "reason": "invalid_ordering_field"
+        "reason": "unsupported_ordering_field"
       }
     }
   },
   {
-    "code": "misc/route-not-found",
+    "code": "request/route-not-found",
     "status": 404,
     "operation": "assets.retrieve",
     "args": {
@@ -522,21 +554,21 @@
       "status": 404,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-misc-route-not-found"
+        "x-request-id": "req-request-route-not-found"
       },
       "body": {
-        "code": "misc/route-not-found",
+        "code": "request/route-not-found",
         "message": "No endpoint matches this method and path.",
-        "requestId": "req-misc-route-not-found",
+        "requestId": "req-request-route-not-found",
         "details": {
           "reason": "route_not_found"
         }
       }
     },
     "expected": {
-      "code": "misc/route-not-found",
+      "code": "request/route-not-found",
       "status": 404,
-      "requestId": "req-misc-route-not-found",
+      "requestId": "req-request-route-not-found",
       "retryAfter": null,
       "details": {
         "reason": "route_not_found"
@@ -544,7 +576,7 @@
     }
   },
   {
-    "code": "misc/internal-error",
+    "code": "server/internal-error",
     "status": 500,
     "operation": "assets.retrieve",
     "args": {
@@ -554,21 +586,21 @@
       "status": 500,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-misc-internal-error"
+        "x-request-id": "req-server-internal-error"
       },
       "body": {
-        "code": "misc/internal-error",
+        "code": "server/internal-error",
         "message": "An internal error occurred. Retry later, and quote requestId to support.",
-        "requestId": "req-misc-internal-error",
+        "requestId": "req-server-internal-error",
         "details": {
           "reason": "internal_error"
         }
       }
     },
     "expected": {
-      "code": "misc/internal-error",
+      "code": "server/internal-error",
       "status": 500,
-      "requestId": "req-misc-internal-error",
+      "requestId": "req-server-internal-error",
       "retryAfter": null,
       "details": {
         "reason": "internal_error"
@@ -608,7 +640,7 @@
     }
   },
   {
-    "code": "auth/token-expired",
+    "code": "session-token/expired",
     "status": 401,
     "operation": "assets.retrieve",
     "args": {
@@ -618,21 +650,21 @@
       "status": 401,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-auth-token-expired"
+        "x-request-id": "req-session-token-expired"
       },
       "body": {
-        "code": "auth/token-expired",
+        "code": "session-token/expired",
         "message": "The session token has expired. Sign in again.",
-        "requestId": "req-auth-token-expired",
+        "requestId": "req-session-token-expired",
         "details": {
           "reason": "token_expired"
         }
       }
     },
     "expected": {
-      "code": "auth/token-expired",
+      "code": "session-token/expired",
       "status": 401,
-      "requestId": "req-auth-token-expired",
+      "requestId": "req-session-token-expired",
       "retryAfter": null,
       "details": {
         "reason": "token_expired"
@@ -640,7 +672,7 @@
     }
   },
   {
-    "code": "auth/invalid-token",
+    "code": "session-token/invalid",
     "status": 401,
     "operation": "assets.retrieve",
     "args": {
@@ -650,21 +682,21 @@
       "status": 401,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-auth-invalid-token"
+        "x-request-id": "req-session-token-invalid"
       },
       "body": {
-        "code": "auth/invalid-token",
+        "code": "session-token/invalid",
         "message": "The session token is invalid. Sign in again.",
-        "requestId": "req-auth-invalid-token",
+        "requestId": "req-session-token-invalid",
         "details": {
           "reason": "invalid_token"
         }
       }
     },
     "expected": {
-      "code": "auth/invalid-token",
+      "code": "session-token/invalid",
       "status": 401,
-      "requestId": "req-auth-invalid-token",
+      "requestId": "req-session-token-invalid",
       "retryAfter": null,
       "details": {
         "reason": "invalid_token"
@@ -704,7 +736,7 @@
     }
   },
   {
-    "code": "asset/invalid-transform",
+    "code": "transform/invalid",
     "status": 400,
     "operation": "assets.retrieve",
     "args": {
@@ -714,21 +746,21 @@
       "status": 400,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-asset-invalid-transform"
+        "x-request-id": "req-transform-invalid"
       },
       "body": {
-        "code": "asset/invalid-transform",
+        "code": "transform/invalid",
         "message": "The transform names an unknown type or is not a valid selector.",
-        "requestId": "req-asset-invalid-transform",
+        "requestId": "req-transform-invalid",
         "details": {
           "reason": "invalid_transform"
         }
       }
     },
     "expected": {
-      "code": "asset/invalid-transform",
+      "code": "transform/invalid",
       "status": 400,
-      "requestId": "req-asset-invalid-transform",
+      "requestId": "req-transform-invalid",
       "retryAfter": null,
       "details": {
         "reason": "invalid_transform"
@@ -736,7 +768,7 @@
     }
   },
   {
-    "code": "asset/invalid-transform-options",
+    "code": "transform-options/invalid",
     "status": 400,
     "operation": "assets.retrieve",
     "args": {
@@ -746,21 +778,21 @@
       "status": 400,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-asset-invalid-transform-options"
+        "x-request-id": "req-transform-options-invalid"
       },
       "body": {
-        "code": "asset/invalid-transform-options",
+        "code": "transform-options/invalid",
         "message": "The transform's options are invalid for its type.",
-        "requestId": "req-asset-invalid-transform-options",
+        "requestId": "req-transform-options-invalid",
         "details": {
           "reason": "invalid_transform_options"
         }
       }
     },
     "expected": {
-      "code": "asset/invalid-transform-options",
+      "code": "transform-options/invalid",
       "status": 400,
-      "requestId": "req-asset-invalid-transform-options",
+      "requestId": "req-transform-options-invalid",
       "retryAfter": null,
       "details": {
         "reason": "invalid_transform_options"
@@ -768,7 +800,7 @@
     }
   },
   {
-    "code": "asset/remote-url-redirect-limit",
+    "code": "remote-url/too-many-redirects",
     "status": 400,
     "operation": "assets.retrieve",
     "args": {
@@ -778,93 +810,29 @@
       "status": 400,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-asset-remote-url-redirect-limit"
+        "x-request-id": "req-remote-url-too-many-redirects"
       },
       "body": {
-        "code": "asset/remote-url-redirect-limit",
+        "code": "remote-url/too-many-redirects",
         "message": "The remote URL redirected too many times.",
-        "requestId": "req-asset-remote-url-redirect-limit",
+        "requestId": "req-remote-url-too-many-redirects",
         "details": {
-          "reason": "remote_url_redirect_limit"
+          "reason": "remote_url_too_many_redirects"
         }
       }
     },
     "expected": {
-      "code": "asset/remote-url-redirect-limit",
+      "code": "remote-url/too-many-redirects",
       "status": 400,
-      "requestId": "req-asset-remote-url-redirect-limit",
+      "requestId": "req-remote-url-too-many-redirects",
       "retryAfter": null,
       "details": {
-        "reason": "remote_url_redirect_limit"
+        "reason": "remote_url_too_many_redirects"
       }
     }
   },
   {
-    "code": "copyright/content-held",
-    "status": 409,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 409,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-copyright-content-held"
-      },
-      "body": {
-        "code": "copyright/content-held",
-        "message": "The asset's content is held for a copyright claim and cannot be changed.",
-        "requestId": "req-copyright-content-held",
-        "details": {
-          "reason": "copyright_content_held"
-        }
-      }
-    },
-    "expected": {
-      "code": "copyright/content-held",
-      "status": 409,
-      "requestId": "req-copyright-content-held",
-      "retryAfter": null,
-      "details": {
-        "reason": "copyright_content_held"
-      }
-    }
-  },
-  {
-    "code": "asset/api-key-missing-permission",
-    "status": 403,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 403,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-asset-api-key-missing-permission"
-      },
-      "body": {
-        "code": "asset/api-key-missing-permission",
-        "message": "This API key needs assets:download permission for this asset's folder.",
-        "requestId": "req-asset-api-key-missing-permission",
-        "details": {
-          "reason": "download_permission_required"
-        }
-      }
-    },
-    "expected": {
-      "code": "asset/api-key-missing-permission",
-      "status": 403,
-      "requestId": "req-asset-api-key-missing-permission",
-      "retryAfter": null,
-      "details": {
-        "reason": "download_permission_required"
-      }
-    }
-  },
-  {
-    "code": "validation/invalid-cursor",
+    "code": "cursor/invalid",
     "status": 400,
     "operation": "assets.retrieve",
     "args": {
@@ -874,21 +842,21 @@
       "status": 400,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-validation-invalid-cursor"
+        "x-request-id": "req-cursor-invalid"
       },
       "body": {
-        "code": "validation/invalid-cursor",
+        "code": "cursor/invalid",
         "message": "The cursor is invalid or belongs to a different query.",
-        "requestId": "req-validation-invalid-cursor",
+        "requestId": "req-cursor-invalid",
         "details": {
           "reason": "invalid_cursor"
         }
       }
     },
     "expected": {
-      "code": "validation/invalid-cursor",
+      "code": "cursor/invalid",
       "status": 400,
-      "requestId": "req-validation-invalid-cursor",
+      "requestId": "req-cursor-invalid",
       "retryAfter": null,
       "details": {
         "reason": "invalid_cursor"
@@ -896,7 +864,7 @@
     }
   },
   {
-    "code": "auth/missing-token",
+    "code": "api-key/missing",
     "status": 401,
     "operation": "assets.retrieve",
     "args": {
@@ -906,29 +874,29 @@
       "status": 401,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-auth-missing-token"
+        "x-request-id": "req-api-key-missing"
       },
       "body": {
-        "code": "auth/missing-token",
+        "code": "api-key/missing",
         "message": "Authentication required. Send your project API key in the X-Api-Key header.",
-        "requestId": "req-auth-missing-token",
+        "requestId": "req-api-key-missing",
         "details": {
-          "reason": "missing_token"
+          "reason": "missing_api_key"
         }
       }
     },
     "expected": {
-      "code": "auth/missing-token",
+      "code": "api-key/missing",
       "status": 401,
-      "requestId": "req-auth-missing-token",
+      "requestId": "req-api-key-missing",
       "retryAfter": null,
       "details": {
-        "reason": "missing_token"
+        "reason": "missing_api_key"
       }
     }
   },
   {
-    "code": "auth/invalid-api-key",
+    "code": "api-key/invalid",
     "status": 401,
     "operation": "assets.retrieve",
     "args": {
@@ -938,21 +906,21 @@
       "status": 401,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-auth-invalid-api-key"
+        "x-request-id": "req-api-key-invalid"
       },
       "body": {
-        "code": "auth/invalid-api-key",
+        "code": "api-key/invalid",
         "message": "The API key is invalid, revoked or expired. Create a key under Developer → API Keys.",
-        "requestId": "req-auth-invalid-api-key",
+        "requestId": "req-api-key-invalid",
         "details": {
           "reason": "invalid_api_key"
         }
       }
     },
     "expected": {
-      "code": "auth/invalid-api-key",
+      "code": "api-key/invalid",
       "status": 401,
-      "requestId": "req-auth-invalid-api-key",
+      "requestId": "req-api-key-invalid",
       "retryAfter": null,
       "details": {
         "reason": "invalid_api_key"
@@ -960,7 +928,7 @@
     }
   },
   {
-    "code": "auth/project-mismatch",
+    "code": "api-key/project-mismatch",
     "status": 403,
     "operation": "assets.retrieve",
     "args": {
@@ -970,21 +938,21 @@
       "status": 403,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-auth-project-mismatch"
+        "x-request-id": "req-api-key-project-mismatch"
       },
       "body": {
-        "code": "auth/project-mismatch",
+        "code": "api-key/project-mismatch",
         "message": "This API key belongs to a different project. Use a key created for the project that owns this resource.",
-        "requestId": "req-auth-project-mismatch",
+        "requestId": "req-api-key-project-mismatch",
         "details": {
           "reason": "api_key_project_mismatch"
         }
       }
     },
     "expected": {
-      "code": "auth/project-mismatch",
+      "code": "api-key/project-mismatch",
       "status": 403,
-      "requestId": "req-auth-project-mismatch",
+      "requestId": "req-api-key-project-mismatch",
       "retryAfter": null,
       "details": {
         "reason": "api_key_project_mismatch"
@@ -992,7 +960,7 @@
     }
   },
   {
-    "code": "auth/api-key-not-accepted",
+    "code": "api-key/not-accepted",
     "status": 403,
     "operation": "assets.retrieve",
     "args": {
@@ -1002,21 +970,21 @@
       "status": 403,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-auth-api-key-not-accepted"
+        "x-request-id": "req-api-key-not-accepted"
       },
       "body": {
-        "code": "auth/api-key-not-accepted",
+        "code": "api-key/not-accepted",
         "message": "API keys are only accepted by the public API at /v1.",
-        "requestId": "req-auth-api-key-not-accepted",
+        "requestId": "req-api-key-not-accepted",
         "details": {
           "reason": "api_key_not_accepted"
         }
       }
     },
     "expected": {
-      "code": "auth/api-key-not-accepted",
+      "code": "api-key/not-accepted",
       "status": 403,
-      "requestId": "req-auth-api-key-not-accepted",
+      "requestId": "req-api-key-not-accepted",
       "retryAfter": null,
       "details": {
         "reason": "api_key_not_accepted"
@@ -1038,7 +1006,7 @@
       },
       "body": {
         "code": "auth/permission-denied",
-        "message": "This API key lacks a permission the request needs, such as assets:delete for an asset's folder, or the resource belongs to another project.",
+        "message": "This API key lacks a permission the request needs (details.permission names it, such as assets:download for an asset's folder), or the resource belongs to another project.",
         "requestId": "req-auth-permission-denied",
         "details": {
           "reason": "permission_denied"
@@ -1056,103 +1024,39 @@
     }
   },
   {
-    "code": "upload/file-too-large",
-    "status": 400,
+    "code": "upload/too-large",
+    "status": 413,
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
     },
     "response": {
-      "status": 400,
+      "status": 413,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-upload-file-too-large"
+        "x-request-id": "req-upload-too-large"
       },
       "body": {
-        "code": "upload/file-too-large",
-        "message": "File size exceeds limit. Maximum direct image size is 10 MiB, audio/video size is 50 MiB, and other files is 5,000 MiB.",
-        "requestId": "req-upload-file-too-large",
+        "code": "upload/too-large",
+        "message": "The file is larger than allowed. details.limitBytes is the limit, and details.source says whether it is the plan's (`plan`) or the upload preset's (`preset`).",
+        "requestId": "req-upload-too-large",
         "details": {
-          "reason": "file_too_large"
+          "reason": "upload_too_large"
         }
       }
     },
     "expected": {
-      "code": "upload/file-too-large",
-      "status": 400,
-      "requestId": "req-upload-file-too-large",
+      "code": "upload/too-large",
+      "status": 413,
+      "requestId": "req-upload-too-large",
       "retryAfter": null,
       "details": {
-        "reason": "file_too_large"
+        "reason": "upload_too_large"
       }
     }
   },
   {
-    "code": "upload/multipart-image-too-large",
-    "status": 400,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 400,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-upload-multipart-image-too-large"
-      },
-      "body": {
-        "code": "upload/multipart-image-too-large",
-        "message": "Multipart image uploads cannot exceed 20 MiB.",
-        "requestId": "req-upload-multipart-image-too-large",
-        "details": {
-          "reason": "multipart_image_too_large"
-        }
-      }
-    },
-    "expected": {
-      "code": "upload/multipart-image-too-large",
-      "status": 400,
-      "requestId": "req-upload-multipart-image-too-large",
-      "retryAfter": null,
-      "details": {
-        "reason": "multipart_image_too_large"
-      }
-    }
-  },
-  {
-    "code": "upload/image-exceeded-max-dimensions",
-    "status": 400,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 400,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-upload-image-exceeded-max-dimensions"
-      },
-      "body": {
-        "code": "upload/image-exceeded-max-dimensions",
-        "message": "Image exceeds maximum dimensions. Maximum dimensions are 12,000px.",
-        "requestId": "req-upload-image-exceeded-max-dimensions",
-        "details": {
-          "reason": "image_exceeded_max_dimensions"
-        }
-      }
-    },
-    "expected": {
-      "code": "upload/image-exceeded-max-dimensions",
-      "status": 400,
-      "requestId": "req-upload-image-exceeded-max-dimensions",
-      "retryAfter": null,
-      "details": {
-        "reason": "image_exceeded_max_dimensions"
-      }
-    }
-  },
-  {
-    "code": "image/invalid-input",
+    "code": "image/invalid",
     "status": 422,
     "operation": "assets.retrieve",
     "args": {
@@ -1162,29 +1066,29 @@
       "status": 422,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-image-invalid-input"
+        "x-request-id": "req-image-invalid"
       },
       "body": {
-        "code": "image/invalid-input",
+        "code": "image/invalid",
         "message": "The image is corrupt or cannot be decoded. Upload a valid image file.",
-        "requestId": "req-image-invalid-input",
+        "requestId": "req-image-invalid",
         "details": {
-          "reason": "image_invalid_input"
+          "reason": "invalid_image"
         }
       }
     },
     "expected": {
-      "code": "image/invalid-input",
+      "code": "image/invalid",
       "status": 422,
-      "requestId": "req-image-invalid-input",
+      "requestId": "req-image-invalid",
       "retryAfter": null,
       "details": {
-        "reason": "image_invalid_input"
+        "reason": "invalid_image"
       }
     }
   },
   {
-    "code": "image/unsupported-format",
+    "code": "image/too-large",
     "status": 422,
     "operation": "assets.retrieve",
     "args": {
@@ -1194,61 +1098,29 @@
       "status": 422,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-image-unsupported-format"
+        "x-request-id": "req-image-too-large"
       },
       "body": {
-        "code": "image/unsupported-format",
-        "message": "This image format is not supported. Convert it to PNG, JPEG or WebP before uploading.",
-        "requestId": "req-image-unsupported-format",
+        "code": "image/too-large",
+        "message": "The image exceeds a processing limit: details.limit is `bytes`, `pixels` or `dimension`. Reduce its size before uploading.",
+        "requestId": "req-image-too-large",
         "details": {
-          "reason": "image_unsupported_format"
+          "reason": "image_too_large"
         }
       }
     },
     "expected": {
-      "code": "image/unsupported-format",
+      "code": "image/too-large",
       "status": 422,
-      "requestId": "req-image-unsupported-format",
+      "requestId": "req-image-too-large",
       "retryAfter": null,
       "details": {
-        "reason": "image_unsupported_format"
+        "reason": "image_too_large"
       }
     }
   },
   {
-    "code": "image/input-limit",
-    "status": 422,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 422,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-image-input-limit"
-      },
-      "body": {
-        "code": "image/input-limit",
-        "message": "The image exceeds the processing byte or pixel limit. Reduce its size before uploading.",
-        "requestId": "req-image-input-limit",
-        "details": {
-          "reason": "image_input_limit"
-        }
-      }
-    },
-    "expected": {
-      "code": "image/input-limit",
-      "status": 422,
-      "requestId": "req-image-input-limit",
-      "retryAfter": null,
-      "details": {
-        "reason": "image_input_limit"
-      }
-    }
-  },
-  {
-    "code": "upload/limit-exceeded",
+    "code": "usage/free-uploads-exhausted",
     "status": 403,
     "operation": "assets.retrieve",
     "args": {
@@ -1258,29 +1130,29 @@
       "status": 403,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-upload-limit-exceeded"
+        "x-request-id": "req-usage-free-uploads-exhausted"
       },
       "body": {
-        "code": "upload/limit-exceeded",
-        "message": "Upload limit exceeded. This project's organisation has used its free uploads. Set up billing to continue uploading.",
-        "requestId": "req-upload-limit-exceeded",
+        "code": "usage/free-uploads-exhausted",
+        "message": "This project's organisation has used its free uploads. Set up billing to continue uploading.",
+        "requestId": "req-usage-free-uploads-exhausted",
         "details": {
-          "reason": "upload_limit_exceeded"
+          "reason": "free_uploads_exhausted"
         }
       }
     },
     "expected": {
-      "code": "upload/limit-exceeded",
+      "code": "usage/free-uploads-exhausted",
       "status": 403,
-      "requestId": "req-upload-limit-exceeded",
+      "requestId": "req-usage-free-uploads-exhausted",
       "retryAfter": null,
       "details": {
-        "reason": "upload_limit_exceeded"
+        "reason": "free_uploads_exhausted"
       }
     }
   },
   {
-    "code": "upload/spend-limit-reached",
+    "code": "usage/uploads-paused",
     "status": 402,
     "operation": "assets.retrieve",
     "args": {
@@ -1290,61 +1162,61 @@
       "status": 402,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-upload-spend-limit-reached"
+        "x-request-id": "req-usage-uploads-paused"
       },
       "body": {
-        "code": "upload/spend-limit-reached",
+        "code": "usage/uploads-paused",
         "message": "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.",
-        "requestId": "req-upload-spend-limit-reached",
+        "requestId": "req-usage-uploads-paused",
         "details": {
-          "reason": "spend_limit_reached"
+          "reason": "uploads_paused"
         }
       }
     },
     "expected": {
-      "code": "upload/spend-limit-reached",
+      "code": "usage/uploads-paused",
       "status": 402,
-      "requestId": "req-upload-spend-limit-reached",
+      "requestId": "req-usage-uploads-paused",
       "retryAfter": null,
       "details": {
-        "reason": "spend_limit_reached"
+        "reason": "uploads_paused"
       }
     }
   },
   {
-    "code": "upload/invalid-mime-type",
-    "status": 400,
+    "code": "upload/unsupported-type",
+    "status": 415,
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
     },
     "response": {
-      "status": 400,
+      "status": 415,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-upload-invalid-mime-type"
+        "x-request-id": "req-upload-unsupported-type"
       },
       "body": {
-        "code": "upload/invalid-mime-type",
-        "message": "Upload file type is not supported. Uploads must use a concrete file MIME type that CalmLens can store and process, such as image/png, image/jpeg, application/pdf, or text/plain.",
-        "requestId": "req-upload-invalid-mime-type",
+        "code": "upload/unsupported-type",
+        "message": "The file type is not accepted. details.source is `calmlens` when CalmLens cannot store and process it (use a concrete MIME type such as image/png, application/pdf or text/plain) or `preset` when the upload preset doesn't allow it.",
+        "requestId": "req-upload-unsupported-type",
         "details": {
-          "reason": "invalid_upload_mime_type"
+          "reason": "unsupported_upload_type"
         }
       }
     },
     "expected": {
-      "code": "upload/invalid-mime-type",
-      "status": 400,
-      "requestId": "req-upload-invalid-mime-type",
+      "code": "upload/unsupported-type",
+      "status": 415,
+      "requestId": "req-upload-unsupported-type",
       "retryAfter": null,
       "details": {
-        "reason": "invalid_upload_mime_type"
+        "reason": "unsupported_upload_type"
       }
     }
   },
   {
-    "code": "upload/invalid-payload",
+    "code": "upload-payload/invalid",
     "status": 400,
     "operation": "assets.retrieve",
     "args": {
@@ -1354,21 +1226,21 @@
       "status": 400,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-upload-invalid-payload"
+        "x-request-id": "req-upload-payload-invalid"
       },
       "body": {
-        "code": "upload/invalid-payload",
+        "code": "upload-payload/invalid",
         "message": "Upload payload is invalid.",
-        "requestId": "req-upload-invalid-payload",
+        "requestId": "req-upload-payload-invalid",
         "details": {
           "reason": "invalid_upload_payload"
         }
       }
     },
     "expected": {
-      "code": "upload/invalid-payload",
+      "code": "upload-payload/invalid",
       "status": 400,
-      "requestId": "req-upload-invalid-payload",
+      "requestId": "req-upload-payload-invalid",
       "retryAfter": null,
       "details": {
         "reason": "invalid_upload_payload"
@@ -1440,7 +1312,7 @@
     }
   },
   {
-    "code": "upload/invalid-part-number",
+    "code": "upload-part/invalid-number",
     "status": 409,
     "operation": "assets.retrieve",
     "args": {
@@ -1450,21 +1322,21 @@
       "status": 409,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-upload-invalid-part-number"
+        "x-request-id": "req-upload-part-invalid-number"
       },
       "body": {
-        "code": "upload/invalid-part-number",
+        "code": "upload-part/invalid-number",
         "message": "Multipart upload part number is invalid.",
-        "requestId": "req-upload-invalid-part-number",
+        "requestId": "req-upload-part-invalid-number",
         "details": {
           "reason": "invalid_upload_part_number"
         }
       }
     },
     "expected": {
-      "code": "upload/invalid-part-number",
+      "code": "upload-part/invalid-number",
       "status": 409,
-      "requestId": "req-upload-invalid-part-number",
+      "requestId": "req-upload-part-invalid-number",
       "retryAfter": null,
       "details": {
         "reason": "invalid_upload_part_number"
@@ -1825,7 +1697,7 @@
     }
   },
   {
-    "code": "asset/safety-held",
+    "code": "asset/held",
     "status": 423,
     "operation": "assets.retrieve",
     "args": {
@@ -1835,24 +1707,24 @@
       "status": 423,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-asset-safety-held"
+        "x-request-id": "req-asset-held"
       },
       "body": {
-        "code": "asset/safety-held",
-        "message": "Asset access is restricted by a safety hold.",
-        "requestId": "req-asset-safety-held",
+        "code": "asset/held",
+        "message": "The asset is held and this request can't change or deliver it. details.hold is `safety` for a safety hold or `copyright` for a copyright claim.",
+        "requestId": "req-asset-held",
         "details": {
-          "reason": "asset_safety_held"
+          "reason": "asset_held"
         }
       }
     },
     "expected": {
-      "code": "asset/safety-held",
+      "code": "asset/held",
       "status": 423,
-      "requestId": "req-asset-safety-held",
+      "requestId": "req-asset-held",
       "retryAfter": null,
       "details": {
-        "reason": "asset_safety_held"
+        "reason": "asset_held"
       }
     }
   },
@@ -2145,7 +2017,7 @@
     }
   },
   {
-    "code": "support/ticket-not-found",
+    "code": "support-ticket/not-found",
     "status": 404,
     "operation": "assets.retrieve",
     "args": {
@@ -2158,7 +2030,7 @@
         "x-request-id": "req-support-ticket-not-found"
       },
       "body": {
-        "code": "support/ticket-not-found",
+        "code": "support-ticket/not-found",
         "message": "Support ticket not found.",
         "requestId": "req-support-ticket-not-found",
         "details": {
@@ -2167,7 +2039,7 @@
       }
     },
     "expected": {
-      "code": "support/ticket-not-found",
+      "code": "support-ticket/not-found",
       "status": 404,
       "requestId": "req-support-ticket-not-found",
       "retryAfter": null,
@@ -2433,7 +2305,7 @@
     }
   },
   {
-    "code": "hash-list/entry-not-found",
+    "code": "hash-list-entry/not-found",
     "status": 404,
     "operation": "assets.retrieve",
     "args": {
@@ -2446,7 +2318,7 @@
         "x-request-id": "req-hash-list-entry-not-found"
       },
       "body": {
-        "code": "hash-list/entry-not-found",
+        "code": "hash-list-entry/not-found",
         "message": "Hash list entry not found.",
         "requestId": "req-hash-list-entry-not-found",
         "details": {
@@ -2455,7 +2327,7 @@
       }
     },
     "expected": {
-      "code": "hash-list/entry-not-found",
+      "code": "hash-list-entry/not-found",
       "status": 404,
       "requestId": "req-hash-list-entry-not-found",
       "retryAfter": null,
@@ -2497,7 +2369,7 @@
     }
   },
   {
-    "code": "hash-list/entry-limit-reached",
+    "code": "hash-list-entry/limit-reached",
     "status": 409,
     "operation": "assets.retrieve",
     "args": {
@@ -2510,7 +2382,7 @@
         "x-request-id": "req-hash-list-entry-limit-reached"
       },
       "body": {
-        "code": "hash-list/entry-limit-reached",
+        "code": "hash-list-entry/limit-reached",
         "message": "This project's hash lists hold the most entries they can. Remove entries to add more.",
         "requestId": "req-hash-list-entry-limit-reached",
         "details": {
@@ -2519,7 +2391,7 @@
       }
     },
     "expected": {
-      "code": "hash-list/entry-limit-reached",
+      "code": "hash-list-entry/limit-reached",
       "status": 409,
       "requestId": "req-hash-list-entry-limit-reached",
       "retryAfter": null,
@@ -2945,7 +2817,7 @@
     }
   },
   {
-    "code": "upload/remote-url-not-allowed",
+    "code": "remote-url/not-allowed",
     "status": 403,
     "operation": "assets.retrieve",
     "args": {
@@ -2955,21 +2827,21 @@
       "status": 403,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-upload-remote-url-not-allowed"
+        "x-request-id": "req-remote-url-not-allowed"
       },
       "body": {
-        "code": "upload/remote-url-not-allowed",
+        "code": "remote-url/not-allowed",
         "message": "This project doesn't accept URLs from this domain. Change the allowed or blocked domains under Project settings.",
-        "requestId": "req-upload-remote-url-not-allowed",
+        "requestId": "req-remote-url-not-allowed",
         "details": {
           "reason": "remote_url_not_allowed"
         }
       }
     },
     "expected": {
-      "code": "upload/remote-url-not-allowed",
+      "code": "remote-url/not-allowed",
       "status": 403,
-      "requestId": "req-upload-remote-url-not-allowed",
+      "requestId": "req-remote-url-not-allowed",
       "retryAfter": null,
       "details": {
         "reason": "remote_url_not_allowed"
@@ -2977,7 +2849,7 @@
     }
   },
   {
-    "code": "upload/website-rate-limit-exceeded",
+    "code": "upload/website-rate-limit-reached",
     "status": 429,
     "operation": "assets.retrieve",
     "args": {
@@ -2987,89 +2859,25 @@
       "status": 429,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-upload-website-rate-limit-exceeded",
+        "x-request-id": "req-upload-website-rate-limit-reached",
         "retry-after": "60"
       },
       "body": {
-        "code": "upload/website-rate-limit-exceeded",
+        "code": "upload/website-rate-limit-reached",
         "message": "This project has submitted too many websites in the last minute. Wait for the Retry-After period, or lower the pace of submissions.",
-        "requestId": "req-upload-website-rate-limit-exceeded",
+        "requestId": "req-upload-website-rate-limit-reached",
         "details": {
-          "reason": "website_rate_limit_exceeded"
+          "reason": "website_rate_limit_reached"
         }
       }
     },
     "expected": {
-      "code": "upload/website-rate-limit-exceeded",
+      "code": "upload/website-rate-limit-reached",
       "status": 429,
-      "requestId": "req-upload-website-rate-limit-exceeded",
+      "requestId": "req-upload-website-rate-limit-reached",
       "retryAfter": 60,
       "details": {
-        "reason": "website_rate_limit_exceeded"
-      }
-    }
-  },
-  {
-    "code": "upload-preset/content-type-not-allowed",
-    "status": 415,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 415,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-upload-preset-content-type-not-allowed"
-      },
-      "body": {
-        "code": "upload-preset/content-type-not-allowed",
-        "message": "This upload preset doesn't accept this file type.",
-        "requestId": "req-upload-preset-content-type-not-allowed",
-        "details": {
-          "reason": "upload_preset_content_type_not_allowed"
-        }
-      }
-    },
-    "expected": {
-      "code": "upload-preset/content-type-not-allowed",
-      "status": 415,
-      "requestId": "req-upload-preset-content-type-not-allowed",
-      "retryAfter": null,
-      "details": {
-        "reason": "upload_preset_content_type_not_allowed"
-      }
-    }
-  },
-  {
-    "code": "upload-preset/too-large",
-    "status": 413,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 413,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-upload-preset-too-large"
-      },
-      "body": {
-        "code": "upload-preset/too-large",
-        "message": "This file is larger than the upload preset allows.",
-        "requestId": "req-upload-preset-too-large",
-        "details": {
-          "reason": "upload_preset_too_large"
-        }
-      }
-    },
-    "expected": {
-      "code": "upload-preset/too-large",
-      "status": 413,
-      "requestId": "req-upload-preset-too-large",
-      "retryAfter": null,
-      "details": {
-        "reason": "upload_preset_too_large"
+        "reason": "website_rate_limit_reached"
       }
     }
   },
@@ -3267,7 +3075,7 @@
     }
   },
   {
-    "code": "asset/invalid-remote-url",
+    "code": "remote-url/invalid",
     "status": 400,
     "operation": "assets.retrieve",
     "args": {
@@ -3277,21 +3085,21 @@
       "status": 400,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-asset-invalid-remote-url"
+        "x-request-id": "req-remote-url-invalid"
       },
       "body": {
-        "code": "asset/invalid-remote-url",
+        "code": "remote-url/invalid",
         "message": "Remote URLs must use HTTP or HTTPS and cannot target private networks, localhost names or URL credentials.",
-        "requestId": "req-asset-invalid-remote-url",
+        "requestId": "req-remote-url-invalid",
         "details": {
           "reason": "invalid_remote_url"
         }
       }
     },
     "expected": {
-      "code": "asset/invalid-remote-url",
+      "code": "remote-url/invalid",
       "status": 400,
-      "requestId": "req-asset-invalid-remote-url",
+      "requestId": "req-remote-url-invalid",
       "retryAfter": null,
       "details": {
         "reason": "invalid_remote_url"
@@ -3299,7 +3107,7 @@
     }
   },
   {
-    "code": "asset/remote-url-unavailable",
+    "code": "remote-url/unavailable",
     "status": 422,
     "operation": "assets.retrieve",
     "args": {
@@ -3309,21 +3117,21 @@
       "status": 422,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-asset-remote-url-unavailable"
+        "x-request-id": "req-remote-url-unavailable"
       },
       "body": {
-        "code": "asset/remote-url-unavailable",
+        "code": "remote-url/unavailable",
         "message": "The URL responded with an error status. Check that it is publicly reachable.",
-        "requestId": "req-asset-remote-url-unavailable",
+        "requestId": "req-remote-url-unavailable",
         "details": {
           "reason": "remote_url_unavailable"
         }
       }
     },
     "expected": {
-      "code": "asset/remote-url-unavailable",
+      "code": "remote-url/unavailable",
       "status": 422,
-      "requestId": "req-asset-remote-url-unavailable",
+      "requestId": "req-remote-url-unavailable",
       "retryAfter": null,
       "details": {
         "reason": "remote_url_unavailable"
@@ -3551,38 +3359,6 @@
       "retryAfter": null,
       "details": {
         "reason": "appeal_invalid_action"
-      }
-    }
-  },
-  {
-    "code": "appeal/safety-held",
-    "status": 409,
-    "operation": "assets.retrieve",
-    "args": {
-      "assetId": "asset-1"
-    },
-    "response": {
-      "status": 409,
-      "headers": {
-        "content-type": "application/json",
-        "x-request-id": "req-appeal-safety-held"
-      },
-      "body": {
-        "code": "appeal/safety-held",
-        "message": "A safety hold prevents this appeal from being submitted or applied.",
-        "requestId": "req-appeal-safety-held",
-        "details": {
-          "reason": "appeal_safety_held"
-        }
-      }
-    },
-    "expected": {
-      "code": "appeal/safety-held",
-      "status": 409,
-      "requestId": "req-appeal-safety-held",
-      "retryAfter": null,
-      "details": {
-        "reason": "appeal_safety_held"
       }
     }
   },

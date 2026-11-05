@@ -11,9 +11,8 @@ const demo = UPLOAD_PRESET_ID === "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P";
 const ERROR_MESSAGES = {
   "upload-preset/daily-limit-reached":
     "We've received a lot of feedback today. Please try again tomorrow.",
-  "upload-preset/content-type-not-allowed":
-    "Please attach an image, such as a PNG or JPEG screenshot.",
-  "upload-preset/too-large": "That image is too large. Please attach a smaller screenshot.",
+  "upload/unsupported-type": "Please attach an image, such as a PNG or JPEG screenshot.",
+  "upload/too-large": "That image is too large. Please attach a smaller screenshot.",
   "upload-preset/origin-not-allowed":
     "Uploads aren't allowed from this site. Add it to the preset's allowed sites.",
   "upload-preset/disabled": "Feedback uploads are paused right now. Please try again later.",

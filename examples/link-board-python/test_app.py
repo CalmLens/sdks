@@ -337,13 +337,13 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(self.status(response), 502)
 
     def test_sdk_error_text_is_not_shown(self):
-        client = MockCalmLensServerClient().enqueue_error(CalmLensError("upload/limit-exceeded", "Secret internal detail", status=403))
+        client = MockCalmLensServerClient().enqueue_error(CalmLensError("usage/free-uploads-exhausted", "Secret internal detail", status=403))
         board = live_board(client)
         with self.assertLogs(level="WARNING"):
             response = self.request(board, "POST", "/links", {"url": "https://example.com/", "note": "Hi", "csrf": board.csrf_token})
         self.assertEqual(self.status(response), 502)
         self.assertNotIn(b"Secret internal detail", response)
-        self.assertNotIn(b"upload/limit-exceeded", response)
+        self.assertNotIn(b"usage/free-uploads-exhausted", response)
 
 
 if __name__ == "__main__":

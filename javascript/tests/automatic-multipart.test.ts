@@ -116,7 +116,7 @@ describe("automatic multipart uploads", () => {
       if (index === 1) throw new TypeError("fetch failed: connection reset");
       // Part 3's response was lost before: the API asks for part 4.
       if (request.query.get("partNumber") === "3") {
-        return apiError("upload/invalid-part-number", 409, {
+        return apiError("upload-part/invalid-number", 409, {
           expectedPartNumber: 4,
           receivedPartNumber: 3,
         });
@@ -214,7 +214,7 @@ describe("automatic multipart uploads", () => {
         name: "huge.png",
         content: { uint8Array: fileOf(21 * MiB), type: "image/png" },
       }),
-    ).rejects.toMatchObject({ code: "upload/multipart-image-too-large" });
+    ).rejects.toMatchObject({ code: "upload/too-large" });
     expect(sent).toEqual([]);
   });
 
