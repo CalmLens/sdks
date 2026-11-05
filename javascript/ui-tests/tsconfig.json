@@ -1,5 +1,5 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": { "rootDir": "..", "noEmit": true, "types": ["bun"] },
-  "include": ["*.ts"]
+  "include": ["*.ts", "../src/ui/hls.d.ts", "../src/ui/viewers/pdfjs.d.ts"]
 }
