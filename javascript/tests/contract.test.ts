@@ -416,6 +416,7 @@ interface Capability {
   id: string;
   kind: string;
   value?: string;
+  path?: string;
   names: { javascript: string };
   /** Languages the capability cannot apply to, with the reason. */
   notApplicable?: { javascript?: string };
@@ -506,7 +507,7 @@ const present = async (capability: Capability): Promise<boolean> => {
     case "cdn-resource":
       return client.cdn
         .getAssetUrl({ assetIdentifier: "asset-1", resource: name as never })
-        .endsWith(`/asset-1/${capability.value}`);
+        .endsWith(`/asset-1/${capability.path}`);
     case "cdn-option":
       return client.cdn
         .getAssetUrl({ assetIdentifier: "asset-1", [name]: { ageConfirmed: true } })

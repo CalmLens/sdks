@@ -65,9 +65,9 @@ export const getMediaLoadKey = (state: MediaState): string => {
     case "image":
       return `${state.src} ${state.srcSet ?? ""}`;
     case "video":
-      return `${state.src} ${state.poster ?? ""}`;
+      return `${state.src} ${state.stream ?? ""} ${state.poster ?? ""}`;
     case "audio":
-      return `${state.src} ${state.waveformUrl ?? ""} ${state.peaks?.length ?? 0}`;
+      return `${state.src} ${state.stream ?? ""} ${state.waveformUrl ?? ""} ${state.peaks?.length ?? 0}`;
     case "pdf":
       return state.src;
     case "file":

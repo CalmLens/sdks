@@ -94,6 +94,32 @@ declare const EXTRACTED_TEXT_SCHEMA: zod.ZodDiscriminatedUnion<[zod.ZodObject<{
   id: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
 }, zod.core.$strip>], "type">;
 type ExtractedText = zod.infer<typeof EXTRACTED_TEXT_SCHEMA>;
+/** One rendition of an adaptive stream, as the HLS master playlist lists it. */
+declare const ASSET_HLS_RENDITION_SCHEMA: zod.ZodObject<{
+  kind: zod.ZodEnum<{
+    audio: "audio";
+    video: "video";
+  }>;
+  width: zod.ZodNullable<zod.ZodNumber>;
+  height: zod.ZodNullable<zod.ZodNumber>;
+  bandwidth: zod.ZodNumber;
+  codecs: zod.ZodString;
+}, zod.core.$strip>;
+type AssetHlsRendition = zod.infer<typeof ASSET_HLS_RENDITION_SCHEMA>;
+/** The adaptive stream of audio or video, as the CDN's `/hls` resource serves it. */
+declare const ASSET_HLS_SCHEMA: zod.ZodObject<{
+  renditions: zod.ZodArray<zod.ZodObject<{
+    kind: zod.ZodEnum<{
+      audio: "audio";
+      video: "video";
+    }>;
+    width: zod.ZodNullable<zod.ZodNumber>;
+    height: zod.ZodNullable<zod.ZodNumber>;
+    bandwidth: zod.ZodNumber;
+    codecs: zod.ZodString;
+  }, zod.core.$strip>>;
+}, zod.core.$strip>;
+type AssetHls = zod.infer<typeof ASSET_HLS_SCHEMA>;
 declare const ASSET_RENDERED_KIND_SCHEMA: zod.ZodEnum<{
   audio: "audio";
   image: "image";
@@ -146,6 +172,9 @@ declare const PROCESSING_OPTIONS_SCHEMA: zod.ZodOptional<zod.ZodNullable<zod.Zod
       enabled: zod.ZodBoolean;
     }, zod.core.$strict>>>;
     aiGeneratedDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
+      enabled: zod.ZodBoolean;
+    }, zod.core.$strict>>>;
+    streaming: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
       enabled: zod.ZodBoolean;
     }, zod.core.$strict>>>;
   }, zod.core.$strict>>>;
@@ -9800,6 +9829,18 @@ declare const ASSET_CONTENT_SCHEMA: zod.ZodObject<{
     height: zod.ZodNullable<zod.ZodNumber>;
     peaks: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
   }, zod.core.$strip>>;
+  hls: zod.ZodNullable<zod.ZodObject<{
+    renditions: zod.ZodArray<zod.ZodObject<{
+      kind: zod.ZodEnum<{
+        audio: "audio";
+        video: "video";
+      }>;
+      width: zod.ZodNullable<zod.ZodNumber>;
+      height: zod.ZodNullable<zod.ZodNumber>;
+      bandwidth: zod.ZodNumber;
+      codecs: zod.ZodString;
+    }, zod.core.$strip>>;
+  }, zod.core.$strip>>;
   preview: zod.ZodNullable<zod.ZodObject<{
     width: zod.ZodNullable<zod.ZodNumber>;
     height: zod.ZodNullable<zod.ZodNumber>;
@@ -14808,6 +14849,18 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       height: zod.ZodNullable<zod.ZodNumber>;
       peaks: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
     }, zod.core.$strip>>;
+    hls: zod.ZodNullable<zod.ZodObject<{
+      renditions: zod.ZodArray<zod.ZodObject<{
+        kind: zod.ZodEnum<{
+          audio: "audio";
+          video: "video";
+        }>;
+        width: zod.ZodNullable<zod.ZodNumber>;
+        height: zod.ZodNullable<zod.ZodNumber>;
+        bandwidth: zod.ZodNumber;
+        codecs: zod.ZodString;
+      }, zod.core.$strip>>;
+    }, zod.core.$strip>>;
     preview: zod.ZodNullable<zod.ZodObject<{
       width: zod.ZodNullable<zod.ZodNumber>;
       height: zod.ZodNullable<zod.ZodNumber>;
@@ -14817,4 +14870,4 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
   }, zod.core.$strip>;
 }, zod.core.$strip>;
 type Asset = zod.infer<typeof ASSET_SCHEMA>;
-export { ExtractedText as _, AssetContentRemovalReason as a, ProcessingOptions as b, AssetModerationStatus as c, AssetRenderedKind as d, AssetSafetyHold as f, AssetVisibility as g, AssetUpload as h, AssetContent as i, AssetPreview as l, AssetType as m, AssetClassification as n, AssetContentStatus as o, AssetSafetyHoldReason as p, AssetClassificationStatus as r, AssetModeration as s, Asset as t, AssetRendered as u, FileMetadata as v, MetadataItem as y };
+export { ProcessingOptions as S, AssetUpload as _, AssetContentRemovalReason as a, FileMetadata as b, AssetHlsRendition as c, AssetPreview as d, AssetRendered as f, AssetType as g, AssetSafetyHoldReason as h, AssetContent as i, AssetModeration as l, AssetSafetyHold as m, AssetClassification as n, AssetContentStatus as o, AssetRenderedKind as p, AssetClassificationStatus as r, AssetHls as s, Asset as t, AssetModerationStatus as u, AssetVisibility as v, MetadataItem as x, ExtractedText as y };

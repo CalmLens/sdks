@@ -75,10 +75,12 @@ const FORBIDDEN_MODULES = {
     /CryptoUtils\.ts$/,
   ],
 };
-const PEER_ENTRIES = new Set(["react", "vue"]);
+const PEER_ENTRIES = new Set(["react", "react-native", "vue"]);
 // The UI entries run in browsers too, so they carry no more than the app entry.
 for (const entry of ["ui", "react", "vue", "elements"])
   FORBIDDEN_MODULES[entry] = FORBIDDEN_MODULES.app;
+// Native players play HLS themselves, so React Native apps never bundle hls.js.
+FORBIDDEN_MODULES["react-native"] = [/MediaStream\.ts$/];
 
 /** The source modules bundled into an entry and every chunk it imports. */
 function bundledModules(buildDir, entryFile) {

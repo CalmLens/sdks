@@ -12,6 +12,7 @@
     MEDIA_FILE_ICON_SIZE,
     type MediaOptions,
     type MediaProps,
+    MediaStreamPlayer,
     MediaUrlSigner,
     resolveMediaProps,
     resolveMessages,
@@ -55,6 +56,11 @@
   let load: "loading" | "loaded" | "error" = $state("loading");
   let played = $state(0);
   let image: HTMLImageElement | undefined = $state();
+  let media: HTMLMediaElement | undefined = $state();
+  const streams = new MediaStreamPlayer(signer);
+  // A video or audio stream plays through its element, so it starts after the render.
+  $effect(() => streams.update(media, state));
+  onMount(() => () => streams.stop());
 
   $effect.pre(() => {
     void loadKey;
@@ -69,7 +75,7 @@
     load = "error";
   };
   const onMediaError = (event: Event) => {
-    if (!signer.recoverElement(event.currentTarget as HTMLMediaElement)) load = "error";
+    if (!streams.recover(event.currentTarget as HTMLMediaElement)) load = "error";
   };
   const onLoadedMetadata = (event: Event) =>
     signer.loaded(event.currentTarget as HTMLMediaElement);
@@ -113,8 +119,9 @@
     <!-- svelte-ignore a11y_media_has_caption -->
     <!-- biome-ignore lint/a11y/useMediaCaption: captions are your app's to add -->
     <video
+      bind:this={media}
       class="calmlens-media__content"
-      src={state.src}
+      src={state.stream ? undefined : state.src}
       poster={state.poster}
       {controls}
       playsinline
@@ -152,8 +159,9 @@
     {/if}
     <!-- biome-ignore lint/a11y/useMediaCaption: audio has no captions track to add here -->
     <audio
+      bind:this={media}
       class="calmlens-media__content"
-      src={state.src}
+      src={state.stream ? undefined : state.src}
       {controls}
       preload="metadata"
       aria-label={alt || undefined}

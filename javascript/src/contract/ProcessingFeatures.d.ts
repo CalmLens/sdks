@@ -2,13 +2,13 @@ import * as zod from "zod";
 /**
  * Optional analyses a request can turn on or off with `processingOptions.features.<id>`. The
  * catalog is the single source for the request and result schemas, cache keys and metering. Each
- * feature's `activation` sets what a request that doesn't mention it gets; there is no
- * project-level default.
+ * feature's `activation` sets what a request that doesn't mention it gets. Streaming alone also
+ * follows a project setting (`streamingEnabled`) when the request doesn't mention it.
  */
 /** How mature a feature is. Beta results may change shape. */
 declare const PROCESSING_FEATURE_STAGES: readonly ["beta", "ga"];
 type ProcessingFeatureStage = (typeof PROCESSING_FEATURE_STAGES)[number];
-declare const PROCESSING_FEATURE_IDS: readonly ["ocr", "personDetection", "faceDetection", "linkDetection", "aiGeneratedDetection"];
+declare const PROCESSING_FEATURE_IDS: readonly ["ocr", "personDetection", "faceDetection", "linkDetection", "aiGeneratedDetection", "streaming"];
 type ProcessingFeatureId = (typeof PROCESSING_FEATURE_IDS)[number];
 declare const PROCESSING_FEATURES_SCHEMA: zod.ZodObject<{
   ocr: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
@@ -25,6 +25,9 @@ declare const PROCESSING_FEATURES_SCHEMA: zod.ZodObject<{
     enabled: zod.ZodBoolean;
   }, zod.core.$strict>>>;
   aiGeneratedDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
+    enabled: zod.ZodBoolean;
+  }, zod.core.$strict>>>;
+  streaming: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     enabled: zod.ZodBoolean;
   }, zod.core.$strict>>>;
 }, zod.core.$strict>;

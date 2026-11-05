@@ -94,6 +94,7 @@ export type {
   SignedUploadToken,
   SignedUrl,
   SignUploadTokenOptions,
+  StreamingFeatureOptions,
   SubmitAssetOptions,
   UpdateAssetOptions,
   UpdateFolderOptions,
@@ -111,6 +112,8 @@ export type {
 export { DEFAULT_CDN_BASE_URL, getAssetUrl, SIGNED_CDN_RESOURCES } from "./client/CalmLensUtils";
 export { SDK_VERSION } from "./client/CalmLensVersion";
 export type {
+  AssetHls,
+  AssetHlsRendition,
   AssetPreview,
   AssetRendered,
   AssetRenderedKind,

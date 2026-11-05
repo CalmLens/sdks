@@ -101,6 +101,7 @@ const assign = (
     if (PROPERTIES.has(name)) (element as unknown as Record<string, unknown>)[name] = value;
     else if (name === "viewerClaims") element.setAttribute("viewer-claims", JSON.stringify(value));
     else if (name === "autoUpload") element.toggleAttribute("no-auto-upload", value === false);
+    else if (name === "stream") element.toggleAttribute("no-stream", value === false);
     else if (name in events) {
       element.addEventListener(events[name] as string, (event) =>
         (value as (detail: unknown) => void)((event as CustomEvent).detail),

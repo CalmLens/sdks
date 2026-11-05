@@ -259,8 +259,8 @@ const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restri
 /**
 * Optional analyses a request can turn on or off with `processingOptions.features.<id>`. The
 * catalog is the single source for the request and result schemas, cache keys and metering. Each
-* feature's `activation` sets what a request that doesn't mention it gets; there is no
-* project-level default.
+* feature's `activation` sets what a request that doesn't mention it gets. Streaming alone also
+* follows a project setting (`streamingEnabled`) when the request doesn't mention it.
 */
 /** How mature a feature is. Beta results may change shape. */
 const PROCESSING_FEATURE_STAGES = ["beta", "ga"];
@@ -293,6 +293,10 @@ const createFeatureOptionsSchemas = (booleanSchema) => {
 		aiGeneratedDetection: zod.object({ enabled }).strict().meta(metaStore([docPropertyInfo({
 			description: "Preview. Read the provenance metadata AI image generators attach (C2PA Content Credentials, the IPTC digital source type and generator tool settings) to tell whether an image says it was made or edited with AI. Images whose metadata was stripped, such as screenshots, report no provenance. Results are informational and never change the moderation decision. Free.",
 			namedType: "AiGeneratedDetectionFeatureOptions"
+		})])),
+		streaming: zod.object({ enabled: booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to prepare the stream. Left out, the project's streaming setting decides." })])) }).strict().meta(metaStore([docPropertyInfo({
+			description: "Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made browser-safe, served at `/hls/index.m3u8` and played by the embed page at `/embed`. Needs `keepContentAfterProcessing`. Billed per started minute of media; `false` turns it off for an upload in a project that streams by default.",
+			namedType: "StreamingFeatureOptions"
 		})]))
 	};
 };
@@ -303,9 +307,10 @@ const createProcessingFeaturesSchema = (booleanSchema) => {
 		personDetection: options.personDetection.nullish(),
 		faceDetection: options.faceDetection.nullish(),
 		linkDetection: options.linkDetection.nullish(),
-		aiGeneratedDetection: options.aiGeneratedDetection.nullish()
+		aiGeneratedDetection: options.aiGeneratedDetection.nullish(),
+		streaming: options.streaming.nullish()
 	}).strict().omit({ aiGeneratedDetection: true }).meta(metaStore([docPropertyInfo({
-		description: "Optional analyses to run on this asset, keyed by feature. Link detection runs unless turned off; the others run only when turned on. Unknown features are rejected.",
+		description: "Optional analyses and delivery features for this asset, keyed by feature. Link detection runs unless turned off; streaming follows the project's setting unless set here; the others run only when turned on. Unknown features are rejected.",
 		namedType: "ProcessingFeatures"
 	})]));
 };
@@ -791,6 +796,40 @@ const PREVIEW_IMAGE_SCHEMA = zod.object({
 	height: zod.number().int().positive().nullable().describe("Preview height in pixels")
 });
 const pixels = (description) => zod.number().int().positive().nullable().describe(description);
+/** A rendition ID: `audio`, or `v` and the picture's height (`v720`). It names its CDN path. */
+const STREAM_RENDITION_ID_SCHEMA = zod.string().regex(/^(audio|v[1-9][0-9]{1,3})$/);
+/**
+* One rendition of an adaptive stream as stored: fragmented MP4 (CMAF) files of `bytes` bytes in
+* all, each holding an init segment and media segments, and its media playlist, beside the others
+* under the stream's `prefix`.
+*/
+const STORED_STREAM_RENDITION_SCHEMA = zod.object({
+	id: STREAM_RENDITION_ID_SCHEMA,
+	kind: zod.enum(["video", "audio"]),
+	width: zod.number().int().positive().nullable(),
+	height: zod.number().int().positive().nullable(),
+	/** Peak segment bit rate in bits per second, as HLS's `BANDWIDTH` (audio not included). */
+	bandwidth: zod.number().int().positive(),
+	averageBandwidth: zod.number().int().positive(),
+	codecs: saneStringField(),
+	frameRate: zod.number().positive().nullable(),
+	channels: zod.number().int().positive().nullable(),
+	bytes: zod.number().int().nonnegative()
+});
+/** An adaptive (HLS) stream processing stored for a browser-safe copy. Stored only. */
+const STORED_MEDIA_STREAM_SCHEMA = zod.object({
+	/**
+	* Storage key prefix of its files: per rendition its media playlist `<id>.m3u8` and one
+	* fragmented MP4 per encoded window, `<id>-<window>.mp4` (audio is one window).
+	*/
+	prefix: saneStringField(),
+	durationSeconds: zod.number().nonnegative(),
+	/** How many windows the video was encoded in. */
+	windows: zod.number().int().positive(),
+	renditions: zod.array(STORED_STREAM_RENDITION_SCHEMA).min(1).max(5),
+	/** Every file's bytes together, counted towards the project's storage. */
+	bytes: zod.number().int().nonnegative()
+});
 /**
 * A browser-safe copy of an audio or video asset that processing stores, served at the rendered
 * resource in place of the upload. Stored only; the API describes it as `content.rendered`.
@@ -801,8 +840,26 @@ const RENDERED_MEDIA_SCHEMA = zod.object({
 	kind: zod.enum(["video", "audio"]),
 	width: zod.number().int().positive().nullish(),
 	height: zod.number().int().positive().nullish(),
-	peaks: zod.array(zod.number().min(0).max(1)).max(512).nullish()
+	peaks: zod.array(zod.number().min(0).max(1)).max(512).nullish(),
+	/** Its adaptive stream, once one is prepared from it. */
+	stream: STORED_MEDIA_STREAM_SCHEMA.nullish()
 });
+/** One rendition of an adaptive stream, as the HLS master playlist lists it. */
+const ASSET_HLS_RENDITION_SCHEMA = zod.object({
+	kind: zod.enum(["video", "audio"]).describe("`video` for a picture size (video renditions carry no sound; they play with the `audio` rendition), or `audio`"),
+	width: pixels("Picture width in pixels; `null` for audio"),
+	height: pixels("Picture height in pixels; `null` for audio"),
+	bandwidth: zod.number().int().positive().describe("Peak bit rate in bits per second, counting the audio a video rendition plays with"),
+	codecs: zod.string().describe("The rendition's codecs as RFC 6381 names, such as `avc1.64001f`")
+}).meta(metaStore([docPropertyInfo({
+	description: "One rendition of the adaptive (HLS) stream",
+	namedType: "AssetHlsRendition"
+})]));
+/** The adaptive stream of audio or video, as the CDN's `/hls` resource serves it. */
+const ASSET_HLS_SCHEMA = zod.object({ renditions: zod.array(ASSET_HLS_RENDITION_SCHEMA).describe("Every rendition, video from the largest down, then audio") }).meta(metaStore([docPropertyInfo({
+	description: "The adaptive stream of audio or video: HLS with fragmented MP4 (CMAF) segments, served at `/hls/index.m3u8`",
+	namedType: "AssetHls"
+})]));
 const ASSET_RENDERED_KIND_SCHEMA = zod.enum([
 	"image",
 	"pdf",
@@ -1025,6 +1082,7 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	metadata: FILE_METADATA_SCHEMA.nullable().describe("Metadata embedded in an uploaded image, such as its capture time, camera and software, read before any of it is removed for `storeSensitiveMetadata`. Read-only and separate from the asset's own `metadata`. `null` when the image declares none, for other asset types, once the content is removed and while the asset is held."),
 	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document. `null` while the asset is held."),
 	rendered: ASSET_RENDERED_SCHEMA.nullable().describe("The displayable file, served at `/rendered`: an image, a PDF, or browser-safe video or audio. `null` when the asset has none (text, spreadsheets and other files, or media not yet made browser-safe), once the content is removed and while the asset is held."),
+	hls: ASSET_HLS_SCHEMA.nullable().describe("Preview. The adaptive (HLS) stream of video or audio, once streaming has prepared it from the rendered file, served at `/hls/index.m3u8` and played by the embed page at `/embed`. `null` for other assets, until a stream is prepared, once the content is removed and while the asset is held."),
 	preview: ASSET_PREVIEW_SCHEMA.nullable().describe("A still image for the asset, served at `/preview` (and its blurred placeholder at `/placeholder`). `null` when the asset has none (text, spreadsheets and other files, or a document, video or audio whose still isn't made yet), once the content is removed and while the asset is held.")
 }).meta(metaStore([docPropertyInfo({
 	description: "Content state",
@@ -1122,6 +1180,7 @@ STORED_ASSET_SCHEMA.pick({
 				thumbhash: null,
 				averageColor: null
 			},
+			hls: null,
 			extractedText: null
 		}
 	}

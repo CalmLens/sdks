@@ -227,6 +227,36 @@ describe("getMediaState", () => {
     });
   });
 
+  it("plays the adaptive stream of video or audio that has one, unless streaming is off", () => {
+    const asset = (kind: "video" | "audio" | "image", stream: boolean) => ({
+      id: "v1",
+      projectId: PROJECT_ID,
+      content: {
+        rendered: { kind, width: null, height: null },
+        preview: null,
+        hls: stream ? { renditions: [] } : null,
+      },
+    });
+    const file = `${CDN}/assets/${PROJECT_ID}/v1/rendered`;
+    const stream = `${CDN}/assets/${PROJECT_ID}/v1/hls/index.m3u8`;
+    expect(getMediaState({ asset: asset("video", true), lens: "card" })).toMatchObject({
+      kind: "video",
+      src: file,
+      stream,
+    });
+    expect(getMediaState({ asset: asset("audio", true) })).toMatchObject({
+      kind: "audio",
+      src: file,
+      stream,
+    });
+    expect(getMediaState({ asset: asset("video", true), stream: false })).toMatchObject({
+      kind: "video",
+      stream: undefined,
+    });
+    expect(getMediaState({ asset: asset("video", false) })).toMatchObject({ stream: undefined });
+    expect(getMediaState({ asset: asset("image", true) })).not.toHaveProperty("stream");
+  });
+
   it("requests no unsigned preview beside a signed URL given as it is", () => {
     const url = "https://cdn.calmlens.com/v1/assets/p/v1/rendered?exp=1&sig=abc";
     expect(
@@ -302,6 +332,22 @@ describe("signed media URLs", () => {
     expect(signer.urls({ ...video, assetId: "v2", getSignedUrl: fetch })).toEqual({});
     await Bun.sleep(0);
     expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("signs a streamed video's stream beside its file, which plays when the stream can't be signed", async () => {
+    const streamed = { ...video, hasPreview: false, hasStream: true };
+    expect(getSignedMediaResources(streamed).sort()).toEqual(["hls", "rendered"]);
+    expect(getSignedMediaResources({ ...streamed, stream: false })).toEqual(["rendered"]);
+    expect(
+      getMediaState(streamed, { rendered: "https://signed.example/r", hls: null }),
+    ).toMatchObject({ kind: "video", src: "https://signed.example/r", stream: undefined });
+
+    const fetch = mock(getSignedUrl);
+    const signer = new MediaUrlSigner(() => {});
+    signer.urls({ ...streamed, getSignedUrl: fetch });
+    expect(signer.recover({ position: 30, playing: true }, "hls")).toBe(true);
+    await Bun.sleep(0);
+    expect(fetch.mock.calls.map(([resource]) => resource)).toEqual(["rendered", "hls", "hls"]);
   });
 
   it("refreshes a failed file once until it loads again", async () => {

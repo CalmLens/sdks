@@ -26,6 +26,7 @@ import {
   MediaUrlSigner,
   resolveMediaProps,
 } from "./ui/Media";
+import { MediaStreamPlayer } from "./ui/MediaStream";
 import {
   describeUploader,
   describeUploadItem,
@@ -356,6 +357,8 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     contentRemoved,
     type,
     hasPreview,
+    hasStream,
+    stream,
     peaks,
     resource,
     lens,
@@ -395,6 +398,8 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     contentRemoved,
     type,
     hasPreview,
+    hasStream,
+    stream,
     peaks,
     resource,
     lens,
@@ -410,6 +415,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
   };
   const [, setSigned] = useState(0);
   const [signer] = useState(() => new MediaUrlSigner(() => setSigned((count) => count + 1)));
+  const [streams] = useState(() => new MediaStreamPlayer(signer));
   const state = getMediaState(options, signer.urls(options));
   const loadKey = getMediaLoadKey(state);
   const [load, setLoad] = useState<{ key: string; state: LoadState }>({
@@ -419,6 +425,7 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
   const current = load.key === loadKey ? load : { key: loadKey, state: "loading" as const };
   const [played, setPlayed] = useState(0);
   const image = useRef<HTMLImageElement>(null);
+  const media = useRef<HTMLVideoElement & HTMLAudioElement>(null);
 
   // An image that loaded before hydration fires no load event.
   useEffect(() => {
@@ -433,9 +440,12 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
   const placeholderUrl = failed
     ? undefined
     : getShownPlaceholder(state, current.state === "loaded");
-  const onMediaError = (media: HTMLMediaElement) => {
-    if (!signer.recoverElement(media)) setLoad({ key: loadKey, state: "error" });
+  const onMediaError = (element: HTMLMediaElement) => {
+    if (!streams.recover(element)) setLoad({ key: loadKey, state: "error" });
   };
+  // A video or audio stream plays through its element, so it starts after the render.
+  useEffect(() => streams.update(failed ? null : media.current, state));
+  useEffect(() => () => streams.stop(), [streams]);
 
   return (
     <figure
@@ -484,8 +494,9 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
       {state.kind === "video" && !failed && (
         // biome-ignore lint/a11y/useMediaCaption: captions come from your app, as <track> children are not supported here
         <video
+          ref={media}
           className="calmlens-media__content"
-          src={state.src}
+          src={state.stream ? undefined : state.src}
           poster={state.poster}
           controls={controls}
           playsInline
@@ -500,8 +511,9 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
           <Waveform url={state.waveformUrl} peaks={state.peaks} played={played} />
           {/* biome-ignore lint/a11y/useMediaCaption: audio has no captions track to add here */}
           <audio
+            ref={media}
             className="calmlens-media__content"
-            src={state.src}
+            src={state.stream ? undefined : state.src}
             controls={controls}
             preload="metadata"
             aria-label={alt || undefined}

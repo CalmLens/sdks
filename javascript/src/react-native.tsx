@@ -41,7 +41,8 @@ import { useOwnController, useUploadSnapshot } from "./ui/ReactUpload";
 import { type CalmLensTheme, resolveTheme } from "./ui/Theme";
 import type { UploadFile, UploadItem } from "./ui/UploadController";
 
-export * from "./ui";
+// Not `./ui`: its stream player loads hls.js, which native players never need.
+export * from "./ui/Core";
 export { type UseCalmLensUploadResult, useCalmLensUpload } from "./ui/ReactUpload";
 
 /** What the uploader asks your picker for. */
@@ -370,11 +371,20 @@ export function CalmLensUploader<F extends UploadFile = UploadFile>({
   );
 }
 
-/** A video or audio file for your app's player to play. */
+/** A video or audio file or stream for your app's player to play. */
 export interface MediaPlayerSource {
   kind: "video" | "audio";
-  /** The asset's rendered file, which plays in every browser and on phones. */
+  /**
+   * What to play: the asset's adaptive stream (an HLS playlist, which AVPlayer and ExoPlayer play)
+   * when it has one, or its rendered file, which plays in every browser and on phones. If the
+   * stream fails, the component renders the player again with the file.
+   */
   src: string;
+  /**
+   * Whether `src` is the HLS stream, for players that are told the source's type, such as
+   * `expo-video`'s `contentType: "hls"`.
+   */
+  streaming: boolean;
   /** The preview still, if the asset has one: a video's poster or an audio waveform. */
   poster?: string;
   /** Audio's waveform peaks from 0 to 1, for drawing its progress. */
@@ -386,7 +396,8 @@ export interface MediaPlayerSource {
   /**
    * Call when the player fails, with where it was. With `getSignedUrl`, the component fetches a
    * fresh URL (once until `onLoad`) and renders the player again with it and `resumeFrom`;
-   * otherwise, or when that fails too, it shows the unavailable notice.
+   * otherwise, or when that fails too, a stream gives way to the rendered file (with
+   * `resumeFrom`), and a file shows the unavailable notice.
    */
   onError: (playback?: MediaPlayback) => void;
   /** Call once the player has loaded `src`, so a later expiry can fetch a fresh URL again. */
@@ -459,6 +470,8 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     contentRemoved,
     type,
     hasPreview,
+    hasStream,
+    stream,
     peaks,
     resource,
     lens,
@@ -493,6 +506,8 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
     contentRemoved,
     type,
     hasPreview,
+    hasStream,
+    stream,
     peaks,
     resource,
     lens,
@@ -525,6 +540,8 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
   });
   const current = load.key === loadKey ? load.state : "loading";
   const [resumeFrom, setResumeFrom] = useState<MediaPlayback>();
+  // The stream that failed, after which the rendered file plays.
+  const [failedStream, setFailedStream] = useState<string>();
 
   const ratio = getMediaAspectRatio({ aspectRatio, width, height });
   const unavailable = state.kind === "unavailable" || current === "error";
@@ -538,19 +555,25 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
           : state.placeholderUrl
         : getShownPlaceholder(state, current === "loaded");
   const playable = state.kind === "video" || state.kind === "audio";
+  const streaming = playable && Boolean(state.stream) && state.stream !== failedStream;
   const player =
     playable && !unavailable
       ? renderPlayer?.({
           kind: state.kind,
-          src: state.src,
+          src: streaming && state.stream ? state.stream : state.src,
+          streaming,
           poster: state.kind === "video" ? state.poster : state.waveformUrl,
           peaks: state.kind === "audio" ? state.peaks : undefined,
           alt,
           resumeFrom,
           onError: (playback) => {
             const from = playback ?? { position: 0, playing: false };
-            if (signer.recover(from)) setResumeFrom(from);
-            else setLoad({ key: loadKey, state: "error" });
+            // A failed stream is signed again once, then gives way to the rendered file.
+            if (signer.recover(from, streaming ? "hls" : "rendered")) setResumeFrom(from);
+            else if (streaming) {
+              setFailedStream(state.stream);
+              setResumeFrom(from);
+            } else setLoad({ key: loadKey, state: "error" });
           },
           onLoad: () => signer.loaded(),
         })

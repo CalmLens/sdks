@@ -32,6 +32,7 @@ import type {
   PutPolicyAutomaticUpdatesBody,
   PutProjectPolicyBody,
 } from "../contract/Policy.js";
+import type { ProcessingFeatures } from "../contract/ProcessingFeatures.js";
 import type {
   AssetBatchOperation,
   AssetTimelineSegment,
@@ -411,18 +412,29 @@ export interface IdempotencyOptions {
 /**
  * The CDN resources a signed URL can be created for: the asset's `original` file, exactly as
  * uploaded; its `rendered` file for display (an image in the best format the client accepts, a
- * PDF, or browser-safe video or audio); or its `preview`, a still image that stands for the asset.
+ * PDF, or browser-safe video or audio); its `preview`, a still image that stands for the asset;
+ * the `hls` stream of audio or video, its adaptive HLS master playlist (one signature covers every
+ * playlist and segment beneath it); or the `embed` page, an HTML page that shows the asset in an
+ * iframe.
  */
 export type SignedCdnResource = (typeof SIGNED_CDN_RESOURCES)[number];
 
 /**
- * What a CDN URL serves: a signed resource (`original`, `rendered` or `preview`), or the
- * `placeholder`, a small blurred PNG made from the preview that is public for every asset whatever
- * its visibility or moderation status. Defaults to `rendered`; ask for `original` to download the
- * exact file. Lenses and transforms apply to `preview`, and to `rendered` when it is an image; the
- * CDN refuses them on other resources with `asset/invalid-transform`.
+ * What a CDN URL serves: a signed resource (`original`, `rendered`, `preview`, `hls` or
+ * `embed`), or the `placeholder`, a small blurred PNG made from the preview that is public for
+ * every asset whatever its visibility or moderation status. Defaults to `rendered`; ask for
+ * `original` to download the exact file. Lenses and transforms apply to `preview`, and to
+ * `rendered` when it is an image; the CDN refuses them on rendered PDFs, video and audio with
+ * `asset/invalid-transform`, and the original, hls, embed and placeholder take none.
  */
 export type CdnResource = SignedCdnResource | "placeholder";
+
+/**
+ * `processingOptions.features.streaming`: whether to prepare an adaptive (HLS) stream of audio or
+ * video once it is decided and made browser-safe. Left out, the project's streaming setting
+ * decides.
+ */
+export type StreamingFeatureOptions = NonNullable<ProcessingFeatures["streaming"]>;
 
 export interface ViewerClaims {
   /** Defaults to the country of the connection reaching CalmLens. Forward the viewer country through proxies. */

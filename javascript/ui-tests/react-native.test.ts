@@ -21,7 +21,7 @@ type NativeProps = Parameters<typeof native.mountMedia>[0] & {
 };
 const mountNative = (props: NativeProps) =>
   native.mountMedia(props as Parameters<typeof native.mountMedia>[0]);
-const apiAsset = (kind: "video" | "audio" | "pdf", peaks?: number[]) => ({
+const apiAsset = (kind: "video" | "audio" | "pdf", peaks?: number[], stream = false) => ({
   id: "v1",
   projectId: PROJECT_ID,
   type: kind === "pdf" ? "multimedia-document" : kind,
@@ -29,6 +29,7 @@ const apiAsset = (kind: "video" | "audio" | "pdf", peaks?: number[]) => ({
   content: {
     status: "stored",
     rendered: { kind, width: null, height: null, peaks },
+    hls: stream ? { renditions: [] } : null,
     preview: { width: 640, height: 360, thumbhash: null, averageColor: null },
   },
 });
@@ -55,6 +56,26 @@ describe("React Native media", () => {
         src: `${CDN}/assets/${PROJECT_ID}/v1/rendered`,
         poster: `${CDN}/assets/${PROJECT_ID}/v1/preview`,
         alt: "A cat chasing a laser",
+      }),
+    );
+  });
+
+  it("hands the app's player the stream when there is one, and the rendered file once it fails", async () => {
+    const renderPlayer = mock((_source: MediaPlayerSource) => null);
+    mounted = mountNative({ asset: apiAsset("video", undefined, true), renderPlayer });
+
+    await waitFor(() =>
+      expect(renderPlayer.mock.calls.at(-1)?.[0]).toMatchObject({
+        src: `${CDN}/assets/${PROJECT_ID}/v1/hls/index.m3u8`,
+        streaming: true,
+      }),
+    );
+    renderPlayer.mock.calls.at(-1)?.[0].onError({ position: 8, playing: true });
+    await waitFor(() =>
+      expect(renderPlayer.mock.calls.at(-1)?.[0]).toMatchObject({
+        src: `${CDN}/assets/${PROJECT_ID}/v1/rendered`,
+        streaming: false,
+        resumeFrom: { position: 8, playing: true },
       }),
     );
   });

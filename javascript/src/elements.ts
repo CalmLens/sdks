@@ -21,6 +21,7 @@ import {
   MediaUrlSigner,
   resolveMediaProps,
 } from "./ui/Media";
+import { MediaStreamPlayer } from "./ui/MediaStream";
 import {
   type CalmLensMessages,
   describeUploader,
@@ -454,7 +455,8 @@ export class CalmLensUploaderElement extends BaseElement {
  * audio with its waveform, a PDF, or a file's preview still or icon. Age-restricted assets show
  * the placeholder and a reveal button, which dispatches `calmlens-reveal`, until `viewer-claims`
  * confirms the viewer's age. Attributes: `project-id`, `asset-id`, `status`, `content-removed`,
- * `type`, `has-preview`, `peaks` (comma-separated), `resource`, `lens`, `transform`, `widths`
+ * `type`, `has-preview`, `has-stream`, `no-stream`, `peaks` (comma-separated), `resource`,
+ * `lens`, `transform`, `widths`
  * (comma-separated), `url`, `no-placeholder`, `placeholder-hash`, `placeholder-url`,
  * `average-color`, `cdn-base-url`, `viewer-claims` (JSON), `alt`, `aspect-ratio`, `width`,
  * `height`, `sizes`, `fit`, `position`, `eager`, `fetch-priority` and `no-controls`. Set the
@@ -469,6 +471,8 @@ export class CalmLensMediaElement extends BaseElement {
     "content-removed",
     "type",
     "has-preview",
+    "has-stream",
+    "no-stream",
     "peaks",
     "resource",
     "lens",
@@ -498,6 +502,7 @@ export class CalmLensMediaElement extends BaseElement {
   #getSignedUrl?: GetSignedMediaUrl;
   #loadKey?: string;
   #signer = new MediaUrlSigner(() => this.#render());
+  #streams = new MediaStreamPlayer(this.#signer);
 
   get messages(): Partial<CalmLensMessages> | undefined {
     return this.#messages;
@@ -543,6 +548,12 @@ export class CalmLensMediaElement extends BaseElement {
     this.#render();
   }
 
+  disconnectedCallback() {
+    this.#streams.stop();
+    // Connecting again renders afresh, starting any stream again.
+    this.#loadKey = undefined;
+  }
+
   #mediaOptions() {
     const list = (name: string) =>
       this.getAttribute(name)
@@ -557,6 +568,8 @@ export class CalmLensMediaElement extends BaseElement {
       contentRemoved: this.hasAttribute("content-removed") ? true : undefined,
       type: (this.getAttribute("type") as MediaOptions["type"] | null) ?? undefined,
       hasPreview: this.hasAttribute("has-preview") ? true : undefined,
+      hasStream: this.hasAttribute("has-stream") ? true : undefined,
+      stream: !this.hasAttribute("no-stream"),
       peaks: list("peaks")?.map(Number),
       resource: (this.getAttribute("resource") as MediaOptions["resource"] | null) ?? undefined,
       lens: this.getAttribute("lens") ?? undefined,
@@ -621,6 +634,7 @@ export class CalmLensMediaElement extends BaseElement {
         ]),
       ]);
     const fail = () => {
+      this.#streams.stop();
       this.dataset.state = "error";
       this.replaceChildren(unavailable());
     };
@@ -628,7 +642,7 @@ export class CalmLensMediaElement extends BaseElement {
     const playable = (media: HTMLMediaElement) => {
       media.addEventListener("loadedmetadata", () => this.#signer.loaded(media));
       media.addEventListener("error", () => {
-        if (!this.#signer.recoverElement(media)) fail();
+        if (!this.#streams.recover(media)) fail();
       });
       return media;
     };
@@ -674,7 +688,8 @@ export class CalmLensMediaElement extends BaseElement {
         playable(
           el("video", {
             class: "calmlens-media__content",
-            src: state.src,
+            // A stream sets the element's source itself.
+            src: state.stream ? undefined : state.src,
             poster: state.poster,
             controls,
             playsinline: true,
@@ -687,7 +702,7 @@ export class CalmLensMediaElement extends BaseElement {
       const audio = playable(
         el("audio", {
           class: "calmlens-media__content",
-          src: state.src,
+          src: state.stream ? undefined : state.src,
           controls,
           preload: "metadata",
           "aria-label": alt || undefined,
@@ -746,6 +761,8 @@ export class CalmLensMediaElement extends BaseElement {
       );
       this.replaceChildren(file);
     }
+    // A video or audio stream plays through the element just rendered.
+    this.#streams.update(this.querySelector<HTMLMediaElement>("video, audio"), state);
   }
 }
 

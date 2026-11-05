@@ -32,6 +32,11 @@ export interface MediaAsset {
       height?: number | null;
       peaks?: readonly number[] | null;
     } | null;
+    /**
+     * The adaptive (HLS) stream of video or audio the CDN serves at `/hls/index.m3u8`, or `null`
+     * until streaming prepares one.
+     */
+    hls?: { renditions?: readonly unknown[] } | null;
     /** The still image the CDN serves at `/preview`, or `null` when the asset has none. */
     preview?: {
       width?: number | null;
@@ -103,6 +108,18 @@ export interface MediaSettings {
    * audio waveform, or the picture shown for a file. Set from `asset` when you pass one.
    */
   hasPreview?: boolean;
+  /**
+   * Whether video or audio has an adaptive stream, as its `content.hls` is set. Set
+   * from `asset` when you pass one.
+   */
+  hasStream?: boolean;
+  /**
+   * Whether video and audio play their adaptive stream when the asset has one; defaults to `true`.
+   * The stream plays natively where the browser plays HLS (Safari and iOS), and otherwise through
+   * hls.js, which loads only then; browsers with neither, and a stream that fails, play the
+   * rendered file.
+   */
+  stream?: boolean;
   /** Audio's waveform peaks from 0 to 1, from `content.rendered.peaks`, drawn as its progress. */
   peaks?: readonly number[];
   /**
@@ -126,9 +143,9 @@ export interface MediaSettings {
   url?: string;
   /**
    * Fetches signed URLs for a private asset from your server, once per resource the component
-   * shows (`rendered`, `original` or `preview`), and again when a video or audio URL expires
-   * mid-playback, which then resumes where it stopped. Nothing is requested while the asset is
-   * blocked or behind the age notice.
+   * shows (`rendered`, `original`, `preview` or a video or audio's `hls` stream), and again when a
+   * video or audio URL expires mid-playback, which then resumes where it stopped. Nothing is
+   * requested while the asset is blocked or behind the age notice.
    */
   getSignedUrl?: GetSignedMediaUrl;
   /** Show the blurred placeholder while the media loads. Defaults to `true`. */
@@ -157,8 +174,16 @@ export type MediaState =
       sources?: MediaImageSource[];
       placeholderUrl?: string;
     }
-  | { kind: "video"; src: string; poster?: string; placeholderUrl?: string }
-  | { kind: "audio"; src: string; waveformUrl?: string; peaks?: readonly number[] }
+  /** Video, whose `stream`, when there is one, plays in place of the rendered file `src`. */
+  | { kind: "video"; src: string; stream?: string; poster?: string; placeholderUrl?: string }
+  /** Audio, whose `stream`, when there is one, plays in place of the rendered file `src`. */
+  | {
+      kind: "audio";
+      src: string;
+      stream?: string;
+      waveformUrl?: string;
+      peaks?: readonly number[];
+    }
   | { kind: "pdf"; src: string; placeholderUrl?: string }
   /** An asset with no rendered file or preview still, shown as its file-type icon. */
   | { kind: "file"; icon: UploadFileIconFamily | "unknown" };
@@ -213,8 +238,9 @@ type AssetDisplay = { width?: number; height?: number; averageColor?: string };
 
 /**
  * Fills the props left unset from `asset`, if there is one: the project and ID, its moderation
- * status, what its rendered resource serves, its preview still (ThumbHash, average colour and
- * whether it has one), audio's waveform peaks, and the size of the file shown. Every framework's
+ * status, what its rendered resource serves and whether it has a stream, its preview still
+ * (ThumbHash, average colour and whether it has one), audio's waveform peaks, and the size of the
+ * file shown. Every framework's
  * media component calls this before rendering.
  */
 export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
@@ -224,6 +250,7 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
   if (!asset) return props as T & { projectId: string; assetId: string };
   const rendered = asset.content?.rendered;
   const preview = asset.content?.preview;
+  const hls = asset.content?.hls;
   const regionEntries = asset.classification?.moderation?.regions ?? [];
   const ranks: Record<string, number> = {
     pending: 0,
@@ -264,6 +291,7 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
     contentRemoved: props.contentRemoved ?? asset.content?.status === "removed",
     type,
     hasPreview: props.hasPreview ?? (preview === undefined ? undefined : preview !== null),
+    hasStream: props.hasStream ?? (hls === undefined ? undefined : hls !== null),
     peaks: props.peaks ?? rendered?.peaks ?? undefined,
     placeholderHash: props.placeholderHash ?? preview?.thumbhash ?? undefined,
     averageColor: props.averageColor ?? preview?.averageColor ?? undefined,
@@ -323,6 +351,8 @@ const describeMedia = (
     contentRemoved = false,
     type = "image",
     hasPreview = false,
+    hasStream = false,
+    stream: streaming = true,
     peaks,
     resource = "rendered",
     lens,
@@ -405,6 +435,13 @@ const describeMedia = (
         : url
           ? undefined
           : build("preview", { selectable: false });
+  /** A video or audio's stream, played in place of the file; never with a given `url`. */
+  const stream = () =>
+    !hasStream || !streaming || url
+      ? undefined
+      : getSignedUrl
+        ? fetched("hls", false)
+        : build("hls", { selectable: false });
   const settle = (state: MediaState) =>
     failed
       ? done({ kind: "unavailable" })
@@ -414,18 +451,21 @@ const describeMedia = (
 
   if (type === "audio") {
     const src = shown("rendered", false);
+    const streamUrl = stream();
     const waveformUrl = still();
     return settle({
       kind: "audio",
       src: src ?? "",
+      stream: streamUrl,
       waveformUrl,
       peaks: peaks?.length ? peaks : undefined,
     });
   }
   if (type === "video") {
     const src = shown("rendered", false);
+    const streamUrl = stream();
     const poster = still();
-    return settle({ kind: "video", src: src ?? "", poster, placeholderUrl });
+    return settle({ kind: "video", src: src ?? "", stream: streamUrl, poster, placeholderUrl });
   }
   if (type === "pdf") return settle({ kind: "pdf", src: shown("rendered", false) ?? "" });
   if (type === "file" && !hasPreview) {
@@ -470,8 +510,8 @@ export interface MediaPlayback {
 
 /**
  * Keeps the signed URLs a media component shows: it asks `getSignedUrl` for each resource the
- * state needs, once per asset, and for a fresh `rendered` URL when a video or audio URL fails
- * mid-playback. Every framework's media component drives one; `onChange` runs whenever a URL
+ * state needs, once per asset, and for a fresh `rendered` or `hls` URL when a video or audio
+ * URL fails mid-playback. Every framework's media component drives one; `onChange` runs whenever a URL
  * arrives, so the component renders again with `getMediaState(options, signer.urls(options))`.
  */
 export class MediaUrlSigner {
@@ -507,15 +547,15 @@ export class MediaUrlSigner {
   }
 
   /**
-   * Fetches a fresh `rendered` URL after a video or audio element failed, to resume `playback`
-   * once it loads. `false` when there is no `getSignedUrl`, or the last fresh URL failed before it
-   * loaded, so the error stands.
+   * Fetches a fresh URL for `resource` (the `rendered` file, or the `hls` stream that was playing)
+   * after a video or audio element failed, to resume `playback` once it loads. `false` when there
+   * is no `getSignedUrl`, or the last fresh URL failed before it loaded, so the error stands.
    */
-  recover(playback: MediaPlayback): boolean {
+  recover(playback: MediaPlayback, resource: "rendered" | "hls" = "rendered"): boolean {
     if (!this.#getSignedUrl || this.#refreshing) return false;
     this.#refreshing = true;
     this.#resume = playback;
-    this.#fetch("rendered");
+    this.#fetch(resource);
     return true;
   }
 
@@ -539,12 +579,15 @@ export class MediaUrlSigner {
     if (resume.playing) void media.play()?.catch(() => {});
   }
 
-  /** For a video or audio element's `error`: `true` when it is fetching a fresh URL. */
-  recoverElement(media: HTMLMediaElement): boolean {
-    return this.recover({
-      position: media.currentTime || 0,
-      playing: !media.paused && !media.ended,
-    });
+  /**
+   * For a video or audio element's `error`, or its stream's expiry: `true` when it is fetching a
+   * fresh URL for `resource`.
+   */
+  recoverElement(media: HTMLMediaElement, resource: "rendered" | "hls" = "rendered"): boolean {
+    return this.recover(
+      { position: media.currentTime || 0, playing: !media.paused && !media.ended },
+      resource,
+    );
   }
 
   #fetch(resource: SignedCdnResource) {

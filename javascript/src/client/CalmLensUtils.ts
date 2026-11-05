@@ -442,16 +442,29 @@ export const transformSelector = (transform: CdnTransform | undefined): string |
 export const DEFAULT_CDN_BASE_URL = `https://cdn.${DOMAIN}/v1`;
 
 /** The CDN resources a signed URL can be created for, as the API accepts them. */
-export const SIGNED_CDN_RESOURCES = ["original", "rendered", "preview"] as const;
+export const SIGNED_CDN_RESOURCES = ["original", "rendered", "preview", "hls", "embed"] as const;
 
-const CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
-  ...SIGNED_CDN_RESOURCES,
-  "placeholder",
-]);
+/**
+ * Where each resource is served beneath an asset's CDN path. The HLS stream is its master
+ * playlist; its media playlists and segments are the other files beneath `hls/`.
+ */
+const CDN_RESOURCE_PATHS: Readonly<Record<CdnResource, string>> = {
+  original: "original",
+  rendered: "rendered",
+  preview: "preview",
+  hls: "hls/index.m3u8",
+  embed: "embed",
+  placeholder: "placeholder",
+};
 
-/** The resources that take no lens or transform: the exact upload and the public placeholder. */
+/**
+ * The resources that take no lens or transform: the exact upload, the HLS stream, the embed
+ * page and the public placeholder.
+ */
 const UNSELECTABLE_CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
   "original",
+  "hls",
+  "embed",
   "placeholder",
 ]);
 
@@ -480,9 +493,10 @@ export const validateBatchAssetsOptions = ({ assetIds, operation }: BatchAssetsO
 };
 
 /**
- * Checks signed URL options as the API does: the `original`, `rendered` and `preview` resources
- * are signed (a placeholder needs no signature), the original takes no lens or transform, and the
- * lifetime is a whole number of seconds from 1 to 24 hours.
+ * Checks signed URL options as the API does: the `original`, `rendered`, `preview`, `hls` and
+ * `embed` resources are signed (a placeholder needs no signature), the original, hls and
+ * embed page take no lens or transform, and the lifetime is a whole number of seconds from 1 to 24
+ * hours.
  */
 export const validateSignedUrlOptions = (options: {
   resource?: unknown;
@@ -496,8 +510,11 @@ export const validateSignedUrlOptions = (options: {
       `A signed URL's resource must be one of ${SIGNED_CDN_RESOURCES.join(", ")}`,
     );
   }
-  if (resource === "original" && (lens !== undefined || transform !== undefined)) {
-    throw invalidArgument("The original resource takes no lens or transform");
+  if (
+    UNSELECTABLE_CDN_RESOURCES.has(resource as string) &&
+    (lens !== undefined || transform !== undefined)
+  ) {
+    throw invalidArgument(`The ${resource} resource takes no lens or transform`);
   }
   if (
     expiresInSeconds !== undefined &&
@@ -515,10 +532,13 @@ export const validateSignedUrlOptions = (options: {
  *
  * `resource` is `rendered` (default: the displayable file, an image in the best format the browser
  * accepts, a PDF, or browser-safe video or audio), `original` (the exact upload), `preview` (a
- * still image for the asset) or `placeholder` (a small blurred PNG that the CDN serves publicly
- * for every asset whatever its visibility or moderation status, without requiring age
- * confirmation). Lenses and transforms apply to `preview`, and to `rendered` when it is an image;
- * the CDN refuses them on rendered PDFs, video and audio with `asset/invalid-transform`.
+ * still image for the asset), `hls` (the HLS master playlist of audio or video's adaptive stream,
+ * once `content.hls` is set), `embed` (an HTML page that shows the asset in an iframe) or
+ * `placeholder` (a small blurred PNG that the CDN serves publicly for every asset whatever its
+ * visibility or moderation status, without requiring age confirmation). Lenses
+ * and transforms apply to `preview`, and to `rendered` when it is an image; the CDN refuses them
+ * on rendered PDFs, video and audio with `asset/invalid-transform`, and the SDK refuses them on
+ * the original, hls, embed and placeholder.
  */
 export const getAssetUrl = ({
   projectId,
@@ -527,8 +547,8 @@ export const getAssetUrl = ({
   resource = "rendered",
   ...options
 }: GetAssetUrlOptions): string => {
-  if (!CDN_RESOURCES.has(resource)) {
-    throw invalidArgument(`resource must be one of ${[...CDN_RESOURCES].join(", ")}`);
+  if (!Object.hasOwn(CDN_RESOURCE_PATHS, resource)) {
+    throw invalidArgument(`resource must be one of ${Object.keys(CDN_RESOURCE_PATHS).join(", ")}`);
   }
   if (
     UNSELECTABLE_CDN_RESOURCES.has(resource) &&
@@ -536,7 +556,7 @@ export const getAssetUrl = ({
   ) {
     throw invalidArgument(`The ${resource} resource takes no lens or transform`);
   }
-  const url = `${cdnBaseUrl.replace(/\/+$/, "")}/assets/${encodePathSegment(projectId, "Project ID")}/${encodePathSegment(assetIdentifier, "Asset identifier")}/${resource}`;
+  const url = `${cdnBaseUrl.replace(/\/+$/, "")}/assets/${encodePathSegment(projectId, "Project ID")}/${encodePathSegment(assetIdentifier, "Asset identifier")}/${CDN_RESOURCE_PATHS[resource]}`;
   return appendCdnSelector(url, options);
 };
 

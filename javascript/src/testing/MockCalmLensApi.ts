@@ -296,8 +296,9 @@ const assetNameFact = (asset: Asset) => ({
   url: `https://calmlens.com/go/asset/${asset.id}`,
 });
 
-/** Paths beneath `/rendered/` the CDN reserves for streaming and an embeddable player. */
-const RESERVED_RENDERED_PATHS = ["stream", "player"];
+/** The page the mock serves at `/embed`, standing in for the CDN's embed page. */
+const MOCK_EMBED_HTML =
+  '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Embed</title></head><body></body></html>';
 
 /** A ThumbHash as the PNG the placeholder resource serves. */
 const mockPlaceholderPng = (thumbhash: string) =>
@@ -306,7 +307,7 @@ const mockPlaceholderPng = (thumbhash: string) =>
   );
 
 /** Removing or withholding content removes its rendered file and preview, as the API does. */
-const NO_RENDERING = { rendered: null, preview: null } as const;
+const NO_RENDERING = { rendered: null, preview: null, hls: null } as const;
 
 /** The size of the waveform the API makes as an audio asset's preview. */
 const WAVEFORM_SIZE = { width: 1200, height: 300 } as const;
@@ -341,12 +342,12 @@ const isBrowserSafeMediaFormat = (format: string | null) =>
  * first page as the preview; video and audio as a browser-safe file (MP4 or M4A unless browsers
  * play the upload), audio with a waveform preview and video with no poster; and every preview has
  * its ThumbHash. Text, spreadsheets and other files have neither. The mock decodes nothing, so
- * sizes are unknown and audio has no peaks.
+ * sizes are unknown, audio has no peaks, and audio and video never get an HLS stream.
  */
 const mockRendering = (
   asset: Asset,
   processed: boolean,
-): Pick<Asset["content"], "rendered" | "preview"> => {
+): Pick<Asset["content"], "rendered" | "preview" | "hls"> => {
   const format = asset.content.format;
   const mimeType = normalizeUploadMimeType(format ?? "");
   const browserSafe = isBrowserSafeMediaFormat(format);
@@ -366,22 +367,30 @@ const mockRendering = (
       return {
         rendered: { kind: "image", format: format ?? "image/png", ...unsized },
         preview: preview(unsized),
+        hls: null,
       };
     case "website":
       return {
         rendered: { kind: "image", format: "image/png", ...unsized },
         preview: preview(unsized),
+        hls: null,
       };
     case "multimedia-document":
       if (SPREADSHEET_MIME_TYPES.includes(mimeType)) return NO_RENDERING;
       return {
         rendered: { kind: "pdf", format: "application/pdf", ...unsized },
         preview: processed ? preview(unsized) : null,
+        hls: null,
       };
     case "video":
       return {
-        rendered: { kind: "video", format: browserSafe ? format! : "video/mp4", ...unsized },
+        rendered: {
+          kind: "video",
+          format: browserSafe ? format! : "video/mp4",
+          ...unsized,
+        },
         preview: null,
+        hls: null,
       };
     case "audio":
       return {
@@ -392,6 +401,7 @@ const mockRendering = (
           ...(processed && { peaks: [] }),
         },
         preview: processed ? preview(WAVEFORM_SIZE) : null,
+        hls: null,
       };
     default:
       return NO_RENDERING;
@@ -2699,19 +2709,20 @@ export class MockCalmLensApi {
         { code: "asset/invalid-transform", message: "Invalid transform selector" },
         url,
       );
-    // Like the CDN (serveAssetResource.ts), `/rendered/stream` and `/rendered/player` are reserved,
-    // then the selector after the resource is read (AssetTransformParser.ts); the original takes none.
-    if (resource === "rendered" && RESERVED_RENDERED_PATHS.includes(selectorPath[0] ?? "")) {
-      return noRenderedVersion();
-    }
+    // Like the CDN (serveAssetResource.ts), everything beneath `/hls/` is the HLS stream's
+    // playlists and segments, which take no lens or transform; otherwise the selector after the
+    // resource is read (AssetTransformParser.ts), and the original and the embed page take none.
+    const isHls = resource === "hls";
     let selector: ReturnType<typeof parseTransformSelector>;
     try {
-      selector = parseTransformSelector(selectorPath.join("/"));
+      selector = parseTransformSelector(isHls ? "" : selectorPath.join("/"));
     } catch {
       return invalidTransform();
     }
     const hasSelector = Boolean(selector.lens || selector.options);
-    if (resource === "original" && hasSelector) return invalidTransform();
+    if ((resource === "original" || resource === "embed") && hasSelector) {
+      return invalidTransform();
+    }
     if (root !== "assets" || projectId !== this.projectId || !assetIdentifier) return notFound();
     const assets = await this.databaseStorage.listAssets(this.projectId);
     const asset = assets.find(
@@ -2784,11 +2795,26 @@ export class MockCalmLensApi {
       );
     }
 
+    // The embed page shows any asset that may be delivered, as its viewer for the asset's type or a
+    // notice that the type has none.
+    if (resource === "embed") {
+      return this.cdnResponse(isHead, new TextEncoder().encode(MOCK_EMBED_HTML), url, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": Object.keys(claims).length
+          ? "private, no-store"
+          : `${isPrivate ? "private" : "public"}, max-age=3600`,
+        "Cache-Tag": `asset-${asset.id}`,
+        "X-Content-Type-Options": "nosniff",
+      });
+    }
+
     // Then whether the asset has the resource, and whether it is a still image that takes a lens
     // or transform: the preview always is, the rendered file only when it is an image.
     if ((resource === "rendered" && !rendered) || (resource === "preview" && !preview)) {
       return noRenderedVersion();
     }
+    // The mock never prepares a stream, so it has no playlists or segments to serve.
+    if (isHls && !asset.content.hls) return noRenderedVersion();
     const stillImage =
       resource === "preview" || (resource === "rendered" && rendered?.kind === "image");
     if (!stillImage && hasSelector) return invalidTransform();

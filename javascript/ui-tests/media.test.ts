@@ -20,7 +20,11 @@ const url = (resource: string, assetId = "a1") =>
 /** An API asset whose rendered resource serves `kind`, with or without a preview still. */
 const apiAsset = (
   kind: "image" | "video" | "audio" | "pdf" | null,
-  { preview = true, peaks }: { preview?: boolean; peaks?: number[] } = {},
+  {
+    preview = true,
+    peaks,
+    stream = false,
+  }: { preview?: boolean; peaks?: number[]; stream?: boolean } = {},
 ) => ({
   id: "a1",
   projectId: PROJECT_ID,
@@ -29,9 +33,17 @@ const apiAsset = (
   content: {
     status: "stored",
     rendered: kind
-      ? { kind, width: kind === "audio" ? null : 640, height: kind === "audio" ? null : 360, peaks }
+      ? {
+          kind,
+          width: kind === "audio" ? null : 640,
+          height: kind === "audio" ? null : 360,
+          peaks,
+        }
       : null,
     preview: preview ? { width: 640, height: 360, thumbhash: null, averageColor: "#223344" } : null,
+    hls: stream
+      ? { renditions: [{ kind: "audio", width: null, height: null, bandwidth: 1, codecs: "" }] }
+      : null,
   },
 });
 /** A `getSignedUrl` that signs each resource with a counter, so each fetch has its own URL. */
@@ -40,10 +52,68 @@ const signer = () => {
   return mock(async (resource: string) => `https://signed.example/${resource}?n=${++count}`);
 };
 
+/** Stands in for hls.js's light build, which the media components load only to play a stream. */
+class FakeHls {
+  static Events = { ERROR: "hlsError" };
+  static isSupported = mock(() => true);
+  static created: FakeHls[] = [];
+  source?: string;
+  media?: HTMLMediaElement;
+  destroyed = false;
+  readonly #listeners: ((event: string, data: object) => void)[] = [];
+  constructor() {
+    FakeHls.created.push(this);
+  }
+  on(_event: string, listener: (event: string, data: object) => void) {
+    this.#listeners.push(listener);
+  }
+  loadSource(url: string) {
+    this.source = url;
+  }
+  attachMedia(media: HTMLMediaElement) {
+    this.media = media;
+  }
+  stopLoad() {}
+  destroy() {
+    this.destroyed = true;
+  }
+  /** Reports an hls.js error, such as a fatal one or a 403 for an expired signature. */
+  fail(data: { fatal: boolean; response?: { code: number } }) {
+    for (const listener of this.#listeners) listener(FakeHls.Events.ERROR, data);
+  }
+}
+mock.module("hls.js/light", () => ({ default: FakeHls }));
+/** Whether the component loaded and used hls.js, which it only does to play a stream. */
+const usedHls = async () => {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  return FakeHls.isSupported.mock.calls.length > 0 || FakeHls.created.length > 0;
+};
+
+/** Makes the browser play HLS itself, as Safari does, or have Media Source Extensions, or neither. */
+const browserPlays = (support: "native" | "mse" | "neither") => {
+  const canPlayType = HTMLMediaElement.prototype.canPlayType;
+  HTMLMediaElement.prototype.canPlayType = (type: string) =>
+    support === "native" && type === "application/vnd.apple.mpegurl" ? "maybe" : "";
+  const hadMediaSource = Object.hasOwn(window, "MediaSource");
+  const mediaSource = (window as { MediaSource?: unknown }).MediaSource;
+  if (support === "mse") (window as { MediaSource?: unknown }).MediaSource = class {};
+  else delete (window as { MediaSource?: unknown }).MediaSource;
+  return () => {
+    HTMLMediaElement.prototype.canPlayType = canPlayType;
+    if (hadMediaSource) (window as { MediaSource?: unknown }).MediaSource = mediaSource;
+    else delete (window as { MediaSource?: unknown }).MediaSource;
+  };
+};
+
+let restoreBrowser: (() => void) | undefined;
 let mounted: Mounted | undefined;
 afterEach(() => {
   mounted?.unmount();
   mounted = undefined;
+  restoreBrowser?.();
+  restoreBrowser = undefined;
+  FakeHls.created = [];
+  FakeHls.isSupported.mockClear();
 });
 
 const view = () => within(mounted?.container ?? document.body);
@@ -298,6 +368,121 @@ for (const binding of BINDINGS) {
         expect(video.getAttribute("src")).toMatch(/^https:\/\/signed\.example\/rendered\?n=\d$/);
         expect(video.getAttribute("poster")).toMatch(/^https:\/\/signed\.example\/preview\?n=\d$/);
         expect(requested().filter((src) => src?.startsWith(CDN))).toEqual([]);
+      },
+    );
+
+    it.skipIf(!binding.playsMedia)(
+      "plays a video's stream as the element's own source where the browser plays HLS",
+      async () => {
+        restoreBrowser = browserPlays("native");
+        mounted = binding.mountMedia({
+          asset: apiAsset("video", { stream: true }),
+          alt: asset.alt,
+          messages,
+        });
+        const video = await view().findByLabelText(asset.alt);
+
+        await waitFor(() => expect(video.getAttribute("src")).toBe(url("hls/index.m3u8")));
+        expect(await usedHls()).toBe(false);
+      },
+    );
+
+    it.skipIf(!binding.playsMedia)(
+      "plays audio's stream through hls.js with Media Source Extensions, and its file once that fails",
+      async () => {
+        restoreBrowser = browserPlays("mse");
+        mounted = binding.mountMedia({
+          asset: apiAsset("audio", { stream: true }),
+          alt: asset.alt,
+          messages,
+        });
+        const audio = await view().findByLabelText(asset.alt);
+
+        await waitFor(() => expect(FakeHls.created).toHaveLength(1));
+        const [hls] = FakeHls.created;
+        expect(hls?.source).toBe(url("hls/index.m3u8"));
+        expect(hls?.media).toBe(audio as HTMLMediaElement);
+        hls?.fail({ fatal: true });
+        await waitFor(() => expect(audio.getAttribute("src")).toBe(url("rendered")));
+        expect(hls?.destroyed).toBe(true);
+      },
+    );
+
+    it.skipIf(!binding.playsMedia)(
+      "plays the rendered file where the browser can play no stream",
+      async () => {
+        restoreBrowser = browserPlays("neither");
+        mounted = binding.mountMedia({
+          asset: apiAsset("video", { stream: true }),
+          alt: asset.alt,
+          messages,
+        });
+        const video = await view().findByLabelText(asset.alt);
+
+        await waitFor(() => expect(video.getAttribute("src")).toBe(url("rendered")));
+        expect(await usedHls()).toBe(false);
+      },
+    );
+
+    it.skipIf(!binding.playsMedia)(
+      "plays the rendered file, loading no hls.js, with streaming off or no stream",
+      async () => {
+        restoreBrowser = browserPlays("mse");
+        for (const props of [
+          { asset: apiAsset("video", { stream: true }), stream: false },
+          { asset: apiAsset("video") },
+        ]) {
+          mounted = binding.mountMedia({ ...props, alt: asset.alt, messages });
+          const video = await view().findByLabelText(asset.alt);
+
+          expect(video.getAttribute("src")).toBe(url("rendered"));
+          mounted.unmount();
+          mounted = undefined;
+        }
+        expect(await usedHls()).toBe(false);
+      },
+    );
+
+    it.skipIf(!binding.playsMedia)(
+      "signs a private video's stream, and signs it again when it expires mid-playback",
+      async () => {
+        restoreBrowser = browserPlays("mse");
+        const play = mock(async () => {});
+        const originalPlay = HTMLMediaElement.prototype.play;
+        HTMLMediaElement.prototype.play = play;
+        try {
+          const getSignedUrl = signer();
+          mounted = binding.mountMedia({
+            asset: apiAsset("video", { preview: false, stream: true }),
+            getSignedUrl,
+            alt: asset.alt,
+            messages,
+          });
+          await waitFor(() => expect(FakeHls.created).toHaveLength(1));
+          expect(getSignedUrl.mock.calls.map(([resource]) => resource).sort()).toEqual([
+            "hls",
+            "rendered",
+          ]);
+          const [first] = FakeHls.created;
+          expect(first?.source).toMatch(/^https:\/\/signed\.example\/hls\?n=\d$/);
+          const video = first?.media as HTMLVideoElement;
+          video.currentTime = 42;
+          Object.defineProperty(video, "paused", { configurable: true, value: false });
+          first?.fail({ fatal: false, response: { code: 403 } });
+
+          await waitFor(() => expect(FakeHls.created).toHaveLength(2));
+          expect(getSignedUrl.mock.calls.at(-1)).toEqual(["hls"]);
+          const fresh = FakeHls.created[1];
+          expect(fresh?.source).toBe("https://signed.example/hls?n=3");
+          expect(first?.destroyed).toBe(true);
+          const element = fresh?.media as HTMLVideoElement;
+          element.currentTime = 0;
+          element.dispatchEvent(new Event("loadedmetadata"));
+          expect(element.currentTime).toBe(42);
+          expect(play).toHaveBeenCalledTimes(1);
+        } finally {
+          HTMLMediaElement.prototype.play = originalPlay;
+        }
       },
     );
 

@@ -38,6 +38,7 @@ import {
   MediaUrlSigner,
   resolveMediaProps,
 } from "./ui/Media";
+import { MediaStreamPlayer } from "./ui/MediaStream";
 import {
   type CalmLensMessages,
   describeUploader,
@@ -417,6 +418,9 @@ export const CalmLensMedia = defineComponent({
     contentRemoved: optional(Boolean),
     type: optional(String as PropType<MediaKind>),
     hasPreview: optional(Boolean),
+    hasStream: optional(Boolean),
+    /** Whether video and audio play their adaptive stream when the asset has one. */
+    stream: { type: Boolean, default: true },
     peaks: optional(Array as PropType<readonly number[]>),
     resource: optional(String as PropType<"original" | "rendered">),
     lens: optional(String),
@@ -459,6 +463,11 @@ export const CalmLensMedia = defineComponent({
     const load = ref<LoadState>("loading");
     const played = ref(0);
     const image = ref<HTMLImageElement>();
+    const media = ref<HTMLMediaElement>();
+    const streams = new MediaStreamPlayer(signer);
+    // A video or audio stream plays through its element, so it starts after the render.
+    watch([media, state], () => streams.update(media.value, state.value), { flush: "post" });
+    onScopeDispose(() => streams.stop());
     watch(loadKey, () => {
       load.value = "loading";
     });
@@ -470,7 +479,7 @@ export const CalmLensMedia = defineComponent({
       load.value = "error";
     };
     const onMediaError = (event: Event) => {
-      if (!signer.recoverElement(event.target as HTMLMediaElement)) load.value = "error";
+      if (!streams.recover(event.target as HTMLMediaElement)) load.value = "error";
     };
     const onLoadedMetadata = (event: Event) => signer.loaded(event.target as HTMLMediaElement);
 
@@ -530,8 +539,10 @@ export const CalmLensMedia = defineComponent({
           current.kind === "video" &&
             !failed &&
             h("video", {
+              ref: media,
               class: "calmlens-media__content",
-              src: current.src,
+              // A stream sets the element's source itself.
+              ...(current.stream ? {} : { src: current.src }),
               poster: current.poster,
               controls: props.controls,
               playsinline: true,
@@ -546,8 +557,9 @@ export const CalmLensMedia = defineComponent({
           current.kind === "audio" &&
             !failed &&
             h("audio", {
+              ref: media,
               class: "calmlens-media__content",
-              src: current.src,
+              ...(current.stream ? {} : { src: current.src }),
               controls: props.controls,
               preload: "metadata",
               "aria-label": props.alt || undefined,
