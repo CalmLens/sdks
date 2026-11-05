@@ -1578,12 +1578,12 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if suffix == "signed-url":
             expires = body["expiresInSeconds"]
             selector = "".join(f"&{k}={quote(str(body[k]), safe='')}" for k in ("lens", "transform") if body.get(k))
-            return {"url": f"{self.signed_url_base_url}/assets/{identifier}/{body.get('resource', 'rendered')}"
-                           f"?expiresInSeconds={expires}{selector}",
             if isinstance(body.get("viewerClaims"), dict):
                 # Like the API, the URL carries the viewer claims its signature covers.
                 claims = json.dumps(body["viewerClaims"], separators=(",", ":"))
                 selector += f"&viewerClaims={quote(claims, safe='')}"
+            return {"url": f"{self.signed_url_base_url}/assets/{identifier}/{body.get('resource', 'rendered')}"
+                           f"?expiresInSeconds={expires}{selector}",
                     "expiresAt": now + expires * 1000}
         if suffix == "retry":
             if asset["classification"]["status"] != "failed" or \

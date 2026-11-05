@@ -1515,8 +1515,8 @@ export class MockCalmLensApi {
     const asset = await this.findOwnAsset(assetId);
     const expiresInSeconds = (body.expiresInSeconds as number | undefined) ?? 60 * 15;
     const resource = (body.resource as string | undefined) ?? "rendered";
-    const selector =
     // Like the API, the URL carries the viewer claims its signature covers.
+    const selector =
       (body.lens ? `&lens=${encodeURIComponent(String(body.lens))}` : "") +
       (body.transform ? `&transform=${encodeURIComponent(String(body.transform))}` : "") +
       (body.viewerClaims
@@ -2170,7 +2170,6 @@ export class MockCalmLensApi {
     const fields = this.uploadFields(request);
     const token = request.headers.get("authorization");
     if (preset.requireToken && !token) throw fail(API_ERROR_CODES.UPLOAD_PRESET_TOKEN_REQUIRED);
-    if (
     // Like the API, a browser upload's external ID is the one its token was signed for.
     const tokenExternalId = token
       ? decodeUploadToken(token.replace(/^Bearer /, ""))?.claims.x
@@ -2180,6 +2179,7 @@ export class MockCalmLensApi {
         details: { field: "externalId" },
       });
     }
+    if (
       preset.allowedContentTypes &&
       !isFileAccepted(
         { name: fields.name, type: fields.contentType ?? "" },
@@ -2199,8 +2199,8 @@ export class MockCalmLensApi {
     const asset = await this.storeAsset(
       {
         ...fields,
-        uploadPresetId,
         externalId: tokenExternalId,
+        uploadPresetId,
         visibility: preset.visibility ?? "public",
         folderId: preset.folderId ?? undefined,
         processingOptions: {

@@ -1,5 +1,5 @@
 import "./Asset-CQt2Rst2.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-6aKXD46f.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-BKqcghco.js";
 import "./Page-DNdKkX2B.js";
 import * as zod from "zod";
 declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{

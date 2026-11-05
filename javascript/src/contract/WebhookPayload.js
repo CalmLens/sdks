@@ -1165,6 +1165,12 @@ const assetTypeField = field(ASSET_TYPE_SCHEMA.nullish(), {
 	display: "enum",
 	valueLabels: ASSET_TYPE_LABELS
 });
+/** Set on assets CalmLens extracts from an upload, such as the text and images of a document. */
+const parentAssetField = field(zod.string().optional(), {
+	label: msg("Parent asset"),
+	description: "ID of the uploaded asset this one was extracted from, such as the text or an image of a document, as in the asset's `parentId`. Absent for uploaded assets.",
+	display: "code"
+});
 const reviewerUserIdField = field(zod.string().nullish(), {
 	label: msg("Reviewer ID"),
 	description: "ID of the user who made the decision, or `null` when an API key made it.",
@@ -1226,6 +1232,7 @@ const ASSET_CLASSIFIED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
+		parentAsset: parentAssetField,
 		flaggedCategories: field(zod.array(zod.string()), FLAGGED_CATEGORIES_INFO),
 		moderationStatus: field(ASSET_MODERATION_STATUS_SCHEMA, {
 			label: msg("Moderation status"),
@@ -1252,6 +1259,7 @@ const ASSET_REGION_RESTRICTED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
+		parentAsset: parentAssetField,
 		region: field(JURISDICTION_SCHEMA.exclude(["global"]), {
 			label: msg("Region"),
 			description: "Jurisdiction whose mandatory rule raises the delivery action.",
@@ -1282,13 +1290,18 @@ const ASSET_REGION_RESTRICTED = defineEventType({
 		action: "age-restrict"
 	}
 });
-const decidedByField = field(zod.enum(["automated", "reviewer"]), {
+const decidedByField = field(zod.enum([
+	"automated",
+	"reviewer",
+	"api-key"
+]), {
 	label: msg("Decided by"),
-	description: `Who made the decision: \`automated\` moderation or a \`reviewer\` in the portal or through the API.`,
+	description: `Who made the decision: \`automated\` moderation, a \`reviewer\` in the portal (or an assistant acting for one), or an \`api-key\` through the API.`,
 	display: "enum",
 	valueLabels: {
 		automated: msg("Automated moderation"),
-		reviewer: msg("Reviewer")
+		reviewer: msg("Reviewer"),
+		"api-key": msg("API key")
 	}
 });
 /** One event per moderation status, emitted whenever automated moderation or a reviewer sets it. */
@@ -1299,6 +1312,7 @@ const defineModerationOutcome = (outcome) => defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
+		parentAsset: parentAssetField,
 		decidedBy: decidedByField,
 		flaggedCategories: field(zod.array(zod.string()).optional(), FLAGGED_CATEGORIES_INFO),
 		reviewerUserId: reviewerUserIdField,
@@ -1362,6 +1376,7 @@ const ASSET_FAILED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
+		parentAsset: parentAssetField,
 		previousStatus: field(ASSET_CLASSIFICATION_STATUS_SCHEMA.nullish(), {
 			label: msg("Previous status"),
 			description: "The asset's processing status before it failed, such as `processing`.",
@@ -1590,6 +1605,7 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
+		parentAsset: parentAssetField,
 		automatedOutcome: field(HUMAN_REVIEW_SAMPLED_OUTCOME_SCHEMA, {
 			label: msg("Automated outcome"),
 			description: "The asset's status from automated moderation: `allowed`, `limited`, `age-restricted` or `blocked`.",
@@ -1631,6 +1647,7 @@ const ASSET_HASH_MATCHED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
+		parentAsset: parentAssetField,
 		hashListId: field(idField("hl"), {
 			label: msg("Hash list ID"),
 			description: "ID of the hash list with the closest match.",
@@ -1678,6 +1695,7 @@ const ASSET_LINK_FLAGGED = defineEventType({
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
+		parentAsset: parentAssetField,
 		linkVerdict: field(LINK_SAFETY_VERDICT_SCHEMA, {
 			label: msg("Verdict"),
 			description: "What the link's destination is: `adult`, `gambling`, `phishing`, `malware`, `unresolved` when a short link or redirect chain could not be followed or a check failed, or `safe` when only the off-platform setting acted. The most severe verdict of any address on the way decides.",

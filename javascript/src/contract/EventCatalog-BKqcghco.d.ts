@@ -139,6 +139,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       flaggedCategories: EventFieldDefinition<zod.ZodArray<zod.ZodString>>;
       moderationStatus: EventFieldDefinition<zod.ZodEnum<{
         "age-restricted": "age-restricted";
@@ -153,6 +154,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      parentAsset?: string | undefined;
       flaggedCategories: string[];
       moderationStatus: "age-restricted" | "allowed" | "blocked" | "limited" | "pending" | "purged";
     }>;
@@ -183,6 +185,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       flaggedCategories: zod.ZodArray<zod.ZodString>;
       moderationStatus: zod.ZodEnum<{
         "age-restricted": "age-restricted";
@@ -220,6 +223,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       region: EventFieldDefinition<zod.ZodEnum<{
         AT: "AT";
         AU: "AU";
@@ -241,6 +245,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      parentAsset?: string | undefined;
       region: "AT" | "AU" | "BR" | "DE" | "EU" | "FR" | "GB";
       rule: string;
       action: "age-restrict" | "block" | "limit" | "purge";
@@ -272,6 +277,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       region: zod.ZodEnum<{
         AT: "AT";
         AU: "AU";
@@ -316,7 +322,9 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       decidedBy: EventFieldDefinition<zod.ZodEnum<{
+        "api-key": "api-key";
         automated: "automated";
         reviewer: "reviewer";
       }>>;
@@ -329,7 +337,8 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
-      decidedBy: "automated" | "reviewer";
+      parentAsset?: string | undefined;
+      decidedBy: "api-key" | "automated" | "reviewer";
       flaggedCategories?: string[] | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
@@ -362,7 +371,9 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       decidedBy: zod.ZodEnum<{
+        "api-key": "api-key";
         automated: "automated";
         reviewer: "reviewer";
       }>;
@@ -398,7 +409,9 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       decidedBy: EventFieldDefinition<zod.ZodEnum<{
+        "api-key": "api-key";
         automated: "automated";
         reviewer: "reviewer";
       }>>;
@@ -411,7 +424,8 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
-      decidedBy: "automated" | "reviewer";
+      parentAsset?: string | undefined;
+      decidedBy: "api-key" | "automated" | "reviewer";
       flaggedCategories?: string[] | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
@@ -444,7 +458,9 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       decidedBy: zod.ZodEnum<{
+        "api-key": "api-key";
         automated: "automated";
         reviewer: "reviewer";
       }>;
@@ -480,7 +496,9 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       decidedBy: EventFieldDefinition<zod.ZodEnum<{
+        "api-key": "api-key";
         automated: "automated";
         reviewer: "reviewer";
       }>>;
@@ -493,7 +511,8 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
-      decidedBy: "automated" | "reviewer";
+      parentAsset?: string | undefined;
+      decidedBy: "api-key" | "automated" | "reviewer";
       flaggedCategories?: string[] | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
@@ -526,7 +545,9 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       decidedBy: zod.ZodEnum<{
+        "api-key": "api-key";
         automated: "automated";
         reviewer: "reviewer";
       }>;
@@ -562,7 +583,9 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       decidedBy: EventFieldDefinition<zod.ZodEnum<{
+        "api-key": "api-key";
         automated: "automated";
         reviewer: "reviewer";
       }>>;
@@ -575,7 +598,8 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
-      decidedBy: "automated" | "reviewer";
+      parentAsset?: string | undefined;
+      decidedBy: "api-key" | "automated" | "reviewer";
       flaggedCategories?: string[] | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
@@ -608,7 +632,9 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       decidedBy: zod.ZodEnum<{
+        "api-key": "api-key";
         automated: "automated";
         reviewer: "reviewer";
       }>;
@@ -644,7 +670,9 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       decidedBy: EventFieldDefinition<zod.ZodEnum<{
+        "api-key": "api-key";
         automated: "automated";
         reviewer: "reviewer";
       }>>;
@@ -657,7 +685,8 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
-      decidedBy: "automated" | "reviewer";
+      parentAsset?: string | undefined;
+      decidedBy: "api-key" | "automated" | "reviewer";
       flaggedCategories?: string[] | undefined;
       reviewerUserId?: string | null | undefined;
       reviewerName?: string | null | undefined;
@@ -690,7 +719,9 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       decidedBy: zod.ZodEnum<{
+        "api-key": "api-key";
         automated: "automated";
         reviewer: "reviewer";
       }>;
@@ -726,6 +757,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       previousStatus: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
         completed: "completed";
         failed: "failed";
@@ -749,6 +781,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      parentAsset?: string | undefined;
       previousStatus?: "completed" | "failed" | "pending" | "processing" | null | undefined;
       failureReason: "child-failed" | "duration-limit" | "file-too-large" | "free-upload-limit" | "multiple-tracks" | "processing-error" | "resolution-limit" | "type-mismatch" | "undecodable-content" | "unsupported-format";
     }>;
@@ -779,6 +812,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       previousStatus: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
         completed: "completed";
         failed: "failed";
@@ -1008,6 +1042,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       automatedOutcome: EventFieldDefinition<zod.ZodEnum<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
@@ -1033,6 +1068,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      parentAsset?: string | undefined;
       automatedOutcome: "age-restricted" | "allowed" | "blocked" | "limited";
       reviewReason: "sampled" | "uncertain";
       uncertainCategories: ("criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence")[];
@@ -1064,6 +1100,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       automatedOutcome: zod.ZodEnum<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
@@ -1112,6 +1149,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       hashListId: EventFieldDefinition<zod.ZodString>;
       hashListName: EventFieldDefinition<zod.ZodString>;
       distance: EventFieldDefinition<zod.ZodNumber>;
@@ -1124,6 +1162,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      parentAsset?: string | undefined;
       hashListId: string;
       hashListName: string;
       distance: number;
@@ -1156,6 +1195,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       hashListId: zod.ZodString;
       hashListName: zod.ZodString;
       distance: zod.ZodNumber;
@@ -1191,6 +1231,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>>;
+      parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
       linkVerdict: EventFieldDefinition<zod.ZodEnum<{
         adult: "adult";
         gambling: "gambling";
@@ -1211,6 +1252,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
+      parentAsset?: string | undefined;
       linkVerdict: "adult" | "gambling" | "malware" | "phishing" | "safe" | "unresolved";
       linkUrl: string;
       linkFinalUrl?: string | null | undefined;
@@ -1243,6 +1285,7 @@ declare const EVENT_TYPE_INFO: {
         video: "video";
         website: "website";
       }>>>;
+      parentAsset: zod.ZodOptional<zod.ZodString>;
       linkVerdict: zod.ZodEnum<{
         adult: "adult";
         gambling: "gambling";

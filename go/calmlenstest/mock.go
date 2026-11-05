@@ -511,18 +511,18 @@ func (m *MockServerClient) recordLifecycleEvent(eventType string, a calmlens.JSO
 }
 
 // snapshot is the asset summary events carry.
-func snapshot(a calmlens.JSON) calmlens.JSON {
-	return calmlens.JSON{
-		"id": a["id"], "externalId": a["externalId"], "uploadPresetId": a["uploadPresetId"],
-		"upload":  calmlens.JSON{"status": section(a, "upload")["status"]},
-		"content": calmlens.JSON{"status": section(a, "content")["status"]},
-		"classification": calmlens.JSON{
 // announcedStatus is the moderation status each asset.<status> event announces.
 var announcedStatus = map[string]string{
 	"asset.allowed": "allowed", "asset.limited": "limited", "asset.age-restricted": "age-restricted",
 	"asset.blocked": "blocked", "asset.purged": "purged",
 }
 
+func snapshot(a calmlens.JSON) calmlens.JSON {
+	return calmlens.JSON{
+		"id": a["id"], "externalId": a["externalId"], "uploadPresetId": a["uploadPresetId"],
+		"upload":  calmlens.JSON{"status": section(a, "upload")["status"]},
+		"content": calmlens.JSON{"status": section(a, "content")["status"]},
+		"classification": calmlens.JSON{
 			"status":     section(a, "classification")["status"],
 			"moderation": calmlens.JSON{"status": section(section(a, "classification"), "moderation")["status"]},
 		},
@@ -1861,17 +1861,17 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 				params.Set(key, value)
 			}
 		}
+		// Like the API, the URL carries the viewer claims its signature covers.
+		if claims, ok := body["viewerClaims"].(map[string]any); ok {
+			encoded, _ := json.Marshal(claims)
+			params.Set("viewerClaims", string(encoded))
+		}
 		// Like the API, the resource defaults to rendered.
 		resource := text(body["resource"])
 		if resource == "" {
 			resource = calmlens.ResourceRendered
 		}
 		return calmlens.JSON{"url": m.options.SignedURLBaseURL + "/assets/" + id + "/" + resource + "?" + params.Encode(), "expiresAt": now + int64(number(body["expiresInSeconds"])*1000)}, nil
-		// Like the API, the URL carries the viewer claims its signature covers.
-		if claims, ok := body["viewerClaims"].(map[string]any); ok {
-			encoded, _ := json.Marshal(claims)
-			params.Set("viewerClaims", string(encoded))
-		}
 	case method == "POST" && suffix == "retry":
 		classification := section(a, "classification")
 		if classification["status"] != calmlens.ClassificationStatusFailed || section(classification, "moderation")["status"] != calmlens.ModerationStatusPending {

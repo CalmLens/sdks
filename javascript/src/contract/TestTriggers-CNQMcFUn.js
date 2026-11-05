@@ -432,7 +432,13 @@ const TEST_INPUT_PRESETS = {
 		qualifiers: ["harassment-threat"]
 	}] }
 };
-const pattern = /<!calmlens-test ([a-f0-9]{32}) ([A-Za-z0-9_-]+)>/g;
+/**
+* A text code as it appears in the text being moderated. Text extracted from a document (a PDF, or
+* a Word file converted to one) breaks a code that its layout wrapped: a line break between its
+* parts, after a hyphen or anywhere in a long payload. Whitespace inside a code is layout, not
+* content, so it is removed before the signature is checked.
+*/
+const pattern = /<!calmlens-\s*test\s+([A-Za-z0-9_\s-]{33,16384})>/g;
 const tag = async (payload, key) => (await hmacSha256Hex(key, `calmlens-test:v1:${payload}`)).slice(0, 32);
 async function generateTestTextCode(scenario, key) {
 	if (!/^[a-f0-9]{32}$/.test(key)) throw new TypeError("Invalid test input key");
@@ -444,8 +450,10 @@ async function detectTestTrigger(text, key) {
 	if (!/^[a-f0-9]{32}$/.test(key)) return;
 	const matches = [...text.matchAll(pattern)];
 	if (matches.length !== 1) return;
-	const [, signature, payload] = matches[0];
-	if (payload.length > 8e3 || !timingSafeEqual(signature, await tag(payload, key))) return;
+	const code = matches[0][1].replace(/\s+/g, "");
+	const signature = code.slice(0, 32);
+	const payload = code.slice(32);
+	if (!/^[a-f0-9]{32}$/.test(signature) || !payload || payload.length > 8e3 || !timingSafeEqual(signature, await tag(payload, key))) return;
 	try {
 		const parsed = TEST_INPUT_SCHEMA.safeParse(JSON.parse(atob(payload.replaceAll("-", "+").replaceAll("_", "/"))));
 		return parsed.success ? parsed.data : void 0;

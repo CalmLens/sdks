@@ -2040,13 +2040,13 @@ impl Backend {
                         url.query_pairs_mut().append_pair(key, value);
                     }
                 }
-                return Ok(json!({"url": url.as_str(), "expiresAt": now + expires * 1000}));
-            }
                 // Like the API, the URL carries the viewer claims its signature covers.
                 if let Some(claims) = body.get("viewerClaims").filter(|claims| claims.is_object()) {
                     url.query_pairs_mut()
                         .append_pair("viewerClaims", &claims.to_string());
                 }
+                return Ok(json!({"url": url.as_str(), "expiresAt": now + expires * 1000}));
+            }
             ("POST", "retry") => {
                 if asset["classification"]["status"] != "failed"
                     || asset["classification"]["moderation"]["status"] != "pending"

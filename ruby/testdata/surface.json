@@ -82,7 +82,7 @@
     {
       "id": "folders.move",
       "kind": "method",
-      "description": "Move a folder under another folder, or to the project root",
+      "description": "Move a folder under another folder, or to the project root. Needs the Manage project permission (project:manage), which administrators hold, because moving a folder changes who can access everything inside it.",
       "names": {
         "javascript": "folders.move",
         "python": "folders.move",
@@ -264,7 +264,7 @@
     {
       "id": "assets.decide",
       "kind": "method",
-      "description": "Record a reviewer's decision on an asset, replacing the policy's. The asset's `classification.moderation.status` becomes the decision, the matching `asset.<status>` event is sent with `decided-by` set to `reviewer`, and the decision and note are added to its review history. An asset still pending moderation can only be blocked or purged. Purging also needs `assets:delete` and permanently deletes the stored content.",
+      "description": "Record a reviewer's decision on an asset, replacing the policy's. The asset's `classification.moderation.status` becomes the decision, the matching `asset.<status>` event is sent with `decided-by` set to `api-key` (or `reviewer` when an assistant's key acts for a person), and the decision and note are added to its review history. An asset still pending moderation can only be blocked or purged. Purging also needs `assets:delete` and permanently deletes the stored content.",
       "names": {
         "javascript": "assets.decide",
         "python": "assets.decide",
