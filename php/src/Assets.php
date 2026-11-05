@@ -138,7 +138,13 @@ final class Assets extends Resource
         return $this->session->request('POST', $path . '/explain', body: $body, options: $request);
     }
 
-    public function deleteContent(array $options): array
+    /**
+     * Removes the asset's stored content, including the original, rendered files, extracted text
+     * and placeholder, and keeps the asset record, metadata and classification results. The
+     * returned asset has `content.status` `removed` and `content.removalReason` `requested`; the
+     * CDN no longer serves it.
+     */
+    public function removeContent(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('DELETE', $this->path($api, 'assets', 'assetId') . '/content', options: $request);
@@ -153,13 +159,14 @@ final class Assets extends Resource
     /**
      * Deletes up to 500 assets (`'operation' => 'delete'`) or removes their stored content
      * (`'remove-content'`) in one request. Every asset must exist in the project and the key needs
-     * `assets:delete` for its folder, or nothing is queued. Returns `['queued' => true]` once
-     * queued; the work runs in the background and records `asset.deleted` or
-     * `asset.content-removed` for each asset. Assets under a safety hold are skipped. Not retried:
-     * it carries no `Idempotency-Key`.
+     * `assets:delete` for its folder, or nothing is queued. Returns
+     * `['batchId' => ..., 'status' => 'queued', 'assetCount' => ...]` once queued; the work runs in
+     * the background and records `asset.deleted` or `asset.content-removed` for each asset, with a
+     * `batch-id` fact naming `batchId`. Assets under a safety hold are skipped. Not retried: it
+     * carries no `Idempotency-Key`.
      *
      * @param array{assetIds: list<string>, operation: string} $options
-     * @return array{queued: bool}
+     * @return array{batchId: string, status: string, assetCount: int}
      */
     public function batch(array $options): array
     {
@@ -224,7 +231,7 @@ final class Assets extends Resource
     public function classify(array $options): array
     {
         if (isset($options['content']['plainText']) && (!is_string($options['content']['plainText']) || trim($options['content']['plainText']) === '')) {
-            Values::invalid('Text must not be blank', 'upload/invalid-payload');
+            Values::invalid('Text must not be blank', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
         }
         return $this->submit($options, false);
     }
@@ -234,7 +241,7 @@ final class Assets extends Resource
         [$api, $request] = $this->split($options, 'create');
         if (!is_string($api['name'] ?? null) || $api['name'] === ''
             || count(array_intersect(['content', 'part', 'url'], array_keys($api))) !== 1 || array_key_exists('isFinal', $api)) {
-            Values::invalid('Supply a name and exactly one of content, part or url', 'upload/invalid-payload');
+            Values::invalid('Supply a name and exactly one of content, part or url', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
         }
         if (array_key_exists('context', $api)) {
             if (!is_array($api['context']) || !is_array($api['context']['items'] ?? null)) {
@@ -250,12 +257,12 @@ final class Assets extends Resource
         $content = $api[$multipart ? 'part' : 'content'];
         $mime = is_array($content) ? ($content['type'] ?? null) : null;
         if (!is_string($mime) || preg_match('/[\r\n]/', $mime)) {
-            Values::invalid('Invalid content type', 'upload/invalid-mime-type');
+            Values::invalid('Invalid content type', ErrorCodes::UNSUPPORTED_UPLOAD_TYPE, ['source' => 'calmlens']);
         }
         $baseMime = strtolower(trim(explode(';', $mime)[0]));
         Values::checkUploadMimeType($mime);
         if ($multipart && ($content['partNumber'] ?? 1) !== 1) {
-            Values::invalid('Use uploadPart for subsequent parts', 'upload/use-upload-part');
+            Values::invalid('Use uploadPart for subsequent parts', ErrorCodes::USE_UPLOAD_PART);
         }
         $direct = !$multipart && !$this->session->deferUploadChecks;
         $image = str_starts_with($baseMime, 'image/');
@@ -273,12 +280,12 @@ final class Assets extends Resource
         }
         if ($direct && $split && $image) {
             if ($body->getSize() > self::MAX_MULTIPART_IMAGE_BYTES) {
-                Values::invalid('Multipart image uploads cannot exceed 20 MiB', ErrorCodes::MULTIPART_IMAGE_TOO_LARGE);
+                self::tooLarge('Multipart image uploads cannot exceed 20 MiB', self::MAX_MULTIPART_IMAGE_BYTES);
             }
         } elseif ($direct) {
             self::checkSize($baseMime, $body->getSize(), $split);
         }
-        $query = array_intersect_key($api, array_flip(['name', 'description', 'processingOptions', 'visibility', 'metadata', 'authorId', 'context', 'externalId', 'externalUrl', 'folderId', 'uploadPresetId']));
+        $query = array_intersect_key($api, array_flip(['name', 'description', 'processingOptions', 'visibility', 'metadata', 'tags', 'authorId', 'context', 'externalId', 'externalUrl', 'folderId', 'uploadPresetId']));
         $query += ['queue' => $queue, 'contentType' => $mime, 'sizeInBytes' => $body->getSize()];
         if ($split) {
             return $this->submitInParts($query, $mime, $body, $request);
@@ -287,12 +294,12 @@ final class Assets extends Resource
             $total = $api['totalSizeInBytes'] ?? null;
             if ($total !== null && (!is_int($total) || $total <= 0
                 || (!$this->session->deferUploadChecks && $total < $body->getSize()))) {
-                Values::invalid('Invalid totalSizeInBytes', 'upload/invalid-payload');
+                Values::invalid('Invalid totalSizeInBytes', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
             }
             if (str_starts_with($baseMime, 'image/') && !$this->session->deferUploadChecks) {
                 $size = $total ?? $body->getSize();
-                if ($size > 20 * 1024 * 1024) {
-                    Values::invalid('Multipart image exceeds 20MiB', 'upload/multipart-image-too-large');
+                if ($size > self::MAX_MULTIPART_IMAGE_BYTES) {
+                    self::tooLarge('Multipart image uploads cannot exceed 20 MiB', self::MAX_MULTIPART_IMAGE_BYTES);
                 }
             } elseif (!$this->session->deferUploadChecks) {
                 // A declared whole-file size over the limit for parts can never finish.
@@ -363,7 +370,7 @@ final class Assets extends Resource
         $path = $this->path($api, 'assets', 'assetId');
         $part = $api['part'] ?? null;
         if (!is_array($part) || !is_int($part['partNumber'] ?? null) || $part['partNumber'] < 1) {
-            Values::invalid('partNumber must be positive', 'upload/invalid-part-number');
+            Values::invalid('partNumber must be positive', ErrorCodes::INVALID_UPLOAD_PART_NUMBER);
         }
         $body = UploadBody::from($part, true, !$this->session->deferUploadChecks);
         $query = ['partNumber' => $part['partNumber'], 'isFinal' => $part['isFinal'] ?? false, 'sizeInBytes' => $body->getSize()];
@@ -378,11 +385,12 @@ final class Assets extends Resource
     }
 
     /**
-     * Retrieves an asset until `classification.moderation.status` is no longer `pending`, or its
-     * `classification.status` is `failed`, and returns it. Waits 0.5 seconds before the second
-     * check and 1.5 times longer each time, at most 2 seconds. Throws `TimeoutException`
-     * (`sdk/timeout`, with the asset's statuses in `details`) once `timeout` seconds (default 60)
-     * pass without a decision; 0 checks once.
+     * Retrieves an asset until it is settled, its `classification.status` `completed` (with its
+     * decision in `classification.moderation.status`) or `failed`, and returns it. A `queued` or
+     * `processing` asset is still waiting, even when a reviewer has already decided it. Waits 0.5
+     * seconds before the second check and 1.5 times longer each time, at most 2 seconds. Throws
+     * `TimeoutException` (`sdk/timeout`, with the asset's statuses in `details`) once `timeout`
+     * seconds (default 60) pass without it settling; 0 checks once.
      */
     public function waitForDecision(array $options): array
     {
@@ -398,9 +406,8 @@ final class Assets extends Resource
         do {
             $asset = $this->retrieve($options);
             $classification = $asset['classification'] ?? [];
-            // Any status but pending is a decision: allowed, limited, age-restricted, blocked or purged.
             $status = $classification['moderation']['status'] ?? null;
-            if (($status !== null && $status !== 'pending') || ($classification['status'] ?? null) === 'failed') {
+            if (in_array($classification['status'] ?? null, ['completed', 'failed'], true)) {
                 return $asset;
             }
             $remaining = $deadline - ($this->session->clock)();
@@ -430,8 +437,14 @@ final class Assets extends Resource
             default => [self::MAX_FILE_BYTES, 'Files can be at most 5,000 MiB'],
         };
         if ($size !== null && $size > $limit) {
-            Values::invalid($message, ErrorCodes::FILE_TOO_LARGE);
+            self::tooLarge($message, $limit);
         }
+    }
+
+    /** Fails with `upload/too-large`, naming the plan's `limitBytes` as the API does. */
+    private static function tooLarge(string $message, int $limit): never
+    {
+        Values::invalid($message, ErrorCodes::UPLOAD_TOO_LARGE, ['limitBytes' => $limit, 'source' => 'plan']);
     }
 
     /** An upload's response must be an asset with its statuses. */

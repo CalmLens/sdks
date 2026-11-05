@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CalmLens\Internal;
 
 use CalmLens\CalmLensException;
+use CalmLens\ErrorCodes;
 
 /** @internal */
 final class Values
@@ -46,7 +47,7 @@ final class Values
     /**
      * Whether the API accepts an upload of this MIME type: an image, audio, video, text, document
      * or website type, not a container such as `application/octet-stream`. It refuses any other
-     * type with `upload/invalid-mime-type`.
+     * type with `upload/unsupported-type`.
      */
     public static function acceptedUploadMimeType(string $mimeType): bool
     {
@@ -67,11 +68,15 @@ final class Values
         return in_array($type, UploadMimeTypes::TYPES, true);
     }
 
-    /** Fails with `upload/invalid-mime-type` (`details.mimeType`) for a type the API refuses. */
+    /**
+     * Fails with `upload/unsupported-type` (`details.mimeType`, and `details.source` `calmlens`)
+     * for a type the API refuses.
+     */
     public static function checkUploadMimeType(string $mimeType): void
     {
         if (!self::acceptedUploadMimeType($mimeType)) {
-            self::invalid(self::refusedUploadMimeTypeMessage($mimeType), 'upload/invalid-mime-type', ['mimeType' => $mimeType]);
+            self::invalid(self::refusedUploadMimeTypeMessage($mimeType), ErrorCodes::UNSUPPORTED_UPLOAD_TYPE,
+                ['mimeType' => $mimeType, 'source' => 'calmlens']);
         }
     }
 
@@ -131,7 +136,7 @@ final class Values
             }
         };
         foreach ($values as $key => $value) {
-            $append((string) $key, in_array($key, ['metadata', 'processingOptions', 'context'], true) && $value !== null ? self::json($value) : $value);
+            $append((string) $key, in_array($key, ['metadata', 'tags', 'processingOptions', 'context'], true) && $value !== null ? self::json($value) : $value);
         }
         return implode('&', $pairs);
     }

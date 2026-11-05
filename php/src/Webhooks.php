@@ -42,12 +42,16 @@ final class Webhooks
 
     /**
      * The JSON body a webhook delivers for an event, such as one from `events->list`: the event in
-     * the same flat shape `events->list` returns it. Fields that are not part of that shape are left out.
+     * the same flat shape `events->list` returns it, with its `actor` right after `projectId`.
+     * Fields that are not part of that shape are left out.
      */
     public static function toPayload(array $event): array
     {
+        // Like the JavaScript SDK's builder, an event given without an actor (as some shared
+        // webhook fixtures are) yields a payload without one.
         return [
-            'id' => $event['id'], 'projectId' => $event['projectId'], 'type' => $event['type'],
+            'id' => $event['id'], 'projectId' => $event['projectId'],
+            ...(array_key_exists('actor', $event) ? ['actor' => $event['actor']] : []), 'type' => $event['type'],
             'severity' => $event['severity'], 'title' => $event['title'], 'description' => $event['description'] ?? null,
             'assetId' => $event['assetId'] ?? null, 'assetSequence' => $event['assetSequence'] ?? null,
             'asset' => $event['asset'] ?? null, 'facts' => $event['facts'],

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use CalmLens\CalmLensException;
+use CalmLens\ErrorCodes;
 use CalmLens\Exception;
 use CalmLens\Testing\MockServerClient;
 use CalmLens\ServerClient;
@@ -38,10 +39,11 @@ final class ClientTest extends TestCase
         $mock = new MockTransport();
         $client = $mock->client();
         $mib = 1024 * 1024;
-        foreach (['image/png' => 10 * $mib + 1, 'video/mp4' => 50 * $mib + 1, 'application/pdf' => 5000 * $mib + 1] as $type => $size) {
+        foreach (['image/png' => 10 * $mib, 'video/mp4' => 50 * $mib, 'application/pdf' => 5000 * $mib] as $type => $limit) {
             // A one-shot stream goes in one request; an image the client can read again goes in parts.
             $stream = new \GuzzleHttp\Psr7\NoSeekStream(Utils::streamFor(fopen('php://memory', 'r')));
-            $this->error('upload/file-too-large', fn () => $client->assets->create(['name' => 'big', 'content' => ['type' => $type, 'data' => $stream, 'sizeInBytes' => $size]]));
+            $error = $this->error(ErrorCodes::UPLOAD_TOO_LARGE, fn () => $client->assets->create(['name' => 'big', 'content' => ['type' => $type, 'data' => $stream, 'sizeInBytes' => $limit + 1]]));
+            self::assertSame(['limitBytes' => $limit, 'source' => 'plan'], $error->details, $type);
         }
         self::assertSame([], $mock->requests());
         $mock->enqueueJson(self::ASSET);
@@ -89,13 +91,13 @@ final class ClientTest extends TestCase
 
     public static function invalidUploads(): iterable
     {
-        yield [['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => 'a', 'base64' => 'YQ==']], 'upload/invalid-payload'];
-        yield [['name' => 'x', 'content' => ['type' => 'application/octet-stream', 'data' => 'a']], 'upload/invalid-mime-type'];
-        yield [['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => 'a', 'sizeInBytes' => 2]], 'upload/invalid-payload'];
-        yield [['name' => 'x', 'content' => ['type' => 'text/plain', 'base64' => '!!!']], 'upload/invalid-payload'];
-        yield [['name' => 'x', 'part' => ['type' => 'text/plain', 'data' => 'a']], 'upload/invalid-payload'];
-        yield [['name' => 'x', 'part' => ['type' => 'image/png', 'data' => 'a', 'isFinal' => true], 'totalSizeInBytes' => 21 * 1024 * 1024], 'upload/multipart-image-too-large'];
-        yield [['name' => 'x', 'part' => ['type' => 'text/plain', 'data' => 'a', 'partNumber' => 2, 'isFinal' => true]], 'upload/use-upload-part'];
+        yield [['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => 'a', 'base64' => 'YQ==']], ErrorCodes::INVALID_UPLOAD_PAYLOAD];
+        yield [['name' => 'x', 'content' => ['type' => 'application/octet-stream', 'data' => 'a']], ErrorCodes::UNSUPPORTED_UPLOAD_TYPE];
+        yield [['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => 'a', 'sizeInBytes' => 2]], ErrorCodes::INVALID_UPLOAD_PAYLOAD];
+        yield [['name' => 'x', 'content' => ['type' => 'text/plain', 'base64' => '!!!']], ErrorCodes::INVALID_UPLOAD_PAYLOAD];
+        yield [['name' => 'x', 'part' => ['type' => 'text/plain', 'data' => 'a']], ErrorCodes::INVALID_UPLOAD_PAYLOAD];
+        yield [['name' => 'x', 'part' => ['type' => 'image/png', 'data' => 'a', 'isFinal' => true], 'totalSizeInBytes' => 21 * 1024 * 1024], ErrorCodes::UPLOAD_TOO_LARGE];
+        yield [['name' => 'x', 'part' => ['type' => 'text/plain', 'data' => 'a', 'partNumber' => 2, 'isFinal' => true]], ErrorCodes::USE_UPLOAD_PART];
     }
 
     #[DataProvider('invalidUploads')]
@@ -132,7 +134,7 @@ final class ClientTest extends TestCase
                 self::fail('Expected byte count mismatch');
             }]));
             $stream = new NoSeekStream(Utils::streamFor('abc'));
-            $this->error('upload/invalid-payload', fn () => $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream, 'sizeInBytes' => $size]]));
+            $this->error(ErrorCodes::INVALID_UPLOAD_PAYLOAD, fn () => $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream, 'sizeInBytes' => $size]]));
         }
     }
 
@@ -215,13 +217,13 @@ final class ClientTest extends TestCase
     {
         $mock = new MockTransport();
         $mock->enqueueJson(['code' => 'asset/not-found', 'message' => 'Asset not found'], 404, ['X-Request-Id' => 'req-1'])
-            ->enqueueJson(['code' => 'upload/limit-exceeded'], 429, ['Retry-After' => 'Wed, 21 Oct 2015 07:28:00 GMT'])
+            ->enqueueJson(['code' => 'usage/free-uploads-exhausted'], 429, ['Retry-After' => 'Wed, 21 Oct 2015 07:28:00 GMT'])
             ->enqueue(new Response(502, [], 'Bad gateway'));
         $client = $mock->client();
         $missing = $this->error('asset/not-found', fn () => $client->assets->retrieve(['assetId' => 'a']));
         self::assertInstanceOf(Exception\NotFoundException::class, $missing);
         self::assertSame(['req-1', true, null], [$missing->requestId, $missing->isNotFound(), $missing->retryAfter()]);
-        $limited = $this->error('upload/limit-exceeded', fn () => $client->assets->retrieve(['assetId' => 'a']));
+        $limited = $this->error(ErrorCodes::FREE_UPLOADS_EXHAUSTED, fn () => $client->assets->retrieve(['assetId' => 'a']));
         self::assertInstanceOf(Exception\RateLimitException::class, $limited);
         self::assertSame(0.0, $limited->retryAfter());
         $gateway = $this->error('sdk/http-error', fn () => $client->assets->retrieve(['assetId' => 'a']));

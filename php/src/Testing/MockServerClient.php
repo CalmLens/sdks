@@ -32,7 +32,8 @@ use Psr\Http\Message\ResponseInterface;
  * retrieve, list, search, update, move and delete; folders, hash lists, policies, lenses, idempotency keys
  * and the events feed behave like the API's (uploads are not matched against hash lists); the CDN serves stored bytes and placeholders; and errors use
  * the API's codes, statuses, `X-Request-Id` header and body shape (schema errors are
- * `validation/<issue>` with the field in `details.path`). It does not classify content: the
+ * `validation/invalid-request`, listing each field's `path`, `message` and issue `code`, such as
+ * `validation/too-big`, in `details.issues`). It does not classify content: the
  * `moderate` callable decides each asset the mock moderates (see the constructor), and
  * `completeProcessing` finishes a queued one. A decided asset gets the decision's full report.
  * Content is kept only with `keepContentAfterProcessing: true`; otherwise it is removed once
@@ -43,7 +44,9 @@ use Psr\Http\Message\ResponseInterface;
  * while a safety hold is on. Like the API, a completed upload adds
  * `asset.uploaded`, then `asset.classified` and the automated `asset.<status>` once decided, or
  * `asset.failed`; deleting an asset, removing its content and retrying it add `asset.deleted`,
- * `asset.content-removed` and `asset.retried`. The project starts on the organisation's own
+ * `asset.content-removed` and `asset.retried`. Every event names its `actor`: the mock API key
+ * (`['type' => 'api-key', 'id' => null]`, as mock keys have no ID) for what the client does,
+ * `automated` moderation for the pipeline's decisions, and a `user` for `decide`. The project starts on the organisation's own
  * General preset policy; the mock's presets have one release (version 1) and no settings, and policies never decide uploads.
  *
  * Like the CDN, a safety hold refuses every resource, the placeholder included, with 403
@@ -93,10 +96,18 @@ final class MockServerClient
     private const MAX_UPLOAD_PARTS = 10000;
     /** An asset ID as the API's schema accepts it: `asset_` and 20 base62 characters. */
     private const ASSET_ID_PATTERN = '/^asset_[0-9A-Za-z]{20}$/D';
+    /** The actor of events the mock's API key causes: mock keys have no ID. */
+    public const API_KEY_ACTOR = ['type' => 'api-key', 'id' => null];
+    /** The actor of a reviewer's decision through the `decide` test hook. */
+    public const REVIEWER_ACTOR = ['type' => 'user', 'id' => null];
+    /** The actor of the pipeline's moderation events. */
+    public const AUTOMATED_ACTOR = ['type' => 'automated', 'id' => null];
+    /** An event type's shape (`resource.action`), as the mock checks `types` without the catalog. */
+    private const EVENT_TYPE_PATTERN = '/^[a-z][a-z-]*\.[a-z][a-z-]*$/D';
     /** The client methods `failNextRequest` can target. */
     public const OPERATIONS = ['assets.list', 'assets.search', 'assets.retrieve', 'assets.waitForDecision', 'assets.update',
         'assets.listChildren', 'assets.listTimeline', 'assets.create', 'assets.classify', 'assets.uploadPart', 'assets.createSignedUrl', 'assets.move',
-        'assets.retry', 'assets.explain', 'assets.decide', 'assets.deleteContent', 'assets.delete', 'assets.batch', 'text.classify',
+        'assets.retry', 'assets.explain', 'assets.decide', 'assets.removeContent', 'assets.delete', 'assets.batch', 'text.classify',
         'cdn.serve', 'events.list', 'folders.list', 'folders.retrieve', 'folders.create', 'folders.update', 'folders.delete',
         'folders.move', 'hashLists.list', 'hashLists.retrieve', 'hashLists.create', 'hashLists.update', 'hashLists.delete',
         'hashLists.listEntries', 'hashLists.addEntry', 'hashLists.removeEntry', 'policies.list', 'policies.retrieve',
@@ -131,6 +142,8 @@ final class MockServerClient
     private array $idempotent = [];
     /** @var array<string, array{queue: bool, total: ?int}> Open multipart uploads, as they started. */
     private array $uploads = [];
+    /** The processing options each asset was uploaded with, which the API keeps but doesn't return. */
+    private array $processingOptions = [];
     private array $grants;
     private float $elapsed = 0.0;
     private int $requestCount = 0;
@@ -156,7 +169,7 @@ final class MockServerClient
      * @param ?string $apiKey the client's API key. Its grants, from `createApiKey()`, decide CDN
      *   downloads of private and age-restricted content; the default key has none.
      * @param ?callable $createId receives the prefix of the new object's ID (`asset`, `fldr`, `hl`,
-     *   `hle`, `pol`, `lens`, `evt` or `rev`) and returns the ID; by default, like the API, the prefix, `_`
+     *   `hle`, `pol`, `lens`, `evt`, `rev` or `batch`) and returns the ID; by default, like the API, the prefix, `_`
      *   and 20 random base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
      * @param int $maxRetries retries for the mock's client; 0 by default so enqueued failures surface.
      * @param int $maxResponseBytes the largest response body the mock's client reads, as for `ServerClient`.
@@ -252,7 +265,7 @@ final class MockServerClient
      * stored state unchanged. Each queued failure fails one request, so a retry takes the next
      * failure or reaches the stand-in. `transport-error` and `timeout` fail the connection, so the
      * client throws `ConnectionException` (`sdk/transport-error`) or `TimeoutException`
-     * (`sdk/timeout`). An API error code, such as `upload/limit-exceeded`, is answered as the API
+     * (`sdk/timeout`). An API error code, such as `usage/free-uploads-exhausted`, is answered as the API
      * answers it: its HTTP status, message and request ID, with `details` and, with `retryAfter`,
      * a `Retry-After` header of that many seconds. A `CalmLensException` is answered with its
      * status (or the API's status for its code), a JSON `{code, message, details}` body and its
@@ -294,7 +307,8 @@ final class MockServerClient
 
     /**
      * Adds an event to the feed returned by `events.list`. Omitted `id`, `projectId`, `severity`,
-     * `title`, `description`, `assetId`, `asset`, `facts` and `createdAt` are filled in; when `assetId` names a stored
+     * `title`, `description`, `assetId`, `asset`, `actor` (the mock API key,
+     * `['type' => 'api-key', 'id' => null]`), `facts` and `createdAt` are filled in; when `assetId` names a stored
      * asset, the event carries a snapshot of its status, as the API's events do, with the moderation
      * status an `asset.<status>` event announces. `assetSequence` is assigned like the API's (any
      * given one is ignored): the asset's next number, from 1, or null without an `assetId`. Pass the result to
@@ -318,7 +332,7 @@ final class MockServerClient
         unset($event['assetSequence']);
         $event += ['id' => ($this->createId)('evt'), 'projectId' => $this->projectId, 'severity' => 'low',
             'title' => $event['type'] ?? '', 'description' => null, 'assetId' => null, 'assetSequence' => $sequence,
-            'asset' => $snapshot, 'facts' => [], 'createdAt' => $now];
+            'asset' => $snapshot, 'actor' => self::API_KEY_ACTOR, 'facts' => [], 'createdAt' => $now];
         $this->events[] = $event;
         return $event;
     }
@@ -328,7 +342,7 @@ final class MockServerClient
      * stored asset, as the portal would: the moderation status changes (`purged` also removes the
      * content with reason `requested` and first adds an `asset.content-removed` event), the review
      * joins `manualReviews`, and an `asset.<decision>` event with the catalog's severity (`low` for
-     * `allowed` and `limited`, `high` otherwise) and a `decided-by: reviewer` fact joins the feed.
+     * `allowed` and `limited`, `high` otherwise) whose `actor` is a `user` joins the feed.
      * The moderation report stays as it was. Throws `InvalidArgumentException`
      * (`sdk/invalid-argument`) for another outcome, and `NotFoundException` (`asset/not-found`)
      * for an unknown asset. To finish processing as moderation would, use `completeProcessing`.
@@ -339,15 +353,14 @@ final class MockServerClient
             throw self::invalidArgument('decide takes ' . implode(', ', self::DECISIONS) . " (got $outcome)");
         }
         $asset = $this->applyOutcome($this->ownAsset($assetId), $outcome, 'requested');
-        $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)('rev'), 'decision' => $outcome,
-            'note' => null, 'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
+        $asset['classification']['moderation']['manualReviews'][] = self::review(($this->createId)('rev'), $outcome, null, ($this->now)());
         $this->assets[$assetId] = $asset;
         if ($outcome === 'purged') {
-            $this->lifecycleEvent('asset.content-removed', $asset);
+            $this->lifecycleEvent('asset.content-removed', $asset, actor: self::REVIEWER_ACTOR);
         }
         $this->enqueueEvent(['type' => 'asset.' . $outcome, 'severity' => in_array($outcome, ['allowed', 'limited'], true) ? 'low' : 'high',
-            'title' => 'asset.' . $outcome, 'assetId' => $assetId, 'asset' => $this->snapshot($asset),
-            'facts' => [['key' => 'decided-by', 'value' => 'reviewer'], ['key' => 'asset-type', 'value' => $asset['type']],
+            'title' => 'asset.' . $outcome, 'assetId' => $assetId, 'asset' => $this->snapshot($asset), 'actor' => self::REVIEWER_ACTOR,
+            'facts' => [['key' => 'asset-type', 'value' => $asset['type']],
                 ['key' => 'asset-name', 'value' => $asset['name'], 'url' => 'https://calmlens.com/go/asset/' . $assetId], ['key' => 'note', 'value' => null]]]);
         return $asset;
     }
@@ -369,6 +382,17 @@ final class MockServerClient
         return $this->moderateStored($asset, MockModerationInput::COMPLETE, $decision === null ? null : MockDecision::from($decision));
     }
 
+    /**
+     * A manual review as the API returns it. Either way the review is the mock API key's, and mock
+     * API keys have no ID, so `decidedBy` is `['type' => 'api-key', 'id' => null]`; the test hook
+     * records no note, the API's handler records it.
+     */
+    private static function review(string $id, string $decision, ?string $note, int $reviewedAt): array
+    {
+        return ['id' => $id, 'decision' => $decision, 'note' => $note, 'decidedBy' => ['type' => 'api-key', 'id' => null],
+            'reviewedAt' => $reviewedAt, 'applied' => true];
+    }
+
     private function ownAsset(string $assetId): array
     {
         return $this->assets[$assetId] ?? throw CalmLensException::create(ErrorCodes::ASSET_NOT_FOUND, 'Asset not found', 404);
@@ -379,16 +403,23 @@ final class MockServerClient
         return CalmLensException::create(SdkErrorCodes::INVALID_ARGUMENT, $message);
     }
 
-    /** Adds an `asset.deleted`, `asset.content-removed` or `asset.retried` event, like the API. */
-    private function lifecycleEvent(string $type, array $asset): void
+    /**
+     * Adds an `asset.deleted`, `asset.content-removed` or `asset.retried` event, like the API: the
+     * mock API key's unless `$actor` says otherwise, with a `batch-id` fact when a batch caused it.
+     */
+    private function lifecycleEvent(string $type, array $asset, ?string $batchId = null, array $actor = self::API_KEY_ACTOR): void
     {
         $name = ['key' => 'asset-name', 'value' => $asset['name']];
         // A deleted asset has no portal page to link to.
         if ($type !== 'asset.deleted') {
             $name['url'] = 'https://calmlens.com/go/asset/' . $asset['id'];
         }
+        $facts = [$name, ['key' => 'asset-type', 'value' => $asset['type']]];
+        if ($batchId !== null) {
+            $facts[] = ['key' => 'batch-id', 'value' => $batchId];
+        }
         $this->enqueueEvent(['type' => $type, 'severity' => 'low', 'assetId' => $asset['id'], 'asset' => $this->snapshot($asset),
-            'facts' => [$name, ['key' => 'asset-type', 'value' => $asset['type']]]]);
+            'actor' => $actor, 'facts' => $facts]);
     }
 
     private function snapshot(array $asset): array
@@ -451,7 +482,7 @@ final class MockServerClient
             return $method === 'DELETE' && $suffix === '' ? ['hashLists.removeEntry'] : [];
         }
         $names = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'POST move' => 'move',
-            'GET children' => 'listChildren', 'DELETE content' => 'deleteContent', 'POST retry' => 'retry',
+            'GET children' => 'listChildren', 'DELETE content' => 'removeContent', 'POST retry' => 'retry',
             'POST explain' => 'explain', 'POST decision' => 'decide', 'POST part' => 'uploadPart', 'POST signed-url' => 'createSignedUrl'];
         $name = $names[$method . ' ' . $suffix] ?? null;
         if ($name === null || !in_array($resource, ['assets', 'folders'], true)) {
@@ -559,10 +590,13 @@ final class MockServerClient
         throw new CalmLensException($code, $message ?: $code, $status ?? ErrorCodes::STATUSES[$code] ?? 400, $details);
     }
 
-    /** A request the API's schema refuses: `validation/<issue>` with HTTP 400 and the field in `details.path`. */
+    /**
+     * A request the API's schema refuses: `validation/invalid-request` with HTTP 400, listing the
+     * field and its issue code (such as `validation/too-big`) in `details.issues`.
+     */
     private static function invalid(string $code, string $path): never
     {
-        self::fail($code, 400, "Invalid $path", ['path' => $path]);
+        self::fail(ErrorCodes::INVALID_REQUEST, 400, "Invalid $path", ['issues' => [['path' => $path, 'message' => "Invalid $path", 'code' => $code]]]);
     }
 
     /**
@@ -694,7 +728,7 @@ final class MockServerClient
                 }
                 return $this->assets[$id] = $this->touch(array_replace($asset, $fields));
             case 'DELETE ':
-                unset($this->assets[$id], $this->content[$id], $this->uploads[$id]);
+                unset($this->assets[$id], $this->content[$id], $this->uploads[$id], $this->processingOptions[$id]);
                 $this->lifecycleEvent('asset.deleted', $asset);
                 return null;
             case 'DELETE content':
@@ -810,7 +844,7 @@ final class MockServerClient
     {
         return match (true) {
             $type !== 'image' => null,
-            $size > 20 * self::MIB => ErrorCodes::MULTIPART_IMAGE_TOO_LARGE,
+            $size > Assets::MAX_MULTIPART_IMAGE_BYTES => ErrorCodes::UPLOAD_TOO_LARGE,
             default => null,
         };
     }
@@ -821,8 +855,12 @@ final class MockServerClient
         return $total !== null && ($received > $total || ($final && $received !== $total)) ? ErrorCodes::UPLOAD_SIZE_MISMATCH : null;
     }
 
+    /** Fails with `$code`; `upload/too-large` carries the plan's limit for images in parts. */
     private static function failIf(?string $code): void
     {
+        if ($code === ErrorCodes::UPLOAD_TOO_LARGE) {
+            self::fail($code, null, 'Multipart image uploads cannot exceed 20 MiB', ['limitBytes' => Assets::MAX_MULTIPART_IMAGE_BYTES, 'source' => 'plan']);
+        }
         if ($code !== null) {
             self::fail($code);
         }
@@ -835,7 +873,7 @@ final class MockServerClient
         self::checkMetadata($decode('metadata'));
         // Like the API: content and a first part must be of a type CalmLens moderates; a URL is exempt.
         if ($bytes !== null && !Values::acceptedUploadMimeType($mime)) {
-            self::fail(ErrorCodes::INVALID_UPLOAD_MIME_TYPE, null, Values::refusedUploadMimeTypeMessage($mime), ['mimeType' => $mime]);
+            self::fail(ErrorCodes::UNSUPPORTED_UPLOAD_TYPE, null, Values::refusedUploadMimeTypeMessage($mime), ['mimeType' => $mime, 'source' => 'calmlens']);
         }
         $url = $bytes === null ? ($options['url'] ?? null) : null;
         $type = self::kind($mime, $url);
@@ -875,7 +913,7 @@ final class MockServerClient
             'description' => $options['description'] ?? null, 'externalId' => $options['externalId'] ?? null,
             'externalUrl' => $url ?? ($multipart ? null : ($options['externalUrl'] ?? null)),
             'type' => $type, 'metadata' => $decode('metadata'),
-            'authorId' => $options['authorId'] ?? null, 'context' => $context === [] ? null : ['items' => $context], 'tags' => null, 'processingOptions' => $processing,
+            'authorId' => $options['authorId'] ?? null, 'context' => $context === [] ? null : ['items' => $context], 'tags' => $decode('tags'),
             'visibility' => $options['visibility'] ?? 'private',
             'content' => ['status' => $keep ? 'stored' : 'temporary', 'removalReason' => null, 'updatedAt' => $now,
                 'safetyHold' => null, 'format' => $mime === '' ? null : $mime, 'extension' => null, 'sizeInBytes' => $size,
@@ -885,7 +923,7 @@ final class MockServerClient
                 // Like the API, the rendered file and preview come with processing.
                 ...self::NO_RENDERING],
             'upload' => ['status' => $final ? 'completed' : 'uploading', 'updatedAt' => $now, 'partsReceived' => $final ? null : 1],
-            'classification' => ['status' => $final ? 'processing' : 'pending', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
+            'classification' => ['status' => $final ? 'processing' : 'queued', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
                 // The mock analyses nothing in sections, and never reads test inputs.
                 'progress' => null, 'testInput' => false,
                 'moderation' => ['status' => 'pending', 'manualReviews' => [], 'flaggedCategories' => [], 'regions' => [], 'timeline' => null]],
@@ -894,6 +932,7 @@ final class MockServerClient
             $asset['content'] = array_replace($asset['content'], self::rendering($asset, false));
         }
         $this->assets[$asset['id']] = $asset;
+        $this->processingOptions[$asset['id']] = $processing;
         if ($bytes !== null) {
             $this->content[$asset['id']] = ['type' => $mime, 'bytes' => $bytes];
         }
@@ -935,7 +974,7 @@ final class MockServerClient
         if ($next['classification']['status'] !== 'completed' || $asset['type'] !== 'image') {
             return $next;
         }
-        $features = $asset['processingOptions']['features'] ?? null;
+        $features = $this->processingOptions[$asset['id']]['features'] ?? null;
         if (($features['personDetection']['enabled'] ?? null) === true) {
             $next['classification']['personDetection'] = ['status' => 'evaluated', 'stage' => 'beta', 'people' => []];
         }
@@ -975,7 +1014,7 @@ final class MockServerClient
         if ($status === 'pending') {
             return;
         }
-        $event = ['assetId' => $asset['id'], 'asset' => $this->snapshot($asset)];
+        $event = ['assetId' => $asset['id'], 'asset' => $this->snapshot($asset), 'actor' => self::AUTOMATED_ACTOR];
         if ($status === 'failed') {
             $this->enqueueEvent($event + ['type' => 'asset.failed', 'severity' => 'high', 'facts' => [self::nameFact($asset),
                 ['key' => 'asset-type', 'value' => $asset['type']], ['key' => 'previous-status', 'value' => 'processing'],
@@ -987,7 +1026,7 @@ final class MockServerClient
             ['key' => 'flagged-categories', 'value' => $flagged], ['key' => 'moderation-status', 'value' => $status],
             ['key' => 'asset-type', 'value' => $asset['type']], self::nameFact($asset)]]);
         $this->enqueueEvent($event + ['type' => 'asset.' . $status, 'severity' => in_array($status, ['allowed', 'limited'], true) ? 'low' : 'high',
-            'facts' => [['key' => 'decided-by', 'value' => 'automated'], ['key' => 'flagged-categories', 'value' => $flagged],
+            'facts' => [['key' => 'flagged-categories', 'value' => $flagged],
                 ['key' => 'asset-type', 'value' => $asset['type']], self::nameFact($asset)]]);
     }
 
@@ -1109,21 +1148,19 @@ final class MockServerClient
             self::fail(ErrorCodes::ASSET_CONTENT_PURGED);
         }
         $asset['classification']['moderation']['status'] = $decision;
-        $asset['classification']['moderation']['manualReviews'][] = ['id' => ($this->createId)('rev'), 'decision' => $decision,
-            'note' => $note, 'reviewerName' => 'API key', 'reviewerEmail' => null,
-            'reviewedAt' => ($this->now)(), 'appliedToAsset' => true];
+        $asset['classification']['moderation']['manualReviews'][] = self::review(($this->createId)('rev'), $decision, $note, ($this->now)());
         $asset = $this->assets[$asset['id']] = $this->touch($asset);
         if ($decision === 'purged') {
             $asset = $this->requestedRemoval($asset);
         }
         $this->enqueueEvent(['type' => 'asset.' . $decision, 'severity' => in_array($decision, ['allowed', 'limited'], true) ? 'low' : 'high',
             'title' => 'asset.' . $decision, 'assetId' => $asset['id'], 'asset' => $this->snapshot($asset),
-            'facts' => [['key' => 'decided-by', 'value' => 'api-key'], ['key' => 'asset-type', 'value' => $asset['type']],
+            'facts' => [['key' => 'asset-type', 'value' => $asset['type']],
                 ['key' => 'asset-name', 'value' => $asset['name'], 'url' => 'https://calmlens.com/go/asset/' . $asset['id']], ['key' => 'note', 'value' => $note]]]);
         return $asset;
     }
 
-    private function requestedRemoval(array $asset): array
+    private function requestedRemoval(array $asset, ?string $batchId = null): array
     {
         unset($this->content[$asset['id']]);
         if ($asset['content']['status'] !== 'removed') {
@@ -1132,7 +1169,7 @@ final class MockServerClient
             $asset['content'] = array_replace($asset['content'], self::NO_RENDERING);
         }
         $this->assets[$asset['id']] = $asset;
-        $this->lifecycleEvent('asset.content-removed', $asset);
+        $this->lifecycleEvent('asset.content-removed', $asset, $batchId);
         return $asset;
     }
 
@@ -1142,7 +1179,8 @@ final class MockServerClient
      * batch), then answers 202 and applies the operation at once, in request order, instead of in
      * the background: `delete` deletes each asset with its stored child assets and records
      * `asset.deleted` with the asset as it was; `remove-content` removes the content like
-     * DELETE /assets/:id/content. Mock assets carry no safety holds, so none is skipped.
+     * DELETE /assets/:id/content. It answers with a `batch_` ID, which each event it causes names
+     * in a `batch-id` fact. Mock assets carry no safety holds, so none is skipped.
      */
     private function batch(array $json): array
     {
@@ -1169,16 +1207,17 @@ final class MockServerClient
         foreach (array_unique($ids) as $id) {
             $assets[] = $this->assets[$id] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
         }
+        $batchId = ($this->createId)('batch');
         foreach ($assets as $asset) {
             if ($operation === Assets::BATCH_DELETE) {
                 $this->deleteTree($asset['id']);
-                $this->lifecycleEvent('asset.deleted', $asset);
+                $this->lifecycleEvent('asset.deleted', $asset, $batchId);
             } else {
-                $this->requestedRemoval($this->assets[$asset['id']] ?? $asset);
+                $this->requestedRemoval($this->assets[$asset['id']] ?? $asset, $batchId);
             }
         }
         $this->status = 202;
-        return ['queued' => true];
+        return ['batchId' => $batchId, 'status' => 'queued', 'assetCount' => count($assets)];
     }
 
     /** Deletes an asset, its stored child assets and their content. */
@@ -1189,7 +1228,7 @@ final class MockServerClient
                 $this->deleteTree((string) $childId);
             }
         }
-        unset($this->assets[$id], $this->content[$id], $this->uploads[$id]);
+        unset($this->assets[$id], $this->content[$id], $this->uploads[$id], $this->processingOptions[$id]);
     }
 
     private function removeContent(array $asset, string $reason): array
@@ -1256,7 +1295,7 @@ final class MockServerClient
         $asset = $this->assets[$assetId] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
         $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
         if (($asset['content']['safetyHold'] ?? null) !== null) {
-            self::fail(ErrorCodes::ASSET_SAFETY_HELD);
+            self::fail(ErrorCodes::ASSET_HELD, null, 'This asset is held', ['hold' => 'safety']);
         }
         if (array_key_exists('cursor', $query)) {
             self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
@@ -1334,7 +1373,7 @@ final class MockServerClient
      * An RSQL filter like the API's (zodbase/rsql with @rsql/parser): comparisons on the fields in
      * {@see AssetFilters::FIELDS}, each with its own operators, joined by
      * `;` or `and` (which bind tighter) and `,` or `or`, grouped with parentheses. Anything else
-     * fails with `validation/invalid-filter`, like the API.
+     * fails with `filter/invalid`, like the API.
      */
     private static function filter(string $expression): \Closure
     {
@@ -1820,28 +1859,52 @@ final class MockServerClient
         }
         $entry = ['id' => ($this->createId)('hle'), 'projectId' => $this->projectId, 'hashListId' => $list['id'], 'hash' => $hash,
             'quality' => $quality, 'label' => is_string($json['label'] ?? null) ? $json['label'] : null,
-            'sourceAssetId' => $assetId, 'createdAt' => ($this->now)()];
+            'assetId' => $assetId, 'createdAt' => ($this->now)()];
         $this->status = 201;
         return $this->hashListEntries[$entry['id']] = $entry;
     }
 
     /**
      * Without `cursor` the page is empty and its `nextCursor` is now, like the API; `pageSize` is 1
-     * to 100, 50 by default. Cursors are `mock_<n>`: the number of events in the feed when taken.
-     * The mock's key holds every permission, so no event type is excluded.
+     * to 100, 50 by default. `types` (comma-separated event types) and `assetId` narrow the feed.
+     * Cursors are `mock_<n>~<filters>`: the feed position when taken and the filters they were
+     * issued with, so a cursor used with other filters is `cursor/invalid`, like the API's. The
+     * mock's key holds every permission, so no event type is excluded.
      */
     private function listEvents(array $query): array
     {
         $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
-        if (!isset($query['cursor']) || $query['cursor'] === '') {
-            return ['items' => [], 'nextCursor' => 'mock_' . count($this->events), 'hasMore' => false, 'excludedTypes' => []];
+        $typesValue = $query['types'] ?? null;
+        $types = $typesValue === null ? [] : explode(',', (string) $typesValue);
+        if ($typesValue !== null && (!is_string($typesValue) || array_filter($types, fn ($type) => !preg_match(self::EVENT_TYPE_PATTERN, $type)) !== [])) {
+            self::invalid(ErrorCodes::INVALID_VALUE, 'types');
         }
-        if (!preg_match('/^mock_(\d+)$/D', (string) $query['cursor'], $match) || (int) $match[1] > count($this->events)) {
+        $assetId = $query['assetId'] ?? null;
+        if ($assetId !== null && (!is_string($assetId) || !preg_match(self::ASSET_ID_PATTERN, $assetId))) {
+            self::invalid(ErrorCodes::INVALID_FORMAT, 'assetId');
+        }
+        // Like the API, a cursor belongs to the filters it was issued with.
+        $unique = array_values(array_unique($types));
+        sort($unique);
+        $filter = rtrim(strtr(base64_encode(Values::json([$unique, $assetId])), '+/', '-_'), '=');
+        $matches = fn (array $event): bool => ($types === [] || in_array($event['type'] ?? null, $types, true))
+            && ($assetId === null || ($event['assetId'] ?? null) === $assetId);
+        if (!isset($query['cursor']) || $query['cursor'] === '') {
+            return ['items' => [], 'nextCursor' => 'mock_' . count($this->events) . '~' . $filter, 'hasMore' => false, 'excludedTypes' => []];
+        }
+        if (!preg_match('/^mock_(\d+)~(.*)$/D', (string) $query['cursor'], $match) || $match[2] !== $filter || (int) $match[1] > count($this->events)) {
             self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
         }
-        $taken = array_slice($this->events, (int) $match[1], $size);
-        $next = (int) $match[1] + count($taken);
-        return ['items' => $taken, 'nextCursor' => 'mock_' . $next, 'hasMore' => $next < count($this->events), 'excludedTypes' => []];
+        $items = [];
+        $next = (int) $match[1];
+        while ($next < count($this->events) && count($items) < $size) {
+            $event = $this->events[$next++];
+            if ($matches($event)) {
+                $items[] = $event;
+            }
+        }
+        $hasMore = array_filter(array_slice($this->events, $next), $matches) !== [];
+        return ['items' => $items, 'nextCursor' => "mock_$next~$filter", 'hasMore' => $hasMore, 'excludedTypes' => []];
     }
 
     // Policies: the project starts on the organisation's own General preset policy, following
@@ -2056,7 +2119,7 @@ final class MockServerClient
     {
         [, $project, $identifier, $resource] = $segments + [null, null, null, null];
         $noRenderedVersion = fn () => $this->json(404, ['code' => 'asset/no-rendered-version', 'message' => 'This asset has no such resource']);
-        $invalidTransform = fn () => $this->json(400, ['code' => 'asset/invalid-transform', 'message' => 'Invalid transform selector']);
+        $invalidTransform = fn () => $this->json(400, ['code' => ErrorCodes::INVALID_TRANSFORM, 'message' => 'Invalid transform selector']);
         // Like the CDN, the adaptive stream's files sit beneath `/hls/` (its master playlist is
         // `/hls/index.m3u8`). Otherwise the selector after the resource is read; the original and
         // the embed page take none.
@@ -2106,7 +2169,8 @@ final class MockServerClient
         if ($status === 'age-restricted' && ($claims['ageConfirmed'] ?? false) !== true) return $this->json(403, ['code' => 'viewer/age-confirmation-required']);
         $private = $asset['visibility'] !== 'public';
         if ($private && !$this->canDownload($asset['folderId'] ?? null)) {
-            return $this->json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'This API key needs assets:download permission for this asset’s folder.']);
+            return $this->json(403, ['code' => ErrorCodes::PERMISSION_DENIED, 'message' => 'This API key needs assets:download permission for this asset’s folder.',
+                'details' => ['permission' => 'assets:download']]);
         }
         // The embed page shows any asset that may be delivered, as its viewer for the asset's type
         // or a notice that the type has none.
@@ -2132,7 +2196,7 @@ final class MockServerClient
         if ($transform['options'] !== null) {
             ['unknownKeys' => $unknown, 'invalidKeys' => $invalid] = Transforms::check($transform['options']);
             if ($unknown !== [] || $invalid !== []) {
-                return $this->json(400, ['code' => 'asset/invalid-transform-options',
+                return $this->json(400, ['code' => ErrorCodes::INVALID_TRANSFORM_OPTIONS,
                     'message' => 'Invalid transform options: ' . implode(', ', [...$unknown, ...$invalid])]);
             }
         }

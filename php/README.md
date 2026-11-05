@@ -46,7 +46,8 @@ options array with camelCase keys; responses are associative arrays with the API
 | `blocked`        | Don't show it.                                                               |
 | `purged`         | Don't show it; its content has been deleted.                                 |
 
-A failed classification (`classification.status` is `failed`) is not a decision to allow.
+An asset is settled once `classification.status` is `completed` or `failed`; while it is `queued` or
+`processing`, keep it unpublished. A failed classification is not a decision to allow.
 
 ## What you can do
 

@@ -762,9 +762,9 @@ final class ContractTest extends TestCase
     {
         try {
             self::offlineClient()->assets->create(['name' => 'x', 'content' => ['data' => 'hello', 'type' => $type]]);
-            self::fail('Expected upload/invalid-mime-type');
+            self::fail('Expected upload/unsupported-type');
         } catch (CalmLensException $error) {
-            self::assertSame([ErrorCodes::INVALID_UPLOAD_MIME_TYPE, ['mimeType' => $type]], [$error->errorCode, $error->details]);
+            self::assertSame([ErrorCodes::UNSUPPORTED_UPLOAD_TYPE, ['mimeType' => $type, 'source' => 'calmlens']], [$error->errorCode, $error->details]);
         }
     }
 
@@ -780,6 +780,27 @@ final class ContractTest extends TestCase
         foreach (self::fixtures('mock-scenarios')['scenarios'] as $scenario) {
             yield $scenario['name'] => [$scenario];
         }
+    }
+
+    /**
+     * `$actual` with each object cut to the keys `$wanted` lists, at every level, so a comparison
+     * checks only those; lists keep every item, so their lengths must still match.
+     */
+    private static function onlyListed(mixed $wanted, mixed $actual): mixed
+    {
+        if (!is_array($wanted) || !is_array($actual)) {
+            return $actual;
+        }
+        if (array_is_list($wanted) && array_is_list($actual)) {
+            return array_map(fn ($item, $index) => self::onlyListed($wanted[$index] ?? null, $item), $actual, array_keys($actual));
+        }
+        $kept = [];
+        foreach ($wanted as $key => $value) {
+            if (array_key_exists($key, $actual)) {
+                $kept[$key] = self::onlyListed($value, $actual[$key]);
+            }
+        }
+        return $kept;
     }
 
     /** Follows a dotted path: numeric segments index arrays, `length` is an array's length. */
@@ -943,9 +964,11 @@ final class ContractTest extends TestCase
                         if (isset($expect['error']['retryAfter'])) {
                             self::assertSame((float) $expect['error']['retryAfter'], $error->retryAfter(), "$label: retryAfter");
                         }
-                        // `details` lists only the keys to compare.
+                        // `details` lists only the keys to compare, and objects in them (such as each of a
+                        // validation error's `issues`) only the fields to compare.
                         foreach ($expect['error']['details'] ?? [] as $key => $value) {
-                            self::assertSameJson(self::resolve($value, $saved), $error->details[$key] ?? null, "$label: details.$key");
+                            $actual = $error->details[$key] ?? null;
+                            self::assertSameJson(self::resolve($value, $saved), self::onlyListed(self::resolve($value, $saved), $actual), "$label: details.$key");
                         }
                     }
                     continue;

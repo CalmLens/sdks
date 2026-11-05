@@ -76,7 +76,7 @@ final class MockDecision
 
     /**
      * The report a decided asset gets, as the API sends it: every category (unflagged ones
-     * evaluated with score 0), the highest score, and the policy's actions and
+     * evaluated with score 0), the highest score, the policy's actions, the automated status and
      * `flaggedCategories`. Null for `pending` and `failed`.
      *
      * @return ?array{categories: array, score: int|float, policy: array}
@@ -105,7 +105,7 @@ final class MockDecision
         $flagged = array_keys(array_filter($evaluated, fn ($score) => $action($score) !== 'allow'));
         return ['raw' => ['categories' => $categories],
             'categories' => array_map(fn ($score) => ['score' => $score, 'action' => $action($score)], $evaluated),
-            'explanationComplete' => true, 'source' => 'policy', 'automatedAction' => self::ACTIONS[$status],
+            'explanationComplete' => true, 'source' => 'policy', 'automatedStatus' => $status,
             // The mock analyses no audio or video, so a decision has no findings timeline.
             'regions' => [], 'timeline' => null, 'flaggedCategories' => $flagged];
     }

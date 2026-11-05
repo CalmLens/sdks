@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CalmLens\Internal;
 
+use CalmLens\ErrorCodes;
 use GuzzleHttp\Psr7\StreamDecoratorTrait;
 use Psr\Http\Message\StreamInterface;
 
@@ -19,7 +20,7 @@ final class UploadStream implements StreamInterface
     {
         $this->start = $stream->isSeekable() ? $stream->tell() : 0;
         if ($size === 0 && $stream->read(1) !== '') {
-            Values::invalid('Stream exceeds sizeInBytes', 'upload/invalid-payload');
+            Values::invalid('Stream exceeds sizeInBytes', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
         }
     }
 
@@ -63,11 +64,11 @@ final class UploadStream implements StreamInterface
         }
         $chunk = $this->stream->read(min($length, $this->size - $this->position));
         if ($chunk === '') {
-            Values::invalid('Stream ended before sizeInBytes', 'upload/invalid-payload');
+            Values::invalid('Stream ended before sizeInBytes', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
         }
         $this->position += strlen($chunk);
         if ($this->eof() && $this->stream->read(1) !== '') {
-            Values::invalid('Stream exceeds sizeInBytes', 'upload/invalid-payload');
+            Values::invalid('Stream exceeds sizeInBytes', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
         }
         return $chunk;
     }

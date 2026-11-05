@@ -43,7 +43,7 @@ final class Cdn extends Resource
      * HTML page that shows the asset, a viewer for its type, for an iframe) or
      * `placeholder` (a small blurred PNG served publicly for every asset whatever its visibility or
      * moderation status). Lenses and transforms apply to `preview`, and to `rendered` when it is an
-     * image; the CDN refuses them on rendered PDFs, video and audio with `asset/invalid-transform`,
+     * image; the CDN refuses them on rendered PDFs, video and audio with `transform/invalid`,
      * and the client refuses them on `original`, `hls`, `embed` and `placeholder`.
      *
      * `viewerClaims` takes `region` and `ageConfirmed`. `ageConfirmed` is your platform's

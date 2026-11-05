@@ -114,10 +114,15 @@ final class MockServerClientTest extends TestCase
 
     private static function code(callable $call): string
     {
+        return self::error($call)->errorCode;
+    }
+
+    private static function error(callable $call): CalmLensException
+    {
         try {
             $call();
         } catch (CalmLensException $error) {
-            return $error->errorCode;
+            return $error;
         }
         self::fail('Expected an error');
     }
@@ -140,11 +145,15 @@ final class MockServerClientTest extends TestCase
             'processingOptions' => ['keepContentAfterProcessing' => true]]);
         self::assertSame([null, null], [$clip['classification']['progress'], $clip['classification']['moderation']['timeline']]);
         $mock->assets[$clip['id']]['content']['safetyHold'] = ['placedAt' => 1, 'reason' => 'suspected-illegal-content', 'disposedAt' => null];
-        self::assertSame('validation/too-big', self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => 101])));
-        self::assertSame('validation/too-small', self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => 0])));
-        self::assertSame(ErrorCodes::ASSET_SAFETY_HELD, self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id'], 'cursor' => 'x'])));
-        $mock->failNextRequest('misc/internal-error', 'assets.listTimeline');
-        self::assertSame('misc/internal-error', self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id']])));
+        foreach ([101 => ErrorCodes::TOO_BIG, 0 => ErrorCodes::TOO_SMALL] as $size => $issue) {
+            $error = self::error(fn () => $client->assets->listTimeline(['assetId' => $clip['id'], 'pageSize' => $size]));
+            self::assertSame([ErrorCodes::INVALID_REQUEST, [['path' => 'pageSize', 'code' => $issue]]],
+                [$error->errorCode, array_map(fn ($found) => ['path' => $found['path'], 'code' => $found['code']], $error->details['issues'])]);
+        }
+        $held = self::error(fn () => $client->assets->listTimeline(['assetId' => $clip['id'], 'cursor' => 'x']));
+        self::assertSame([ErrorCodes::ASSET_HELD, 'safety'], [$held->errorCode, $held->details['hold']]);
+        $mock->failNextRequest(ErrorCodes::INTERNAL_ERROR, 'assets.listTimeline');
+        self::assertSame(ErrorCodes::INTERNAL_ERROR, self::code(fn () => $client->assets->listTimeline(['assetId' => $clip['id']])));
     }
 
     public function testASafetyHoldWithholdsTheRenderingAndRefusesEveryCdnResource(): void
@@ -185,7 +194,7 @@ final class MockServerClientTest extends TestCase
         $http = (fn () => $this->http)->call((fn () => $this->session)->call($client));
         $base = 'https://cdn.calmlens.invalid/v1/assets/project-1';
         // The selector is refused before the asset is looked up; the stream has neither a master nor a media playlist.
-        $cases = [["$base/missing/embed/@thumbnail", 400, 'asset/invalid-transform'],
+        $cases = [["$base/missing/embed/@thumbnail", 400, ErrorCodes::INVALID_TRANSFORM],
             ["$base/{$video['id']}/hls/index.m3u8", 404, 'asset/no-rendered-version'],
             ["$base/{$video['id']}/hls/video-720p.m3u8", 404, 'asset/no-rendered-version']];
         foreach ($cases as [$url, $status, $code]) {
@@ -221,7 +230,7 @@ final class MockServerClientTest extends TestCase
         $mock = new MockServerClient();
         $client = $mock->client();
         $mock->failNextRequest()->failNextRequest('timeout')
-            ->failNextRequest(new CalmLensException(ErrorCodes::UPLOAD_LIMIT_EXCEEDED, 'Slow down', 429, ['limit' => 5], ['Retry-After' => '7']));
+            ->failNextRequest(new CalmLensException(ErrorCodes::FREE_UPLOADS_EXHAUSTED, 'Slow down', 429, ['limit' => 5], ['Retry-After' => '7']));
         try {
             $client->assets->list();
             self::fail('Expected a transport error');
@@ -234,7 +243,7 @@ final class MockServerClientTest extends TestCase
             $client->assets->list();
             self::fail('Expected an API error');
         } catch (Exception\RateLimitException $error) {
-            self::assertSame([ErrorCodes::UPLOAD_LIMIT_EXCEEDED, 429, 7.0, 5], [$error->errorCode, $error->status, $error->retryAfter(), $error->details['limit']]);
+            self::assertSame([ErrorCodes::FREE_UPLOADS_EXHAUSTED, 429, 7.0, 5], [$error->errorCode, $error->status, $error->retryAfter(), $error->details['limit']]);
             self::assertStringStartsWith('mock-', (string) $error->requestId);
         }
         self::assertCount(0, $mock->assets);
@@ -253,7 +262,7 @@ final class MockServerClientTest extends TestCase
         // The shared scenarios cover unknown operations and transport errors with details or retryAfter.
         self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest('disconnect')));
         self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest(new \RuntimeException('down'), details: ['reason' => 'x'])));
-        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest('upload/limit-exceeded', retryAfter: -1)));
+        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->failNextRequest(ErrorCodes::FREE_UPLOADS_EXHAUSTED, retryAfter: -1)));
         self::assertSame(0, $mock->pending());
     }
 
@@ -305,7 +314,7 @@ final class MockServerClientTest extends TestCase
         $mock->assets[$unhashed['id']]['content'] = ['perceptualHash' => $hash, 'perceptualHashQuality' => 87] + $mock->assets[$unhashed['id']]['content'];
         $entry = $client->hashLists->addEntry(['hashListId' => $list['id'], 'assetId' => $unhashed['id'], 'label' => 'Report 1042']);
         self::assertSame(201, $status());
-        self::assertSame([$hash, 87, $unhashed['id'], 'Report 1042'], [$entry['hash'], $entry['quality'], $entry['sourceAssetId'], $entry['label']]);
+        self::assertSame([$hash, 87, $unhashed['id'], 'Report 1042'], [$entry['hash'], $entry['quality'], $entry['assetId'], $entry['label']]);
         $again = $client->hashLists->addEntry(['hashListId' => $list['id'], 'hash' => strtoupper($hash)]);
         self::assertSame(200, $status());
         self::assertSame($entry['id'], $again['id']);
@@ -337,6 +346,60 @@ final class MockServerClientTest extends TestCase
         self::assertSame(ErrorCodes::ASSET_NOT_DECIDED, self::code(fn () => $client->assets->explain(['assetId' => $asset['id']])));
     }
 
+    public function testWaitForDecisionKeepsWaitingWhileQueuedOrProcessingEvenOnceDecided(): void
+    {
+        $mock = new MockServerClient();
+        foreach ([['queued', 'pending'], ['processing', 'blocked'], ['completed', 'blocked']] as [$classification, $moderation]) {
+            $mock->enqueueJson(['id' => 'asset-1', 'classification' => ['status' => $classification, 'moderation' => ['status' => $moderation]]]);
+        }
+        $asset = $mock->client()->assets->waitForDecision(['assetId' => 'asset-1']);
+        self::assertSame(['completed', 'blocked'], [$asset['classification']['status'], $asset['classification']['moderation']['status']]);
+        self::assertCount(3, $mock->requests());
+    }
+
+    public function testUploadsKeepTheTagsTheyAreCreatedWithFromARawUploadOrAUrl(): void
+    {
+        $mock = new MockServerClient();
+        $client = $mock->client();
+        $uploaded = $client->assets->create(['name' => 'photo.png', 'content' => ['data' => 'png-bytes', 'type' => 'image/png'],
+            'tags' => ['catalogue', 'backpacks']]);
+        $site = $client->assets->create(['name' => 'site', 'url' => 'https://example.com', 'tags' => ['landing']]);
+        // A raw upload sends its tags in the query as a JSON array, like its metadata.
+        self::assertSame('["catalogue","backpacks"]', $mock->requests()[0]->query['tags'] ?? null);
+        self::assertSame(['catalogue', 'backpacks'], $uploaded['tags']);
+        self::assertSame(['landing'], $client->assets->retrieve(['assetId' => $site['id']])['tags']);
+    }
+
+    public function testReviewsRecordTheDecidingApiKeyWithoutPersonalData(): void
+    {
+        $mock = new MockServerClient();
+        $client = $mock->client();
+        $asset = $client->assets->classify(['name' => 'photo.png', 'content' => ['data' => 'png-bytes', 'type' => 'image/png']]);
+        $client->assets->decide(['assetId' => $asset['id'], 'decision' => 'blocked', 'note' => '  Spam  ']);
+        $reviews = $mock->decide($asset['id'], 'limited')['classification']['moderation']['manualReviews'];
+        foreach ($reviews as $review) {
+            self::assertMatchesRegularExpression('/^rev_/', $review['id']);
+            self::assertIsInt($review['reviewedAt']);
+        }
+        // Through the API and the test hook alike, the review is the mock API key's, which has no ID.
+        $apiKey = ['type' => 'api-key', 'id' => null];
+        self::assertSame([['decision' => 'blocked', 'note' => 'Spam', 'decidedBy' => $apiKey, 'applied' => true],
+            ['decision' => 'limited', 'note' => null, 'decidedBy' => $apiKey, 'applied' => true]],
+            array_map(fn (array $review) => array_diff_key($review, ['id' => true, 'reviewedAt' => true]), $reviews));
+    }
+
+    public function testAssetsLeaveOutTheProcessingOptionsTheyWereUploadedWith(): void
+    {
+        $client = (new MockServerClient())->client();
+        $asset = $client->assets->classify(['name' => 'photo.png', 'content' => ['data' => 'png-bytes', 'type' => 'image/png'],
+            'processingOptions' => ['keepContentAfterProcessing' => true, 'features' => ['personDetection' => ['enabled' => true]]]]);
+        $retrieved = $client->assets->retrieve(['assetId' => $asset['id']]);
+        self::assertArrayNotHasKey('processingOptions', $asset);
+        self::assertArrayNotHasKey('processingOptions', $retrieved);
+        // The mock still keeps them: the content is kept and the person detection they turned on ran.
+        self::assertSame(['stored', 'evaluated'], [$retrieved['content']['status'], $retrieved['classification']['personDetection']['status']]);
+    }
+
     /** The SDK refuses these types itself, so each is sent past it, straight to the mock, as another client could. */
     public function testTheMockRefusesUploadsOfTypesTheApiRefuses(): void
     {
@@ -348,9 +411,52 @@ final class MockServerClientTest extends TestCase
             $response = $http->request('POST', 'https://api.calmlens.invalid/v1/projects/project-1/assets?name=x&sizeInBytes=5&contentType=' . rawurlencode($type),
                 ['headers' => ['Content-Type' => $type, 'X-CalmLens-Upload' => 'content'], 'body' => 'hello', 'http_errors' => false]);
             $body = json_decode((string) $response->getBody(), true);
-            self::assertSame([400, ErrorCodes::INVALID_UPLOAD_MIME_TYPE, ['mimeType' => $type]],
+            self::assertSame([415, ErrorCodes::UNSUPPORTED_UPLOAD_TYPE, ['mimeType' => $type, 'source' => 'calmlens']],
                 [$response->getStatusCode(), $body['code'] ?? null, $body['details'] ?? null], $type);
         }
         self::assertSame([], $mock->assets);
+    }
+
+    public function testEventsNameTheApiKeyThePipelineOrTheReviewerAsTheirActor(): void
+    {
+        $mock = new MockServerClient(moderate: fn () => 'blocked');
+        $client = $mock->client();
+        $asset = self::image($mock);
+        $mock->decide($asset['id'], 'purged');
+        $actors = array_map(fn (array $event) => [$event['type'], $event['actor']], $mock->events);
+        self::assertSame([
+            ['asset.uploaded', ['type' => 'api-key', 'id' => null]],
+            ['asset.classified', ['type' => 'automated', 'id' => null]],
+            ['asset.blocked', ['type' => 'automated', 'id' => null]],
+            ['asset.content-removed', ['type' => 'user', 'id' => null]],
+            ['asset.purged', ['type' => 'user', 'id' => null]],
+        ], $actors);
+        $facts = array_merge(...array_map(fn (array $event) => array_column($event['facts'], 'key'), $mock->events));
+        self::assertNotContains('decided-by', $facts);
+        self::assertSame(['type' => 'api-key', 'id' => null], $mock->enqueueEvent(['type' => 'asset.allowed'])['actor']);
+        self::assertSame(['type' => 'system', 'id' => null], $mock->enqueueEvent(['type' => 'asset.allowed', 'actor' => ['type' => 'system', 'id' => null]])['actor']);
+        $client->assets->removeContent(['assetId' => $asset['id']]);
+        self::assertSame(['asset.content-removed', ['type' => 'api-key', 'id' => null]], [end($mock->events)['type'], end($mock->events)['actor']]);
+    }
+
+    public function testTheEventsFeedRefusesUnknownTypesAndPagesThroughTheRequestedOnes(): void
+    {
+        $mock = new MockServerClient();
+        $client = $mock->client();
+        $error = self::error(fn () => $client->events->list(['types' => ['asset.uploaded', 'not a type']]));
+        self::assertSame([ErrorCodes::INVALID_REQUEST, ['types']], [$error->errorCode, array_column($error->details['issues'], 'path')]);
+        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $client->events->list(['types' => ['asset.uploaded,asset.blocked']])));
+        self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $client->events->list(['types' => 'asset.uploaded'])));
+        $start = $client->events->list(['types' => ['asset.deleted']]);
+        // No types is the whole feed, so its cursor works without the filter.
+        $all = $client->events->list(['types' => []]);
+        $client->events->list(['cursor' => $all['nextCursor']]);
+        foreach (range(1, 3) as $index) {
+            $asset = self::image($mock);
+            $client->assets->delete(['assetId' => $asset['id']]);
+        }
+        $pages = iterator_to_array($client->events->eachPage(['cursor' => $start['nextCursor'], 'types' => ['asset.deleted'], 'pageSize' => 2]), false);
+        self::assertSame([['asset.deleted', 'asset.deleted'], ['asset.deleted']],
+            array_map(fn (array $page) => array_column($page['items'], 'type'), $pages));
     }
 }

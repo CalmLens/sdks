@@ -194,7 +194,7 @@ final class AutomaticMultipartTest extends TestCase
         self::assertSame('sdk/invalid-argument', self::errorCode(fn () => $client->assets->create([
             'name' => 'clip.mp4', 'content' => ['bytes' => self::fileOf(6 * self::MIB), 'type' => 'video/mp4'],
             'requestOptions' => ['idempotencyKey' => str_repeat('k', 241)]])));
-        self::assertSame(ErrorCodes::MULTIPART_IMAGE_TOO_LARGE, self::errorCode(fn () => $client->assets->create([
+        self::assertSame(ErrorCodes::UPLOAD_TOO_LARGE, self::errorCode(fn () => $client->assets->create([
             'name' => 'huge.png', 'content' => ['bytes' => self::fileOf(21 * self::MIB), 'type' => 'image/png']])));
         self::assertSame([], $sent);
     }
