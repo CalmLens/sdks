@@ -3187,6 +3187,260 @@
       ]
     },
     {
+      "name": "filters accept only the API's fields and operators, and * matches regardless of case",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "Summer Photo.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "summer",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "100%_off.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "percent",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "100xyoff.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "plain",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "name==*summer*"
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "summer.id"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "name!=\"*PHOTO*\""
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.id": {
+                "$ref": "plain.id"
+              },
+              "items.1.id": {
+                "$ref": "percent.id"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "name==\"summer photo.png\""
+          },
+          "expect": {
+            "result": {
+              "items.length": 0
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "name==\"*%*\""
+          },
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.id": {
+                "$ref": "percent.id"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "name==\"100_*\""
+          },
+          "expect": {
+            "result": {
+              "items.length": 0
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "createdAt>0;description==null;name=in=(\"100%_off.png\",\"Summer Photo.png\")"
+          },
+          "expect": {
+            "result": {
+              "items.length": 2,
+              "items.0.id": {
+                "$ref": "percent.id"
+              },
+              "items.1.id": {
+                "$ref": "summer.id"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "description!=anything"
+          },
+          "expect": {
+            "result": {
+              "items.length": 0
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "name=like=Summer%"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "createdAt=gt=0"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "createdAt=le=0"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "storageId==x"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "moderationStatus==pending"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "content.sizeInBytes==*5*"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "filter": "createdAt==null"
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-filter",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "assets.list",
+          "args": {
+            "ordering": [
+              {
+                "field": "name",
+                "direction": "asc"
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-value",
+              "status": 400,
+              "details": {
+                "path": "ordering.0.field"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "list cursors resume after the last item when assets are created or deleted between pages",
       "mock": {},
       "steps": [

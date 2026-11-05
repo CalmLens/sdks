@@ -161,14 +161,6 @@ class MockTests(unittest.TestCase):
             self.client.folders.retrieve(folder_id="missing")
         self.assertEqual((raised.exception.code, raised.exception.status), (error_codes.FOLDER_NOT_FOUND, 404))
 
-class MockFilterTests(unittest.TestCase):
-    def test_filters_the_mock_cannot_evaluate_raise_instead_of_matching_wrongly(self):
-        c = MockCalmLensServerClient()
-        c.assets.create(name="a", content={"plainText": "a", "type": "text/plain"})
-        with self.assertRaises(NotImplementedError):
-            c.assets.list(filter="name=like=a")
-
-
 class MockConfigurationAndCaptureTests(unittest.TestCase):
     def test_accepts_real_client_configuration(self):
         c = MockCalmLensServerClient(project_id="p1", base_url="https://api.example.test/v2/", cdn_base_url="https://cdn.example.test/v2",

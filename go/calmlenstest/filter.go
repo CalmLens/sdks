@@ -2,25 +2,14 @@ package calmlenstest
 
 import (
 	"fmt"
+	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
 	calmlens "github.com/CalmLens/sdks/go"
 )
-
-// filterFields are the asset fields the mock accepts in RSQL filters and ordering; nested
-// fields are named by path.
-var filterFields = map[string]bool{
-	"id": true, "name": true, "type": true, "visibility": true, "parentId": true,
-	"folderId": true, "externalId": true, "externalUrl": true, "createdAt": true, "updatedAt": true,
-	"tags": true, "description": true,
-	"classification.status": true, "classification.updatedAt": true,
-	"classification.moderation.status": true,
-	"moderation.completedAt":           true,
-	"content.status":                   true, "content.removalReason": true, "content.format": true,
-	"content.extension": true, "content.sizeInBytes": true,
-}
 
 // lookup returns the value at a dotted field path, such as "classification.moderation.status", or nil.
 func lookup(asset calmlens.JSON, path string) any {
@@ -40,9 +29,12 @@ type filterNode interface {
 }
 type anyOf []filterNode
 type allOf []filterNode
+
+// comparison is one field comparison. values holds each parsed value: a string, a float64 for a
+// number field, or nil for `null` on a nullable field.
 type comparison struct {
 	field, op string
-	values    []string
+	values    []any
 }
 
 func (n anyOf) match(a calmlens.JSON) bool {
@@ -62,20 +54,28 @@ func (n allOf) match(a calmlens.JSON) bool {
 	return true
 }
 
-// compareValues orders two values numerically when both are numbers, otherwise as text.
-func compareValues(left any, right string) int {
-	if n, ok := asNumber(left); ok {
-		if r, err := strconv.ParseFloat(right, 64); err == nil {
-			switch {
-			case n < r:
-				return -1
-			case n > r:
-				return 1
-			}
-			return 0
+// compare orders a present asset value against a parsed filter value like the database:
+// numbers numerically, text by code point. ok is false when they can't be compared.
+func compare(value any, literal any) (order int, ok bool) {
+	if n, isNumber := asNumber(value); isNumber {
+		r, isFloat := literal.(float64)
+		if !isFloat {
+			return 0, false
 		}
+		switch {
+		case n < r:
+			return -1, true
+		case n > r:
+			return 1, true
+		}
+		return 0, true
 	}
-	return strings.Compare(fmt.Sprint(left), right)
+	text, isText := value.(string)
+	r, isString := literal.(string)
+	if !isText || !isString {
+		return 0, false
+	}
+	return strings.Compare(text, r), true
 }
 
 func asNumber(value any) (float64, bool) {
@@ -90,82 +90,113 @@ func asNumber(value any) (float64, bool) {
 	return 0, false
 }
 
-func equal(value any, literal string) bool {
-	if value == nil {
-		return literal == "null"
-	}
-	if b, ok := value.(bool); ok {
-		return strconv.FormatBool(b) == literal
-	}
-	return compareValues(value, literal) == 0
+// equal is SQL equality with a non-null value: a missing asset value never equals.
+func equal(value, literal any) bool {
+	order, ok := compare(value, literal)
+	return ok && order == 0
 }
 
+// items are a list field's values, or nil when value is not a list.
+func items(value any) ([]any, bool) {
+	switch list := value.(type) {
+	case []any:
+		return list, true
+	case []string:
+		out := make([]any, len(list))
+		for i, item := range list {
+			out[i] = item
+		}
+		return out, true
+	}
+	return nil, false
+}
+
+// match applies the comparison like the API's SQL: a comparison never matches a missing value,
+// except `==null`, and `!=null` matches any present one.
 func (c comparison) match(a calmlens.JSON) bool {
 	value := lookup(a, c.field)
-	values := []any{value}
-	if list, ok := value.([]any); ok {
-		values = list
-	} else if list, ok := value.([]string); ok {
-		values = values[:0]
-		for _, item := range list {
-			values = append(values, item)
+	if list, ok := items(value); ok && filterFields[c.field].kind == "list" {
+		// A list field holds any of its values (=in=); other operators compare its items too.
+		anyItem := func(test func(any) bool) bool {
+			return slices.ContainsFunc(list, test)
+		}
+		switch c.op {
+		case "==", "=in=":
+			return anyItem(func(item any) bool {
+				return slices.ContainsFunc(c.values, func(v any) bool { return v != nil && matchValue(item, v) })
+			})
+		case "!=", "=out=":
+			return !anyItem(func(item any) bool {
+				return slices.ContainsFunc(c.values, func(v any) bool { return v != nil && matchValue(item, v) })
+			})
+		}
+		return false
+	}
+	literal := c.values[0]
+	if literal == nil {
+		switch c.op {
+		case "==":
+			return value == nil
+		case "!=":
+			return value != nil
+		}
+		// IN and comparisons with NULL never match; NOT IN with a NULL never matches either.
+		if c.op != "=in=" {
+			return false
 		}
 	}
-	anyEqual := func() bool {
-		for _, v := range values {
-			for _, literal := range c.values {
-				if equal(v, literal) {
-					return true
-				}
-			}
-		}
+	if value == nil {
 		return false
 	}
 	switch c.op {
 	case "==":
-		if strings.Contains(c.values[0], "*") {
-			return like(value, c.values[0])
-		}
-		return anyEqual()
-	case "=in=":
-		return anyEqual()
+		return matchValue(value, literal)
 	case "!=":
-		if strings.Contains(c.values[0], "*") {
-			return !like(value, c.values[0])
+		if pattern, ok := literal.(string); ok && strings.Contains(pattern, "*") {
+			text, isText := value.(string)
+			return isText && !wildcard(text, pattern)
 		}
-		return !anyEqual()
+		_, comparable := compare(value, literal)
+		return comparable && !equal(value, literal)
+	case "=in=":
+		return slices.ContainsFunc(c.values, func(v any) bool { return v != nil && equal(value, v) })
 	case "=out=":
-		return !anyEqual()
-	case "=like=":
-		return like(value, c.values[0])
+		return !slices.Contains(c.values, nil) && !slices.ContainsFunc(c.values, func(v any) bool { return equal(value, v) })
 	}
-	if value == nil {
+	order, ok := compare(value, literal)
+	if !ok {
 		return false
 	}
-	order := compareValues(value, c.values[0])
 	switch c.op {
-	case ">", "=gt=":
+	case ">":
 		return order > 0
-	case ">=", "=ge=":
+	case ">=":
 		return order >= 0
-	case "<", "=lt=":
+	case "<":
 		return order < 0
-	case "<=", "=le=":
+	case "<=":
 		return order <= 0
 	}
 	return false
 }
 
-func like(value any, pattern string) bool {
-	text, ok := value.(string)
-	if !ok {
-		return false
+// matchValue is `==` with a non-null value: a text value with `*` is a wildcard pattern.
+func matchValue(value, literal any) bool {
+	if pattern, ok := literal.(string); ok && strings.Contains(pattern, "*") {
+		text, isText := value.(string)
+		return isText && wildcard(text, pattern)
 	}
+	return equal(value, literal)
+}
+
+// wildcard matches text against a pattern whose only wildcard is `*` (any run of characters),
+// regardless of case; every other character, `%` and `_` included, matches itself.
+func wildcard(text, pattern string) bool {
 	parts := strings.Split(pattern, "*")
 	for i := range parts {
 		parts[i] = regexp.QuoteMeta(parts[i])
 	}
-	return regexp.MustCompile("(?i)^" + strings.Join(parts, ".*") + "$").MatchString(text)
+	return regexp.MustCompile("(?is)^" + strings.Join(parts, ".*") + "$").MatchString(text)
 }
 
 type filterParser struct {
@@ -173,11 +204,16 @@ type filterParser struct {
 	pos   int
 }
 
-// parseFilter parses the RSQL subset the API documents: ==, !=, >, >=, <, <=, =in=, =out=,
-// =like= (and =gt=-style aliases), ";" for AND (binding tighter than ","), "," for OR and
-// nested parentheses.
+// parseFilter parses an RSQL filter like the API (@rsql/parser with zodbase/rsql): comparisons
+// on filterFields with filterOperators, ";" or " and " for AND (binding tighter than ","
+// or " or "), nested parentheses and whitespace between tokens. Each value is read by its
+// field's kind. Anything else is an error, which the mock answers with validation/invalid-filter.
 func parseFilter(input string) (filterNode, error) {
 	p := &filterParser{input: input}
+	p.space()
+	if p.pos == len(p.input) {
+		return nil, fmt.Errorf("empty filter")
+	}
 	node, err := p.or()
 	if err == nil && p.pos != len(p.input) {
 		err = fmt.Errorf("unexpected %q at %d", p.input[p.pos:], p.pos)
@@ -185,7 +221,33 @@ func parseFilter(input string) (filterNode, error) {
 	return node, err
 }
 
-func (p *filterParser) peek(prefix string) bool { return strings.HasPrefix(p.input[p.pos:], prefix) }
+// reserved are the characters an unquoted selector or value can't contain.
+const reserved = "\"'();,=!~<> \n\t\r"
+
+func (p *filterParser) space() {
+	for p.pos < len(p.input) && strings.ContainsRune(" \n\t\r", rune(p.input[p.pos])) {
+		p.pos++
+	}
+}
+
+// peek skips whitespace and reports whether the input continues with prefix.
+func (p *filterParser) peek(prefix string) bool {
+	p.space()
+	return strings.HasPrefix(p.input[p.pos:], prefix)
+}
+
+// logic consumes a canonical (";" or ",") or verbose ("and " or "or ") logic operator.
+func (p *filterParser) logic(canonical, verbose string) bool {
+	if p.peek(canonical) {
+		p.pos++
+		return true
+	}
+	if p.peek(verbose + " ") {
+		p.pos += len(verbose)
+		return true
+	}
+	return false
+}
 
 func (p *filterParser) or() (filterNode, error) {
 	nodes := anyOf{}
@@ -195,10 +257,9 @@ func (p *filterParser) or() (filterNode, error) {
 			return nil, err
 		}
 		nodes = append(nodes, node)
-		if !p.peek(",") {
+		if !p.logic(",", "or") {
 			return nodes, nil
 		}
-		p.pos++
 	}
 }
 
@@ -210,14 +271,34 @@ func (p *filterParser) and() (filterNode, error) {
 			return nil, err
 		}
 		nodes = append(nodes, node)
-		if !p.peek(";") {
+		if !p.logic(";", "and") {
 			return nodes, nil
 		}
-		p.pos++
 	}
 }
 
-var operators = []string{"=in=", "=out=", "=like=", "=gt=", "=ge=", "=lt=", "=le=", "==", "!=", ">=", "<=", ">", "<"}
+// operator reads a comparison operator: a canonical one or any FIQL-style =name=.
+func (p *filterParser) operator() string {
+	p.space()
+	for _, candidate := range []string{"==", "!=", "<=", ">=", "<", ">"} {
+		if p.peek(candidate) {
+			p.pos += len(candidate)
+			return candidate
+		}
+	}
+	if p.peek("=") {
+		end := p.pos + 1
+		for end < len(p.input) && p.input[end] >= 'a' && p.input[end] <= 'z' {
+			end++
+		}
+		if end < len(p.input) && p.input[end] == '=' {
+			op := p.input[p.pos : end+1]
+			p.pos = end + 1
+			return op
+		}
+	}
+	return ""
+}
 
 func (p *filterParser) term() (filterNode, error) {
 	if p.peek("(") {
@@ -232,59 +313,88 @@ func (p *filterParser) term() (filterNode, error) {
 		p.pos++
 		return node, nil
 	}
-	start := p.pos
-	for p.pos < len(p.input) && (isWord(p.input[p.pos])) {
-		p.pos++
+	p.space()
+	field, err := p.unquoted()
+	if err != nil {
+		return nil, err
 	}
-	field := p.input[start:p.pos]
-	if !filterFields[field] {
+	info, known := filterFields[field]
+	if !known {
 		return nil, fmt.Errorf("unknown filter field %q", field)
 	}
-	op := ""
-	for _, candidate := range operators {
-		if p.peek(candidate) {
-			op = candidate
-			break
-		}
-	}
+	op := p.operator()
 	if op == "" {
 		return nil, fmt.Errorf("missing operator after %q", field)
 	}
-	p.pos += len(op)
-	if op == "=in=" || op == "=out=" {
-		if !p.peek("(") {
-			return nil, fmt.Errorf("%s needs a list", op)
-		}
+	if !slices.Contains(filterOperators, op) {
+		return nil, fmt.Errorf("unsupported operator %s", op)
+	}
+	raw := []string{}
+	if p.peek("(") {
 		p.pos++
-		values := []string{}
 		for {
 			value, err := p.value()
 			if err != nil {
 				return nil, err
 			}
-			values = append(values, value)
+			raw = append(raw, value)
 			if p.peek(")") {
 				p.pos++
-				return comparison{field, op, values}, nil
+				break
 			}
 			if !p.peek(",") {
 				return nil, fmt.Errorf("missing ) in %s list", op)
 			}
 			p.pos++
 		}
+	} else {
+		value, err := p.value()
+		if err != nil {
+			return nil, err
+		}
+		raw = append(raw, value)
 	}
-	value, err := p.value()
-	if err != nil {
-		return nil, err
+	if op != "=in=" && op != "=out=" && len(raw) != 1 {
+		return nil, fmt.Errorf("%s takes one value", op)
 	}
-	return comparison{field, op, []string{value}}, nil
+	values := make([]any, len(raw))
+	for i, value := range raw {
+		if values[i], err = info.read(value); err != nil {
+			return nil, err
+		}
+	}
+	return comparison{field, op, values}, nil
 }
 
-func isWord(b byte) bool {
-	return b == '_' || b == '.' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9'
+// read parses a value like zodbase/rsql: `null` is a missing value on a nullable field, a number
+// field's value must be a finite number, and any other value is text.
+func (f filterField) read(value string) (any, error) {
+	if value == "null" && f.nullable {
+		return nil, nil
+	}
+	if f.kind != "number" {
+		return value, nil
+	}
+	number, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || math.IsInf(number, 0) || math.IsNaN(number) || strings.TrimSpace(value) == "" {
+		return nil, fmt.Errorf("invalid numeric value %q", value)
+	}
+	return number, nil
+}
+
+func (p *filterParser) unquoted() (string, error) {
+	start := p.pos
+	for p.pos < len(p.input) && !strings.ContainsRune(reserved, rune(p.input[p.pos])) {
+		p.pos++
+	}
+	if p.pos == start {
+		return "", fmt.Errorf("unexpected input at %d", start)
+	}
+	return p.input[start:p.pos], nil
 }
 
 func (p *filterParser) value() (string, error) {
+	p.space()
 	if p.pos < len(p.input) && (p.input[p.pos] == '"' || p.input[p.pos] == '\'') {
 		quote := p.input[p.pos]
 		p.pos++
@@ -304,12 +414,5 @@ func (p *filterParser) value() (string, error) {
 		}
 		return "", fmt.Errorf("unterminated string")
 	}
-	start := p.pos
-	for p.pos < len(p.input) && !strings.ContainsRune(";,()", rune(p.input[p.pos])) {
-		p.pos++
-	}
-	if p.pos == start {
-		return "", fmt.Errorf("missing value at %d", start)
-	}
-	return p.input[start:p.pos], nil
+	return p.unquoted()
 }

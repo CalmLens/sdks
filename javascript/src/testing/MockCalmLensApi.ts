@@ -43,7 +43,13 @@ import {
   type MockModerationTrigger,
 } from "./MockDecision";
 import type { MockDatabaseStorage, MockImageStorage } from "./MockStorage";
-import { createPage, DEFAULT_PAGE_SIZE, filterAssets, searchAssets } from "./MockUtils";
+import {
+  createPage,
+  DEFAULT_PAGE_SIZE,
+  filterAssets,
+  MockInvalidFilter,
+  searchAssets,
+} from "./MockUtils";
 
 // The in-memory CalmLens API and CDN behind the mock clients. The mocks run the real clients,
 // whose `fetch` is `MockCalmLensApi.handle`: every request is answered here with the API's
@@ -1411,10 +1417,24 @@ export class MockCalmLensApi {
       ? fail(API_ERROR_CODES.INVALID_CURSOR)
       : invalidField(code, path ?? "pageSize")) as unknown as Error;
 
+  /**
+   * A cursor list's query, checked like CURSOR_PAGE_QUERY_SCHEMA before anything else: `pageSize`
+   * from 1 to 100, and at most two `ordering` rules, each by `createdAt` or `id`.
+   */
   private pageQuery(query: URLSearchParams) {
+    const pageSize = this.integer(query, "pageSize", DEFAULT_PAGE_SIZE);
+    if (pageSize < 1) throw invalidField("validation/too-small", "pageSize");
+    if (pageSize > 100) throw invalidField("validation/too-big", "pageSize");
     const ordering = this.ordering(query);
+    for (const [index, rule] of ordering.entries()) {
+      if (rule.field !== "createdAt" && rule.field !== "id")
+        throw invalidField("validation/invalid-value", `ordering.${index}.field`);
+      if (rule.direction !== "asc" && rule.direction !== "desc")
+        throw invalidField("validation/invalid-value", `ordering.${index}.direction`);
+    }
+    if (ordering.length > 2) throw invalidField("validation/too-big", "ordering");
     return {
-      pageSize: this.integer(query, "pageSize", DEFAULT_PAGE_SIZE),
+      pageSize,
       cursor: query.get("cursor") ?? undefined,
       ordering: ordering.length ? ordering : undefined,
     };
@@ -1436,9 +1456,15 @@ export class MockCalmLensApi {
     if (folderId !== null) {
       assets = assets.filter((asset) => (asset.folderId ?? null) === folderId);
     }
+    const page = this.pageQuery(query);
     const filter = query.get("filter") ?? undefined;
-    assets = filterAssets(assets, filter);
-    return createPage(assets, this.pageQuery(query), {
+    try {
+      assets = filterAssets(assets, filter);
+    } catch (error) {
+      if (error instanceof MockInvalidFilter) throw fail(API_ERROR_CODES.INVALID_FILTER);
+      throw error;
+    }
+    return createPage(assets, page, {
       scope: JSON.stringify([this.projectId, filter ?? null, folderId]),
       fail: this.pageFailure,
     });

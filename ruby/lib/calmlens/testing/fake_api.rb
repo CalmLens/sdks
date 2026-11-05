@@ -6,6 +6,7 @@ require 'securerandom'
 require 'uri'
 require_relative 'placeholder'
 require_relative 'mock_decision'
+require_relative 'rsql'
 
 module CalmLens
   module Testing
@@ -195,7 +196,8 @@ module CalmLens
         # Like the event catalog: only allowing and limiting are low severity.
         add_event('type' => "asset.#{decision}", 'severity' => %w[allowed limited].include?(decision) ? 'low' : 'high',
                   'title' => "asset.#{decision}", 'assetId' => item['id'], 'asset' => snapshot(item),
-                  'facts' => [{ 'key' => 'decided-by', 'value' => reviewer_name ? 'api-key' : 'reviewer' }, { 'key' => 'asset-type', 'value' => item['type'] },
+                  'facts' => [{ 'key' => 'decided-by', 'value' => reviewer_name ? 'api-key' : 'reviewer' },
+                              { 'key' => 'asset-type', 'value' => item['type'] },
                               { 'key' => 'asset-name', 'value' => item['name'], 'url' => "https://calmlens.com/go/asset/#{item['id']}" },
                               *reviewer_facts, { 'key' => 'note', 'value' => note }])
       end
@@ -429,7 +431,9 @@ module CalmLens
       end
 
       def list(query)
-        items = project_assets.reject { |item| item['parentId'] }
+        # Like the API: the query schema is checked before the filter.
+        page_query(query)
+        items = project_assets
         items = items.select { |item| item['folderId'] == query['folderId'] } if query.key?('folderId')
         page(RSQL.filter(items, query['filter']), query, JSON.generate([@project_id, query['filter'], query['folderId']]))
       end
@@ -1140,17 +1144,23 @@ module CalmLens
         {}
       end
 
-      # One keyset page like the API's: ordered by `fields` (`createdAt` descending by default; an `id`
-      # tie-breaker is added), starting after the cursor's values. The cursor is tied to `scope` (the
-      # filter, folder or parent) and the ordering, so it only continues the query it came from.
-      def page(items, query, scope, fields: %w[createdAt id], default: { 'field' => 'createdAt', 'direction' => 'desc' })
+      # The page size and ordering, refused like the API's query schema: each ordering entry's field
+      # and direction are enum values.
+      def page_query(query, fields = %w[createdAt id], default = { 'field' => 'createdAt', 'direction' => 'desc' })
         size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
         ordering = ordering(query, default)
-        # Like the API's query schema: each entry's field and direction are enum values.
         ordering.each_with_index do |rule, index|
           invalid!('validation/invalid-value', "ordering.#{index}.field") unless fields.include?(rule['field'])
           invalid!('validation/invalid-value', "ordering.#{index}.direction") unless %w[asc desc].include?(rule['direction'])
         end
+        [size, ordering]
+      end
+
+      # One keyset page like the API's: ordered by `fields` (`createdAt` descending by default; an `id`
+      # tie-breaker is added), starting after the cursor's values. The cursor is tied to `scope` (the
+      # filter, folder or parent) and the ordering, so it only continues the query it came from.
+      def page(items, query, scope, fields: %w[createdAt id], default: { 'field' => 'createdAt', 'direction' => 'desc' })
+        size, ordering = page_query(query, fields, default)
         ordering << { 'field' => 'id', 'direction' => ordering.first['direction'] } unless ordering.any? { |o| o['field'] == 'id' }
         signature = JSON.generate([scope, ordering])
         sorted = items.sort { |a, b| compare_items(a, b, ordering) }
@@ -1354,126 +1364,6 @@ module CalmLens
           raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT,
                                          "MockServerClient outcomes are #{OUTCOMES.keys.join(', ')} (got #{outcome.inspect})")
         end
-      end
-    end
-
-    # The RSQL subset the fake API understands: `==` and `!=` (with `*` wildcards), `=in=` and
-    # `=out=` with a `(value,value)` list, and `=gt=`, `=ge=`, `=lt=`, `=le=`, with quoted values,
-    # combined with `;` (and), which binds tighter than `,` (or), and grouped with `( … )`.
-    # Anything else raises instead of being ignored, so a test never passes on an unfiltered list.
-    # @api private
-    module RSQL
-      module_function
-
-      def filter(items, expression)
-        return items if expression.nil? || expression.to_s.strip.empty?
-
-        test = parse(expression.to_s)
-        items.select { |item| test.call(item) }
-      end
-
-      # Compiles `,` (or) of `;` (and) terms, where a term is a comparison or a `( … )` group.
-      def parse(expression)
-        alternatives = split(expression, ',').map do |alternative|
-          split(alternative, ';').map do |term|
-            text = term.strip
-            raise unsupported(expression) if text.empty?
-
-            group = unwrap(text)
-            group ? parse(group) : comparison(text)
-          end
-        end
-        ->(item) { alternatives.any? { |terms| terms.all? { |test| test.call(item) } } }
-      end
-
-      # The expression inside `( … )` when the parentheses enclose all of `text`, else nil.
-      def unwrap(text)
-        return unless text.start_with?('(') && text.end_with?(')')
-
-        depth = 0
-        quote = nil
-        text.each_char.with_index do |char, index|
-          if quote
-            quote = nil if char == quote
-          elsif ['"', "'"].include?(char)
-            quote = char
-          elsif char == '('
-            depth += 1
-          elsif char == ')'
-            depth -= 1
-            return index == text.length - 1 ? text[1..-2] : nil if depth.zero?
-          end
-        end
-        nil
-      end
-
-      def unsupported(term)
-        InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT,
-                                 'MockServerClient filters support ==, !=, =in=, =out=, =gt=, =ge=, =lt= and ' \
-                                 "=le=, joined by ; and , and grouped with parentheses (got #{term.inspect})")
-      end
-
-      # Splits on `separator` outside quotes and parentheses (groups and `=in=(...)` lists).
-      def split(text, separator)
-        parts = ['']
-        quote = nil
-        depth = 0
-        text.each_char do |char|
-          if quote
-            quote = nil if char == quote
-          elsif ['"', "'"].include?(char)
-            quote = char
-          elsif char == '('
-            depth += 1
-          elsif char == ')'
-            depth -= 1
-          elsif char == separator && depth.zero?
-            parts << ''
-            next
-          end
-          parts[-1] += char
-        end
-        parts
-      end
-
-      def comparison(term)
-        match = term.strip.match(/\A([A-Za-z][\w.]*)(==|!=|=in=|=out=|=gt=|=ge=|=lt=|=le=)(.+)\z/m)
-        raise unsupported(term) unless match
-
-        field, operator, raw = match.captures
-        values = list(operator, raw.strip)
-        lambda do |item|
-          actual = field.split('.').reduce(item) { |object, key| object.is_a?(Hash) ? object[key] : nil }
-          entries = Array(actual.nil? ? 'null' : actual).map(&:to_s)
-          case operator
-          when '==', '=in=' then values.any? { |value| matches?(entries, value) }
-          when '!=', '=out=' then values.none? { |value| matches?(entries, value) }
-          else entries.any? { |entry| ordered?(entry, operator, values.first) }
-          end
-        end
-      end
-
-      def list(operator, raw)
-        return [unquote(raw)] unless %w[=in= =out=].include?(operator)
-
-        unless raw.start_with?('(') && raw.end_with?(')')
-          raise InvalidArgumentError.new(SdkErrorCodes::INVALID_ARGUMENT, "#{operator} takes a (value,value) list")
-        end
-
-        split(raw[1..-2], ',').map { |value| unquote(value.strip) }
-      end
-
-      def unquote(value) = value.match?(/\A(["']).*\1\z/m) ? value[1..-2] : value
-
-      def matches?(entries, value)
-        pattern = Regexp.new("\\A#{Regexp.escape(value).gsub('\*', '.*')}\\z", Regexp::MULTILINE)
-        entries.any? { |entry| pattern.match?(entry) }
-      end
-
-      # Numbers compare as numbers and everything else (such as ISO dates) as text.
-      def ordered?(entry, operator, value)
-        left, right = [entry, value].all? { |text| text.match?(/\A-?\d+(\.\d+)?\z/) } ? [entry.to_f, value.to_f] : [entry, value]
-        { '=gt=' => left > right, '=ge=' => left >= right, '=lt=' => left < right, '=le=' => left <= right }.fetch(operator)
       end
     end
   end

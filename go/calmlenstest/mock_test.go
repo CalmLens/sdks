@@ -293,13 +293,6 @@ func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
 	if got := names(calmlens.ListAssetsOptions{FolderID: &folder.ID}); got != "[c a]" {
 		t.Fatal(got)
 	}
-	for _, filter := range []string{"secret==1", "status==pending"} {
-		_, err := c.Assets.List(ctx, calmlens.ListAssetsOptions{Filter: calmlens.Ptr(filter)})
-		var apiErr *calmlens.Error
-		if !errors.As(err, &apiErr) || apiErr.Status != 400 || apiErr.Code != calmlens.CodeInvalidFilter {
-			t.Fatal("unknown filter field accepted", filter, err)
-		}
-	}
 }
 
 func TestMockSignsUploadTokensWithItsKeyWithoutARequest(t *testing.T) {

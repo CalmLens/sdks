@@ -405,6 +405,9 @@ final class MockApi {
         case "GET assets": {
           String folderId = str(q, "folderId");
           String filter = str(q, "filter");
+          // Like the API, the query is validated before the filter is read.
+          bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+          if (q.has("ordering")) checkOrdering(q.getAsJsonArray("ordering"));
           List<JsonObject> items = projectAssets().stream().filter(asset -> folderId == null || folderId.equals(str(asset, "folderId"))).collect(Collectors.toList());
           if (filter != null && !filter.isBlank()) items = items.stream().filter(rsql(filter)).collect(Collectors.toList());
           JsonArray scope = new JsonArray();
@@ -1037,17 +1040,18 @@ final class MockApi {
   // ------------------------------------------------------------------ Lists and search
 
   /**
-   * A subset of RSQL: {@code ==} and {@code !=} (with {@code *} wildcards), {@code =in=}, {@code =out=},
-   * {@code =gt=}, {@code =ge=}, {@code =lt=} and {@code =le=}, joined by {@code ;} (and), which binds
-   * tighter than {@code ,} (or), and grouped with {@code ( … )}.
+   * An RSQL filter as the API reads it: comparisons on the fields in {@link MockAssetFilters#FIELDS}
+   * with the operators in {@link MockAssetFilters#OPERATORS}, joined by {@code ;} (and), which binds
+   * tighter than {@code ,} (or), and grouped with {@code ( … )}. Anything else is
+   * {@code validation/invalid-filter}.
    */
-  static Predicate<JsonObject> rsql(String expression) throws IOException {
+  static Predicate<JsonObject> rsql(String expression) throws Failure {
     List<List<Predicate<JsonObject>>> alternatives = new ArrayList<>();
     for (String alternative : split(expression, ',')) {
       List<Predicate<JsonObject>> tests = new ArrayList<>();
       for (String term : split(alternative, ';')) {
         String text = term.strip();
-        if (text.isEmpty()) throw new IOException("MockCalmLensServerClient cannot evaluate the filter " + expression);
+        if (text.isEmpty()) throw invalidFilter();
         String group = unwrap(text);
         tests.add(group != null ? rsql(group) : comparison(text));
       }
@@ -1056,20 +1060,27 @@ final class MockApi {
     return asset -> alternatives.stream().anyMatch(group -> group.stream().allMatch(test -> test.test(asset)));
   }
 
+  private static Failure invalidFilter() { return new Failure(ErrorCodes.INVALID_FILTER, "Invalid filter"); }
+
   /** Splits on {@code separator} outside quotes and parentheses (groups and {@code =in=(...)} lists). */
-  private static List<String> split(String text, char separator) {
+  private static List<String> split(String text, char separator) throws Failure {
     List<String> parts = new ArrayList<>();
     StringBuilder current = new StringBuilder();
     int depth = 0;
     char quote = 0;
-    for (char c : text.toCharArray()) {
-      if (quote != 0) { if (c == quote) quote = 0; }
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (quote != 0) {
+        if (c == '\\' && i + 1 < text.length()) { current.append(c).append(text.charAt(++i)); continue; }
+        if (c == quote) quote = 0;
+      }
       else if (c == '"' || c == '\'') quote = c;
       else if (c == '(') depth++;
-      else if (c == ')') depth--;
+      else if (c == ')' && --depth < 0) throw invalidFilter();
       else if (depth == 0 && c == separator) { parts.add(current.toString()); current.setLength(0); continue; }
       current.append(c);
     }
+    if (quote != 0 || depth != 0) throw invalidFilter();
     parts.add(current.toString());
     return parts;
   }
@@ -1081,7 +1092,7 @@ final class MockApi {
     char quote = 0;
     for (int i = 0; i < text.length(); i++) {
       char c = text.charAt(i);
-      if (quote != 0) { if (c == quote) quote = 0; }
+      if (quote != 0) { if (c == '\\') i++; else if (c == quote) quote = 0; }
       else if (c == '"' || c == '\'') quote = c;
       else if (c == '(') depth++;
       else if (c == ')' && --depth == 0) return i == text.length() - 1 ? text.substring(1, i) : null;
@@ -1089,38 +1100,81 @@ final class MockApi {
     return null;
   }
 
-  private static final Pattern COMPARISON = Pattern.compile("\\s*([\\w.]+)\\s*(==|!=|=in=|=out=|=gt=|=ge=|=lt=|=le=)(.*)", Pattern.DOTALL);
-  private static final Pattern VALUE = Pattern.compile("\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'|[^,()]+");
+  // An operator is == or != or a comparison, or =name= (FIQL): only MockAssetFilters.OPERATORS pass.
+  private static final Pattern COMPARISON = Pattern.compile("\\s*([^\\s=!~<>(),;\"']+)\\s*(==|!=|>=|<=|>|<|=[a-z]*=)(.*)", Pattern.DOTALL);
+  private static final Pattern VALUE = Pattern.compile("\\s*(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*'|[^\\s\"'(),;=!~<>]+)\\s*");
+  private static final Pattern NUMBER = Pattern.compile("[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?");
 
-  private static String unquote(String value) {
-    String text = value.strip();
-    return text.length() >= 2 && (text.charAt(0) == '"' || text.charAt(0) == '\'') ? text.substring(1, text.length() - 1).replace("\\\"", "\"").replace("\\'", "'") : text;
+  /** One value: quoted (backslash escapes the next character) or unquoted, or null when invalid. */
+  private static String value(String raw) {
+    Matcher found = VALUE.matcher(raw);
+    if (!found.matches()) return null;
+    String text = found.group(1);
+    if (text.charAt(0) != '"' && text.charAt(0) != '\'') return text;
+    return text.substring(1, text.length() - 1).replaceAll("\\\\(.)", "$1");
   }
 
-  private static Predicate<JsonObject> comparison(String text) throws IOException {
+  /** Compares text by code point, like the database. */
+  private static int compareText(String a, String b) {
+    int[] left = a.codePoints().toArray(), right = b.codePoints().toArray();
+    for (int i = 0; i < Math.min(left.length, right.length); i++)
+      if (left[i] != right[i]) return Integer.compare(left[i], right[i]);
+    return Integer.compare(left.length, right.length);
+  }
+
+  private static Predicate<JsonObject> comparison(String text) throws Failure {
     Matcher found = COMPARISON.matcher(text);
-    if (!found.matches()) throw new IOException("MockCalmLensServerClient cannot evaluate the filter " + text);
+    if (!found.matches()) throw invalidFilter();
     String name = found.group(1), operator = found.group(2), raw = found.group(3).strip();
-    List<String> values = new ArrayList<>();
-    if (raw.startsWith("(") && raw.endsWith(")")) {
-      Matcher value = VALUE.matcher(raw.substring(1, raw.length() - 1));
-      while (value.find()) values.add(unquote(value.group()));
-    } else values.add(unquote(raw));
-    Pattern glob = Pattern.compile(java.util.Arrays.stream(values.get(0).split("\\*", -1)).map(Pattern::quote).collect(Collectors.joining(".*")), Pattern.DOTALL);
+    MockAssetFilters.Field field = MockAssetFilters.FIELDS.get(name);
+    if (field == null || !MockAssetFilters.OPERATORS.contains(operator)) throw invalidFilter();
+    boolean isList = operator.equals("=in=") || operator.equals("=out=");
+    List<String> texts = new ArrayList<>();
+    if (isList) {
+      if (!raw.startsWith("(") || !raw.endsWith(")")) throw invalidFilter();
+      for (String part : split(raw.substring(1, raw.length() - 1), ',')) texts.add(value(part));
+    } else texts.add(value(raw));
+    if (texts.contains(null)) throw invalidFilter();
+    boolean number = field.kind().equals("number"), list = field.kind().equals("list");
+    // Values as the API reads them: null for a nullable field's "null", a number for a number field.
+    List<Object> values = new ArrayList<>();
+    for (String value : texts) {
+      if (field.nullable() && value.equals("null")) values.add(null);
+      else if (!number) values.add(value);
+      else if (NUMBER.matcher(value).matches()) values.add(Double.parseDouble(value));
+      else throw invalidFilter();
+    }
+    Object first = values.get(0);
+    // `*` in an == or != text value matches any run of characters, ignoring case.
+    Pattern glob = !isList && (operator.equals("==") || operator.equals("!=")) && first instanceof String pattern && pattern.contains("*")
+        ? Pattern.compile(java.util.Arrays.stream(pattern.split("\\*", -1)).map(part -> part.isEmpty() ? "" : Pattern.quote(part)).collect(Collectors.joining(".*")),
+            Pattern.DOTALL | Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE)
+        : null;
     return asset -> {
       JsonElement actual = path(asset, name);
-      List<String> texts = new ArrayList<>();
-      if (actual != null && actual.isJsonArray()) actual.getAsJsonArray().forEach(item -> texts.add(item.isJsonPrimitive() ? item.getAsString() : ""));
-      else texts.add(actual == null || !actual.isJsonPrimitive() ? "" : actual.getAsString());
+      if (actual == null || actual.isJsonNull()) {
+        // Like SQL, a comparison never matches a missing value; only == null finds one.
+        return operator.equals("==") && glob == null && first == null;
+      }
+      List<Object> present = new ArrayList<>();
+      if (list && actual.isJsonArray()) actual.getAsJsonArray().forEach(item -> present.add(item.isJsonPrimitive() ? item.getAsString() : ""));
+      else if (!actual.isJsonPrimitive()) return false;
+      else if (number && actual.getAsJsonPrimitive().isNumber()) present.add(actual.getAsDouble());
+      else present.add(actual.getAsString());
+      Predicate<Object> equal = expected -> expected != null && present.stream().anyMatch(expected::equals);
       switch (operator) {
-        case "==": return texts.stream().anyMatch(t -> glob.matcher(t).matches());
-        case "!=": return texts.stream().noneMatch(t -> glob.matcher(t).matches());
-        case "=in=": return texts.stream().anyMatch(values::contains);
-        case "=out=": return texts.stream().noneMatch(values::contains);
+        case "==": return glob != null ? present.stream().anyMatch(v -> glob.matcher(String.valueOf(v)).matches()) : first != null && equal.test(first);
+        case "!=": return glob != null ? present.stream().noneMatch(v -> glob.matcher(String.valueOf(v)).matches()) : first == null || !equal.test(first);
+        case "=in=": return values.stream().anyMatch(equal);
+        case "=out=": return !values.contains(null) && values.stream().noneMatch(equal);
         default:
-          double left, right;
-          try { left = Double.parseDouble(texts.get(0)); right = Double.parseDouble(values.get(0)); } catch (NumberFormatException notNumber) { return false; }
-          return switch (operator) { case "=gt=" -> left > right; case "=ge=" -> left >= right; case "=lt=" -> left < right; default -> left <= right; };
+          if (first == null || list) return false;
+          Object left = present.get(0);
+          int order;
+          if (left instanceof Double l && first instanceof Double r) order = Double.compare(l, r);
+          else if (left instanceof String l && first instanceof String r) order = compareText(l, r);
+          else return false;
+          return switch (operator) { case ">" -> order > 0; case ">=" -> order >= 0; case "<" -> order < 0; default -> order <= 0; };
       }
     };
   }
@@ -1138,6 +1192,18 @@ final class MockApi {
    * tie-breaker is added), starting after the cursor's values. A cursor is tied to {@code scope}
    * (the filter, folder or parent) and the ordering, so it only continues the query it came from.
    */
+  /** Refuses an ordering the API's schema refuses: at most two rules, each by {@code createdAt} or {@code id}. */
+  private static void checkOrdering(JsonArray ordering) throws Failure {
+    if (ordering.size() > 2) throw Failure.validation("validation/too-big", "ordering");
+    for (int i = 0; i < ordering.size(); i++) {
+      JsonObject order = ordering.get(i).getAsJsonObject();
+      String field = str(order, "field");
+      if (!"createdAt".equals(field) && !"id".equals(field)) throw Failure.validation(ErrorCodes.INVALID_VALUE, "ordering." + i + ".field");
+      String direction = Objects.requireNonNullElse(str(order, "direction"), "asc");
+      if (!direction.equals("asc") && !direction.equals("desc")) throw Failure.validation(ErrorCodes.INVALID_VALUE, "ordering." + i + ".direction");
+    }
+  }
+
   private JsonObject page(List<JsonObject> items, JsonObject q, String scope) throws Failure {
     long size = bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     JsonArray ordering = new JsonArray();
@@ -1148,15 +1214,12 @@ final class MockApi {
       newest.addProperty("direction", "desc");
       ordering.add(newest);
     }
+    checkOrdering(ordering);
     boolean byId = false;
     for (JsonElement element : ordering) {
       JsonObject order = element.getAsJsonObject();
-      String field = str(order, "field");
-      if (!"createdAt".equals(field) && !"id".equals(field)) throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "Invalid ordering");
-      String direction = Objects.requireNonNullElse(str(order, "direction"), "asc");
-      if (!direction.equals("asc") && !direction.equals("desc")) throw Failure.validation(ErrorCodes.INVALID_VALUE, "ordering.direction");
-      order.addProperty("direction", direction);
-      byId |= field.equals("id");
+      order.addProperty("direction", Objects.requireNonNullElse(str(order, "direction"), "asc"));
+      byId |= "id".equals(str(order, "field"));
     }
     if (!byId) {
       JsonObject tieBreak = new JsonObject();

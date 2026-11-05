@@ -122,14 +122,14 @@ final class MockServerClientTest extends TestCase
         self::fail('Expected an error');
     }
 
-    public function testChildrenListOnlyChildren(): void
+    public function testChildrenListOnlyChildrenAndTheAssetListIncludesThem(): void
     {
         $mock = new MockServerClient();
         $client = $mock->client();
         $cat = $client->text->classify(['name' => 'Black cat', 'text' => 'meow']);
         $mock->assets['child'] = ['id' => 'child', 'parentId' => $cat['id'], 'createdAt' => 1] + $cat;
         self::assertSame(['child'], array_column($client->assets->listChildren(['assetId' => $cat['id']])['items'], 'id'));
-        self::assertNotContains('child', array_column($client->assets->list()['items'], 'id'));
+        self::assertSame([$cat['id'], 'child'], array_column($client->assets->list()['items'], 'id'));
     }
 
     public function testFiltersSupportOrWildcardsAndValueLists(): void

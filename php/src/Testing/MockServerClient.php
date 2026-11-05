@@ -1121,7 +1121,7 @@ final class MockServerClient
     private function listAssets(array $query): array
     {
         $folderId = $query['folderId'] ?? null;
-        $items = array_filter($this->assets, fn ($asset) => $asset['parentId'] === null && ($folderId === null || $asset['folderId'] === $folderId));
+        $items = array_filter($this->assets, fn ($asset) => $folderId === null || $asset['folderId'] === $folderId);
         return $this->page($items, $query, Values::json([$this->projectId, $query['filter'] ?? null, $folderId]));
     }
 
@@ -1145,27 +1145,30 @@ final class MockServerClient
     }
 
     /**
-     * One keyset page like the API's: filtered with a subset of RSQL (`;` and, `,` or, `==` with
-     * `*` wildcards, `!=`, `=in=`, `=out=`, `=gt=`, `=ge=`, `=lt=`, `=le=`, `( … )` groups),
-     * ordered by `createdAt` and `id` with an `id` tie-breaker, resuming after the cursor's
-     * values. A cursor only continues the query (`$scope` and ordering) it came from.
+     * One keyset page like the API's: the query's ordering is checked first, like its schema
+     * (`createdAt` or `id`, at most two), then the filter, then the cursor. Ordered with an `id`
+     * tie-breaker, resuming after the cursor's values. A cursor only continues the query
+     * (`$scope` and ordering) it came from.
      */
     private function page(array $items, array $query, string $scope): array
     {
         $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
-        $items = array_values($items);
-        if (($query['filter'] ?? '') !== '') {
-            $items = array_values(array_filter($items, self::filter((string) $query['filter'])));
-        }
         $ordering = is_array($query['ordering'] ?? null) && $query['ordering'] !== [] ? array_values($query['ordering']) : [['field' => 'createdAt', 'direction' => 'desc']];
         foreach ($ordering as $i => $order) {
             if (!in_array($order['field'] ?? null, ['createdAt', 'id'], true)) {
-                self::fail(ErrorCodes::INVALID_ORDERING_FIELD, null, 'Invalid ordering', ['path' => "ordering.$i.field"]);
+                self::invalid(ErrorCodes::INVALID_VALUE, "ordering.$i.field");
             }
             $ordering[$i]['direction'] ??= 'asc';
             if (!in_array($ordering[$i]['direction'], ['asc', 'desc'], true)) {
-                self::invalid('validation/invalid-value', "ordering.$i.direction");
+                self::invalid(ErrorCodes::INVALID_VALUE, "ordering.$i.direction");
             }
+        }
+        if (count($ordering) > 2) {
+            self::invalid('validation/too-big', 'ordering');
+        }
+        $items = array_values($items);
+        if (($query['filter'] ?? '') !== '') {
+            $items = array_values(array_filter($items, self::filter((string) $query['filter'])));
         }
         if (!in_array('id', array_column($ordering, 'field'), true)) {
             $ordering[] = ['field' => 'id', 'direction' => $ordering[0]['direction']];
@@ -1207,33 +1210,87 @@ final class MockServerClient
         return ['items' => $taken, 'pageSize' => $size, 'hasMore' => $more, 'ordering' => $ordering, 'nextCursor' => $cursor];
     }
 
+    /**
+     * An RSQL filter like the API's (zodbase/rsql with @rsql/parser): comparisons on the fields in
+     * {@see AssetFilters::FIELDS} with the operators in {@see AssetFilters::OPERATORS}, joined by
+     * `;` or `and` (which bind tighter) and `,` or `or`, grouped with parentheses. Anything else
+     * fails with `validation/invalid-filter`, like the API.
+     */
     private static function filter(string $expression): \Closure
     {
-        preg_match_all('/"(?:[^"\\\\]|\\\\.)*"|\'(?:[^\'\\\\]|\\\\.)*\'|[;,()]|[^;,()"\']+/', $expression, $match);
-        $tokens = $match[0];
-        if (implode('', $tokens) !== $expression) {
-            throw new \LogicException("MockServerClient cannot parse the filter $expression");
-        }
-        // Whitespace between parentheses and separators carries nothing.
-        $tokens = array_values(array_filter($tokens, fn (string $token) => trim($token) !== ''));
+        $tokens = self::filterTokens($expression);
         $position = 0;
         $test = self::alternatives($tokens, $position);
         if ($position !== count($tokens)) {
-            throw new \LogicException("MockServerClient cannot parse the filter $expression");
+            self::invalidFilter();
         }
         return $test;
     }
 
-    /** `,` (or) of `;` (and) terms, read from `$tokens` until a closing `)` or the end. */
+    private static function invalidFilter(): never
+    {
+        self::fail(ErrorCodes::INVALID_FILTER, 400, 'Invalid filter');
+    }
+
+    /**
+     * The filter's tokens, as `[type, text]` pairs: `value` (unquoted), `quoted` (unescaped),
+     * `(`, `)`, `and`, `or` and `operator`. Like @rsql/parser, whitespace separates tokens and an
+     * unquoted run stops at a reserved character.
+     *
+     * @return list<array{string, string}>
+     */
+    private static function filterTokens(string $expression): array
+    {
+        $tokens = [];
+        $length = strlen($expression);
+        $position = 0;
+        while ($position < $length) {
+            $char = $expression[$position];
+            $rest = substr($expression, $position);
+            if (str_contains(" \n\t\r", $char)) {
+                $position++;
+            } elseif ($char === '"' || $char === "'") {
+                if (!preg_match('/^' . $char . '((?:[^' . $char . '\\\\]|\\\\.)*)' . $char . '/s', $rest, $match)) {
+                    self::invalidFilter();
+                }
+                $tokens[] = ['quoted', (string) preg_replace('/\\\\(.)/s', '$1', $match[1])];
+                $position += strlen($match[0]);
+            } elseif ($char === '(' || $char === ')') {
+                $tokens[] = [$char, $char];
+                $position++;
+            } elseif ($char === ';' || $char === ',') {
+                $tokens[] = [$char === ';' ? 'and' : 'or', $char];
+                $position++;
+            } elseif (preg_match('/^(==|!=|<=|>=|<|>|=[a-z]*=)/', $rest, $match)) {
+                $tokens[] = ['operator', $match[1]];
+                $position += strlen($match[1]);
+            } elseif (str_contains('=!~<>', $char)) {
+                self::invalidFilter();
+            } elseif (preg_match('/^(and|or) /', $rest, $match)) {
+                $tokens[] = [$match[1], $match[1]];
+                $position += strlen($match[1]);
+            } else {
+                preg_match('/^[^"\'();,=!~<> \n\t\r]+/', $rest, $match);
+                $tokens[] = ['value', $match[0]];
+                $position += strlen($match[0]);
+            }
+        }
+        if ($tokens === []) {
+            self::invalidFilter();
+        }
+        return $tokens;
+    }
+
+    /** `or` of `and` terms, read from `$tokens` until a closing `)` or the end. */
     private static function alternatives(array $tokens, int &$position): \Closure
     {
         $alternatives = [[]];
         while (true) {
             $alternatives[array_key_last($alternatives)][] = self::term($tokens, $position);
-            $token = $tokens[$position] ?? null;
-            if ($token === ';') {
+            $type = $tokens[$position][0] ?? null;
+            if ($type === 'and') {
                 $position++;
-            } elseif ($token === ',') {
+            } elseif ($type === 'or') {
                 $position++;
                 $alternatives[] = [];
             } else {
@@ -1250,83 +1307,120 @@ final class MockServerClient
         };
     }
 
-    /** A `( … )` group or a comparison, whose `=in=`/`=out=` value list keeps its parentheses. */
+    /** A `( … )` group, or a comparison: a field, an operator and a value or `( … )` value list. */
     private static function term(array $tokens, int &$position): \Closure
     {
-        if (($tokens[$position] ?? null) === '(') {
+        if (($tokens[$position][0] ?? null) === '(') {
             $position++;
             $group = self::alternatives($tokens, $position);
-            if (($tokens[$position] ?? null) !== ')') {
-                throw new \LogicException('MockServerClient filters need a closing parenthesis');
+            if (($tokens[$position][0] ?? null) !== ')') {
+                self::invalidFilter();
             }
             $position++;
             return $group;
         }
-        $text = '';
-        $depth = 0;
-        while (isset($tokens[$position])) {
-            $token = $tokens[$position];
-            if ($token === '(') {
-                if (!preg_match('/=(in|out)=\s*$/', $text)) {
-                    throw new \LogicException("MockServerClient cannot parse the filter term $text(");
+        [$type, $name] = $tokens[$position] ?? [null, ''];
+        [$opType, $operator] = $tokens[$position + 1] ?? [null, ''];
+        if ($type !== 'value' || $opType !== 'operator') {
+            self::invalidFilter();
+        }
+        $position += 2;
+        $values = [];
+        if (($tokens[$position][0] ?? null) === '(') {
+            $position++;
+            while (true) {
+                [$valueType, $value] = $tokens[$position] ?? [null, ''];
+                if ($valueType !== 'value' && $valueType !== 'quoted') {
+                    self::invalidFilter();
                 }
-                $depth++;
-            } elseif ($token === ')') {
-                if ($depth === 0) {
+                $values[] = $value;
+                $position++;
+                $next = $tokens[$position][0] ?? null;
+                $position++;
+                if ($next === ')') {
                     break;
                 }
-                $depth--;
-            } elseif ($depth === 0 && ($token === ';' || $token === ',')) {
-                break;
+                if ($next !== 'or') {
+                    self::invalidFilter();
+                }
             }
-            $text .= $token;
+        } else {
+            [$valueType, $value] = $tokens[$position] ?? [null, ''];
+            if ($valueType !== 'value' && $valueType !== 'quoted') {
+                self::invalidFilter();
+            }
+            $values[] = $value;
             $position++;
         }
-        return self::comparison($text);
+        return self::comparison($name, $operator, $values);
     }
 
-    private static function comparison(string $text): \Closure
+    /**
+     * One comparison, read like zodbase/rsql: the value is a number for a number field (anything
+     * else is refused), `null` is a missing value only on a nullable field, and other values stay
+     * text. `*` in an `==` or `!=` text value matches any run of characters regardless of case;
+     * every other character matches itself. As in SQL, no comparison matches a missing value.
+     *
+     * @param list<string> $raw
+     */
+    private static function comparison(string $name, string $operator, array $raw): \Closure
     {
-        if (!preg_match('/^\s*([\w.]+)\s*(==|!=|=in=|=out=|=gt=|=ge=|=lt=|=le=)(.*)$/sD', $text, $match)) {
-            throw new \LogicException("MockServerClient cannot evaluate the filter $text");
+        $field = AssetFilters::FIELDS[$name] ?? null;
+        if ($field === null || !in_array($operator, AssetFilters::OPERATORS, true)) {
+            self::invalidFilter();
         }
-        [, $name, $operator, $raw] = $match;
-        $raw = trim($raw);
-        $unquote = function (string $value): string {
-            $value = trim($value);
-            return $value !== '' && ($value[0] === '"' || $value[0] === "'")
-                ? str_replace(['\\"', "\\'"], ['"', "'"], substr($value, 1, -1)) : $value;
-        };
-        if (str_starts_with($raw, '(')) {
-            preg_match_all('/"(?:[^"\\\\]|\\\\.)*"|[^,()]+/', substr($raw, 1, -1), $listed);
-            $values = array_map($unquote, $listed[0]);
-        } else {
-            $values = [$unquote($raw)];
-        }
-        return function (array $asset) use ($name, $operator, $values): bool {
+        $values = array_map(function (string $value) use ($field): int|float|string|null {
+            if ($value === 'null' && $field['nullable']) {
+                return null;
+            }
+            if ($field['kind'] !== 'number') {
+                return $value;
+            }
+            $number = trim($value);
+            if (!is_numeric($number) || !is_finite((float) $number)) {
+                self::invalidFilter();
+            }
+            return $number + 0;
+        }, $raw);
+        $value = $values[0];
+        $pattern = is_string($value) && str_contains($value, '*') && ($operator === '==' || $operator === '!=')
+            ? '/^' . implode('.*', array_map(fn (string $part) => preg_quote($part, '/'), explode('*', $value))) . '$/isu'
+            : null;
+        $list = $field['kind'] === 'list';
+        return function (array $asset) use ($name, $operator, $values, $value, $pattern, $list): bool {
             $actual = $asset;
             foreach (explode('.', $name) as $key) {
                 $actual = is_array($actual) ? ($actual[$key] ?? null) : null;
             }
-            $items = is_array($actual) && array_is_list($actual) ? $actual : [$actual];
-            $texts = array_map(fn ($item) => match (true) {
-                $item === null => '',
-                is_bool($item) => $item ? 'true' : 'false',
-                is_array($item) => Values::json($item),
-                default => (string) $item,
-            }, $items);
-            $any = fn (callable $test) => array_filter($texts, $test) !== [];
+            if ($actual === null) {
+                return $operator === '==' && $value === null && $pattern === null;
+            }
+            $equals = fn ($item, $expected): bool => $expected !== null && (is_string($expected) ? $item === $expected : (is_int($item) || is_float($item)) && $item == $expected);
+            $matches = fn ($item): bool => $pattern !== null
+                ? is_string($item) && preg_match($pattern, $item) === 1
+                : $equals($item, $value);
+            $items = $list && is_array($actual) ? $actual : [$actual];
+            $any = fn (callable $test): bool => array_filter($items, $test) !== [];
             return match ($operator) {
-                '==' => $any(fn ($t) => fnmatch($values[0], $t, FNM_NOESCAPE)),
-                '!=' => !$any(fn ($t) => fnmatch($values[0], $t, FNM_NOESCAPE)),
-                '=in=' => $any(fn ($t) => in_array($t, $values, true)),
-                '=out=' => !$any(fn ($t) => in_array($t, $values, true)),
-                default => is_numeric($actual) && is_numeric($values[0]) && match ($operator) {
-                    '=gt=' => $actual > $values[0], '=ge=' => $actual >= $values[0],
-                    '=lt=' => $actual < $values[0], default => $actual <= $values[0],
+                '==' => $value !== null && $any($matches),
+                '!=' => $value === null || !$any($matches),
+                '=in=' => $any(fn ($item) => array_filter($values, fn ($expected) => $equals($item, $expected)) !== []),
+                '=out=' => !in_array(null, $values, true)
+                    && !$any(fn ($item) => array_filter($values, fn ($expected) => $equals($item, $expected)) !== []),
+                default => !$list && $value !== null && match ($operator) {
+                    '>' => self::compareFilterValues($actual, $value) > 0,
+                    '>=' => self::compareFilterValues($actual, $value) >= 0,
+                    '<' => self::compareFilterValues($actual, $value) < 0,
+                    default => self::compareFilterValues($actual, $value) <= 0,
                 },
             };
         };
+    }
+
+    /** Numbers compare numerically and text by code point, like the database. */
+    private static function compareFilterValues(mixed $actual, int|float|string $value): int
+    {
+        return is_string($value) ? strcmp((string) $actual, $value) : $actual <=> $value;
     }
 
     /** Keyword search fields, in the order matches are reported, and where each value sits in the asset. */

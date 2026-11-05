@@ -1,4 +1,5 @@
 //! The in-memory API behind [`MockServerClient::in_memory`](super::MockServerClient::in_memory).
+use super::asset_filters;
 use super::decision::{
     IntoMockDecision, MockDecision, MockModerationContent, MockModerationInput,
     MockModerationTrigger, MockOutcome,
@@ -804,7 +805,11 @@ impl Backend {
             "high"
         };
         // A decision through the API (with its note) is the API key's; the test hook's is a reviewer's.
-        let decided_by = if note.is_null() { "reviewer" } else { "api-key" };
+        let decided_by = if note.is_null() {
+            "reviewer"
+        } else {
+            "api-key"
+        };
         let facts = json!([
             {"key": "decided-by", "value": decided_by},
             {"key": "asset-type", "value": asset["type"]},
@@ -2214,12 +2219,13 @@ impl Backend {
         scope: &str,
         include: impl Fn(&Value) -> bool,
     ) -> Outcome<Value> {
+        // In the API's order: the query schema (page size, then ordering), then the filter.
         let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
+        let ordering = cursor_ordering(q)?;
         let filter = q
             .get("filter")
             .map(|expression| parse_filter(expression))
             .transpose()?;
-        let ordering = cursor_ordering(q)?;
         let items: Vec<&Value> = self
             .storage
             .assets
@@ -2704,12 +2710,24 @@ fn cursor_ordering(q: &HashMap<String, String>) -> Outcome<Vec<(String, bool)>> 
             .get(&format!("ordering[{}][direction]", ordering.len()))
             .cloned()
             .unwrap_or_default();
-        if !["createdAt", "id"].contains(&field.as_str())
-            || !["asc", "desc"].contains(&direction.as_str())
-        {
-            return Err(invalid("Ordering must be createdAt or id, asc or desc"));
+        // Like CURSOR_PAGE_QUERY_SCHEMA: a field of createdAt or id, then a direction.
+        let index = ordering.len();
+        if !["createdAt", "id"].contains(&field.as_str()) {
+            return Err(validation(
+                "invalid-value",
+                &format!("ordering.{index}.field"),
+            ));
+        }
+        if !["asc", "desc"].contains(&direction.as_str()) {
+            return Err(validation(
+                "invalid-value",
+                &format!("ordering.{index}.direction"),
+            ));
         }
         ordering.push((field.clone(), direction == "asc"));
+    }
+    if ordering.len() > 2 {
+        return Err(validation("too-big", "ordering"));
     }
     if ordering.is_empty() {
         ordering.push(("createdAt".into(), false));
@@ -2812,8 +2830,9 @@ fn compare(a: &Value, b: &Value) -> Ordering {
     }
 }
 
-/// An RSQL subset: `;` (and), which binds tighter than `,` (or), `( … )` groups, `==` and `!=`
-/// (with `*` wildcards), `=in=`, `=out=`, `=gt=`, `=ge=`, `=lt=`, `=le=` and quoted values.
+/// An asset list filter as the API reads it (zodbase/rsql with @rsql/parser): `;` (and), which
+/// binds tighter than `,` (or), `( … )` groups, quoted or unquoted values, and only the fields
+/// and operators in `asset_filters`. Anything else is `validation/invalid-filter`.
 /// Alternatives (`,`) of terms (`;`) that must all hold.
 struct Filter(Vec<Vec<Term>>);
 enum Term {
@@ -2821,113 +2840,181 @@ enum Term {
     Group(Filter),
 }
 struct Comparison {
-    field: String,
+    field: &'static str,
     operator: &'static str,
-    values: Vec<String>,
+    values: Vec<Operand>,
+}
+/// A filter value read by its field's type: `null` only on a nullable field, a number on a
+/// number field, and text otherwise.
+enum Operand {
+    Null,
+    Number(f64),
+    Text(String),
+}
+/// Characters that end an unquoted selector or value (@rsql/ast ReservedChars).
+const RESERVED: &[char] = &[
+    '"', '\'', '(', ')', ';', ',', '=', '!', '~', '<', '>', ' ', '\n', '\t', '\r',
+];
+fn invalid_filter() -> Failure {
+    fail(ErrorCode::InvalidFilter, "Invalid filter")
+}
+/// Walks `text` outside quotes (honouring `\` escapes), calling `visit` with each character's
+/// index, the character and the parenthesis depth before it.
+fn scan(text: &str, mut visit: impl FnMut(usize, char, i32) -> bool) -> Option<i32> {
+    let (mut depth, mut quote, mut escaped) = (0i32, None, false);
+    for (index, c) in text.char_indices() {
+        if let Some(q) = quote {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == q {
+                quote = None;
+            }
+            continue;
+        }
+        if !visit(index, c, depth) {
+            return None;
+        }
+        match c {
+            '"' | '\'' => quote = Some(c),
+            '(' => depth += 1,
+            ')' => depth -= 1,
+            _ => {}
+        }
+    }
+    quote.is_none().then_some(depth)
 }
 /// The expression inside `( … )` when the parentheses enclose all of `text`.
 fn unwrap_group(text: &str) -> Option<&str> {
     if !text.starts_with('(') || !text.ends_with(')') {
         return None;
     }
-    let (mut depth, mut quote) = (0i32, None);
-    for (index, c) in text.char_indices() {
-        match (quote, c) {
-            (Some(q), c) if c == q => quote = None,
-            (Some(_), _) => {}
-            (None, '"' | '\'') => quote = Some(c),
-            (None, '(') => depth += 1,
-            (None, ')') => {
-                depth -= 1;
-                if depth == 0 {
-                    return (index == text.len() - 1).then(|| &text[1..index]);
-                }
-            }
-            _ => {}
+    let mut closes_early = false;
+    scan(text, |index, c, depth| {
+        if c == ')' && depth == 1 && index != text.len() - 1 {
+            closes_early = true;
         }
-    }
-    None
+        true
+    })?;
+    (!closes_early).then(|| &text[1..text.len() - 1])
 }
-fn split_top(expression: &str, separator: char) -> Vec<&str> {
-    let (mut parts, mut start, mut depth, mut quote) = (Vec::new(), 0, 0i32, None);
-    for (index, c) in expression.char_indices() {
-        match (quote, c) {
-            (Some(q), c) if c == q => quote = None,
-            (Some(_), _) => {}
-            (None, '"' | '\'') => quote = Some(c),
-            (None, '(') => depth += 1,
-            (None, ')') => depth -= 1,
-            (None, c) if c == separator && depth == 0 => {
-                parts.push(&expression[start..index]);
-                start = index + 1;
-            }
-            _ => {}
+fn split_top(expression: &str, separator: char) -> Outcome<Vec<&str>> {
+    let (mut parts, mut start) = (Vec::new(), 0);
+    let depth = scan(expression, |index, c, depth| {
+        if c == separator && depth == 0 {
+            parts.push(&expression[start..index]);
+            start = index + 1;
         }
+        depth >= 0
+    });
+    if depth != Some(0) {
+        return Err(invalid_filter());
     }
     parts.push(&expression[start..]);
-    parts
+    Ok(parts)
 }
-fn unquote(value: &str) -> String {
+/// One value token: a quoted string with `\` escapes, or unquoted text without reserved
+/// characters.
+fn value_token(value: &str) -> Outcome<String> {
     let value = value.trim();
     match value.chars().next() {
-        Some(q @ ('"' | '\'')) if value.len() >= 2 && value.ends_with(q) => {
-            value[1..value.len() - 1].replace(&format!("\\{q}"), &q.to_string())
+        Some(q @ ('"' | '\'')) => {
+            let mut out = String::new();
+            let mut chars = value[1..].chars();
+            while let Some(c) = chars.next() {
+                match c {
+                    '\\' => out.push(chars.next().ok_or_else(invalid_filter)?),
+                    c if c == q => {
+                        return chars
+                            .as_str()
+                            .is_empty()
+                            .then_some(out)
+                            .ok_or_else(invalid_filter)
+                    }
+                    c => out.push(c),
+                }
+            }
+            Err(invalid_filter())
         }
-        _ => value.to_owned(),
+        _ if value.is_empty() || value.contains(RESERVED) => Err(invalid_filter()),
+        _ => Ok(value.to_owned()),
     }
 }
 fn parse_filter(expression: &str) -> Outcome<Filter> {
-    parse_group(expression, expression)
+    if expression.trim().is_empty() {
+        return Err(invalid_filter());
+    }
+    parse_group(expression)
 }
-fn parse_group(expression: &str, whole: &str) -> Outcome<Filter> {
-    let unsupported = |reason: &str| {
-        let mut failure = custom(
-            "mock/invalid-filter",
-            400,
-            "The mock cannot evaluate this filter",
-        );
-        failure.details = json!({ "filter": whole, "reason": reason });
-        failure
-    };
+fn parse_group(expression: &str) -> Outcome<Filter> {
     let mut alternatives = Vec::new();
-    for alternative in split_top(expression, ',') {
+    for alternative in split_top(expression, ',')? {
         let mut terms = Vec::new();
-        for term in split_top(alternative, ';') {
+        for term in split_top(alternative, ';')? {
             let term = term.trim();
             if let Some(group) = unwrap_group(term) {
-                terms.push(Term::Group(parse_group(group, whole)?));
+                terms.push(Term::Group(parse_group(group)?));
                 continue;
             }
-            let field_end = term
-                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '.' || c == '_'))
-                .unwrap_or(term.len());
-            let (field, rest) = term.split_at(field_end);
-            let operator = ["==", "!=", "=in=", "=out=", "=gt=", "=ge=", "=lt=", "=le="]
-                .into_iter()
-                .find(|operator| rest.starts_with(operator))
-                .filter(|_| !field.is_empty())
-                .ok_or_else(|| unsupported("expected `field<operator>value` or a ( … ) group"))?;
-            let raw = rest[operator.len()..].trim();
-            let values = if operator == "=in=" || operator == "=out=" {
-                let list = raw
-                    .strip_prefix('(')
-                    .and_then(|list| list.strip_suffix(')'))
-                    .ok_or_else(|| unsupported("=in= and =out= take a (list)"))?;
-                split_top(list, ',').into_iter().map(unquote).collect()
-            } else if raw.starts_with('(') {
-                return Err(unsupported("only =in= and =out= take a (list)"));
-            } else {
-                vec![unquote(raw)]
-            };
-            terms.push(Term::Comparison(Comparison {
-                field: field.to_owned(),
-                operator,
-                values,
-            }));
+            terms.push(Term::Comparison(parse_comparison(term)?));
         }
         alternatives.push(terms);
     }
     Ok(Filter(alternatives))
+}
+fn parse_comparison(term: &str) -> Outcome<Comparison> {
+    let selector_end = term.find(RESERVED).unwrap_or(term.len());
+    let (selector, rest) = term.split_at(selector_end);
+    let rest = rest.trim_start();
+    // A canonical operator, or a FIQL-style `=word=` the API then refuses.
+    let operator_len = ["==", "!=", "<=", ">=", "<", ">"]
+        .into_iter()
+        .find(|operator| rest.starts_with(operator))
+        .map(str::len)
+        .or_else(|| {
+            let word = rest.strip_prefix('=')?;
+            let letters = word.bytes().take_while(u8::is_ascii_lowercase).count();
+            word[letters..].starts_with('=').then_some(letters + 2)
+        })
+        .ok_or_else(invalid_filter)?;
+    let (field, kind, nullable) = *asset_filters::ASSET_FILTER_FIELDS
+        .iter()
+        .find(|(name, _, _)| *name == selector)
+        .ok_or_else(invalid_filter)?;
+    let operator = *asset_filters::FILTER_OPERATORS
+        .iter()
+        .find(|operator| **operator == &rest[..operator_len])
+        .ok_or_else(invalid_filter)?;
+    let raw = rest[operator_len..].trim();
+    let tokens = match raw.strip_prefix('(') {
+        Some(list) => {
+            let list = list.strip_suffix(')').ok_or_else(invalid_filter)?;
+            split_top(list, ',')?
+        }
+        None => vec![raw],
+    };
+    let mut values = Vec::new();
+    for token in tokens {
+        let text = value_token(token)?;
+        values.push(if nullable && text == "null" {
+            Operand::Null
+        } else if kind == "number" {
+            text.trim()
+                .parse::<f64>()
+                .ok()
+                .filter(|number| number.is_finite() && !text.trim().is_empty())
+                .map(Operand::Number)
+                .ok_or_else(invalid_filter)?
+        } else {
+            Operand::Text(text)
+        });
+    }
+    Ok(Comparison {
+        field,
+        operator,
+        values,
+    })
 }
 fn wildcard(pattern: &str, value: &str) -> bool {
     match pattern.split_once('*') {
@@ -2942,37 +3029,81 @@ fn wildcard(pattern: &str, value: &str) -> bool {
         }
     }
 }
+impl Operand {
+    /// Whether a present value equals this one, as SQL `=` compares them (case-sensitively).
+    fn equals(&self, actual: &Value) -> bool {
+        match self {
+            Operand::Null => false,
+            Operand::Number(number) => actual.as_f64() == Some(*number),
+            Operand::Text(text) => actual.as_str() == Some(text.as_str()),
+        }
+    }
+    /// A `*` pattern, matched regardless of case, when this is text that holds one.
+    fn pattern(&self) -> Option<String> {
+        match self {
+            Operand::Text(text) if text.contains('*') => Some(text.to_lowercase()),
+            _ => None,
+        }
+    }
+    fn order(&self, actual: &Value) -> Option<Ordering> {
+        match self {
+            Operand::Null => None,
+            Operand::Number(number) => actual.as_f64().map(|left| left.total_cmp(number)),
+            Operand::Text(text) => actual.as_str().map(|left| left.cmp(text.as_str())),
+        }
+    }
+}
 impl Filter {
     fn matches(&self, asset: &Value) -> bool {
         self.0.iter().any(|terms| {
-            terms.iter().all(|term| {
-                let comparison = match term {
-                    Term::Group(group) => return group.matches(asset),
-                    Term::Comparison(comparison) => comparison,
-                };
-                let actual = lookup(asset, &comparison.field);
-                let texts: Vec<String> = match actual {
-                    Value::Array(items) => items.iter().map(display).collect(),
-                    value => vec![display(value)],
-                };
-                let first = &comparison.values[0];
-                let number =
-                    |op: fn(f64, f64) -> bool| match (actual.as_f64(), first.parse::<f64>()) {
-                        (Some(left), Ok(right)) => op(left, right),
-                        _ => false,
-                    };
-                match comparison.operator {
-                    "==" => texts.iter().any(|text| wildcard(first, text)),
-                    "!=" => !texts.iter().any(|text| wildcard(first, text)),
-                    "=in=" => texts.iter().any(|text| comparison.values.contains(text)),
-                    "=out=" => !texts.iter().any(|text| comparison.values.contains(text)),
-                    "=gt=" => number(|a, b| a > b),
-                    "=ge=" => number(|a, b| a >= b),
-                    "=lt=" => number(|a, b| a < b),
-                    _ => number(|a, b| a <= b),
-                }
+            terms.iter().all(|term| match term {
+                Term::Group(group) => group.matches(asset),
+                Term::Comparison(comparison) => comparison.matches(asset),
             })
         })
+    }
+}
+impl Comparison {
+    /// Like SQL, a comparison never matches a missing value, except `==null`.
+    fn matches(&self, asset: &Value) -> bool {
+        let actual = lookup(asset, self.field);
+        let first = &self.values[0];
+        if actual.is_null() {
+            return self.operator == "==" && matches!(first, Operand::Null);
+        }
+        // Tags hold a list: a term matches when one of them does.
+        let items: Vec<&Value> = match actual {
+            Value::Array(items) => items.iter().collect(),
+            value => vec![value],
+        };
+        let equals = |operand: &Operand| match operand.pattern() {
+            Some(pattern) => items.iter().any(|item| {
+                item.as_str()
+                    .is_some_and(|text| wildcard(&pattern, &text.to_lowercase()))
+            }),
+            None => items.iter().any(|item| operand.equals(item)),
+        };
+        let listed = |operand: &Operand| items.iter().any(|item| operand.equals(item));
+        let order = |test: fn(Ordering) -> bool| {
+            items.iter().any(|item| first.order(item).is_some_and(test))
+        };
+        match self.operator {
+            "==" => equals(first),
+            "!=" => matches!(first, Operand::Null) || !equals(first),
+            // Lists compare exactly: `*` is a wildcard only in `==` and `!=`.
+            "=in=" => self.values.iter().any(listed),
+            "=out=" => {
+                !self
+                    .values
+                    .iter()
+                    .any(|value| matches!(value, Operand::Null))
+                    && !self.values.iter().any(listed)
+            }
+            ">" => order(Ordering::is_gt),
+            ">=" => order(Ordering::is_ge),
+            "<" => order(Ordering::is_lt),
+            _ => order(Ordering::is_le),
+        }
     }
 }
 

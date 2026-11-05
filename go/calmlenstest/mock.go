@@ -2135,13 +2135,7 @@ type pageCursor struct {
 // pagination from the query like the API. A cursor continues only the query (scope and
 // ordering) it came from.
 func (m *MockServerClient) page(include func(calmlens.JSON) bool, q url.Values, scope string) (any, error) {
-	var filter filterNode
-	if expression := q.Get("filter"); expression != "" {
-		var err error
-		if filter, err = parseFilter(expression); err != nil {
-			return nil, &apiError{code: calmlens.CodeInvalidFilter, status: http.StatusBadRequest, details: calmlens.JSON{"reason": err.Error()}}
-		}
-	}
+	// Like the API: the query schema (page size, ordering) first, then the filter.
 	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
 	if err != nil {
 		return nil, err
@@ -2149,6 +2143,12 @@ func (m *MockServerClient) page(include func(calmlens.JSON) bool, q url.Values, 
 	ordering, err := cursorOrdering(q)
 	if err != nil {
 		return nil, err
+	}
+	var filter filterNode
+	if expression := q.Get("filter"); expression != "" {
+		if filter, err = parseFilter(expression); err != nil {
+			return nil, fail(calmlens.CodeInvalidFilter)
+		}
 	}
 	items := []calmlens.JSON{}
 	for _, a := range m.DatabaseStorage.Assets {
@@ -2165,10 +2165,16 @@ func cursorOrdering(q url.Values) ([]calmlens.Order, error) {
 	ordering := []calmlens.Order{}
 	for i := 0; q.Has(fmt.Sprintf("ordering[%d][field]", i)); i++ {
 		order := calmlens.Order{Field: q.Get(fmt.Sprintf("ordering[%d][field]", i)), Direction: q.Get(fmt.Sprintf("ordering[%d][direction]", i))}
-		if (order.Field != "createdAt" && order.Field != "id") || order.Direction != calmlens.OrderAscending && order.Direction != calmlens.OrderDescending {
-			return nil, fail(calmlens.CodeInvalidUploadPayload)
+		if order.Field != "createdAt" && order.Field != "id" {
+			return nil, validation("validation/invalid-value", fmt.Sprintf("ordering.%d.field", i))
+		}
+		if order.Direction != calmlens.OrderAscending && order.Direction != calmlens.OrderDescending {
+			return nil, validation("validation/invalid-value", fmt.Sprintf("ordering.%d.direction", i))
 		}
 		ordering = append(ordering, order)
+	}
+	if len(ordering) > 2 {
+		return nil, validation("validation/too-big", "ordering")
 	}
 	if len(ordering) == 0 {
 		ordering = append(ordering, calmlens.Order{Field: "createdAt", Direction: calmlens.OrderDescending})
@@ -2177,6 +2183,22 @@ func cursorOrdering(q url.Values) ([]calmlens.Order, error) {
 		ordering = append(ordering, calmlens.Order{Field: "id", Direction: ordering[0].Direction})
 	}
 	return ordering, nil
+}
+
+// compareValues orders two values numerically when both are numbers, otherwise as text.
+func compareValues(left any, right string) int {
+	if n, ok := asNumber(left); ok {
+		if r, err := strconv.ParseFloat(right, 64); err == nil {
+			switch {
+			case n < r:
+				return -1
+			case n > r:
+				return 1
+			}
+			return 0
+		}
+	}
+	return strings.Compare(fmt.Sprint(left), right)
 }
 
 // keysetPage sorts items by ordering (which ends with the id tie-breaker) and returns the page

@@ -1,6 +1,7 @@
 import { invalidArgument } from "../client/CalmLensError";
 import type { Asset, AssetSearchResponse } from "../client/CalmLensTypes";
 import type { CursorPage, Page } from "../contract/Page.js";
+import { MOCK_ASSET_FILTER_FIELDS, MOCK_FILTER_OPERATORS } from "./MockAssetFilters";
 
 type Ordering = NonNullable<Page<unknown>["ordering"]>;
 
@@ -139,16 +140,145 @@ export const orderItems = <T>(items: T[], ordering: Ordering | null | undefined)
   });
 };
 
-const COMPARISON = /^([A-Za-z][\w.]*)(==|!=|=in=|=out=|>=|<=|=gt=|=ge=|=lt=|=le=|>|<)(.+)$/;
+/** Thrown for a filter the API refuses with `validation/invalid-filter`. */
+export class MockInvalidFilter extends Error {}
 
-const parseFilterValue = (raw: string): unknown => {
-  const value = raw.trim();
-  if (/^".*"$/.test(value) || /^'.*'$/.test(value)) return value.slice(1, -1);
-  if (value === "null") return null;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  if (value !== "" && !Number.isNaN(Number(value))) return Number(value);
-  return value;
+type FilterValue = string | number | null;
+type FilterNode =
+  | { type: "and" | "or"; nodes: FilterNode[] }
+  | { type: "comparison"; field: string; operator: string; values: FilterValue[] };
+type FilterToken = { kind: "word" | "quoted" | "operator" | "paren" | "logic"; text: string };
+
+/** The characters that end an unquoted word, as in @rsql/parser. */
+const RESERVED = "\"'();,=!~<> \n\t\r";
+const LOGIC_WORDS = ["and", "or"];
+
+/** Splits a filter into tokens like @rsql/parser's lexer. */
+const tokenize = (filter: string): FilterToken[] => {
+  const tokens: FilterToken[] = [];
+  let i = 0;
+  while (i < filter.length) {
+    const char = filter[i]!;
+    if (" \n\t\r".includes(char)) {
+      i++;
+    } else if (char === '"' || char === "'") {
+      let text = "";
+      let j = i + 1;
+      for (; j < filter.length && filter[j] !== char; j++) {
+        if (filter[j] === "\\" && j + 1 < filter.length) j++;
+        text += filter[j];
+      }
+      if (j >= filter.length) throw new MockInvalidFilter();
+      tokens.push({ kind: "quoted", text });
+      i = j + 1;
+    } else if (char === "(" || char === ")") {
+      tokens.push({ kind: "paren", text: char });
+      i++;
+    } else if (char === ";" || char === ",") {
+      tokens.push({ kind: "logic", text: char === ";" ? "and" : "or" });
+      i++;
+    } else if ("=!~<>".includes(char)) {
+      const operator = /^(==|!=|<=|>=|<|>|=[a-z]*=)/.exec(filter.slice(i))?.[0];
+      if (!operator) throw new MockInvalidFilter();
+      tokens.push({ kind: "operator", text: operator });
+      i += operator.length;
+    } else {
+      const word = LOGIC_WORDS.find((logic) => filter.startsWith(`${logic} `, i));
+      if (word) {
+        tokens.push({ kind: "logic", text: word });
+        i += word.length;
+        continue;
+      }
+      let j = i + 1;
+      while (j < filter.length && !RESERVED.includes(filter[j]!)) j++;
+      tokens.push({ kind: "word", text: filter.slice(i, j) });
+      i = j;
+    }
+  }
+  return tokens;
+};
+
+/**
+ * A field's value as the API reads it (zodbase/rsql): `null` is a missing value only on a
+ * nullable field, and a number field's value must be a finite number.
+ */
+const readFilterValue = (field: string, text: string): FilterValue => {
+  const { kind, nullable } = MOCK_ASSET_FILTER_FIELDS[field]!;
+  if (text === "null" && nullable) return null;
+  if (kind !== "number") return text;
+  const number = Number(text);
+  if (text === "" || !Number.isFinite(number)) throw new MockInvalidFilter();
+  return number;
+};
+
+/** Parses a filter: `;` (and) binds tighter than `,` (or), and parentheses group. */
+const parseFilter = (filter: string): FilterNode => {
+  const tokens = tokenize(filter);
+  let position = 0;
+  const peek = () => tokens[position];
+  const next = () => {
+    const token = tokens[position++];
+    if (!token) throw new MockInvalidFilter();
+    return token;
+  };
+  const value = () => {
+    const token = next();
+    if (token.kind !== "word" && token.kind !== "quoted") throw new MockInvalidFilter();
+    return token.text;
+  };
+  const term = (): FilterNode => {
+    const token = next();
+    if (token.kind === "paren" && token.text === "(") {
+      const node = alternatives();
+      if (next().text !== ")") throw new MockInvalidFilter();
+      return node;
+    }
+    if (token.kind !== "word" || !Object.hasOwn(MOCK_ASSET_FILTER_FIELDS, token.text))
+      throw new MockInvalidFilter();
+    const field = token.text;
+    const operator = next();
+    if (operator.kind !== "operator" || !MOCK_FILTER_OPERATORS.includes(operator.text))
+      throw new MockInvalidFilter();
+    let texts: string[];
+    if (peek()?.kind === "paren" && peek()?.text === "(") {
+      next();
+      texts = [value()];
+      while (peek()?.kind === "logic" && peek()?.text === "or") {
+        next();
+        texts.push(value());
+      }
+      if (next().text !== ")") throw new MockInvalidFilter();
+    } else {
+      texts = [value()];
+    }
+    if (texts.length > 1 && operator.text !== "=in=" && operator.text !== "=out=")
+      throw new MockInvalidFilter();
+    return {
+      type: "comparison",
+      field,
+      operator: operator.text,
+      values: texts.map((text) => readFilterValue(field, text)),
+    };
+  };
+  const conjunction = (): FilterNode => {
+    const nodes = [term()];
+    while (peek()?.kind === "logic" && peek()?.text === "and") {
+      next();
+      nodes.push(term());
+    }
+    return nodes.length === 1 ? nodes[0]! : { type: "and", nodes };
+  };
+  const alternatives = (): FilterNode => {
+    const nodes = [conjunction()];
+    while (peek()?.kind === "logic" && peek()?.text === "or") {
+      next();
+      nodes.push(conjunction());
+    }
+    return nodes.length === 1 ? nodes[0]! : { type: "or", nodes };
+  };
+  const node = alternatives();
+  if (position !== tokens.length) throw new MockInvalidFilter();
+  return node;
 };
 
 const readField = (item: Record<string, unknown>, path: string): unknown =>
@@ -160,118 +290,77 @@ const readField = (item: Record<string, unknown>, path: string): unknown =>
       item,
     );
 
-const unsupportedFilter = (expression: string) =>
-  invalidArgument(
-    `MockCalmLensServerClient cannot evaluate the filter "${expression}". It supports ==, !=, <, <=, >, >=, =in= and =out=, joined by ; (and) or , (or) and grouped with parentheses.`,
+/** `*` matches any run of characters, regardless of case; every other character itself. */
+const wildcard = (pattern: string) =>
+  new RegExp(
+    `^${pattern
+      .split("*")
+      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join(".*")}$`,
+    "isu",
   );
 
-const matchesComparison = (item: Record<string, unknown>, comparison: string): boolean => {
-  const match = COMPARISON.exec(comparison.trim());
-  if (!match) throw unsupportedFilter(comparison);
-  const [, field, operator, rawValue] = match as unknown as [string, string, string, string];
-  const actual = readField(item, field);
-  const isList = operator === "=in=" || operator === "=out=";
-  if (isList && !/^\(.*\)$/.test(rawValue.trim())) throw unsupportedFilter(comparison);
-  const values = isList
-    ? rawValue.trim().slice(1, -1).split(",").map(parseFilterValue)
-    : [parseFilterValue(rawValue)];
-  const equals = (expected: unknown) =>
-    Array.isArray(actual)
-      ? actual.includes(expected)
-      : expected === null
-        ? actual === null || actual === undefined
-        : actual === expected;
+/** Compares like SQL: a missing value never matches, except `== null`. */
+const matchesComparison = (
+  item: Record<string, unknown>,
+  { field, operator, values }: Extract<FilterNode, { type: "comparison" }>,
+): boolean => {
+  const actual = readField(item, field) ?? null;
+  const [value] = values;
+  if (actual === null) return operator === "==" && value === null;
+  if (operator === "!=" && value === null) return true;
+  // Each tag counts as the asset's value.
+  const actuals = Array.isArray(actual) ? actual : [actual];
+  const equals = (expected: FilterValue) => actuals.some((each) => each === expected);
+  if (
+    (operator === "==" || operator === "!=") &&
+    typeof value === "string" &&
+    value.includes("*")
+  ) {
+    const pattern = wildcard(value);
+    const matched = actuals.some((each) => typeof each === "string" && pattern.test(each));
+    return operator === "==" ? matched : !matched;
+  }
   switch (operator) {
     case "==":
-      return equals(values[0]);
+      return equals(value!);
     case "!=":
-      return !equals(values[0]);
+      return !equals(value!);
     case "=in=":
       return values.some(equals);
     case "=out=":
-      return !values.some(equals);
+      return !values.includes(null) && !values.some(equals);
+  }
+  if (value === null) return false;
+  const order = compareValues(actual, value);
+  switch (operator) {
     case ">":
-    case "=gt=":
-      return compareValues(actual, values[0]) > 0;
+      return order > 0;
     case ">=":
-    case "=ge=":
-      return compareValues(actual, values[0]) >= 0;
+      return order >= 0;
     case "<":
-    case "=lt=":
-      return compareValues(actual, values[0]) < 0;
+      return order < 0;
     default:
-      return compareValues(actual, values[0]) <= 0;
+      return order <= 0;
   }
 };
 
-/** Splits on `separator` outside quotes and parentheses. */
-const splitTopLevel = (text: string, separator: string): string[] => {
-  const parts: string[] = [];
-  let depth = 0;
-  let quote: string | null = null;
-  let current = "";
-  for (const char of text) {
-    if (quote) {
-      if (char === quote) quote = null;
-    } else if (char === '"' || char === "'") {
-      quote = char;
-    } else if (char === "(") {
-      depth++;
-    } else if (char === ")") {
-      depth--;
-    } else if (char === separator && depth === 0) {
-      parts.push(current);
-      current = "";
-      continue;
-    }
-    current += char;
-  }
-  parts.push(current);
-  return parts;
-};
-
-/** The expression inside `( … )` when the parentheses enclose all of `text`, else undefined. */
-const unwrapGroup = (text: string): string | undefined => {
-  if (!text.startsWith("(") || !text.endsWith(")")) return undefined;
-  let depth = 0;
-  let quote: string | null = null;
-  for (const [index, char] of [...text].entries()) {
-    if (quote) {
-      if (char === quote) quote = null;
-    } else if (char === '"' || char === "'") {
-      quote = char;
-    } else if (char === "(") {
-      depth++;
-    } else if (char === ")" && --depth === 0) {
-      return index === text.length - 1 ? text.slice(1, -1) : undefined;
-    }
-  }
-  return undefined;
-};
-
-/** Evaluates `,` (or) of `;` (and) terms, where a term is a comparison or a `( … )` group. */
-const matchesExpression = (item: Record<string, unknown>, expression: string): boolean =>
-  splitTopLevel(expression, ",").some((alternative) =>
-    splitTopLevel(alternative, ";").every((term) => {
-      const trimmed = term.trim();
-      if (!trimmed) throw unsupportedFilter(expression);
-      const group = unwrapGroup(trimmed);
-      return group === undefined
-        ? matchesComparison(item, trimmed)
-        : matchesExpression(item, group);
-    }),
-  );
+const matchesNode = (item: Record<string, unknown>, node: FilterNode): boolean =>
+  node.type === "comparison"
+    ? matchesComparison(item, node)
+    : node.type === "and"
+      ? node.nodes.every((child) => matchesNode(item, child))
+      : node.nodes.some((child) => matchesNode(item, child));
 
 /**
- * Applies an RSQL `filter` like the API: comparisons joined by `;` (and), which binds tighter
- * than `,` (or), and grouped with parentheses. Anything it can't evaluate throws instead of
- * returning wrong results.
+ * Applies an RSQL `filter` like the API (zodbase/rsql with MOCK_ASSET_FILTER_FIELDS): only the
+ * listed fields and operators, `;` (and) binding tighter than `,` (or), and parentheses. Throws
+ * `MockInvalidFilter` for any filter the API refuses with `validation/invalid-filter`.
  */
 export const filterAssets = <T>(items: T[], filter: string | null | undefined): T[] => {
   if (!filter) return items;
-  // Evaluate once up front so an unsupported filter fails even when there are no items.
-  if (items.length === 0) matchesExpression({}, filter);
-  return items.filter((item) => matchesExpression(item as Record<string, unknown>, filter));
+  const node = parseFilter(filter);
+  return items.filter((item) => matchesNode(item as Record<string, unknown>, node));
 };
 
 const MAX_SEARCH_TOKENS = 8;

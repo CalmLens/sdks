@@ -107,11 +107,9 @@ class MockTest < Minitest::Test
       mock.assets.each(filter: filter, ordering: [{ field: 'createdAt', direction: 'asc' }]).map { |asset| asset['name'] }
     end
     created = mock.assets.each.to_h { |asset| [asset['name'], asset['createdAt']] }
-    assert_equal %w[bad-a good-c], by_name.call("name=in=(bad-a,\"good-c\");createdAt=gt=#{created['good-b']}")
+    assert_equal %w[bad-a good-c], by_name.call("name=in=(bad-a,\"good-c\");createdAt>#{created['good-b']}")
     assert_equal %w[good-b good-a], by_name.call('name=out=(bad-a,good-c)')
-    assert_equal %w[good-b bad-a], by_name.call("createdAt=le=#{created['bad-a']}")
-    error = assert_raises(CalmLens::InvalidArgumentError) { mock.assets.list(filter: 'name=like=good') }
-    assert_equal 'sdk/invalid-argument', error.code
+    assert_equal %w[good-b bad-a], by_name.call("createdAt<=#{created['bad-a']}")
   end
 
   def test_mock_errors_always_carry_a_details_object_and_request_id

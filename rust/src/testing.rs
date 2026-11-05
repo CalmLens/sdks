@@ -14,6 +14,8 @@
 //! [dev-dependencies]
 //! calmlens = { version = "0.1", features = ["testing"] }
 //! ```
+// Generated (packages/sdk-contract/mockAssetFilters.ts).
+mod asset_filters;
 // Generated, one line per list (packages/sdk-contract/mockClassification.ts).
 #[rustfmt::skip]
 mod classification;

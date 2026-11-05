@@ -17,7 +17,6 @@ import builtins
 import copy
 import dataclasses
 import email.utils
-import fnmatch
 import hashlib
 import io
 import json
@@ -35,6 +34,7 @@ from urllib.parse import parse_qsl, quote, unquote, urlsplit
 from urllib.request import Request
 
 from . import error_codes
+from ._asset_filters import ASSET_FILTER_FIELDS, FILTER_OPERATORS
 from ._mock_classification import CATEGORIES, QUALIFIERS
 from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAULT_PART_SIZE_BYTES, DEFAULT_TIMEOUT,
                      CalmLensServerClient,
@@ -395,47 +395,99 @@ def _unwrap_group(text: str) -> str | None:
     return None
 
 
-def _rsql(expression: str) -> Callable[[Mapping[str, Any]], bool]:
-    """RSQL like the API: ``;`` (and), which binds tighter than ``,`` (or), ``( … )`` groups,
-    ``==`` (``*`` wildcards), ``!=``, ``=in=``, ``=out=``, ``=gt=``, ``=ge=``, ``=lt=``, ``=le=``
-    and quoted values. Anything else raises ``NotImplementedError`` instead of matching wrongly."""
+class _InvalidFilter(Exception):
+    """A filter the API refuses with ``validation/invalid-filter``."""
 
-    def unquote_value(value: str) -> str:
-        value = value.strip()
-        return value[1:-1].replace('\\"', '"').replace("\\'", "'") if value[:1] in "\"'" else value
+
+def _wildcard(pattern: str) -> re.Pattern[str]:
+    """``*`` matches any run of characters, ignoring case; every other character matches itself."""
+    return re.compile("".join(".*" if part == "*" else re.escape(part) for part in re.split(r"(\*)", pattern)),
+                      re.S | re.I)
+
+
+def _rsql(expression: str) -> Callable[[Mapping[str, Any]], bool]:
+    """An asset list filter like the API's: ``;`` (and), which binds tighter than ``,`` (or),
+    ``( … )`` groups and quoted values, naming only the fields in ``ASSET_FILTER_FIELDS`` with the
+    operators in ``FILTER_OPERATORS``. A number field's value must be a number, and ``null`` is a
+    missing value only on a nullable field. ``*`` in an ``==`` or ``!=`` value matches any run of
+    characters, ignoring case; without it ``==`` is exact. As in SQL, a comparison never matches a
+    missing value. Anything else raises ``_InvalidFilter``."""
 
     def comparison(text: str) -> Callable[[Mapping[str, Any]], bool]:
-        found = re.fullmatch(r"\s*([\w.]+)\s*(==|!=|=in=|=out=|=gt=|=ge=|=lt=|=le=)(.*)", text, re.S)
+        found = re.fullmatch(r"\s*([\w.]+)\s*(==|!=|<=|>=|<|>|=[a-z]*=)\s*(.*?)\s*", text, re.S)
         if not found:
-            raise NotImplementedError(f"MockCalmLensServerClient cannot evaluate the filter {text!r}")
+            raise _InvalidFilter(text)
         name, operator, raw = found.groups()
-        raw = raw.strip()
-        if raw.startswith("("):
-            if not raw.endswith(")") or operator not in ("=in=", "=out="):
-                raise NotImplementedError(f"MockCalmLensServerClient cannot evaluate the filter {text!r}")
-            values = [unquote_value(v) for v in _split_top_level(raw[1:-1], ",")]
+        if name not in ASSET_FILTER_FIELDS or operator not in FILTER_OPERATORS:
+            raise _InvalidFilter(text)
+        kind, nullable = ASSET_FILTER_FIELDS[name]
+        listed = operator in ("=in=", "=out=")
+        if listed:
+            if not (raw.startswith("(") and raw.endswith(")")):
+                raise _InvalidFilter(text)
+            raws = _split_top_level(raw[1:-1], ",")
         else:
-            values = [unquote_value(raw)]
+            raws = [raw]
+
+        def read(value: str) -> Any:
+            value = value.strip()
+            if value[:1] in "\"'":
+                if len(value) < 2 or value[-1] != value[0]:
+                    raise _InvalidFilter(text)
+                value = re.sub(r"\\(.)", r"\1", value[1:-1], flags=re.S)
+            elif not value or re.search(r"[\s\"'();,=!~<>]", value):
+                raise _InvalidFilter(text)
+            if value == "null" and nullable:
+                return None
+            if kind == "number":
+                try:
+                    number = float(value)
+                except ValueError:
+                    raise _InvalidFilter(text) from None
+                if not math.isfinite(number):
+                    raise _InvalidFilter(text)
+                return number
+            return value
+
+        values = [read(value) for value in raws]
+        first = values[0]
+        pattern = _wildcard(first) if not listed and isinstance(first, str) and "*" in first else None
+
+        def same(actual: Any, value: Any) -> bool:
+            if isinstance(actual, list):
+                return value in actual
+            if isinstance(actual, bool) or isinstance(value, bool):
+                return False
+            return bool(actual == value)
 
         def matches(asset: Mapping[str, Any]) -> bool:
             actual: Any = asset
             for key in name.split("."):
                 actual = actual.get(key) if isinstance(actual, Mapping) else None
-            items = actual if isinstance(actual, list) else [actual]
-            texts = ["" if item is None else str(item).lower() if isinstance(item, bool) else str(item) for item in items]
+            if pattern is not None:
+                texts = [item for item in actual if isinstance(item, str)] if isinstance(actual, list) else [actual]
+                if not texts or not all(isinstance(item, str) for item in texts):
+                    return False
+                return any(pattern.fullmatch(item) for item in texts) == (operator == "==")
             if operator == "==":
-                return any(fnmatch.fnmatchcase(t, values[0]) for t in texts)
-            if operator == "!=":
-                return not any(fnmatch.fnmatchcase(t, values[0]) for t in texts)
-            if operator == "=in=":
-                return any(t in values for t in texts)
-            if operator == "=out=":
-                return not any(t in values for t in texts)
-            try:
-                left, right = float(actual), float(values[0])
-            except (TypeError, ValueError):
+                return actual is None if first is None else actual is not None and same(actual, first)
+            if actual is None:
                 return False
-            return {"=gt=": left > right, "=ge=": left >= right, "=lt=": left < right, "=le=": left <= right}[operator]
+            if operator == "!=":
+                return first is None or not same(actual, first)
+            if operator == "=in=":
+                return any(value is not None and same(actual, value) for value in values)
+            if operator == "=out=":
+                return all(value is not None and not same(actual, value) for value in values)
+            if first is None or isinstance(actual, (list, bool)):
+                return False
+            if kind == "number":
+                if not isinstance(actual, (int, float)):
+                    return False
+                order = (float(actual) > float(first)) - (float(actual) < float(first))
+            else:
+                order = (str(actual) > str(first)) - (str(actual) < str(first))
+            return {">": order > 0, ">=": order >= 0, "<": order < 0, "<=": order <= 0}[operator]
         return matches
 
     def parse(text: str) -> Callable[[Mapping[str, Any]], bool]:
@@ -445,7 +497,7 @@ def _rsql(expression: str) -> Callable[[Mapping[str, Any]], bool]:
             for term in _split_top_level(alternative, ";"):
                 term = term.strip()
                 if not term:
-                    raise NotImplementedError(f"MockCalmLensServerClient cannot parse the filter {expression!r}")
+                    raise _InvalidFilter(expression)
                 group = _unwrap_group(term)
                 terms.append(comparison(term) if group is None else parse(group))
             alternatives.append(terms)
@@ -792,8 +844,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     ``assets.search`` is the API's keyword search: every whitespace-separated word (at most 8,
     case-insensitive) must appear in a searchable field, and results carry the API's keyword
-    ``score`` and ``matchedFields``, ranked by score and then newest first. List filters support
-    ``( … )`` groups, with ``;`` binding tighter than ``,``, and list cursors resume after the last
+    ``score`` and ``matchedFields``, ranked by score and then newest first. Asset list filters take
+    the API's fields and operators, with ``( … )`` groups and ``;`` binding tighter than ``,``, and
+    refuse others with ``validation/invalid-filter``; list cursors resume after the last
     item returned and only continue the query they came from."""
 
     def __init__(self, *, api_key: str | None = None, project_id: str = MOCK_PROJECT_ID,
@@ -1975,16 +2028,19 @@ class MockCalmLensServerClient(CalmLensServerClient):
         ``scope`` (the filter, folder or parent) and the ordering, so it only continues the query
         it came from."""
         size = _bounded_int(query.get("pageSize", _DEFAULT_PAGE_SIZE), "pageSize", _MAX_PAGE_SIZE)
-        if query.get("filter"):
-            matches = _rsql(query["filter"])
-            items = [item for item in items if matches(item)]
         ordering = [dict(order) for order in
                     query.get("ordering") or default or [{"field": "createdAt", "direction": "desc"}]]
-        if any(o.get("field") not in fields for o in ordering):
-            raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "Invalid ordering")
         for index, order in enumerate(ordering):
+            if order.get("field") not in fields:
+                raise _invalid_field(error_codes.INVALID_VALUE, f"ordering.{index}.field")
             if order.get("direction") not in ("asc", "desc"):
                 raise _invalid_field(error_codes.INVALID_VALUE, f"ordering.{index}.direction")
+        if query.get("filter"):
+            try:
+                matches = _rsql(query["filter"])
+            except _InvalidFilter:
+                raise _Failure(error_codes.INVALID_FILTER, "Invalid filter") from None
+            items = [item for item in items if matches(item)]
         if not any(o["field"] == "id" for o in ordering):
             ordering.append({"field": "id", "direction": ordering[0]["direction"]})
         signature = _json([scope, ordering])
