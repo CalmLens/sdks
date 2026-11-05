@@ -57,7 +57,11 @@ import java.util.function.LongSupplier;
  * <p>The CDN refuses {@code blocked} and {@code purged} assets, serves {@code limited} ones like
  * {@code allowed} ones, serves age-restricted ones only with {@code viewerClaims(new
  * ViewerClaims().ageConfirmed(true))} whatever the key, and serves private ones only to an API key
- * with the {@code assets:download} grant (see {@link #createMockApiKey}).
+ * with the {@code assets:download} grant (see {@link #createMockApiKey}) or beneath a URL from
+ * {@code cdn.signAssetUrl}. The mock signs asset URLs beneath the client's CDN base URL with a
+ * readable grant, which its CDN accepts until it expires; the {@code original} resource only when
+ * signed with original access. It also finds assets by external ID ({@code ext:}) and serves the
+ * {@code info} resource. {@link #fetchCdn} loads its CDN URLs as a browser would.
  *
  * <p>Queued responses take precedence, in order: {@link #enqueue(int, Object)}, {@link
  * #enqueueError}, {@link #enqueueEvents}, {@link #enqueueCdn} and the other {@code enqueue}
@@ -202,7 +206,6 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     java.util.function.Function<ModerationInput, MockDecision> moderate = MockCalmLensServerClient::defaultModerate;
     java.util.function.Function<String, String> createId = MockApi::newId;
     LongSupplier now = monotonicClock();
-    String signedUrlBaseUrl = "https://mock.calmlens.invalid";
     String projectId;
 
     /** Defaults: queued work stays pending until {@link MockCalmLensServerClient#completeProcessing(String)}, everything else is allowed. */
@@ -242,9 +245,6 @@ public final class MockCalmLensServerClient implements AutoCloseable {
      */
     public Options now(LongSupplier value) { now = Objects.requireNonNull(value, "now"); return this; }
 
-    /** @param value base URL of returned signed URLs (not production URLs) @return these options */
-    public Options signedUrlBaseUrl(String value) { signedUrlBaseUrl = Objects.requireNonNull(value, "signedUrlBaseUrl").replaceAll("/+$", ""); return this; }
-
     /**
      * The project of a mock built without a client builder; a builder sets its own project ID.
      *
@@ -259,7 +259,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     }
 
     private Options copy() {
-      Options copy = new Options().moderate(moderate).createId(createId).now(now).signedUrlBaseUrl(signedUrlBaseUrl);
+      Options copy = new Options().moderate(moderate).createId(createId).now(now);
       copy.projectId = projectId;
       return copy;
     }
@@ -765,6 +765,36 @@ public final class MockCalmLensServerClient implements AutoCloseable {
 
   /** @return every request received so far (or since {@link #clearRequests}), with its response status */
   public synchronized List<Request> requests() { return requests.stream().map(r -> r.request.withStatus(r.status)).toList(); }
+
+  /**
+   * Fetches a URL of the mock's CDN as a browser would, without the API key: a signed asset URL
+   * from {@code cdn.signAssetUrl} (with a resource appended), or a public one from {@code
+   * cdn.getAssetUrl}. The request is recorded like any other, and queued responses answer it first.
+   *
+   * @param url the CDN URL
+   * @return the response, including non-2xx statuses; close it when done
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for a URL that isn't
+   *     absolute, or {@link ErrorCodes#SDK_TRANSPORT_ERROR} when a queued failure answers it
+   */
+  public CdnResponse fetchCdn(String url) {
+    URI uri;
+    try {
+      uri = new URI(Objects.requireNonNull(url, "url"));
+    } catch (java.net.URISyntaxException invalid) {
+      throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "url must be an absolute CDN URL", invalid);
+    }
+    if (!uri.isAbsolute()) throw new CalmLensException(ErrorCodes.SDK_INVALID_ARGUMENT, "url must be an absolute CDN URL");
+    Transport.Response response;
+    try {
+      response = send(new Transport.Request("GET", uri, Map.of(), null, null));
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Request interrupted", interrupted);
+    } catch (IOException failure) {
+      throw CalmLensServerClient.transportError(failure);
+    }
+    return new CdnResponse(response, response.body());
+  }
 
   /** Forgets the requests received so far. */
   public synchronized void clearRequests() { requests.clear(); }

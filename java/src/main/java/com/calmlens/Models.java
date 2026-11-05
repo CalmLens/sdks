@@ -1533,32 +1533,57 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
-  /** Options for {@code assets.createSignedUrl}. */
-  public static final class SignedUrlOptions {
-    private ViewerClaims viewerClaims;
-    public SignedUrlOptions viewerClaims(ViewerClaims value) { viewerClaims = value; return this; }
+  /**
+   * Options for {@code cdn.signAssetUrl}: the private asset to sign a URL for, by exactly one of
+   * {@link #assetId} and {@link #externalId}, how long the grant lasts and whether it grants the
+   * original. {@link #resource}, {@link #lens}, {@code transform} and {@link #viewerClaims} aren't
+   * part of the grant: they are appended to the signed URL exactly as {@code cdn.getAssetUrl}
+   * appends them, and can be changed later without signing again.
+   */
+  public static final class SignAssetUrlOptions {
+    private String projectId;
     private String assetId;
+    private String externalId;
+    private Long expiresIn;
+    private Boolean original;
     private String resource;
     private String lens;
     private transient Object transform;
-    private Long expiresInSeconds;
-    public SignedUrlOptions() {}
-    /** @param assetId the asset */
-    public SignedUrlOptions(String assetId) { this.assetId = assetId; }
-    public SignedUrlOptions assetId(String value) { assetId = value; return this; }
-    /** @param value {@code rendered} (the API's default), {@code preview}, or {@code original}, {@code hls} or {@code embed} (no lens or transform); see {@link CalmLensServerClient#SIGNED_CDN_RESOURCES} @return these options */
-    public SignedUrlOptions resource(String value) { resource = value; return this; }
-    public SignedUrlOptions lens(String value) { lens = value; return this; }
+    private ViewerClaims viewerClaims;
+    public SignAssetUrlOptions() {}
+    /** @param assetId the asset's ID */
+    public SignAssetUrlOptions(String assetId) { this.assetId = assetId; }
+    /** @param value the asset's project; null for the client's @return these options */
+    public SignAssetUrlOptions projectId(String value) { projectId = value; return this; }
+    /** @param value the asset's ID; set this or {@link #externalId}, not both @return these options */
+    public SignAssetUrlOptions assetId(String value) { assetId = value; return this; }
+    /** @param value the external ID the asset was uploaded with; set this or {@link #assetId}, not both @return these options */
+    public SignAssetUrlOptions externalId(String value) { externalId = value; return this; }
     /**
-     * @param value comma-separated options in one path segment, such as {@code fit=cover,width=1024};
-     *     they replace the lens's options of the same name
+     * @param value the grant's lifetime in whole seconds, from 1 to {@link
+     *     CalmLensServerClient#MAX_SIGNED_URL_EXPIRES_IN_SECONDS}; null for {@link
+     *     CalmLensServerClient#DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS}
      * @return these options
      */
-    public SignedUrlOptions transform(String value) { transform = value; return this; }
+    public SignAssetUrlOptions expiresIn(Long value) { expiresIn = value; return this; }
+    /** @param value whether the URL serves the {@code original} resource, the exact upload, which it refuses otherwise; null for false @return these options */
+    public SignAssetUrlOptions original(Boolean value) { original = value; return this; }
+    /** @param value a resource to return the URL of beneath the grant; null for the signed asset URL itself; see {@link CalmLensServerClient#CDN_RESOURCES} @return these options */
+    public SignAssetUrlOptions resource(String value) { resource = value; return this; }
+    /** @param value a lens, for the {@code rendered} or {@code preview} resource @return these options */
+    public SignAssetUrlOptions lens(String value) { lens = value; return this; }
+    /**
+     * @param value comma-separated options in one path segment, such as {@code fit=cover,width=1024},
+     *     for the {@code rendered} or {@code preview} resource; they replace the lens's options of
+     *     the same name
+     * @return these options
+     */
+    public SignAssetUrlOptions transform(String value) { transform = value; return this; }
     /** @param value structured options, at least one set, serialized as a selector @return these options */
-    public SignedUrlOptions transform(ImageTransformOptions value) { transform = value; return this; }
+    public SignAssetUrlOptions transform(ImageTransformOptions value) { transform = value; return this; }
+    /** @param value claims appended as the unsigned {@code viewerClaims} query, defaults left out @return these options */
+    public SignAssetUrlOptions viewerClaims(ViewerClaims value) { viewerClaims = value; return this; }
     Object transformValue() { return transform; }
-    public SignedUrlOptions expiresInSeconds(Long value) { expiresInSeconds = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -1702,21 +1727,42 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
-  /** Options for {@code cdn.getAssetUrl} and {@code cdn.serve}. Transform options replace a lens's options of the same name. */
+  /**
+   * Options for {@code cdn.getAssetUrl} and {@code cdn.serve}: an asset, by exactly one of {@link
+   * #assetId} and {@link #externalId}, and optionally one of its resources with a lens or transform
+   * and the viewer claims. Transform options replace a lens's options of the same name.
+   */
   public static final class CdnRequest {
-    private String assetIdentifier;
+    private String projectId;
+    private String assetId;
+    private String externalId;
     private String resource;
     private String lens;
     private transient Object transform;
     private ViewerClaims viewerClaims;
-    public CdnRequest viewerClaims(ViewerClaims value) { viewerClaims = value; return this; }
     private HttpOptions init;
     public CdnRequest() {}
-    /** @param assetIdentifier an asset ID or external ID */
-    public CdnRequest(String assetIdentifier) { this.assetIdentifier = assetIdentifier; }
-    public CdnRequest assetIdentifier(String value) { assetIdentifier = value; return this; }
-    /** @param value {@code rendered} (default), {@code preview}, or {@code original}, {@code hls}, {@code embed} or {@code placeholder} (no lens or transform); see {@link CalmLensServerClient#CDN_RESOURCES} @return these options */
+    /** @param assetId the asset's ID */
+    public CdnRequest(String assetId) { this.assetId = assetId; }
+    /** @param value the asset's project; null for the client's @return these options */
+    public CdnRequest projectId(String value) { projectId = value; return this; }
+    /** @param value the asset's ID; set this or {@link #externalId}, not both @return these options */
+    public CdnRequest assetId(String value) { assetId = value; return this; }
+    /**
+     * @param value the external ID the asset was uploaded with, written {@code ext:} and the
+     *     URL-encoded ID; set this or {@link #assetId}, not both
+     * @return these options
+     */
+    public CdnRequest externalId(String value) { externalId = value; return this; }
+    /**
+     * @param value {@code rendered}, {@code preview} (both take a lens or transform), or {@code
+     *     original}, {@code hls}, {@code embed}, {@code placeholder} or {@code info}; see {@link
+     *     CalmLensServerClient#CDN_RESOURCES}. Null builds the asset URL itself for {@code
+     *     cdn.getAssetUrl}, and serves {@code rendered} for {@code cdn.serve}
+     * @return these options
+     */
     public CdnRequest resource(String value) { resource = value; return this; }
+    /** @param value a lens, for the {@code rendered} or {@code preview} resource @return these options */
     public CdnRequest lens(String value) { lens = value; return this; }
     /**
      * @param value comma-separated options in one path segment, such as {@code fit=cover,width=1024};
@@ -1726,6 +1772,8 @@ public final class Models {
     public CdnRequest transform(String value) { transform = value; return this; }
     /** @param value structured options, at least one set, serialized as a selector @return these options */
     public CdnRequest transform(ImageTransformOptions value) { transform = value; return this; }
+    /** @param value claims appended as the {@code viewerClaims} query, defaults left out @return these options */
+    public CdnRequest viewerClaims(ViewerClaims value) { viewerClaims = value; return this; }
     Object transformValue() { return transform; }
     /** @param value the request method and extra headers, such as {@code Range} @return these options */
     public CdnRequest init(HttpOptions value) { init = value; return this; }
@@ -3002,28 +3050,81 @@ public final class Models {
       String description, ImageTransformOptions transform) {}
 
   /**
-   * A signed CDN URL. It grants access until it expires, so {@link #toString()} hides its query.
+   * A signed asset URL, or a resource URL beneath it. It grants access until it expires, so {@link
+   * #toString()} hides its grant and query.
    *
    * @param url the signed URL
    * @param expiresAt expiry time
    */
-  public record SignedUrl(String url, @JsonAdapter(Json.EpochMillis.class) Instant expiresAt) {
+  public record SignedAssetUrl(String url, @JsonAdapter(Json.EpochMillis.class) Instant expiresAt) {
     @Override public String toString() {
-      int query = url == null ? -1 : url.indexOf('?');
-      return "SignedUrl[url=" + (query < 0 ? url : url.substring(0, query) + "?[redacted]") + ", expiresAt=" + expiresAt + "]";
+      String shown = url == null ? null : url.replaceAll("/sig_[^/?#]*", "/sig_[redacted]").replaceAll("\\?.*$", "?[redacted]");
+      return "SignedAssetUrl[url=" + shown + ", expiresAt=" + expiresAt + "]";
     }
   }
-  /** Optional customer assertions for CDN delivery. */
+
+  /** Whether the viewer an {@link AssetInfo} was read for can see the asset now. */
+  public enum AssetAvailability {
+    /** The viewer can see the content now. */
+    @SerializedName("available") AVAILABLE("available"),
+    /** The content needs the viewer's age confirmed ({@link ViewerClaims#ageConfirmed}). */
+    @SerializedName("age-restricted") AGE_RESTRICTED("age-restricted"),
+    /** The viewer can't see the content: it is held, blocked, not yet moderated or removed. */
+    @SerializedName("unavailable") UNAVAILABLE("unavailable");
+
+    private final String value;
+
+    AssetAvailability(String value) { this.value = value; }
+
+    /** @return the CDN value, such as {@code "age-restricted"} */
+    public String value() { return value; }
+  }
+
+  /**
+   * An asset's display info, the CDN's {@code info} resource: the public asset fields a viewer needs,
+   * with the same names as on {@link Asset}, and whether this viewer can see it now. It never holds
+   * moderation results, metadata, names, tags or extracted text.
+   *
+   * @param id the asset's ID
+   * @param projectId the asset's project
+   * @param type the asset's type, such as {@code image} or {@code video}
+   * @param externalUrl a website's page, which a viewer links to; null for other assets
+   * @param content the displayable content
+   * @param availability whether the viewer the request's claims describe can see it; the CDN's
+   *     resources refuse exactly what it refuses
+   */
+  public record AssetInfo(String id, String projectId, String type, String externalUrl, AssetInfoContent content, AssetAvailability availability) {}
+
+  /**
+   * The part of {@link AssetContent} that {@link AssetInfo} carries.
+   *
+   * @param format the content's MIME type; it tells a spreadsheet from other documents
+   * @param width width in pixels; null when unknown or not visual
+   * @param height height in pixels, like {@code width}
+   * @param durationSeconds audio or video length; null for other content
+   * @param pageCount a document's pages; null for other content
+   * @param rendered the displayable file; null when there is none
+   * @param preview the still image; null when there is none
+   * @param hls the adaptive stream; null until one is prepared
+   */
+  public record AssetInfoContent(String format, Integer width, Integer height, Double durationSeconds, Integer pageCount,
+      AssetRendered rendered, AssetPreview preview, AssetHls hls) {}
+
+  /**
+   * Your app's assertions about the viewer, added to a CDN URL (public or signed) as its unsigned
+   * {@code viewerClaims} query. The defaults, no region and no age confirmation, are left out so
+   * default URLs stay cacheable.
+   */
   public static final class ViewerClaims {
     private String region;
     private Boolean ageConfirmed;
+    /** @param value the viewer's country, an ISO 3166-1 alpha-2 code such as {@code DE} @return these claims */
     public ViewerClaims region(String value) { region = value; return this; }
     /**
      * Your platform's confirmation that the viewer passed its age check; defaults to false. Your
-     * platform confirms the viewer's age; CalmLens does not verify this claim. Anyone requesting a
-     * public asset's URL can set it, so it doesn't restrict access: to control who loads an
-     * age-restricted asset, make it private and include the claim in a signed URL, whose signature
-     * covers it.
+     * platform confirms the viewer's age; CalmLens does not verify this claim, and anyone holding
+     * a URL, signed or not, can add it. To control who loads an age-restricted asset, make it
+     * private and sign its URL only for viewers whose age you confirmed.
      *
      * @param value whether your platform confirmed the viewer's age
      * @return these claims

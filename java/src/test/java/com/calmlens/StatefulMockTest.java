@@ -200,11 +200,14 @@ class StatefulMockTest {
     assertIssue(update, "metadata.0.id", "validation/invalid-type");
     JsonObject name = raw(api, "PATCH", "/assets/asset_missing", java.util.Map.of(), null, "{\"name\":null}");
     assertIssue(name, "name", "validation/invalid-type");
-    JsonObject signed = raw(api, "POST", "/assets/asset_missing/signed-url", java.util.Map.of(), null, "{\"resource\":null}");
-    assertIssue(signed, "resource", "validation/invalid-value");
-    // A resource outside the signed ones is refused before the asset lookup too.
-    JsonObject placeholder = raw(api, "POST", "/assets/asset_missing/signed-url", java.util.Map.of(), null, "{\"resource\":\"placeholder\"}");
-    assertIssue(placeholder, "resource", "validation/invalid-value");
+    // A signed asset URL's body is checked before the asset is looked up.
+    String sign = "/projects/project-1/signed-asset-urls";
+    assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"original\":null}"), "original", "validation/invalid-type");
+    assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"expiresIn\":1.5}"), "expiresIn", "validation/invalid-type");
+    assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"expiresIn\":0}"), "expiresIn", "validation/too-small");
+    assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"expiresIn\":86401}"), "expiresIn", "validation/too-big");
+    assertIssue(raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\",\"externalId\":\"post-1\"}"), "", "custom");
+    assertEquals(ErrorCodes.ASSET_NOT_FOUND, raw(api, "POST", sign, java.util.Map.of(), null, "{\"assetId\":\"asset_missing\"}").get("code").getAsString());
   }
 
   /** Pages of a filtered feed keep their filters: a cursor sent without them would be refused. */
@@ -284,6 +287,37 @@ class StatefulMockTest {
     }
   }
 
+  /** The mock's clock moves a second per reading, so a one-second grant has expired by its first use. */
+  @Test void anExpiredGrantIsRefusedByEveryResourceAndTheInfo() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    Models.Asset asset = mock.client.assets.classify(kept("private.png").visibility(Models.Visibility.PRIVATE));
+    Models.SignedAssetUrl signed = mock.client.cdn.signAssetUrl(new Models.SignAssetUrlOptions(asset.id()).expiresIn(1L));
+    try (CdnResponse expired = mock.fetchCdn(signed.url() + "/rendered")) {
+      assertEquals(403, expired.status());
+      assertEquals(ErrorCodes.SIGNED_URL_EXPIRED, JsonParser.parseString(new String(expired.readAllBytes(1 << 16), java.nio.charset.StandardCharsets.UTF_8))
+          .getAsJsonObject().get("code").getAsString());
+    }
+    ApiException info = assertThrows(ApiException.class, () -> mock.client.cdn.getAssetInfo(signed.url()));
+    assertEquals(ErrorCodes.SIGNED_URL_EXPIRED, info.getCode());
+    assertEquals(403, info.getStatus());
+  }
+
+  /** getAssetInfo reads the claims the URL carries, sends no API key, and given claims replace the URL's. */
+  @Test void assetInfoUsesTheUrlsViewerClaimsUnlessOthersAreGiven() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    Models.Asset asset = mock.client.assets.classify(kept("public.png").visibility(Models.Visibility.PUBLIC));
+    mock.decide(asset.id(), Outcome.AGE_RESTRICTED);
+    String confirmed = mock.client.cdn.getAssetUrl(new Models.CdnRequest(asset.id()).viewerClaims(new Models.ViewerClaims().ageConfirmed(true)));
+    mock.clearRequests();
+    assertSame(Models.AssetAvailability.AVAILABLE, mock.client.cdn.getAssetInfo(confirmed).availability());
+    MockCalmLensServerClient.Request sent = mock.requests().get(0);
+    assertEquals("/assets/project-1/" + asset.id() + "/info", sent.path());
+    assertEquals("{\"ageConfirmed\":true}", sent.query().get("viewerClaims"));
+    assertNull(sent.header("X-Api-Key"));
+    assertSame(Models.AssetAvailability.AGE_RESTRICTED, mock.client.cdn.getAssetInfo(confirmed, new Models.ViewerClaims()).availability());
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.client.cdn.getAssetInfo("/assets/project-1/x")).getCode());
+  }
+
   /** No shared scenario can place a safety hold, so this one is placed in storage. */
   @Test void aSafetyHoldWithholdsTheRenderingAndRefusesEveryResourceAndTheTimeline() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
@@ -305,6 +339,9 @@ class StatefulMockTest {
     ApiException held = assertThrows(ApiException.class, () -> mock.client.assets.listTimeline(new Models.ListTimeline(asset.id())));
     assertEquals(ErrorCodes.ASSET_HELD, held.getCode());
     assertEquals(java.util.Map.of("hold", "safety"), held.getDetails());
+    assertEquals(ErrorCodes.ASSET_HELD, assertThrows(ApiException.class,
+        () -> mock.client.cdn.signAssetUrl(new Models.SignAssetUrlOptions(asset.id()))).getCode());
+    assertSame(Models.AssetAvailability.UNAVAILABLE, mock.client.cdn.getAssetInfo(mock.client.cdn.getAssetUrl(new Models.CdnRequest(asset.id()))).availability());
     Models.Asset decided = mock.decide(asset.id(), Outcome.LIMITED);
     assertNull(decided.content().rendered());
     assertNull(decided.content().preview());

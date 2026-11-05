@@ -206,7 +206,7 @@
       },
       "body": {
         "code": "signed-url/invalid",
-        "message": "The signed URL's signature doesn't match its asset, resource, lens, transform, expiry or viewer claims. Use the URL exactly as created.",
+        "message": "The signed asset URL's grant wasn't signed for this project, or was changed after signing. Use the URL as created, adding only resources, selectors and viewer claims.",
         "requestId": "req-signed-url-invalid",
         "details": {
           "reason": "signed_url_invalid"
@@ -220,6 +220,38 @@
       "retryAfter": null,
       "details": {
         "reason": "signed_url_invalid"
+      }
+    }
+  },
+  {
+    "code": "signed-url/original-not-granted",
+    "status": 403,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-signed-url-original-not-granted"
+      },
+      "body": {
+        "code": "signed-url/original-not-granted",
+        "message": "This signed asset URL doesn't grant the original file. Sign it with original access.",
+        "requestId": "req-signed-url-original-not-granted",
+        "details": {
+          "reason": "signed_url_original_not_granted"
+        }
+      }
+    },
+    "expected": {
+      "code": "signed-url/original-not-granted",
+      "status": 403,
+      "requestId": "req-signed-url-original-not-granted",
+      "retryAfter": null,
+      "details": {
+        "reason": "signed_url_original_not_granted"
       }
     }
   },

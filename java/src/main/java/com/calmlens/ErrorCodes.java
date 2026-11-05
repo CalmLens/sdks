@@ -24,6 +24,8 @@ public final class ErrorCodes {
   public static final String SIGNED_URL_EXPIRED = "signed-url/expired";
   /** {@code signed-url/invalid} (HTTP 403). */
   public static final String SIGNED_URL_INVALID = "signed-url/invalid";
+  /** {@code signed-url/original-not-granted} (HTTP 403). */
+  public static final String SIGNED_URL_ORIGINAL_NOT_GRANTED = "signed-url/original-not-granted";
   /** {@code validation/invalid-request} (HTTP 400). */
   public static final String INVALID_REQUEST = "validation/invalid-request";
   /** {@code validation/invalid-type} (HTTP 400). */
@@ -254,6 +256,7 @@ public final class ErrorCodes {
       Map.entry(REGIONAL_EVIDENCE_REQUIRED, 403),
       Map.entry(SIGNED_URL_EXPIRED, 403),
       Map.entry(SIGNED_URL_INVALID, 403),
+      Map.entry(SIGNED_URL_ORIGINAL_NOT_GRANTED, 403),
       Map.entry(INVALID_REQUEST, 400),
       Map.entry(INVALID_TYPE, 400),
       Map.entry(TOO_SMALL, 400),

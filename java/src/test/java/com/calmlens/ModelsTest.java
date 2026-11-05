@@ -123,10 +123,10 @@ class ModelsTest {
 
     CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").build();
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/format=avif,gravity=entropy,trim.border=true,trim.left=3",
-        client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(transform)));
+        client.cdn.getAssetUrl(new Models.CdnRequest("a").resource("rendered").transform(transform)));
     Models.ImageTransformOptions point = new Models.ImageTransformOptions().gravity(Models.Gravity.point("remainder", 0.25, 1.0));
     assertEquals("https://cdn.calmlens.com/v1/assets/project-1/a/rendered/gravity.mode=remainder,gravity.x=0.25,gravity.y=1",
-        client.cdn.getAssetUrl(new Models.CdnRequest("a").transform(point)));
+        client.cdn.getAssetUrl(new Models.CdnRequest("a").resource("rendered").transform(point)));
   }
   @Test void reportPolicySnapshotDecodesIntoTypedRecords() {
     Models.AssetModeration policy = Json.GSON.fromJson("""

@@ -75,7 +75,7 @@ class ClientCasesTest {
     values.put("retryMaxDelayMs", CalmLensServerClient.RETRY_MAX_DELAY.toMillis());
     values.put("retryAfterMaxMs", CalmLensServerClient.RETRY_AFTER_MAX.toMillis());
     values.put("maxResponseBytes", client.maxResponseBytes());
-    values.put("signedUrlExpiresInSeconds", CalmLensServerClient.DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS);
+    values.put("signedUrlExpiresIn", CalmLensServerClient.DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS);
     values.put("uploadTokenExpiresInSeconds", (long) CalmLensServerClient.DEFAULT_UPLOAD_TOKEN_EXPIRES_IN_SECONDS);
     values.put("waitForDecisionTimeoutMs", CalmLensServerClient.DEFAULT_DECISION_TIMEOUT.toMillis());
     values.put("waitForDecisionFirstIntervalMs", CalmLensServerClient.DECISION_POLL_FIRST_DELAY.toMillis());

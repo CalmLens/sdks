@@ -14,6 +14,7 @@ import java.io.UncheckedIOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -68,32 +69,30 @@ public final class CalmLensServerClient implements AutoCloseable {
   /** The production CDN. */
   public static final String DEFAULT_CDN_BASE_URL = "https://cdn.calmlens.com/v1";
   /**
-   * The CDN resources a signed URL can be created for, as the API accepts them: the exact
-   * {@code original} upload, the {@code rendered} file for display (an image, a PDF, or
-   * browser-safe video or audio), the {@code preview}, a still image that stands for the asset,
-   * the {@code hls} stream of audio or video, its adaptive HLS master playlist (one signature
-   * covers every playlist and segment beneath {@code hls/}), and the {@code embed} page, which
-   * shows the asset in an iframe.
+   * The resources beneath an asset URL, public or signed: the exact {@code original} upload (beneath
+   * a signed URL only when it grants the original), the {@code rendered} file for display (an image,
+   * a PDF, or browser-safe video or audio), the {@code preview}, a still image that stands for the
+   * asset, the blurred {@code placeholder}, the {@code hls} stream of audio or video (its adaptive
+   * HLS master playlist; its media playlists and segments are relative paths beneath {@code hls/}),
+   * the {@code embed} page, which shows the asset in an iframe, and the {@code info} display JSON
+   * ({@link Cdn#getAssetInfo(String)}).
    */
-  public static final List<String> SIGNED_CDN_RESOURCES = List.of("original", "rendered", "preview", "hls", "embed");
-  /** Every CDN resource: the signed ones and the public {@code placeholder}. */
-  public static final List<String> CDN_RESOURCES = List.of("original", "rendered", "preview", "hls", "embed", "placeholder");
-  /**
-   * Where each resource is served beneath an asset's CDN path. The HLS stream is its master
-   * playlist; its media playlists and segments are the other files beneath {@code hls/}.
-   */
+  public static final List<String> CDN_RESOURCES = List.of("original", "rendered", "preview", "placeholder", "hls", "embed", "info");
+  /** Where each resource is served beneath an asset URL. */
   private static final Map<String, String> CDN_RESOURCE_PATHS = Map.of(
       "original", "original",
       "rendered", "rendered",
       "preview", "preview",
+      "placeholder", "placeholder",
       "hls", "hls/index.m3u8",
       "embed", "embed",
-      "placeholder", "placeholder");
-  /**
-   * The resources that take no lens or transform: the exact upload, the HLS stream, the embed page
-   * and the public placeholder.
-   */
-  private static final List<String> UNSELECTABLE_CDN_RESOURCES = List.of("original", "hls", "embed", "placeholder");
+      "info", "info");
+  /** The resources that take a lens or transform: the rendered file and the preview. */
+  private static final Set<String> SELECTABLE_CDN_RESOURCES = Set.of("rendered", "preview");
+  /** The asset segment prefix that names an asset by its external ID. */
+  private static final String EXTERNAL_ID_SEGMENT_PREFIX = "ext:";
+  /** The ISO 3166-1 alpha-2 countries a viewer's region can be. EU is not a viewer country. */
+  private static final Set<String> VIEWER_COUNTRIES = Set.of(("AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW").split(" "));
 
   /** Header carrying {@code v1=<hex>} HMAC-SHA256 signatures (comma-separated during secret rotation). */
   public static final String WEBHOOK_SIGNATURE_HEADER = "x-calmlens-signature";
@@ -103,8 +102,8 @@ public final class CalmLensServerClient implements AutoCloseable {
   public static final String WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
   /** Deliveries whose timestamp is further than this from the receiver's clock are rejected. */
   public static final long WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 300;
-  /** The longest signed URL lifetime the API accepts, in seconds: 24 hours. */
-  public static final long MAX_SIGNED_URL_SECONDS = 24 * 60 * 60;
+  /** The longest signed asset URL lifetime the API accepts, in seconds: 24 hours. */
+  public static final long MAX_SIGNED_URL_EXPIRES_IN_SECONDS = 24 * 60 * 60;
 
   private static final long MULTIPART_MIN_PART_BYTES = 5L * 1024 * 1024;
   private static final Pattern HEADER_NAME = Pattern.compile("[!#$%&'*+.^_`|~0-9A-Za-z-]+");
@@ -129,7 +128,7 @@ public final class CalmLensServerClient implements AutoCloseable {
   public static final Duration RETRY_MAX_DELAY = Duration.ofSeconds(8);
   /** A {@code Retry-After} longer than this is not waited out: the error goes back to the caller. */
   public static final Duration RETRY_AFTER_MAX = Duration.ofSeconds(60);
-  /** {@code assets.createSignedUrl}'s lifetime when none is given, in seconds. */
+  /** {@code cdn.signAssetUrl}'s lifetime when none is given, in seconds: 15 minutes. */
   public static final long DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS = 900;
   /** {@code uploadTokens.sign}'s lifetime when none is given, in seconds. */
   public static final int DEFAULT_UPLOAD_TOKEN_EXPIRES_IN_SECONDS = 600;
@@ -1600,36 +1599,6 @@ public final class CalmLensServerClient implements AutoCloseable {
     public Models.Asset uploadPart(Models.UploadPart options, RequestOptions requestOptions) {
       return with(requestOptions).sendPart(options, key(requestOptions));
     }
-
-    /**
-     * Creates a short-lived signed CDN URL for a private asset. The API signs the {@code rendered}
-     * resource unless the options ask for {@code original} or {@code preview}; the expiry defaults
-     * to 900 seconds.
-     *
-     * @param options the asset, resource, lens or transform and expiry
-     * @return the URL
-     */
-    public Models.SignedUrl createSignedUrl(Models.SignedUrlOptions options) {
-      JsonObject o = Models.encode(options);
-      String path = "/assets/" + id(str(o, "assetId", null)) + "/signed-url";
-      // As the API checks: a placeholder needs no signature, and the original, hls and embed take
-      // no lens or transform.
-      String resource = str(o, "resource", "rendered");
-      if (!SIGNED_CDN_RESOURCES.contains(resource))
-        throw argument("A signed URL's resource must be one of " + String.join(", ", SIGNED_CDN_RESOURCES));
-      if (UNSELECTABLE_CDN_RESOURCES.contains(resource) && (o.has("lens") || options.transformValue() != null))
-        throw argument("The " + resource + " resource takes no lens or transform");
-      if (o.has("expiresInSeconds")) {
-        long seconds = o.get("expiresInSeconds").getAsLong();
-        if (seconds < 1 || seconds > MAX_SIGNED_URL_SECONDS) throw argument("expiresInSeconds must be from 1 to 86400");
-      }
-      JsonObject body = new JsonObject();
-      body.addProperty("expiresInSeconds", DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS);
-      without(o, "assetId").entrySet().forEach(entry -> body.add(entry.getKey(), entry.getValue()));
-      String transform = transformSelector(options.transformValue());
-      if (transform != null) body.addProperty("transform", transform);
-      return decode(json("POST", path, null, body), Models.SignedUrl.class);
-    }
   }
 
   /** Text moderation. */
@@ -1966,41 +1935,199 @@ public final class CalmLensServerClient implements AutoCloseable {
   }
 
 
-  /** CDN URLs and downloads. */
-  public final class Cdn {
-    private Cdn() {}
+  /**
+   * The asset segment of an asset URL: the path-encoded asset ID, or {@code ext:} and the
+   * URL-encoded external ID. Exactly one of them must be given.
+   */
+  private static String assetSegment(JsonObject o) {
+    boolean byId = o.has("assetId") && !o.get("assetId").isJsonNull();
+    boolean byExternalId = o.has("externalId") && !o.get("externalId").isJsonNull();
+    if (byId == byExternalId) throw argument("Pass either assetId or externalId");
+    if (byId) return id(o.get("assetId").getAsString());
+    String externalId = o.get("externalId").getAsString();
+    if (externalId.isEmpty()) throw argument("externalId is required");
+    return EXTERNAL_ID_SEGMENT_PREFIX + encodeComponent(externalId);
+  }
 
-    /**
-     * Builds the CDN URL of an asset's resource, with optional {@code viewerClaims} encoded in its
-     * query: {@code rendered} (default: the displayable file, an image in the best format the
-     * client accepts, a PDF, or browser-safe video or audio), {@code original} (the exact upload),
-     * {@code preview} (a still image for the asset), {@code hls} (the HLS master playlist of audio
-     * or video at {@code hls/index.m3u8}, once {@code content.hls} is set), {@code embed} (an HTML
-     * page that shows the asset, for an iframe) or {@code placeholder} (a small blurred PNG, public
-     * whatever the asset's visibility or moderation status, without age confirmation). Lenses and
-     * transforms apply to {@code preview}, and to {@code rendered} when it is an image; the CDN
-     * refuses them on rendered PDFs, video and audio with {@code transform/invalid}, and the
-     * SDK refuses them on the original, hls, embed and placeholder.
-     *
-     * @param options the asset and selector
-     * @return the URL
-     */
-    public String getAssetUrl(Models.CdnRequest options) {
-      JsonObject o = Models.encode(options);
-      Object transform = options.transformValue();
-      String resource = str(o, "resource", "rendered");
-      if (!CDN_RESOURCES.contains(resource)) throw argument("Resource must be one of " + String.join(", ", CDN_RESOURCES));
-      boolean transformed = o.has("lens") && !o.get("lens").isJsonNull() || transform != null;
-      if (UNSELECTABLE_CDN_RESOURCES.contains(resource) && transformed) throw argument("The " + resource + " resource takes no lens or transform");
-      String url = cdnBaseUrl + "/assets/" + id(projectId) + "/" + id(str(o, "assetIdentifier", null)) + "/" + CDN_RESOURCE_PATHS.get(resource);
+  /**
+   * The {@code ?viewerClaims=} query of a URL with these claims, or an empty string for the
+   * defaults: no region and no age confirmation are left out, so default URLs stay cacheable. The
+   * claims are an object of only a viewer country {@code region} and a boolean {@code ageConfirmed}.
+   */
+  private static String viewerClaimsQuery(JsonElement claims) {
+    if (claims == null || claims.isJsonNull()) return "";
+    if (!claims.isJsonObject()) throw argument("viewerClaims must be an object");
+    JsonObject given = claims.getAsJsonObject();
+    for (String key : given.keySet())
+      if (!key.equals("region") && !key.equals("ageConfirmed")) throw argument("viewerClaims has only region and ageConfirmed, not " + key);
+    JsonElement region = given.get("region"), ageConfirmed = given.get("ageConfirmed");
+    JsonObject sent = new JsonObject();
+    if (region != null && !region.isJsonNull()) {
+      if (!(region.isJsonPrimitive() && region.getAsJsonPrimitive().isString() && VIEWER_COUNTRIES.contains(region.getAsString())))
+        throw argument("viewerClaims.region must be an ISO 3166-1 alpha-2 country code, such as DE");
+      sent.add("region", region);
+    }
+    if (ageConfirmed != null && !ageConfirmed.isJsonNull()) {
+      if (!(ageConfirmed.isJsonPrimitive() && ageConfirmed.getAsJsonPrimitive().isBoolean())) throw argument("viewerClaims.ageConfirmed must be a boolean");
+      if (ageConfirmed.getAsBoolean()) sent.addProperty("ageConfirmed", true);
+    }
+    return sent.isEmpty() ? "" : "?viewerClaims=" + encodeComponent(Json.write(sent));
+  }
+
+  /**
+   * Appends a resource, its {@code @lens} and transform selector, and the viewer claims to an asset
+   * URL, public or signed. Without a resource the URL stays the asset URL, which takes no selector.
+   */
+  private static String appendAssetLocation(String assetUrl, JsonObject o, Object transform) {
+    String resource = str(o, "resource", null);
+    String lens = str(o, "lens", null);
+    boolean selected = lens != null || transform != null;
+    String url = assetUrl;
+    if (resource == null) {
+      if (selected) throw argument("A lens or transform needs a resource, such as rendered");
+    } else {
+      String path = CDN_RESOURCE_PATHS.get(resource);
+      if (path == null) throw argument("Resource must be one of " + String.join(", ", CDN_RESOURCES));
+      if (selected && !SELECTABLE_CDN_RESOURCES.contains(resource)) throw argument("The " + resource + " resource takes no lens or transform");
+      url += "/" + path;
       List<String> selector = new ArrayList<>();
-      if (o.has("lens") && !o.get("lens").isJsonNull()) selector.add("@" + id(o.get("lens").getAsString()));
+      if (lens != null) selector.add("@" + id(lens));
       if (transform instanceof String text) { if (!text.isEmpty()) selector.add(transformPath(text)); }
       // Serialized options are already path-safe: unreserved characters, escapes, "=", "," and ".".
       else if (transform != null) selector.add(transformSelector(transform));
       if (!selector.isEmpty()) url += "/" + String.join(",", selector);
-      if (o.has("viewerClaims") && !o.get("viewerClaims").isJsonNull()) url += "?viewerClaims=" + encodeComponent(o.get("viewerClaims").toString());
-      return url;
+    }
+    return url + viewerClaimsQuery(o.get("viewerClaims"));
+  }
+
+  /**
+   * CDN URLs, signed asset URLs, asset display info and downloads.
+   *
+   * <p>Every asset has one URL, {@code {cdnBaseUrl}/assets/{projectId}/{asset}}, and each resource
+   * is a path beneath it ({@link #CDN_RESOURCES}). The asset segment is the asset ID or {@code
+   * ext:} and the URL-encoded external ID for a public asset, or a signed grant for a private one:
+   * use {@link #signAssetUrl} if the asset is private, {@link #getAssetUrl} otherwise, and add
+   * viewer claims to either.
+   */
+  public final class Cdn {
+    private Cdn() {}
+
+    private String assetUrl(JsonObject o, Object transform) {
+      String base = cdnBaseUrl + "/assets/" + id(str(o, "projectId", projectId)) + "/" + assetSegment(o);
+      return appendAssetLocation(base, o, transform);
+    }
+
+    /**
+     * Builds an asset's CDN URL without sending a request: the asset URL, which every resource is a
+     * path beneath, or a resource URL when {@code resource} is set, with its lens or transform and
+     * the viewer claims. Name the asset by exactly one of {@code assetId} and {@code externalId};
+     * {@code projectId} defaults to the client's. Use it for public assets; private ones need
+     * {@link #signAssetUrl}. Lenses and transforms apply to {@code preview}, and to {@code
+     * rendered} when it is an image (the CDN refuses them on rendered PDFs, video and audio with
+     * {@code transform/invalid}); the SDK refuses them without a resource and on the other
+     * resources. Viewer claims are your app's unsigned assertions: CalmLens does not verify an age
+     * confirmation, and anyone holding the URL can add it.
+     *
+     * @param options the asset, resource, selector and viewer claims
+     * @return the URL
+     * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for invalid options
+     */
+    public String getAssetUrl(Models.CdnRequest options) {
+      return assetUrl(Models.encode(options), options.transformValue());
+    }
+
+    /**
+     * Signs a private asset's URL on your server, so browsers and apps can load it without an API
+     * key until it expires. Every resource is a path beneath it, as beneath a public asset URL; the
+     * {@code original} only when signed with {@code original(true)}. With a {@code resource}, it
+     * returns that resource's URL beneath the grant, with the lens, transform and viewer claims
+     * appended as {@link #getAssetUrl} appends them. The options are checked before anything is
+     * sent; the lifetime defaults to {@link #DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS}.
+     *
+     * @param options the asset, lifetime, original access and the location beneath the grant
+     * @return the signed URL and its expiry
+     * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for invalid options
+     */
+    public Models.SignedAssetUrl signAssetUrl(Models.SignAssetUrlOptions options) {
+      JsonObject o = Models.encode(options);
+      Object transform = options.transformValue();
+      assetSegment(o);
+      long expiresIn = DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS;
+      if (o.has("expiresIn")) {
+        expiresIn = o.get("expiresIn").getAsLong();
+        if (expiresIn < 1 || expiresIn > MAX_SIGNED_URL_EXPIRES_IN_SECONDS) throw argument("expiresIn must be a whole number of seconds from 1 to 86400");
+      }
+      // The location is appended to the signed URL: check it before signing.
+      appendAssetLocation("", o, transform);
+      JsonObject body = new JsonObject();
+      if (o.has("assetId")) body.add("assetId", o.get("assetId"));
+      else body.add("externalId", o.get("externalId"));
+      body.addProperty("expiresIn", expiresIn);
+      body.addProperty("original", flag(o, "original"));
+      String path = "/projects/" + id(str(o, "projectId", projectId)) + "/signed-asset-urls";
+      Models.SignedAssetUrl signed = decode(json("POST", path, null, body), Models.SignedAssetUrl.class);
+      if (signed.url() == null || signed.url().isEmpty())
+        throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "The API returned no signed asset URL", null, 200, Map.of(), null);
+      return new Models.SignedAssetUrl(appendAssetLocation(signed.url(), o, transform), signed.expiresAt());
+    }
+
+    /**
+     * Fetches the display info of an asset URL, public or signed ({@code {url}/info}), for the
+     * viewer claims the URL carries.
+     *
+     * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, without a resource
+     * @return the asset's type, size, rendered file, preview and stream, and whether the viewer can see it
+     * @see #getAssetInfo(String, Models.ViewerClaims)
+     */
+    public Models.AssetInfo getAssetInfo(String url) { return getAssetInfo(url, null); }
+
+    /**
+     * Fetches the display info of an asset URL, public or signed ({@code {url}/info}): its type,
+     * size, rendered file, preview and stream, and whether the viewer its claims describe can see
+     * it. It sends no API key, as a browser would, and is retried like API reads. A refusal throws
+     * {@link ApiException} with the CDN's code, such as {@link ErrorCodes#SIGNED_URL_EXPIRED} or
+     * {@code asset/not-available}.
+     *
+     * @param url an asset URL from {@link #getAssetUrl} or {@link #signAssetUrl}, without a resource
+     * @param viewerClaims the viewer's claims, replacing those the URL carries; null keeps the URL's
+     * @return the display info
+     * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} when the URL isn't absolute
+     *     or its claims are invalid
+     */
+    public Models.AssetInfo getAssetInfo(String url, Models.ViewerClaims viewerClaims) {
+      URI parsed;
+      try {
+        parsed = url == null ? null : new URI(url);
+      } catch (java.net.URISyntaxException invalid) {
+        parsed = null;
+      }
+      if (parsed == null || !parsed.isAbsolute() || parsed.getHost() == null) throw argument("url must be an absolute asset URL");
+      String[] parts = url.split("#", 2)[0].split("\\?", 2);
+      String base = parts[0].replaceAll("/+$", "");
+      JsonElement claims = viewerClaims == null ? null : Json.GSON.toJsonTree(viewerClaims);
+      if (claims == null && parts.length == 2)
+        for (String pair : parts[1].split("&")) {
+          String[] param = pair.split("=", 2);
+          if (!URLDecoder.decode(param[0], StandardCharsets.UTF_8).equals("viewerClaims")) continue;
+          try {
+            claims = JsonParser.parseString(URLDecoder.decode(param.length == 2 ? param[1] : "", StandardCharsets.UTF_8));
+          } catch (JsonParseException | IllegalArgumentException invalid) {
+            throw argument("The asset URL's viewerClaims are not JSON");
+          }
+        }
+      Map<String, String> headers = new LinkedHashMap<>();
+      headers.put("User-Agent", userAgent);
+      headers.put("Accept", "application/json");
+      Reply reply = execute(new Call("GET", base + "/info" + viewerClaimsQuery(claims), headers, null, timeout, true));
+      Models.AssetInfo info;
+      try {
+        info = reply.json() != null && reply.json().isJsonObject() ? Json.GSON.fromJson(reply.json(), Models.AssetInfo.class) : null;
+      } catch (JsonParseException | IllegalStateException | IllegalArgumentException invalid) {
+        info = null;
+      }
+      if (info == null || info.id() == null || info.projectId() == null || info.type() == null || info.content() == null || info.availability() == null)
+        throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "The CDN returned no asset info", null, reply.status(), reply.headers(), null);
+      return info;
     }
 
     /**
@@ -2023,7 +2150,9 @@ public final class CalmLensServerClient implements AutoCloseable {
     public CdnResponse serve(Models.CdnRequest options, RequestOptions requestOptions) {
       CalmLensServerClient derived = with(requestOptions);
       if (derived != CalmLensServerClient.this) return derived.cdn.serve(options);
-      String url = getAssetUrl(options);
+      JsonObject o = Models.encode(options);
+      if (!o.has("resource")) o.addProperty("resource", "rendered");
+      String url = assetUrl(o, options.transformValue());
       // No Accept unless the caller sets one: the CDN answers with the content's own type.
       Map<String, String> headers = baseHeaders(null);
       Models.HttpOptions init = options.initValue();

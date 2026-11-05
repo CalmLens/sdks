@@ -145,10 +145,11 @@ class RobustnessTest {
 
   @Test void secretsNeverAppearInStringForms() {
     CalmLensServerClient.Builder builder = CalmLensServerClient.builder("sk_live_secret", "project");
-    var transport = new Scripted(reply(200, "{\"url\":\"https://cdn.example/a?signature=sig_secret\",\"expiresAt\":1}"));
+    var transport = new Scripted(reply(200, "{\"url\":\"https://cdn.example/v1/assets/project/sig_secret\",\"expiresAt\":1}"));
     CalmLensServerClient client = transport.client(builder);
-    Models.SignedUrl signed = client.assets.createSignedUrl(new Models.SignedUrlOptions("a"));
-    assertEquals("https://cdn.example/a?signature=sig_secret", signed.url());
+    Models.SignedAssetUrl signed = client.cdn.signAssetUrl(new Models.SignAssetUrlOptions("a").resource("rendered")
+        .viewerClaims(new Models.ViewerClaims().ageConfirmed(true)));
+    assertEquals("https://cdn.example/v1/assets/project/sig_secret/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D", signed.url());
     for (String text : List.of(client.toString(), builder.toString(), transport.requests.get(0).toString(), signed.toString())) {
       assertFalse(text.contains("sk_live_secret"), text);
       assertFalse(text.contains("sig_secret"), text);

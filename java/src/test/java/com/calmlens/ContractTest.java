@@ -77,7 +77,8 @@ class ContractTest {
       String operation = fixture.get("operation").getAsString();
       Object result = Fixtures.invoke(client, operation, fixture.getAsJsonObject("options"));
       assertEquals(fixture.get("request"), captured[0]);
-      JsonElement response = fixture.get("response");
+      // A fixture's result is what the method returns when it isn't the response body.
+      JsonElement response = fixture.has("result") ? fixture.get("result") : fixture.get("response");
       JsonElement expected = operation.endsWith(".delete") || operation.equals("hashLists.removeEntry") ? JsonNull.INSTANCE
           : operation.equals("ensureLenses") ? response.getAsJsonObject().get("lenses") : response;
       Fixtures.assertMatches(expected, tree(result), "result");
@@ -476,7 +477,7 @@ class ContractTest {
       assertEquals(options, transformRoundTrip(options), "decodes into ImageTransformOptions");
       Models.ImageTransformOptions typed = Json.GSON.fromJson(options, Models.ImageTransformOptions.class);
       CalmLensException error = assertThrows(CalmLensException.class,
-          () -> refusing().cdn.getAssetUrl(new Models.CdnRequest("asset-1").transform(typed)));
+          () -> refusing().cdn.getAssetUrl(new Models.CdnRequest("asset-1").resource("rendered").transform(typed)));
       assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, error.getCode());
       List<String> unknownKeys = Json.GSON.fromJson(testCase.get("unknownKeys"), new com.google.gson.reflect.TypeToken<List<String>>() {}.getType());
       List<String> invalidKeys = Json.GSON.fromJson(testCase.get("invalidKeys"), new com.google.gson.reflect.TypeToken<List<String>>() {}.getType());
@@ -646,6 +647,25 @@ class ContractTest {
     return grants.toArray(Grant[]::new);
   }
 
+  /** A CDN response as the scenarios compare it: status, error code, body and lowercase headers. */
+  private static JsonObject served(CdnResponse served) {
+    try (CdnResponse response = served) {
+      byte[] bytes = response.readAllBytes(100_000_000);
+      String body = new String(bytes, StandardCharsets.UTF_8);
+      JsonObject result = new JsonObject();
+      result.addProperty("status", response.status());
+      String type = response.header("content-type");
+      result.add("code", type != null && type.startsWith("application/json") ? JsonParser.parseString(body).getAsJsonObject().get("code") : JsonNull.INSTANCE);
+      result.addProperty("body", body);
+      result.addProperty("bodyBase64", java.util.Base64.getEncoder().encodeToString(bytes));
+      // Header names are case-insensitive: keep them lowercase.
+      JsonObject headers = new JsonObject();
+      response.headers().forEach((key, values) -> headers.addProperty(key.toLowerCase(java.util.Locale.ROOT), String.join(", ", values)));
+      result.add("headers", headers);
+      return result;
+    }
+  }
+
   private static JsonElement run(MockCalmLensServerClient mock, String operation, JsonObject args, JsonArray moderateCalls) throws Throwable {
     switch (operation) {
       case "mock.decide":
@@ -694,23 +714,13 @@ class ContractTest {
         mock.failNextRequest(args.get("failure").getAsString(), failure);
         return JsonNull.INSTANCE;
       }
-      case "cdn.serve": {
-        try (CdnResponse response = mock.client.cdn.serve(Fixtures.decode(args, Models.CdnRequest.class))) {
-          byte[] bytes = response.readAllBytes(100_000_000);
-          String body = new String(bytes, StandardCharsets.UTF_8);
-          JsonObject result = new JsonObject();
-          result.addProperty("status", response.status());
-          String type = response.header("content-type");
-          result.add("code", type != null && type.startsWith("application/json") ? JsonParser.parseString(body).getAsJsonObject().get("code") : JsonNull.INSTANCE);
-          result.addProperty("body", body);
-          result.addProperty("bodyBase64", java.util.Base64.getEncoder().encodeToString(bytes));
-          // Header names are case-insensitive: keep them lowercase.
-          JsonObject headers = new JsonObject();
-          response.headers().forEach((key, values) -> headers.addProperty(key.toLowerCase(java.util.Locale.ROOT), String.join(", ", values)));
-          result.add("headers", headers);
-          return result;
-        }
-      }
+      case "cdn.serve":
+        return served(mock.client.cdn.serve(Fixtures.decode(args, Models.CdnRequest.class)));
+      case "mock.fetchCdn":
+        return served(mock.fetchCdn(args.get("url").getAsString()));
+      case "cdn.getAssetInfo":
+        return tree(mock.client.cdn.getAssetInfo(args.get("url").getAsString(),
+            args.has("viewerClaims") ? Json.GSON.fromJson(args.get("viewerClaims"), Models.ViewerClaims.class) : null));
       case "assets.waitForDecision":
         return tree(mock.client.assets.waitForDecision(new Models.WaitForDecision(args.get("assetId").getAsString())
             .timeout(Duration.ofMillis(args.get("timeoutMs").getAsLong()))));
@@ -1013,11 +1023,11 @@ class ContractTest {
 
   /** Fixture options a Java type cannot hold, so the type already refuses the request. */
   private static final Map<String, String> REJECTED_BY_TYPE = Map.of(
-      "signed URL lifetime of a fraction of a second", "SignedUrlOptions.expiresInSeconds is a Long",
+      "signed URL lifetime of a fraction of a second", "SignAssetUrlOptions.expiresIn is a Long",
       "batch with an unknown operation", "BatchAssets.operation is an AssetBatchOperation enum",
       "signed URL with an unknown transform option", "ImageTransformOptions has no bogus option");
   private static final Map<String, Class<?>> REJECTED_TYPES = Map.of(
-      "signed URL lifetime of a fraction of a second", Models.SignedUrlOptions.class,
+      "signed URL lifetime of a fraction of a second", Models.SignAssetUrlOptions.class,
       "batch with an unknown operation", Models.BatchAssets.class);
 
   @TestFactory Stream<DynamicTest> refusesRejectedRequestsBeforeSending() throws Exception {

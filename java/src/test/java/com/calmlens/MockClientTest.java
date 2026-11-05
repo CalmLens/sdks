@@ -179,7 +179,7 @@ class MockClientTest {
         .baseUrl("http://localhost:6110/v1").cdnBaseUrl("http://localhost:6130/v1").timeout(Duration.ofSeconds(5)).maxRetries(0));
     assertEquals(ErrorCodes.SDK_INVALID_CONFIG, assertThrows(CalmLensException.class,
         () -> new MockCalmLensServerClient(CalmLensServerClient.builder("key", "project").timeout(Duration.ZERO))).getCode());
-    assertEquals("http://localhost:6130/v1/assets/project-9/one/rendered", mock.client.cdn.getAssetUrl(new Models.CdnRequest("one")));
+    assertEquals("http://localhost:6130/v1/assets/project-9/one", mock.client.cdn.getAssetUrl(new Models.CdnRequest("one")));
 
     var refused = new java.net.ConnectException("Connection refused");
     mock.enqueueFailure(refused).enqueueTimeout();

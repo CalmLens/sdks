@@ -278,7 +278,7 @@
     {
       "id": "assets.decide",
       "kind": "method",
-      "description": "Record a reviewer's decision on an asset, replacing the policy's. The asset's `classification.moderation.status` becomes the decision, the matching `asset.<status>` event is sent with `decided-by` set to `api-key` (or `reviewer` when an assistant's key acts for a person), and the decision and note are added to its review history. An asset still pending moderation can only be blocked or purged. Purging also needs `assets:delete` and permanently deletes the stored content.",
+      "description": "Record a reviewer's decision on an asset, replacing the policy's. The asset's `classification.moderation.status` becomes the decision, the matching `asset.<status>` event is sent with the request's `actor` (the API key, or the person an assistant's key acts for), and the decision and note are added to its review history. An asset still pending moderation can only be blocked or purged. Purging also needs `assets:delete` and permanently deletes the stored content.",
       "names": {
         "javascript": "assets.decide",
         "python": "assets.decide",
@@ -304,17 +304,17 @@
       }
     },
     {
-      "id": "assets.createSignedUrl",
+      "id": "cdn.signAssetUrl",
       "kind": "method",
-      "description": "Create a short-lived signed CDN URL for an asset",
+      "description": "Create a short-lived signed URL for a private asset, the base URL of all its CDN resources",
       "names": {
-        "javascript": "assets.createSignedUrl",
-        "python": "assets.create_signed_url",
-        "go": "Assets.CreateSignedURL",
-        "rust": "assets().create_signed_url",
-        "java": "assets.createSignedUrl",
-        "ruby": "assets.create_signed_url",
-        "php": "assets->createSignedUrl"
+        "javascript": "cdn.signAssetUrl",
+        "python": "cdn.sign_asset_url",
+        "go": "CDN.SignAssetURL",
+        "rust": "cdn().sign_asset_url",
+        "java": "cdn.signAssetUrl",
+        "ruby": "cdn.sign_asset_url",
+        "php": "cdn->signAssetUrl"
       }
     },
     {
@@ -684,7 +684,7 @@
     {
       "id": "cdn.getAssetUrl",
       "kind": "method",
-      "description": "Builds a CDN URL without a request.",
+      "description": "Builds an asset's public CDN URL, or a resource URL beneath it, without a request.",
       "names": {
         "javascript": "cdn.getAssetUrl",
         "python": "cdn.get_asset_url",
@@ -693,6 +693,20 @@
         "java": "cdn.getAssetUrl",
         "ruby": "cdn.get_asset_url",
         "php": "cdn->getAssetUrl"
+      }
+    },
+    {
+      "id": "cdn.getAssetInfo",
+      "kind": "method",
+      "description": "Fetches an asset URL's display info (`/info`) and its availability.",
+      "names": {
+        "javascript": "cdn.getAssetInfo",
+        "python": "cdn.get_asset_info",
+        "go": "CDN.GetAssetInfo",
+        "rust": "cdn().get_asset_info",
+        "java": "cdn.getAssetInfo",
+        "ruby": "cdn.get_asset_info",
+        "php": "cdn->getAssetInfo"
       }
     },
     {
@@ -1063,9 +1077,25 @@
       }
     },
     {
+      "id": "cdn.resource.info",
+      "kind": "cdn-resource",
+      "description": "The CDN's info resource.",
+      "value": "info",
+      "path": "info",
+      "names": {
+        "javascript": "info",
+        "python": "info",
+        "go": "ResourceInfo",
+        "rust": "CdnResource::Info",
+        "java": "info",
+        "ruby": "info",
+        "php": "info"
+      }
+    },
+    {
       "id": "cdn.viewerClaims",
       "kind": "cdn-option",
-      "description": "Lets the CDN serve a public age-restricted asset from the URL.",
+      "description": "Adds the viewer's region and age confirmation to a CDN URL, unsigned; the defaults are left out.",
       "names": {
         "javascript": "viewerClaims",
         "python": "viewer_claims",
@@ -1074,6 +1104,20 @@
         "java": "CdnRequest.viewerClaims",
         "ruby": "viewer_claims",
         "php": "viewerClaims"
+      }
+    },
+    {
+      "id": "cdn.externalId",
+      "kind": "cdn-option",
+      "description": "Names the asset by the external ID it was uploaded with, as `ext:` in the URL.",
+      "names": {
+        "javascript": "externalId",
+        "python": "external_id",
+        "go": "CDNAssetURLOptions.ExternalID",
+        "rust": "CdnRequest::external_id",
+        "java": "CdnRequest.externalId",
+        "ruby": "external_id",
+        "php": "externalId"
       }
     },
     {
@@ -1510,6 +1554,11 @@
     },
     {
       "code": "signed-url/invalid",
+      "status": 403,
+      "retryable": false
+    },
+    {
+      "code": "signed-url/original-not-granted",
       "status": 403,
       "retryable": false
     },
@@ -2081,12 +2130,12 @@
       "observedBy": []
     },
     {
-      "id": "signedUrlExpiresInSeconds",
+      "id": "signedUrlExpiresIn",
       "value": 900,
       "unit": "seconds",
-      "description": "assets.createSignedUrl's expiresInSeconds when omitted (sent explicitly).",
+      "description": "cdn.signAssetUrl's expiresIn when omitted (sent explicitly, with original: false).",
       "observedBy": [
-        "assets.createSignedUrl sends the default lifetime"
+        "cdn.signAssetUrl sends the default lifetime and no original access"
       ]
     },
     {

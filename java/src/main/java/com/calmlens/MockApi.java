@@ -164,8 +164,8 @@ final class MockApi {
   static final Set<String> OPERATIONS = Set.of(
       "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
       "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.create", "assets.classify", "assets.uploadPart",
-      "assets.createSignedUrl", "assets.move", "assets.retry", "assets.explain", "assets.decide", "assets.removeContent",
-      "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list", "events.pages", "folders.list",
+      "assets.move", "assets.retry", "assets.explain", "assets.decide", "assets.removeContent",
+      "assets.delete", "assets.batch", "text.classify", "cdn.serve", "cdn.getAssetInfo", "cdn.signAssetUrl", "events.list", "events.pages", "folders.list",
       "folders.retrieve", "folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
       "hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete", "hashLists.listEntries",
       "hashLists.addEntry", "hashLists.removeEntry", "policies.list", "policies.retrieve", "policies.create",
@@ -187,7 +187,10 @@ final class MockApi {
    */
   Set<String> operations(MockCalmLensServerClient.Request request) {
     String url = request.url().split("\\?", 2)[0];
-    if (isCdn(url)) return Set.of("cdn.serve");
+    if (isCdn(url)) {
+      List<String> parts = segments(url.substring(cdnBase.length()));
+      return parts.size() == 4 && parts.get(3).equals("info") ? Set.of("cdn.getAssetInfo") : Set.of("cdn.serve");
+    }
     if (!url.startsWith(apiBase + "/")) return Set.of();
     List<String> parts = segments(url.substring(apiBase.length()));
     String method = request.method();
@@ -218,6 +221,7 @@ final class MockApi {
         case "GET assets/search" -> Set.of("assets.search");
         case "GET assets" -> Set.of("assets.list", "assets.iterate");
         case "POST assets/batch" -> Set.of("assets.batch");
+        case "POST signed-asset-urls" -> Set.of("cdn.signAssetUrl");
         case "POST assets" -> "false".equals(request.query().get("queue")) ? Set.of("assets.classify", "text.classify") : Set.of("assets.create");
         default -> Set.of();
       };
@@ -235,7 +239,6 @@ final class MockApi {
       case "assets POST decision" -> Set.of("assets.decide");
       case "assets POST move" -> Set.of("assets.move");
       case "assets POST part" -> Set.of("assets.uploadPart");
-      case "assets POST signed-url" -> Set.of("assets.createSignedUrl");
       case "folders GET " -> Set.of("folders.retrieve");
       case "folders PATCH " -> Set.of("folders.update");
       case "folders DELETE " -> Set.of("folders.delete");
@@ -445,6 +448,7 @@ final class MockApi {
         }
         case "POST assets": return createAsset(upload, q, body, raw, now);
         case "POST assets/batch": return batch(body, now);
+        case "POST signed-asset-urls": return signAssetUrl(body, now);
         default: break;
       }
       if (parts.size() == 5 && parts.get(2).equals("assets") && parts.get(4).equals("timeline") && method.equals("GET"))
@@ -1109,6 +1113,88 @@ final class MockApi {
     return asset;
   }
 
+  /**
+   * The mock's grant, the asset segment of a URL {@code signAssetUrl} signs: {@code sig_} and the
+   * lowercase hex of the UTF-8 string {@code {assetId}.{1|0}.{expiresAt}}, its asset, original
+   * access and expiry. Every SDK's mock writes it the same way. It is readable, not signed, as the
+   * mock has no secret to keep.
+   */
+  static String encodeMockGrant(String assetId, boolean original, long expiresAt) {
+    return "sig_" + java.util.HexFormat.of().formatHex((assetId + "." + (original ? 1 : 0) + "." + expiresAt).getBytes(StandardCharsets.UTF_8));
+  }
+
+  /** A grant the mock signed. */
+  record MockGrant(String assetId, boolean original, long expiresAt) {}
+
+  private static final Pattern MOCK_GRANT = Pattern.compile("(.+)\\.([01])\\.(\\d+)", Pattern.DOTALL);
+
+  /** Reads a mock grant, or null for a segment the mock didn't sign. */
+  static MockGrant decodeMockGrant(String segment) {
+    String hex = segment.substring("sig_".length());
+    if (!hex.matches("(?:[0-9a-f]{2})+")) return null;
+    String text;
+    try {
+      text = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(java.util.HexFormat.of().parseHex(hex))).toString();
+    } catch (java.nio.charset.CharacterCodingException invalid) {
+      return null;
+    }
+    java.util.regex.Matcher match = MOCK_GRANT.matcher(text);
+    if (!match.matches()) return null;
+    try {
+      return new MockGrant(match.group(1), match.group(2).equals("1"), Long.parseLong(match.group(3)));
+    } catch (NumberFormatException tooLong) {
+      return null;
+    }
+  }
+
+  /**
+   * Signs an asset URL like the API ({@code POST /projects/:projectId/signed-asset-urls}): a grant
+   * to one asset, by ID or external ID, until it expires, serving the original only when asked.
+   * The mock's grant is readable (its asset, original access and expiry), unlike the CDN's, and
+   * only the mock's CDN accepts it.
+   */
+  private JsonObject signAssetUrl(JsonObject body, long now) throws Failure {
+    // Like the API's schema, none of these fields takes null.
+    for (String key : List.of("assetId", "externalId", "expiresIn", "original"))
+      if (body.has(key) && body.get(key).isJsonNull()) throw Failure.validation("validation/invalid-type", key);
+    if (body.has("assetId") == body.has("externalId")) {
+      Map<String, Object> issue = new java.util.LinkedHashMap<>();
+      issue.put("path", "");
+      issue.put("message", "Send either assetId or externalId");
+      issue.put("code", "custom");
+      throw new Failure(ErrorCodes.INVALID_REQUEST, 400, "Send either assetId or externalId", Map.of("issues", List.of(issue)));
+    }
+    long expiresIn = 15 * 60;
+    if (body.has("expiresIn")) {
+      JsonElement value = body.get("expiresIn");
+      if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber() || value.getAsDouble() != Math.rint(value.getAsDouble()))
+        throw Failure.validation("validation/invalid-type", "expiresIn");
+      if (value.getAsDouble() < 1) throw Failure.validation("validation/too-small", "expiresIn");
+      if (value.getAsDouble() > 24 * 60 * 60) throw Failure.validation("validation/too-big", "expiresIn");
+      expiresIn = value.getAsLong();
+    }
+    boolean original = false;
+    if (body.has("original")) {
+      JsonElement value = body.get("original");
+      if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) throw Failure.validation("validation/invalid-type", "original");
+      original = value.getAsBoolean();
+    }
+    JsonObject asset;
+    if (body.has("externalId")) {
+      JsonElement externalId = body.get("externalId");
+      asset = projectAssets().stream().filter(candidate -> externalId.equals(candidate.get("externalId"))).findFirst()
+          .orElseThrow(() -> new Failure(ErrorCodes.ASSET_NOT_FOUND, "Asset not found"));
+    } else {
+      asset = asset(body.get("assetId").isJsonPrimitive() ? body.get("assetId").getAsString() : body.get("assetId").toString());
+    }
+    if (held(asset)) throw Failure.of(ErrorCodes.ASSET_HELD, Map.of("hold", "safety"));
+    long expiresAt = now + expiresIn * 1000;
+    JsonObject signed = new JsonObject();
+    signed.addProperty("url", cdnBase + "/assets/" + CalmLensServerClient.encodeComponent(projectId) + "/" + encodeMockGrant(str(asset, "id"), original, expiresAt));
+    signed.addProperty("expiresAt", expiresAt);
+    return signed;
+  }
+
   private JsonElement assetRoute(String method, String id, String suffix, JsonObject q, JsonObject body, byte[] raw, long now)
       throws Failure, IOException {
     // Like the API's schemas, which are checked before the asset is looked up.
@@ -1116,13 +1202,6 @@ final class MockApi {
       checkMetadata(body.get("metadata"));
       if (body.has("name") && body.get("name").isJsonNull()) throw Failure.validation("validation/invalid-type", "name");
     }
-    if (method.equals("POST") && suffix.equals("signed-url"))
-      for (String key : List.of("viewerClaims", "resource", "lens", "transform", "expiresInSeconds"))
-        if (body.has(key) && body.get(key).isJsonNull())
-          throw Failure.validation(key.equals("resource") ? "validation/invalid-value" : "validation/invalid-type", key);
-    if (method.equals("POST") && suffix.equals("signed-url") && body.has("resource")
-        && !(body.get("resource").isJsonPrimitive() && CalmLensServerClient.SIGNED_CDN_RESOURCES.contains(body.get("resource").getAsString())))
-      throw Failure.validation("validation/invalid-value", "resource");
     JsonObject asset = asset(id);
     switch (method + " " + suffix) {
       case "GET ": return asset;
@@ -1172,23 +1251,6 @@ final class MockApi {
         return asset;
       }
       case "POST part": uploadPart(asset, q, raw, now); return asset;
-      case "POST signed-url": {
-        long expires = number(body, "expiresInSeconds", 900, "expiresInSeconds", 1, Integer.MAX_VALUE);
-        List<String> params = new ArrayList<>();
-        params.add("expiresInSeconds=" + expires);
-        for (String key : List.of("lens", "transform")) {
-          String value = str(body, key);
-          if (value != null) params.add(key + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8));
-        }
-        // Like the API, the URL carries the viewer claims its signature covers.
-        if (body.has("viewerClaims") && body.get("viewerClaims").isJsonObject())
-          params.add("viewerClaims=" + URLEncoder.encode(body.get("viewerClaims").toString(), StandardCharsets.UTF_8));
-        JsonObject signed = new JsonObject();
-        signed.addProperty("url", options.signedUrlBaseUrl + "/assets/" + CalmLensServerClient.encodeComponent(id) + "/"
-            + Objects.requireNonNullElse(str(body, "resource"), "rendered") + "?" + String.join("&", params));
-        signed.addProperty("expiresAt", now + expires * 1000);
-        return signed;
-      }
       case "PATCH ":
         // Like the API: only the given fields change, null clears one, and an externalId stays unique.
         for (var entry : body.entrySet()) {
@@ -2124,9 +2186,10 @@ final class MockApi {
    * the placeholder PNG for a screenshot, page or waveform.
    */
   private Transport.Response cdn(MockCalmLensServerClient.Request request, List<String> parts) {
-    String identifier = parts.get(2), resource = parts.get(3);
+    String resource = parts.get(3);
     List<String> raw = new ArrayList<>();
     for (String part : request.url().split("\\?", 2)[0].substring(cdnBase.length()).split("/")) if (!part.isEmpty()) raw.add(part);
+    String segment = raw.get(2);
     List<String> selectorPath = raw.subList(4, raw.size());
     Failure invalidTransform = new Failure(ErrorCodes.INVALID_TRANSFORM, 400, "Invalid transform selector");
     Failure noRenderedVersion = new Failure(ErrorCodes.NO_RENDERED_VERSION, 404, "This asset has no such resource");
@@ -2140,10 +2203,33 @@ final class MockApi {
       return error(invalidTransform);
     }
     boolean hasSelector = selector.lens() != null || selector.options() != null;
-    if ((resource.equals("original") || resource.equals("embed")) && hasSelector) return error(invalidTransform);
-    JsonObject asset = parts.get(1).equals(projectId) ? projectAssets().stream()
-        .filter(a -> identifier.equals(str(a, "id")) || identifier.equals(str(a, "externalId"))).findFirst().orElse(null) : null;
-    if (asset == null) return error(new Failure(ErrorCodes.ASSET_NOT_FOUND, 404, "Asset not found"));
+    if ((resource.equals("original") || resource.equals("embed") || resource.equals("info")) && hasSelector) return error(invalidTransform);
+    Failure notFound = new Failure(ErrorCodes.ASSET_NOT_FOUND, 404, "Asset not found");
+    if (!parts.get(1).equals(projectId)) return error(notFound);
+    // Like the CDN, the asset is "ext:" and its URL-encoded external ID, a grant ("sig_…") or its ID.
+    MockGrant grant = null;
+    String assetId = null, externalId = null;
+    if (segment.startsWith("sig_")) {
+      grant = decodeMockGrant(segment);
+      if (grant == null) return error(new Failure(ErrorCodes.SIGNED_URL_INVALID, 403, "The signed asset URL's grant is invalid"));
+      if (grant.expiresAt() <= now()) return error(new Failure(ErrorCodes.SIGNED_URL_EXPIRED, 403, "The signed URL has expired"));
+      assetId = grant.assetId();
+    } else if (segment.startsWith("ext:")) {
+      try {
+        externalId = URLDecoder.decode(segment.substring("ext:".length()).replace("+", "%2B"), StandardCharsets.UTF_8);
+      } catch (IllegalArgumentException undecodable) {
+        return error(notFound);
+      }
+    } else {
+      assetId = parts.get(2);
+    }
+    String wantedId = assetId, wantedExternalId = externalId;
+    JsonObject asset = projectAssets().stream()
+        .filter(a -> wantedId != null ? wantedId.equals(str(a, "id")) : !wantedExternalId.isEmpty() && wantedExternalId.equals(str(a, "externalId")))
+        .findFirst().orElse(null);
+    if (asset == null) return error(notFound);
+    if (resource.equals("original") && grant != null && !grant.original())
+      return error(new Failure(ErrorCodes.SIGNED_URL_ORIGINAL_NOT_GRANTED, 403, "This signed asset URL doesn't grant the original file"));
     Failure notAvailable = new Failure("asset/not-available", 403, "Asset is not available");
     String status = str(asset.getAsJsonObject("classification").getAsJsonObject("moderation"), "status");
     boolean isPublic = "public".equals(str(asset, "visibility"));
@@ -2151,6 +2237,7 @@ final class MockApi {
     JsonObject content = asset.getAsJsonObject("content");
     JsonObject rendered = content.get("rendered") instanceof JsonObject value ? value : null;
     JsonObject preview = content.get("preview") instanceof JsonObject value ? value : null;
+    if (resource.equals("info")) return info(request, asset, grant != null || canDownload(str(asset, "folderId"), apiKey));
     // Like the CDN, a safety hold refuses every resource.
     if (held(asset)) return error(notAvailable);
     if (resource.equals("placeholder")) {
@@ -2175,7 +2262,7 @@ final class MockApi {
     if ("age-restricted".equals(status) && !(claims.has("ageConfirmed") && claims.get("ageConfirmed").getAsBoolean()))
       return error(new Failure("viewer/age-confirmation-required", 403, "Age confirmation required"));
     boolean isPrivate = !isPublic;
-    if (isPrivate && !canDownload(str(asset, "folderId"), apiKey))
+    if (isPrivate && grant == null && !canDownload(str(asset, "folderId"), apiKey))
       return error(new Failure(ErrorCodes.PERMISSION_DENIED, 403, "This API key needs assets:download permission for this asset’s folder."));
     // The embed page shows any asset that may be delivered, as its viewer for the asset's type or a
     // notice that the type has none.
@@ -2232,6 +2319,42 @@ final class MockApi {
     return served(request, bytes, type, headers.toArray(String[]::new));
   }
 
+  /**
+   * The display info at {@code /info}, like the CDN's: the allowlisted fields and whether the
+   * viewer the claims describe can see the content, decided as the other resources decide it. A
+   * private asset's needs a grant or an API key with {@code assets:download}.
+   */
+  private Transport.Response info(MockCalmLensServerClient.Request request, JsonObject asset, boolean authorised) {
+    if (!"public".equals(str(asset, "visibility")) && !authorised)
+      return error(new Failure("asset/not-available", 404, "Asset is not available"));
+    JsonObject claims;
+    try {
+      claims = JsonParser.parseString(request.query().getOrDefault("viewerClaims", "{}")).getAsJsonObject();
+    } catch (RuntimeException invalid) {
+      return error(new Failure(ErrorCodes.INVALID_VIEWER_CLAIMS, 400, "Invalid viewer claims"));
+    }
+    String status = str(asset.getAsJsonObject("classification").getAsJsonObject("moderation"), "status");
+    JsonObject content = asset.getAsJsonObject("content");
+    String availability = held(asset) || "uploading".equals(str(asset.getAsJsonObject("upload"), "status"))
+        || "blocked".equals(status) || "purged".equals(status) || "failed".equals(str(asset.getAsJsonObject("classification"), "status"))
+        || "removed".equals(str(content, "status")) ? "unavailable"
+        : "age-restricted".equals(status) && !(claims.get("ageConfirmed") instanceof JsonPrimitive confirmed && confirmed.isBoolean() && confirmed.getAsBoolean())
+        ? "age-restricted" : "available";
+    JsonObject shown = new JsonObject();
+    for (String key : List.of("format", "width", "height", "durationSeconds", "pageCount", "rendered", "preview", "hls"))
+      shown.add(key, Objects.requireNonNullElse(content.get(key), JsonNull.INSTANCE));
+    JsonObject info = new JsonObject();
+    info.add("id", asset.get("id"));
+    info.add("projectId", asset.get("projectId"));
+    info.add("type", asset.get("type"));
+    info.add("externalUrl", Objects.requireNonNullElse(asset.get("externalUrl"), JsonNull.INSTANCE));
+    info.add("content", shown);
+    info.addProperty("availability", availability);
+    return served(request, Json.write(info).getBytes(StandardCharsets.UTF_8), "application/json",
+        "Cache-Control", ("public".equals(str(asset, "visibility")) ? "public" : "private") + ", max-age=60",
+        "Cache-Tag", "asset-" + str(asset, "id"));
+  }
+
   /** A 200 CDN response with its length and request ID; {@code HEAD} gets no body. */
   private static Transport.Response served(MockCalmLensServerClient.Request request, byte[] bytes, String type, String... headers) {
     Transport.Response response = respond(200, type, bytes, headers);
@@ -2239,6 +2362,8 @@ final class MockApi {
   }
 
   private boolean canDownload(String folderId, String apiKey) {
+    // A request without the API key, as a browser sends it, has no grants.
+    if (apiKey == null) return false;
     JsonArray granted = grants;
     if (granted == null) {
       if (apiKey == null || !apiKey.startsWith("sk_test_")) return false;
