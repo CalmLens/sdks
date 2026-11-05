@@ -121,6 +121,27 @@ final class Session
         return $this->execute($method, $url, $headers, null, $options + $this->defaults, true);
     }
 
+    /**
+     * A CDN GET of JSON without the API key, as a browser would send it, retried like other reads.
+     * A non-2xx response throws the CDN's error; a body that isn't a JSON object fails with
+     * `sdk/invalid-response`.
+     */
+    public function cdnJson(string $url, array $options): array
+    {
+        self::validateOptions($options);
+        $settings = $options + $this->defaults;
+        $response = $this->execute('GET', $url, ['Accept' => 'application/json'], null, $settings, true, false);
+        $status = $response->getStatusCode();
+        if ($status < 200 || $status >= 300) {
+            throw $this->apiError($response, $settings['maxResponseBytes']);
+        }
+        $data = json_decode($this->readBounded($response, $settings['maxResponseBytes']), true);
+        if (!is_array($data) || array_is_list($data)) {
+            throw $this->responseError('sdk/invalid-response', "Invalid JSON response (HTTP $status)", $response);
+        }
+        return $data;
+    }
+
     /** `Retry-After` in seconds (whole seconds or an HTTP date; 0 retries at once), or null. */
     public static function retryAfter(?string $value): ?int
     {
@@ -153,14 +174,17 @@ final class Session
         return method_exists($error, 'getHandlerContext') && ($error->getHandlerContext()['errno'] ?? null) === 28;
     }
 
-    private function execute(string $method, string $url, array $headers, ?StreamInterface $body, array $settings, bool $cdn = false): ResponseInterface
+    /** `$apiKey` false sends the request without the API key, as a browser loading a CDN URL. */
+    private function execute(string $method, string $url, array $headers, ?StreamInterface $body, array $settings, bool $cdn = false, bool $apiKey = true): ResponseInterface
     {
         foreach ($headers as $key => $_) {
             if (in_array(strtolower((string) $key), ['x-api-key', 'user-agent', 'authorization'], true)) {
                 unset($headers[$key]);
             }
         }
-        $headers['X-Api-Key'] = $this->apiKey;
+        if ($apiKey) {
+            $headers['X-Api-Key'] = $this->apiKey;
+        }
         $headers['User-Agent'] = Version::userAgent();
         // Reads and requests carrying an Idempotency-Key are safe to repeat, unless their body is a one-shot stream.
         $retryable = (in_array($method, ['GET', 'HEAD'], true) || isset($headers['Idempotency-Key']))

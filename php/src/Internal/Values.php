@@ -13,8 +13,9 @@ final class Values
     /** Option keys of methods that send no request of their own, or take keys of their own beside one. */
     private const LOCAL_OPTION_KEYS = [
         'assets.waitForDecision' => ['assetId', 'timeout'],
-        'cdn.getAssetUrl' => ['assetIdentifier', 'lens', 'resource', 'transform', 'viewerClaims'],
-        'cdn.serve' => ['assetIdentifier', 'init', 'lens', 'resource', 'transform', 'viewerClaims'],
+        'cdn.getAssetInfo' => ['viewerClaims'],
+        'cdn.getAssetUrl' => ['assetId', 'externalId', 'lens', 'projectId', 'resource', 'transform', 'viewerClaims'],
+        'cdn.serve' => ['assetId', 'externalId', 'init', 'lens', 'projectId', 'resource', 'transform', 'viewerClaims'],
         'uploadTokens.sign' => ['expiresInSeconds', 'externalId', 'uploadPresetId'],
     ];
 
@@ -97,6 +98,12 @@ final class Values
         if (!is_string($value) || $value === '' || $value === '.' || $value === '..') {
             self::invalid('An ID must be a non-empty string other than . or ..');
         }
+        return self::component($value);
+    }
+
+    /** Percent-encodes like JavaScript's encodeURIComponent. */
+    public static function component(string $value): string
+    {
         return strtr(rawurlencode($value), ['%21' => '!', '%27' => "'", '%28' => '(', '%29' => ')', '%2A' => '*']);
     }
 

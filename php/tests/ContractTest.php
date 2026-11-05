@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use CalmLens\Assets;
 use CalmLens\CalmLensException;
+use CalmLens\Cdn;
 use CalmLens\ErrorCodes;
 use CalmLens\Exception;
 use CalmLens\Internal\Session;
@@ -110,6 +111,8 @@ final class ContractTest extends TestCase
     private static function expectedResult(array $fixture): mixed
     {
         return match (true) {
+            // What the method returns when it isn't the response body.
+            array_key_exists('result', $fixture) => $fixture['result'],
             str_ends_with($fixture['operation'], '.delete'), $fixture['operation'] === 'hashLists.removeEntry' => null,
             $fixture['operation'] === 'ensureLenses' => $fixture['response']['lenses'],
             default => $fixture['response'],
@@ -675,7 +678,7 @@ final class ContractTest extends TestCase
             'retryMaxDelayMs' => Session::RETRY_MAX_DELAY_MS,
             'retryAfterMaxMs' => Session::RETRY_AFTER_MAX_MS,
             'maxResponseBytes' => ServerClient::DEFAULT_MAX_RESPONSE_BYTES,
-            'signedUrlExpiresInSeconds' => Assets::DEFAULT_SIGNED_URL_SECONDS,
+            'signedUrlExpiresIn' => Cdn::DEFAULT_SIGNED_URL_EXPIRES_IN,
             'uploadTokenExpiresInSeconds' => UploadTokens::DEFAULT_EXPIRES_IN_SECONDS,
             'waitForDecisionTimeoutMs' => Assets::DEFAULT_DECISION_TIMEOUT * 1000,
             'waitForDecisionFirstIntervalMs' => Assets::DECISION_FIRST_INTERVAL * 1000,
@@ -705,7 +708,7 @@ final class ContractTest extends TestCase
     #[DataProvider('transformOptions')]
     public function testTransformOption(array $case): void
     {
-        $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'transform' => $case['options']]);
+        $url = self::offlineClient()->cdn->getAssetUrl(['assetId' => 'asset-1', 'resource' => 'rendered', 'transform' => $case['options']]);
         self::assertSame($case['selector'], explode('/rendered/', $url, 2)[1]);
     }
 
@@ -722,7 +725,7 @@ final class ContractTest extends TestCase
     {
         $cases = array_values(array_filter(self::fixtures('transform-options')['cases'], fn ($case) => array_key_exists($name, $case['options'])));
         self::assertNotSame([], $cases, "no case sets $name");
-        $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'transform' => $cases[0]['options']]);
+        $url = self::offlineClient()->cdn->getAssetUrl(['assetId' => 'asset-1', 'resource' => 'rendered', 'transform' => $cases[0]['options']]);
         self::assertMatchesRegularExpression('/(^|,)' . preg_quote($name, '/') . '[=.]/', explode('/rendered/', $url, 2)[1]);
     }
 
@@ -738,7 +741,7 @@ final class ContractTest extends TestCase
     public function testRefusesTransformOptionsTheCdnRefuses(array $case): void
     {
         try {
-            self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'transform' => $case['options']]);
+            self::offlineClient()->cdn->getAssetUrl(['assetId' => 'asset-1', 'resource' => 'rendered', 'transform' => $case['options']]);
             self::fail('Expected sdk/invalid-argument');
         } catch (CalmLensException $error) {
             self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, $error->errorCode);
@@ -893,10 +896,13 @@ final class ContractTest extends TestCase
                 $mock->failNextRequest($args['failure'], $args['operation'] ?? null, $args['details'] ?? [], $args['retryAfter'] ?? null);
                 return null;
             case 'cdn.serve':
-                $response = $client->cdn->serve($args);
+            case 'mock.fetchCdn':
+                $response = $operation === 'cdn.serve' ? $client->cdn->serve($args) : $mock->fetchCdn($args['url']);
                 $body = (string) $response->getBody();
                 $json = str_starts_with($response->getHeaderLine('Content-Type'), 'application/json') ? json_decode($body, true) : null;
                 return ['status' => $response->getStatusCode(), 'code' => $json['code'] ?? null, 'body' => $body, 'response' => $response];
+            case 'cdn.getAssetInfo':
+                return $client->cdn->getAssetInfo($args['url'], array_diff_key($args, ['url' => true]));
             case 'assets.iterate':
                 return self::collect($client->assets->each($args));
             case 'assets.iterateChildren':
@@ -1087,11 +1093,16 @@ final class ContractTest extends TestCase
                 }
                 return property_exists($error, $name) && $error->{$name} === $want;
             case 'cdn-resource':
-                $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', 'resource' => $name]);
+                $url = self::offlineClient()->cdn->getAssetUrl(['assetId' => 'asset-1', 'resource' => $name]);
                 return str_ends_with($url, '/asset-1/' . $capability['path']);
             case 'cdn-option':
-                $url = self::offlineClient()->cdn->getAssetUrl(['assetIdentifier' => 'asset-1', $name => ['ageConfirmed' => true]]);
-                return str_ends_with($url, '?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D');
+                // Each option is checked by the URL it builds.
+                return match ($name) {
+                    'viewerClaims' => str_ends_with(self::offlineClient()->cdn->getAssetUrl(['assetId' => 'asset-1', $name => ['ageConfirmed' => true]]),
+                        '/asset-1?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D'),
+                    'externalId' => str_ends_with(self::offlineClient()->cdn->getAssetUrl([$name => 'post/1']), '/ext:post%2F1'),
+                    default => self::fail("No check for CDN option $name"),
+                };
             case 'mock-client':
                 return class_exists('CalmLens\\' . $name);
             case 'mock-method':

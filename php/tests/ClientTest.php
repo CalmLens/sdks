@@ -63,7 +63,7 @@ final class ClientTest extends TestCase
             'assets.waitForDecision' => fn () => $client->assets->waitForDecision(['assetId' => 'a', 'timeoutSeconds' => 5]),
             'assets.listChildren' => fn () => iterator_to_array($client->assets->eachChild(['assetId' => 'a', 'filter' => 'name==a'])),
             'assets.listTimeline' => fn () => $client->assets->listTimeline(['assetId' => 'a', 'ordering' => []]),
-            'cdn.getAssetUrl' => fn () => $client->cdn->getAssetUrl(['assetIdentifier' => 'a', 'lenz' => 'thumbnail']),
+            'cdn.getAssetUrl' => fn () => $client->cdn->getAssetUrl(['assetId' => 'a', 'lenz' => 'thumbnail']),
             'uploadTokens.sign' => fn () => $client->uploadTokens->sign(['uploadPresetId' => 'preset_1', 'external' => 'x']),
             'ensureLenses' => fn () => $client->ensureLenses(['lens' => [['identifier' => 'thumbnail']]]),
         ];
@@ -162,11 +162,37 @@ final class ClientTest extends TestCase
     {
         $mock = new MockTransport();
         $mock->enqueue(new Response(206, ['Content-Range' => 'bytes 1-3/4'], 'abc'));
-        $response = $mock->client()->cdn->serve(['assetIdentifier' => 'a', 'init' => ['headers' => ['x-api-key' => 'attacker', 'Range' => 'bytes=1-3']]]);
+        $response = $mock->client()->cdn->serve(['assetId' => 'a', 'init' => ['headers' => ['x-api-key' => 'attacker', 'Range' => 'bytes=1-3']]]);
         self::assertSame(206, $response->getStatusCode());
         self::assertSame('abc', $response->getBody()->getContents());
         self::assertSame('test-key', $mock->requests()[0]->request->getHeaderLine('X-Api-Key'));
         self::assertSame('bytes=1-3', $mock->requests()[0]->request->getHeaderLine('Range'));
+    }
+
+    /** getAssetInfo reads `{url}/info` without the API key, with the URL's claims unless the options give others, and raises a CDN refusal by its code. */
+    public function testGetAssetInfoKeepsOrReplacesTheUrlsClaims(): void
+    {
+        $info = ['id' => 'asset-1', 'projectId' => 'project-1', 'type' => 'image', 'externalUrl' => null,
+            'content' => ['format' => 'image/png', 'width' => 4, 'height' => 3, 'durationSeconds' => null, 'pageCount' => null,
+                'rendered' => null, 'preview' => null, 'hls' => null], 'availability' => 'age-restricted'];
+        $mock = new MockTransport();
+        $mock->enqueueJson($info)->enqueueJson($info)
+            ->enqueueJson(['code' => ErrorCodes::SIGNED_URL_EXPIRED, 'message' => 'The signed URL has expired'], 403);
+        $cdn = $mock->client()->cdn;
+        $url = 'https://cdn.calmlens.com/v1/assets/project-1/sig_00/?viewerClaims=' . rawurlencode('{"region":"DE","ageConfirmed":false}');
+        self::assertSame($info, $cdn->getAssetInfo($url));
+        $cdn->getAssetInfo($url, ['viewerClaims' => ['ageConfirmed' => true]]);
+        $this->error(ErrorCodes::SIGNED_URL_EXPIRED, fn () => $cdn->getAssetInfo('https://cdn.calmlens.com/v1/assets/project-1/sig_00'));
+        $sent = array_map(fn ($recorded) => $recorded->request, $mock->requests());
+        self::assertSame([
+            'https://cdn.calmlens.com/v1/assets/project-1/sig_00/info?viewerClaims=' . rawurlencode('{"region":"DE"}'),
+            'https://cdn.calmlens.com/v1/assets/project-1/sig_00/info?viewerClaims=' . rawurlencode('{"ageConfirmed":true}'),
+            'https://cdn.calmlens.com/v1/assets/project-1/sig_00/info',
+        ], array_map(fn ($request) => (string) $request->getUri(), $sent));
+        foreach ($sent as $request) {
+            self::assertFalse($request->hasHeader('X-Api-Key'));
+        }
+        self::assertSame(0, $mock->pending());
     }
 
     public function testConfigurationAndDebugOutput(): void
@@ -189,7 +215,7 @@ final class ClientTest extends TestCase
         }
         $mock = new MockTransport();
         $this->error('sdk/invalid-argument', fn () => $mock->client()->cdn->serve([
-            'assetIdentifier' => 'a', 'init' => ['headers' => ['Range' => "bad\r\nheader"]],
+            'assetId' => 'a', 'init' => ['headers' => ['Range' => "bad\r\nheader"]],
         ]));
         self::assertSame([], $mock->requests());
         $mock->enqueue(new Response(204));

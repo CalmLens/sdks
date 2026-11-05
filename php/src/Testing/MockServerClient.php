@@ -54,7 +54,8 @@ use Psr\Http\Message\ResponseInterface;
  * content was removed or is still uploading, return 403 `asset/not-available` whatever the key.
  * Then access: an age-restricted asset requested without `'viewerClaims' => ['ageConfirmed' => true]`
  * returns 403 `viewer/age-confirmation-required` whatever the key, and a private asset needs an
- * `assets:download` grant for its folder. Then whether the asset has the resource (404
+ * `assets:download` grant for its folder, or a grant from `cdn->signAssetUrl`, which `fetchCdn`
+ * loads without the API key as a browser would. Then whether the asset has the resource (404
  * `asset/no-rendered-version`), and lenses and transforms only on a still image: the preview, or a
  * rendered image. The mock converts nothing: an upload stands in for its rendered file and an
  * image's preview, and the placeholder PNG for a website screenshot, document page or audio
@@ -88,7 +89,7 @@ final class MockServerClient
     /** The size of the waveform the API makes as an audio asset's preview. */
     private const WAVEFORM_SIZE = ['width' => 1200, 'height' => 300];
     /** The resources an asset's CDN path names. */
-    private const PATH_RESOURCES = ['original', 'rendered', 'preview', 'hls', 'embed', 'placeholder'];
+    private const PATH_RESOURCES = ['original', 'rendered', 'preview', 'hls', 'embed', 'placeholder', 'info'];
     /** The page the mock serves at `/embed`, standing in for the CDN's embed page. */
     private const EMBED_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Embed</title></head><body></body></html>';
     private const MIB = 1024 * 1024;
@@ -106,9 +107,9 @@ final class MockServerClient
     private const EVENT_TYPE_PATTERN = '/^[a-z][a-z-]*\.[a-z][a-z-]*$/D';
     /** The client methods `failNextRequest` can target. */
     public const OPERATIONS = ['assets.list', 'assets.search', 'assets.retrieve', 'assets.waitForDecision', 'assets.update',
-        'assets.listChildren', 'assets.listTimeline', 'assets.create', 'assets.classify', 'assets.uploadPart', 'assets.createSignedUrl', 'assets.move',
+        'assets.listChildren', 'assets.listTimeline', 'assets.create', 'assets.classify', 'assets.uploadPart', 'assets.move',
         'assets.retry', 'assets.explain', 'assets.decide', 'assets.removeContent', 'assets.delete', 'assets.batch', 'text.classify',
-        'cdn.serve', 'events.list', 'folders.list', 'folders.retrieve', 'folders.create', 'folders.update', 'folders.delete',
+        'cdn.serve', 'cdn.getAssetInfo', 'cdn.signAssetUrl', 'events.list', 'folders.list', 'folders.retrieve', 'folders.create', 'folders.update', 'folders.delete',
         'folders.move', 'hashLists.list', 'hashLists.retrieve', 'hashLists.create', 'hashLists.update', 'hashLists.delete',
         'hashLists.listEntries', 'hashLists.addEntry', 'hashLists.removeEntry', 'policies.list', 'policies.retrieve',
         'policies.create', 'policies.update', 'policies.applyPreset', 'policies.setAutomaticUpdates', 'policies.delete',
@@ -145,6 +146,10 @@ final class MockServerClient
     /** The processing options each asset was uploaded with, which the API keeps but doesn't return. */
     private array $processingOptions = [];
     private array $grants;
+    /** The client's API key: a CDN request without it, as `fetchCdn` sends, has no grants. */
+    private string $apiKey;
+    /** Sends a CDN request through the mock without the API key, for `fetchCdn`. */
+    private Client $browser;
     private float $elapsed = 0.0;
     private int $requestCount = 0;
     /** Every API cursor list returns this many items unless `pageSize` says otherwise. */
@@ -199,7 +204,9 @@ final class MockServerClient
         });
         $this->createId = \Closure::fromCallable($createId ?? fn (string $prefix): string => Values::id($prefix));
         $this->grants = $apiKey === null ? [] : self::grantsOf($apiKey);
+        $this->apiKey = $apiKey ?? 'mock-key';
         $stack = HandlerStack::create(fn (RequestInterface $request, array $options) => $this->handle($request));
+        $this->browser = new Client(['handler' => $stack]);
         $this->client = new ServerClient($apiKey ?? 'mock-key', $projectId, $baseUrl, $cdnBaseUrl, maxRetries: $maxRetries,
             httpClient: new Client(['handler' => $stack]), maxResponseBytes: $maxResponseBytes,
             uploadTimeout: $uploadTimeout, partSizeBytes: $partSizeBytes);
@@ -442,7 +449,7 @@ final class MockServerClient
     private function operations(RequestInterface $request, bool $cdn, array $parts, array $query): array
     {
         if ($cdn) {
-            return ['cdn.serve'];
+            return rawurldecode($this->cdnSegments($request)[3] ?? '') === 'info' ? ['cdn.getAssetInfo'] : ['cdn.serve'];
         }
         $method = $request->getMethod();
         if (($parts[0] ?? null) === 'projects') {
@@ -468,6 +475,7 @@ final class MockServerClient
                 'GET assets' => ['assets.list'],
                 'GET assets/search' => ['assets.search'],
                 'POST assets/batch' => ['assets.batch'],
+                'POST signed-asset-urls' => ['cdn.signAssetUrl'],
                 'POST assets' => self::flag($query['queue'] ?? null) ? ['assets.create'] : ['assets.classify', 'text.classify'],
                 default => [],
             };
@@ -483,12 +491,25 @@ final class MockServerClient
         }
         $names = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'POST move' => 'move',
             'GET children' => 'listChildren', 'DELETE content' => 'removeContent', 'POST retry' => 'retry',
-            'POST explain' => 'explain', 'POST decision' => 'decide', 'POST part' => 'uploadPart', 'POST signed-url' => 'createSignedUrl'];
+            'POST explain' => 'explain', 'POST decision' => 'decide', 'POST part' => 'uploadPart'];
         $name = $names[$method . ' ' . $suffix] ?? null;
         if ($name === null || !in_array($resource, ['assets', 'folders'], true)) {
             return [];
         }
         return $name === 'retrieve' && $resource === 'assets' ? ['assets.retrieve', 'assets.waitForDecision'] : ["$resource.$name"];
+    }
+
+    /**
+     * The path segments of a CDN request after the CDN base URL, as sent, still percent-encoded:
+     * like the CDN, the asset segment and the selector are read before decoding, as an external ID
+     * may hold an encoded `/`.
+     *
+     * @return list<string>
+     */
+    private function cdnSegments(RequestInterface $request): array
+    {
+        $raw = substr((string) $request->getUri()->withQuery('')->withFragment(''), strlen($this->cdnBaseUrl));
+        return array_values(array_filter(explode('/', $raw), fn ($part) => $part !== ''));
     }
 
     /** Records the request with the status it is answered with, null when it fails without a response. */
@@ -523,10 +544,7 @@ final class MockServerClient
             return $queued;
         }
         if ($cdn) {
-            // The selector is read as sent, still percent-encoded, like the CDN.
-            $raw = substr((string) $request->getUri()->withQuery('')->withFragment(''), strlen($this->cdnBaseUrl));
-            $rawParts = array_values(array_filter(explode('/', $raw), fn ($part) => $part !== ''));
-            return $this->serve($request->getMethod(), $parts, $query, implode('/', array_slice($rawParts, 4)));
+            return $this->serve($request->getMethod(), $this->cdnSegments($request), $query, $request->getHeaderLine('X-Api-Key') === $this->apiKey);
         }
         // The HTTP library trims header values, as every HTTP stack does before the API sees them.
         $key = $request->hasHeader('Idempotency-Key') ? $request->getHeaderLine('Idempotency-Key') : null;
@@ -669,6 +687,7 @@ final class MockServerClient
                 $route === 'GET assets' => $this->listAssets($query),
                 $route === 'GET assets/search' => $this->search($query),
                 $route === 'POST assets/batch' => $this->batch($json),
+                $route === 'POST signed-asset-urls' => $this->signAssetUrl($json),
                 $route === 'POST assets' && $upload === '' => $this->createAsset($json, self::flag($query['queue'] ?? null), null, false),
                 $route === 'POST assets' && in_array($upload, ['content', 'part'], true) => $this->createAsset($query, self::flag($query['queue'] ?? null), $body, $upload === 'part'),
                 default => throw new \LogicException("MockServerClient does not emulate $route; enqueue a response for it"),
@@ -698,17 +717,6 @@ final class MockServerClient
             if (array_key_exists('name', $json) && $json['name'] === null) {
                 self::invalid('validation/invalid-type', 'name');
             }
-        }
-        if ($route === 'POST signed-url') {
-            // None of these fields takes null.
-            foreach (['viewerClaims', 'resource', 'lens', 'transform', 'expiresInSeconds'] as $field) {
-                if (array_key_exists($field, $json) && $json[$field] === null) {
-                    self::invalid($field === 'resource' ? 'validation/invalid-value' : 'validation/invalid-type', $field);
-                }
-            }
-        }
-        if ($route === 'POST signed-url' && !in_array($json['resource'] ?? 'rendered', Cdn::SIGNED_RESOURCES, true)) {
-            self::invalid('validation/invalid-value', 'resource');
         }
         $asset = $this->assets[$id] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
         switch ($route) {
@@ -774,16 +782,6 @@ final class MockServerClient
                 return $this->assets[$id] = $this->touch(['folderId' => $folderId] + $asset);
             case 'POST part':
                 return $this->uploadPart($asset, $query, $body);
-            case 'POST signed-url':
-                $expires = $json['expiresInSeconds'] ?? 900;
-                $query = array_intersect_key($json, array_flip(['lens', 'transform'])) + ['expires' => $expires];
-                // Like the API, the URL carries the viewer claims its signature covers.
-                if (is_array($json['viewerClaims'] ?? null)) {
-                    $query['viewerClaims'] = json_encode((object) $json['viewerClaims'], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-                }
-                $params = http_build_query($query);
-                return ['url' => $this->cdnBaseUrl . '/signed/' . rawurlencode($id) . '/' . ($json['resource'] ?? 'rendered') . '?' . $params,
-                    'expiresAt' => ($this->now)() + $expires * 1000];
         }
         throw new \LogicException("MockServerClient does not emulate $route for an asset; enqueue a response for it");
     }
@@ -1182,6 +1180,99 @@ final class MockServerClient
      * DELETE /assets/:id/content. It answers with a `batch_` ID, which each event it causes names
      * in a `batch-id` fact. Mock assets carry no safety holds, so none is skipped.
      */
+    /**
+     * Signs an asset URL like the API (`POST /projects/:projectId/signed-asset-urls`): a grant to
+     * one asset, by ID or external ID, until it expires, serving the original only when asked. The
+     * mock's grant is readable (`encodeGrant`), and only the mock's CDN accepts it.
+     */
+    private function signAssetUrl(array $json): array
+    {
+        // Like the API's schema, none of these fields takes null.
+        foreach (['assetId', 'externalId', 'expiresIn', 'original'] as $field) {
+            if (array_key_exists($field, $json) && $json[$field] === null) {
+                self::invalid('validation/invalid-type', $field);
+            }
+        }
+        if (array_key_exists('assetId', $json) === array_key_exists('externalId', $json)) {
+            self::fail(ErrorCodes::INVALID_REQUEST, 400, 'Send either assetId or externalId',
+                ['issues' => [['path' => '', 'message' => 'Send either assetId or externalId', 'code' => 'custom']]]);
+        }
+        $expiresIn = $json['expiresIn'] ?? Cdn::DEFAULT_SIGNED_URL_EXPIRES_IN;
+        if (!is_int($expiresIn) && !(is_float($expiresIn) && is_finite($expiresIn) && floor($expiresIn) === $expiresIn)) {
+            self::invalid('validation/invalid-type', 'expiresIn');
+        }
+        if ($expiresIn < 1) {
+            self::invalid('validation/too-small', 'expiresIn');
+        }
+        if ($expiresIn > Cdn::MAX_SIGNED_URL_EXPIRES_IN) {
+            self::invalid('validation/too-big', 'expiresIn');
+        }
+        $original = $json['original'] ?? false;
+        if (!is_bool($original)) {
+            self::invalid('validation/invalid-type', 'original');
+        }
+        $asset = null;
+        if (array_key_exists('externalId', $json)) {
+            foreach ($this->assets as $candidate) {
+                if (($candidate['externalId'] ?? null) === $json['externalId']) {
+                    $asset = $candidate;
+                    break;
+                }
+            }
+        } elseif (is_string($json['assetId'])) {
+            $asset = $this->assets[$json['assetId']] ?? null;
+        }
+        if ($asset === null) {
+            self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
+        }
+        if (($asset['content']['safetyHold'] ?? null) !== null) {
+            self::fail(ErrorCodes::ASSET_HELD, null, 'This asset is held', ['hold' => 'safety']);
+        }
+        $expiresAt = ($this->now)() + (int) $expiresIn * 1000;
+        return ['url' => $this->cdnBaseUrl . '/assets/' . Values::component($this->projectId) . '/'
+            . self::encodeGrant($asset['id'], $original, $expiresAt), 'expiresAt' => $expiresAt];
+    }
+
+    /**
+     * The mock's grant, the asset segment of a URL `signAssetUrl` signs: `sig_` and the lowercase
+     * hex of the UTF-8 string `{assetId}.{1|0}.{expiresAt}`, its asset, original access and expiry.
+     * Every SDK's mock writes it the same way. It is readable, not signed, as the mock has no
+     * secret to keep.
+     */
+    private static function encodeGrant(string $assetId, bool $original, int $expiresAt): string
+    {
+        return 'sig_' . bin2hex($assetId . '.' . ($original ? '1' : '0') . '.' . $expiresAt);
+    }
+
+    /** @return ?array{assetId: string, original: bool, expiresAt: int} a grant, or null for a segment the mock didn't sign */
+    private static function decodeGrant(string $segment): ?array
+    {
+        $hex = substr($segment, strlen('sig_'));
+        if (!preg_match('/^(?:[0-9a-f]{2})+$/D', $hex)) {
+            return null;
+        }
+        $text = (string) hex2bin($hex);
+        if (preg_match('//u', $text) !== 1 || !preg_match('/^(.+)\.([01])\.(\d+)$/sD', $text, $match)) {
+            return null;
+        }
+        return ['assetId' => $match[1], 'original' => $match[2] === '1', 'expiresAt' => (int) $match[3]];
+    }
+
+    /**
+     * Fetches a URL of the mock's CDN as a browser would, with a GET and without the API key: a
+     * signed asset URL from `cdn->signAssetUrl` (with a resource appended), or a public one from
+     * `cdn->getAssetUrl`. The request is recorded like any other, and an HTTP error is returned,
+     * not thrown.
+     */
+    public function fetchCdn(string $url): ResponseInterface
+    {
+        try {
+            return $this->browser->send(new \GuzzleHttp\Psr7\Request('GET', $url), ['http_errors' => false, 'allow_redirects' => false]);
+        } catch (\GuzzleHttp\Exception\TransferException $error) {
+            throw CalmLensException::create(SdkErrorCodes::TRANSPORT_ERROR, 'Request failed', previous: $error);
+        }
+    }
+
     private function batch(array $json): array
     {
         $ids = $json['assetIds'] ?? null;
@@ -2110,32 +2201,66 @@ final class MockServerClient
      * Serves an asset's resources like the CDN, with its headers: `original` is the upload;
      * `rendered` the image, PDF, video or audio file `content.rendered` describes; `preview` the
      * still `content.preview` describes; `hls` the adaptive stream's files, which the mock never
-     * prepares; `embed` a small page standing in for the embed page of any asset; and `placeholder` the preview's
-     * ThumbHash as a PNG. The mock converts
+     * prepares; `embed` a small page standing in for the embed page of any asset; `placeholder` the preview's
+     * ThumbHash as a PNG; and `info` the display info. The asset is named by its ID, `ext:` and its
+     * URL-encoded external ID, or a grant from `signAssetUrl`. The mock converts
      * nothing: an upload stands in for its rendered file and an image's preview, and the placeholder
      * PNG for a website screenshot, document page or audio waveform.
      */
-    private function serve(string $method, array $segments, array $query, string $selector): Response
+    private function serve(string $method, array $segments, array $query, bool $keyed): Response
     {
-        [, $project, $identifier, $resource] = $segments + [null, null, null, null];
+        [$root, $project, $assetSegment, $resource] = array_map('rawurldecode', array_slice($segments, 0, 4)) + ['', '', '', ''];
+        $assetSegment = $segments[2] ?? '';
+        $selector = implode('/', array_slice($segments, 4));
         $noRenderedVersion = fn () => $this->json(404, ['code' => 'asset/no-rendered-version', 'message' => 'This asset has no such resource']);
         $invalidTransform = fn () => $this->json(400, ['code' => ErrorCodes::INVALID_TRANSFORM, 'message' => 'Invalid transform selector']);
+        $notFound = fn () => $this->json(404, ['code' => 'asset/not-found', 'message' => 'Asset not found']);
         // Like the CDN, the adaptive stream's files sit beneath `/hls/` (its master playlist is
-        // `/hls/index.m3u8`). Otherwise the selector after the resource is read; the original and
-        // the embed page take none.
+        // `/hls/index.m3u8`). Otherwise the selector after the resource is read; the original, the
+        // embed page and the info take none.
         $transform = Transforms::parse($resource === 'hls' ? '' : $selector);
         $selected = $transform !== null && ($transform['lens'] !== null || $transform['options'] !== null);
-        if ($transform === null || (in_array($resource, ['original', 'embed'], true) && $selected)) {
+        if ($transform === null || (in_array($resource, ['original', 'embed', 'info'], true) && $selected)) {
             return $invalidTransform();
         }
-        $asset = null;
-        foreach ($this->assets as $candidate) {
-            if ($candidate['id'] === $identifier || ($candidate['externalId'] ?? null) === $identifier) {
-                $asset = $candidate;
-            }
+        if ($root !== 'assets' || $project !== $this->projectId || $assetSegment === '') {
+            return $notFound();
         }
-        if ($project !== $this->projectId || $asset === null || !in_array($resource, self::PATH_RESOURCES, true)) {
-            return $this->json(404, ['code' => 'asset/not-found', 'message' => 'Asset not found']);
+        // Like the CDN, the asset is `ext:` and its URL-encoded external ID, a grant (`sig_…`) or its ID.
+        $grant = null;
+        $find = function (string $field, string $value): ?array {
+            foreach ($this->assets as $candidate) {
+                if (($candidate[$field] ?? null) === $value) {
+                    return $candidate;
+                }
+            }
+            return null;
+        };
+        if (str_starts_with($assetSegment, 'sig_')) {
+            $grant = self::decodeGrant($assetSegment);
+            if ($grant === null) {
+                return $this->json(403, ['code' => ErrorCodes::SIGNED_URL_INVALID, 'message' => "The signed asset URL's grant is invalid"]);
+            }
+            if ($grant['expiresAt'] <= ($this->now)()) {
+                return $this->json(403, ['code' => ErrorCodes::SIGNED_URL_EXPIRED, 'message' => 'The signed URL has expired']);
+            }
+            $asset = $find('id', $grant['assetId']);
+        } elseif (str_starts_with($assetSegment, 'ext:')) {
+            $externalId = rawurldecode(substr($assetSegment, strlen('ext:')));
+            $asset = $externalId === '' ? null : $find('externalId', $externalId);
+        } else {
+            $asset = $find('id', rawurldecode($assetSegment));
+        }
+        if ($asset === null || !in_array($resource, self::PATH_RESOURCES, true)) {
+            return $notFound();
+        }
+        if ($resource === 'original' && $grant !== null && !$grant['original']) {
+            return $this->json(403, ['code' => ErrorCodes::SIGNED_URL_ORIGINAL_NOT_GRANTED, 'message' => "This signed asset URL doesn't grant the original file"]);
+        }
+        // A grant authorises a private asset without the API key; a request without the key has no grants.
+        $canDownload = fn (): bool => $grant !== null || ($keyed && $this->canDownload($asset['folderId'] ?? null));
+        if ($resource === 'info') {
+            return $this->serveInfo($method, $asset, $query, $canDownload());
         }
         $notAvailable = fn () => $this->json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
         $status = $asset['classification']['moderation']['status'];
@@ -2168,7 +2293,7 @@ final class MockServerClient
         $claims = json_decode($query['viewerClaims'] ?? '{}', true);
         if ($status === 'age-restricted' && ($claims['ageConfirmed'] ?? false) !== true) return $this->json(403, ['code' => 'viewer/age-confirmation-required']);
         $private = $asset['visibility'] !== 'public';
-        if ($private && !$this->canDownload($asset['folderId'] ?? null)) {
+        if ($private && !$canDownload()) {
             return $this->json(403, ['code' => ErrorCodes::PERMISSION_DENIED, 'message' => 'This API key needs assets:download permission for this asset’s folder.',
                 'details' => ['permission' => 'assets:download']]);
         }
@@ -2223,6 +2348,38 @@ final class MockServerClient
             + ['X-Content-Type-Options' => 'nosniff', 'Content-Security-Policy' => "sandbox; default-src 'none'"]
             // Content a browser could run as a document is served as a download.
             + (in_array($base, self::ACTIVE_CONTENT_TYPES, true) || str_ends_with($base, '+xml') ? ['Content-Disposition' => 'attachment'] : []));
+    }
+
+    /**
+     * The display info at `/info`, like the CDN's: the allowlisted fields and whether the viewer
+     * the claims describe can see the content, decided as the other resources decide it. A private
+     * asset's needs a grant or an API key with `assets:download`.
+     */
+    private function serveInfo(string $method, array $asset, array $query, bool $authorised): Response
+    {
+        $private = $asset['visibility'] !== 'public';
+        if ($private && !$authorised) {
+            return $this->json(404, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
+        }
+        $claims = json_decode($query['viewerClaims'] ?? '{}', true);
+        if (!is_array($claims)) {
+            return $this->json(400, ['code' => ErrorCodes::INVALID_VIEWER_CLAIMS, 'message' => 'Invalid viewer claims']);
+        }
+        $content = $asset['content'];
+        $status = $asset['classification']['moderation']['status'];
+        $availability = match (true) {
+            ($content['safetyHold'] ?? null) !== null, $asset['upload']['status'] === 'uploading', in_array($status, ['blocked', 'purged'], true),
+            $asset['classification']['status'] === 'failed', $content['status'] === 'removed' => Cdn::AVAILABILITY_UNAVAILABLE,
+            $status === 'age-restricted' && ($claims['ageConfirmed'] ?? null) !== true => Cdn::AVAILABILITY_AGE_RESTRICTED,
+            default => Cdn::AVAILABILITY_AVAILABLE,
+        };
+        $info = ['id' => $asset['id'], 'projectId' => $asset['projectId'], 'type' => $asset['type'], 'externalUrl' => $asset['externalUrl'] ?? null,
+            'content' => ['format' => $content['format'] ?? null, 'width' => $content['width'] ?? null, 'height' => $content['height'] ?? null,
+                'durationSeconds' => $content['durationSeconds'] ?? null, 'pageCount' => $content['pageCount'] ?? null,
+                'rendered' => $content['rendered'] ?? null, 'preview' => $content['preview'] ?? null, 'hls' => $content['hls'] ?? null],
+            'availability' => $availability];
+        return $this->cdnResponse($method, json_encode($info, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ['Content-Type' => 'application/json', 'Cache-Control' => ($private ? 'private' : 'public') . ', max-age=60', 'Cache-Tag' => 'asset-' . $asset['id']]);
     }
 
     private function cdnResponse(string $method, string $bytes, array $headers): Response

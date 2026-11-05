@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace CalmLens;
 
-use CalmLens\Internal\Transforms;
 use CalmLens\Internal\UploadBody;
 use CalmLens\Internal\Values;
 use GuzzleHttp\Psr7\LimitStream;
@@ -14,10 +13,6 @@ final class Assets extends Resource
 {
     protected const OPERATIONS = 'assets';
 
-    /** The longest signed URL lifetime the API accepts: 24 hours. */
-    public const MAX_SIGNED_URL_SECONDS = 86400;
-    /** `createSignedUrl`'s lifetime when none is given, sent explicitly. */
-    public const DEFAULT_SIGNED_URL_SECONDS = 900;
     /** Seconds `waitForDecision` polls before `sdk/timeout`; 0 checks once. */
     public const DEFAULT_DECISION_TIMEOUT = 60;
     /** Seconds before `waitForDecision`'s second check; each later wait is 1.5 times longer, at most 2 seconds. */
@@ -201,30 +196,6 @@ final class Assets extends Resource
             Values::invalid('folderId is required (null moves to root)');
         }
         return $this->session->request('POST', $path . '/move', body: ['folderId' => $api['folderId']], options: $request);
-    }
-
-    public function createSignedUrl(array $options): array
-    {
-        [$api, $request] = $this->split($options, __FUNCTION__);
-        $path = $this->path($api, 'assets', 'assetId');
-        // As the API checks: the original, rendered, preview, hls and embed resources are signed
-        // (a placeholder needs no signature), and the original, hls and embed take no lens or
-        // transform.
-        $resource = $api['resource'] ?? 'rendered';
-        if (!in_array($resource, Cdn::SIGNED_RESOURCES, true)) {
-            Values::invalid("A signed URL's resource must be one of " . implode(', ', Cdn::SIGNED_RESOURCES));
-        }
-        if (in_array($resource, Cdn::UNSELECTABLE_RESOURCES, true) && (isset($api['lens']) || isset($api['transform']))) {
-            Values::invalid("The $resource resource takes no lens or transform");
-        }
-        $expires = $api['expiresInSeconds'] ?? self::DEFAULT_SIGNED_URL_SECONDS;
-        if (!is_int($expires) || $expires < 1 || $expires > self::MAX_SIGNED_URL_SECONDS) {
-            Values::invalid('expiresInSeconds must be a whole number from 1 to 86400');
-        }
-        if (isset($api['transform'])) {
-            $api['transform'] = Transforms::selector($api['transform']);
-        }
-        return $this->session->request('POST', $path . '/signed-url', body: $api + ['expiresInSeconds' => self::DEFAULT_SIGNED_URL_SECONDS], options: $request);
     }
 
     public function create(array $options): array { return $this->submit($options, true); }

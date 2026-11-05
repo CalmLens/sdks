@@ -23,6 +23,28 @@ final class MockServerClientTest extends TestCase
         ]);
     }
 
+    /** A grant serves until its expiry, then the CDN refuses it; a held asset can't be signed. */
+    public function testSignedAssetUrlExpiresAndHeldAssetsAreNotSigned(): void
+    {
+        $now = 1000;
+        $mock = new MockServerClient(now: function () use (&$now): int { return $now; });
+        $asset = self::image($mock, 'private');
+        $signed = $mock->client()->cdn->signAssetUrl(['assetId' => $asset['id'], 'expiresIn' => 60, 'original' => true, 'resource' => 'original']);
+        self::assertSame(61000, $signed['expiresAt']);
+        $now = $signed['expiresAt'] - 1;
+        self::assertSame('png-bytes', (string) $mock->fetchCdn($signed['url'])->getBody());
+        $now = $signed['expiresAt'];
+        $expired = $mock->fetchCdn($signed['url']);
+        self::assertSame([403, ErrorCodes::SIGNED_URL_EXPIRED], [$expired->getStatusCode(), json_decode((string) $expired->getBody(), true)['code']]);
+        $mock->assets[$asset['id']]['content']['safetyHold'] = ['reason' => 'csam-suspected'];
+        try {
+            $mock->client()->cdn->signAssetUrl(['assetId' => $asset['id']]);
+            self::fail('Signed a held asset');
+        } catch (CalmLensException $error) {
+            self::assertSame(ErrorCodes::ASSET_HELD, $error->errorCode);
+        }
+    }
+
     public static function outcomes(): iterable
     {
         yield ['allowed', 'completed', 'allowed', 'stored'];
@@ -165,11 +187,11 @@ final class MockServerClientTest extends TestCase
         $queued = self::image($mock);
         self::assertSame(['image', MockServerClient::THUMBHASH], [$photo['content']['rendered']['kind'], $photo['content']['preview']['thumbhash']]);
         foreach (['original', 'rendered', 'preview', 'placeholder'] as $resource) {
-            self::assertSame(200, $client->cdn->serve(['assetIdentifier' => $photo['id'], 'resource' => $resource])->getStatusCode(), $resource);
+            self::assertSame(200, $client->cdn->serve(['assetId' => $photo['id'], 'resource' => $resource])->getStatusCode(), $resource);
         }
         $mock->assets[$photo['id']]['content']['safetyHold'] = ['placedAt' => 1, 'reason' => 'suspected-illegal-content', 'disposedAt' => null];
         foreach (['original', 'rendered', 'preview', 'hls', 'embed', 'placeholder'] as $resource) {
-            $response = $client->cdn->serve(['assetIdentifier' => $photo['id'], 'resource' => $resource]);
+            $response = $client->cdn->serve(['assetId' => $photo['id'], 'resource' => $resource]);
             self::assertSame([403, 'asset/not-available'], [$response->getStatusCode(), json_decode((string) $response->getBody(), true)['code']], $resource);
         }
         // A decision while a hold is on reports neither a rendered file nor a preview.
@@ -205,7 +227,7 @@ final class MockServerClientTest extends TestCase
         $sheet = $client->assets->classify(['name' => 'sheet.csv', 'visibility' => 'public',
             'content' => ['data' => 'a,b', 'type' => 'text/csv'], 'processingOptions' => $keep]);
         foreach ([$video, $sheet] as $asset) {
-            $embed = $client->cdn->serve(['assetIdentifier' => $asset['id'], 'resource' => 'embed', 'init' => ['method' => 'HEAD']]);
+            $embed = $client->cdn->serve(['assetId' => $asset['id'], 'resource' => 'embed', 'init' => ['method' => 'HEAD']]);
             self::assertSame([200, 'text/html; charset=utf-8', ''], [$embed->getStatusCode(), $embed->getHeaderLine('Content-Type'), (string) $embed->getBody()], $asset['name']);
         }
     }
