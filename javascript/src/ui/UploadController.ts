@@ -1,6 +1,10 @@
 import CalmLensAppClient from "../client/CalmLensAppClient";
 import { CalmLensError, SDK_ERROR_CODES } from "../client/CalmLensError";
-import type { AssetModerationStatus, CalmLensAppClientOptions } from "../client/CalmLensTypes";
+import type {
+  AssetModerationStatus,
+  CalmLensAppClientOptions,
+  UploadedAsset,
+} from "../client/CalmLensTypes";
 import { createProgressFetch } from "./ProgressFetch";
 
 /**
@@ -200,8 +204,34 @@ const sleep = (ms: number, signal: AbortSignal) =>
     });
   });
 
-/** An upload as the uploader tracks it: its asset ID and moderation status. */
-type CheckedAsset = { id: string; status?: AssetModerationStatus };
+/**
+ * An upload as the uploader tracks it: its asset ID, its moderation status, whether it is settled
+ * (no longer waiting to be processed) and whether its processing failed.
+ */
+type CheckedAsset = {
+  id: string;
+  status?: AssetModerationStatus;
+  settled: boolean;
+  failed?: boolean;
+};
+
+/** A custom upload is settled once it has a status other than `pending`, or reports none. */
+const checkedCustomUpload = (id: string, status?: AssetModerationStatus): CheckedAsset => ({
+  id,
+  status,
+  settled: status !== "pending",
+});
+
+/**
+ * An upload preset's upload is settled once its processing is `completed` or `failed`; its
+ * moderation status is present only when the preset shows decisions.
+ */
+const checkedPresetUpload = ({ id, classification }: UploadedAsset): CheckedAsset => ({
+  id,
+  status: classification.moderation?.status,
+  settled: classification.status === "completed" || classification.status === "failed",
+  failed: classification.status === "failed",
+});
 
 let nextKey = 0;
 
@@ -400,16 +430,20 @@ export class UploadController<F extends UploadFile = UploadFile> {
         this.#update(key, { stage: "checking", progress: null, assetId: asset.id });
       }
       const deadline = Date.now() + (options.decisionTimeoutMs ?? DEFAULT_DECISION_TIMEOUT_MS);
-      for (
-        let delay = 1000;
-        asset.status === "pending" && check && Date.now() < deadline;
-        delay *= 2
-      ) {
+      for (let delay = 1000; !asset.settled && check && Date.now() < deadline; delay *= 2) {
         await sleep(Math.min(delay, Math.max(0, deadline - Date.now())), abort.signal);
         if (abort.signal.aborted) return;
         asset = await check(asset.id);
       }
       if (abort.signal.aborted) return;
+      if (asset.failed) {
+        // Checking a failed upload again would find it failed, so `retry` uploads the file again.
+        this.#checks.delete(key);
+        this.#update(key, { stage: "failed", progress: null });
+        const item = this.#find(key);
+        if (item) options.onFailed?.(item);
+        return;
+      }
       this.#update(key, { stage: "complete", status: asset.status });
       const item = this.#find(key);
       if (!item) return;
@@ -443,10 +477,10 @@ export class UploadController<F extends UploadFile = UploadFile> {
       return {
         create: async () => {
           const { assetId, status } = await upload(file, { signal, onProgress });
-          return { id: assetId, status };
+          return checkedCustomUpload(assetId, status);
         },
         retrieve: checkStatus
-          ? async (assetId) => ({ id: assetId, status: await checkStatus(assetId, { signal }) })
+          ? async (assetId) => checkedCustomUpload(assetId, await checkStatus(assetId, { signal }))
           : undefined,
       };
     }
@@ -466,14 +500,16 @@ export class UploadController<F extends UploadFile = UploadFile> {
     return {
       create: async () => {
         const type = file.type || "application/octet-stream";
-        return client.assets.create({
-          name: file.name,
-          content: isBlob(file)
-            ? { data: file, type }
-            : { uint8Array: new Uint8Array(await file.arrayBuffer()), type },
-        });
+        return checkedPresetUpload(
+          await client.assets.create({
+            name: file.name,
+            content: isBlob(file)
+              ? { data: file, type }
+              : { uint8Array: new Uint8Array(await file.arrayBuffer()), type },
+          }),
+        );
       },
-      retrieve: (assetId) => client.assets.retrieve({ assetId }),
+      retrieve: async (assetId) => checkedPresetUpload(await client.assets.retrieve({ assetId })),
     };
   }
 

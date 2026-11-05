@@ -150,13 +150,16 @@ describe("MockCalmLensServerClient assets.decide", () => {
       decision: "blocked",
       note: "  Spam  ",
     });
+    // The review names the API key that decided, never a person's name or email.
     expect(blocked.classification.moderation.manualReviews).toEqual([
-      expect.objectContaining({
+      {
+        id: expect.stringMatching(/^rev_/),
         decision: "blocked",
         note: "Spam",
-        reviewerName: "An API key",
-        appliedToAsset: true,
-      }),
+        decidedBy: { type: "api-key", id: null },
+        reviewedAt: expect.any(Number),
+        applied: true,
+      },
     ]);
     const [event] = (await client.events.list({ cursor: nextCursor })).items;
     expect(event?.facts).toEqual(

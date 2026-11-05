@@ -12,6 +12,7 @@ import type {
   AssetContent as SharedAssetContent,
   AssetModeration as SharedAssetModeration,
   AssetUpload as SharedAssetUpload,
+  ProcessingOptions as SharedProcessingOptions,
 } from "../contract/Asset.js";
 import type { AssetBinaryPayloadInput } from "../contract/AssetPayload.js";
 import type {
@@ -59,7 +60,11 @@ import type { SIGNED_CDN_RESOURCES } from "./CalmLensUtils";
 // The enum values listed are the ones this SDK version knows; newer API versions may return
 // others, so handle unknown values (for example as "not ready").
 
-/** Where the asset is in the pipeline: `uploading`, `processing`, then `done` or `failed`. */
+/**
+ * Where the asset is in the pipeline: `queued` while it waits for its content (a multipart upload
+ * still receiving parts) or its turn, `processing`, then `completed` or `failed`. The asset is
+ * settled once it is `completed` or `failed`.
+ */
 export type AssetClassificationStatus = KnownAssetClassificationStatus | (string & {});
 /**
  * Why processing failed: `file-too-large`, `duration-limit`, `resolution-limit`,
@@ -372,14 +377,24 @@ export type UploadPresetSubmitAssetOptions = IdempotencyOptions & {
       }
   );
 
-/** An upload made through an upload preset, as the uploader sees it. */
+/**
+ * An upload made through an upload preset, as the uploader sees it: the same nesting as `Asset`,
+ * holding only its upload and processing state.
+ */
 export interface UploadedAsset {
   id: string;
   name: string;
-  uploadPresetId?: string | null;
+  uploadPresetId: string | null;
   createdAt: number;
-  /** The moderation status, present only when the preset shows decisions to uploaders. */
-  status?: AssetModerationStatus;
+  upload: Pick<AssetUpload, "status" | "partsReceived">;
+  classification: {
+    /** `queued`, `processing`, then `completed` or `failed`. */
+    status: AssetClassificationStatus;
+    /** Why processing failed; `null` unless `status` is `failed`. */
+    failureReason: AssetClassificationFailureReason | null;
+    /** The moderation decision, present only when the preset shows decisions to uploaders. */
+    moderation?: { status: AssetModerationStatus };
+  };
 }
 
 // ---- Operation options --------------------------------------------------------------------
@@ -616,9 +631,11 @@ export type CreateMultipartUploadPartOptions = AssetContentOptions & {
 export interface SubmitAssetCommonOptions extends IdempotencyOptions {
   name: string;
   description?: string;
-  processingOptions?: SharedAsset["processingOptions"];
+  processingOptions?: SharedProcessingOptions;
   visibility?: "public" | "private";
   metadata?: SharedAsset["metadata"];
+  /** Tags for the asset, such as `["catalogue", "backpacks"]`. */
+  tags?: SharedAsset["tags"];
   /**
    * Your identifier for who wrote the content. CalmLens only compares it with the author IDs in
    * `context`, to tell which posts share a speaker.

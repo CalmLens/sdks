@@ -50,7 +50,12 @@ const recordingFetch = () => {
       name: "photo.png",
       uploadPresetId: PRESET_ID,
       createdAt: 1,
-      status: "pending",
+      upload: { status: "completed", partsReceived: null },
+      classification: {
+        status: "processing",
+        failureReason: null,
+        moderation: { status: "pending" },
+      },
     });
   }) as typeof fetch;
   return { fetchImpl, requests };

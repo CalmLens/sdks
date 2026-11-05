@@ -1,5 +1,5 @@
-import "./Asset-BbqYD4p1.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-DI7W0zqj.js";
+import "./Asset-Bs7gZstW.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-dnfPGB50.js";
 import "./Page-DNdKkX2B.js";
 import * as zod from "zod";
 declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
@@ -16,8 +16,8 @@ declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
     status: zod.ZodEnum<{
       completed: "completed";
       failed: "failed";
-      pending: "pending";
       processing: "processing";
+      queued: "queued";
     }>;
     testInput: zod.ZodBoolean;
     moderation: zod.ZodObject<{
@@ -98,8 +98,8 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
       status: zod.ZodEnum<{
         completed: "completed";
         failed: "failed";
-        pending: "pending";
         processing: "processing";
+        queued: "queued";
       }>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
@@ -189,8 +189,8 @@ declare const PUBLIC_EVENT_SCHEMA: zod.ZodObject<{
       status: zod.ZodEnum<{
         completed: "completed";
         failed: "failed";
-        pending: "pending";
         processing: "processing";
+        queued: "queued";
       }>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{

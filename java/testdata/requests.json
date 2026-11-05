@@ -845,7 +845,6 @@
               "action": "block",
               "source": {
                 "kind": "allowance",
-                "index": 0,
                 "indexes": [
                   0,
                   1
@@ -889,13 +888,7 @@
               "violence": {
                 "status": "evaluated",
                 "score": 0.9,
-                "likelihood": "very-likely",
-                "policyConditions": {
-                  "some:contract-condition": {
-                    "status": "evaluated",
-                    "score": 0.8
-                  }
-                }
+                "likelihood": "very-likely"
               }
             }
           },
@@ -2431,25 +2424,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -2457,7 +2431,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -2473,21 +2447,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -2516,24 +2493,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -2560,12 +2549,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -2578,12 +2561,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -2598,12 +2575,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -2616,12 +2587,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -2636,12 +2601,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -2654,12 +2613,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -2674,12 +2627,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -2692,12 +2639,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -2714,16 +2655,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -2811,15 +2743,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -2930,25 +2853,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -2956,7 +2860,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -2972,21 +2876,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -3015,24 +2922,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -3059,12 +2978,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -3077,12 +2990,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -3097,12 +3004,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -3115,12 +3016,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -3135,12 +3030,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -3153,12 +3042,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -3173,12 +3056,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -3191,12 +3068,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -3213,16 +3084,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -3310,15 +3172,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -3468,25 +3321,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -3494,7 +3328,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -3510,21 +3344,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -3553,24 +3390,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -3597,12 +3446,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -3615,12 +3458,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -3635,12 +3472,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -3653,12 +3484,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -3673,12 +3498,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -3691,12 +3510,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -3711,12 +3524,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -3729,12 +3536,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -3751,16 +3552,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -3848,15 +3640,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -3993,25 +3776,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -4019,7 +3783,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -4035,21 +3799,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -4078,24 +3845,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -4122,12 +3901,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -4140,12 +3913,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -4160,12 +3927,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -4178,12 +3939,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -4198,12 +3953,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -4216,12 +3965,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -4236,12 +3979,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -4254,12 +3991,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -4276,16 +4007,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -4373,15 +4095,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -4551,25 +4264,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -4577,7 +4271,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -4593,21 +4287,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -4636,24 +4333,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -4680,12 +4389,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -4698,12 +4401,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -4718,12 +4415,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -4736,12 +4427,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -4756,12 +4441,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -4774,12 +4453,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -4794,12 +4467,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -4812,12 +4479,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -4834,16 +4495,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -4931,15 +4583,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -5060,25 +4703,6 @@
             "tags": [
               "example"
             ],
-            "processingOptions": {
-              "keepContentAfterProcessing": true,
-              "storeSensitiveMetadata": true,
-              "features": {
-                "ocr": {
-                  "enabled": true
-                },
-                "personDetection": {
-                  "enabled": true
-                },
-                "faceDetection": {
-                  "enabled": true,
-                  "ageEstimation": true
-                },
-                "linkDetection": {
-                  "enabled": true
-                }
-              }
-            },
             "visibility": "public",
             "upload": {
               "status": "uploading",
@@ -5086,7 +4710,7 @@
               "partsReceived": 1
             },
             "classification": {
-              "status": "pending",
+              "status": "queued",
               "failureReason": "file-too-large",
               "updatedAt": 1,
               "completedAt": 1,
@@ -5102,21 +4726,24 @@
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
                     "decision": "allowed",
                     "note": "example",
-                    "reviewerName": "example",
-                    "reviewerEmail": "example",
+                    "decidedBy": {
+                      "type": "user",
+                      "id": "example"
+                    },
                     "reviewedAt": 1,
-                    "appliedToAsset": true
+                    "applied": true
                   }
                 ],
+                "automatedStatus": "allowed",
+                "source": "policy",
+                "explanationComplete": true,
                 "categories": {
                   "sexual": {
                     "score": 0.5,
                     "action": "allow",
                     "source": {
                       "kind": "allowance",
-                      "index": 1,
                       "indexes": [
-                        1,
                         1
                       ]
                     },
@@ -5145,24 +4772,36 @@
                     }
                   }
                 },
-                "explanationComplete": true,
-                "source": "policy",
-                "automatedAction": "allow",
+                "flaggedCategories": [
+                  "sexual"
+                ],
                 "regions": [
                   {
                     "region": "DE",
-                    "action": "limit",
+                    "status": "limited",
                     "rule": "example",
                     "category": "sexual"
                   }
                 ],
-                "flaggedCategories": [
-                  "sexual"
-                ],
                 "linkSafety": {
                   "action": "allow",
                   "links": [
-                    1
+                    {
+                      "url": "example",
+                      "finalUrl": "example",
+                      "redirects": 1,
+                      "source": "qr-code",
+                      "verdict": "safe",
+                      "evidence": [
+                        {
+                          "check": "domain-categories",
+                          "status": "checked",
+                          "labels": [
+                            "example"
+                          ]
+                        }
+                      ]
+                    }
                   ],
                   "settings": {
                     "verdictActions": {
@@ -5189,12 +4828,6 @@
                           "allScore": 0.5,
                           "likelihood": "very-unlikely"
                         }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
                       }
                     },
                     "violence": {
@@ -5207,12 +4840,6 @@
                           "someScore": 0.5,
                           "allScore": 0.5,
                           "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
                         }
                       }
                     },
@@ -5227,12 +4854,6 @@
                           "allScore": 0.5,
                           "likelihood": "very-unlikely"
                         }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
                       }
                     },
                     "harassment": {
@@ -5245,12 +4866,6 @@
                           "someScore": 0.5,
                           "allScore": 0.5,
                           "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
                         }
                       }
                     },
@@ -5265,12 +4880,6 @@
                           "allScore": 0.5,
                           "likelihood": "very-unlikely"
                         }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
                       }
                     },
                     "criminal-activity": {
@@ -5283,12 +4892,6 @@
                           "someScore": 0.5,
                           "allScore": 0.5,
                           "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
                         }
                       }
                     },
@@ -5303,12 +4906,6 @@
                           "allScore": 0.5,
                           "likelihood": "very-unlikely"
                         }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
-                        }
                       }
                     },
                     "profanity": {
@@ -5321,12 +4918,6 @@
                           "someScore": 0.5,
                           "allScore": 0.5,
                           "likelihood": "very-unlikely"
-                        }
-                      },
-                      "policyConditions": {
-                        "example": {
-                          "status": "evaluated",
-                          "score": 0.5
                         }
                       }
                     }
@@ -5343,16 +4934,7 @@
                 },
                 "timeline": {
                   "segmentCount": 1
-                },
-                "testCategoryActions": {
-                  "sexual": "allow"
-                },
-                "testRegionalActions": [
-                  {
-                    "region": "DE",
-                    "action": "limit"
-                  }
-                ]
+                }
               },
               "personDetection": {
                 "status": "evaluated",
@@ -5440,15 +5022,6 @@
                     "height": 1.5
                   },
                   "personalInformation": true
-                }
-              ],
-              "labels": [
-                {
-                  "description": "example",
-                  "score": 1.5,
-                  "topicalityScore": 1.5,
-                  "likelihood": "very-unlikely",
-                  "knowledgeBaseId": "example"
                 }
               ]
             },
@@ -5575,25 +5148,6 @@
           "tags": [
             "example"
           ],
-          "processingOptions": {
-            "keepContentAfterProcessing": true,
-            "storeSensitiveMetadata": true,
-            "features": {
-              "ocr": {
-                "enabled": true
-              },
-              "personDetection": {
-                "enabled": true
-              },
-              "faceDetection": {
-                "enabled": true,
-                "ageEstimation": true
-              },
-              "linkDetection": {
-                "enabled": true
-              }
-            }
-          },
           "visibility": "public",
           "upload": {
             "status": "uploading",
@@ -5601,7 +5155,7 @@
             "partsReceived": 1
           },
           "classification": {
-            "status": "pending",
+            "status": "queued",
             "failureReason": "file-too-large",
             "updatedAt": 1,
             "completedAt": 1,
@@ -5617,21 +5171,24 @@
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
                   "decision": "allowed",
                   "note": "example",
-                  "reviewerName": "example",
-                  "reviewerEmail": "example",
+                  "decidedBy": {
+                    "type": "user",
+                    "id": "example"
+                  },
                   "reviewedAt": 1,
-                  "appliedToAsset": true
+                  "applied": true
                 }
               ],
+              "automatedStatus": "allowed",
+              "source": "policy",
+              "explanationComplete": true,
               "categories": {
                 "sexual": {
                   "score": 0.5,
                   "action": "allow",
                   "source": {
                     "kind": "allowance",
-                    "index": 1,
                     "indexes": [
-                      1,
                       1
                     ]
                   },
@@ -5660,24 +5217,36 @@
                   }
                 }
               },
-              "explanationComplete": true,
-              "source": "policy",
-              "automatedAction": "allow",
+              "flaggedCategories": [
+                "sexual"
+              ],
               "regions": [
                 {
                   "region": "DE",
-                  "action": "limit",
+                  "status": "limited",
                   "rule": "example",
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ],
               "linkSafety": {
                 "action": "allow",
                 "links": [
-                  1
+                  {
+                    "url": "example",
+                    "finalUrl": "example",
+                    "redirects": 1,
+                    "source": "qr-code",
+                    "verdict": "safe",
+                    "evidence": [
+                      {
+                        "check": "domain-categories",
+                        "status": "checked",
+                        "labels": [
+                          "example"
+                        ]
+                      }
+                    ]
+                  }
                 ],
                 "settings": {
                   "verdictActions": {
@@ -5704,12 +5273,6 @@
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
                       }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
-                      }
                     }
                   },
                   "violence": {
@@ -5722,12 +5285,6 @@
                         "someScore": 0.5,
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
-                      }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
                       }
                     }
                   },
@@ -5742,12 +5299,6 @@
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
                       }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
-                      }
                     }
                   },
                   "harassment": {
@@ -5760,12 +5311,6 @@
                         "someScore": 0.5,
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
-                      }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
                       }
                     }
                   },
@@ -5780,12 +5325,6 @@
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
                       }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
-                      }
                     }
                   },
                   "criminal-activity": {
@@ -5798,12 +5337,6 @@
                         "someScore": 0.5,
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
-                      }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
                       }
                     }
                   },
@@ -5818,12 +5351,6 @@
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
                       }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
-                      }
                     }
                   },
                   "profanity": {
@@ -5836,12 +5363,6 @@
                         "someScore": 0.5,
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
-                      }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
                       }
                     }
                   }
@@ -5858,16 +5379,7 @@
               },
               "timeline": {
                 "segmentCount": 1
-              },
-              "testCategoryActions": {
-                "sexual": "allow"
-              },
-              "testRegionalActions": [
-                {
-                  "region": "DE",
-                  "action": "limit"
-                }
-              ]
+              }
             },
             "personDetection": {
               "status": "evaluated",
@@ -5955,15 +5467,6 @@
                   "height": 1.5
                 },
                 "personalInformation": true
-              }
-            ],
-            "labels": [
-              {
-                "description": "example",
-                "score": 1.5,
-                "topicalityScore": 1.5,
-                "likelihood": "very-unlikely",
-                "knowledgeBaseId": "example"
               }
             ]
           },
@@ -6096,25 +5599,6 @@
           "tags": [
             "example"
           ],
-          "processingOptions": {
-            "keepContentAfterProcessing": true,
-            "storeSensitiveMetadata": true,
-            "features": {
-              "ocr": {
-                "enabled": true
-              },
-              "personDetection": {
-                "enabled": true
-              },
-              "faceDetection": {
-                "enabled": true,
-                "ageEstimation": true
-              },
-              "linkDetection": {
-                "enabled": true
-              }
-            }
-          },
           "visibility": "public",
           "upload": {
             "status": "uploading",
@@ -6122,7 +5606,7 @@
             "partsReceived": 1
           },
           "classification": {
-            "status": "pending",
+            "status": "queued",
             "failureReason": "file-too-large",
             "updatedAt": 1,
             "completedAt": 1,
@@ -6138,21 +5622,24 @@
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
                   "decision": "allowed",
                   "note": "example",
-                  "reviewerName": "example",
-                  "reviewerEmail": "example",
+                  "decidedBy": {
+                    "type": "user",
+                    "id": "example"
+                  },
                   "reviewedAt": 1,
-                  "appliedToAsset": true
+                  "applied": true
                 }
               ],
+              "automatedStatus": "allowed",
+              "source": "policy",
+              "explanationComplete": true,
               "categories": {
                 "sexual": {
                   "score": 0.5,
                   "action": "allow",
                   "source": {
                     "kind": "allowance",
-                    "index": 1,
                     "indexes": [
-                      1,
                       1
                     ]
                   },
@@ -6181,24 +5668,36 @@
                   }
                 }
               },
-              "explanationComplete": true,
-              "source": "policy",
-              "automatedAction": "allow",
+              "flaggedCategories": [
+                "sexual"
+              ],
               "regions": [
                 {
                   "region": "DE",
-                  "action": "limit",
+                  "status": "limited",
                   "rule": "example",
                   "category": "sexual"
                 }
               ],
-              "flaggedCategories": [
-                "sexual"
-              ],
               "linkSafety": {
                 "action": "allow",
                 "links": [
-                  1
+                  {
+                    "url": "example",
+                    "finalUrl": "example",
+                    "redirects": 1,
+                    "source": "qr-code",
+                    "verdict": "safe",
+                    "evidence": [
+                      {
+                        "check": "domain-categories",
+                        "status": "checked",
+                        "labels": [
+                          "example"
+                        ]
+                      }
+                    ]
+                  }
                 ],
                 "settings": {
                   "verdictActions": {
@@ -6225,12 +5724,6 @@
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
                       }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
-                      }
                     }
                   },
                   "violence": {
@@ -6243,12 +5736,6 @@
                         "someScore": 0.5,
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
-                      }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
                       }
                     }
                   },
@@ -6263,12 +5750,6 @@
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
                       }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
-                      }
                     }
                   },
                   "harassment": {
@@ -6281,12 +5762,6 @@
                         "someScore": 0.5,
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
-                      }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
                       }
                     }
                   },
@@ -6301,12 +5776,6 @@
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
                       }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
-                      }
                     }
                   },
                   "criminal-activity": {
@@ -6319,12 +5788,6 @@
                         "someScore": 0.5,
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
-                      }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
                       }
                     }
                   },
@@ -6339,12 +5802,6 @@
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
                       }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
-                      }
                     }
                   },
                   "profanity": {
@@ -6357,12 +5814,6 @@
                         "someScore": 0.5,
                         "allScore": 0.5,
                         "likelihood": "very-unlikely"
-                      }
-                    },
-                    "policyConditions": {
-                      "example": {
-                        "status": "evaluated",
-                        "score": 0.5
                       }
                     }
                   }
@@ -6379,16 +5830,7 @@
               },
               "timeline": {
                 "segmentCount": 1
-              },
-              "testCategoryActions": {
-                "sexual": "allow"
-              },
-              "testRegionalActions": [
-                {
-                  "region": "DE",
-                  "action": "limit"
-                }
-              ]
+              }
             },
             "personDetection": {
               "status": "evaluated",
@@ -6476,15 +5918,6 @@
                   "height": 1.5
                 },
                 "personalInformation": true
-              }
-            ],
-            "labels": [
-              {
-                "description": "example",
-                "score": 1.5,
-                "topicalityScore": 1.5,
-                "likelihood": "very-unlikely",
-                "knowledgeBaseId": "example"
               }
             ]
           },
@@ -6611,25 +6044,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -6637,7 +6051,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -6653,21 +6067,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -6696,24 +6113,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -6740,12 +6169,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -6758,12 +6181,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -6778,12 +6195,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -6796,12 +6207,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -6816,12 +6221,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -6834,12 +6233,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -6854,12 +6247,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -6872,12 +6259,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -6894,16 +6275,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -6991,15 +6363,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -7295,25 +6658,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -7321,7 +6665,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -7337,21 +6681,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -7380,24 +6727,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -7424,12 +6783,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -7442,12 +6795,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -7462,12 +6809,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -7480,12 +6821,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -7500,12 +6835,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -7518,12 +6847,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -7538,12 +6861,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -7556,12 +6873,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -7578,16 +6889,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -7675,15 +6977,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -7794,25 +7087,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -7820,7 +7094,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -7836,21 +7110,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -7879,24 +7156,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -7923,12 +7212,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -7941,12 +7224,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -7961,12 +7238,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -7979,12 +7250,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -7999,12 +7264,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -8017,12 +7276,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -8037,12 +7290,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -8055,12 +7302,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -8077,16 +7318,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -8174,15 +7406,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -8298,25 +7521,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -8324,7 +7528,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -8340,21 +7544,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -8383,24 +7590,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -8427,12 +7646,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -8445,12 +7658,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -8465,12 +7672,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -8483,12 +7684,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -8503,12 +7698,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -8521,12 +7710,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -8541,12 +7724,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -8559,12 +7736,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -8581,16 +7752,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -8678,15 +7840,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -8797,25 +7950,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -8823,7 +7957,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -8839,21 +7973,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -8882,24 +8019,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -8926,12 +8075,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -8944,12 +8087,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -8964,12 +8101,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -8982,12 +8113,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -9002,12 +8127,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -9020,12 +8139,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -9040,12 +8153,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -9058,12 +8165,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -9080,16 +8181,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -9177,15 +8269,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -9299,25 +8382,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -9325,7 +8389,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -9341,21 +8405,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -9384,24 +8451,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -9428,12 +8507,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -9446,12 +8519,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -9466,12 +8533,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -9484,12 +8545,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -9504,12 +8559,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -9522,12 +8571,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -9542,12 +8585,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -9560,12 +8597,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -9582,16 +8613,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -9679,15 +8701,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -9833,25 +8846,6 @@
       "tags": [
         "example"
       ],
-      "processingOptions": {
-        "keepContentAfterProcessing": true,
-        "storeSensitiveMetadata": true,
-        "features": {
-          "ocr": {
-            "enabled": true
-          },
-          "personDetection": {
-            "enabled": true
-          },
-          "faceDetection": {
-            "enabled": true,
-            "ageEstimation": true
-          },
-          "linkDetection": {
-            "enabled": true
-          }
-        }
-      },
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -9859,7 +8853,7 @@
         "partsReceived": 1
       },
       "classification": {
-        "status": "pending",
+        "status": "queued",
         "failureReason": "file-too-large",
         "updatedAt": 1,
         "completedAt": 1,
@@ -9875,21 +8869,24 @@
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
               "decision": "allowed",
               "note": "example",
-              "reviewerName": "example",
-              "reviewerEmail": "example",
+              "decidedBy": {
+                "type": "user",
+                "id": "example"
+              },
               "reviewedAt": 1,
-              "appliedToAsset": true
+              "applied": true
             }
           ],
+          "automatedStatus": "allowed",
+          "source": "policy",
+          "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
               "source": {
                 "kind": "allowance",
-                "index": 1,
                 "indexes": [
-                  1,
                   1
                 ]
               },
@@ -9918,24 +8915,36 @@
               }
             }
           },
-          "explanationComplete": true,
-          "source": "policy",
-          "automatedAction": "allow",
+          "flaggedCategories": [
+            "sexual"
+          ],
           "regions": [
             {
               "region": "DE",
-              "action": "limit",
+              "status": "limited",
               "rule": "example",
               "category": "sexual"
             }
           ],
-          "flaggedCategories": [
-            "sexual"
-          ],
           "linkSafety": {
             "action": "allow",
             "links": [
-              1
+              {
+                "url": "example",
+                "finalUrl": "example",
+                "redirects": 1,
+                "source": "qr-code",
+                "verdict": "safe",
+                "evidence": [
+                  {
+                    "check": "domain-categories",
+                    "status": "checked",
+                    "labels": [
+                      "example"
+                    ]
+                  }
+                ]
+              }
             ],
             "settings": {
               "verdictActions": {
@@ -9962,12 +8971,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "violence": {
@@ -9980,12 +8983,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -10000,12 +8997,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "harassment": {
@@ -10018,12 +9009,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -10038,12 +9023,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "criminal-activity": {
@@ -10056,12 +9035,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               },
@@ -10076,12 +9049,6 @@
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
                   }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
-                  }
                 }
               },
               "profanity": {
@@ -10094,12 +9061,6 @@
                     "someScore": 0.5,
                     "allScore": 0.5,
                     "likelihood": "very-unlikely"
-                  }
-                },
-                "policyConditions": {
-                  "example": {
-                    "status": "evaluated",
-                    "score": 0.5
                   }
                 }
               }
@@ -10116,16 +9077,7 @@
           },
           "timeline": {
             "segmentCount": 1
-          },
-          "testCategoryActions": {
-            "sexual": "allow"
-          },
-          "testRegionalActions": [
-            {
-              "region": "DE",
-              "action": "limit"
-            }
-          ]
+          }
         },
         "personDetection": {
           "status": "evaluated",
@@ -10213,15 +9165,6 @@
               "height": 1.5
             },
             "personalInformation": true
-          }
-        ],
-        "labels": [
-          {
-            "description": "example",
-            "score": 1.5,
-            "topicalityScore": 1.5,
-            "likelihood": "very-unlikely",
-            "knowledgeBaseId": "example"
           }
         ]
       },
@@ -11181,7 +10124,7 @@
               "status": "uploading"
             },
             "classification": {
-              "status": "pending",
+              "status": "queued",
               "testInput": true,
               "moderation": {
                 "status": "pending"

@@ -278,7 +278,7 @@
                   }
                 }
               },
-              "classification.moderation.automatedAction": "block",
+              "classification.moderation.automatedStatus": "blocked",
               "classification.moderation.flaggedCategories": [],
               "classification.moderation.regions": [],
               "classification.moderation.source": "policy",
@@ -374,7 +374,7 @@
                   }
                 }
               },
-              "classification.moderation.automatedAction": "block",
+              "classification.moderation.automatedStatus": "blocked",
               "classification.moderation.flaggedCategories": [],
               "classification.moderation.regions": [],
               "classification.moderation.source": "policy",
@@ -474,7 +474,7 @@
                   }
                 }
               },
-              "classification.moderation.automatedAction": "allow",
+              "classification.moderation.automatedStatus": "allowed",
               "classification.moderation.flaggedCategories": [],
               "classification.moderation.regions": [],
               "classification.moderation.source": "policy",
@@ -616,7 +616,7 @@
                   }
                 }
               },
-              "classification.moderation.automatedAction": "block",
+              "classification.moderation.automatedStatus": "blocked",
               "classification.moderation.flaggedCategories": [
                 "violence"
               ],
@@ -718,7 +718,7 @@
                   }
                 }
               },
-              "classification.moderation.automatedAction": "limit",
+              "classification.moderation.automatedStatus": "limited",
               "classification.moderation.flaggedCategories": [
                 "profanity"
               ],
@@ -1231,7 +1231,8 @@
               },
               "classification.moderation.manualReviews.0.decision": "blocked",
               "classification.moderation.manualReviews.0.note": null,
-              "classification.moderation.manualReviews.0.appliedToAsset": true,
+              "classification.moderation.manualReviews.0.applied": true,
+              "classification.moderation.manualReviews.0.decidedBy.type": "api-key",
               "content.status": "stored"
             }
           }
@@ -4001,7 +4002,7 @@
             },
             "facts": [
               {
-                "key": "automated-outcome",
+                "key": "automated-status",
                 "value": "allowed"
               },
               {
@@ -4044,7 +4045,7 @@
               },
               "items.0.facts": {
                 "$contains": {
-                  "key": "automated-outcome",
+                  "key": "automated-status",
                   "value": "allowed"
                 }
               },
@@ -6275,7 +6276,7 @@
             "result": {
               "upload.status": "uploading",
               "upload.partsReceived": 1,
-              "classification.status": "pending",
+              "classification.status": "queued",
               "classification.moderation.status": "pending",
               "content.sizeInBytes": 5242880
             },
@@ -9188,7 +9189,7 @@
                   }
                 }
               },
-              "classification.moderation.automatedAction": "age-restrict",
+              "classification.moderation.automatedStatus": "age-restricted",
               "classification.moderation.flaggedCategories": [
                 "sexual"
               ],
@@ -9358,7 +9359,7 @@
                   }
                 }
               },
-              "classification.moderation.automatedAction": "allow",
+              "classification.moderation.automatedStatus": "allowed",
               "classification.moderation.flaggedCategories": [],
               "classification.moderation.regions": [],
               "classification.moderation.source": "policy",

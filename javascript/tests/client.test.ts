@@ -342,6 +342,21 @@ describe("assets.waitForDecision", () => {
     expect(requests).toHaveLength(2);
   });
 
+  test("keeps waiting while the asset is queued or processing, even once a reviewer decided it", async () => {
+    const states: Array<[string, string]> = [
+      ["queued", "pending"],
+      ["processing", "blocked"],
+      ["completed", "blocked"],
+    ];
+    const { fetchImpl, requests } = recordingFetch(() => assetResponse(...states.shift()!));
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
+    const asset = await client.assets.waitForDecision({ assetId: "asset-1" });
+    expect(asset).toMatchObject({
+      classification: { status: "completed", moderation: { status: "blocked" } },
+    });
+    expect(requests).toHaveLength(3);
+  });
+
   test("rejects with sdk/timeout and the last status when no decision arrives in time", async () => {
     const { fetchImpl } = recordingFetch(() => assetResponse("processing"));
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });

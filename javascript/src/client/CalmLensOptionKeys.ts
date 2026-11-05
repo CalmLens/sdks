@@ -4,8 +4,8 @@
 /** The option keys each `CalmLensServerClient` method sends to the API. */
 export const SERVER_OPTION_KEYS: Readonly<Record<string, readonly string[]>> = {
   "assets.batch": ["assetIds", "operation"],
-  "assets.classify": ["authorId", "content", "context", "description", "externalId", "externalUrl", "folderId", "isFinal", "metadata", "name", "part", "processingOptions", "sizeInBytes", "totalSizeInBytes", "uploadPresetId", "url", "visibility"],
-  "assets.create": ["authorId", "content", "context", "description", "externalId", "externalUrl", "folderId", "isFinal", "metadata", "name", "part", "processingOptions", "sizeInBytes", "totalSizeInBytes", "uploadPresetId", "url", "visibility"],
+  "assets.classify": ["authorId", "content", "context", "description", "externalId", "externalUrl", "folderId", "isFinal", "metadata", "name", "part", "processingOptions", "sizeInBytes", "tags", "totalSizeInBytes", "uploadPresetId", "url", "visibility"],
+  "assets.create": ["authorId", "content", "context", "description", "externalId", "externalUrl", "folderId", "isFinal", "metadata", "name", "part", "processingOptions", "sizeInBytes", "tags", "totalSizeInBytes", "uploadPresetId", "url", "visibility"],
   "assets.createSignedUrl": ["assetId", "expiresInSeconds", "lens", "resource", "transform", "viewerClaims"],
   "assets.decide": ["assetId", "confirmPurge", "decision", "note"],
   "assets.delete": ["assetId"],
@@ -48,7 +48,7 @@ export const SERVER_OPTION_KEYS: Readonly<Record<string, readonly string[]>> = {
   "policies.retrieve": ["policyId"],
   "policies.setAutomaticUpdates": ["enabled", "policyId", "presetVersion", "revision"],
   "policies.update": ["description", "name", "policyId", "revision", "settings"],
-  "text.classify": ["authorId", "context", "description", "externalId", "externalUrl", "folderId", "metadata", "name", "processingOptions", "text", "uploadPresetId", "visibility"],
+  "text.classify": ["authorId", "context", "description", "externalId", "externalUrl", "folderId", "metadata", "name", "processingOptions", "tags", "text", "uploadPresetId", "visibility"],
 };
 
 /** The option keys each `CalmLensAppClient` method sends to the API. */
@@ -64,8 +64,8 @@ export const APP_OPTION_KEYS: Readonly<Record<string, readonly string[]>> = {
  * other option given as `null` is left out, as the API refuses `null` for it.
  */
 export const NULLABLE_OPTION_KEYS: Readonly<Record<string, readonly string[]>> = {
-  "assets.classify": ["authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "uploadPresetId", "visibility"],
-  "assets.create": ["authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "uploadPresetId", "visibility"],
+  "assets.classify": ["authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "tags", "uploadPresetId", "visibility"],
+  "assets.create": ["authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "tags", "uploadPresetId", "visibility"],
   "assets.iterate": ["filter", "folderId"],
   "assets.list": ["filter", "folderId"],
   "assets.move": ["folderId"],
@@ -75,5 +75,5 @@ export const NULLABLE_OPTION_KEYS: Readonly<Record<string, readonly string[]>> =
   "hashLists.addEntry": ["label", "quality"],
   "hashLists.create": ["description"],
   "hashLists.update": ["description"],
-  "text.classify": ["authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "uploadPresetId", "visibility"],
+  "text.classify": ["authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "tags", "uploadPresetId", "visibility"],
 };

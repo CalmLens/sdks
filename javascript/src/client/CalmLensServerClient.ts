@@ -515,9 +515,11 @@ export default class CalmLensServerClient {
       },
 
       /**
-       * Waits until an asset's `classification.moderation.status` is no longer `pending` (`allowed`,
-       * `limited`, `age-restricted`, `blocked` or `purged`), or its `classification.status` is `failed`, and returns that asset, checking every few seconds. Rejects with `sdk/timeout` if there is no
-       * decision within `timeoutMs` (default 60000). Webhooks report decisions without polling.
+       * Waits until an asset is settled, its `classification.status` `completed` (with its
+       * decision in `classification.moderation.status`) or `failed`, and returns that asset,
+       * checking every few seconds. A `queued` or `processing` asset is still waiting, even when a
+       * reviewer has already decided it. Rejects with `sdk/timeout` if it is not settled within
+       * `timeoutMs` (default 60000). Webhooks report decisions without polling.
        */
       waitForDecision: async (waitOptions: WaitForAssetDecisionOptions): Promise<Asset> => {
         const { assetId, ...options } = checked("assets.waitForDecision", waitOptions);

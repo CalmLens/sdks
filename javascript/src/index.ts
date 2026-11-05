@@ -126,7 +126,6 @@ export type {
   ClassificationCategories,
   ClassificationCategory,
   ClassificationCategoryReport,
-  ClassificationLabel,
   ClassificationNotEvaluatedReason,
   ClassificationQualifierResults,
   Likelihood,

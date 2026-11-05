@@ -1,5 +1,5 @@
-import { i as EventFacts } from "./EventCatalog-DI7W0zqj.js";
-import { n as EventAsset, r as TypedEvent, t as Event } from "./Event-DD-9baX7.js";
+import { i as EventFacts } from "./EventCatalog-dnfPGB50.js";
+import { n as EventAsset, r as TypedEvent, t as Event } from "./Event-BMq7zvrd.js";
 import * as zod from "zod";
 export declare const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
 export declare const WEBHOOK_TIMESTAMP_HEADER = "x-calmlens-timestamp";
@@ -32,8 +32,8 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
       status: zod.ZodEnum<{
         completed: "completed";
         failed: "failed";
-        pending: "pending";
         processing: "processing";
+        queued: "queued";
       }>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
@@ -83,8 +83,8 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
       status: zod.ZodEnum<{
         completed: "completed";
         failed: "failed";
-        pending: "pending";
         processing: "processing";
+        queued: "queued";
       }>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{

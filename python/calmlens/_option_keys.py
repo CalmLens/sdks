@@ -8,8 +8,8 @@ from typing import Dict, FrozenSet
 #: The camelCase option keys each method sends as ``null`` when given ``None``; any other option
 #: given as ``None`` is left out, as the API refuses ``null`` for it.
 NULLABLE_OPTION_KEYS: Dict[str, FrozenSet[str]] = {
-    "assets.classify": frozenset({"authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "uploadPresetId", "visibility"}),
-    "assets.create": frozenset({"authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "uploadPresetId", "visibility"}),
+    "assets.classify": frozenset({"authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "tags", "uploadPresetId", "visibility"}),
+    "assets.create": frozenset({"authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "tags", "uploadPresetId", "visibility"}),
     "assets.each": frozenset({"filter", "folderId"}),
     "assets.list": frozenset({"filter", "folderId"}),
     "assets.move": frozenset({"folderId"}),
@@ -19,5 +19,5 @@ NULLABLE_OPTION_KEYS: Dict[str, FrozenSet[str]] = {
     "hashLists.addEntry": frozenset({"label", "quality"}),
     "hashLists.create": frozenset({"description"}),
     "hashLists.update": frozenset({"description"}),
-    "text.classify": frozenset({"authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "uploadPresetId", "visibility"}),
+    "text.classify": frozenset({"authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "tags", "uploadPresetId", "visibility"}),
 }

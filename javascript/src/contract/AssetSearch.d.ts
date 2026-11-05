@@ -55,28 +55,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
       value: zod.ZodJSONSchema;
     }, zod.core.$strip>>>>;
     tags: zod.ZodOptional<zod.ZodNullable<zod.ZodArray<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>>;
-    processingOptions: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-      keepContentAfterProcessing: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-      storeSensitiveMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
-      features: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-        ocr: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-          enabled: zod.ZodBoolean;
-        }, zod.core.$strict>>>;
-        personDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-          enabled: zod.ZodBoolean;
-        }, zod.core.$strict>>>;
-        faceDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-          enabled: zod.ZodBoolean;
-          ageEstimation: zod.ZodOptional<zod.ZodBoolean>;
-        }, zod.core.$strict>>>;
-        linkDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-          enabled: zod.ZodBoolean;
-        }, zod.core.$strict>>>;
-        aiGeneratedDetection: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-          enabled: zod.ZodBoolean;
-        }, zod.core.$strict>>>;
-      }, zod.core.$strict>>>;
-    }, zod.core.$strict>>>;
     visibility: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
       private: "private";
       public: "public";
@@ -93,8 +71,8 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
       status: zod.ZodEnum<{
         completed: "completed";
         failed: "failed";
-        pending: "pending";
         processing: "processing";
+        queued: "queued";
       }>;
       failureReason: zod.ZodNullable<zod.ZodEnum<{
         "child-failed": "child-failed";
@@ -118,6 +96,50 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
       }, zod.core.$strip>>;
       testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
+        status: zod.ZodEnum<{
+          "age-restricted": "age-restricted";
+          allowed: "allowed";
+          blocked: "blocked";
+          limited: "limited";
+          pending: "pending";
+          purged: "purged";
+        }>;
+        manualReviews: zod.ZodArray<zod.ZodObject<{
+          id: zod.ZodString;
+          decision: zod.ZodEnum<{
+            "age-restricted": "age-restricted";
+            allowed: "allowed";
+            blocked: "blocked";
+            limited: "limited";
+            purged: "purged";
+          }>;
+          note: zod.ZodNullable<zod.ZodString>;
+          decidedBy: zod.ZodObject<{
+            id: zod.ZodNullable<zod.ZodString>;
+            type: zod.ZodEnum<{
+              "api-key": "api-key";
+              user: "user";
+            }>;
+          }, zod.core.$strict>;
+          reviewedAt: zod.ZodNumber;
+          applied: zod.ZodBoolean;
+        }, zod.core.$strip>>;
+        automatedStatus: zod.ZodOptional<zod.ZodEnum<{
+          "age-restricted": "age-restricted";
+          allowed: "allowed";
+          blocked: "blocked";
+          limited: "limited";
+          purged: "purged";
+        }>>;
+        source: zod.ZodOptional<zod.ZodEnum<{
+          children: "children";
+          "hash-list": "hash-list";
+          "link-safety": "link-safety";
+          "mandatory-rule": "mandatory-rule";
+          policy: "policy";
+        }>>;
+        rule: zod.ZodOptional<zod.ZodString>;
+        explanationComplete: zod.ZodOptional<zod.ZodBoolean>;
         categories: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
           "criminal-activity": "criminal-activity";
           harassment: "harassment";
@@ -142,12 +164,10 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             kind: zod.ZodLiteral<"below-threshold">;
           }, zod.core.$strict>, zod.ZodObject<{
             kind: zod.ZodLiteral<"allowance">;
-            index: zod.ZodNumber;
-            indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
+            indexes: zod.ZodArray<zod.ZodNumber>;
           }, zod.core.$strict>, zod.ZodObject<{
             kind: zod.ZodLiteral<"restriction">;
-            index: zod.ZodNumber;
-            indexes: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
+            indexes: zod.ZodArray<zod.ZodNumber>;
           }, zod.core.$strict>], "kind">>;
           settings: zod.ZodOptional<zod.ZodObject<{
             categoryAction: zod.ZodEnum<{
@@ -729,30 +749,79 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             }, zod.core.$strict>>;
           }, zod.core.$strict>>;
         }, zod.core.$strict>>>;
-        explanationComplete: zod.ZodOptional<zod.ZodBoolean>;
-        source: zod.ZodOptional<zod.ZodEnum<{
-          children: "children";
-          "hash-list": "hash-list";
-          "link-safety": "link-safety";
-          "mandatory-rule": "mandatory-rule";
-          policy: "policy";
+        flaggedCategories: zod.ZodArray<zod.ZodEnum<{
+          "criminal-activity": "criminal-activity";
+          harassment: "harassment";
+          hate: "hate";
+          "personal-information": "personal-information";
+          profanity: "profanity";
+          "self-harm": "self-harm";
+          sexual: "sexual";
+          violence: "violence";
         }>>;
-        automatedAction: zod.ZodOptional<zod.ZodEnum<{
-          "age-restrict": "age-restrict";
-          allow: "allow";
-          block: "block";
-          limit: "limit";
-          purge: "purge";
-        }>>;
-        rule: zod.ZodOptional<zod.ZodOptional<zod.ZodString>>;
-        linkSafety: zod.ZodOptional<zod.ZodOptional<zod.ZodObject<{
+        regions: zod.ZodArray<zod.ZodObject<{
+          region: zod.ZodEnum<{
+            AT: "AT";
+            AU: "AU";
+            BR: "BR";
+            DE: "DE";
+            EU: "EU";
+            FR: "FR";
+            GB: "GB";
+          }>;
+          status: zod.ZodEnum<{
+            "age-restricted": "age-restricted";
+            blocked: "blocked";
+            limited: "limited";
+            purged: "purged";
+          }>;
+          rule: zod.ZodString;
+          category: zod.ZodOptional<zod.ZodEnum<{
+            "criminal-activity": "criminal-activity";
+            harassment: "harassment";
+            hate: "hate";
+            "personal-information": "personal-information";
+            profanity: "profanity";
+            "self-harm": "self-harm";
+            sexual: "sexual";
+            violence: "violence";
+          }>>;
+        }, zod.core.$strict>>;
+        linkSafety: zod.ZodOptional<zod.ZodObject<{
           action: zod.ZodEnum<{
             "age-restrict": "age-restrict";
             allow: "allow";
             block: "block";
             limit: "limit";
           }>;
-          links: zod.ZodArray<zod.ZodNumber>;
+          links: zod.ZodArray<zod.ZodObject<{
+            url: zod.ZodString;
+            finalUrl: zod.ZodNullable<zod.ZodString>;
+            redirects: zod.ZodNumber;
+            source: zod.ZodEnum<{
+              "qr-code": "qr-code";
+              text: "text";
+            }>;
+            verdict: zod.ZodEnum<{
+              adult: "adult";
+              gambling: "gambling";
+              malware: "malware";
+              phishing: "phishing";
+              safe: "safe";
+              unresolved: "unresolved";
+            }>;
+            evidence: zod.ZodArray<zod.ZodObject<{
+              check: zod.ZodEnum<{
+                "domain-categories": "domain-categories";
+                "threat-lists": "threat-lists";
+              }>;
+              status: zod.ZodEnum<{
+                checked: "checked";
+                failed: "failed";
+              }>;
+              labels: zod.ZodArray<zod.ZodString>;
+            }, zod.core.$strict>>;
+          }, zod.core.$strict>>;
           settings: zod.ZodObject<{
             verdictActions: zod.ZodRecord<zod.ZodEnum<{
               adult: "adult";
@@ -775,67 +844,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               allowedDomains: zod.ZodArray<zod.ZodString>;
             }, zod.core.$strict>>;
           }, zod.core.$strict>;
-        }, zod.core.$strict>>>;
-        status: zod.ZodEnum<{
-          "age-restricted": "age-restricted";
-          allowed: "allowed";
-          blocked: "blocked";
-          limited: "limited";
-          pending: "pending";
-          purged: "purged";
-        }>;
-        manualReviews: zod.ZodArray<zod.ZodObject<{
-          id: zod.ZodString;
-          decision: zod.ZodEnum<{
-            "age-restricted": "age-restricted";
-            allowed: "allowed";
-            blocked: "blocked";
-            limited: "limited";
-            purged: "purged";
-          }>;
-          note: zod.ZodNullable<zod.ZodString>;
-          reviewerName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-          reviewerEmail: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-          reviewedAt: zod.ZodNumber;
-          appliedToAsset: zod.ZodBoolean;
-        }, zod.core.$strip>>;
-        flaggedCategories: zod.ZodArray<zod.ZodEnum<{
-          "criminal-activity": "criminal-activity";
-          harassment: "harassment";
-          hate: "hate";
-          "personal-information": "personal-information";
-          profanity: "profanity";
-          "self-harm": "self-harm";
-          sexual: "sexual";
-          violence: "violence";
-        }>>;
-        regions: zod.ZodArray<zod.ZodObject<{
-          region: zod.ZodEnum<{
-            AT: "AT";
-            AU: "AU";
-            BR: "BR";
-            DE: "DE";
-            EU: "EU";
-            FR: "FR";
-            GB: "GB";
-          }>;
-          action: zod.ZodEnum<{
-            "age-restrict": "age-restrict";
-            block: "block";
-            limit: "limit";
-            purge: "purge";
-          }>;
-          rule: zod.ZodString;
-          category: zod.ZodOptional<zod.ZodEnum<{
-            "criminal-activity": "criminal-activity";
-            harassment: "harassment";
-            hate: "hate";
-            "personal-information": "personal-information";
-            profanity: "profanity";
-            "self-harm": "self-harm";
-            sexual: "sexual";
-            violence: "violence";
-          }>>;
         }, zod.core.$strict>>;
         raw: zod.ZodOptional<zod.ZodObject<{
           categories: zod.ZodObject<{
@@ -996,16 +1004,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -1177,16 +1175,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -1340,16 +1328,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -1522,16 +1500,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"partial">;
               likelihood: zod.ZodEnum<{
@@ -1696,16 +1664,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -1859,16 +1817,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -2041,16 +1989,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"partial">;
               likelihood: zod.ZodEnum<{
@@ -2215,16 +2153,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -2378,16 +2306,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -2560,16 +2478,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"partial">;
               likelihood: zod.ZodEnum<{
@@ -2734,16 +2642,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -2897,16 +2795,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -3079,16 +2967,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"partial">;
               likelihood: zod.ZodEnum<{
@@ -3253,16 +3131,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -3416,16 +3284,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -3598,16 +3456,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"partial">;
               likelihood: zod.ZodEnum<{
@@ -3772,16 +3620,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -3935,16 +3773,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -4117,16 +3945,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"partial">;
               likelihood: zod.ZodEnum<{
@@ -4291,16 +4109,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"not-evaluated">;
               reason: zod.ZodEnum<{
@@ -4454,16 +4262,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -4636,16 +4434,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>, zod.ZodObject<{
               status: zod.ZodLiteral<"partial">;
               likelihood: zod.ZodEnum<{
@@ -4803,16 +4591,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   "very-likely": "very-likely";
                   "very-unlikely": "very-unlikely";
                 }>;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
               }, zod.core.$strict>, zod.ZodObject<{
                 status: zod.ZodLiteral<"not-evaluated">;
                 reason: zod.ZodEnum<{
@@ -4980,16 +4758,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                   unavailable: "unavailable";
                 }>;
               }, zod.core.$strict>], "status">>>;
-              policyConditions: zod.ZodOptional<zod.ZodRecord<zod.ZodString, zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-                status: zod.ZodLiteral<"evaluated">;
-                score: zod.ZodNumber;
-              }, zod.core.$strict>, zod.ZodObject<{
-                status: zod.ZodLiteral<"not-evaluated">;
-                reason: zod.ZodEnum<{
-                  "not-supported": "not-supported";
-                  unavailable: "unavailable";
-                }>;
-              }, zod.core.$strict>], "status">>>;
             }, zod.core.$strict>], "status">;
           }, zod.core.$strict>;
           hashMatches: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
@@ -5008,37 +4776,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         timeline: zod.ZodNullable<zod.ZodObject<{
           segmentCount: zod.ZodNumber;
         }, zod.core.$strip>>;
-        testCategoryActions: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
-          "criminal-activity": "criminal-activity";
-          harassment: "harassment";
-          hate: "hate";
-          "personal-information": "personal-information";
-          profanity: "profanity";
-          "self-harm": "self-harm";
-          sexual: "sexual";
-          violence: "violence";
-        }> & zod.core.$partial, zod.ZodEnum<{
-          "age-restrict": "age-restrict";
-          allow: "allow";
-          block: "block";
-          limit: "limit";
-        }>>>;
-        testRegionalActions: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
-          region: zod.ZodEnum<{
-            AT: "AT";
-            AU: "AU";
-            BR: "BR";
-            DE: "DE";
-            EU: "EU";
-            FR: "FR";
-            GB: "GB";
-          }>;
-          action: zod.ZodEnum<{
-            "age-restrict": "age-restrict";
-            block: "block";
-            limit: "limit";
-          }>;
-        }, zod.core.$strict>>>;
       }, zod.core.$strip>;
       personDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
         status: zod.ZodLiteral<"evaluated">;
@@ -5213,19 +4950,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         }, zod.core.$strict>;
         personalInformation: zod.ZodBoolean;
       }, zod.core.$strict>>>;
-      labels: zod.ZodOptional<zod.ZodNullable<zod.ZodArray<zod.ZodObject<{
-        description: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
-        score: zod.ZodNumber;
-        topicalityScore: zod.ZodOptional<zod.ZodNullable<zod.ZodNumber>>;
-        likelihood: zod.ZodEnum<{
-          likely: "likely";
-          possible: "possible";
-          unlikely: "unlikely";
-          "very-likely": "very-likely";
-          "very-unlikely": "very-unlikely";
-        }>;
-        knowledgeBaseId: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
-      }, zod.core.$strip>>>>;
     }, zod.core.$strip>;
     content: zod.ZodObject<{
       status: zod.ZodEnum<{

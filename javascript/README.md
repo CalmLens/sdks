@@ -59,7 +59,7 @@ console.log(image.classification.status, image.classification.moderation.status)
 | `completed`               | `age-restricted`                   | Delivered only with `viewerClaims.ageConfirmed=true`. Show it only to age-checked viewers. |
 | `completed`               | `blocked`                          | Your policy blocked it; the CDN doesn't deliver it. Don't show it.                         |
 | `completed`               | `purged`                           | Your policy blocked it and deleted its content. Don't show it.                             |
-| `pending` or `processing` | `pending`                          | Still being received or classified.                                                        |
+| `queued` or `processing`  | `pending`                          | Still being received or classified.                                                        |
 | `failed`                  | `pending`                          | Processing failed; see `assets.retry`.                                                     |
 
 The latest applied review in `classification.moderation.manualReviews` takes precedence over the automated decision. Treat a status you don't recognise as not allowed. See [How CalmLens works](https://calmlens.com/docs/how-it-works).

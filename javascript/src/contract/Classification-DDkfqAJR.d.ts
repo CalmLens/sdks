@@ -1,4 +1,3 @@
-import "./AssetModerationDecision-CNE4ddHt.js";
 import "./ModerationContext-9lGm-Mna.js";
 import "./HashList-DQugW0Gh.js";
 import * as z from "zod";
@@ -1009,6 +1008,21 @@ declare const POLICY_ACTION_SCHEMA: z.ZodEnum<{
   purge: "purge";
 }>;
 type PolicyAction = z.infer<typeof POLICY_ACTION_SCHEMA>;
+/**
+ * What moderation decided for an asset, which also decides how it is delivered: served to anyone
+ * with access (`allowed`), served the same way but marked for reduced reach (`limited`), only to
+ * requests that confirm the viewer's age with `ageConfirmed`, signed URLs and server keys included
+ * (`age-restricted`), not served (`blocked`), or not served with its stored content deleted
+ * (`purged`).
+ */
+declare const ASSET_MODERATION_DECISION_SCHEMA: z.ZodEnum<{
+  "age-restricted": "age-restricted";
+  allowed: "allowed";
+  blocked: "blocked";
+  limited: "limited";
+  purged: "purged";
+}>;
+type AssetModerationDecision = z.infer<typeof ASSET_MODERATION_DECISION_SCHEMA>;
 declare const CLASSIFICATION_CATEGORY_SCHEMA: z.ZodEnum<{
   "criminal-activity": "criminal-activity";
   harassment: "harassment";
@@ -5869,18 +5883,4 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
   }, z.core.$strict>], "status">;
 }, z.core.$strict>;
 type ClassificationCategories = z.infer<typeof CATEGORIES_SCHEMA>;
-declare const CLASSIFICATION_LABEL_SCHEMA: z.ZodObject<{
-  description: z.ZodPipe<z.ZodString, z.ZodTransform<string, string>>;
-  score: z.ZodNumber;
-  topicalityScore: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
-  likelihood: z.ZodEnum<{
-    likely: "likely";
-    possible: "possible";
-    unlikely: "unlikely";
-    "very-likely": "very-likely";
-    "very-unlikely": "very-unlikely";
-  }>;
-  knowledgeBaseId: z.ZodOptional<z.ZodNullable<z.ZodPipe<z.ZodString, z.ZodTransform<string, string>>>>;
-}, z.core.$strip>;
-type ClassificationLabel = z.infer<typeof CLASSIFICATION_LABEL_SCHEMA>;
-export { ClassificationNotEvaluatedReason as a, PolicyAction as c, VIEWER_CLAIMS_SCHEMA as d, VIEWER_REGION_SCHEMA as f, ClassificationLabel as i, ModerationQualifier as l, ClassificationCategory as n, ClassificationQualifierResults as o, ClassificationCategoryReport as r, Likelihood as s, ClassificationCategories as t, EU_COUNTRIES as u };
+export { ClassificationQualifierResults as a, PolicyAction as c, VIEWER_CLAIMS_SCHEMA as d, VIEWER_REGION_SCHEMA as f, ClassificationNotEvaluatedReason as i, ModerationQualifier as l, ClassificationCategory as n, Likelihood as o, ClassificationCategoryReport as r, AssetModerationDecision as s, ClassificationCategories as t, EU_COUNTRIES as u };

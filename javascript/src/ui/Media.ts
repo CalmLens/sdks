@@ -20,7 +20,7 @@ export interface MediaAsset {
   classification?: {
     moderation?: {
       status?: AssetModerationStatus | null;
-      regions?: { region: string; action: string }[];
+      regions?: { region: string; status: string }[];
     } | null;
   } | null;
   content?: {
@@ -233,12 +233,6 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
     blocked: 3,
     purged: 4,
   };
-  const statuses: Record<string, AssetModerationStatus> = {
-    limit: "limited",
-    "age-restrict": "age-restricted",
-    block: "blocked",
-    purge: "purged",
-  };
   let status = props.status ?? asset.classification?.moderation?.status ?? "allowed";
   for (const entry of regionEntries) {
     const region = props.viewerClaims?.region;
@@ -246,8 +240,10 @@ export const resolveMediaProps = <T extends MediaOptions & AssetDisplay>(
       region &&
       (entry.region === region || (entry.region === "EU" && EU_COUNTRIES.has(region)))
     ) {
-      const regionalStatus = statuses[entry.action];
-      if (regionalStatus && ranks[regionalStatus] > ranks[status]) status = regionalStatus;
+      const regionalStatus = entry.status;
+      if (regionalStatus in ranks && ranks[regionalStatus] > (ranks[status] ?? 0)) {
+        status = regionalStatus;
+      }
     }
   }
   // An asset without its content described (a partial object) shows as its type says.

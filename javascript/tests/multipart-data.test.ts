@@ -89,7 +89,7 @@ describe("multipart binary field names", () => {
     expect(bodies).toEqual([directStream, multipartStream]);
   });
 
-  test("serializes externalId, metadata, processingOptions and queue=true on direct uploads", async () => {
+  test("serializes externalId, metadata, tags, processingOptions and queue=true on direct uploads", async () => {
     const requests: Request[] = [];
     const fetchImpl: typeof fetch = async (input, init) => {
       requests.push(input instanceof Request ? input : new Request(input, init));
@@ -113,6 +113,7 @@ describe("multipart binary field names", () => {
           type: "image/png",
         },
         metadata: [{ id: "source", value: "sdk-test" }],
+        tags: ["catalogue", "backpacks"],
         processingOptions: { keepContentAfterProcessing: true },
       }),
     ).rejects.toThrow("stop after capturing the request");
@@ -126,6 +127,7 @@ describe("multipart binary field names", () => {
     expect(JSON.parse(url.searchParams.get("metadata")!)).toEqual([
       { id: "source", value: "sdk-test" },
     ]);
+    expect(JSON.parse(url.searchParams.get("tags")!)).toEqual(["catalogue", "backpacks"]);
     expect(JSON.parse(url.searchParams.get("processingOptions")!)).toEqual({
       keepContentAfterProcessing: true,
     });
@@ -302,7 +304,7 @@ describe("multipart binary field names", () => {
       return Response.json({
         id: assetId,
         upload: { status: "uploading" },
-        classification: { status: "pending", moderation: { status: "pending" } },
+        classification: { status: "queued", moderation: { status: "pending" } },
       });
     };
     const client = new CalmLensServerClient({

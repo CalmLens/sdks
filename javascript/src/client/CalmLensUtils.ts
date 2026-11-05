@@ -604,11 +604,11 @@ export const stringifyQuery = (query: Record<string, unknown>): string => {
 };
 
 /**
- * Whether an asset has a moderation decision (`classification.moderation.status` is no longer
- * `pending`) or failed processing; `assets.waitForDecision` returns at the first such state.
+ * Whether an asset is settled: its `classification.status` is `completed` (moderation decided it)
+ * or `failed`. `assets.waitForDecision` returns at the first such state.
  */
 export const isAssetDecided = (asset: Pick<Asset, "classification">): boolean =>
-  asset.classification.moderation.status !== "pending" || asset.classification.status === "failed";
+  asset.classification.status === "completed" || asset.classification.status === "failed";
 
 export const DECISION_POLL_FIRST_DELAY_MS = 500;
 export const DECISION_POLL_DELAY_FACTOR = 1.5;
@@ -616,7 +616,8 @@ export const DECISION_POLL_MAX_DELAY_MS = 2_000;
 export const DEFAULT_DECISION_TIMEOUT_MS = 60_000;
 
 /**
- * Retrieves an asset until it has a decision, waiting 0.5s between checks and 1.5 times longer
+ * Retrieves an asset until it is settled (see `isAssetDecided`), waiting 0.5s between checks and
+ * 1.5 times longer
  * each time, up to 2s. Rejects with `sdk/timeout` once `timeoutMs` passes without one.
  */
 export const pollForDecision = async (

@@ -30,6 +30,8 @@ const createPresetClient = (token?: string | (() => string | Promise<string>)) =
       name: "photo.png",
       uploadPresetId: PRESET_ID,
       createdAt: 1,
+      upload: { status: "completed", partsReceived: null },
+      classification: { status: "processing", failureReason: null },
     });
   };
   const client = new CalmLensAppClient({

@@ -244,6 +244,24 @@ describe("MockCalmLensServerClient", () => {
     expect(asset.externalUrl).toBe("https://example.com");
   });
 
+  it("stores the tags an upload is created with, from a raw upload or a URL", async () => {
+    const client = createClient();
+
+    const uploaded = await client.assets.create({
+      name: "photo.png",
+      content: { base64: pngBase64, type: "image/png" },
+      tags: ["catalogue", "backpacks"],
+    });
+    const site = await client.assets.create({
+      name: "site",
+      url: "https://example.com",
+      tags: ["landing"],
+    });
+
+    expect(uploaded.tags).toEqual(["catalogue", "backpacks"]);
+    expect((await client.assets.retrieve({ assetId: site.id })).tags).toEqual(["landing"]);
+  });
+
   it("supports multipart create and uploadPart flows", async () => {
     const imageStorage = new InMemoryMockImageStorage();
     const client = createClient({ imageStorage });
@@ -257,7 +275,7 @@ describe("MockCalmLensServerClient", () => {
     });
 
     expect(uploading.upload).toMatchObject({ status: "uploading", partsReceived: 1 });
-    expect(uploading.classification.status).toBe("pending");
+    expect(uploading.classification.status).toBe("queued");
 
     const updated = await client.assets.uploadPart({
       assetId: uploading.id,
@@ -1097,8 +1115,13 @@ describe("MockCalmLensAppClient", () => {
     const good = await app.assets.create({ name: "good.png", content: photo });
     const bad = await app.assets.create({ name: "bad.png", content: photo });
 
-    expect([good.status, bad.status]).toEqual(["allowed", "blocked"]);
-    expect((await app.assets.retrieve({ assetId: good.id })).status).toBe("allowed");
+    expect([good, bad].map((upload) => upload.classification.moderation?.status)).toEqual([
+      "allowed",
+      "blocked",
+    ]);
+    expect(
+      (await app.assets.retrieve({ assetId: good.id })).classification.moderation?.status,
+    ).toBe("allowed");
     const served = await app.server.cdn.serve({ assetIdentifier: good.id });
     expect(new Uint8Array(await served.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
     expect((await app.server.cdn.serve({ assetIdentifier: bad.id })).status).toBe(403);
@@ -1167,7 +1190,8 @@ describe("MockCalmLensAppClient", () => {
       mockOptions: { moderate: () => "allowed", preset: { showDecisions: false } },
     });
     const upload = await app.assets.create({ name: "a.png", content: photo });
-    expect(upload.status).toBeUndefined();
+    // Its processing state shows, without the moderation decision.
+    expect(upload.classification).toEqual({ status: "completed", failureReason: null });
     const other = new MockCalmLensAppClient({
       uploadPresetId: PRESET,
       mockOptions: { server: app.server },

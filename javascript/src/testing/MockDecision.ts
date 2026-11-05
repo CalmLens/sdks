@@ -121,7 +121,7 @@ export class MockDecision {
 
   /**
    * The report a decided asset gets, as the API sends it: every category (unflagged ones
-   * evaluated with score 0), policy-adjusted results and the automated action and
+   * evaluated with score 0), policy-adjusted results and the automated status and
    * `flaggedCategories`. `undefined` for `pending` and `failed`.
    */
   report(): Omit<AssetModeration, "status" | "manualReviews"> | undefined {
@@ -163,7 +163,7 @@ export class MockDecision {
       ),
       explanationComplete: true,
       source: "policy",
-      automatedAction: STATUS_ACTION[status],
+      automatedStatus: status,
       regions: [],
       // The mock analyses no audio or video, so a decision has no findings timeline.
       timeline: null,

@@ -13,6 +13,7 @@ import type {
   Lens,
   Policy,
   PolicyList,
+  UploadedAsset,
 } from "../client/CalmLensTypes";
 import {
   checkTransformOptions,
@@ -20,6 +21,7 @@ import {
   parseTransformSelector,
   SIGNED_CDN_RESOURCES,
 } from "../client/CalmLensUtils";
+import type { ProcessingOptions } from "../contract/Asset.js";
 import { validateAssetPayload } from "../contract/AssetPayload.js";
 import type { TypedEvent } from "../contract/Event.js";
 import type { Folder } from "../contract/Folder.js";
@@ -184,7 +186,7 @@ export interface MockUploadPreset {
   /** Accepted content types, such as `["image/*"]`. Defaults to any type. */
   allowedContentTypes?: string[];
   maxFileSizeInBytes?: number;
-  /** Return `status` to the uploader. Defaults to `true`. */
+  /** Return `classification.moderation.status` to the uploader. Defaults to `true`. */
   showDecisions?: boolean;
   /** Defaults to `public`. */
   visibility?: "public" | "private";
@@ -608,9 +610,10 @@ const decodeSegment = (segment: string) => {
 interface UploadFields {
   name: string;
   description?: string;
-  processingOptions?: Asset["processingOptions"];
+  processingOptions?: ProcessingOptions;
   visibility?: Asset["visibility"];
   metadata?: Asset["metadata"];
+  tags?: Asset["tags"];
   authorId?: string;
   context?: { items: ModerationContextItem[] };
   externalId?: string;
@@ -652,6 +655,8 @@ export class MockCalmLensApi {
   private readonly eventFeed: TypedEvent[] = [];
   /** Each asset's latest `assetSequence`, which the API keeps on the asset row. */
   private readonly assetEventSequences = new Map<string, number>();
+  /** The processing options each asset was uploaded with, which the API keeps but doesn't return. */
+  private readonly processingOptions = new Map<string, ProcessingOptions>();
   /** What each open multipart upload was started with, as the API saves it. */
   private readonly openUploads = new Map<string, { queue: boolean; totalSizeInBytes?: number }>();
   private readonly idempotentResults = new Map<
@@ -784,8 +789,8 @@ export class MockCalmLensApi {
   /**
    * `POST /assets/:assetId/decision`, like the API: an asset still uploading or processing can't
    * be decided, one pending moderation can only be blocked or purged, a decision must change the
-   * status and purged content can only be blocked. Mock API keys have no name, so the reviewer is
-   * "An API key".
+   * status and purged content can only be blocked. The review is the API key's, and mock API keys
+   * have no ID or name, so its ID is `null` and the event names the reviewer "An API key".
    */
   private async decideAsset(assetId: string, body: Record<string, unknown>): Promise<Asset> {
     const { decision, note: rawNote } = body;
@@ -811,21 +816,18 @@ export class MockCalmLensApi {
     if (decision !== "purged" && decision !== "blocked" && status === "purged") {
       throw fail(API_ERROR_CODES.ASSET_CONTENT_PURGED);
     }
-    return this.recordDecision(asset, decision as MockReviewDecision, {
-      note,
-      reviewerName: API_KEY_REVIEWER_NAME,
-    });
+    return this.recordDecision(asset, decision as MockReviewDecision, { note });
   }
 
   /**
    * Sets the reviewer's decision: the moderation status, a manual review and the
-   * `asset.<status>` event (after `asset.content-removed` when purging). The test hook records no
-   * reviewer or note; the API's handler records both.
+   * `asset.<status>` event (after `asset.content-removed` when purging). Either way the review is
+   * the mock API key's; the test hook records no note, the API's handler records it.
    */
   private async recordDecision(
     asset: Asset,
     decision: MockReviewDecision,
-    review?: { note: string; reviewerName: string },
+    review?: { note: string },
   ): Promise<Asset> {
     const decided = await this.applyOutcome(asset, decision, "requested");
     const now = this.now();
@@ -835,9 +837,10 @@ export class MockCalmLensApi {
         id: this.createId("rev"),
         decision,
         note: review?.note ?? null,
-        ...(review && { reviewerName: review.reviewerName, reviewerEmail: null }),
+        // Mock API keys have no ID.
+        decidedBy: { type: "api-key", id: null },
         reviewedAt: now,
-        appliedToAsset: true,
+        applied: true,
       },
     ];
     const stored = await this.databaseStorage.updateAsset(decided);
@@ -861,7 +864,7 @@ export class MockCalmLensApi {
         ...(review
           ? [
               { key: "reviewer-user-id", value: null },
-              { key: "reviewer-name", value: review.reviewerName },
+              { key: "reviewer-name", value: API_KEY_REVIEWER_NAME },
             ]
           : []),
         { key: "note", value: review?.note ?? null },
@@ -1866,6 +1869,7 @@ export class MockCalmLensApi {
       processingOptions: parsed("processingOptions"),
       visibility: text("visibility") as Asset["visibility"] | undefined,
       metadata: parsed("metadata"),
+      tags: parsed("tags"),
       authorId: text("authorId"),
       context: parsed("context"),
       externalId: text("externalId"),
@@ -1941,6 +1945,7 @@ export class MockCalmLensApi {
     const isOpenUpload = part !== undefined && !part.isFinal;
     const processingOptions = fields.processingOptions ?? { keepContentAfterProcessing: false };
     const keepContent = processingOptions.keepContentAfterProcessing === true;
+    this.processingOptions.set(id, processingOptions);
     const hasContent = fields.url === undefined;
     const contextItems = selectModerationContextItems(fields.context?.items ?? []);
     // Fields the API returns as `null` when they are not set.
@@ -1961,8 +1966,7 @@ export class MockCalmLensApi {
       authorId: fields.authorId ?? null,
       // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
       context: contextItems.length ? { items: contextItems } : null,
-      tags: null,
-      processingOptions,
+      tags: fields.tags ?? null,
       visibility: fields.visibility ?? "private",
       content: {
         status: keepContent ? "stored" : "temporary",
@@ -1992,7 +1996,7 @@ export class MockCalmLensApi {
         partsReceived: isOpenUpload ? part.partNumber : null,
       },
       classification: {
-        status: isOpenUpload ? "pending" : "processing",
+        status: isOpenUpload ? "queued" : "processing",
         failureReason: null,
         updatedAt: now,
         completedAt: null,
@@ -2140,7 +2144,7 @@ export class MockCalmLensApi {
    */
   private async decided(asset: Asset, decision: MockDecision): Promise<Asset> {
     const next = await this.applyOutcome(asset, decision.status, "policy", decision.report());
-    const features = asset.processingOptions?.features;
+    const features = this.processingOptions.get(asset.id)?.features;
     if (next.classification.status !== "completed" || asset.type !== "image") return next;
     return {
       ...next,
@@ -2340,12 +2344,21 @@ export class MockCalmLensApi {
   ) {
     if (!session) throw fail(API_ERROR_CODES.UPLOAD_PRESET_NOT_FOUND);
     const { preset } = session;
-    const toUploaded = (asset: Asset) => ({
+    // Like toUploadedAsset in the API: the asset's upload and processing state, and its
+    // moderation status only when the preset shows decisions.
+    const toUploaded = (asset: Asset): UploadedAsset => ({
       id: asset.id,
       name: asset.name,
       uploadPresetId,
       createdAt: asset.createdAt,
-      ...(preset.showDecisions !== false && { status: asset.classification.moderation.status }),
+      upload: { status: asset.upload.status, partsReceived: asset.upload.partsReceived },
+      classification: {
+        status: asset.classification.status,
+        failureReason: asset.classification.failureReason,
+        ...(preset.showDecisions !== false && {
+          moderation: { status: asset.classification.moderation.status },
+        }),
+      },
     });
     const [assetId, action] = rest;
     if (assetId !== undefined) {
@@ -2370,6 +2383,12 @@ export class MockCalmLensApi {
       throw fail(API_ERROR_CODES.UPLOAD_PRESET_FIELD_NOT_ALLOWED, {
         details: { field: "externalId" },
       });
+    }
+    // Like the API, a browser can't set the fields its server sets.
+    for (const field of ["metadata", "tags", "authorId", "context", "processingOptions"] as const) {
+      if (fields[field] !== undefined && fields[field] !== null) {
+        throw fail(API_ERROR_CODES.UPLOAD_PRESET_FIELD_NOT_ALLOWED, { details: { field } });
+      }
     }
     if (
       preset.allowedContentTypes &&

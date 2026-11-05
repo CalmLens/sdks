@@ -301,7 +301,9 @@ const isUploadedAsset = (data: unknown): data is UploadedAsset =>
   !!data &&
   typeof data === "object" &&
   typeof (data as { id?: unknown }).id === "string" &&
-  !!(data as { id: string }).id;
+  !!(data as { id: string }).id &&
+  hasStringStatus((data as { classification?: unknown }).classification) &&
+  hasStringStatus((data as { upload?: unknown }).upload);
 
 export const expectUploadedAsset = (data: unknown): UploadedAsset => {
   if (!isUploadedAsset(data)) {
@@ -444,6 +446,7 @@ export class CalmLensConnection {
     setOptionalQueryValue(query, "processingOptions", options.processingOptions);
     setOptionalQueryValue(query, "visibility", options.visibility);
     setOptionalQueryValue(query, "metadata", options.metadata);
+    setOptionalQueryValue(query, "tags", options.tags);
     setOptionalQueryValue(query, "authorId", options.authorId);
     setOptionalQueryValue(query, "context", options.context);
     setOptionalQueryValue(query, "externalId", options.externalId);

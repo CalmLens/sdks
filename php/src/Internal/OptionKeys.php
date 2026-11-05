@@ -15,8 +15,8 @@ final class OptionKeys
 {
     public const KEYS = [
         'assets.batch' => ['assetIds', 'operation'],
-        'assets.classify' => ['authorId', 'content', 'context', 'description', 'externalId', 'externalUrl', 'folderId', 'isFinal', 'metadata', 'name', 'part', 'processingOptions', 'sizeInBytes', 'totalSizeInBytes', 'uploadPresetId', 'url', 'visibility'],
-        'assets.create' => ['authorId', 'content', 'context', 'description', 'externalId', 'externalUrl', 'folderId', 'isFinal', 'metadata', 'name', 'part', 'processingOptions', 'sizeInBytes', 'totalSizeInBytes', 'uploadPresetId', 'url', 'visibility'],
+        'assets.classify' => ['authorId', 'content', 'context', 'description', 'externalId', 'externalUrl', 'folderId', 'isFinal', 'metadata', 'name', 'part', 'processingOptions', 'sizeInBytes', 'tags', 'totalSizeInBytes', 'uploadPresetId', 'url', 'visibility'],
+        'assets.create' => ['authorId', 'content', 'context', 'description', 'externalId', 'externalUrl', 'folderId', 'isFinal', 'metadata', 'name', 'part', 'processingOptions', 'sizeInBytes', 'tags', 'totalSizeInBytes', 'uploadPresetId', 'url', 'visibility'],
         'assets.createSignedUrl' => ['assetId', 'expiresInSeconds', 'lens', 'resource', 'transform', 'viewerClaims'],
         'assets.decide' => ['assetId', 'confirmPurge', 'decision', 'note'],
         'assets.delete' => ['assetId'],
@@ -60,7 +60,7 @@ final class OptionKeys
         'policies.retrieve' => ['policyId'],
         'policies.setAutomaticUpdates' => ['enabled', 'policyId', 'presetVersion', 'revision'],
         'policies.update' => ['description', 'name', 'policyId', 'revision', 'settings'],
-        'text.classify' => ['authorId', 'context', 'description', 'externalId', 'externalUrl', 'folderId', 'metadata', 'name', 'processingOptions', 'text', 'uploadPresetId', 'visibility'],
+        'text.classify' => ['authorId', 'context', 'description', 'externalId', 'externalUrl', 'folderId', 'metadata', 'name', 'processingOptions', 'tags', 'text', 'uploadPresetId', 'visibility'],
     ];
 
     /**
@@ -68,8 +68,8 @@ final class OptionKeys
      * null is left out, as the API refuses null for it.
      */
     public const NULLABLE = [
-        'assets.classify' => ['authorId', 'context', 'description', 'externalId', 'folderId', 'metadata', 'processingOptions', 'uploadPresetId', 'visibility'],
-        'assets.create' => ['authorId', 'context', 'description', 'externalId', 'folderId', 'metadata', 'processingOptions', 'uploadPresetId', 'visibility'],
+        'assets.classify' => ['authorId', 'context', 'description', 'externalId', 'folderId', 'metadata', 'processingOptions', 'tags', 'uploadPresetId', 'visibility'],
+        'assets.create' => ['authorId', 'context', 'description', 'externalId', 'folderId', 'metadata', 'processingOptions', 'tags', 'uploadPresetId', 'visibility'],
         'assets.each' => ['filter', 'folderId'],
         'assets.list' => ['filter', 'folderId'],
         'assets.move' => ['folderId'],
@@ -79,6 +79,6 @@ final class OptionKeys
         'hashLists.addEntry' => ['label', 'quality'],
         'hashLists.create' => ['description'],
         'hashLists.update' => ['description'],
-        'text.classify' => ['authorId', 'context', 'description', 'externalId', 'folderId', 'metadata', 'processingOptions', 'uploadPresetId', 'visibility'],
+        'text.classify' => ['authorId', 'context', 'description', 'externalId', 'folderId', 'metadata', 'processingOptions', 'tags', 'uploadPresetId', 'visibility'],
     ];
 }

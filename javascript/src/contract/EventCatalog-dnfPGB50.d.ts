@@ -249,11 +249,11 @@ declare const EVENT_TYPE_INFO: {
         GB: "GB";
       }>>;
       rule: EventFieldDefinition<zod.ZodString>;
-      action: EventFieldDefinition<zod.ZodEnum<{
-        "age-restrict": "age-restrict";
-        block: "block";
-        limit: "limit";
-        purge: "purge";
+      status: EventFieldDefinition<zod.ZodEnum<{
+        "age-restricted": "age-restricted";
+        blocked: "blocked";
+        limited: "limited";
+        purged: "purged";
       }>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
@@ -263,7 +263,7 @@ declare const EVENT_TYPE_INFO: {
       parentAsset?: string | undefined;
       region: "AT" | "AU" | "BR" | "DE" | "EU" | "FR" | "GB";
       rule: string;
-      action: "age-restrict" | "block" | "limit" | "purge";
+      status: "age-restricted" | "blocked" | "limited" | "purged";
     }>;
     factInfo: {
       label: string;
@@ -303,11 +303,11 @@ declare const EVENT_TYPE_INFO: {
         GB: "GB";
       }>;
       rule: zod.ZodString;
-      action: zod.ZodEnum<{
-        "age-restrict": "age-restrict";
-        block: "block";
-        limit: "limit";
-        purge: "purge";
+      status: zod.ZodEnum<{
+        "age-restricted": "age-restricted";
+        blocked: "blocked";
+        limited: "limited";
+        purged: "purged";
       }>;
     }, zod.core.$strip>;
   };
@@ -776,8 +776,8 @@ declare const EVENT_TYPE_INFO: {
       previousStatus: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
         completed: "completed";
         failed: "failed";
-        pending: "pending";
         processing: "processing";
+        queued: "queued";
       }>>>>;
       failureReason: EventFieldDefinition<zod.ZodEnum<{
         "child-failed": "child-failed";
@@ -799,7 +799,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
-      previousStatus?: "completed" | "failed" | "pending" | "processing" | null | undefined;
+      previousStatus?: "completed" | "failed" | "processing" | "queued" | null | undefined;
       failureReason: "child-failed" | "duration-limit" | "file-too-large" | "free-upload-limit" | "media-limit" | "multiple-tracks" | "processing-error" | "resolution-limit" | "spend-limit" | "type-mismatch" | "undecodable-content" | "unsupported-format";
     }>;
     factInfo: {
@@ -833,8 +833,8 @@ declare const EVENT_TYPE_INFO: {
       previousStatus: zod.ZodOptional<zod.ZodNullable<zod.ZodEnum<{
         completed: "completed";
         failed: "failed";
-        pending: "pending";
         processing: "processing";
+        queued: "queued";
       }>>>;
       failureReason: zod.ZodEnum<{
         "child-failed": "child-failed";
@@ -1129,7 +1129,7 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>>;
       parentAsset: EventFieldDefinition<zod.ZodOptional<zod.ZodString>>;
-      automatedOutcome: EventFieldDefinition<zod.ZodEnum<{
+      automatedStatus: EventFieldDefinition<zod.ZodEnum<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
@@ -1155,7 +1155,7 @@ declare const EVENT_TYPE_INFO: {
       assetName?: string | null | undefined;
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
-      automatedOutcome: "age-restricted" | "allowed" | "blocked" | "limited";
+      automatedStatus: "age-restricted" | "allowed" | "blocked" | "limited";
       reviewReason: "sampled" | "uncertain";
       uncertainCategories: ("criminal-activity" | "harassment" | "hate" | "personal-information" | "profanity" | "self-harm" | "sexual" | "violence")[];
     }>;
@@ -1187,7 +1187,7 @@ declare const EVENT_TYPE_INFO: {
         website: "website";
       }>>>;
       parentAsset: zod.ZodOptional<zod.ZodString>;
-      automatedOutcome: zod.ZodEnum<{
+      automatedStatus: zod.ZodEnum<{
         "age-restricted": "age-restricted";
         allowed: "allowed";
         blocked: "blocked";
@@ -1328,10 +1328,10 @@ declare const EVENT_TYPE_INFO: {
       }>>;
       linkUrl: EventFieldDefinition<zod.ZodString>;
       linkFinalUrl: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
-      linkAction: EventFieldDefinition<zod.ZodEnum<{
-        "age-restrict": "age-restrict";
-        block: "block";
-        limit: "limit";
+      linkStatus: EventFieldDefinition<zod.ZodEnum<{
+        "age-restricted": "age-restricted";
+        blocked: "blocked";
+        limited: "limited";
       }>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
@@ -1342,7 +1342,7 @@ declare const EVENT_TYPE_INFO: {
       linkVerdict: "adult" | "gambling" | "malware" | "phishing" | "safe" | "unresolved";
       linkUrl: string;
       linkFinalUrl?: string | null | undefined;
-      linkAction: "age-restrict" | "block" | "limit";
+      linkStatus: "age-restricted" | "blocked" | "limited";
     }>;
     factInfo: {
       label: string;
@@ -1382,10 +1382,10 @@ declare const EVENT_TYPE_INFO: {
       }>;
       linkUrl: zod.ZodString;
       linkFinalUrl: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
-      linkAction: zod.ZodEnum<{
-        "age-restrict": "age-restrict";
-        block: "block";
-        limit: "limit";
+      linkStatus: zod.ZodEnum<{
+        "age-restricted": "age-restricted";
+        blocked: "blocked";
+        limited: "limited";
       }>;
     }, zod.core.$strip>;
   };

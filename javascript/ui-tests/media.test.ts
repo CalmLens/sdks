@@ -116,7 +116,7 @@ for (const binding of BINDINGS) {
           id: "a1",
           projectId: PROJECT_ID,
           classification: {
-            moderation: { status: "allowed", regions: [{ region: "DE", action: "block" }] },
+            moderation: { status: "allowed", regions: [{ region: "DE", status: "blocked" }] },
           },
         },
       });
@@ -153,7 +153,7 @@ for (const binding of BINDINGS) {
           id: "a1",
           projectId: PROJECT_ID,
           classification: {
-            moderation: { status: "allowed", regions: [{ region: "DE", action: "block" }] },
+            moderation: { status: "allowed", regions: [{ region: "DE", status: "blocked" }] },
           },
         },
       });

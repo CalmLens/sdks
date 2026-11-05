@@ -384,6 +384,26 @@ describe("UploadController", () => {
     globalThis.fetch = originalFetch;
   });
 
+  /**
+   * An upload as the preset's routes return it: `pending` is still processing, `failed` failed
+   * processing, and any other status is a decision.
+   */
+  const uploadedAsset = (status: string) => ({
+    id: "asset-1",
+    name: "photo.png",
+    uploadPresetId: PRESET_ID,
+    createdAt: 1,
+    upload: { status: "completed", partsReceived: null },
+    classification:
+      status === "failed"
+        ? { status: "failed", failureReason: "processing-error", moderation: { status: "pending" } }
+        : {
+            status: status === "pending" ? "processing" : "completed",
+            failureReason: null,
+            moderation: { status },
+          },
+  });
+
   /** Answers the token endpoint and the preset's upload routes, recording each request. */
   const serve = (statuses: string[]) => {
     const requests: {
@@ -403,7 +423,7 @@ describe("UploadController", () => {
       });
       if (url.pathname === "/api/upload-token") return Response.json({ token: "clut_signed" });
       const status = statuses[Math.min(checks++, statuses.length - 1)];
-      return Response.json({ id: "asset-1", name: "photo.png", createdAt: 1, status });
+      return Response.json(uploadedAsset(status ?? "allowed"));
     }) as typeof fetch;
     return requests;
   };
@@ -457,6 +477,36 @@ describe("UploadController", () => {
     expect(controller.getSnapshot().items[0]).toMatchObject({
       stage: "complete",
       status: "age-restricted",
+    });
+  });
+
+  it("shows an upload whose processing failed as failed, and uploads it again on retry", async () => {
+    const requests = serve(["pending", "failed", "allowed"]);
+    const uploaded: CalmLensUpload[] = [];
+    const failed: UploadItem[] = [];
+    const controller = createUploadController({
+      uploadPresetId: PRESET_ID,
+      onUploaded: (upload) => uploaded.push(upload),
+      onFailed: (item) => failed.push(item),
+    });
+    controller.addFiles([photo()]);
+    await settle(controller);
+
+    expect(requests.map((request) => request.method)).toEqual(["POST", "GET"]);
+    expect(controller.getSnapshot().items[0]).toMatchObject({
+      stage: "failed",
+      assetId: "asset-1",
+    });
+    expect(failed.map((item) => item.assetId)).toEqual(["asset-1"]);
+    expect(uploaded).toEqual([]);
+
+    controller.retry(controller.getSnapshot().items[0]?.key ?? "");
+    await settle(controller);
+    // Checking it again would find it failed, so the file is uploaded again.
+    expect(requests.map((request) => request.method)).toEqual(["POST", "GET", "POST"]);
+    expect(controller.getSnapshot().items[0]).toMatchObject({
+      stage: "complete",
+      status: "allowed",
     });
   });
 
@@ -518,7 +568,7 @@ describe("UploadController", () => {
     globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
       signal = init?.signal ?? undefined;
       await gate;
-      return Response.json({ id: "asset-1", name: "photo.png", createdAt: 1, status: "allowed" });
+      return Response.json(uploadedAsset("allowed"));
     }) as typeof fetch;
     const uploaded: CalmLensUpload[] = [];
     const controller = createUploadController({
@@ -786,7 +836,7 @@ test("regional media uses the viewer country and forwards it on responsive URLs"
     id: "asset-region",
     projectId: "project-region",
     classification: {
-      moderation: { status: "allowed" as const, regions: [{ region: "DE", action: "block" }] },
+      moderation: { status: "allowed" as const, regions: [{ region: "DE", status: "blocked" }] },
     },
   };
   const inferred = getMediaState({ asset });

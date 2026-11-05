@@ -9,11 +9,11 @@ module CalmLens
       'assets.batch' => %w[assetIds operation].freeze,
       'assets.classify' => %w[
         authorId content context description externalId externalUrl folderId isFinal metadata name part
-        processingOptions sizeInBytes totalSizeInBytes uploadPresetId url visibility
+        processingOptions sizeInBytes tags totalSizeInBytes uploadPresetId url visibility
       ].freeze,
       'assets.create' => %w[
         authorId content context description externalId externalUrl folderId isFinal metadata name part
-        processingOptions sizeInBytes totalSizeInBytes uploadPresetId url visibility
+        processingOptions sizeInBytes tags totalSizeInBytes uploadPresetId url visibility
       ].freeze,
       'assets.createSignedUrl' => %w[assetId expiresInSeconds lens resource transform viewerClaims].freeze,
       'assets.decide' => %w[assetId confirmPurge decision note].freeze,
@@ -59,7 +59,7 @@ module CalmLens
       'policies.setAutomaticUpdates' => %w[enabled policyId presetVersion revision].freeze,
       'policies.update' => %w[description name policyId revision settings].freeze,
       'text.classify' => %w[
-        authorId context description externalId externalUrl folderId metadata name processingOptions text
+        authorId context description externalId externalUrl folderId metadata name processingOptions tags text
         uploadPresetId visibility
       ].freeze
     }.freeze
@@ -68,10 +68,12 @@ module CalmLens
     # is left out, as the API refuses null for it.
     NULLABLE_OPTION_KEYS = {
       'assets.classify' => %w[
-        authorId context description externalId folderId metadata processingOptions uploadPresetId visibility
+        authorId context description externalId folderId metadata processingOptions tags uploadPresetId
+        visibility
       ].freeze,
       'assets.create' => %w[
-        authorId context description externalId folderId metadata processingOptions uploadPresetId visibility
+        authorId context description externalId folderId metadata processingOptions tags uploadPresetId
+        visibility
       ].freeze,
       'assets.each' => %w[filter folderId].freeze,
       'assets.list' => %w[filter folderId].freeze,
@@ -83,7 +85,8 @@ module CalmLens
       'hashLists.create' => %w[description].freeze,
       'hashLists.update' => %w[description].freeze,
       'text.classify' => %w[
-        authorId context description externalId folderId metadata processingOptions uploadPresetId visibility
+        authorId context description externalId folderId metadata processingOptions tags uploadPresetId
+        visibility
       ].freeze
     }.freeze
   end

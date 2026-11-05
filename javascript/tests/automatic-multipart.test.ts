@@ -19,7 +19,7 @@ const fileOf = (length: number) => Uint8Array.from({ length }, (_, index) => (in
 
 const asset = (id: string, status: "uploading" | "completed", partsReceived: number | null) => ({
   id,
-  classification: { status: "pending", moderation: { status: "pending" } },
+  classification: { status: "queued", moderation: { status: "pending" } },
   upload: { status, updatedAt: 1, partsReceived },
 });
 

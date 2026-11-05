@@ -14,7 +14,7 @@ const createClient = (projectId = "project-1") => {
         : {
             id: "a",
             upload: { status: "uploading" },
-            classification: { status: "pending", moderation: { status: "pending" } },
+            classification: { status: "queued", moderation: { status: "pending" } },
           },
     );
   };
