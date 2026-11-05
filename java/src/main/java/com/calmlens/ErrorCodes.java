@@ -10,11 +10,22 @@ import java.util.Optional;
  */
 public final class ErrorCodes {
   private ErrorCodes() {}
-  /** Invalid viewer assertions (HTTP 400). */
-  public static final String INVALID_VIEWER_CLAIMS = "viewer/invalid-claims";
-  /** Age-restricted delivery needs confirmation (HTTP 403). */
+  /** {@code viewer-claims/invalid} (HTTP 400). */
+  public static final String INVALID_VIEWER_CLAIMS = "viewer-claims/invalid";
+  /** {@code viewer/age-confirmation-required} (HTTP 403). */
   public static final String AGE_CONFIRMATION_REQUIRED = "viewer/age-confirmation-required";
-
+  /** {@code viewer-region/invalid} (HTTP 400). */
+  public static final String INVALID_VIEWER_REGION = "viewer-region/invalid";
+  /** {@code viewer/region-required} (HTTP 403). */
+  public static final String VIEWER_REGION_REQUIRED = "viewer/region-required";
+  /** {@code asset/regional-evidence-required} (HTTP 403). */
+  public static final String REGIONAL_EVIDENCE_REQUIRED = "asset/regional-evidence-required";
+  /** {@code signed-url/expired} (HTTP 403). */
+  public static final String SIGNED_URL_EXPIRED = "signed-url/expired";
+  /** {@code signed-url/invalid} (HTTP 403). */
+  public static final String SIGNED_URL_INVALID = "signed-url/invalid";
+  /** {@code validation/invalid-request} (HTTP 400). */
+  public static final String INVALID_REQUEST = "validation/invalid-request";
   /** {@code validation/invalid-type} (HTTP 400). */
   public static final String INVALID_TYPE = "validation/invalid-type";
   /** {@code validation/too-small} (HTTP 400). */
@@ -27,73 +38,62 @@ public final class ErrorCodes {
   public static final String INVALID_VALUE = "validation/invalid-value";
   /** {@code validation/unknown-field} (HTTP 400). */
   public static final String UNKNOWN_FIELD = "validation/unknown-field";
-  /** {@code validation/unsupported-content-type} (HTTP 415). */
-  public static final String UNSUPPORTED_CONTENT_TYPE = "validation/unsupported-content-type";
-  /** {@code validation/invalid-filter} (HTTP 400). */
-  public static final String INVALID_FILTER = "validation/invalid-filter";
-  /** {@code validation/invalid-ordering-field} (HTTP 400). */
-  public static final String INVALID_ORDERING_FIELD = "validation/invalid-ordering-field";
-  /** {@code misc/route-not-found} (HTTP 404). */
-  public static final String ROUTE_NOT_FOUND = "misc/route-not-found";
-  /** {@code misc/internal-error} (HTTP 500). */
-  public static final String INTERNAL_ERROR = "misc/internal-error";
+  /** {@code request/unsupported-content-type} (HTTP 415). */
+  public static final String UNSUPPORTED_CONTENT_TYPE = "request/unsupported-content-type";
+  /** {@code filter/invalid} (HTTP 400). */
+  public static final String INVALID_FILTER = "filter/invalid";
+  /** {@code ordering/unsupported-field} (HTTP 400). */
+  public static final String UNSUPPORTED_ORDERING_FIELD = "ordering/unsupported-field";
+  /** {@code request/route-not-found} (HTTP 404). */
+  public static final String ROUTE_NOT_FOUND = "request/route-not-found";
+  /** {@code server/internal-error} (HTTP 500). */
+  public static final String INTERNAL_ERROR = "server/internal-error";
   /** {@code auth/unauthenticated} (HTTP 401). */
   public static final String UNAUTHENTICATED = "auth/unauthenticated";
-  /** {@code auth/token-expired} (HTTP 401). */
-  public static final String TOKEN_EXPIRED = "auth/token-expired";
-  /** {@code auth/invalid-token} (HTTP 401). */
-  public static final String INVALID_TOKEN = "auth/invalid-token";
+  /** {@code session-token/expired} (HTTP 401). */
+  public static final String TOKEN_EXPIRED = "session-token/expired";
+  /** {@code session-token/invalid} (HTTP 401). */
+  public static final String INVALID_TOKEN = "session-token/invalid";
   /** {@code search/unavailable} (HTTP 503). */
   public static final String SEARCH_UNAVAILABLE = "search/unavailable";
-  /** {@code asset/invalid-transform} (HTTP 400). */
-  public static final String INVALID_TRANSFORM = "asset/invalid-transform";
-  /** {@code asset/invalid-transform-options} (HTTP 400). */
-  public static final String INVALID_TRANSFORM_OPTIONS = "asset/invalid-transform-options";
-  /** {@code asset/remote-url-redirect-limit} (HTTP 400). */
-  public static final String REMOTE_URL_REDIRECT_LIMIT = "asset/remote-url-redirect-limit";
-  /** {@code copyright/content-held} (HTTP 409). */
-  public static final String COPYRIGHT_CONTENT_HELD = "copyright/content-held";
-  /** {@code asset/api-key-missing-permission} (HTTP 403). */
-  public static final String DOWNLOAD_PERMISSION_REQUIRED = "asset/api-key-missing-permission";
-  /** {@code validation/invalid-cursor} (HTTP 400). */
-  public static final String INVALID_CURSOR = "validation/invalid-cursor";
-
-  /** {@code auth/missing-token} (HTTP 401). */
-  public static final String MISSING_TOKEN = "auth/missing-token";
-  /** {@code auth/invalid-api-key} (HTTP 401). */
-  public static final String INVALID_API_KEY = "auth/invalid-api-key";
-  /** {@code auth/project-mismatch} (HTTP 403). */
-  public static final String API_KEY_PROJECT_MISMATCH = "auth/project-mismatch";
-  /** {@code auth/api-key-not-accepted} (HTTP 403). */
-  public static final String API_KEY_NOT_ACCEPTED = "auth/api-key-not-accepted";
+  /** {@code transform/invalid} (HTTP 400). */
+  public static final String INVALID_TRANSFORM = "transform/invalid";
+  /** {@code transform-options/invalid} (HTTP 400). */
+  public static final String INVALID_TRANSFORM_OPTIONS = "transform-options/invalid";
+  /** {@code remote-url/too-many-redirects} (HTTP 400). */
+  public static final String REMOTE_URL_TOO_MANY_REDIRECTS = "remote-url/too-many-redirects";
+  /** {@code cursor/invalid} (HTTP 400). */
+  public static final String INVALID_CURSOR = "cursor/invalid";
+  /** {@code api-key/missing} (HTTP 401). */
+  public static final String MISSING_API_KEY = "api-key/missing";
+  /** {@code api-key/invalid} (HTTP 401). */
+  public static final String INVALID_API_KEY = "api-key/invalid";
+  /** {@code api-key/project-mismatch} (HTTP 403). */
+  public static final String API_KEY_PROJECT_MISMATCH = "api-key/project-mismatch";
+  /** {@code api-key/not-accepted} (HTTP 403). */
+  public static final String API_KEY_NOT_ACCEPTED = "api-key/not-accepted";
   /** {@code auth/permission-denied} (HTTP 403). */
   public static final String PERMISSION_DENIED = "auth/permission-denied";
-  /** {@code upload/file-too-large} (HTTP 400). */
-  public static final String FILE_TOO_LARGE = "upload/file-too-large";
-  /** {@code upload/multipart-image-too-large} (HTTP 400). */
-  public static final String MULTIPART_IMAGE_TOO_LARGE = "upload/multipart-image-too-large";
-  /** {@code upload/image-exceeded-max-dimensions} (HTTP 400). */
-  public static final String IMAGE_EXCEEDED_MAX_DIMENSIONS = "upload/image-exceeded-max-dimensions";
-  /** {@code image/invalid-input} (HTTP 422). */
-  public static final String IMAGE_INVALID_INPUT = "image/invalid-input";
-  /** {@code image/unsupported-format} (HTTP 422). */
-  public static final String IMAGE_UNSUPPORTED_FORMAT = "image/unsupported-format";
-  /** {@code image/input-limit} (HTTP 422). */
-  public static final String IMAGE_INPUT_LIMIT = "image/input-limit";
-  /** {@code upload/limit-exceeded} (HTTP 403). */
-  public static final String UPLOAD_LIMIT_EXCEEDED = "upload/limit-exceeded";
-  /** {@code upload/spend-limit-reached} (HTTP 402). */
-  public static final String SPEND_LIMIT_REACHED = "upload/spend-limit-reached";
-  /** {@code upload/invalid-mime-type} (HTTP 400). */
-  public static final String INVALID_UPLOAD_MIME_TYPE = "upload/invalid-mime-type";
-  /** {@code upload/invalid-payload} (HTTP 400). */
-  public static final String INVALID_UPLOAD_PAYLOAD = "upload/invalid-payload";
+  /** {@code upload/too-large} (HTTP 413). */
+  public static final String UPLOAD_TOO_LARGE = "upload/too-large";
+  /** {@code image/invalid} (HTTP 422). */
+  public static final String INVALID_IMAGE = "image/invalid";
+  /** {@code image/too-large} (HTTP 422). */
+  public static final String IMAGE_TOO_LARGE = "image/too-large";
+  /** {@code usage/free-uploads-exhausted} (HTTP 403). */
+  public static final String FREE_UPLOADS_EXHAUSTED = "usage/free-uploads-exhausted";
+  /** {@code usage/uploads-paused} (HTTP 402). */
+  public static final String UPLOADS_PAUSED = "usage/uploads-paused";
+  /** {@code upload/unsupported-type} (HTTP 415). */
+  public static final String UNSUPPORTED_UPLOAD_TYPE = "upload/unsupported-type";
+  /** {@code upload-payload/invalid} (HTTP 400). */
+  public static final String INVALID_UPLOAD_PAYLOAD = "upload-payload/invalid";
   /** {@code upload/use-upload-part} (HTTP 409). */
   public static final String USE_UPLOAD_PART = "upload/use-upload-part";
   /** {@code upload/not-open} (HTTP 409). */
   public static final String UPLOAD_NOT_OPEN = "upload/not-open";
-  /** {@code upload/invalid-part-number} (HTTP 409). */
-  public static final String INVALID_UPLOAD_PART_NUMBER = "upload/invalid-part-number";
+  /** {@code upload-part/invalid-number} (HTTP 409). */
+  public static final String INVALID_UPLOAD_PART_NUMBER = "upload-part/invalid-number";
   /** {@code upload/missing} (HTTP 409). */
   public static final String UPLOAD_MISSING = "upload/missing";
   /** {@code upload/size-mismatch} (HTTP 400). */
@@ -116,28 +116,28 @@ public final class ErrorCodes {
   public static final String ASSET_REVIEW_NOTE_REQUIRED = "asset/review-note-required";
   /** {@code asset/update-failed} (HTTP 500). */
   public static final String ASSET_UPDATE_FAILED = "asset/update-failed";
-  /** {@code asset/safety-held} (HTTP 423). */
-  public static final String ASSET_SAFETY_HELD = "asset/safety-held";
-  /** {@code asset/not-retryable} (HTTP 409). */
-  public static final String ASSET_NOT_RETRYABLE = "asset/not-retryable";
-  /** {@code asset/content-unavailable} (HTTP 409). */
-  public static final String ASSET_CONTENT_UNAVAILABLE = "asset/content-unavailable";
-  /** {@code asset/content-purged} (HTTP 409). */
-  public static final String ASSET_CONTENT_PURGED = "asset/content-purged";
+  /** {@code asset/held} (HTTP 423). */
+  public static final String ASSET_HELD = "asset/held";
   /** {@code asset/processing} (HTTP 409). */
   public static final String ASSET_PROCESSING = "asset/processing";
   /** {@code asset/decision-not-allowed} (HTTP 409). */
   public static final String ASSET_DECISION_NOT_ALLOWED = "asset/decision-not-allowed";
   /** {@code asset/decision-unchanged} (HTTP 409). */
   public static final String ASSET_DECISION_UNCHANGED = "asset/decision-unchanged";
+  /** {@code asset/not-retryable} (HTTP 409). */
+  public static final String ASSET_NOT_RETRYABLE = "asset/not-retryable";
+  /** {@code asset/content-unavailable} (HTTP 409). */
+  public static final String ASSET_CONTENT_UNAVAILABLE = "asset/content-unavailable";
+  /** {@code asset/content-purged} (HTTP 409). */
+  public static final String ASSET_CONTENT_PURGED = "asset/content-purged";
   /** {@code asset/not-decided} (HTTP 409). */
   public static final String ASSET_NOT_DECIDED = "asset/not-decided";
   /** {@code asset/policy-changed} (HTTP 409). */
   public static final String ASSET_POLICY_CHANGED = "asset/policy-changed";
   /** {@code asset/reviewed} (HTTP 409). */
   public static final String ASSET_REVIEWED = "asset/reviewed";
-  /** {@code support/ticket-not-found} (HTTP 404). */
-  public static final String SUPPORT_TICKET_NOT_FOUND = "support/ticket-not-found";
+  /** {@code support-ticket/not-found} (HTTP 404). */
+  public static final String SUPPORT_TICKET_NOT_FOUND = "support-ticket/not-found";
   /** {@code asset/duplicate-external-id} (HTTP 409). */
   public static final String DUPLICATE_EXTERNAL_ID = "asset/duplicate-external-id";
   /** {@code folder/not-found} (HTTP 404). */
@@ -152,24 +152,14 @@ public final class ErrorCodes {
   public static final String LENS_VERSION_CONFLICT = "lens/version-conflict";
   /** {@code lens/identifier-reserved} (HTTP 409). */
   public static final String LENS_IDENTIFIER_RESERVED = "lens/identifier-reserved";
-  /** {@code viewer/invalid-region} (HTTP 400). */
-  public static final String INVALID_VIEWER_REGION = "viewer/invalid-region";
-  /** {@code viewer/region-required} (HTTP 403). */
-  public static final String VIEWER_REGION_REQUIRED = "viewer/region-required";
-  /** {@code asset/regional-evidence-required} (HTTP 403). */
-  public static final String REGIONAL_EVIDENCE_REQUIRED = "asset/regional-evidence-required";
-  /** {@code signed-url/expired} (HTTP 403). */
-  public static final String SIGNED_URL_EXPIRED = "signed-url/expired";
-  /** {@code signed-url/invalid} (HTTP 403). */
-  public static final String SIGNED_URL_INVALID = "signed-url/invalid";
   /** {@code hash-list/not-found} (HTTP 404). */
   public static final String HASH_LIST_NOT_FOUND = "hash-list/not-found";
-  /** {@code hash-list/entry-not-found} (HTTP 404). */
-  public static final String HASH_LIST_ENTRY_NOT_FOUND = "hash-list/entry-not-found";
+  /** {@code hash-list-entry/not-found} (HTTP 404). */
+  public static final String HASH_LIST_ENTRY_NOT_FOUND = "hash-list-entry/not-found";
   /** {@code hash-list/limit-reached} (HTTP 409). */
   public static final String HASH_LIST_LIMIT_REACHED = "hash-list/limit-reached";
-  /** {@code hash-list/entry-limit-reached} (HTTP 409). */
-  public static final String HASH_LIST_ENTRY_LIMIT_REACHED = "hash-list/entry-limit-reached";
+  /** {@code hash-list-entry/limit-reached} (HTTP 409). */
+  public static final String HASH_LIST_ENTRY_LIMIT_REACHED = "hash-list-entry/limit-reached";
   /** {@code hash-list/asset-not-hashed} (HTTP 409). */
   public static final String HASH_LIST_ASSET_NOT_HASHED = "hash-list/asset-not-hashed";
   /** {@code policy/not-found} (HTTP 404). */
@@ -196,14 +186,10 @@ public final class ErrorCodes {
   public static final String UPLOAD_PRESET_DISABLED = "upload-preset/disabled";
   /** {@code upload-preset/token-required} (HTTP 401). */
   public static final String UPLOAD_PRESET_TOKEN_REQUIRED = "upload-preset/token-required";
-  /** {@code upload/remote-url-not-allowed} (HTTP 403). */
-  public static final String REMOTE_URL_NOT_ALLOWED = "upload/remote-url-not-allowed";
-  /** {@code upload/website-rate-limit-exceeded} (HTTP 429). */
-  public static final String WEBSITE_RATE_LIMIT_EXCEEDED = "upload/website-rate-limit-exceeded";
-  /** {@code upload-preset/content-type-not-allowed} (HTTP 415). */
-  public static final String UPLOAD_PRESET_CONTENT_TYPE_NOT_ALLOWED = "upload-preset/content-type-not-allowed";
-  /** {@code upload-preset/too-large} (HTTP 413). */
-  public static final String UPLOAD_PRESET_TOO_LARGE = "upload-preset/too-large";
+  /** {@code remote-url/not-allowed} (HTTP 403). */
+  public static final String REMOTE_URL_NOT_ALLOWED = "remote-url/not-allowed";
+  /** {@code upload/website-rate-limit-reached} (HTTP 429). */
+  public static final String WEBSITE_RATE_LIMIT_REACHED = "upload/website-rate-limit-reached";
   /** {@code upload-preset/daily-limit-reached} (HTTP 429). */
   public static final String UPLOAD_PRESET_DAILY_LIMIT_REACHED = "upload-preset/daily-limit-reached";
   /** {@code upload-preset/origin-not-allowed} (HTTP 403). */
@@ -216,10 +202,10 @@ public final class ErrorCodes {
   public static final String UPLOAD_TOKEN_EXPIRED = "upload-token/expired";
   /** {@code upload-token/used} (HTTP 409). */
   public static final String UPLOAD_TOKEN_USED = "upload-token/used";
-  /** {@code asset/invalid-remote-url} (HTTP 400). */
-  public static final String INVALID_REMOTE_URL = "asset/invalid-remote-url";
-  /** {@code asset/remote-url-unavailable} (HTTP 422). */
-  public static final String REMOTE_URL_UNAVAILABLE = "asset/remote-url-unavailable";
+  /** {@code remote-url/invalid} (HTTP 400). */
+  public static final String INVALID_REMOTE_URL = "remote-url/invalid";
+  /** {@code remote-url/unavailable} (HTTP 422). */
+  public static final String REMOTE_URL_UNAVAILABLE = "remote-url/unavailable";
   /** {@code appeal/not-found} (HTTP 404). */
   public static final String APPEAL_NOT_FOUND = "appeal/not-found";
   /** {@code appeal/judgment-not-found} (HTTP 404). */
@@ -234,8 +220,6 @@ public final class ErrorCodes {
   public static final String APPEAL_DECISION_CHANGED = "appeal/decision-changed";
   /** {@code appeal/invalid-action} (HTTP 400). */
   public static final String APPEAL_INVALID_ACTION = "appeal/invalid-action";
-  /** {@code appeal/safety-held} (HTTP 409). */
-  public static final String APPEAL_SAFETY_HELD = "appeal/safety-held";
   /** {@code appeal/content-unavailable} (HTTP 409). */
   public static final String APPEAL_CONTENT_UNAVAILABLE = "appeal/content-unavailable";
 
@@ -263,6 +247,14 @@ public final class ErrorCodes {
   public static final String SDK_INVALID_WEBHOOK_PAYLOAD = "sdk/invalid-webhook-payload";
 
   private static final Map<String, Integer> STATUSES = Map.ofEntries(
+      Map.entry(INVALID_VIEWER_CLAIMS, 400),
+      Map.entry(AGE_CONFIRMATION_REQUIRED, 403),
+      Map.entry(INVALID_VIEWER_REGION, 400),
+      Map.entry(VIEWER_REGION_REQUIRED, 403),
+      Map.entry(REGIONAL_EVIDENCE_REQUIRED, 403),
+      Map.entry(SIGNED_URL_EXPIRED, 403),
+      Map.entry(SIGNED_URL_INVALID, 403),
+      Map.entry(INVALID_REQUEST, 400),
       Map.entry(INVALID_TYPE, 400),
       Map.entry(TOO_SMALL, 400),
       Map.entry(TOO_BIG, 400),
@@ -271,7 +263,7 @@ public final class ErrorCodes {
       Map.entry(UNKNOWN_FIELD, 400),
       Map.entry(UNSUPPORTED_CONTENT_TYPE, 415),
       Map.entry(INVALID_FILTER, 400),
-      Map.entry(INVALID_ORDERING_FIELD, 400),
+      Map.entry(UNSUPPORTED_ORDERING_FIELD, 400),
       Map.entry(ROUTE_NOT_FOUND, 404),
       Map.entry(INTERNAL_ERROR, 500),
       Map.entry(UNAUTHENTICATED, 401),
@@ -280,26 +272,19 @@ public final class ErrorCodes {
       Map.entry(SEARCH_UNAVAILABLE, 503),
       Map.entry(INVALID_TRANSFORM, 400),
       Map.entry(INVALID_TRANSFORM_OPTIONS, 400),
-      Map.entry(REMOTE_URL_REDIRECT_LIMIT, 400),
-      Map.entry(COPYRIGHT_CONTENT_HELD, 409),
-      Map.entry(DOWNLOAD_PERMISSION_REQUIRED, 403),
+      Map.entry(REMOTE_URL_TOO_MANY_REDIRECTS, 400),
       Map.entry(INVALID_CURSOR, 400),
-      Map.entry(INVALID_VIEWER_CLAIMS, 400),
-      Map.entry(AGE_CONFIRMATION_REQUIRED, 403),
-      Map.entry(MISSING_TOKEN, 401),
+      Map.entry(MISSING_API_KEY, 401),
       Map.entry(INVALID_API_KEY, 401),
       Map.entry(API_KEY_PROJECT_MISMATCH, 403),
       Map.entry(API_KEY_NOT_ACCEPTED, 403),
       Map.entry(PERMISSION_DENIED, 403),
-      Map.entry(FILE_TOO_LARGE, 400),
-      Map.entry(MULTIPART_IMAGE_TOO_LARGE, 400),
-      Map.entry(IMAGE_EXCEEDED_MAX_DIMENSIONS, 400),
-      Map.entry(IMAGE_INVALID_INPUT, 422),
-      Map.entry(IMAGE_UNSUPPORTED_FORMAT, 422),
-      Map.entry(IMAGE_INPUT_LIMIT, 422),
-      Map.entry(UPLOAD_LIMIT_EXCEEDED, 403),
-      Map.entry(SPEND_LIMIT_REACHED, 402),
-      Map.entry(INVALID_UPLOAD_MIME_TYPE, 400),
+      Map.entry(UPLOAD_TOO_LARGE, 413),
+      Map.entry(INVALID_IMAGE, 422),
+      Map.entry(IMAGE_TOO_LARGE, 422),
+      Map.entry(FREE_UPLOADS_EXHAUSTED, 403),
+      Map.entry(UPLOADS_PAUSED, 402),
+      Map.entry(UNSUPPORTED_UPLOAD_TYPE, 415),
       Map.entry(INVALID_UPLOAD_PAYLOAD, 400),
       Map.entry(USE_UPLOAD_PART, 409),
       Map.entry(UPLOAD_NOT_OPEN, 409),
@@ -315,13 +300,13 @@ public final class ErrorCodes {
       Map.entry(ASSET_REVIEW_CHANGED, 409),
       Map.entry(ASSET_REVIEW_NOTE_REQUIRED, 400),
       Map.entry(ASSET_UPDATE_FAILED, 500),
-      Map.entry(ASSET_SAFETY_HELD, 423),
-      Map.entry(ASSET_NOT_RETRYABLE, 409),
-      Map.entry(ASSET_CONTENT_UNAVAILABLE, 409),
-      Map.entry(ASSET_CONTENT_PURGED, 409),
+      Map.entry(ASSET_HELD, 423),
       Map.entry(ASSET_PROCESSING, 409),
       Map.entry(ASSET_DECISION_NOT_ALLOWED, 409),
       Map.entry(ASSET_DECISION_UNCHANGED, 409),
+      Map.entry(ASSET_NOT_RETRYABLE, 409),
+      Map.entry(ASSET_CONTENT_UNAVAILABLE, 409),
+      Map.entry(ASSET_CONTENT_PURGED, 409),
       Map.entry(ASSET_NOT_DECIDED, 409),
       Map.entry(ASSET_POLICY_CHANGED, 409),
       Map.entry(ASSET_REVIEWED, 409),
@@ -333,11 +318,6 @@ public final class ErrorCodes {
       Map.entry(FOLDER_PARENT_CYCLE, 409),
       Map.entry(LENS_VERSION_CONFLICT, 409),
       Map.entry(LENS_IDENTIFIER_RESERVED, 409),
-      Map.entry(INVALID_VIEWER_REGION, 400),
-      Map.entry(VIEWER_REGION_REQUIRED, 403),
-      Map.entry(REGIONAL_EVIDENCE_REQUIRED, 403),
-      Map.entry(SIGNED_URL_EXPIRED, 403),
-      Map.entry(SIGNED_URL_INVALID, 403),
       Map.entry(HASH_LIST_NOT_FOUND, 404),
       Map.entry(HASH_LIST_ENTRY_NOT_FOUND, 404),
       Map.entry(HASH_LIST_LIMIT_REACHED, 409),
@@ -356,9 +336,7 @@ public final class ErrorCodes {
       Map.entry(UPLOAD_PRESET_DISABLED, 403),
       Map.entry(UPLOAD_PRESET_TOKEN_REQUIRED, 401),
       Map.entry(REMOTE_URL_NOT_ALLOWED, 403),
-      Map.entry(WEBSITE_RATE_LIMIT_EXCEEDED, 429),
-      Map.entry(UPLOAD_PRESET_CONTENT_TYPE_NOT_ALLOWED, 415),
-      Map.entry(UPLOAD_PRESET_TOO_LARGE, 413),
+      Map.entry(WEBSITE_RATE_LIMIT_REACHED, 429),
       Map.entry(UPLOAD_PRESET_DAILY_LIMIT_REACHED, 429),
       Map.entry(UPLOAD_PRESET_ORIGIN_NOT_ALLOWED, 403),
       Map.entry(UPLOAD_PRESET_FIELD_NOT_ALLOWED, 400),
@@ -374,7 +352,6 @@ public final class ErrorCodes {
       Map.entry(APPEAL_ALREADY_REVIEWED, 409),
       Map.entry(APPEAL_DECISION_CHANGED, 409),
       Map.entry(APPEAL_INVALID_ACTION, 400),
-      Map.entry(APPEAL_SAFETY_HELD, 409),
       Map.entry(APPEAL_CONTENT_UNAVAILABLE, 409));
 
   /**

@@ -83,14 +83,13 @@ public final class Calmmarket {
 
   /** Registered fact keys and labels from packages/shared/src/EventCatalog.ts shown in the activity log. */
   static final Map<String, String> FACT_LABELS = Map.of(
-      "asset-name", "Asset", "asset-type", "Asset type", "decided-by", "Decided by",
-      "previous-status", "Previous status", "moderation-status", "Moderation status",
+      "asset-name", "Asset", "asset-type", "Asset type", "previous-status", "Previous status", "moderation-status", "Moderation status",
       "flagged-categories", "Categories", "reviewer-name", "Reviewer", "note", "Note");
   /**
    * Events that can change a listing's decision. Each moderation status has its own event
    * ({@code asset.allowed}, {@code asset.limited}, {@code asset.age-restricted}, {@code
-   * asset.blocked}, {@code asset.purged}), sent for automated moderation and reviewers alike; its {@code decided-by} fact
-   * says which.
+   * asset.blocked}, {@code asset.purged}), sent for automated moderation and reviewers alike; its
+   * {@code actor} says which.
    */
   static final Map<String, String> EVENT_LABELS = Map.of(
       "asset.classified", "Classified", "asset.allowed", "Allowed", "asset.limited", "Limited",
@@ -685,7 +684,7 @@ public final class Calmmarket {
     photo.moderation = moderationStatus(asset);
     // Later applied reviews supersede earlier ones; the last applied one is in force.
     AssetReview review = moderation == null ? null
-        : moderation.manualReviews().stream().filter(AssetReview::appliedToAsset).reduce((first, second) -> second).orElse(null);
+        : moderation.manualReviews().stream().filter(AssetReview::applied).reduce((first, second) -> second).orElse(null);
     photo.reviewed = review != null;
     photo.report = report(asset);
     photo.reviewNote = review == null ? null : review.note();
@@ -784,7 +783,7 @@ public final class Calmmarket {
 
   /**
    * Takes the listing down at once, then removes the stored content of every photo and its OCR
-   * text with {@code assets.deleteContent}. The asset records and their reports stay for audit,
+   * text with {@code assets.removeContent}. The asset records and their reports stay for audit,
    * and the CDN stops serving the photos. Removal that fails can be retried; content under a
    * safety hold cannot be removed and is not retried.
    */
@@ -808,10 +807,10 @@ public final class Calmmarket {
         for (String assetId : pending) {
           String outcome;
           try {
-            Asset asset = backend.contentRemoval(assetId).assets.deleteContent(new AssetId(assetId));
+            Asset asset = backend.contentRemoval(assetId).assets.removeContent(new AssetId(assetId));
             outcome = asset.content() != null && asset.content().status() == AssetContentStatus.REMOVED ? "removed" : "unconfirmed";
           } catch (CalmLensException error) {
-            outcome = error.isNotFound() ? "removed" : ErrorCodes.ASSET_SAFETY_HELD.equals(error.getCode()) ? "held" : "failed";
+            outcome = error.isNotFound() ? "removed" : ErrorCodes.ASSET_HELD.equals(error.getCode()) ? "held" : "failed";
             if (outcome.equals("failed")) log("Could not remove photo content", error);
           }
           switch (outcome) {

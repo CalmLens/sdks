@@ -33,19 +33,20 @@ import com.calmlens.CalmLensServerClient;
 import com.calmlens.Models.*;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 
 try (var client = CalmLensServerClient.builder(System.getenv("CALMLENS_API_KEY"), System.getenv("CALMLENS_PROJECT_ID")).build()) {
   Asset asset = client.text.classify("Hello world");
   if (asset.classification().moderation().status() == AssetModerationStatus.ALLOWED) System.out.println(asset.id());
 
   Asset queued = client.assets.create(new SubmitAsset("photo.jpg", Content.file(Path.of("photo.jpg"), "image/jpeg"))
-      .externalId("post-42").visibility(Visibility.PRIVATE));
+      .externalId("post-42").tags(List.of("posts")).visibility(Visibility.PRIVATE));
   Asset decided = client.assets.waitForDecision(new WaitForDecision(queued.id()).timeout(Duration.ofSeconds(30)));
   client.assets.update(new UpdateAsset(decided.id()).description(Patch.clear()));
 }
 ```
 
-`assets.create` queues processing; `assets.classify` and `text.classify` wait for the decision. Webhooks report queued decisions without polling.
+`assets.create` queues processing; `assets.classify` and `text.classify` wait for the decision. `waitForDecision` returns once the asset is settled: its `classification().status()` is `COMPLETED` or `FAILED`. Webhooks report queued decisions without polling.
 
 Act on `asset.classification().moderation().status()`:
 

@@ -68,9 +68,9 @@ import java.util.function.LongSupplier;
  * retries, reads and uploads are retried on HTTP 429, 500, 502, 503 and 504 and on network failures
  * (without waiting), and each attempt takes the next queued answer.
  *
- * <p>{@code assets.waitForDecision} retrieves the asset until its {@code
- * classification.moderation.status} is no longer {@code pending} or its classification failed.
- * Its waits are skipped but still count towards its timeout, so a pending asset times out at once.
+ * <p>{@code assets.waitForDecision} retrieves the asset until it is settled, its {@code
+ * classification.status} {@code completed} or {@code failed}. Its waits are skipped but still
+ * count towards its timeout, so an asset still processing times out at once.
  */
 public final class MockCalmLensServerClient implements AutoCloseable {
   /**
@@ -630,8 +630,8 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    * age-restricted}, {@code blocked} or {@code purged}): it records a manual review and adds the
    * matching {@code asset.<status>} event with the asset's snapshot, the event catalog's severity
    * ({@code low} for {@code allowed} and {@code limited}, {@code high} otherwise) and a {@code
-   * decided-by: reviewer} fact. {@code purged} removes the content with reason {@code requested},
-   * adding an {@code asset.content-removed} event first, as the API does. The moderation report
+   * user} actor. {@code purged} removes the content with reason {@code requested}, adding an
+   * {@code asset.content-removed} event by the same actor first, as the API does. The moderation report
    * stays as the pipeline left it.
    *
    * @param assetId a stored asset
@@ -652,15 +652,17 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     review.addProperty("id", api.createId("rev"));
     review.addProperty("decision", outcome.value());
     review.add("note", null);
+    // The review is the mock API key's, which has no ID.
+    review.add("decidedBy", MockApi.mockApiKeyDecider());
     review.addProperty("reviewedAt", now);
-    review.addProperty("appliedToAsset", true);
+    review.addProperty("applied", true);
     asset.getAsJsonObject("classification").getAsJsonObject("moderation").getAsJsonArray("manualReviews").add(review);
     String name = MockApi.str(asset, "name"), type = MockApi.str(asset, "type");
     if (outcome == Outcome.PURGED)
-      api.recordEvent("asset.content-removed", "low", asset, List.of(new Models.EventFact("asset-name", name, "https://calmlens.com/go/asset/" + assetId), new Models.EventFact("asset-type", type, null)));
+      api.recordEvent("asset.content-removed", "low", MockApi.USER_ACTOR, asset, List.of(new Models.EventFact("asset-name", name, "https://calmlens.com/go/asset/" + assetId), new Models.EventFact("asset-type", type, null)));
     // Like the event catalog: allowing and limiting are low severity.
-    api.recordEvent("asset." + outcome.value(), outcome == Outcome.ALLOWED || outcome == Outcome.LIMITED ? "low" : "high", asset, java.util.Arrays.asList(
-        new Models.EventFact("decided-by", "reviewer", null), new Models.EventFact("asset-type", type, null),
+    api.recordEvent("asset." + outcome.value(), outcome == Outcome.ALLOWED || outcome == Outcome.LIMITED ? "low" : "high", MockApi.USER_ACTOR, asset, java.util.Arrays.asList(
+        new Models.EventFact("asset-type", type, null),
         new Models.EventFact("asset-name", name, "https://calmlens.com/go/asset/" + assetId), new Models.EventFact("note", null, null)));
     return Json.GSON.fromJson(asset, Models.Asset.class);
   }
@@ -705,18 +707,36 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    * cursors taken earlier. When {@code assetId} names a stored asset, the event carries a snapshot
    * of its status, as the API's events do, with the moderation status an {@code asset.<status>}
    * event announces. An event about an asset takes that asset's next {@code assetSequence}, like
-   * the API's; one without an asset has none.
+   * the API's; one without an asset has none. Its actor is the mock's API key, which has no ID.
    *
    * @param type a registered event type, such as {@code asset.blocked}
    * @param assetId the asset the event is about, or null
    * @param facts the event's registered facts
    * @return the event
    */
-  public synchronized Models.Event enqueueEvent(String type, String assetId, Models.EventFact... facts) {
+  public Models.Event enqueueEvent(String type, String assetId, Models.EventFact... facts) {
+    return enqueueEvent(type, assetId, new Models.EventActor("api-key", null), facts);
+  }
+
+  /**
+   * Adds an event that {@code actor} caused, like {@link #enqueueEvent(String, String,
+   * Models.EventFact...)}.
+   *
+   * @param type a registered event type, such as {@code asset.blocked}
+   * @param assetId the asset the event is about, or null
+   * @param actor who caused it, such as {@code new EventActor("user", null)}
+   * @param facts the event's registered facts
+   * @return the event
+   */
+  public synchronized Models.Event enqueueEvent(String type, String assetId, Models.EventActor actor, Models.EventFact... facts) {
     long now = api.now();
     JsonObject event = new JsonObject();
     event.addProperty("id", api.createId("evt"));
     event.addProperty("projectId", projectId);
+    JsonObject actorJson = new JsonObject();
+    actorJson.addProperty("type", Objects.requireNonNull(actor, "actor").type());
+    actorJson.addProperty("id", actor.id());
+    event.add("actor", actorJson);
     event.addProperty("type", Objects.requireNonNull(type, "type"));
     event.addProperty("severity", "low");
     event.addProperty("title", type);

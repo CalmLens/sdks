@@ -84,7 +84,7 @@ final class Demo implements Calmmarket.Backend {
       // A reviewer's decision replaces the automated one.
       Map<String, Object> moderation = moderation(asset);
       moderation.put("status", "blocked");
-      moderation.put("manualReviews", java.util.List.of(Map.of("id", id("rev"), "decision", "blocked", "note", "Simulated portal decision", "reviewedAt", System.currentTimeMillis(), "appliedToAsset", true)));
+      moderation.put("manualReviews", java.util.List.of(Map.of("id", id("rev"), "decision", "blocked", "note", "Simulated portal decision", "decidedBy", Map.of("type", "user", "id", "demo-reviewer"), "reviewedAt", System.currentTimeMillis(), "applied", true)));
     }
     mock.enqueue(200, asset);
 
@@ -117,6 +117,7 @@ final class Demo implements Calmmarket.Backend {
     event.put("type", "asset.blocked");
     event.put("projectId", "demo-project");
     event.put("createdAt", System.currentTimeMillis());
+    event.put("actor", Map.of("type", "user", "id", "demo-reviewer"));
     event.put("severity", "high");
     event.put("title", "Asset blocked");
     event.put("assetId", photo.assetId);
@@ -127,8 +128,6 @@ final class Demo implements Calmmarket.Backend {
     event.put("facts", List.of(
         Map.of("key", "asset-name", "value", photo.name),
         Map.of("key", "asset-type", "value", "image"),
-        Map.of("key", "decided-by", "value", "reviewer"),
-        Map.of("key", "reviewer-user-id", "value", "demo-reviewer"),
         Map.of("key", "reviewer-name", "value", "Demo reviewer"),
         Map.of("key", "note", "value", "Simulated portal decision")));
     return mock().enqueueEvents("demo-" + id, false, event).client;
@@ -189,7 +188,7 @@ final class Demo implements Calmmarket.Backend {
     // The simulated policy acts on every overridden category, as a real report's policy decision names them.
     List<String> flagged = overrides.keySet().stream().sorted().toList();
     return Map.of("raw", Map.of("categories", categories), "categories", Map.of(),
-        "source", "policy", "automatedAction", flagged.isEmpty() ? "allow" : "block",
+        "source", "policy", "automatedStatus", flagged.isEmpty() ? "allowed" : "blocked",
         "flaggedCategories", flagged, "regions", List.of(), "explanationComplete", true);
   }
 

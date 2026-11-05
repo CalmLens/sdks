@@ -154,8 +154,10 @@ class AutomaticMultipartTest {
         .transport(scripted(sent, (request, index) -> uploadResponse(request))).build();
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> client.assets.create(
         new Models.SubmitAsset("clip.mp4", Models.Content.bytes(fileOf(9 * MIB), "video/mp4")), new RequestOptions().idempotencyKey("k".repeat(241)))).getCode());
-    assertEquals(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, assertThrows(CalmLensException.class, () -> client.assets.create(
-        new Models.SubmitAsset("huge.png", Models.Content.bytes(fileOf(21 * MIB), "image/png")))).getCode());
+    CalmLensException tooLarge = assertThrows(CalmLensException.class, () -> client.assets.create(
+        new Models.SubmitAsset("huge.png", Models.Content.bytes(fileOf(21 * MIB), "image/png"))));
+    assertEquals(ErrorCodes.UPLOAD_TOO_LARGE, tooLarge.getCode());
+    assertEquals(Map.of("limitBytes", 20L * MIB, "source", "plan"), tooLarge.getDetails());
     assertEquals(List.of(), sent);
     // An image over the one-request limit goes in parts.
     client.assets.create(new Models.SubmitAsset("large.png", Models.Content.bytes(fileOf(12 * MIB), "image/png")));

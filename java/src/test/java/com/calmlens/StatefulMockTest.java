@@ -26,6 +26,23 @@ class StatefulMockTest {
         .processingOptions(new Models.ProcessingOptions().keepContentAfterProcessing(true));
   }
 
+  @Test void uploadsSendTheirTagsAndTheAssetKeepsThem() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    Models.Asset uploaded = mock.client.assets.classify(kept("photo.png").tags(List.of("catalogue", "backpacks")));
+    assertEquals(List.of("catalogue", "backpacks"), uploaded.tags());
+    // A raw upload carries its tags as a JSON array in the query, like metadata.
+    assertEquals(JsonParser.parseString("[\"catalogue\",\"backpacks\"]"), JsonParser.parseString(mock.requests().get(0).query().get("tags")));
+    Models.Asset text = mock.client.text.classify(new Models.ClassifyText("hello").tags(List.of("comments")));
+    assertEquals(List.of("comments"), text.tags());
+    Models.Asset linked = mock.client.assets.create(new Models.SubmitAsset().name("site").url("https://example.com").tags(List.of("links")));
+    assertEquals(List.of("links"), linked.tags());
+    JsonObject body = JsonParser.parseString(new String(mock.requests().get(2).body(), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+    assertEquals(JsonParser.parseString("[\"links\"]"), body.get("tags"));
+    assertEquals(List.of("catalogue", "backpacks"), mock.client.assets.retrieve(new Models.AssetId(uploaded.id())).tags());
+    // Like the API, the processing options an asset was uploaded with are not returned.
+    mock.withStorage(storage -> assertFalse(storage.assets.get(uploaded.id()).has("processingOptions")));
+  }
+
   @Test void explainCompletesTheEvidenceAndRerunModeratesAgain() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().moderate(input -> MockDecision.of(input.queued() ? "pending" : "blocked")));
     Models.Asset asset = mock.client.assets.classify(kept("photo.png"));
@@ -118,7 +135,7 @@ class StatefulMockTest {
     Models.HashListEntry entry = mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).assetId(hashed.id()).label("Report 1"));
     assertEquals(hash, entry.hash());
     assertEquals(80, entry.quality());
-    assertEquals(hashed.id(), entry.sourceAssetId());
+    assertEquals(hashed.id(), entry.assetId());
     assertEquals(entry.id(), mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).hash(hash.toUpperCase())).id());
     assertEquals(ErrorCodes.HASH_LIST_ASSET_NOT_HASHED, assertThrows(ApiException.class,
         () -> mock.client.hashLists.addEntry(new Models.AddHashListEntry(list.id()).assetId(unhashed.id()))).getCode());
@@ -137,6 +154,15 @@ class StatefulMockTest {
     assertEquals(List.of(), mock.client.hashLists.list().items());
   }
 
+  /** A schema refusal: {@code validation/invalid-request} whose one issue names the field and its issue code. */
+  private static void assertIssue(JsonObject refused, String path, String code) {
+    assertEquals(ErrorCodes.INVALID_REQUEST, refused.get("code").getAsString(), path);
+    com.google.gson.JsonArray issues = refused.getAsJsonObject("details").getAsJsonArray("issues");
+    assertEquals(1, issues.size(), path);
+    assertEquals(path, issues.get(0).getAsJsonObject().get("path").getAsString());
+    assertEquals(code, issues.get(0).getAsJsonObject().get("code").getAsString(), path);
+  }
+
   /** A request sent straight to the in-memory API, as a client other than this SDK's could send it. */
   private static JsonObject raw(MockApi api, String method, String path, java.util.Map<String, String> query, String upload, String json) throws Exception {
     java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
@@ -153,9 +179,10 @@ class StatefulMockTest {
     MockApi api = new MockApi("project-1", "https://api.calmlens.com/v1", "https://cdn.calmlens.com/v1", deterministic());
     for (String type : List.of("application/zip", "application/octet-stream", "font/woff2")) {
       JsonObject refused = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("name", "x", "contentType", type), "content", null);
-      assertEquals(400, refused.get("status").getAsInt(), type);
-      assertEquals(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, refused.get("code").getAsString(), type);
+      assertEquals(415, refused.get("status").getAsInt(), type);
+      assertEquals(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, refused.get("code").getAsString(), type);
       assertEquals(type, refused.getAsJsonObject("details").get("mimeType").getAsString(), type);
+      assertEquals("calmlens", refused.getAsJsonObject("details").get("source").getAsString(), type);
     }
     assertEquals(200, raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("name", "x", "contentType", "TEXT/Markdown"), "content", null)
         .get("status").getAsInt());
@@ -164,25 +191,59 @@ class StatefulMockTest {
         .get("status").getAsInt());
 
     JsonObject dict = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of(), null, "{\"name\":\"x\",\"url\":\"https://example.com/\",\"metadata\":{\"a\":1}}");
-    assertEquals("validation/invalid-type", dict.get("code").getAsString());
-    assertEquals("metadata", dict.getAsJsonObject("details").get("path").getAsString());
+    assertIssue(dict, "metadata", "validation/invalid-type");
     JsonObject query = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("name", "x", "contentType", "text/plain", "metadata", "[{\"id\":\"a\"}]"), "content", null);
-    assertEquals("validation/invalid-value", query.get("code").getAsString());
-    assertEquals("metadata.0.value", query.getAsJsonObject("details").get("path").getAsString());
+    assertIssue(query, "metadata.0.value", "validation/invalid-value");
     // Schema checks come before the asset lookup.
     JsonObject update = raw(api, "PATCH", "/assets/asset_missing", java.util.Map.of(), null, "{\"metadata\":[{\"id\":7,\"value\":1}]}");
     assertEquals(400, update.get("status").getAsInt());
-    assertEquals("metadata.0.id", update.getAsJsonObject("details").get("path").getAsString());
+    assertIssue(update, "metadata.0.id", "validation/invalid-type");
     JsonObject name = raw(api, "PATCH", "/assets/asset_missing", java.util.Map.of(), null, "{\"name\":null}");
-    assertEquals("validation/invalid-type", name.get("code").getAsString());
-    assertEquals("name", name.getAsJsonObject("details").get("path").getAsString());
+    assertIssue(name, "name", "validation/invalid-type");
     JsonObject signed = raw(api, "POST", "/assets/asset_missing/signed-url", java.util.Map.of(), null, "{\"resource\":null}");
-    assertEquals("validation/invalid-value", signed.get("code").getAsString());
-    assertEquals("resource", signed.getAsJsonObject("details").get("path").getAsString());
+    assertIssue(signed, "resource", "validation/invalid-value");
     // A resource outside the signed ones is refused before the asset lookup too.
     JsonObject placeholder = raw(api, "POST", "/assets/asset_missing/signed-url", java.util.Map.of(), null, "{\"resource\":\"placeholder\"}");
-    assertEquals("validation/invalid-value", placeholder.get("code").getAsString());
-    assertEquals("resource", placeholder.getAsJsonObject("details").get("path").getAsString());
+    assertIssue(placeholder, "resource", "validation/invalid-value");
+  }
+
+  /** Pages of a filtered feed keep their filters: a cursor sent without them would be refused. */
+  @Test void eventPagesKeepTheirFiltersAndMalformedFiltersAreRefused() throws Exception {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    Models.ListEvents uploads = new Models.ListEvents().types(List.of("asset.uploaded", "asset.deleted")).pageSize(1);
+    String start = mock.client.events.list(uploads).nextCursor();
+    Models.Asset first = mock.client.assets.classify(kept("first.png"));
+    Models.Asset second = mock.client.assets.classify(kept("second.png"));
+    mock.client.assets.delete(new Models.AssetId(first.id()));
+    List<String> seen = new java.util.ArrayList<>();
+    for (Models.EventsPage page : mock.client.events.pages(uploads.cursor(start)))
+      page.items().forEach(event -> seen.add(event.type() + " " + event.assetId()));
+    assertEquals(List.of("asset.uploaded " + first.id(), "asset.uploaded " + second.id(), "asset.deleted " + first.id()), seen);
+
+    MockApi api = new MockApi("project-1", "https://api.calmlens.com/v1", "https://cdn.calmlens.com/v1", deterministic());
+    for (String types : List.of("", "asset.uploaded,", "Asset.Uploaded", "uploaded"))
+      assertIssue(raw(api, "GET", "/projects/project-1/events", java.util.Map.of("types", types), null, null), "types", "validation/invalid-value");
+    assertIssue(raw(api, "GET", "/projects/project-1/events", java.util.Map.of("assetId", "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P"), null, null),
+        "assetId", "validation/invalid-format");
+  }
+
+  /** The client sends the types as one comma-separated value, and none when the list is empty. */
+  @Test void eventTypesAreSentAsOneCommaSeparatedValue() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    mock.client.events.list(new Models.ListEvents().types(List.of("asset.blocked", "asset.purged")));
+    mock.client.events.list(new Models.ListEvents().types(List.of()));
+    assertEquals("asset.blocked,asset.purged", mock.requests().get(0).query().get("types"));
+    assertFalse(mock.requests().get(1).query().containsKey("types"));
+  }
+
+  @Test void enqueuedEventsAreTheApiKeysUnlessGivenAnActor() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    String start = mock.client.events.list(new Models.ListEvents()).nextCursor();
+    Models.EventActor reviewer = new Models.EventActor("user", "user_5Rt8Xm3Lq9Vk2Wb7Np4C");
+    mock.enqueueEvent("asset.allowed", null);
+    mock.enqueueEvent("asset.blocked", null, reviewer);
+    assertEquals(List.of(new Models.EventActor("api-key", null), reviewer),
+        mock.client.events.list(new Models.ListEvents().cursor(start)).items().stream().map(Models.Event::actor).toList());
   }
 
   /** No shared scenario can place a safety hold, so this one is placed in storage. */
@@ -203,8 +264,9 @@ class StatefulMockTest {
             .getAsJsonObject().get("code").getAsString(), resource);
       }
     }
-    assertEquals(ErrorCodes.ASSET_SAFETY_HELD, assertThrows(ApiException.class,
-        () -> mock.client.assets.listTimeline(new Models.ListTimeline(asset.id()))).getCode());
+    ApiException held = assertThrows(ApiException.class, () -> mock.client.assets.listTimeline(new Models.ListTimeline(asset.id())));
+    assertEquals(ErrorCodes.ASSET_HELD, held.getCode());
+    assertEquals(java.util.Map.of("hold", "safety"), held.getDetails());
     Models.Asset decided = mock.decide(asset.id(), Outcome.LIMITED);
     assertNull(decided.content().rendered());
     assertNull(decided.content().preview());

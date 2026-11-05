@@ -22,7 +22,7 @@ class MockClientTest {
   }
 
   @Test void queuedErrorsUseTheApiStatusAndBodyShape() {
-    for (String code : List.of(ErrorCodes.ASSET_NOT_FOUND, ErrorCodes.ASSET_SAFETY_HELD, ErrorCodes.INVALID_API_KEY, ErrorCodes.DUPLICATE_EXTERNAL_ID)) {
+    for (String code : List.of(ErrorCodes.ASSET_NOT_FOUND, ErrorCodes.ASSET_HELD, ErrorCodes.INVALID_API_KEY, ErrorCodes.DUPLICATE_EXTERNAL_ID)) {
       MockCalmLensServerClient mock = new MockCalmLensServerClient().enqueueError(code);
       ApiException error = assertThrows(ApiException.class, () -> mock.client.assets.retrieve(new Models.AssetId("a")));
       assertEquals(code, error.getCode());
@@ -34,12 +34,12 @@ class MockClientTest {
   }
 
   @Test void waitForDecisionReadsQueuedAssetsAndTimesOutWithoutWaiting() {
-    MockCalmLensServerClient decided = new MockCalmLensServerClient().enqueue("GET", "/assets/asset-1", 200, Fixtures.asset("asset-1", "processing", "pending"))
+    // A reviewer's decision on an asset still processing doesn't settle it; failing does.
+    MockCalmLensServerClient decided = new MockCalmLensServerClient().enqueue("GET", "/assets/asset-1", 200, Fixtures.asset("asset-1", "processing", "blocked"))
         .enqueue("GET", "/assets/asset-1", 200, Fixtures.asset("asset-1", "failed", "pending"));
     Models.Asset asset = decided.client.assets.waitForDecision(new Models.WaitForDecision("asset-1"));
     assertEquals("asset-1", asset.id());
     assertSame(Models.AssetClassificationStatus.FAILED, asset.classification().status());
-    assertSame(Models.AssetModerationStatus.PENDING, asset.classification().moderation().status());
     assertEquals(2, decided.requests().size());
     assertEquals(0, decided.remainingResponses());
 
@@ -157,11 +157,11 @@ class MockClientTest {
         faces.classification().faceDetection().faces());
   }
 
-  @Test void deleteContentThenDeleteAsset() {
+  @Test void removeContentThenDeleteAsset() {
     MockCalmLensServerClient mock = new MockCalmLensServerClient()
         .enqueue(200, removedContent(Fixtures.asset("asset 1", "completed", "allowed")))
         .enqueue(200, Map.of());
-    Models.Asset removed = mock.client.assets.deleteContent(new Models.AssetId("asset 1"));
+    Models.Asset removed = mock.client.assets.removeContent(new Models.AssetId("asset 1"));
     assertSame(Models.AssetContentStatus.REMOVED, removed.content().status());
     assertEquals("requested", removed.content().removalReason());
     assertEquals(java.time.Instant.ofEpochMilli(1700000000000L), removed.content().updatedAt());

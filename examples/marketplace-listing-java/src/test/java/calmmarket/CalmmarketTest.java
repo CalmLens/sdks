@@ -266,7 +266,7 @@ class CalmmarketTest {
   void flaggedCategoriesComeFromThePolicyDecision() {
     Map<String, Object> flagged = new LinkedHashMap<>(report(Map.of("criminal-activity", evaluated(0.95), "profanity", evaluated(0.4))));
     flagged.put("source", "policy");
-    flagged.put("automatedAction", "block");
+    flagged.put("automatedStatus", "blocked");
     flagged.put("flaggedCategories", List.of("criminal-activity"));
     assertEquals(List.of("criminal-activity"), Calmmarket.flaggedCategories(model(flagged, AssetModeration.class)));
     assertEquals(List.of(), Calmmarket.flaggedCategories(model(report(Map.of("violence", evaluated(0.9))), AssetModeration.class)), "no policy decision, no flagged categories");
@@ -411,7 +411,7 @@ class CalmmarketTest {
     for (int i = 1; i <= 3; i++) mock.enqueue(200, photo(listing, i, "allowed", CLEAN));
     get(app, "/");
     int before = mock.requests().size();
-    mock.enqueue(200, removed("photo-1")).enqueueTimeout().enqueueError(ErrorCodes.ASSET_SAFETY_HELD);
+    mock.enqueue(200, removed("photo-1")).enqueueTimeout().enqueueError(ErrorCodes.ASSET_HELD);
     Calmmarket.Response response = post(app, "/listings/" + listing.id + "/withdraw", "csrf=" + app.csrf);
     assertEquals("/listings/" + listing.id + "?notice=withdrawn-pending", response.headers().get("location"));
     assertTrue(listing.removalPending());
@@ -530,7 +530,7 @@ class CalmmarketTest {
     assertEquals("review", review.kind());
     List<String> values = review.facts().stream().map(Calmmarket.FactRow::value).toList();
     assertTrue(values.contains("Demo reviewer"));
-    assertFalse(values.contains("demo-reviewer"), "the hidden reviewer ID is not shown");
+    assertFalse(values.contains("demo-reviewer"), "the actor's user ID is not shown");
     assertEquals(409, post(app, "/demo/review", "csrf=" + app.csrf + "&listing=" + listing.id).status());
   }
 
@@ -760,7 +760,8 @@ class CalmmarketTest {
     assertNull(mock.requests().get(3).query().get("cursor"));
 
     Map<String, Object> blocking = Map.of("id", "event-1", "type", "asset.blocked", "assetId", "description-1",
-        "facts", List.of(Map.of("key", "reviewer-user-id", "value", "user-9"), Map.of("key", "reviewer-name", "value", "Sam"),
+        "actor", Map.of("type", "user", "id", "user-9"),
+        "facts", List.of(Map.of("key", "reviewer-name", "value", "Sam"),
             Map.of("key", "note", "value", "Counterfeit", "url", "javascript:alert(1)")));
     Map<String, Object> other = Map.of("id", "event-0", "type", "asset.blocked", "assetId", "someone-else", "facts", List.of());
     // First attempt: retrieval fails, so the cursor must not advance.
@@ -850,7 +851,7 @@ class CalmmarketTest {
     live(app, 1);
     Calmmarket.Listing listing = app.listings().get(0);
     // The event snapshot says allowed, but the API says blocked: the API wins.
-    String body = event("event-1", "asset.blocked", "photo-1", "[{\"key\":\"decided-by\",\"value\":\"automated\"}]");
+    String body = event("event-1", "asset.blocked", "photo-1", "[{\"key\":\"flagged-categories\",\"value\":[\"violence\"]}]");
     mock.enqueueTimeout();
     assertEquals(502, signedWebhook(app, body).status(), "a failed refresh asks CalmLens to retry");
     mock.enqueue(200, photo(listing, 1, "blocked", report(Map.of("violence", evaluated(0.9)))));
@@ -871,7 +872,7 @@ class CalmmarketTest {
     demo(app, "allowed", "visual-blocked");
     Calmmarket.Listing listing = app.listings().get(0);
     expire(listing);
-    assertEquals(204, signedWebhook(app, event("event-1", "asset.blocked", listing.photos.get(0).assetId, "[{\"key\":\"decided-by\",\"value\":\"automated\"}]")).status());
+    assertEquals(204, signedWebhook(app, event("event-1", "asset.blocked", listing.photos.get(0).assetId, "[{\"key\":\"flagged-categories\",\"value\":[\"violence\"]}]")).status());
     assertEquals(Calmmarket.Driver.AUTOMATED, listing.photos.get(0).driver());
   }
 

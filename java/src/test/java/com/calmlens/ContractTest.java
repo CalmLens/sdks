@@ -498,8 +498,8 @@ class ContractTest {
       tests.add(DynamicTest.dynamicTest(type, () -> {
         CalmLensException error = assertThrows(CalmLensException.class, () -> refusing().assets.create(
             new Models.SubmitAsset("x", new Models.Content().mimeType(type).base64("aGVsbG8="))));
-        assertEquals(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, error.getCode());
-        assertEquals(Map.of("mimeType", type), error.getDetails());
+        assertEquals(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, error.getCode());
+        assertEquals(Map.of("mimeType", type, "source", "calmlens"), error.getDetails());
       }));
     }
     return tests.stream();
@@ -561,6 +561,26 @@ class ContractTest {
 
   /** A missing value compares as JSON null; Gson compares numbers by value. */
   static JsonElement normalize(JsonElement value) { return value == null ? JsonNull.INSTANCE : value; }
+
+  /**
+   * Compares {@code actual} with {@code expected} where an object lists only the members to compare
+   * and an array must have as many items, each compared the same way.
+   */
+  static void assertListed(JsonElement expected, JsonElement actual, String label) {
+    JsonElement value = normalize(actual);
+    if (expected.isJsonObject()) {
+      assertTrue(value.isJsonObject(), label + ": expected an object, got " + value);
+      for (Map.Entry<String, JsonElement> member : expected.getAsJsonObject().entrySet())
+        assertListed(member.getValue(), value.getAsJsonObject().get(member.getKey()), label + "." + member.getKey());
+    } else if (expected.isJsonArray()) {
+      assertTrue(value.isJsonArray(), label + ": expected an array, got " + value);
+      assertEquals(expected.getAsJsonArray().size(), value.getAsJsonArray().size(), label + ".length");
+      for (int i = 0; i < expected.getAsJsonArray().size(); i++)
+        assertListed(expected.getAsJsonArray().get(i), value.getAsJsonArray().get(i), label + "." + i);
+    } else {
+      assertEquals(normalize(expected), value, label);
+    }
+  }
 
   private static Outcome outcome(String value) {
     return Arrays.stream(Outcome.values()).filter(outcome -> outcome.value().equals(value)).findFirst().orElseThrow();
@@ -658,7 +678,10 @@ class ContractTest {
         List<Models.EventFact> facts = new ArrayList<>();
         for (JsonElement fact : args.getAsJsonArray("facts")) facts.add(Json.GSON.fromJson(fact, Models.EventFact.class));
         String assetId = args.has("assetId") && !args.get("assetId").isJsonNull() ? args.get("assetId").getAsString() : null;
-        return tree(mock.enqueueEvent(args.get("type").getAsString(), assetId, facts.toArray(Models.EventFact[]::new)));
+        Models.EventFact[] list = facts.toArray(Models.EventFact[]::new);
+        return tree(args.has("actor")
+            ? mock.enqueueEvent(args.get("type").getAsString(), assetId, Json.GSON.fromJson(args.get("actor"), Models.EventActor.class), list)
+            : mock.enqueueEvent(args.get("type").getAsString(), assetId, list));
       }
       case "mock.grant":
         mock.setApiKeyGrants(grants(args.getAsJsonArray("grants")));
@@ -726,11 +749,12 @@ class ContractTest {
         assertInstanceOf(ApiException.class, error, label);
         assertEquals(Optional.of(Duration.ofSeconds(wanted.get("retryAfter").getAsLong())), ((ApiException) error).getRetryAfter(), label + ": retryAfter");
       }
-      // `details` lists only the keys to compare.
+      // `details` lists only the keys to compare, and objects in them (such as each of a
+      // validation error's `issues`) only the fields to compare.
       if (wanted.has("details")) {
         JsonObject details = Json.GSON.toJsonTree(error.getDetails()).getAsJsonObject();
         for (Map.Entry<String, JsonElement> detail : wanted.getAsJsonObject("details").entrySet())
-          assertEquals(normalize(resolve(detail.getValue(), saved)), normalize(details.get(detail.getKey())), label + ": details." + detail.getKey());
+          assertListed(resolve(detail.getValue(), saved), details.get(detail.getKey()), label + ": details." + detail.getKey());
       }
       return;
     }

@@ -121,7 +121,7 @@ class ClientTest {
         new Models.SubmitAsset().name("clip.mp4").part(Models.Content.bytes(new byte[mib], "video/mp4").partNumber(1).isFinal(false))));
     refusals.put(ErrorCodes.INVALID_UPLOAD_PAYLOAD + " later", () -> client.assets.uploadPart(
         new Models.UploadPart("asset-1", Models.Content.bytes(new byte[mib], "video/mp4").partNumber(2).isFinal(false))));
-    refusals.put(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, () -> client.assets.create(
+    refusals.put(ErrorCodes.UPLOAD_TOO_LARGE, () -> client.assets.create(
         new Models.SubmitAsset().name("large.png").part(Models.Content.bytes(new byte[21 * mib], "image/png").partNumber(1).isFinal(false))));
     refusals.forEach((name, call) -> {
       CalmLensException error = assertThrows(CalmLensException.class, call, name);
@@ -138,7 +138,8 @@ class ClientTest {
       // The stream is never read: its declared size is refused first.
       CalmLensException error = assertThrows(CalmLensException.class, () -> client.assets.create(
           new Models.SubmitAsset("big", Models.Content.stream(new java.io.ByteArrayInputStream(new byte[0]), size, type))), type);
-      assertEquals(ErrorCodes.FILE_TOO_LARGE, error.getCode(), type);
+      assertEquals(ErrorCodes.UPLOAD_TOO_LARGE, error.getCode(), type);
+      assertEquals(Map.of("limitBytes", size - 1, "source", "plan"), error.getDetails(), type);
     });
   }
 

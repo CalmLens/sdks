@@ -170,7 +170,7 @@ public final class MockDecision {
     }
     JsonObject report = new JsonObject();
     report.addProperty("source", "policy");
-    report.addProperty("automatedAction", STATUS_ACTION.get(status));
+    report.addProperty("automatedStatus", status.value());
     report.add("regions", new JsonArray());
     // The mock analyses no audio or video, so a decision has no findings timeline.
     report.add("timeline", JsonNull.INSTANCE);

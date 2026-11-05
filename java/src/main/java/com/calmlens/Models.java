@@ -91,16 +91,18 @@ public final class Models {
    */
   @JsonAdapter(AssetClassificationStatus.Adapter.class)
   public static final class AssetClassificationStatus {
-    /** The content is still arriving, such as the parts of a multipart upload. */
-    public static final AssetClassificationStatus PENDING = new AssetClassificationStatus("pending");
-    /** Queued or being classified. */
+    /**
+     * Waiting for its content, such as a multipart upload still receiving parts, or for its turn.
+     */
+    public static final AssetClassificationStatus QUEUED = new AssetClassificationStatus("queued");
+    /** Being classified. */
     public static final AssetClassificationStatus PROCESSING = new AssetClassificationStatus("processing");
     /** Processing finished; see {@code classification.moderation.status} for the decision. */
     public static final AssetClassificationStatus COMPLETED = new AssetClassificationStatus("completed");
     /** Processing failed; {@code assets.retry} processes the asset again. */
     public static final AssetClassificationStatus FAILED = new AssetClassificationStatus("failed");
     private static final Map<String, AssetClassificationStatus> KNOWN = Map.of(
-        "pending", PENDING, "processing", PROCESSING, "completed", COMPLETED, "failed", FAILED);
+        "queued", QUEUED, "processing", PROCESSING, "completed", COMPLETED, "failed", FAILED);
     private final String value;
 
     private AssetClassificationStatus(String value) { this.value = value; }
@@ -1119,6 +1121,7 @@ public final class Models {
     private ProcessingOptions processingOptions;
     private Visibility visibility;
     private List<MetadataItem> metadata;
+    private List<String> tags;
     private String authorId;
     private ModerationContext context;
     private String externalId;
@@ -1152,6 +1155,8 @@ public final class Models {
     public SubmitAsset processingOptions(ProcessingOptions value) { processingOptions = value; return this; }
     public SubmitAsset visibility(Visibility value) { visibility = value; return this; }
     public SubmitAsset metadata(List<MetadataItem> value) { metadata = value; return this; }
+    /** @param value tags for the asset, such as {@code List.of("catalogue", "backpacks")} @return these options */
+    public SubmitAsset tags(List<String> value) { tags = value; return this; }
     /**
      * @param value your identifier for who wrote the content; CalmLens only compares it with the
      *     author IDs in the context, to tell which posts share a speaker
@@ -1220,6 +1225,7 @@ public final class Models {
     private String description;
     private ProcessingOptions processingOptions;
     private List<MetadataItem> metadata;
+    private List<String> tags;
     private String authorId;
     private ModerationContext context;
     private String externalId;
@@ -1238,6 +1244,8 @@ public final class Models {
     public ClassifyText description(String value) { description = value; return this; }
     public ClassifyText processingOptions(ProcessingOptions value) { processingOptions = value; return this; }
     public ClassifyText metadata(List<MetadataItem> value) { metadata = value; return this; }
+    /** @param value tags for the asset, such as {@code List.of("catalogue", "backpacks")} @return these options */
+    public ClassifyText tags(List<String> value) { tags = value; return this; }
     /**
      * @param value your identifier for who wrote the content; CalmLens only compares it with the
      *     author IDs in the context, to tell which posts share a speaker
@@ -1263,6 +1271,7 @@ public final class Models {
       asset.description = description;
       asset.processingOptions = processingOptions;
       asset.metadata = metadata;
+      asset.tags = tags;
       asset.authorId = authorId;
       asset.context = context;
       asset.externalId = externalId;
@@ -1388,7 +1397,6 @@ public final class Models {
     private Patch<String> externalId;
     private Patch<String> externalUrl;
     private Patch<Visibility> visibility;
-    private Patch<ProcessingOptions> processingOptions;
     public UpdateAsset() {}
     /** @param assetId the asset to update */
     public UpdateAsset(String assetId) { this.assetId = assetId; }
@@ -1402,7 +1410,6 @@ public final class Models {
     public UpdateAsset externalId(Patch<String> value) { externalId = value; return this; }
     public UpdateAsset externalUrl(Patch<String> value) { externalUrl = value; return this; }
     public UpdateAsset visibility(Patch<Visibility> value) { visibility = value; return this; }
-    public UpdateAsset processingOptions(Patch<ProcessingOptions> value) { processingOptions = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -1487,11 +1494,15 @@ public final class Models {
   }
 
   /**
-   * What {@code assets.batch} returns once the operation is queued.
+   * What {@code assets.batch} returns once the operation is queued. The {@code asset.deleted} and
+   * {@code asset.content-removed} events the batch records carry a {@code batch-id} fact naming
+   * {@code batchId}.
    *
-   * @param queued always true
+   * @param batchId the batch's ID ({@code batch_} prefix)
+   * @param status {@code queued}
+   * @param assetCount how many distinct assets the batch covers
    */
-  public record BatchAssetsResponse(boolean queued) {}
+  public record BatchAssetsResponse(String batchId, String status, int assetCount) {}
 
   /** Options for {@code assets.uploadPart}: a later part of a multipart upload. */
   public static final class UploadPart {
@@ -1619,15 +1630,26 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
-  /** Options for {@code events.list} and {@code events.pages}. */
+  /**
+   * Options for {@code events.list} and {@code events.pages}. {@code types} and {@code assetId}
+   * narrow the feed; a cursor belongs to the filters it was issued with, so pass the same ones with
+   * each {@code cursor}.
+   */
   public static final class ListEvents {
     private String cursor;
     private Integer pageSize;
+    private List<String> types;
+    private String assetId;
     public ListEvents() {}
     /** @param value a previous page's {@code nextCursor}; omit for an empty page whose cursor is the current time @return these options */
     public ListEvents cursor(String value) { cursor = value; return this; }
     /** @param value events per page, 1 to 100 (default 50) @return these options */
     public ListEvents pageSize(Integer value) { pageSize = value; return this; }
+    /** @param value only events of these types, such as {@code asset.blocked}; null or empty for every type @return these options */
+    public ListEvents types(List<String> value) { types = value == null ? null : List.copyOf(value); return this; }
+    /** @param value only events about this asset, or null for every event @return these options */
+    public ListEvents assetId(String value) { assetId = value; return this; }
+    List<String> typesValue() { return types; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -1738,7 +1760,6 @@ public final class Models {
    * @param context the earlier posts CalmLens used, oldest first; null when none were sent or once
    *     the content is removed
    * @param tags tags
-   * @param processingOptions processing options
    * @param visibility CDN visibility
    * @param upload receipt of source content
    * @param classification progress and capability results
@@ -1750,7 +1771,7 @@ public final class Models {
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       String description, String externalId, String externalUrl, String authorId, ModerationContext context, List<String> tags,
-      ProcessingOptions processingOptions, Visibility visibility,
+      Visibility visibility,
       AssetUpload upload, AssetClassification classification, AssetContent content) {
     /** Copies collections so the record stays immutable. */
     public Asset {
@@ -1768,8 +1789,8 @@ public final class Models {
    * @param status classification progress
    * @param failureReason why processing failed: {@code file-too-large}, {@code duration-limit},
    *     {@code resolution-limit}, {@code unsupported-format}, {@code undecodable-content}, {@code
-   *     multiple-tracks}, {@code type-mismatch}, {@code free-upload-limit}, {@code media-limit},
-   *     {@code spend-limit}, {@code child-failed} or {@code processing-error}; null unless {@code
+   *     multiple-tracks}, {@code type-mismatch}, {@code free-uploads-exhausted}, {@code
+   *     media-limit}, {@code uploads-paused}, {@code child-failed} or {@code processing-error}; null unless {@code
    *     status} is {@code failed}
    * @param progress how far analysis of a long audio or video asset has got, section by section;
    *     null when it isn't analysed in sections
@@ -1785,7 +1806,6 @@ public final class Models {
    *     project's policy acts on links
    * @param aiGeneratedDetection generated-content detection result
    * @param textRegions text found in the image
-   * @param labels labels describing the content
    */
   public record AssetClassification(AssetClassificationStatus status, String failureReason,
       ClassificationProgress progress, @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
@@ -1793,9 +1813,8 @@ public final class Models {
       AssetModeration moderation, PersonDetectionResult personDetection,
       FaceDetectionResult faceDetection, LinkDetectionResult linkDetection,
       LinkSafetyResult linkSafety,
-      AiGeneratedDetectionResult aiGeneratedDetection, List<TextRegion> textRegions,
-      List<ClassificationLabel> labels) {
-    public AssetClassification { labels = list(labels); textRegions = list(textRegions); }
+      AiGeneratedDetectionResult aiGeneratedDetection, List<TextRegion> textRegions) {
+    public AssetClassification { textRegions = list(textRegions); }
   }
 
   /**
@@ -1912,46 +1931,52 @@ public final class Models {
    * An upload's match against a hash list entry.
    *
    * @param source {@code hash-list}
-   * @param listId the hash list
-   * @param entryId the matching entry
+   * @param hashListId the hash list
+   * @param hashListEntryId the matching entry
    * @param distance Hamming distance between the hashes
    * @param action the list's action when matched: {@code flag} or {@code block}
    */
-  public record HashMatch(String source, String listId, String entryId, Integer distance, HashListAction action) {}
+  public record HashMatch(String source, String hashListId, String hashListEntryId, Integer distance, HashListAction action) {}
 
   /**
    * One reviewer decision in an asset's review history.
    *
    * @param decision the reviewer's decision
-   * @param reviewerName the reviewer's display name, when known
-   * @param reviewerEmail the reviewer's email address, when known
+   * @param note why the reviewer decided this, or null
+   * @param decidedBy who made the decision
+   * @param applied whether the decision was applied to the asset
    */
-  public record AssetReview(String id, AssetModerationDecision decision, String note,
-      String reviewerName, String reviewerEmail,
-      @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt, boolean appliedToAsset) {}
+  public record AssetReview(String id, AssetModerationDecision decision, String note, ReviewDecider decidedBy,
+      @JsonAdapter(Json.EpochMillis.class) Instant reviewedAt, boolean applied) {}
 
-  /** A regional restriction supplied by an authenticated test input.
-   * @param region the jurisdiction
-   * @param action the delivery restriction
+  /**
+   * Who made a review decision.
+   *
+   * @param type {@code user} for a person (or an assistant's key acting for one), {@code api-key}
+   *     for an API key
+   * @param id the user's or API key's ID; null only when it was not recorded
    */
-  public record TestRegionalAction(String region, String action) {}
+  public record ReviewDecider(String type, String id) {}
 
   /**
    * Content-safety findings, policy assessment and reviewer decision.
    *
    * @param status the moderation decision in force, which also decides delivery
+   * @param automatedStatus the policy's own outcome before any reviewer decision: {@code allowed},
+   *     {@code limited}, {@code age-restricted}, {@code blocked} or {@code purged}; null before a
+   *     decision
+   * @param regions the regions where the asset is restricted, each with its own status
    * @param linkSafety (preview) what the policy's link safety settings made of the asset's links;
    *     null when the policy doesn't act on links
    * @param timeline the audio or video asset's findings timeline, which {@code assets.listTimeline}
    *     pages through; null for other assets and before analysis
    */
   public record AssetModeration(AssetModerationStatus status, List<AssetReview> manualReviews,
-      String automatedAction, String source, String rule, List<String> flaggedCategories,
+      AssetModerationStatus automatedStatus, String source, String rule, List<String> flaggedCategories,
       LinkSafetyDecision linkSafety,
       List<RegionalDecision> regions, Boolean explanationComplete,
-      Map<String, CategoryPolicyScore> categories, ModerationRaw raw, ModerationTimeline timeline,
-      Map<String, String> testCategoryActions, List<TestRegionalAction> testRegionalActions) {
-    public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); flaggedCategories = listOrEmpty(flaggedCategories); regions = listOrEmpty(regions); testCategoryActions = map(testCategoryActions); testRegionalActions = list(testRegionalActions); }
+      Map<String, CategoryPolicyScore> categories, ModerationRaw raw, ModerationTimeline timeline) {
+    public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); flaggedCategories = listOrEmpty(flaggedCategories); regions = listOrEmpty(regions); }
   }
 
   /**
@@ -1959,11 +1984,10 @@ public final class Models {
    *
    * @param action the strongest action the asset's links take: {@code allow}, {@code limit},
    *     {@code age-restrict} or {@code block}
-   * @param links indexes into {@code classification.linkSafety.links} of the links that take that
-   *     action
+   * @param links the checked links that take that action, as in {@code classification.linkSafety.links}
    * @param settings the link safety settings the decision used
    */
-  public record LinkSafetyDecision(String action, List<Integer> links, LinkSafetySettings settings) {
+  public record LinkSafetyDecision(String action, List<CheckedLink> links, LinkSafetySettings settings) {
     /** Copies collections so the record stays immutable. */
     public LinkSafetyDecision { links = list(links); }
   }
@@ -2081,8 +2105,14 @@ public final class Models {
   public record CategoryPolicyScore(Double score, String action, CategoryPolicySource source,
       CategoryPolicySettingsSnapshot settings) {}
 
-  /** The rule that decided the outcome, or that the policy score stayed below 50%. */
-  public record CategoryPolicySource(String kind, Integer index, List<Integer> indexes) {
+  /**
+   * The rule that decided the outcome, or that the policy score stayed below 50%.
+   *
+   * @param kind {@code default}, {@code below-threshold}, {@code allowance} or {@code restriction}
+   * @param indexes for {@code allowance} and {@code restriction}, the positions of the deciding
+   *     rules in the category's settings, the decisive rule first; empty otherwise
+   */
+  public record CategoryPolicySource(String kind, List<Integer> indexes) {
     public CategoryPolicySource { indexes = list(indexes); }
   }
 
@@ -2101,7 +2131,15 @@ public final class Models {
     public CategoryPolicySettingsSnapshot { allowances = list(allowances); restrictions = list(restrictions); }
   }
 
-  public record RegionalDecision(String region, String action, String rule, String category) {}
+  /**
+   * A restriction of the asset in one region.
+   *
+   * @param region the jurisdiction
+   * @param status {@code limited}, {@code age-restricted}, {@code blocked} or {@code purged}
+   * @param rule the rule that restricted it
+   * @param category the category the rule is about, or null
+   */
+  public record RegionalDecision(String region, AssetModerationStatus status, String rule, String category) {}
   /**
    * One category result. {@code score} is set only for {@code evaluated} and {@code partial}.
    *
@@ -2110,15 +2148,11 @@ public final class Models {
    * @param likelihood likelihood bucket
    * @param reason why the category was not evaluated
    * @param qualifiers qualifier results
-   * @param policyConditions direct condition evidence
    */
-  public record CategoryResult(String status, Double score, String likelihood, String reason, Map<String, QualifierResult> qualifiers, Map<String, PolicyConditionResult> policyConditions) {
+  public record CategoryResult(String status, Double score, String likelihood, String reason, Map<String, QualifierResult> qualifiers) {
     /** Copies collections so the record stays immutable. */
-    public CategoryResult { qualifiers = map(qualifiers); policyConditions = map(policyConditions); }
+    public CategoryResult { qualifiers = map(qualifiers); }
   }
-
-  /** Direct assessment of a same-instance or combined-coverage condition, keyed by an opaque identifier. */
-  public record PolicyConditionResult(String status, Double score, String reason) {}
 
   /**
    * A category qualifier result.
@@ -2130,17 +2164,6 @@ public final class Models {
    * @param reason reason when not evaluated
    */
   public record QualifierResult(Double allScore, String status, Double someScore, String likelihood, String reason) {}
-
-  /**
-   * A detected label.
-   *
-   * @param description label text
-   * @param score confidence
-   * @param topicalityScore topicality
-   * @param likelihood likelihood bucket
-   * @param knowledgeBaseId knowledge base identifier
-   */
-  public record ClassificationLabel(String description, Double score, Double topicalityScore, String likelihood, String knowledgeBaseId) {}
 
   /**
    * Results of the optional features requested in {@code processingOptions.features}. A feature
@@ -2438,11 +2461,11 @@ public final class Models {
    * @param hash PDQ hash, 64 lowercase hexadecimal characters
    * @param quality the hash's quality from 0 to 100, or null when unknown
    * @param label label, or null
-   * @param sourceAssetId the asset the hash was taken from, or null
+   * @param assetId the asset the hash was taken from, or null
    * @param createdAt when it was added
    */
   public record HashListEntry(String id, String projectId, String hashListId, String hash, Integer quality,
-      String label, String sourceAssetId,
+      String label, String assetId,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt) {}
 
   /**
@@ -2757,6 +2780,17 @@ public final class Models {
   public record EventFact(String key, Object value, String url) {}
 
   /**
+   * Who caused an event.
+   *
+   * @param type {@code user} for a person in the portal (or an assistant acting for one), {@code
+   *     api-key} for an API key, {@code automated} for automated moderation or {@code system} for
+   *     CalmLens itself
+   * @param id the user's or API key's ID; null when it was not recorded, and for {@code automated}
+   *     and {@code system}
+   */
+  public record EventActor(String type, String id) {}
+
+  /**
    * The asset's state when an event was created.
    *
    * @param id asset ID
@@ -2791,6 +2825,7 @@ public final class Models {
    *
    * @param id event ID; deliveries of the same event share it
    * @param projectId owning project
+   * @param actor who caused the event
    * @param type event type, such as {@code asset.blocked}
    * @param severity severity
    * @param title short summary
@@ -2804,7 +2839,7 @@ public final class Models {
    * @param json the event's JSON object as the API sent it, fields this SDK version does not model
    *     included; null for an event built in code
    */
-  public record Event(String id, String projectId, String type, String severity, String title, String description,
+  public record Event(String id, String projectId, EventActor actor, String type, String severity, String title, String description,
       String assetId, Long assetSequence, EventAsset asset, List<EventFact> facts,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt, Map<String, Object> json) {
     /** Copies facts; missing facts become an empty list. */
@@ -2815,6 +2850,7 @@ public final class Models {
      *
      * @param id event ID
      * @param projectId owning project
+     * @param actor who caused the event
      * @param type event type
      * @param severity severity
      * @param title short summary
@@ -2825,13 +2861,13 @@ public final class Models {
      * @param facts registered facts
      * @param createdAt creation time
      */
-    public Event(String id, String projectId, String type, String severity, String title, String description,
+    public Event(String id, String projectId, EventActor actor, String type, String severity, String title, String description,
         String assetId, Long assetSequence, EventAsset asset, List<EventFact> facts, Instant createdAt) {
-      this(id, projectId, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, null);
+      this(id, projectId, actor, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, null);
     }
 
     Event withJson(Map<String, Object> value) {
-      return new Event(id, projectId, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, value);
+      return new Event(id, projectId, actor, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, value);
     }
   }
 
@@ -2859,6 +2895,7 @@ public final class Models {
    *
    * @param id event ID; the same on every retry, so use it to skip duplicates
    * @param projectId owning project
+   * @param actor who caused the event
    * @param type event type, such as {@code asset.blocked}
    * @param severity severity
    * @param title short summary
@@ -2872,7 +2909,7 @@ public final class Models {
    * @param json the whole body as received (or as {@code toWebhookEventPayload} builds it), fields
    *     this SDK version does not model included; null for a payload built in code
    */
-  public record WebhookEventPayload(String id, String projectId, String type, String severity, String title, String description,
+  public record WebhookEventPayload(String id, String projectId, EventActor actor, String type, String severity, String title, String description,
       String assetId, Long assetSequence, EventAsset asset, List<EventFact> facts,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt, Map<String, Object> json) {
     /** Copies facts and the JSON object; missing facts become an empty list. */
@@ -2886,6 +2923,7 @@ public final class Models {
      *
      * @param id event ID
      * @param projectId owning project
+     * @param actor who caused the event
      * @param type event type
      * @param severity severity
      * @param title short summary
@@ -2896,13 +2934,13 @@ public final class Models {
      * @param facts registered facts
      * @param createdAt event creation time
      */
-    public WebhookEventPayload(String id, String projectId, String type, String severity, String title, String description,
+    public WebhookEventPayload(String id, String projectId, EventActor actor, String type, String severity, String title, String description,
         String assetId, Long assetSequence, EventAsset asset, List<EventFact> facts, Instant createdAt) {
-      this(id, projectId, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, null);
+      this(id, projectId, actor, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, null);
     }
 
     WebhookEventPayload withJson(Map<String, Object> value) {
-      return new WebhookEventPayload(id, projectId, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, value);
+      return new WebhookEventPayload(id, projectId, actor, type, severity, title, description, assetId, assetSequence, asset, facts, createdAt, value);
     }
   }
 

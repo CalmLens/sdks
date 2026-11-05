@@ -28,7 +28,7 @@ An `evaluated` or `partial` category has a score. A `not-evaluated` result has a
 ## Withdrawing a listing and what is retained
 
 A seller can withdraw a listing at any time. It leaves the market at once, and the app calls
-`assets.deleteContent` for every photo, which also removes its extracted text. This is the retention
+`assets.removeContent` for every photo, which also removes its extracted text. This is the retention
 choice of this example: the stored bytes (the photo and the text read from it) are removed
 (`content.status` becomes `removed`) and the CDN stops serving them, while the asset records and their classification results stay in
 CalmLens for audit and for any later dispute. The title and description assets keep their
@@ -140,7 +140,7 @@ verifies the signature and timestamp before parsing, then applies the event thro
 as the events feed. A forged, tampered or stale delivery gets 401. If retrieval
 fails, it returns 502 so delivery retries. A repeated event has no further effect. A test send
 (fact `{ key: "test", value: true }`) is logged and changes nothing. The Activity panel shows
-registered facts such as **Reviewer** and **Note**; the hidden reviewer ID and unknown keys
+registered facts such as **Reviewer** and **Note**; the actor's user ID and unknown keys
 are not shown, and only absolute HTTP(S) fact URLs become links.
 
 ## Read the code
@@ -149,7 +149,7 @@ are not shown, and only absolute HTTP(S) fact URLs become links.
   photos with `photoProcessing()`, cleanup with `assets.delete`), `lookUp`
   (decision, externalId check and extracted text on the image), `driver` and
   `explain` (combined report categories), `withdraw`
-  (`assets.deleteContent`), `photo` (lens and signed URL), `sync`, `apply` and `webhook`.
+  (`assets.removeContent`), `photo` (lens and signed URL), `sync`, `apply` and `webhook`.
 - [Demo.java](src/main/java/calmmarket/Demo.java): the synthetic demo answers, used only in demo
   mode.
 - [Page.java](src/main/java/calmmarket/Page.java): server-rendered HTML with no JavaScript or

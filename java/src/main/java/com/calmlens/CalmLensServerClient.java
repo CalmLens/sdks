@@ -645,7 +645,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    * does: an optional first {@code @lens}, then {@code key=value} options with dotted keys for
    * nested ones (a bare key is {@code true}). Values are numbers, {@code true}, {@code false}, hex
    * colours ({@code #} added) for colour options, or text. Throws {@link IllegalArgumentException}
-   * on anything the CDN refuses as {@code asset/invalid-transform}. Used by the mock CDN.
+   * on anything the CDN refuses as {@code transform/invalid}. Used by the mock CDN.
    */
   static TransformSelector parseTransformSelector(String selector) {
     if (selector.isEmpty()) return new TransformSelector(null, null);
@@ -1054,7 +1054,7 @@ public final class CalmLensServerClient implements AutoCloseable {
   /**
    * Whether the API accepts an upload of this MIME type: an image, audio, video, text, document or
    * website type, not a container such as {@code application/octet-stream}. It refuses any other
-   * type with {@code upload/invalid-mime-type}.
+   * type with {@code upload/unsupported-type}.
    */
   static boolean isAcceptedUploadMimeType(String type) {
     String mime = normalizeUploadMimeType(type);
@@ -1071,7 +1071,7 @@ public final class CalmLensServerClient implements AutoCloseable {
 
   private static void checkMimeType(String type) {
     if (!isAcceptedUploadMimeType(type))
-      throw new CalmLensException(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, rejectedUploadMimeTypeMessage(type), Map.of("mimeType", type), null);
+      throw new CalmLensException(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, rejectedUploadMimeTypeMessage(type), Map.of("mimeType", type, "source", "calmlens"), null);
   }
 
   /**
@@ -1080,8 +1080,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    */
   private void checkPartSize(long size, boolean last, boolean firstImagePart) {
     if (deferUploadChecks || size < 0) return;
-    if (firstImagePart && size > 20L * 1024 * 1024)
-      throw new CalmLensException(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, "Multipart image uploads cannot exceed 20MB.");
+    if (firstImagePart && size > MULTIPART_IMAGE_LIMIT_BYTES) throw multipartImageTooLarge();
     if (!last && size < MULTIPART_MIN_PART_BYTES)
       throw payloadError("Multipart upload parts must be at least 5MiB except the final part.");
   }
@@ -1095,15 +1094,31 @@ public final class CalmLensServerClient implements AutoCloseable {
    */
   private void checkUploadSize(long size, String mime, boolean inParts) {
     if (deferUploadChecks || size < 0) return;
+    long limit;
+    String message;
     if (mime.startsWith("image/")) {
-      if (size > 10L * 1024 * 1024)
-        throw new CalmLensException(ErrorCodes.FILE_TOO_LARGE, "Images uploaded in one request can be at most 10 MiB; upload larger images in parts");
+      limit = 10L * 1024 * 1024;
+      message = "Images uploaded in one request can be at most 10 MiB; upload larger images in parts";
     } else if (mime.startsWith("audio/") || mime.startsWith("video/")) {
-      if (size > (inParts ? 2048L : 50L) * 1024 * 1024)
-        throw new CalmLensException(ErrorCodes.FILE_TOO_LARGE, "Audio and video files can be at most 50 MiB in one request, or 2 GiB in parts");
-    } else if (size > 5000L * 1024 * 1024) {
-      throw new CalmLensException(ErrorCodes.FILE_TOO_LARGE, "Files can be at most 5,000 MiB");
+      limit = (inParts ? 2048L : 50L) * 1024 * 1024;
+      message = "Audio and video files can be at most 50 MiB in one request, or 2 GiB in parts";
+    } else {
+      limit = 5000L * 1024 * 1024;
+      message = "Files can be at most 5,000 MiB";
     }
+    if (size > limit) throw uploadTooLarge(limit, message);
+  }
+
+  /** Images sent in parts total at most 20 MiB. */
+  private static final long MULTIPART_IMAGE_LIMIT_BYTES = 20L * 1024 * 1024;
+
+  /** {@code upload/too-large} for the plan's limit, with the details the API sends. */
+  private static CalmLensException uploadTooLarge(long limitBytes, String message) {
+    return new CalmLensException(ErrorCodes.UPLOAD_TOO_LARGE, message, Map.of("limitBytes", limitBytes, "source", "plan"), null);
+  }
+
+  private static CalmLensException multipartImageTooLarge() {
+    return uploadTooLarge(MULTIPART_IMAGE_LIMIT_BYTES, "Multipart image uploads cannot exceed 20 MiB.");
   }
 
   /** The request body for upload content: exactly one source, sent without copying files or streams. */
@@ -1197,15 +1212,14 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (key != null && key.length() > MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH)
         throw argument("An idempotency key can be at most " + MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH + " characters for an upload sent in parts");
       if (!mime.startsWith("image/")) checkUploadSize(body.length(), mime, true);
-      else if (!deferUploadChecks && body.length() > 20L * 1024 * 1024)
-        throw new CalmLensException(ErrorCodes.MULTIPART_IMAGE_TOO_LARGE, "Multipart image uploads cannot exceed 20MB.");
+      else if (!deferUploadChecks && body.length() > MULTIPART_IMAGE_LIMIT_BYTES) throw multipartImageTooLarge();
     } else if (multipart) {
       checkPartSize(body.length(), flag(encoded, "isFinal"), mime.startsWith("image/"));
       // A declared whole-file size over the limit for parts can never finish.
       if (!mime.startsWith("image/") && o.has("totalSizeInBytes") && !o.get("totalSizeInBytes").isJsonNull())
         checkUploadSize(o.get("totalSizeInBytes").getAsLong(), mime, true);
     } else checkUploadSize(body.length(), mime, false);
-    for (String k : List.of("name", "description", "processingOptions", "visibility", "metadata", "authorId", "context", "externalId", "externalUrl", "folderId", "uploadPresetId", "totalSizeInBytes"))
+    for (String k : List.of("name", "description", "processingOptions", "visibility", "metadata", "tags", "authorId", "context", "externalId", "externalUrl", "folderId", "uploadPresetId", "totalSizeInBytes"))
       if (o.has(k)) query.add(k, o.get(k));
     query.addProperty("contentType", type);
     if (split) return uploadInParts(query, body, type, key);
@@ -1377,16 +1391,17 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Retrieves the asset until its {@code classification.moderation.status} is no longer {@code
-     * pending} ({@code allowed}, {@code limited}, {@code age-restricted}, {@code blocked} or {@code purged}), or its
-     * {@code classification.status} is {@code failed}, and returns it. It waits 0.5 seconds before the second check and 1.5 times
+     * Retrieves the asset until it is settled, its {@code classification.status} {@code completed}
+     * (with its decision in {@code classification.moderation.status}) or {@code failed}, and
+     * returns it. A {@code queued} or {@code processing} asset is still waiting, even when a
+     * reviewer has already decided it. It waits 0.5 seconds before the second check and 1.5 times
      * longer each time after that, up to 2 seconds, never past the timeout (60 seconds by default).
      * Webhooks report decisions without polling.
      *
      * @param options the asset and timeout
-     * @return the decided asset
-     * @throws CalmLensException {@link ErrorCodes#SDK_TIMEOUT} when the timeout passes without a
-     *     decision, with {@code assetId} and the last {@code classificationStatus} and {@code
+     * @return the settled asset
+     * @throws CalmLensException {@link ErrorCodes#SDK_TIMEOUT} when the timeout passes before the
+     *     asset is settled, with {@code assetId} and the last {@code classificationStatus} and {@code
      *     moderationStatus} in its details; {@link
      *     ErrorCodes#SDK_CANCELLED} when the thread is interrupted (the interrupt flag is kept)
      */
@@ -1403,7 +1418,7 @@ public final class CalmLensServerClient implements AutoCloseable {
         if (Thread.currentThread().isInterrupted())
           throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for a decision");
         Models.Asset asset = retrieve(new Models.AssetId(assetId));
-        if (isDecided(asset)) return asset;
+        if (isSettled(asset)) return asset;
         long remaining = limitNanos - (nanoTime.getAsLong() - started);
         if (remaining <= 0) {
           String processing = asset.classification().status().value(), moderation = asset.classification().moderation().status().value();
@@ -1424,9 +1439,10 @@ public final class CalmLensServerClient implements AutoCloseable {
       }
     }
 
-    private static boolean isDecided(Models.Asset asset) {
-      return !Models.AssetModerationStatus.PENDING.equals(asset.classification().moderation().status())
-          || asset.classification().status() == Models.AssetClassificationStatus.FAILED;
+    /** Whether the asset is settled: its {@code classification.status} is {@code completed} or {@code failed}. */
+    private static boolean isSettled(Models.Asset asset) {
+      Models.AssetClassificationStatus status = asset.classification().status();
+      return Models.AssetClassificationStatus.COMPLETED.equals(status) || Models.AssetClassificationStatus.FAILED.equals(status);
     }
 
     /** @param options the asset and the fields to change @return the updated asset */
@@ -1483,7 +1499,7 @@ public final class CalmLensServerClient implements AutoCloseable {
      * @param options the asset
      * @return the asset
      */
-    public Models.Asset deleteContent(Models.AssetId options) {
+    public Models.Asset removeContent(Models.AssetId options) {
       return decode(json("DELETE", "/assets/" + id(str(Models.encode(options), "assetId", null)) + "/content", null, null), Models.Asset.class);
     }
 
@@ -1497,11 +1513,12 @@ public final class CalmLensServerClient implements AutoCloseable {
      * content ({@link Models.AssetBatchOperation#REMOVE_CONTENT}) in one request. Every asset must
      * exist in the project and the key needs {@code assets:delete} for its folder, or nothing is
      * queued. The work runs in the background and records {@code asset.deleted} or
-     * {@code asset.content-removed} for each asset; assets under a safety hold are skipped. Not
-     * retried: it carries no {@code Idempotency-Key}.
+     * {@code asset.content-removed} for each asset, with a {@code batch-id} fact naming the
+     * response's {@code batchId}; assets under a safety hold are skipped. Not retried: it carries
+     * no {@code Idempotency-Key}.
      *
      * @param options the asset IDs and the operation
-     * @return the queued response
+     * @return the batch's ID, status and asset count
      */
     public Models.BatchAssetsResponse batch(Models.BatchAssets options) {
       validateBatch(options);
@@ -1888,27 +1905,38 @@ public final class CalmLensServerClient implements AutoCloseable {
   public final class Events {
     private Events() {}
 
+    /** The query for {@code options}: the API takes {@code types} as one comma-separated value. */
+    private JsonObject eventsQuery(Models.ListEvents options) {
+      JsonObject query = Models.encode(options);
+      query.remove("types");
+      List<String> types = options.typesValue();
+      if (types != null && !types.isEmpty()) query.addProperty("types", String.join(",", types));
+      return query;
+    }
+
     /**
      * Lists events after a cursor. Without {@code cursor} it returns no events and a
-     * {@code nextCursor} for the current time.
+     * {@code nextCursor} for the current time. {@code types} and {@code assetId} narrow the feed to
+     * some event types or one asset's events; pass the same filters with each {@code cursor}.
      *
-     * @param options cursor and page size
+     * @param options cursor, page size and filters
      * @return one page of events
      */
     public Models.EventsPage list(Models.ListEvents options) {
-      return decode(json("GET", project("events"), Models.encode(options), null), Models.EventsPage.class);
+      return decode(json("GET", project("events"), eventsQuery(options), null), Models.EventsPage.class);
     }
 
     /**
      * Yields pages of events after {@code cursor} until no more are waiting, like the JavaScript
      * SDK's {@code events.pages}. Save each page's {@code nextCursor()} after handling it to resume
-     * later. Without {@code cursor}, it yields one empty page whose cursor is "now".
+     * later. Without {@code cursor}, it yields one empty page whose cursor is "now". Each page keeps
+     * the filters of {@code options}.
      *
-     * @param options cursor and page size
+     * @param options cursor, page size and filters
      * @return a lazy iterable of pages
      */
     public AutoPager<Models.EventsPage> pages(Models.ListEvents options) {
-      JsonObject o = Models.encode(options);
+      JsonObject o = eventsQuery(options);
       return new AutoPager<>(token -> {
         JsonObject query = o.deepCopy();
         if (token != null) query.addProperty("cursor", token);
@@ -1932,7 +1960,7 @@ public final class CalmLensServerClient implements AutoCloseable {
      * {@code preview} (a still image for the asset) or {@code placeholder} (a small blurred PNG,
      * public whatever the asset's visibility or moderation status, without age confirmation).
      * Lenses and transforms apply to {@code preview}, and to {@code rendered} when it is an image;
-     * the CDN refuses them on rendered PDFs, video and audio with {@code asset/invalid-transform}.
+     * the CDN refuses them on rendered PDFs, video and audio with {@code transform/invalid}.
      *
      * @param options the asset and selector
      * @return the URL
@@ -2179,13 +2207,14 @@ public final class CalmLensServerClient implements AutoCloseable {
    */
   public static Models.WebhookEventPayload toWebhookEventPayload(Models.Event event) {
     if (event.json() == null)
-      return new Models.WebhookEventPayload(event.id(), event.projectId(), event.type(), event.severity(), event.title(),
+      return new Models.WebhookEventPayload(event.id(), event.projectId(), event.actor(), event.type(), event.severity(), event.title(),
           event.description(), event.assetId(), event.assetSequence(), event.asset(), event.facts(), event.createdAt());
     // From the event as received, so asset and fact fields this SDK version does not model are kept.
     Map<String, Object> json = event.json();
     Map<String, Object> payload = new LinkedHashMap<>();
-    for (String key : List.of("id", "projectId", "type", "severity", "title", "description", "assetId", "assetSequence", "asset"))
-      payload.put(key, json.get(key));
+    for (String key : List.of("id", "projectId", "actor", "type", "severity", "title", "description", "assetId", "assetSequence", "asset"))
+      // A delivery's actor is optional: one the event lacks stays out.
+      if (!key.equals("actor") || json.containsKey(key)) payload.put(key, json.get(key));
     payload.put("facts", json.containsKey("facts") ? json.get("facts") : List.of());
     payload.put("createdAt", json.get("createdAt"));
     return Json.GSON.fromJson(Json.WRITE.toJsonTree(payload), Models.WebhookEventPayload.class);

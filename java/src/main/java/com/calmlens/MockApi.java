@@ -62,13 +62,22 @@ final class MockApi {
     /** An API error with details, at its HTTP status. */
     static Failure of(String code, Map<String, Object> details) { return new Failure(code, ErrorCodes.httpStatus(code).orElse(400), code, details); }
 
-    /** A request the API's schema refuses: {@code validation/<issue>}, HTTP 400 and the field as {@code path}. */
-    static Failure validation(String code, String path) { return new Failure(code, 400, "Invalid " + path, Map.of("path", path)); }
+    /**
+     * A request the API's schema refuses: {@code validation/invalid-request} with HTTP 400, listing
+     * the field and its issue code (such as {@code validation/too-big}) in {@code details.issues}.
+     */
+    static Failure validation(String code, String path) {
+      Map<String, Object> issue = new java.util.LinkedHashMap<>();
+      issue.put("path", path);
+      issue.put("message", "Invalid " + path);
+      issue.put("code", code);
+      return new Failure(ErrorCodes.INVALID_REQUEST, 400, "Invalid " + path, Map.of("issues", List.of(issue)));
+    }
   }
 
   private record Saved(String fingerprint, int status, byte[] body) {}
 
-  private static final Set<String> JSON_QUERY = Set.of("metadata", "processingOptions", "context");
+  private static final Set<String> JSON_QUERY = Set.of("metadata", "tags", "processingOptions", "context");
   private static final Set<String> INT_QUERY = Set.of("pageSize", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes");
   private static final Set<String> BOOL_QUERY = Set.of("queue", "isFinal");
   private static final Pattern ORDERING = Pattern.compile("ordering\\[(\\d+)]\\[(\\w+)]");
@@ -106,6 +115,8 @@ final class MockApi {
   private final Map<String, Saved> idempotent = new HashMap<>();
   /** Open multipart uploads by asset ID: their queue choice and declared total size. */
   private final Map<String, JsonObject> uploads = new HashMap<>();
+  /** The processing options each asset was uploaded with, which the API keeps but doesn't return. */
+  private final Map<String, JsonObject> processingOptions = new HashMap<>();
   private final Map<String, JsonObject> lenses = new LinkedHashMap<>();
   /** Whether the request being answered created a hash list, hash list entry or policy. */
   private boolean created;
@@ -152,7 +163,7 @@ final class MockApi {
   static final Set<String> OPERATIONS = Set.of(
       "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
       "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.create", "assets.classify", "assets.uploadPart",
-      "assets.createSignedUrl", "assets.move", "assets.retry", "assets.explain", "assets.decide", "assets.deleteContent",
+      "assets.createSignedUrl", "assets.move", "assets.retry", "assets.explain", "assets.decide", "assets.removeContent",
       "assets.delete", "assets.batch", "text.classify", "cdn.serve", "events.list", "events.pages", "folders.list",
       "folders.retrieve", "folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
       "hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete", "hashLists.listEntries",
@@ -217,7 +228,7 @@ final class MockApi {
       case "assets PATCH " -> Set.of("assets.update");
       case "assets DELETE " -> Set.of("assets.delete");
       case "assets GET children" -> Set.of("assets.listChildren", "assets.iterateChildren");
-      case "assets DELETE content" -> Set.of("assets.deleteContent");
+      case "assets DELETE content" -> Set.of("assets.removeContent");
       case "assets POST retry" -> Set.of("assets.retry");
       case "assets POST explain" -> Set.of("assets.explain");
       case "assets POST decision" -> Set.of("assets.decide");
@@ -454,6 +465,14 @@ final class MockApi {
     throw unsupported(method, "/" + String.join("/", parts));
   }
 
+  /** Who decides through the mock: its API key, which has no ID. */
+  static JsonObject mockApiKeyDecider() {
+    JsonObject decidedBy = new JsonObject();
+    decidedBy.addProperty("type", "api-key");
+    decidedBy.add("id", JsonNull.INSTANCE);
+    return decidedBy;
+  }
+
   JsonObject asset(String id) throws Failure {
     JsonObject asset = storage.assets.get(id);
     if (asset == null || !projectId.equals(str(asset, "projectId"))) throw new Failure(ErrorCodes.ASSET_NOT_FOUND, "Asset not found");
@@ -483,7 +502,7 @@ final class MockApi {
 
   /** Like the API: image uploads in parts total at most 20 MiB, at any size below that. */
   private static String imageSizeError(String type, long size, boolean last) {
-    return type.equals("image") && size > MAX_IMAGE_BYTES ? ErrorCodes.MULTIPART_IMAGE_TOO_LARGE : null;
+    return type.equals("image") && size > MAX_IMAGE_BYTES ? ErrorCodes.UPLOAD_TOO_LARGE : null;
   }
 
   /** Like the API: the parts may not overshoot a declared total, and must reach it at the end. */
@@ -491,7 +510,12 @@ final class MockApi {
     return total != null && (received > total || last && received != total) ? ErrorCodes.UPLOAD_SIZE_MISMATCH : null;
   }
 
-  private static void check(String code) throws Failure { if (code != null) throw new Failure(code); }
+  /** Throws a size error code, with the limit {@code upload/too-large} carries. */
+  private static void check(String code) throws Failure {
+    if (code == null) return;
+    if (code.equals(ErrorCodes.UPLOAD_TOO_LARGE)) throw Failure.of(code, Map.of("limitBytes", MAX_IMAGE_BYTES, "source", "plan"));
+    throw new Failure(code);
+  }
 
   private JsonObject createAsset(String upload, JsonObject q, JsonObject body, byte[] raw, long now) throws Failure {
     // X-CalmLens-Upload picks the mode: absent is a JSON body (a URL), "content" raw content and
@@ -502,7 +526,7 @@ final class MockApi {
     String mime = Objects.requireNonNullElse(str(o, "contentType"), "");
     // Like the API: content and a first part must have a type it can moderate; a URL is exempt.
     if (rawUpload && !CalmLensServerClient.isAcceptedUploadMimeType(mime))
-      throw new Failure(ErrorCodes.INVALID_UPLOAD_MIME_TYPE, 400, CalmLensServerClient.rejectedUploadMimeTypeMessage(mime), Map.of("mimeType", mime));
+      throw new Failure(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, 415, CalmLensServerClient.rejectedUploadMimeTypeMessage(mime), Map.of("mimeType", mime, "source", "calmlens"));
     String url = rawUpload ? null : str(o, "url");
     String kind = url != null ? "website" : assetType(mime.toLowerCase(Locale.ROOT));
     boolean queue = bool(q, "queue"), last = !multipart || bool(q, "isFinal");
@@ -549,8 +573,8 @@ final class MockApi {
     asset.add("context", usedContext(o.get("context")));
     asset.addProperty("type", kind);
     asset.add("metadata", o.has("metadata") ? o.get("metadata").deepCopy() : JsonNull.INSTANCE);
-    asset.add("tags", JsonNull.INSTANCE);
-    asset.add("processingOptions", processing.deepCopy());
+    asset.add("tags", o.has("tags") ? o.get("tags").deepCopy() : JsonNull.INSTANCE);
+    processingOptions.put(id, processing.getAsJsonObject().deepCopy());
     asset.addProperty("visibility", Objects.requireNonNullElse(str(o, "visibility"), "private"));
     JsonObject content = new JsonObject();
     content.addProperty("status", keep ? "stored" : "temporary");
@@ -581,7 +605,7 @@ final class MockApi {
     moderation.add("regions", new JsonArray());
     moderation.add("timeline", JsonNull.INSTANCE);
     JsonObject classification = new JsonObject();
-    classification.addProperty("status", last ? "processing" : "pending");
+    classification.addProperty("status", last ? "processing" : "queued");
     classification.add("failureReason", JsonNull.INSTANCE);
     // The mock never analyses media in sections.
     classification.add("progress", JsonNull.INSTANCE);
@@ -626,7 +650,7 @@ final class MockApi {
     JsonObject uploaded = asset.deepCopy();
     if (decision.status() != MockCalmLensServerClient.Outcome.PENDING) decided(asset, decision);
     // UploadAssetUtils.ts records the upload before the pipeline's events.
-    recordEvent("asset.uploaded", "low", uploaded, java.util.Arrays.asList(
+    recordEvent("asset.uploaded", "low", API_KEY_ACTOR, uploaded, java.util.Arrays.asList(
         new Models.EventFact("asset-type", str(uploaded, "type"), null), assetNameFact(uploaded),
         new Models.EventFact("file-format", str(uploaded.getAsJsonObject("content"), "format"), null)));
     recordProcessingEvents(asset, decision);
@@ -661,9 +685,10 @@ final class MockApi {
     if (featureEnabled(asset, "faceDetection")) classification.add("faceDetection", evaluated("faces"));
   }
 
-  /** Whether the asset's {@code processingOptions.features.<feature>.enabled} is true. */
-  private static boolean featureEnabled(JsonObject asset, String feature) {
-    JsonElement enabled = path(asset, "processingOptions.features." + feature + ".enabled");
+  /** Whether the asset was uploaded with {@code processingOptions.features.<feature>.enabled} true. */
+  private boolean featureEnabled(JsonObject asset, String feature) {
+    JsonObject uploaded = processingOptions.get(str(asset, "id"));
+    JsonElement enabled = uploaded == null ? null : path(uploaded, "features." + feature + ".enabled");
     return enabled != null && enabled.isJsonPrimitive() && enabled.getAsJsonPrimitive().isBoolean() && enabled.getAsBoolean();
   }
 
@@ -698,16 +723,16 @@ final class MockApi {
     String type = str(asset, "type");
     if (status == MockCalmLensServerClient.Outcome.FAILED) {
       String reason = str(asset.getAsJsonObject("classification"), "failureReason");
-      recordEvent("asset.failed", "high", asset, List.of(assetNameFact(asset), new Models.EventFact("asset-type", type, null),
+      recordEvent("asset.failed", "high", AUTOMATED_ACTOR, asset, List.of(assetNameFact(asset), new Models.EventFact("asset-type", type, null),
           new Models.EventFact("previous-status", "processing", null), new Models.EventFact("failure-reason", reason == null ? "processing-error" : reason, null)));
       return;
     }
     List<String> flagged = decision.flaggedCategories();
-    recordEvent("asset.classified", "low", asset, List.of(new Models.EventFact("flagged-categories", flagged, null),
+    recordEvent("asset.classified", "low", AUTOMATED_ACTOR, asset, List.of(new Models.EventFact("flagged-categories", flagged, null),
         new Models.EventFact("moderation-status", status.value(), null), new Models.EventFact("asset-type", type, null), assetNameFact(asset)));
     // Like the event catalog: only allowing and limiting are low severity.
-    recordEvent("asset." + status.value(), status == MockCalmLensServerClient.Outcome.ALLOWED || status == MockCalmLensServerClient.Outcome.LIMITED ? "low" : "high", asset,
-        List.of(new Models.EventFact("decided-by", "automated", null), new Models.EventFact("flagged-categories", flagged, null),
+    recordEvent("asset." + status.value(), status == MockCalmLensServerClient.Outcome.ALLOWED || status == MockCalmLensServerClient.Outcome.LIMITED ? "low" : "high",
+        AUTOMATED_ACTOR, asset, List.of(new Models.EventFact("flagged-categories", flagged, null),
             new Models.EventFact("asset-type", type, null), assetNameFact(asset)));
   }
 
@@ -881,13 +906,31 @@ final class MockApi {
     }
   }
 
-  /** The events {@code asset.deleted}, {@code asset.content-removed} and {@code asset.retried} the API records. */
-  private void lifecycle(String type, JsonObject asset) {
-    List<Models.EventFact> facts = List.of(
+  /**
+   * The events {@code asset.deleted}, {@code asset.content-removed} and {@code asset.retried} the
+   * API records for {@code actor}, with the {@code batch-id} fact when a batch caused them.
+   */
+  private void lifecycle(String type, JsonObject asset, JsonObject actor, String batchId) {
+    List<Models.EventFact> facts = new ArrayList<>(List.of(
         // A deleted asset has no portal page to link to.
         new Models.EventFact("asset-name", str(asset, "name"), type.equals("asset.deleted") ? null : "https://calmlens.com/go/asset/" + str(asset, "id")),
-        new Models.EventFact("asset-type", str(asset, "type"), null));
-    recordEvent(type, "low", asset, facts);
+        new Models.EventFact("asset-type", str(asset, "type"), null)));
+    if (batchId != null) facts.add(new Models.EventFact("batch-id", batchId, null));
+    recordEvent(type, "low", actor, asset, facts);
+  }
+
+  /** The actor of events the mock's API key causes: mock keys have no ID. */
+  static final JsonObject API_KEY_ACTOR = actor("api-key");
+  /** The actor of a reviewer's decision through {@link MockCalmLensServerClient#decide}. */
+  static final JsonObject USER_ACTOR = actor("user");
+  /** The actor of the moderation pipeline's events. */
+  static final JsonObject AUTOMATED_ACTOR = actor("automated");
+
+  private static JsonObject actor(String type) {
+    JsonObject actor = new JsonObject();
+    actor.addProperty("type", type);
+    actor.add("id", JsonNull.INSTANCE);
+    return actor;
   }
 
   /** Facts as the API stores them: {@code key}, {@code value} (null included) and {@code url} when there is one. */
@@ -911,12 +954,13 @@ final class MockApi {
     return assetSequences.merge(assetId, 1L, Long::sum);
   }
 
-  /** Adds an event to the feed, with a snapshot of {@code asset} when there is one. */
-  JsonObject recordEvent(String type, String severity, JsonObject asset, List<Models.EventFact> facts) {
+  /** Adds an event that {@code actor} caused to the feed, with a snapshot of {@code asset} when there is one. */
+  JsonObject recordEvent(String type, String severity, JsonObject actor, JsonObject asset, List<Models.EventFact> facts) {
     long now = now();
     JsonObject event = new JsonObject();
     event.addProperty("id", createId("evt"));
     event.addProperty("projectId", projectId);
+    event.add("actor", actor.deepCopy());
     event.addProperty("type", type);
     event.addProperty("severity", severity);
     event.addProperty("title", type);
@@ -955,16 +999,19 @@ final class MockApi {
     if (!"delete".equals(operation) && !"remove-content".equals(operation)) throw Failure.validation("validation/invalid-value", "operation");
     List<JsonObject> assets = new ArrayList<>();
     for (String id : unique) assets.add(asset(id));
+    String batchId = createId("batch");
     for (JsonObject asset : assets) {
       if (operation.equals("delete")) {
         deleteAssetTree(str(asset, "id"));
-        lifecycle("asset.deleted", asset);
+        lifecycle("asset.deleted", asset, API_KEY_ACTOR, batchId);
       } else {
-        removeContent(asset, now);
+        removeContent(asset, now, API_KEY_ACTOR, batchId);
       }
     }
     JsonObject queued = new JsonObject();
-    queued.addProperty("queued", true);
+    queued.addProperty("batchId", batchId);
+    queued.addProperty("status", "queued");
+    queued.addProperty("assetCount", assets.size());
     return queued;
   }
 
@@ -988,9 +1035,10 @@ final class MockApi {
   /**
    * Removes an asset's content like the API: the record and report stay; stored content, extracted
    * text and the placeholder go. Content already removed keeps its reason, and an
-   * asset.content-removed event is recorded either way.
+   * asset.content-removed event is recorded for {@code actor} either way, with the {@code
+   * batch-id} fact when a batch removed it.
    */
-  private JsonObject removeContent(JsonObject asset, long now) {
+  private JsonObject removeContent(JsonObject asset, long now, JsonObject actor, String batchId) {
     storage.content.remove(str(asset, "id"));
     asset.add("context", JsonNull.INSTANCE);
     JsonObject content = asset.getAsJsonObject("content");
@@ -1005,7 +1053,7 @@ final class MockApi {
     } else {
       withoutRendering(content);
     }
-    lifecycle("asset.content-removed", asset);
+    lifecycle("asset.content-removed", asset, actor, batchId);
     return asset;
   }
 
@@ -1021,7 +1069,7 @@ final class MockApi {
    */
   private JsonObject decide(JsonObject asset, JsonObject body, long now) throws Failure {
     String decision = str(body, "decision");
-    if (decision == null || !DECISIONS.contains(decision)) throw Failure.validation("validation/invalid-union", "decision");
+    if (decision == null || !DECISIONS.contains(decision)) throw Failure.validation("validation/invalid-value", "decision");
     JsonElement rawNote = body.get("note");
     if (rawNote == null || !rawNote.isJsonPrimitive() || !rawNote.getAsJsonPrimitive().isString()) throw Failure.validation("validation/invalid-type", "note");
     String note = rawNote.getAsString().strip();
@@ -1041,17 +1089,16 @@ final class MockApi {
     review.addProperty("id", createId("rev"));
     review.addProperty("decision", decision);
     review.addProperty("note", note);
-    review.addProperty("reviewerName", "API key");
-    review.add("reviewerEmail", JsonNull.INSTANCE);
+    review.add("decidedBy", mockApiKeyDecider());
     review.addProperty("reviewedAt", now);
-    review.addProperty("appliedToAsset", true);
+    review.addProperty("applied", true);
     if (!(moderation.get("manualReviews") instanceof JsonArray)) moderation.add("manualReviews", new JsonArray());
     moderation.getAsJsonArray("manualReviews").add(review);
     asset.addProperty("updatedAt", now);
-    if (decision.equals("purged")) removeContent(asset, now);
+    if (decision.equals("purged")) removeContent(asset, now, API_KEY_ACTOR, null);
     String name = str(asset, "name"), type = str(asset, "type");
-    recordEvent("asset." + decision, decision.equals("allowed") || decision.equals("limited") ? "low" : "high", asset, java.util.Arrays.asList(
-        new Models.EventFact("decided-by", "api-key", null), new Models.EventFact("asset-type", type, null),
+    recordEvent("asset." + decision, decision.equals("allowed") || decision.equals("limited") ? "low" : "high", API_KEY_ACTOR, asset, java.util.Arrays.asList(
+        new Models.EventFact("asset-type", type, null),
         new Models.EventFact("asset-name", name, "https://calmlens.com/go/asset/" + str(asset, "id")), new Models.EventFact("note", note, null)));
     return asset;
   }
@@ -1078,9 +1125,9 @@ final class MockApi {
         storage.assets.remove(id);
         storage.content.remove(id);
         uploads.remove(id);
-        lifecycle("asset.deleted", asset);
+        lifecycle("asset.deleted", asset, API_KEY_ACTOR, null);
         return null;
-      case "DELETE content": return removeContent(asset, now);
+      case "DELETE content": return removeContent(asset, now, API_KEY_ACTOR, null);
       case "POST retry":
         if (!"failed".equals(str(asset.getAsJsonObject("classification"), "status"))
             || !"pending".equals(str(asset.getAsJsonObject("classification").getAsJsonObject("moderation"), "status")))
@@ -1088,7 +1135,7 @@ final class MockApi {
         if ("removed".equals(str(asset.getAsJsonObject("content"), "status"))) throw new Failure(ErrorCodes.ASSET_CONTENT_UNAVAILABLE);
         // Like the API: back to processing, to be moderated again, with an asset.retried event.
         applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, "policy", now, null);
-        lifecycle("asset.retried", asset);
+        lifecycle("asset.retried", asset, API_KEY_ACTOR, null);
         moderateStored(asset, MockCalmLensServerClient.Trigger.RETRY, null);
         return asset;
       case "POST decision": return decide(asset, body, now);
@@ -1162,7 +1209,7 @@ final class MockApi {
    * An RSQL filter as the API reads it: comparisons on the fields in {@link MockAssetFilters#FIELDS},
    * each with its own operators, joined by {@code ;} (and), which binds
    * tighter than {@code ,} (or), and grouped with {@code ( … )}. Anything else is
-   * {@code validation/invalid-filter}.
+   * {@code filter/invalid}.
    */
   static Predicate<JsonObject> rsql(String expression) throws Failure {
     List<List<Predicate<JsonObject>>> alternatives = new ArrayList<>();
@@ -1336,7 +1383,7 @@ final class MockApi {
    */
   private JsonObject timeline(JsonObject asset, JsonObject q) throws Failure {
     int pageSize = (int) bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    if (held(asset)) throw new Failure(ErrorCodes.ASSET_SAFETY_HELD);
+    if (held(asset)) throw Failure.of(ErrorCodes.ASSET_HELD, Map.of("hold", "safety"));
     if (q.has("cursor")) throw new Failure(ErrorCodes.INVALID_CURSOR, "The cursor is invalid or belongs to a different query.");
     JsonObject page = new JsonObject();
     page.add("items", new JsonArray());
@@ -1747,7 +1794,7 @@ final class MockApi {
         entry.addProperty("hash", hash);
         entry.add("quality", quality);
         entry.add("label", nullable(str(body, "label")));
-        entry.add("sourceAssetId", nullable(assetId));
+        entry.add("assetId", nullable(assetId));
         entry.addProperty("createdAt", now);
         storage.hashListEntries.put(str(entry, "id"), entry);
         created = true;
@@ -1986,28 +2033,51 @@ final class MockApi {
     return answer;
   }
 
+  /** An event type's shape ({@code resource.action}), as the mock checks {@code types} without the catalog. */
+  private static final Pattern EVENT_TYPE = Pattern.compile("[a-z][a-z-]*\\.[a-z][a-z-]*");
+
   /**
-   * Cursors are {@code mock_<n>}: the number of events in the feed when the cursor was taken.
+   * Cursors are {@code mock_<n>~<filters>}: the number of events in the feed when the cursor was
+   * taken, and the filters it was issued with, since a cursor belongs to them as in the API.
    * Without a cursor the page is empty and its {@code nextCursor} is the current position.
+   * {@code types} (one comma-separated value) and {@code assetId} keep only the matching events.
    */
   private JsonObject events(JsonObject q) throws Failure {
     long pageSize = bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_EVENTS_PAGE_SIZE);
+    String typesValue = str(q, "types");
+    List<String> types = typesValue == null ? List.of() : List.of(typesValue.split(",", -1));
+    if (typesValue != null && types.stream().anyMatch(type -> !EVENT_TYPE.matcher(type).matches()))
+      throw Failure.validation(ErrorCodes.INVALID_VALUE, "types");
+    String assetId = str(q, "assetId");
+    if (assetId != null && !ASSET_ID_PATTERN.matcher(assetId).matches()) throw Failure.validation(ErrorCodes.INVALID_FORMAT, "assetId");
+    JsonArray filters = new JsonArray();
+    JsonArray sortedTypes = new JsonArray();
+    new java.util.TreeSet<>(types).forEach(sortedTypes::add);
+    filters.add(sortedTypes);
+    filters.add(assetId);
+    String filter = Base64.getUrlEncoder().withoutPadding().encodeToString(filters.toString().getBytes(StandardCharsets.UTF_8));
+    java.util.function.Predicate<JsonObject> matches = event ->
+        (types.isEmpty() || types.contains(str(event, "type"))) && (assetId == null || assetId.equals(str(event, "assetId")));
     List<JsonObject> feed = storage.events.stream().filter(e -> projectId.equals(str(e, "projectId"))).collect(Collectors.toList());
     int position = feed.size();
     String cursor = str(q, "cursor");
-    if (cursor != null && !cursor.isEmpty()) {
-      Matcher match = Pattern.compile("mock_(\\d{1,9})").matcher(cursor);
-      if (!match.matches() || Integer.parseInt(match.group(1)) > feed.size())
+    boolean continuing = cursor != null && !cursor.isEmpty();
+    if (continuing) {
+      Matcher match = Pattern.compile("mock_(\\d{1,9})~(.*)").matcher(cursor);
+      if (!match.matches() || !match.group(2).equals(filter) || Integer.parseInt(match.group(1)) > feed.size())
         throw new Failure(ErrorCodes.INVALID_CURSOR, "The cursor is invalid or belongs to a different query.");
       position = Integer.parseInt(match.group(1));
     }
-    int end = cursor == null || cursor.isEmpty() ? position : (int) Math.min(position + pageSize, feed.size());
-    JsonObject page = new JsonObject();
     JsonArray items = new JsonArray();
-    feed.subList(position, end).forEach(items::add);
+    int next = position;
+    while (continuing && next < feed.size() && items.size() < pageSize) {
+      JsonObject event = feed.get(next++);
+      if (matches.test(event)) items.add(event);
+    }
+    JsonObject page = new JsonObject();
     page.add("items", items);
-    page.addProperty("nextCursor", "mock_" + end);
-    page.addProperty("hasMore", end < feed.size());
+    page.addProperty("nextCursor", "mock_" + next + "~" + filter);
+    page.addProperty("hasMore", feed.subList(next, feed.size()).stream().anyMatch(matches));
     // The mock's key holds every permission, so no event type is excluded.
     page.add("excludedTypes", new JsonArray());
     return page;
@@ -2052,7 +2122,7 @@ final class MockApi {
     List<String> raw = new ArrayList<>();
     for (String part : request.url().split("\\?", 2)[0].substring(cdnBase.length()).split("/")) if (!part.isEmpty()) raw.add(part);
     List<String> selectorPath = raw.subList(4, raw.size());
-    Failure invalidTransform = new Failure("asset/invalid-transform", 400, "Invalid transform selector");
+    Failure invalidTransform = new Failure(ErrorCodes.INVALID_TRANSFORM, 400, "Invalid transform selector");
     Failure noRenderedVersion = new Failure(ErrorCodes.NO_RENDERED_VERSION, 404, "This asset has no such resource");
     // Like the CDN, /rendered/stream and /rendered/player are reserved, then the selector after the
     // resource is read as sent (still percent-encoded); the original takes none.
@@ -2101,7 +2171,7 @@ final class MockApi {
       return error(new Failure("viewer/age-confirmation-required", 403, "Age confirmation required"));
     boolean isPrivate = !isPublic;
     if (isPrivate && !canDownload(str(asset, "folderId"), apiKey))
-      return error(new Failure("asset/api-key-missing-permission", 403, "This API key needs assets:download permission for this asset’s folder."));
+      return error(new Failure(ErrorCodes.PERMISSION_DENIED, 403, "This API key needs assets:download permission for this asset’s folder."));
     // Then whether the asset has the resource, and whether it is a still image that takes a lens
     // or transform: the preview always is, the rendered file only when it is an image.
     if (resource.equals("rendered") && rendered == null || resource.equals("preview") && preview == null) return error(noRenderedVersion);
@@ -2114,7 +2184,7 @@ final class MockApi {
       if (!problems.isEmpty()) {
         List<String> keys = new ArrayList<>(problems.unknownKeys());
         keys.addAll(problems.invalidKeys());
-        return error(new Failure("asset/invalid-transform-options", 400, "Invalid transform options: " + String.join(", ", keys)));
+        return error(new Failure(ErrorCodes.INVALID_TRANSFORM_OPTIONS, 400, "Invalid transform options: " + String.join(", ", keys)));
       }
     }
     // The bytes: the upload, which stands in for its own rendered file and an image's preview, or
