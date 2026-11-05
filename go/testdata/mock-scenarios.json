@@ -9987,6 +9987,42 @@
             "name": "upload",
             "content": {
               "base64": "aGVsbG8=",
+              "type": "application/vnd.ms-excel"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "application/vnd.ms-powerpoint.presentation.macroEnabled.12"
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "asset"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "upload",
+            "content": {
+              "base64": "aGVsbG8=",
               "type": "application/x-yaml"
             }
           },

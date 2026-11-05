@@ -12,6 +12,8 @@
     "application/ld+json",
     "application/rss+xml",
     "application/vnd.oasis.opendocument.text",
+    "application/vnd.ms-excel",
+    "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
     "application/x-yaml"
   ],
   "refused": [
@@ -22,6 +24,7 @@
     "application/x-tar",
     "font/woff2",
     "model/gltf-binary",
-    "application/vnd.ms-excel"
+    "application/vnd.apple.keynote",
+    "application/vnd.apple.numbers"
   ]
 }
