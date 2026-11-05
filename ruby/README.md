@@ -16,6 +16,8 @@ gem "calmlens"
 
 The gem has no runtime dependencies: it uses only the standard library (Net::HTTP, JSON, OpenSSL). It ships YARD documentation and RBS signatures in `sig/`, so Steep and other RBS tools can check your calls and the response keys you read.
 
+Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
+
 ## Quick start
 
 Create an API key and copy your project ID in the CalmLens portal, and keep both on your server.

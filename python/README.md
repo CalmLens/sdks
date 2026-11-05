@@ -9,6 +9,8 @@ It requires Python 3.10 or later, has no runtime dependencies and is fully typed
 python -m pip install calmlens
 ```
 
+Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
+
 ## Quick start
 
 Create an API key and copy your project ID as described in

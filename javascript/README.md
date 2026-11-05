@@ -19,6 +19,8 @@ The package has two clients, each with its own import:
 
 API keys are secret, so `CalmLensServerClient` refuses to start in a web page or app. Upload from browsers and apps with `CalmLensAppClient`, and serve private content to them with signed URLs. The package ships ES modules and CommonJS with type declarations and loads no other packages at runtime.
 
+Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
+
 ## Quick start
 
 Create an API key under **Developer → API Keys** in the CalmLens portal. The same page shows your **Project ID**. Keep both on your server.

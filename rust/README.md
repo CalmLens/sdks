@@ -20,6 +20,8 @@ cargo add tokio --features macros,rt-multi-thread
 
 With `default-features = false` the crate contains only the models and the webhook helpers, with no HTTP stack, for services that only receive webhooks.
 
+Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
+
 ## Clients
 
 | Client                                | Use it for                                                                  |

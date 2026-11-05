@@ -14,6 +14,8 @@ A synchronous, thread-safe Java 17+ client for [CalmLens](https://calmlens.com) 
 
 The JAR declares the module name `com.calmlens` (`requires com.calmlens;`).
 
+Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
+
 ## Entry points
 
 | Class                                   | Use                                                                |

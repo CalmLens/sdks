@@ -13,6 +13,8 @@ go get github.com/CalmLens/sdks/go@latest
 | `calmlens`     | `github.com/CalmLens/sdks/go`              | The server client, webhook verification and CDN helpers. |
 | `calmlenstest` | `github.com/CalmLens/sdks/go/calmlenstest` | An in-memory mock client for offline tests.              |
 
+Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
+
 ## Quick start
 
 Create an API key and copy your project ID as described in [Authentication](https://calmlens.com/docs/guides/authentication), and keep them on your server.

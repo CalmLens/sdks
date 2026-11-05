@@ -16,6 +16,8 @@ The
 and [Chirp](https://github.com/CalmLens/sdks/tree/main/examples/chirp-php), a short-post app with
 images, age-restricted media and webhooks, run directly from this repository and include tests.
 
+Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
+
 ## Quick start
 
 ```php
