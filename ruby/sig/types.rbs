@@ -66,7 +66,11 @@ module CalmLens
     ?ocr: { enabled: bool }?,
     ?person_detection: { enabled: bool }?,
     ?face_detection: { enabled: bool, ?age_estimation: bool }?,
-    ?link_detection: { enabled: bool }?
+    ?link_detection: { enabled: bool }?,
+    # Preview. Prepares an adaptive stream (HLS) of audio or video, served at the `hls` resource and
+    # played by the `embed` resource; needs `keep_content_after_processing`. Left out, the project's
+    # streaming setting decides.
+    ?streaming: { enabled: bool }?
   }
   type processing_options_input = {
     ?keep_content_after_processing: bool?,
@@ -81,7 +85,8 @@ module CalmLens
     ?"personDetection" => { "enabled" => bool }?,
     ?"faceDetection" => { "enabled" => bool, ?"ageEstimation" => bool }?,
     ?"linkDetection" => { "enabled" => bool }?,
-    ?"aiGeneratedDetection" => { "enabled" => bool }?
+    ?"aiGeneratedDetection" => { "enabled" => bool }?,
+    ?"streaming" => { "enabled" => bool }?
   }
   # The processing options an asset was uploaded with.
   type processing_options = {
@@ -97,6 +102,20 @@ module CalmLens
     ?"sha384" => String?,
     ?"sha512" => String?
   }
+  # One rendition of an adaptive stream: `video` for a picture size (video renditions carry no sound;
+  # they play with the `audio` rendition), or `audio`. `bandwidth` is the peak bit rate in bits per
+  # second, counting the audio a video rendition plays with; `codecs` are RFC 6381 names.
+  type asset_hls_rendition = {
+    "kind" => "video" | "audio",
+    "width" => Integer?,
+    "height" => Integer?,
+    "bandwidth" => Integer,
+    "codecs" => String
+  }
+  # Preview. The adaptive stream of audio or video: HLS with fragmented MP4 (CMAF) segments, served
+  # at the CDN's `hls` resource (`hls/index.m3u8`) and played by its `embed` resource. Renditions list
+  # video from the largest down, then audio.
+  type asset_hls = { "renditions" => Array[asset_hls_rendition] }
   type asset_rendered_kind = "image" | "pdf" | "video" | "audio"
   # The asset's one displayable file, as the CDN's `rendered` resource serves it: an image, a PDF, or
   # browser-safe video or audio. `peaks` is an audio waveform's normalised peaks.
@@ -216,6 +235,9 @@ module CalmLens
     # `null` until processing makes it, for text, spreadsheets and other files, once the content is
     # removed and while the asset is held.
     "rendered" => asset_rendered?,
+    # Preview. The adaptive stream once streaming has prepared one for audio or video; `nil` for
+    # other assets, until then, once the content is removed and while the asset is held.
+    "hls" => asset_hls?,
     "preview" => asset_preview?
   }
 
@@ -810,13 +832,13 @@ module CalmLens
     ?request_options: request_options
   }
   # The CDN resources a signed URL can be created for ({CalmLens::CDN::SIGNED_RESOURCES}).
-  type signed_cdn_resource = "original" | "rendered" | "preview"
+  type signed_cdn_resource = "original" | "rendered" | "preview" | "hls" | "embed"
   # What a CDN URL serves: a signed resource or the public `placeholder`.
   type cdn_resource = signed_cdn_resource | "placeholder"
   type create_signed_url_options = {
     ?viewer_claims: viewer_claims,
     asset_id: String,
-    # Defaults to `rendered` on the server; `original` takes no lens or transform.
+    # Defaults to `rendered` on the server; `original`, `hls` and `embed` take no lens or transform.
     ?resource: signed_cdn_resource,
     ?expires_in_seconds: Integer,
     # Transform options replace the lens's options of the same name.
@@ -1008,8 +1030,9 @@ module CalmLens
     ?viewer_claims: viewer_claims,
     # The asset ID or external ID.
     asset_identifier: String,
-    # `rendered` is the default. `original` and `placeholder` (a small blurred PNG) take no lens or
-    # transform; `preview` takes them, and `rendered` does when it is an image.
+    # `rendered` is the default. `original`, `hls` (the HLS master playlist), `embed` (the
+    # page that shows the asset) and `placeholder` (a small blurred PNG) take no lens or transform;
+    # `preview` takes them, and `rendered` does when it is an image.
     ?resource: cdn_resource,
     # Transform options replace the lens's options of the same name.
     ?lens: String,

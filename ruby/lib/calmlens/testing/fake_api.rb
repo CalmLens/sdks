@@ -60,9 +60,12 @@ module CalmLens
       # The moderation status each `asset.<status>` event announces.
       ANNOUNCED_STATUSES = REVIEW_DECISIONS.to_h { |status| ["asset.#{status}", status] }.freeze
       MAX_DECISION_NOTE_LENGTH = 1499
-      RESOURCES = [*CDN::SIGNED_RESOURCES, 'placeholder'].freeze
-      # Paths beneath `/rendered/` the CDN reserves for streaming and an embeddable player.
-      RESERVED_RENDERED_PATHS = %w[stream player].freeze
+      # The resources an asset's CDN path names.
+      RESOURCES = %w[original rendered preview hls embed placeholder].freeze
+      # The page the mock serves at `/embed`, standing in for the CDN's embed page.
+      EMBED_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Embed</title></head>' \
+                   '<body></body></html>'
+
       MIN_PART = 5 * 1024 * 1024
       MAX_MULTIPART_IMAGE = 20 * 1024 * 1024
       # Like the API: an upload has at most this many parts.
@@ -70,8 +73,8 @@ module CalmLens
       # The ThumbHash the mock gives every processed asset's preview, standing in for one computed
       # from its pixels. The `placeholder` resource serves it as a PNG, like the CDN.
       THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI'
-      # Removing or withholding content removes its rendered file and preview, as the API does.
-      NO_RENDERING = { 'rendered' => nil, 'preview' => nil }.freeze
+      # Removing or withholding content removes its rendered file, adaptive stream and preview, as the API does.
+      NO_RENDERING = { 'rendered' => nil, 'hls' => nil, 'preview' => nil }.freeze
       # The size of the waveform the API makes as an audio asset's preview.
       WAVEFORM_SIZE = { 'width' => 1200, 'height' => 300 }.freeze
       # Audio and video formats browsers play as uploaded, so the API serves them as stored (Asset.ts).
@@ -806,8 +809,11 @@ module CalmLens
       # first page as the preview; video and audio as a browser-safe file (MP4 or M4A unless browsers
       # play the upload), audio with a waveform preview and video with no poster; and every preview has
       # its ThumbHash. Text, spreadsheets and other files have neither. The mock decodes nothing, so
-      # sizes are unknown and audio has no peaks.
-      def rendering(asset, processed)
+      # sizes are unknown, audio has no peaks, and audio and video never get an adaptive stream.
+      def rendering(asset, processed) = { **rendered_file(asset, processed), 'hls' => nil }
+
+      # The rendered file and preview of {#rendering}.
+      def rendered_file(asset, processed)
         format = asset['content']['format']
         mime = mime_type(format)
         safe = browser_safe_media?(format)
@@ -1315,8 +1321,9 @@ module CalmLens
 
       # Answers like the CDN (serveAssetResource.ts): `original` is the upload; `rendered` the image,
       # PDF, video or audio file `content.rendered` describes; `preview` the still `content.preview`
-      # describes; and `placeholder` its ThumbHash as a PNG, public whatever the asset's visibility or
-      # moderation. A safety hold refuses every resource. Other resources pass delivery checks first,
+      # describes; `hls` the adaptive stream's files, which the mock never prepares; `embed` a small
+      # page standing in for the embed page of any asset; and `placeholder` the preview's ThumbHash as a PNG, public
+      # whatever the asset's visibility or moderation. A safety hold refuses every resource. Other resources pass delivery checks first,
       # which refuse everyone (content still uploading, blocked or purged, failed processing, removed
       # content), then an age-restricted asset needs `viewerClaims.ageConfirmed=true` whatever the key,
       # and a private asset needs an API key with `assets:download` for its folder. The mock converts
@@ -1327,17 +1334,16 @@ module CalmLens
         raw_segments = path.split('/').reject(&:empty?)
         _, project, identifier, resource = raw_segments.map { |part| URI.decode_www_form_component(part) }
         selector_path = raw_segments.drop(4)
-        # Like the CDN, `/rendered/stream` and `/rendered/player` are reserved, then the selector
-        # after the resource is read (AssetTransformParser.ts); the original takes none.
-        return no_rendered_version if resource == 'rendered' && RESERVED_RENDERED_PATHS.include?(selector_path.first)
-
+        # Like the CDN, the adaptive stream's files sit beneath `/hls/` (its master playlist is
+        # `/hls/index.m3u8`). Otherwise the selector after the resource is read
+        # (AssetTransformParser.ts); the original and the embed page take none.
         begin
-          lens, options = TransformRules.parse_selector(selector_path.join('/'))
+          lens, options = TransformRules.parse_selector(resource == 'hls' ? '' : selector_path.join('/'))
         rescue ArgumentError
           return invalid_transform
         end
         selected = !(lens || options).nil?
-        return invalid_transform if resource == 'original' && selected
+        return invalid_transform if %w[original embed].include?(resource) && selected
 
         item = project == @project_id && project_assets.find { |asset| [asset['id'], asset['externalId']].include?(identifier) }
         return error('asset/not-found', 'Asset not found', status: 404) unless item && RESOURCES.include?(resource)
@@ -1356,10 +1362,14 @@ module CalmLens
         return refused if refused
 
         restricted = item['visibility'] != 'public'
+        return embed(method, item, restricted, params) if resource == 'embed'
+
         # Then whether the asset has the resource, and whether it is a still image that takes a lens
         # or transform: the preview always is, the rendered file only when it is an image.
         rendered, preview = item['content'].values_at('rendered', 'preview')
         return no_rendered_version if (resource == 'rendered' && !rendered) || (resource == 'preview' && !preview)
+        # The mock prepares no stream, so it has no HLS files.
+        return no_rendered_version if resource == 'hls'
 
         still = resource == 'preview' || (resource == 'rendered' && rendered['kind'] == 'image')
         return invalid_transform if !still && selector
@@ -1415,6 +1425,16 @@ module CalmLens
         headers = delivery_headers(item, type, restricted, immutable)
         headers['Cache-Control'] = 'private, no-store' if params.key?('viewerClaims')
         headers
+      end
+
+      # The embed page, which shows any asset that may be delivered, as its viewer for the asset's
+      # type or a notice that the type has none; cached like other non-image content.
+      def embed(method, item, restricted, params)
+        cache = if params.key?('viewerClaims') then 'private, no-store'
+                else "#{restricted ? 'private' : 'public'}, max-age=3600"
+                end
+        cdn_response(method, EMBED_HTML, { 'content-type' => 'text/html; charset=utf-8', 'cache-control' => cache,
+                                           'cache-tag' => "asset-#{item['id']}", 'x-content-type-options' => 'nosniff' })
       end
 
       def invalid_transform = error('asset/invalid-transform', 'Invalid transform selector', status: 400)

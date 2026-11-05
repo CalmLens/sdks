@@ -686,10 +686,12 @@ def _thumbhash_png(hash_base64: str) -> bytes:
             + chunk(b"IEND", b""))
 
 
-#: Paths beneath ``/rendered/`` the CDN reserves for streaming and an embeddable player.
-_RESERVED_RENDERED_PATHS = ("stream", "player")
-#: Removing or withholding content removes its rendered file and preview, as the API does.
-_NO_RENDERING: dict[str, Any] = {"rendered": None, "preview": None}
+#: The page the mock serves at ``/embed``, standing in for the CDN's embed page.
+_MOCK_EMBED_HTML = (b'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Embed</title></head>'
+                    b'<body></body></html>')
+#: Removing or withholding content removes its rendered file, adaptive stream and preview, as the
+#: API does.
+_NO_RENDERING: dict[str, Any] = {"rendered": None, "hls": None, "preview": None}
 #: The size of the waveform the API makes as an audio asset's preview.
 _WAVEFORM_SIZE = {"width": 1200, "height": 300}
 #: Audio and video formats browsers play as uploaded, so the API serves them as stored.
@@ -701,13 +703,20 @@ _SPREADSHEET_MIME_TYPES = ("application/vnd.openxmlformats-officedocument.spread
 
 
 def _mock_rendering(asset: Mapping[str, Any], processed: bool) -> dict[str, Any]:
+    """The rendered file, adaptive stream (never one: the mock prepares none) and preview the API
+    reports for an asset with its content held."""
+    return {**_mock_rendered_file(asset, processed), "hls": None}
+
+
+def _mock_rendered_file(asset: Mapping[str, Any], processed: bool) -> dict[str, Any]:
     """The rendered file and preview the API reports for an asset with its content held. Once
     uploaded, an image renders as itself with a preview that has no ThumbHash yet, and a PDF and
     browser-safe audio and video render as uploaded. Once processed, a website renders as its
     screenshot; a document or presentation as a PDF, with its first page as the preview; video and
     audio as a browser-safe file (MP4 or M4A unless browsers play the upload), audio with a waveform
     preview and video with no poster; and every preview has its ThumbHash. Text, spreadsheets and
-    other files have neither. The mock decodes nothing, so sizes are unknown and audio has no peaks."""
+    other files have neither. The mock decodes nothing, so sizes are unknown, audio has no peaks, and
+    audio and video never get an adaptive stream."""
     fmt = asset["content"].get("format")
     mime = _normalize_upload_mime_type(fmt or "")
     browser_safe = mime in _BROWSER_SAFE_MEDIA_FORMATS
@@ -2186,16 +2195,16 @@ class MockCalmLensServerClient(CalmLensServerClient):
         selector_path = segments[4:]
         no_rendered_version = _Failure("asset/no-rendered-version", "This asset has no such resource", 404)
         invalid_transform = _Failure("asset/invalid-transform", "Invalid transform selector", 400)
-        # Like the CDN, ``/rendered/stream`` and ``/rendered/player`` are reserved, then the
-        # selector after the resource is read; the original takes none.
-        if resource == "rendered" and selector_path and selector_path[0] in _RESERVED_RENDERED_PATHS:
-            return self._failure_response(no_rendered_version)
+        # Like the CDN, the adaptive stream's files sit beneath ``/hls/`` (its master playlist is
+        # ``/hls/index.m3u8``); the mock prepares no stream, so it has none. Otherwise the selector
+        # after the resource is read; the original and the embed page take none.
+        is_hls = resource == "hls"
         try:
-            lens, transform_options = _parse_transform_selector("/".join(selector_path))
+            lens, transform_options = _parse_transform_selector("" if is_hls else "/".join(selector_path))
         except _InvalidSelector:
             return self._failure_response(invalid_transform)
         has_selector = lens is not None or transform_options is not None
-        if resource == "original" and has_selector:
+        if resource in ("original", "embed") and has_selector:
             return self._failure_response(invalid_transform)
         not_available = _Failure("asset/not-available", "Asset is not available", 403)
         with self._state_lock:
@@ -2238,9 +2247,18 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._failure_response(_Failure(
                     "asset/api-key-missing-permission",
                     "This API key needs assets:download permission for this asset’s folder.", 403))
+            # The embed page shows any asset that may be delivered, as its viewer for the asset's
+            # type or a notice that the type has none.
+            if resource == "embed":
+                return self._cdn_response(method, _MOCK_EMBED_HTML, {
+                    "Content-Type": "text/html; charset=utf-8",
+                    "Cache-Control": "private, no-store" if claims
+                    else f"{'private' if private else 'public'}, max-age=3600",
+                    "Cache-Tag": f"asset-{asset['id']}", "X-Content-Type-Options": "nosniff"})
             # Then whether the asset has the resource, and whether it is a still image that takes a
             # lens or transform: the preview always is, the rendered file only when it is an image.
-            if (resource == "rendered" and not rendered) or (resource == "preview" and not preview):
+            # The mock prepares no stream, so it has no HLS files.
+            if (resource == "rendered" and not rendered) or (resource == "preview" and not preview) or is_hls:
                 return self._failure_response(no_rendered_version)
             still_image = resource == "preview" or (resource == "rendered" and (rendered or {}).get("kind") == "image")
             if not still_image and has_selector:

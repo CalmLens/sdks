@@ -159,7 +159,7 @@ final class MockServerClientTest extends TestCase
             self::assertSame(200, $client->cdn->serve(['assetIdentifier' => $photo['id'], 'resource' => $resource])->getStatusCode(), $resource);
         }
         $mock->assets[$photo['id']]['content']['safetyHold'] = ['placedAt' => 1, 'reason' => 'suspected-illegal-content', 'disposedAt' => null];
-        foreach (['original', 'rendered', 'preview', 'placeholder'] as $resource) {
+        foreach (['original', 'rendered', 'preview', 'hls', 'embed', 'placeholder'] as $resource) {
             $response = $client->cdn->serve(['assetIdentifier' => $photo['id'], 'resource' => $resource]);
             self::assertSame([403, 'asset/not-available'], [$response->getStatusCode(), json_decode((string) $response->getBody(), true)['code']], $resource);
         }
@@ -168,6 +168,37 @@ final class MockServerClientTest extends TestCase
         $mock->assets[$queued['id']]['content']['safetyHold'] = ['placedAt' => 1, 'reason' => 'suspected-illegal-content', 'disposedAt' => null];
         $held = $mock->completeProcessing($queued['id'], 'allowed');
         self::assertSame([null, null], [$held['content']['rendered'], $held['content']['preview']]);
+    }
+
+    /**
+     * The client builds only the master playlist's URL and refuses a selector on the embed page, so
+     * these requests are sent past it, straight to the mock.
+     */
+    public function testTheMockPreparesNoHlsStreamAndTheEmbedPageTakesNoSelectorAndShowsAnyAsset(): void
+    {
+        $mock = new MockServerClient();
+        $client = $mock->client();
+        $keep = ['keepContentAfterProcessing' => true];
+        $video = $client->assets->classify(['name' => 'clip.mp4', 'visibility' => 'public',
+            'content' => ['data' => 'mp4-bytes', 'type' => 'video/mp4'], 'processingOptions' => $keep]);
+        self::assertNull($video['content']['hls']);
+        $http = (fn () => $this->http)->call((fn () => $this->session)->call($client));
+        $base = 'https://cdn.calmlens.invalid/v1/assets/project-1';
+        // The selector is refused before the asset is looked up; the stream has neither a master nor a media playlist.
+        $cases = [["$base/missing/embed/@thumbnail", 400, 'asset/invalid-transform'],
+            ["$base/{$video['id']}/hls/index.m3u8", 404, 'asset/no-rendered-version'],
+            ["$base/{$video['id']}/hls/video-720p.m3u8", 404, 'asset/no-rendered-version']];
+        foreach ($cases as [$url, $status, $code]) {
+            $response = $http->request('GET', $url, ['http_errors' => false]);
+            self::assertSame([$status, $code], [$response->getStatusCode(), json_decode((string) $response->getBody(), true)['code'] ?? null], $url);
+        }
+        // Unlike the stream, the embed page serves every asset type that may be delivered.
+        $sheet = $client->assets->classify(['name' => 'sheet.csv', 'visibility' => 'public',
+            'content' => ['data' => 'a,b', 'type' => 'text/csv'], 'processingOptions' => $keep]);
+        foreach ([$video, $sheet] as $asset) {
+            $embed = $client->cdn->serve(['assetIdentifier' => $asset['id'], 'resource' => 'embed', 'init' => ['method' => 'HEAD']]);
+            self::assertSame([200, 'text/html; charset=utf-8', ''], [$embed->getStatusCode(), $embed->getHeaderLine('Content-Type'), (string) $embed->getBody()], $asset['name']);
+        }
     }
 
     public function testFiltersSupportOrWildcardsAndValueLists(): void

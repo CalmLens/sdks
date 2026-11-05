@@ -38,7 +38,7 @@ __all__ = [
     "EvaluatedPolicyConditionResult", "PolicyConditionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetPreview", "AssetModerationTimeline", "SignedCdnResource",
+    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "StreamingFeatureOptions", "AssetPreview", "AssetModerationTimeline", "SignedCdnResource",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions",
@@ -112,14 +112,18 @@ ProcessingFeatureStage = Union[Literal["beta", "ga"], str]
 LensType = Literal["image", "video", "audio", "document", "website"]
 #: The CDN resources a signed URL can be created for: ``original`` (the exact upload), ``rendered``
 #: (the displayable file: an image in the best format the client accepts, a PDF, or browser-safe
-#: video or audio) or ``preview`` (a still image that stands for the asset).
-SignedCdnResource = Literal["original", "rendered", "preview"]
+#: video or audio), ``preview`` (a still image that stands for the asset), ``hls`` (the HLS
+#: master playlist of audio or video, once ``content.hls`` is set; one signature covers every
+#: playlist and segment beneath ``/hls/``) or ``embed`` (an HTML page that shows the asset, for an
+#: iframe).
+SignedCdnResource = Literal["original", "rendered", "preview", "hls", "embed"]
 #: Which CDN resource of an asset to address: a signed resource, or ``placeholder``, a small blurred
 #: PNG made from the preview that is served publicly for every asset whatever its visibility or
 #: moderation status, without age confirmation. Defaults to ``rendered``. Lenses and transforms
-#: apply to ``preview``, and to ``rendered`` when it is an image; the CDN refuses them on other
-#: resources with ``asset/invalid-transform``.
-CdnResource = Literal["original", "rendered", "preview", "placeholder"]
+#: apply to ``preview``, and to ``rendered`` when it is an image; the CDN refuses them on rendered
+#: PDFs, video and audio with ``asset/invalid-transform``, and the SDK refuses them on
+#: ``original``, ``hls``, ``embed`` and ``placeholder``.
+CdnResource = Literal["original", "rendered", "preview", "hls", "embed", "placeholder"]
 #: How ``assets.search`` matches.
 SearchMode = Literal["keyword", "semantic", "hybrid"]
 #: Fields a search result matched on. New fields may be added.
@@ -243,6 +247,15 @@ class AiGeneratedDetectionFeatureOptions(TypedDict):
     enabled: bool
 
 
+class StreamingFeatureOptions(TypedDict):
+    """Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made
+    browser-safe, served at the ``hls`` resource and played by the ``embed`` resource. Needs
+    ``keepContentAfterProcessing``. Billed per started minute of media; ``enabled: False`` turns it
+    off for an upload in a project that streams by default."""
+    #: Whether to prepare the stream. Left out, the project's streaming setting decides.
+    enabled: bool
+
+
 class ProcessingFeatures(TypedDict, total=False):
     """Optional analyses to run on an asset, keyed by feature. ``linkDetection`` runs unless
     its ``enabled`` is false; every other feature is off unless its ``enabled`` is true.
@@ -252,6 +265,7 @@ class ProcessingFeatures(TypedDict, total=False):
     faceDetection: Optional[FaceDetectionFeatureOptions]
     linkDetection: Optional[LinkDetectionFeatureOptions]
     aiGeneratedDetection: Optional[AiGeneratedDetectionFeatureOptions]
+    streaming: Optional[StreamingFeatureOptions]
 
 
 class ProcessingOptions(TypedDict, total=False):
@@ -619,6 +633,27 @@ class Checksums(TypedDict, total=False):
 AssetRenderedKind = Literal["image", "pdf", "video", "audio"]
 
 
+class AssetHlsRendition(TypedDict):
+    """One rendition of the adaptive (HLS) stream, as its master playlist lists it."""
+    #: ``video`` for a picture size (video renditions carry no sound; they play with the ``audio``
+    #: rendition), or ``audio``.
+    kind: Literal["video", "audio"]
+    #: Picture width and height in pixels; ``None`` for audio.
+    width: Optional[int]
+    height: Optional[int]
+    #: Peak bit rate in bits per second, counting the audio a video rendition plays with.
+    bandwidth: int
+    #: The rendition's codecs as RFC 6381 names, such as ``avc1.64001f``.
+    codecs: str
+
+
+class AssetHls(TypedDict):
+    """Preview. The adaptive stream of audio or video: HLS with fragmented MP4 (CMAF) segments,
+    served at the ``hls`` resource (``/hls/index.m3u8``) and played by the ``embed`` resource."""
+    #: Every rendition, video from the largest down, then audio.
+    renditions: list[AssetHlsRendition]
+
+
 class _AssetRenderedRequired(TypedDict):
     kind: AssetRenderedKind
     #: MIME type of the rendered file. An image is served in the best format the client accepts,
@@ -857,6 +892,11 @@ class AssetContent(TypedDict):
     #: video or audio. ``None`` when the asset has none, once the content is removed and while the
     #: asset is held.
     rendered: Optional[AssetRendered]
+    #: Preview. The adaptive (HLS) stream of video or audio, once streaming has prepared it from the
+    #: rendered file, served at the ``hls`` resource and played by the ``embed`` page. ``None`` for
+    #: other assets, until a stream is prepared, once the content is removed and while the asset is
+    #: held.
+    hls: Optional[AssetHls]
     #: A still image for the asset, served at the ``preview`` resource (and its blurred placeholder
     #: at ``placeholder``). ``None`` when the asset has none, once the content is removed and while
     #: the asset is held.

@@ -1193,11 +1193,16 @@ DEFAULT_DECISION_TIMEOUT = 60.0
 #: ``assets.create_signed_url``'s lifetime when ``expires_in_seconds`` is omitted.
 DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS = 900
 #: The CDN resources a signed URL can be created for, as the API accepts them.
-SIGNED_CDN_RESOURCES: tuple[SignedCdnResource, ...] = ("original", "rendered", "preview")
-#: Every CDN resource: the signed ones and the public ``placeholder``.
-_CDN_RESOURCES: tuple[CdnResource, ...] = (*SIGNED_CDN_RESOURCES, "placeholder")
-#: The resources that take no lens or transform: the exact upload and the public placeholder.
-_UNSELECTABLE_CDN_RESOURCES = ("original", "placeholder")
+SIGNED_CDN_RESOURCES: tuple[SignedCdnResource, ...] = ("original", "rendered", "preview", "hls", "embed")
+#: Where each CDN resource is served beneath an asset's CDN path: the signed ones and the public
+#: ``placeholder``. The adaptive stream is its HLS master playlist; its media playlists and
+#: segments are the other files beneath ``hls/``.
+_CDN_RESOURCE_PATHS: dict[CdnResource, str] = {
+    "original": "original", "rendered": "rendered", "preview": "preview",
+    "hls": "hls/index.m3u8", "embed": "embed", "placeholder": "placeholder"}
+#: The resources that take no lens or transform: the exact upload, the adaptive stream, the embed
+#: page and the public placeholder.
+_UNSELECTABLE_CDN_RESOURCES = ("original", "hls", "embed", "placeholder")
 
 _SUBMIT_QUERY_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "authorId", "context",
                       "externalId", "externalUrl", "folderId", "uploadPresetId")
@@ -1528,8 +1533,8 @@ class Assets:
         resource = body.get("resource", "rendered")
         if resource not in SIGNED_CDN_RESOURCES:
             raise _invalid("A signed URL's resource must be one of " + ", ".join(SIGNED_CDN_RESOURCES))
-        if resource == "original" and ("lens" in body or "transform" in body):
-            raise _invalid("The original resource takes no lens or transform")
+        if resource in _UNSELECTABLE_CDN_RESOURCES and ("lens" in body or "transform" in body):
+            raise _invalid(f"The {resource} resource takes no lens or transform")
         expires = body["expiresInSeconds"]
         if isinstance(expires, bool) or not isinstance(expires, int) or not 1 <= expires <= 86400:
             raise _invalid("expires_in_seconds must be a whole number from 1 to 86400")
@@ -1843,13 +1848,16 @@ class CDN:
     def get_asset_url(self, options: AssetUrlOptions | None = None, /, *, asset_identifier: str = _UNSET,
                       resource: CdnResource = _UNSET, lens: str = _UNSET, transform: CdnTransform = _UNSET,
                       viewer_claims: ViewerClaims = _UNSET) -> str:
-        """The CDN URL of an asset's ``rendered`` (default), ``original``, ``preview`` or ``placeholder``
-        resource. ``rendered`` is the displayable file (an image in the best format the client
-        accepts, a PDF, or browser-safe video or audio), ``original`` the exact upload and ``preview``
-        a still image for the asset. ``preview``, and ``rendered`` when it is an image, optionally go
-        through a named ``lens``, a ``transform``, or both (the lens runs first); the CDN refuses
-        them on rendered PDFs, video and audio with ``asset/invalid-transform``, and ``original``
-        takes neither. Private assets need an API key or a signed URL.
+        """The CDN URL of an asset's ``rendered`` (default), ``original``, ``preview``, ``hls``,
+        ``embed`` or ``placeholder`` resource. ``rendered`` is the displayable file (an image in the
+        best format the client accepts, a PDF, or browser-safe video or audio), ``original`` the
+        exact upload and ``preview`` a still image for the asset. ``hls`` is the HLS master
+        playlist of audio or video, at ``hls/index.m3u8``, once ``content.hls`` is set, and
+        ``embed`` an HTML page that shows the asset (a viewer for its type), for an iframe.
+        ``preview``, and ``rendered`` when it is an image, optionally go through a named ``lens``, a
+        ``transform``, or both (the lens runs first); the CDN refuses them on rendered PDFs, video and
+        audio with ``asset/invalid-transform``, and ``original``, ``hls`` and ``embed`` take neither.
+        Private assets need an API key or a signed URL.
 
         ``placeholder`` is a small blurred PNG that the CDN serves publicly for every asset, whatever
         its visibility or moderation status. It takes no ``lens`` or ``transform``, and needs no age confirmation.
@@ -1863,13 +1871,13 @@ class CDN:
                         viewer_claims=viewer_claims)
 
         selected = merged.get("resource", "rendered")
-        if selected not in _CDN_RESOURCES:
-            raise _invalid("Resource must be one of " + ", ".join(_CDN_RESOURCES))
+        if selected not in _CDN_RESOURCE_PATHS:
+            raise _invalid("Resource must be one of " + ", ".join(_CDN_RESOURCE_PATHS))
         transformed = merged.get("lens") is not None or merged.get("transform") is not None
         if selected in _UNSELECTABLE_CDN_RESOURCES and transformed:
             raise _invalid(f"The {selected} resource takes no lens or transform")
         url = (f"{self._c.cdn_base_url}/assets/{_id(self._c.project_id)}/"
-               f"{_id(merged.get('assetIdentifier'), 'assetIdentifier')}/{selected}")
+               f"{_id(merged.get('assetIdentifier'), 'assetIdentifier')}/{_CDN_RESOURCE_PATHS[selected]}")
         selector = ["@" + _id(merged["lens"], "lens")] if merged.get("lens") else []
         if _has_transform(merged.get("transform")):
             selector.append(_transform_path(merged["transform"]))

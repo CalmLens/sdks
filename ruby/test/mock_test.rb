@@ -62,12 +62,36 @@ class MockTest < Minitest::Test
     assert_equal 200, mock.cdn.serve(asset_identifier: asset['id'], resource: 'placeholder').status
     mock.state.assets[asset['id']]['content']['safetyHold'] = { 'placedAt' => 1, 'reason' => 'suspected-illegal-content' }
 
-    %w[original rendered preview placeholder].each do |resource|
+    %w[original rendered preview hls embed placeholder].each do |resource|
       served = mock.cdn.serve(asset_identifier: asset['id'], resource: resource)
       assert_equal [403, 'asset/not-available'], [served.status, JSON.parse(served.body)['code']], resource
     end
     error = assert_raises(CalmLens::APIError) { mock.assets.list_timeline(asset_id: asset['id']) }
     assert_equal ['asset/safety-held', 423], [error.code, error.status]
+  end
+
+  def test_the_mock_prepares_no_hls_stream_and_the_embed_page_takes_no_selector_and_shows_any_asset
+    mock = CalmLens::MockServerClient.new
+    video = mock.assets.classify(name: 'clip.mp4', content: { data: 'hello', type: 'video/mp4' }, processing_options: KEEP,
+                                 visibility: 'public')
+    assert_nil video['content']['hls']
+    base = "#{mock.cdn_base_url}/assets/project-1"
+    # The client builds only the master playlist's URL and refuses a selector on the embed page, so
+    # these requests go straight to the mock's transport. The selector is refused before the asset is
+    # looked up; the stream has neither a master nor a media playlist.
+    [["#{base}/missing/embed/@thumbnail", 400, 'asset/invalid-transform'],
+     ["#{base}/#{video['id']}/hls/index.m3u8", 404, 'asset/no-rendered-version'],
+     ["#{base}/#{video['id']}/hls/video-720p.m3u8", 404, 'asset/no-rendered-version']].each do |url, status, code|
+      response = mock.send(:receive, CalmLens::Transport::Request.new(method: 'GET', url: url, headers: {}, body: nil))
+      assert_equal [status, code], [response.status, JSON.parse(response.body)['code']], url
+    end
+    # Unlike the stream, the embed page serves every asset type that may be delivered.
+    sheet = mock.assets.classify(name: 'sheet.csv', content: { data: 'a,b', type: 'text/csv' }, processing_options: KEEP,
+                                 visibility: 'public')
+    [video, sheet].each do |asset|
+      embed = mock.cdn.serve(asset_identifier: asset['id'], resource: 'embed', init: { method: 'HEAD' })
+      assert_equal [200, 'text/html; charset=utf-8', ''], [embed.status, embed.headers['content-type'], embed.body], asset['name']
+    end
   end
 
   def test_hash_list_entries_take_an_assets_hash_and_go_with_their_list

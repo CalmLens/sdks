@@ -24,7 +24,7 @@ ages = faces.map { |face| face['ageRange']&.fetch('low') }
 uploaded = client.assets.create(name: 'photo.jpg', content: { type: 'image/jpeg', data: File.open('photo.jpg', 'rb') },
                                 metadata: [{ id: 'author', value: { 'name' => 'Ada' } }], visibility: 'private',
                                 processing_options: { features: { face_detection: { enabled: true, age_estimation: true },
-                                                                  ocr: { enabled: true } } },
+                                                                  ocr: { enabled: true }, streaming: { enabled: true } } },
                                 request_options: { idempotency_key: 'upload-1', timeout: 60 })
 first = client.assets.classify(name: 'big.png', part: { type: 'image/png', base64: 'AAAA', is_final: false },
                                total_size_in_bytes: 12_000_000)
@@ -86,6 +86,9 @@ lens = client.ensure_lens(identifier: 'small', name: 'Small', type: 'image', act
 lens_width = lenses.first&.dig('transform', 'width')
 
 url = client.cdn.get_asset_url(asset_identifier: 'post-1', lens: lens['identifier'], viewer_claims: { age_confirmed: true })
+renditions = asset['content']['hls']&.fetch('renditions')&.map { |rendition| [rendition['kind'], rendition['bandwidth']] }
+embed = client.cdn.get_asset_url(asset_identifier: 'post-1', resource: 'embed')
+hls = client.assets.create_signed_url(asset_id: 'post-1', resource: 'hls')['url']
 bytes = client.cdn.serve(asset_identifier: 'post-1', init: { method: 'HEAD', headers: { 'If-None-Match' => 'x' } }) do |response|
   response.success? ? response.body(limit: 1024) : nil
 end
@@ -136,4 +139,5 @@ scored = CalmLens::TestInputs.generate_text_code({ instances: [{ category: 'viol
 phrase = CalmLens::TestInputs.generate_media_code('violence', test_input_key)
 
 [status, processing, failure, reviews, removal, format, camera, score, ages, names, more, children, matched, expires, lens_width, url,
- bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered, signed, scored, phrase]
+ renditions, embed, hls, bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered, signed, scored,
+ phrase]

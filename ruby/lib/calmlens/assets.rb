@@ -258,7 +258,9 @@ module CalmLens
     # Creates a time-limited URL that delivers private content without an API key.
     # @option options [String] :asset_id
     # @option options [String] :resource one of {CDN::SIGNED_RESOURCES}: `rendered` (the API's default),
-    #   `original`, which takes no lens or transform, or `preview`
+    #   `original`, `preview`, `hls` (the HLS master playlist of audio or video; one signature covers every
+    #   playlist and segment beneath `hls/`) or `embed` (the page that shows the asset in an iframe). `original`, `hls`
+    #   and `embed` take no lens or transform
     # @option options [Integer] :expires_in_seconds default 900
     # @option options [String] :lens a lens identifier
     # @option options [String, Hash] :transform a selector String or structured options, as for
@@ -521,8 +523,8 @@ module CalmLens
       unless CDN::SIGNED_RESOURCES.include?(resource)
         raise Internal.invalid("A signed URL's resource must be one of #{CDN::SIGNED_RESOURCES.join(', ')}")
       end
-      if resource == 'original' && (body.key?('lens') || body.key?('transform'))
-        raise Internal.invalid('The original resource takes no lens or transform')
+      if Internal::UNSELECTABLE_CDN_RESOURCES.include?(resource) && (body.key?('lens') || body.key?('transform'))
+        raise Internal.invalid("The #{resource} resource takes no lens or transform")
       end
 
       expires = body['expiresInSeconds']

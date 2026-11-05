@@ -108,10 +108,34 @@ class MockTests(unittest.TestCase):
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.list_timeline(asset_id=asset["id"])
         self.assertEqual(raised.exception.code, error_codes.ASSET_SAFETY_HELD)
-        for resource in ("original", "rendered", "preview", "placeholder"):
+        for resource in ("original", "rendered", "preview", "hls", "embed", "placeholder"):
             with c.cdn.serve(asset_identifier=asset["id"], resource=resource) as response:
                 self.assertEqual((resource, response.status, json.loads(response.read())["code"]),
                                  (resource, 403, "asset/not-available"))
+
+    def test_the_mock_prepares_no_hls_stream_and_the_embed_page_takes_no_selector_and_shows_any_asset(self):
+        c = MockCalmLensServerClient()
+        keep = {"keepContentAfterProcessing": True}
+        video = c.assets.classify(name="clip.mp4", content={"data": b"mp4", "type": "video/mp4"},
+                                  processing_options=keep, visibility="public")
+        self.assertIsNone(video["content"]["hls"])
+        base = f"{c.cdn_base_url}/assets/{c.project_id}"
+        # The client builds only the master playlist's URL and refuses a selector on the embed page,
+        # so these requests go straight to the mock's transport. The selector is refused before the
+        # asset is looked up; the stream has neither a master nor a media playlist.
+        cases = [(f"{base}/missing/embed/@thumbnail", 400, "asset/invalid-transform"),
+                 (f"{base}/{video['id']}/hls/index.m3u8", 404, "asset/no-rendered-version"),
+                 (f"{base}/{video['id']}/hls/video-720p.m3u8", 404, "asset/no-rendered-version")]
+        for url, status, code in cases:
+            with self.subTest(url=url), c.transport(Request(url), 1) as response:
+                self.assertEqual((response.status, json.loads(response.read())["code"]), (status, code))
+        # Unlike the stream, the embed page serves every asset type that may be delivered.
+        sheet = c.assets.classify(name="sheet.csv", content={"data": b"a,b", "type": "text/csv"},
+                                  processing_options=keep, visibility="public")
+        for asset in (video, sheet):
+            with c.cdn.serve(asset_identifier=asset["id"], resource="embed", init={"method": "HEAD"}) as embed:
+                self.assertEqual((embed.status, embed.content_type, embed.read()),
+                                 (200, "text/html; charset=utf-8", b""))
 
     def test_unknown_mock_options_and_a_moderate_that_is_not_a_function_are_configuration_errors(self):
         for options in ({"moderate": "blocked"}, {"queued_outcome": "pending"}):

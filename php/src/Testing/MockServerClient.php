@@ -81,11 +81,13 @@ final class MockServerClient
     private const SPREADSHEET_MIME_TYPES = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/vnd.ms-excel.sheet.macroenabled.12', 'application/vnd.ms-excel', 'application/vnd.oasis.opendocument.spreadsheet'];
     /** Removing or withholding content removes its rendered file and preview, as the API does. */
-    private const NO_RENDERING = ['rendered' => null, 'preview' => null];
+    private const NO_RENDERING = ['rendered' => null, 'hls' => null, 'preview' => null];
     /** The size of the waveform the API makes as an audio asset's preview. */
     private const WAVEFORM_SIZE = ['width' => 1200, 'height' => 300];
-    /** Paths beneath `/rendered/` the CDN reserves for streaming and an embeddable player. */
-    private const RESERVED_RENDERED_PATHS = ['stream', 'player'];
+    /** The resources an asset's CDN path names. */
+    private const PATH_RESOURCES = ['original', 'rendered', 'preview', 'hls', 'embed', 'placeholder'];
+    /** The page the mock serves at `/embed`, standing in for the CDN's embed page. */
+    private const EMBED_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Embed</title></head><body></body></html>';
     private const MIB = 1024 * 1024;
     /** Like the API: an upload has at most this many parts. */
     private const MAX_UPLOAD_PARTS = 10000;
@@ -773,8 +775,8 @@ final class MockServerClient
      * screenshot; a document or presentation as a PDF, with its first page as the preview; video
      * and audio as a browser-safe file (MP4 or M4A unless browsers play the upload), audio with a
      * waveform preview and video with no poster; and every preview has its ThumbHash. Text,
-     * spreadsheets and other files have neither. The mock decodes nothing, so sizes are unknown and
-     * audio has no peaks.
+     * spreadsheets and other files have neither. The mock decodes nothing, so sizes are unknown,
+     * audio has no peaks, and audio and video never get an adaptive stream.
      *
      * @return array{rendered: ?array, preview: ?array}
      */
@@ -790,7 +792,8 @@ final class MockServerClient
         if (!$processed && !$rendersOnUpload) {
             return self::NO_RENDERING;
         }
-        return match ($type) {
+        // The mock prepares no adaptive stream.
+        return ['hls' => null] + match ($type) {
             'image' => ['rendered' => ['kind' => 'image', 'format' => $format ?? 'image/png'] + $unsized, 'preview' => $preview($unsized)],
             'website' => ['rendered' => ['kind' => 'image', 'format' => 'image/png'] + $unsized, 'preview' => $preview($unsized)],
             'multimedia-document' => in_array($mime, self::SPREADSHEET_MIME_TYPES, true) ? self::NO_RENDERING
@@ -2043,7 +2046,9 @@ final class MockServerClient
     /**
      * Serves an asset's resources like the CDN, with its headers: `original` is the upload;
      * `rendered` the image, PDF, video or audio file `content.rendered` describes; `preview` the
-     * still `content.preview` describes; and `placeholder` its ThumbHash as a PNG. The mock converts
+     * still `content.preview` describes; `hls` the adaptive stream's files, which the mock never
+     * prepares; `embed` a small page standing in for the embed page of any asset; and `placeholder` the preview's
+     * ThumbHash as a PNG. The mock converts
      * nothing: an upload stands in for its rendered file and an image's preview, and the placeholder
      * PNG for a website screenshot, document page or audio waveform.
      */
@@ -2052,14 +2057,12 @@ final class MockServerClient
         [, $project, $identifier, $resource] = $segments + [null, null, null, null];
         $noRenderedVersion = fn () => $this->json(404, ['code' => 'asset/no-rendered-version', 'message' => 'This asset has no such resource']);
         $invalidTransform = fn () => $this->json(400, ['code' => 'asset/invalid-transform', 'message' => 'Invalid transform selector']);
-        // Like the CDN, `/rendered/stream` and `/rendered/player` are reserved, then the selector
-        // after the resource is read; the original takes none.
-        if ($resource === 'rendered' && in_array(explode('/', $selector)[0], self::RESERVED_RENDERED_PATHS, true)) {
-            return $noRenderedVersion();
-        }
-        $transform = Transforms::parse($selector);
+        // Like the CDN, the adaptive stream's files sit beneath `/hls/` (its master playlist is
+        // `/hls/index.m3u8`). Otherwise the selector after the resource is read; the original and
+        // the embed page take none.
+        $transform = Transforms::parse($resource === 'hls' ? '' : $selector);
         $selected = $transform !== null && ($transform['lens'] !== null || $transform['options'] !== null);
-        if ($transform === null || ($resource === 'original' && $selected)) {
+        if ($transform === null || (in_array($resource, ['original', 'embed'], true) && $selected)) {
             return $invalidTransform();
         }
         $asset = null;
@@ -2068,7 +2071,7 @@ final class MockServerClient
                 $asset = $candidate;
             }
         }
-        if ($project !== $this->projectId || $asset === null || !in_array($resource, Cdn::RESOURCES, true)) {
+        if ($project !== $this->projectId || $asset === null || !in_array($resource, self::PATH_RESOURCES, true)) {
             return $this->json(404, ['code' => 'asset/not-found', 'message' => 'Asset not found']);
         }
         $notAvailable = fn () => $this->json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
@@ -2105,9 +2108,20 @@ final class MockServerClient
         if ($private && !$this->canDownload($asset['folderId'] ?? null)) {
             return $this->json(403, ['code' => 'asset/api-key-missing-permission', 'message' => 'This API key needs assets:download permission for this asset’s folder.']);
         }
+        // The embed page shows any asset that may be delivered, as its viewer for the asset's type
+        // or a notice that the type has none.
+        if ($resource === 'embed') {
+            return $this->cdnResponse($method, self::EMBED_HTML, ['Content-Type' => 'text/html; charset=utf-8',
+                'Cache-Control' => $claims ? 'private, no-store' : ($private ? 'private' : 'public') . ', max-age=3600',
+                'Cache-Tag' => 'asset-' . $asset['id'], 'X-Content-Type-Options' => 'nosniff']);
+        }
         // Then whether the asset has the resource, and whether it is a still image that takes a
         // lens or transform: the preview always is, the rendered file only when it is an image.
         if (($resource === 'rendered' && $rendered === null) || ($resource === 'preview' && $preview === null)) {
+            return $noRenderedVersion();
+        }
+        // The mock prepares no stream, so it has no HLS files.
+        if ($resource === 'hls') {
             return $noRenderedVersion();
         }
         $still = $resource === 'preview' || ($resource === 'rendered' && $rendered['kind'] === 'image');

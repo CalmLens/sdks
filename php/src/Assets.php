@@ -200,14 +200,15 @@ final class Assets extends Resource
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
         $path = $this->path($api, 'assets', 'assetId');
-        // As the API checks: the original, rendered and preview resources are signed (a
-        // placeholder needs no signature), and the original takes no lens or transform.
+        // As the API checks: the original, rendered, preview, hls and embed resources are signed
+        // (a placeholder needs no signature), and the original, hls and embed take no lens or
+        // transform.
         $resource = $api['resource'] ?? 'rendered';
         if (!in_array($resource, Cdn::SIGNED_RESOURCES, true)) {
             Values::invalid("A signed URL's resource must be one of " . implode(', ', Cdn::SIGNED_RESOURCES));
         }
-        if ($resource === 'original' && (isset($api['lens']) || isset($api['transform']))) {
-            Values::invalid('The original resource takes no lens or transform');
+        if (in_array($resource, Cdn::UNSELECTABLE_RESOURCES, true) && (isset($api['lens']) || isset($api['transform']))) {
+            Values::invalid("The $resource resource takes no lens or transform");
         }
         $expires = $api['expiresInSeconds'] ?? self::DEFAULT_SIGNED_URL_SECONDS;
         if (!is_int($expires) || $expires < 1 || $expires > self::MAX_SIGNED_URL_SECONDS) {
