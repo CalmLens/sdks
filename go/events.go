@@ -96,9 +96,12 @@ type EventAssetUpload struct {
 }
 
 type EventAssetClassification struct {
-	Moderation EventAssetModeration `json:"moderation"`
 	// Status is one of the ClassificationStatus constants.
 	Status string `json:"status"`
+	// TestInput is whether the results came from one of the project's test inputs rather than
+	// analysing the content. Never use test results, such as age ranges, for real decisions.
+	TestInput  bool                 `json:"testInput"`
+	Moderation EventAssetModeration `json:"moderation"`
 }
 
 // EventAssetModeration is the asset's moderation status when the event was created.

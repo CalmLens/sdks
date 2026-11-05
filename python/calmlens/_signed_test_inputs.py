@@ -14,7 +14,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, TypedDict, Union, cast
 
-from ._mock_classification import CATEGORIES, INPUT_QUALIFIERS, QUALIFIERS
+from ._mock_classification import (CATEGORIES, INPUT_QUALIFIERS, QUALIFIERS, TEST_DETECTION_BOX_MAX,
+                                  TEST_DETECTIONS_MAX, TEST_FACE_AGE_MAX, TEST_FACE_AGE_PRESETS)
 from .client import _invalid
 from .types import ClassificationCategory
 
@@ -48,15 +49,55 @@ class SignedTestInstance(_SignedTestInstanceRequired, total=False):
     action: SignedTestAction
 
 
+#: A test face's age preset.
+SignedTestFaceAgePreset = Literal["adult", "minor"]
+
+
+class SignedTestFaceAgeRange(TypedDict):
+    """A test face's estimated age range in years: integers from 0 to 120, ``low`` at most
+    ``high``."""
+    low: int
+    high: int
+
+
+#: A test face's age: a preset or a range.
+SignedTestFaceAge = Union[SignedTestFaceAgePreset, SignedTestFaceAgeRange]
+
+
+class _SignedTestDetectedPersonRequired(TypedDict):
+    box: list[int]
+
+
+class SignedTestDetectedPerson(_SignedTestDetectedPersonRequired, total=False):
+    """A detected person: ``box`` is ``[left, top, width, height]`` in integer basis points of the
+    image (0 to 10000, inside the image), and ``confidence`` an integer percentage (0 to 100)."""
+    confidence: int
+
+
+class SignedTestDetectedFace(SignedTestDetectedPerson, total=False):
+    """A detected face, like a person, optionally with its estimated age."""
+    age: SignedTestFaceAge
+
+
+class SignedTestDetections(TypedDict, total=False):
+    """The person and face detection results a test input reports instead of running detection:
+    each a list of at most 32 entries, or ``"unavailable"`` to report the feature as not
+    evaluated."""
+    people: list[SignedTestDetectedPerson] | Literal["unavailable"]
+    faces: list[SignedTestDetectedFace] | Literal["unavailable"]
+
+
 class _SignedTestInputRequired(TypedDict):
     instances: list[SignedTestInstance]
 
 
 class SignedTestInput(_SignedTestInputRequired, total=False):
     """A test scenario: up to 128 instances, the categories CalmLens reports as not assessed
-    (none may have instances), and up to one action per region."""
+    (none may have instances), up to one action per region, and the person and face detections
+    to report."""
     regionalActions: list[SignedTestRegionalAction]
     unassessedCategories: list[ClassificationCategory]
+    detections: SignedTestDetections
 
 
 @dataclass(frozen=True)
@@ -77,7 +118,8 @@ _HEX_WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven", "ei
               "alpha", "bravo", "charlie", "delta", "echo", "foxtrot")
 
 #: Ready-made scenarios: a clean input, a limited one, adult images and text, regional delivery,
-#: content restricted in Germany, and mixed instances in one category.
+#: content restricted in Germany, mixed instances in one category, and person and face
+#: detections: one person and face, nobody, an adult face, a minor's face and a group of three.
 TEST_INPUT_PRESETS: dict[str, SignedTestInput] = {
     "clean": {"instances": []},
     "limited": {"instances": [{"category": "harassment", "qualifiers": ["harassment-abuse"]}]},
@@ -90,6 +132,16 @@ TEST_INPUT_PRESETS: dict[str, SignedTestInput] = {
     "mixed": {"instances": [
         {"category": "harassment", "qualifiers": ["harassment-abuse", "harassment-documentary"]},
         {"category": "harassment", "qualifiers": ["harassment-threat"]}]},
+    "one_face": {"instances": [], "detections": {"people": [{"box": [2500, 1500, 5000, 8500]}],
+                                                 "faces": [{"box": [3500, 2000, 3000, 3500]}]}},
+    "no_face": {"instances": [], "detections": {"people": [], "faces": []}},
+    "adult_face": {"instances": [], "detections": {"people": [{"box": [2500, 1500, 5000, 8500]}],
+                                                   "faces": [{"box": [3500, 2000, 3000, 3500], "age": "adult"}]}},
+    "minor_face": {"instances": [], "detections": {"people": [{"box": [2500, 1500, 5000, 8500]}],
+                                                   "faces": [{"box": [3500, 2000, 3000, 3500], "age": "minor"}]}},
+    "group": {"instances": [], "detections": {
+        "people": [{"box": [left, 2000, 2800, 8000]} for left in (500, 3600, 6700)],
+        "faces": [{"box": [left, 2500, 1400, 2000]} for left in (1200, 4300, 7400)]}},
 }
 
 #: The signals ``generate_test_text_code`` and ``paint_test_image`` accept.
@@ -356,7 +408,8 @@ def _fields(value: object, name: str, required: tuple[str, ...], optional: tuple
 
 def _validate(scenario: object) -> dict[str, Any]:
     """Checks a scenario like the API and copies it in canonical key order."""
-    fields = _fields(scenario, "The test scenario", ("instances",), ("regionalActions", "unassessedCategories"))
+    fields = _fields(scenario, "The test scenario", ("instances",),
+                     ("regionalActions", "unassessedCategories", "detections"))
     result: dict[str, Any] = {}
     if "regionalActions" in fields:
         regional = []
@@ -400,4 +453,53 @@ def _validate(scenario: object) -> dict[str, Any]:
             raise _invalid("Unassessed categories must be unique categories without instances")
         result["unassessedCategories"] = unassessed
     result["instances"] = instances
+    if "detections" in fields:
+        result["detections"] = _validate_detections(fields["detections"])
     return result
+
+
+def _whole(value: object, low: int, high: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
+
+
+def _validate_detections(value: object) -> dict[str, Any]:
+    """Checks a scenario's detections and copies them in canonical key order."""
+    fields = _fields(value, "detections", (), ("people", "faces"))
+    result: dict[str, Any] = {}
+    for name in ("people", "faces"):
+        if name not in fields:
+            continue
+        if fields[name] == "unavailable":
+            result[name] = "unavailable"
+            continue
+        entries = []
+        for item in _list(fields[name], name, TEST_DETECTIONS_MAX):
+            entry = _fields(item, "A detection", ("box",), ("confidence", "age") if name == "faces" else ("confidence",))
+            box = entry["box"]
+            if not isinstance(box, (list, tuple)) or len(box) != 4 \
+                    or not all(_whole(side, 0, TEST_DETECTION_BOX_MAX) for side in box) \
+                    or box[0] + box[2] > TEST_DETECTION_BOX_MAX or box[1] + box[3] > TEST_DETECTION_BOX_MAX:
+                raise _invalid(f"A box is four integers [left, top, width, height] from 0 to {TEST_DETECTION_BOX_MAX} "
+                               f"inside the image: left + width and top + height are at most {TEST_DETECTION_BOX_MAX}")
+            detection: dict[str, Any] = {"box": list(box)}
+            if "confidence" in entry:
+                if not _whole(entry["confidence"], 0, 100):
+                    raise _invalid("A detection's confidence must be an integer from 0 to 100")
+                detection["confidence"] = entry["confidence"]
+            if "age" in entry:
+                detection["age"] = _validate_age(entry["age"])
+            entries.append(detection)
+        result[name] = entries
+    return result
+
+
+def _validate_age(value: object) -> str | dict[str, int]:
+    if isinstance(value, str):
+        if value not in TEST_FACE_AGE_PRESETS:
+            raise _invalid(f"A face's age preset must be one of {', '.join(TEST_FACE_AGE_PRESETS)}")
+        return value
+    age = _fields(value, "A face's age", ("low", "high"), ())
+    low, high = age["low"], age["high"]
+    if not _whole(low, 0, TEST_FACE_AGE_MAX) or not _whole(high, 0, TEST_FACE_AGE_MAX) or low > high:
+        raise _invalid(f"A face's age range is two integers from 0 to {TEST_FACE_AGE_MAX}, low at most high")
+    return {"low": low, "high": high}

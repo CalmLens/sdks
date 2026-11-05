@@ -15,19 +15,36 @@ use CalmLens\SdkErrorCodes;
  * A scenario is an array with the API's keys: up to 128 `instances` (each a `category`, the
  * category's content `qualifiers` that apply, and optionally a `score` from 0 to 1 and an
  * `action`, set on every instance or on none), the `unassessedCategories` CalmLens reports as not
- * assessed (none may have instances), and up to one of the `regionalActions` per region.
+ * assessed (none may have instances), up to one of the `regionalActions` per region, and
+ * optionally the person and face `detections` to report instead of running detection.
  * Input-type qualifiers such as `sexual-text` are automatic. Every method checks its scenario and
  * key and throws `InvalidArgumentException` (`sdk/invalid-argument`) for one the API would reject.
  *
+ * `detections` may hold `people` and `faces`, each a list of up to
+ * `Classification::TEST_DETECTIONS_MAX` (32) entries, or `'unavailable'` to report that feature as
+ * not evaluated. An entry has a `box` of `[left, top, width, height]` in integer basis points of
+ * the image (0 to `Classification::TEST_DETECTION_BOX_MAX`, 10000, with left + width and top +
+ * height at most 10000) and optionally a `confidence` from 0 to 100; a face may also have an
+ * `age`: one of `Classification::TEST_FACE_AGE_PRESETS` (`'adult'` or `'minor'`) or a range
+ * `['low' => …, 'high' => …]` of whole years from 0 to `Classification::TEST_FACE_AGE_MAX` (120).
+ *
  * @phpstan-type TestInstance array{category: string, score?: int|float, action?: string, qualifiers: list<string>}
  * @phpstan-type TestRegionalAction array{region: string, action: string}
- * @phpstan-type TestInput array{regionalActions?: list<TestRegionalAction>, unassessedCategories?: list<string>, instances: list<TestInstance>}
+ * @phpstan-type TestDetectionBox array{int, int, int, int}
+ * @phpstan-type TestDetectedPerson array{box: TestDetectionBox, confidence?: int}
+ * @phpstan-type TestFaceAge 'adult'|'minor'|array{low: int, high: int}
+ * @phpstan-type TestDetectedFace array{box: TestDetectionBox, confidence?: int, age?: TestFaceAge}
+ * @phpstan-type TestDetections array{people?: list<TestDetectedPerson>|'unavailable', faces?: list<TestDetectedFace>|'unavailable'}
+ * @phpstan-type TestInput array{regionalActions?: list<TestRegionalAction>, unassessedCategories?: list<string>, instances: list<TestInstance>, detections?: TestDetections}
  */
 final class TestInputs
 {
     /**
      * Ready-made scenarios: a clean input, a limited one, adult images and text, regional
-     * delivery, content restricted in Germany, and mixed instances in one category.
+     * delivery, content restricted in Germany, mixed instances in one category, and person and
+     * face detections: one person with one face (`oneFace`), nobody (`noFace`), one face
+     * estimated as an adult (`adultFace`) or a minor (`minorFace`), and three people side by side
+     * (`group`).
      *
      * @var array<string, TestInput>
      */
@@ -44,6 +61,20 @@ final class TestInputs
         'mixed' => ['instances' => [
             ['category' => 'harassment', 'qualifiers' => ['harassment-abuse', 'harassment-documentary']],
             ['category' => 'harassment', 'qualifiers' => ['harassment-threat']],
+        ]],
+        'oneFace' => ['instances' => [], 'detections' => [
+            'people' => [['box' => [2500, 1500, 5000, 8500]]], 'faces' => [['box' => [3500, 2000, 3000, 3500]]],
+        ]],
+        'noFace' => ['instances' => [], 'detections' => ['people' => [], 'faces' => []]],
+        'adultFace' => ['instances' => [], 'detections' => [
+            'people' => [['box' => [2500, 1500, 5000, 8500]]], 'faces' => [['box' => [3500, 2000, 3000, 3500], 'age' => 'adult']],
+        ]],
+        'minorFace' => ['instances' => [], 'detections' => [
+            'people' => [['box' => [2500, 1500, 5000, 8500]]], 'faces' => [['box' => [3500, 2000, 3000, 3500], 'age' => 'minor']],
+        ]],
+        'group' => ['instances' => [], 'detections' => [
+            'people' => [['box' => [500, 2000, 2800, 8000]], ['box' => [3600, 2000, 2800, 8000]], ['box' => [6700, 2000, 2800, 8000]]],
+            'faces' => [['box' => [1200, 2500, 1400, 2000]], ['box' => [4300, 2500, 1400, 2000]], ['box' => [7400, 2500, 1400, 2000]]],
         ]],
     ];
 
@@ -166,14 +197,16 @@ final class TestInputs
 
     /**
      * JSON without whitespace, with numbers as JavaScript prints them; validated scenarios are
-     * already in the canonical key order and hold only ASCII tokens.
+     * already in the canonical key order and hold only ASCII tokens. `$object` prints an empty
+     * array as `{}`: `detections` is the only object a scenario may leave empty.
      */
-    private static function canonical(mixed $value): string
+    private static function canonical(mixed $value, bool $object = false): string
     {
         return match (true) {
-            is_array($value) && array_is_list($value) => '[' . implode(',', array_map(self::canonical(...), $value)) . ']',
-            is_array($value) => '{' . implode(',', array_map(static fn (string $key, mixed $item): string => "\"$key\":" . self::canonical($item), array_keys($value), $value)) . '}',
+            is_array($value) && array_is_list($value) && !($object && $value === []) => '[' . implode(',', array_map(static fn (mixed $item): string => self::canonical($item), $value)) . ']',
+            is_array($value) => '{' . implode(',', array_map(static fn (string $key, mixed $item): string => "\"$key\":" . self::canonical($item, $key === 'detections'), array_keys($value), $value)) . '}',
             is_string($value) => "\"$value\"",
+            is_int($value) => (string) $value,
             default => self::jsNumber((float) $value),
         };
     }
@@ -241,7 +274,7 @@ final class TestInputs
      */
     private static function validate(mixed $scenario): array
     {
-        $fields = self::fields($scenario, 'The test scenario', ['instances'], ['regionalActions', 'unassessedCategories']);
+        $fields = self::fields($scenario, 'The test scenario', ['instances'], ['regionalActions', 'unassessedCategories', 'detections']);
         $result = [];
         if (array_key_exists('regionalActions', $fields)) {
             $result['regionalActions'] = [];
@@ -305,7 +338,84 @@ final class TestInputs
             $result['unassessedCategories'] = $unassessed;
         }
         $result['instances'] = $instances;
+        if (array_key_exists('detections', $fields)) {
+            $result['detections'] = self::detections($fields['detections']);
+        }
         return $result;
+    }
+
+    /**
+     * Checks a scenario's `detections` and copies them in canonical key order.
+     *
+     * @return TestDetections
+     */
+    private static function detections(mixed $value): array
+    {
+        $fields = self::fields($value, 'detections', [], ['people', 'faces']);
+        $result = [];
+        foreach (['people' => false, 'faces' => true] as $name => $face) {
+            if (!array_key_exists($name, $fields)) {
+                continue;
+            }
+            if ($fields[$name] === 'unavailable') {
+                $result[$name] = 'unavailable';
+                continue;
+            }
+            $result[$name] = array_map(static fn (mixed $item): array => self::detection($item, $face),
+                self::list($fields[$name], "detections.$name", Classification::TEST_DETECTIONS_MAX));
+        }
+        return $result;
+    }
+
+    /**
+     * Checks one detected person or face (with `$face`, which may have an age).
+     *
+     * @return TestDetectedPerson|TestDetectedFace
+     */
+    private static function detection(mixed $value, bool $face): array
+    {
+        $entry = self::fields($value, $face ? 'A detected face' : 'A detected person', ['box'], $face ? ['confidence', 'age'] : ['confidence']);
+        $box = $entry['box'];
+        $max = Classification::TEST_DETECTION_BOX_MAX;
+        if (!is_array($box) || !array_is_list($box) || count($box) !== 4
+            || array_filter($box, static fn (mixed $side): bool => !self::whole($side, $max)) !== []
+            || $box[0] + $box[2] > $max || $box[1] + $box[3] > $max) {
+            throw self::invalid("A box must be four whole numbers from 0 to $max, with left + width and top + height at most $max");
+        }
+        $detection = ['box' => $box];
+        if (array_key_exists('confidence', $entry)) {
+            if (!self::whole($entry['confidence'], 100)) {
+                throw self::invalid('A confidence must be a whole number from 0 to 100');
+            }
+            $detection['confidence'] = $entry['confidence'];
+        }
+        if (array_key_exists('age', $entry)) {
+            $detection['age'] = self::age($entry['age']);
+        }
+        return $detection;
+    }
+
+    /** @return TestFaceAge */
+    private static function age(mixed $value): string|array
+    {
+        if (is_string($value)) {
+            if (!in_array($value, Classification::TEST_FACE_AGE_PRESETS, true)) {
+                throw self::invalid('An age must be one of ' . implode(', ', Classification::TEST_FACE_AGE_PRESETS) . ' or a range');
+            }
+            return $value;
+        }
+        $range = self::fields($value, 'An age range', ['low', 'high']);
+        $max = Classification::TEST_FACE_AGE_MAX;
+        if (!self::whole($range['low'], $max) || !self::whole($range['high'], $max) || $range['low'] > $range['high']) {
+            throw self::invalid("An age range needs whole years from 0 to $max, with low at most high");
+        }
+        return ['low' => $range['low'], 'high' => $range['high']];
+    }
+
+    /** Whether `$value` is an integer from 0 to `$max`. */
+    private static function whole(mixed $value, int $max): bool
+    {
+        return is_int($value) && $value >= 0 && $value <= $max;
     }
 
     private static function invalid(string $message): InvalidArgumentException

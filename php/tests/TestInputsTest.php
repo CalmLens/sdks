@@ -60,9 +60,16 @@ final class TestInputsTest extends TestCase
         return self::cases('signalInputs', static fn (array $case): string => "{$case['signal']} {$case['kind']}");
     }
 
+    /**
+     * Rejections a PHP array can't express. `detections: []` (a list) decodes to the same empty
+     * array as `detections: {}`, which is a valid scenario; a non-empty list is still refused.
+     */
+    private const INEXPRESSIBLE_REJECTIONS = ['detections list'];
+
     public static function rejections(): array
     {
-        return self::cases('rejections', static fn (array $case): string => "{$case['kind']} {$case['name']}");
+        return array_diff_key(self::cases('rejections', static fn (array $case): string => "{$case['kind']} {$case['name']}"),
+            array_flip(array_map(static fn (string $name): string => "text $name", self::INEXPRESSIBLE_REJECTIONS)));
     }
 
     public static function images(): array
@@ -169,6 +176,25 @@ final class TestInputsTest extends TestCase
         self::assertSame(self::canon($fixture['presets']), self::canon(TestInputs::PRESETS));
         self::assertSame($fixture['signals']['text'], TestInputs::TEXT_SIGNALS);
         self::assertSame($fixture['signals']['media'], TestInputs::MEDIA_SIGNALS);
+    }
+
+    public function testDetectionLimitsAndAgePresetsMatchTheFixture(): void
+    {
+        $detections = self::fixture()['detections'];
+        self::assertSame(
+            [$detections['maxEntries'], $detections['boxMax'], $detections['ageMax'], array_keys($detections['agePresets'])],
+            [Classification::TEST_DETECTIONS_MAX, Classification::TEST_DETECTION_BOX_MAX, Classification::TEST_FACE_AGE_MAX, Classification::TEST_FACE_AGE_PRESETS],
+        );
+    }
+
+    public function testDetectionsAsAListAreRefused(): void
+    {
+        try {
+            TestInputs::generateTestTextCode(['instances' => [], 'detections' => [['box' => [0, 0, 1, 1]]]], str_repeat('a', 32));
+            self::fail('a detections list was accepted');
+        } catch (InvalidArgumentException $error) {
+            self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, $error->errorCode);
+        }
     }
 
     public function testScenarioQualifierVocabularyMatchesTheFixture(): void

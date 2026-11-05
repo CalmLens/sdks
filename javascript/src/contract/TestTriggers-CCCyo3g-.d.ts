@@ -11,6 +11,41 @@ declare const TEST_INPUT_KEY_PATTERN: RegExp;
 /** Category shortcuts are presets in the same instance-based format. */
 declare function testInputForSignal(signal: ClassificationTestSignal, kind?: "image" | "text"): TestInput;
 declare const getImageTestCategories: () => ClassificationTestSignal[];
+/** Each detection list holds at most this many entries; 32 faces fit a test image. */
+declare const TEST_DETECTIONS_MAX = 32;
+/** Box values are integer basis points of the image width and height: 10000 is the full side. */
+declare const TEST_DETECTION_BOX_MAX = 10000;
+/** Age presets and the range a custom estimate may use. */
+declare const TEST_FACE_AGE_PRESETS: {
+  readonly adult: {
+    readonly low: 25;
+    readonly high: 35;
+  };
+  readonly minor: {
+    readonly low: 12;
+    readonly high: 16;
+  };
+};
+declare const TEST_FACE_AGE_MAX = 120;
+/** Person and face detection results a test image reports instead of running detection. */
+declare const TEST_DETECTIONS_SCHEMA: z.ZodObject<{
+  people: z.ZodOptional<z.ZodUnion<readonly [z.ZodArray<z.ZodObject<{
+    box: z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodNumber], null>;
+    confidence: z.ZodOptional<z.ZodNumber>;
+  }, z.core.$strict>>, z.ZodLiteral<"unavailable">]>>;
+  faces: z.ZodOptional<z.ZodUnion<readonly [z.ZodArray<z.ZodObject<{
+    box: z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodNumber], null>;
+    confidence: z.ZodOptional<z.ZodNumber>;
+    age: z.ZodOptional<z.ZodUnion<readonly [z.ZodEnum<{
+      adult: "adult";
+      minor: "minor";
+    }>, z.ZodObject<{
+      low: z.ZodNumber;
+      high: z.ZodNumber;
+    }, z.core.$strict>]>>;
+  }, z.core.$strict>>, z.ZodLiteral<"unavailable">]>>;
+}, z.core.$strict>;
+type TestDetections = z.infer<typeof TEST_DETECTIONS_SCHEMA>;
 /** Each row is one qualifying instance. Unselected qualifiers are explicitly absent. */
 declare const TEST_INPUT_SCHEMA: z.ZodObject<{
   regionalActions: z.ZodOptional<z.ZodArray<z.ZodObject<{
@@ -195,6 +230,23 @@ declare const TEST_INPUT_SCHEMA: z.ZodObject<{
       "violence-wish": "violence-wish";
     }>>;
   }, z.core.$strict>>;
+  detections: z.ZodOptional<z.ZodObject<{
+    people: z.ZodOptional<z.ZodUnion<readonly [z.ZodArray<z.ZodObject<{
+      box: z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodNumber], null>;
+      confidence: z.ZodOptional<z.ZodNumber>;
+    }, z.core.$strict>>, z.ZodLiteral<"unavailable">]>>;
+    faces: z.ZodOptional<z.ZodUnion<readonly [z.ZodArray<z.ZodObject<{
+      box: z.ZodTuple<[z.ZodNumber, z.ZodNumber, z.ZodNumber, z.ZodNumber], null>;
+      confidence: z.ZodOptional<z.ZodNumber>;
+      age: z.ZodOptional<z.ZodUnion<readonly [z.ZodEnum<{
+        adult: "adult";
+        minor: "minor";
+      }>, z.ZodObject<{
+        low: z.ZodNumber;
+        high: z.ZodNumber;
+      }, z.core.$strict>]>>;
+    }, z.core.$strict>>, z.ZodLiteral<"unavailable">]>>;
+  }, z.core.$strict>>;
 }, z.core.$strict>;
 type TestInput = z.infer<typeof TEST_INPUT_SCHEMA>;
 declare const TEST_INPUT_PRESETS: {
@@ -247,6 +299,59 @@ declare const TEST_INPUT_PRESETS: {
       qualifiers: "harassment-threat"[];
     })[];
   };
+  oneFace: {
+    instances: never[];
+    detections: {
+      people: {
+        box: [number, number, number, number];
+      }[];
+      faces: {
+        box: [number, number, number, number];
+      }[];
+    };
+  };
+  noFace: {
+    instances: never[];
+    detections: {
+      people: never[];
+      faces: never[];
+    };
+  };
+  adultFace: {
+    instances: never[];
+    detections: {
+      people: {
+        box: [number, number, number, number];
+      }[];
+      faces: {
+        box: [number, number, number, number];
+        age: "adult";
+      }[];
+    };
+  };
+  minorFace: {
+    instances: never[];
+    detections: {
+      people: {
+        box: [number, number, number, number];
+      }[];
+      faces: {
+        box: [number, number, number, number];
+        age: "minor";
+      }[];
+    };
+  };
+  group: {
+    instances: never[];
+    detections: {
+      people: {
+        box: [number, number, number, number];
+      }[];
+      faces: {
+        box: [number, number, number, number];
+      }[];
+    };
+  };
 };
 declare function generateTestTextCode(scenario: TestInput | ClassificationTestSignal, key: string): Promise<string>;
 declare function detectTestTrigger(text: string, key: string): Promise<TestInput | undefined>;
@@ -273,5 +378,19 @@ declare function detectTestImage(image: RgbaImage, key: string): Promise<{
     action?: "age-restrict" | "allow" | "block" | "limit" | undefined;
     qualifiers: ("criminal-activity-alcohol" | "criminal-activity-coded-incitement" | "criminal-activity-csam" | "criminal-activity-demonstration" | "criminal-activity-discussion" | "criminal-activity-documentary" | "criminal-activity-educational" | "criminal-activity-fictional" | "criminal-activity-fraud" | "criminal-activity-gambling" | "criminal-activity-graffiti" | "criminal-activity-grooming" | "criminal-activity-historical" | "criminal-activity-instructions" | "criminal-activity-preparation" | "criminal-activity-promotion" | "criminal-activity-request" | "criminal-activity-sexual-solicitation" | "criminal-activity-substances" | "criminal-activity-support-prevention" | "criminal-activity-tobacco" | "harassment-abuse" | "harassment-bullying" | "harassment-documentary" | "harassment-educational" | "harassment-encouragement" | "harassment-fictional" | "harassment-historical" | "harassment-mild" | "harassment-public-target" | "harassment-sexual" | "harassment-support-prevention" | "harassment-threat" | "hate-abuse" | "hate-adjudicated-nazi-crimes-denial" | "hate-counterspeech" | "hate-dehumanization" | "hate-documentary" | "hate-educational" | "hate-exclusion" | "hate-fictional" | "hate-historical" | "hate-hostility" | "hate-inferiority" | "hate-nazi-genocide-denial-or-approval" | "hate-nazi-genocide-public-peace" | "hate-nazi-insignia-public-display" | "hate-nazi-symbols-public-display" | "hate-personal" | "hate-slurs" | "hate-support-prevention" | "hate-symbol" | "hate-threat" | "personal-information-contact" | "personal-information-credentials" | "personal-information-documentary" | "personal-information-educational" | "personal-information-email" | "personal-information-fictional" | "personal-information-financial" | "personal-information-government-id" | "personal-information-historical" | "personal-information-identifiers" | "personal-information-location" | "personal-information-phone" | "personal-information-request" | "personal-information-self-disclosure" | "personal-information-support-prevention" | "personal-information-third-party" | "profanity-documentary" | "profanity-educational" | "profanity-fictional" | "profanity-historical" | "profanity-mild" | "profanity-obfuscated" | "profanity-slurs" | "profanity-strong" | "profanity-support-prevention" | "self-harm-act" | "self-harm-age-restricted" | "self-harm-documentary" | "self-harm-educational" | "self-harm-encouragement" | "self-harm-fictional" | "self-harm-historical" | "self-harm-methods" | "self-harm-preparation" | "self-harm-support-prevention" | "self-harm-thoughts" | "sexual-activity" | "sexual-adult-promotion" | "sexual-assault-media" | "sexual-discussion" | "sexual-documentary" | "sexual-educational" | "sexual-explicit-language" | "sexual-extreme" | "sexual-fictional" | "sexual-historical" | "sexual-intimate-image-abuse" | "sexual-minors" | "sexual-non-consensual" | "sexual-non-erotic-nudity" | "sexual-nudity" | "sexual-paid" | "sexual-pornographic-media" | "sexual-revealing-clothing" | "sexual-solicitation" | "sexual-suggestive" | "sexual-support-prevention" | "sexual-text" | "violence-attack" | "violence-coded-incitement" | "violence-decapitation-act" | "violence-discussion" | "violence-documentary" | "violence-educational" | "violence-encouragement" | "violence-extremism" | "violence-fantasy" | "violence-fictional" | "violence-gore" | "violence-graphic" | "violence-high-impact" | "violence-historical" | "violence-injury" | "violence-natural-death" | "violence-preparation" | "violence-sport" | "violence-support-prevention" | "violence-text" | "violence-threat" | "violence-violent-death" | "violence-weapon" | "violence-wish")[];
   }[];
+  detections?: {
+    people?: "unavailable" | {
+      box: [number, number, number, number];
+      confidence?: number | undefined;
+    }[] | undefined;
+    faces?: "unavailable" | {
+      box: [number, number, number, number];
+      confidence?: number | undefined;
+      age?: "adult" | "minor" | {
+        low: number;
+        high: number;
+      } | undefined;
+    }[] | undefined;
+  } | undefined;
 } | undefined>;
-export { detectTestImage as a, getImageTestCategories as c, TestInput as i, paintTestImage as l, TEST_INPUT_KEY_PATTERN as n, detectTestTrigger as o, TEST_INPUT_PRESETS as r, generateTestTextCode as s, ClassificationTestSignal as t, testInputForSignal as u };
+export { TEST_FACE_AGE_PRESETS as a, TestDetections as c, detectTestTrigger as d, generateTestTextCode as f, testInputForSignal as h, TEST_FACE_AGE_MAX as i, TestInput as l, paintTestImage as m, TEST_DETECTIONS_MAX as n, TEST_INPUT_KEY_PATTERN as o, getImageTestCategories as p, TEST_DETECTION_BOX_MAX as r, TEST_INPUT_PRESETS as s, ClassificationTestSignal as t, detectTestImage as u };

@@ -1626,6 +1626,10 @@ pub struct AssetClassification {
     /// When classification completed, in milliseconds since the Unix epoch.
     #[serde(default)]
     pub completed_at: Option<u64>,
+    /// Whether the results came from one of the project's test inputs rather than analysing the
+    /// content. Never use test results, such as age ranges, for real decisions.
+    #[serde(default)]
+    pub test_input: bool,
     /// Content-safety findings and the decision in force.
     #[serde(default)]
     pub moderation: AssetModeration,
@@ -2806,7 +2810,8 @@ impl WebhookEventPayload {
 pub struct EventAsset(serde_json::Map<String, Value>);
 impl EventAsset {
     /// A snapshot of asset `id` with classification status `processing`, moderation status
-    /// `moderation`, content status `content` and a completed upload, e.g. for a mock event.
+    /// `moderation`, content status `content`, a completed upload and results that did not come
+    /// from a test input, e.g. for a mock event.
     pub fn new(
         id: impl Into<String>,
         processing: AssetClassificationStatus,
@@ -2816,7 +2821,11 @@ impl EventAsset {
         let value = serde_json::json!({
             "id": id.into(),
             "upload": {"status": "completed"},
-            "classification": {"status": processing, "moderation": {"status": moderation}},
+            "classification": {
+                "status": processing,
+                "testInput": false,
+                "moderation": {"status": moderation},
+            },
             "content": {"status": content},
         });
         match value {
@@ -2847,6 +2856,15 @@ impl EventAsset {
     /// The classification status when the event was created.
     pub fn classification_status(&self) -> Option<AssetClassificationStatus> {
         self.text(&["classification", "status"]).map(Into::into)
+    }
+    /// Whether the asset's results came from one of the project's test inputs rather than
+    /// analysing the content. Never use test results, such as age ranges, for real decisions.
+    pub fn test_input(&self) -> Option<bool> {
+        self.0
+            .get("classification")?
+            .as_object()?
+            .get("testInput")?
+            .as_bool()
     }
     /// The moderation status when the event was created, which also decides delivery.
     pub fn moderation_status(&self) -> Option<AssetModerationStatus> {

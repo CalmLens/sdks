@@ -235,7 +235,7 @@ module CalmLens
       def snapshot(item)
         { 'id' => item['id'], 'externalId' => item['externalId'], 'uploadPresetId' => item['uploadPresetId'],
           'upload' => { 'status' => item['upload']['status'] },
-          'classification' => { 'status' => item['classification']['status'],
+          'classification' => { 'status' => item['classification']['status'], 'testInput' => item['classification']['testInput'],
                                 'moderation' => { 'status' => item['classification']['moderation']['status'] } },
           'content' => { 'status' => item['content']['status'] } }
       end
@@ -601,7 +601,8 @@ module CalmLens
           # Like the API, only an open upload counts the parts received.
           'upload' => { 'status' => open ? 'uploading' : 'completed', 'updatedAt' => now, 'partsReceived' => open ? 1 : nil },
           'classification' => { 'status' => open ? 'pending' : 'processing', 'failureReason' => nil, 'updatedAt' => now,
-                                'completedAt' => nil,
+                                # The mock never reads test inputs.
+                                'completedAt' => nil, 'testInput' => false,
                                 'moderation' => { 'status' => 'pending', 'manualReviews' => [],
                                                   'flaggedCategories' => [], 'regions' => [] } }
         }
@@ -676,8 +677,20 @@ module CalmLens
       # Without `moderate`, queued work stays pending until completed, which allows it.
       def default_moderation(trigger, queued) = queued && trigger != 'complete' ? 'pending' : 'allowed'
 
-      # Applies `decision` to `asset` with its report.
-      def decided(asset, decision) = apply_outcome(asset, decision.status, 'policy', decision.report)
+      # Applies `decision` to `asset` with its report. Like the API for an image with nobody in it, a
+      # decided image reports the person and face detection its upload turned on.
+      def decided(asset, decision)
+        apply_outcome(asset, decision.status, 'policy', decision.report)
+        classification = asset['classification']
+        return asset unless classification['status'] == 'completed' && asset['type'] == 'image'
+
+        features = asset['processingOptions'].is_a?(Hash) ? asset['processingOptions']['features'] : nil
+        enabled = ->(name) { features.is_a?(Hash) && features[name].is_a?(Hash) && features[name]['enabled'] == true }
+        { 'personDetection' => 'people', 'faceDetection' => 'faces' }.each do |feature, list|
+          classification[feature] = { 'status' => 'evaluated', 'stage' => 'beta', list => [] } if enabled.call(feature)
+        end
+        asset
+      end
 
       # Asks `moderate` (unless `decision` is given) and settles a processing asset: a decision and
       # its events, or nothing for `pending`.

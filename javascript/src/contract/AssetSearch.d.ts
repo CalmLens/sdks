@@ -110,6 +110,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
       }>>;
       updatedAt: zod.ZodNullable<zod.ZodNumber>;
       completedAt: zod.ZodNullable<zod.ZodNumber>;
+      testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
         categories: zod.ZodOptional<zod.ZodRecord<zod.ZodEnum<{
           "criminal-activity": "criminal-activity";

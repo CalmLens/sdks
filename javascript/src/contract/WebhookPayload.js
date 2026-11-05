@@ -537,6 +537,7 @@ const CLASSIFICATION_LABEL_SCHEMA = zod.object({
 	knowledgeBaseId: saneStringField().nullish()
 });
 const CLASSIFICATION_REPORT_SCHEMA = zod.object({
+	testInput: zod.literal(true).optional().describe("Set when the findings come from one of the project's authenticated test inputs."),
 	testCategoryActions: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, zod.enum([
 		"allow",
 		"limit",
@@ -881,6 +882,7 @@ const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 	failureReason: ASSET_FAILURE_REASON_SCHEMA.nullable().describe("Why processing failed, while `status` is `failed`; otherwise `null`. See [Failure reasons](/docs/guides/asset-lifecycle#failure-reasons)."),
 	updatedAt: epoch("When classification state last changed"),
 	completedAt: epoch("When classification completed"),
+	testInput: zod.boolean().describe("Whether the results came from one of the project's test inputs (a signed text code, test image or media test phrase) rather than from analysing the content. Test results, including person and face detection and age ranges, are declared by the input: never use them for real decisions such as age checks. See [Testing](/docs/guides/testing)."),
 	moderation: ASSET_MODERATION_SCHEMA,
 	personDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.personDetection,
 	faceDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.faceDetection,
@@ -953,6 +955,7 @@ STORED_ASSET_SCHEMA.pick({
 			failureReason: null,
 			updatedAt: 1767225601e3,
 			completedAt: 1767225601e3,
+			testInput: false,
 			moderation: {
 				status: "allowed",
 				manualReviews: [],
@@ -2206,6 +2209,7 @@ const EVENT_ASSET_SCHEMA = zod.object({
 	upload: zod.object({ status: zod.enum(["uploading", "completed"]) }),
 	classification: zod.object({
 		status: ASSET_CLASSIFICATION_STATUS_SCHEMA,
+		testInput: zod.boolean().describe("Whether the asset's results came from one of the project's test inputs, as `classification.testInput` on the asset"),
 		moderation: zod.object({ status: ASSET_MODERATION_STATUS_SCHEMA })
 	}),
 	content: zod.object({ status: ASSET_CONTENT_STATUS_SCHEMA }).describe("Whether CalmLens held the asset's content when the event was created")

@@ -63,6 +63,122 @@
       ]
     },
     {
+      "name": "a decided upload reports the person and face detection it turned on, and no test input",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "events.list",
+          "args": {},
+          "save": "feed",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "people.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "features": {
+                "personDetection": {
+                  "enabled": true
+                },
+                "faceDetection": {
+                  "enabled": true,
+                  "ageEstimation": true
+                }
+              }
+            }
+          },
+          "save": "people",
+          "expect": {
+            "result": {
+              "classification.moderation.status": "allowed",
+              "classification.testInput": false,
+              "classification.personDetection": {
+                "status": "evaluated",
+                "stage": "beta",
+                "people": []
+              },
+              "classification.faceDetection": {
+                "status": "evaluated",
+                "stage": "beta",
+                "faces": []
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "faces.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "features": {
+                "faceDetection": {
+                  "enabled": true
+                }
+              }
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.testInput": false,
+              "classification.faceDetection": {
+                "status": "evaluated",
+                "stage": "beta",
+                "faces": []
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "queued.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.status": "processing",
+              "classification.testInput": false
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "feed.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.0.type": "asset.uploaded",
+              "items.0.assetId": {
+                "$ref": "people.id"
+              },
+              "items.0.asset.classification.testInput": false
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
       "name": "moderate decides queued and moderated uploads, and a status alone evaluates every category",
       "mock": {
         "moderate": {

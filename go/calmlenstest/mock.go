@@ -540,6 +540,7 @@ func snapshot(a calmlens.JSON) calmlens.JSON {
 		"content": calmlens.JSON{"status": section(a, "content")["status"]},
 		"classification": calmlens.JSON{
 			"status":     section(a, "classification")["status"],
+			"testInput":  section(a, "classification")["testInput"],
 			"moderation": calmlens.JSON{"status": section(section(a, "classification"), "moderation")["status"]},
 		},
 	}
@@ -1392,7 +1393,8 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 		"extractedText": nil, "fileMetadata": nil,
 	}
 	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
-	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil,
+	// The mock never reads test inputs.
+	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil, "testInput": false,
 		"moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{}, "flaggedCategories": []any{}, "regions": []any{}}}
 	if open {
 		uploadState["status"] = "uploading"
@@ -1517,10 +1519,23 @@ func (m *MockServerClient) decisionFor(a calmlens.JSON, trigger string, queued b
 }
 
 // decide applies a moderation decision to a processing asset, with its report; a pending
-// decision leaves it processing.
+// decision leaves it processing. Like the API for an image with nobody in it, a decided image
+// reports the person and face detection its upload turned on.
 func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
-	if decision.status != OutcomePending {
-		m.applyOutcome(a, decision.status, calmlens.ContentRemovalReasonPolicy, decision.report())
+	if decision.status == OutcomePending {
+		return
+	}
+	m.applyOutcome(a, decision.status, calmlens.ContentRemovalReasonPolicy, decision.report())
+	classification := section(a, "classification")
+	if a["type"] != calmlens.AssetTypeImage || classification["status"] != calmlens.ClassificationStatusCompleted {
+		return
+	}
+	features := asJSON(asJSON(a["processingOptions"])["features"])
+	if enabled, _ := asJSON(features["personDetection"])["enabled"].(bool); enabled {
+		classification["personDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "stage": calmlens.FeatureStageBeta, "people": []any{}}
+	}
+	if enabled, _ := asJSON(features["faceDetection"])["enabled"].(bool); enabled {
+		classification["faceDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "stage": calmlens.FeatureStageBeta, "faces": []any{}}
 	}
 }
 

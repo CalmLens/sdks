@@ -289,6 +289,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
             },
             "classification": {
               "status": "completed",
+              "testInput": true,
               "moderation": {
                 "status": "blocked"
               }
@@ -326,6 +327,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
             asset.id(),
             asset.external_id(),
             asset.classification_status(),
+            asset.test_input(),
             asset.moderation_status(),
             asset.content_status()
         ),
@@ -333,6 +335,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
             "a1",
             Some("x1"),
             Some(AssetClassificationStatus::Completed),
+            Some(true),
             Some(AssetModerationStatus::Blocked),
             Some(AssetContentStatus::Removed)
         )

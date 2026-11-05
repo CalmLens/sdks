@@ -262,6 +262,7 @@ const toEventAsset = (asset: Asset) => ({
   upload: { status: asset.upload.status },
   classification: {
     status: asset.classification.status,
+    testInput: asset.classification.testInput,
     moderation: { status: asset.classification.moderation.status },
   },
   content: { status: asset.content.status },
@@ -1856,6 +1857,8 @@ export class MockCalmLensApi {
         failureReason: null,
         updatedAt: now,
         completedAt: null,
+        // The mock never reads test inputs.
+        testInput: false,
         moderation: { status: "pending", manualReviews: [], flaggedCategories: [], regions: [] },
       },
     } as Asset;
@@ -1984,9 +1987,26 @@ export class MockCalmLensApi {
     );
   }
 
-  /** `asset` decided as `decision` says, with its report. */
-  private decided(asset: Asset, decision: MockDecision): Promise<Asset> {
-    return this.applyOutcome(asset, decision.status, "policy", decision.report());
+  /**
+   * `asset` decided as `decision` says, with its report. Like the API for an image with nobody in
+   * it, a decided image reports the person and face detection its upload turned on.
+   */
+  private async decided(asset: Asset, decision: MockDecision): Promise<Asset> {
+    const next = await this.applyOutcome(asset, decision.status, "policy", decision.report());
+    const features = asset.processingOptions?.features;
+    if (next.classification.status !== "completed" || asset.type !== "image") return next;
+    return {
+      ...next,
+      classification: {
+        ...next.classification,
+        ...(features?.personDetection?.enabled === true && {
+          personDetection: { status: "evaluated", stage: "beta", people: [] },
+        }),
+        ...(features?.faceDetection?.enabled === true && {
+          faceDetection: { status: "evaluated", stage: "beta", faces: [] },
+        }),
+      },
+    };
   }
 
   /**

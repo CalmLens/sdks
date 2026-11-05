@@ -374,7 +374,7 @@ final class MockServerClient
     {
         return ['id' => $asset['id'], 'externalId' => $asset['externalId'] ?? null, 'uploadPresetId' => $asset['uploadPresetId'] ?? null,
             'upload' => ['status' => $asset['upload']['status']], 'classification' => ['status' => $asset['classification']['status'],
-                'moderation' => ['status' => $asset['classification']['moderation']['status']]], 'content' => ['status' => $asset['content']['status']]];
+                'testInput' => $asset['classification']['testInput'], 'moderation' => ['status' => $asset['classification']['moderation']['status']]], 'content' => ['status' => $asset['content']['status']]];
     }
 
     private static function grantsOf(string $apiKey): array
@@ -808,6 +808,8 @@ final class MockServerClient
                 'checksums' => null, 'image' => null, 'extractedText' => null, 'fileMetadata' => null],
             'upload' => ['status' => $final ? 'completed' : 'uploading', 'updatedAt' => $now, 'partsReceived' => $final ? null : 1],
             'classification' => ['status' => $final ? 'processing' : 'pending', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
+                // The mock never reads test inputs.
+                'testInput' => false,
                 'moderation' => ['status' => 'pending', 'manualReviews' => [], 'flaggedCategories' => [], 'regions' => []]],
         ];
         $this->assets[$asset['id']] = $asset;
@@ -842,10 +844,24 @@ final class MockServerClient
         return MockDecision::from(($this->moderate)(new MockModerationInput($asset, new MockModerationContent($bytes, $text), $trigger, $queued)));
     }
 
-    /** Stores `$asset` decided as `$decision` says, with its report. */
+    /**
+     * Stores `$asset` decided as `$decision` says, with its report. Like the API for an image with
+     * nobody in it, a decided image reports the person and face detection its upload turned on.
+     */
     private function decided(array $asset, MockDecision $decision): array
     {
-        return $this->applyOutcome($asset, $decision->status, 'policy', $decision->report());
+        $next = $this->applyOutcome($asset, $decision->status, 'policy', $decision->report());
+        if ($next['classification']['status'] !== 'completed' || $asset['type'] !== 'image') {
+            return $next;
+        }
+        $features = $asset['processingOptions']['features'] ?? null;
+        if (($features['personDetection']['enabled'] ?? null) === true) {
+            $next['classification']['personDetection'] = ['status' => 'evaluated', 'stage' => 'beta', 'people' => []];
+        }
+        if (($features['faceDetection']['enabled'] ?? null) === true) {
+            $next['classification']['faceDetection'] = ['status' => 'evaluated', 'stage' => 'beta', 'faces' => []];
+        }
+        return $this->assets[$next['id']] = $next;
     }
 
     /** Asks `moderate` (unless `$decision` is given) and settles a processing asset; `pending` leaves it processing. */

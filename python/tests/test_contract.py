@@ -1074,6 +1074,31 @@ class SignedTestInputTests(unittest.TestCase):
                         accepted.append(qualifier)
                 self.assertEqual(accepted, qualifiers)
 
+    def test_detection_limits(self) -> None:
+        """Detections accept exactly the fixture's limits and age presets."""
+        limits, key = self.FIXTURE["detections"], self.FIXTURE["text"][0]["key"]
+        self.assertEqual(list(_mock_classification.TEST_FACE_AGE_PRESETS), list(limits["agePresets"]))
+
+        def code(detections: dict[str, Any]) -> str:
+            return testing.generate_test_text_code({"instances": [], "detections": detections}, key)
+
+        box_max, age_max = limits["boxMax"], limits["ageMax"]
+        accepted = [{"faces": [{"box": [0, 0, 1, 1]}] * limits["maxEntries"]},
+                    {"people": [{"box": [0, 0, box_max, box_max]}]},
+                    {"faces": [{"box": [0, 0, 1, 1], "age": {"low": 0, "high": age_max}}]},
+                    *({"faces": [{"box": [0, 0, 1, 1], "age": preset}]} for preset in limits["agePresets"])]
+        for detections in accepted:
+            with self.subTest(accepted=detections):
+                code(detections)
+        rejected = [{"faces": [{"box": [0, 0, 1, 1]}] * (limits["maxEntries"] + 1)},
+                    {"people": [{"box": [0, 0, box_max + 1, 1]}]},
+                    {"faces": [{"box": [0, 0, 1, 1], "age": {"low": 0, "high": age_max + 1}}]}]
+        for detections in rejected:
+            with self.subTest(rejected=detections):
+                with self.assertRaises(CalmLensValidationError) as raised:
+                    code(detections)
+                self.assertEqual(raised.exception.code, "sdk/invalid-argument")
+
     def test_text_codes(self) -> None:
         for case in self.FIXTURE["text"]:
             with self.subTest(case["name"]):

@@ -1,16 +1,23 @@
 //! Signed test inputs: text codes, test images and media phrases that CalmLens decides as the
 //! scenario they carry, for testing a moderation integration end to end without real content.
-use super::classification::{CATEGORIES, INPUT_QUALIFIERS, QUALIFIERS};
+use super::classification::{
+    CATEGORIES, INPUT_QUALIFIERS, QUALIFIERS, TEST_DETECTIONS_MAX, TEST_DETECTION_BOX_MAX,
+    TEST_FACE_AGE_MAX, TEST_FACE_AGE_PRESETS,
+};
 use super::image_grid;
 use crate::error::ErrorCode;
 use crate::{Error, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use hmac::{Hmac, Mac};
+use serde::de::{self, value::MapAccessDeserializer, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
 use sha2::Sha256;
+use std::fmt;
+use std::marker::PhantomData;
 
 /// A test scenario: the qualifying instances CalmLens reports for the input, optionally with
-/// regional delivery actions and categories it reports as not assessed.
+/// regional delivery actions, categories it reports as not assessed and person and face
+/// detection results.
 ///
 /// An absent list (`None`) is left out of the signed payload; an empty one is written as `[]`.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
@@ -25,6 +32,198 @@ pub struct TestInput {
     pub unassessed_categories: Option<Vec<String>>,
     /// The qualifying instances; at most 128.
     pub instances: Vec<TestInputInstance>,
+    /// Person and face detection results for an input whose upload turns those features on.
+    #[serde(default, deserialize_with = "present_object")]
+    pub detections: Option<TestDetections>,
+}
+
+/// Person and face detection results in a [`TestInput`]. A list left out (`None`) reports no
+/// result for the feature.
+#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TestDetections {
+    /// The people found, or [`TestDetectionList::Unavailable`].
+    #[serde(default, deserialize_with = "present")]
+    pub people: Option<TestDetectionList<TestPerson>>,
+    /// The faces found, or [`TestDetectionList::Unavailable`].
+    #[serde(default, deserialize_with = "present")]
+    pub faces: Option<TestDetectionList<TestFace>>,
+}
+
+/// A detection feature's result in [`TestDetections`]: what it found, or that it was not
+/// evaluated (`"unavailable"` on the wire).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TestDetectionList<T> {
+    /// What the feature found; at most 32 entries, and empty when it found nothing.
+    Detected(Vec<T>),
+    /// The feature reports that it could not run.
+    Unavailable,
+}
+impl<T> Default for TestDetectionList<T> {
+    fn default() -> Self {
+        Self::Detected(Vec::new())
+    }
+}
+impl<T> From<Vec<T>> for TestDetectionList<T> {
+    fn from(entries: Vec<T>) -> Self {
+        Self::Detected(entries)
+    }
+}
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for TestDetectionList<T> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        struct ListVisitor<T>(PhantomData<T>);
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for ListVisitor<T> {
+            type Value = TestDetectionList<T>;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str(r#"a list of detections or "unavailable""#)
+            }
+            fn visit_str<E: de::Error>(self, value: &str) -> std::result::Result<Self::Value, E> {
+                match value {
+                    "unavailable" => Ok(TestDetectionList::Unavailable),
+                    _ => Err(E::invalid_value(de::Unexpected::Str(value), &self)),
+                }
+            }
+            fn visit_seq<A: SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> std::result::Result<Self::Value, A::Error> {
+                let mut entries = Vec::new();
+                while let Some(Object(entry)) = seq.next_element()? {
+                    entries.push(entry);
+                }
+                Ok(TestDetectionList::Detected(entries))
+            }
+        }
+        deserializer.deserialize_any(ListVisitor(PhantomData))
+    }
+}
+
+/// A person in [`TestDetections::people`].
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TestPerson {
+    /// Where the person is (`box` on the wire): `[left, top, width, height]` in basis points of
+    /// the image, each from 0 to 10000, within the image.
+    #[serde(rename = "box")]
+    pub bounding_box: [u32; 4],
+    /// The confidence from 0 to 100.
+    #[serde(default, deserialize_with = "present")]
+    pub confidence: Option<u32>,
+}
+
+/// A face in [`TestDetections::faces`].
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TestFace {
+    /// Where the face is (`box` on the wire): `[left, top, width, height]` in basis points of
+    /// the image, each from 0 to 10000, within the image.
+    #[serde(rename = "box")]
+    pub bounding_box: [u32; 4],
+    /// The confidence from 0 to 100.
+    #[serde(default, deserialize_with = "present")]
+    pub confidence: Option<u32>,
+    /// The estimated age.
+    #[serde(default, deserialize_with = "present")]
+    pub age: Option<TestFaceAge>,
+}
+
+/// The estimated age of a [`TestFace`]: a preset or a range of years.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TestFaceAge {
+    /// An adult's age range (`"adult"`).
+    Adult,
+    /// A minor's age range (`"minor"`).
+    Minor,
+    /// An age range in years, each from 0 to 120 with `low` at most `high`.
+    Range(TestAgeRange),
+}
+impl TestFaceAge {
+    /// The presets, in the order of their names in `TEST_FACE_AGE_PRESETS`.
+    const PRESETS: [Self; 2] = [Self::Adult, Self::Minor];
+    /// A preset by its name on the wire.
+    fn preset(name: &str) -> Option<Self> {
+        let index = TEST_FACE_AGE_PRESETS.iter().position(|n| *n == name)?;
+        Self::PRESETS.get(index).copied()
+    }
+    /// A preset's name on the wire; `None` for a range.
+    fn preset_name(self) -> Option<&'static str> {
+        let index = Self::PRESETS.iter().position(|age| *age == self)?;
+        TEST_FACE_AGE_PRESETS.get(index).copied()
+    }
+}
+impl From<TestAgeRange> for TestFaceAge {
+    fn from(range: TestAgeRange) -> Self {
+        Self::Range(range)
+    }
+}
+impl<'de> Deserialize<'de> for TestFaceAge {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        struct AgeVisitor;
+        impl<'de> Visitor<'de> for AgeVisitor {
+            type Value = TestFaceAge;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("an age preset or an age range")
+            }
+            fn visit_str<E: de::Error>(self, value: &str) -> std::result::Result<Self::Value, E> {
+                TestFaceAge::preset(value)
+                    .ok_or_else(|| E::invalid_value(de::Unexpected::Str(value), &self))
+            }
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> std::result::Result<Self::Value, A::Error> {
+                TestAgeRange::deserialize(MapAccessDeserializer::new(map)).map(TestFaceAge::Range)
+            }
+        }
+        deserializer.deserialize_any(AgeVisitor)
+    }
+}
+
+/// An age range in years in a [`TestFaceAge`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TestAgeRange {
+    /// The youngest age, from 0 to 120.
+    pub low: u32,
+    /// The oldest age, from `low` to 120.
+    pub high: u32,
+}
+
+/// A field that is `None` only when left out: `null` is refused.
+fn present<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<T>, D::Error> {
+    T::deserialize(deserializer).map(Some)
+}
+
+/// Like [`present`], for a struct that must be given as an object rather than a list.
+fn present_object<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<T>, D::Error> {
+    Object::deserialize(deserializer).map(|Object(value)| Some(value))
+}
+
+/// A struct decoded only from an object: derived structs also accept a list of their fields.
+struct Object<T>(T);
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Object<T> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        struct ObjectVisitor<T>(PhantomData<T>);
+        impl<'de, T: Deserialize<'de>> Visitor<'de> for ObjectVisitor<T> {
+            type Value = T;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("an object")
+            }
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                map: A,
+            ) -> std::result::Result<Self::Value, A::Error> {
+                T::deserialize(MapAccessDeserializer::new(map))
+            }
+        }
+        deserializer
+            .deserialize_map(ObjectVisitor(PhantomData))
+            .map(Object)
+    }
 }
 
 /// One qualifying instance of a category in a [`TestInput`].
@@ -106,10 +305,20 @@ pub enum TestInputPreset {
     Germany,
     /// Two harassment instances: documentary abuse and a threat.
     Mixed,
+    /// No instances, one person and their face with no estimated age.
+    OneFace,
+    /// No instances, and person and face detection found nobody.
+    NoFace,
+    /// No instances, one person and their face with an adult's age.
+    AdultFace,
+    /// No instances, one person and their face with a minor's age.
+    MinorFace,
+    /// No instances, three people side by side and their faces.
+    Group,
 }
 impl TestInputPreset {
     /// Every preset.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 12] = [
         Self::Clean,
         Self::Limited,
         Self::AdultImage,
@@ -117,12 +326,23 @@ impl TestInputPreset {
         Self::RegionalDelivery,
         Self::Germany,
         Self::Mixed,
+        Self::OneFace,
+        Self::NoFace,
+        Self::AdultFace,
+        Self::MinorFace,
+        Self::Group,
     ];
     /// The preset's scenario.
     pub fn input(self) -> TestInput {
         let one = |category: &str, qualifiers: &[&str]| instance(category, qualifiers);
         let instances = match self {
-            Self::Clean | Self::RegionalDelivery => vec![],
+            Self::Clean
+            | Self::RegionalDelivery
+            | Self::OneFace
+            | Self::NoFace
+            | Self::AdultFace
+            | Self::MinorFace
+            | Self::Group => vec![],
             Self::Limited => vec![one("harassment", &["harassment-abuse"])],
             Self::AdultImage => vec![one("sexual", &["sexual-pornographic-media"])],
             Self::AdultText => vec![one("sexual", &["sexual-explicit-language"])],
@@ -150,7 +370,51 @@ impl TestInputPreset {
             regional_actions,
             unassessed_categories: None,
             instances,
+            detections: self.detections(),
         }
+    }
+
+    fn detections(self) -> Option<TestDetections> {
+        let person = |bounding_box| TestPerson {
+            bounding_box,
+            confidence: None,
+        };
+        let face = |bounding_box, age| TestFace {
+            bounding_box,
+            confidence: None,
+            age,
+        };
+        let one = |age| TestDetections {
+            people: Some(vec![person([2500, 1500, 5000, 8500])].into()),
+            faces: Some(vec![face([3500, 2000, 3000, 3500], age)].into()),
+        };
+        Some(match self {
+            Self::OneFace => one(None),
+            Self::AdultFace => one(Some(TestFaceAge::Adult)),
+            Self::MinorFace => one(Some(TestFaceAge::Minor)),
+            Self::NoFace => TestDetections {
+                people: Some(vec![].into()),
+                faces: Some(vec![].into()),
+            },
+            Self::Group => {
+                let lefts = [500, 3600, 6700];
+                TestDetections {
+                    people: Some(
+                        lefts
+                            .map(|left| person([left, 2000, 2800, 8000]))
+                            .to_vec()
+                            .into(),
+                    ),
+                    faces: Some(
+                        lefts
+                            .map(|left| face([left + 700, 2500, 1400, 2000], None))
+                            .to_vec()
+                            .into(),
+                    ),
+                }
+            }
+            _ => return None,
+        })
     }
 }
 impl From<TestInputPreset> for TestInput {
@@ -458,6 +722,54 @@ fn validate(input: &TestInput) -> Result<()> {
     {
         return fail("Choose each region once with a limit, age-restrict or block action");
     }
+    if let Some(detections) = &input.detections {
+        validate_detections(detections)?;
+    }
+    Ok(())
+}
+
+fn validate_detections(detections: &TestDetections) -> Result<()> {
+    fn entries<T>(list: &Option<TestDetectionList<T>>) -> Result<&[T]> {
+        match list {
+            Some(TestDetectionList::Detected(entries)) if entries.len() > TEST_DETECTIONS_MAX => {
+                Err(invalid_argument(&format!(
+                    "A detection list has at most {TEST_DETECTIONS_MAX} entries"
+                )))
+            }
+            Some(TestDetectionList::Detected(entries)) => Ok(entries),
+            _ => Ok(&[]),
+        }
+    }
+    let valid_box = |[left, top, width, height]: [u32; 4]| {
+        [left, top, width, height]
+            .iter()
+            .all(|value| *value <= TEST_DETECTION_BOX_MAX)
+            && left + width <= TEST_DETECTION_BOX_MAX
+            && top + height <= TEST_DETECTION_BOX_MAX
+    };
+    let valid = |bounding_box: [u32; 4], confidence: Option<u32>| {
+        valid_box(bounding_box) && confidence.is_none_or(|c| c <= 100)
+    };
+    let people = entries(&detections.people)?;
+    let faces = entries(&detections.faces)?;
+    if !people.iter().all(|p| valid(p.bounding_box, p.confidence))
+        || !faces.iter().all(|f| valid(f.bounding_box, f.confidence))
+    {
+        return Err(invalid_argument(&format!(
+            "A detection box lies within the image in basis points (0 to {TEST_DETECTION_BOX_MAX}), and a confidence is from 0 to 100"
+        )));
+    }
+    let valid_age = |age: &Option<TestFaceAge>| match age {
+        Some(TestFaceAge::Range(TestAgeRange { low, high })) => {
+            low <= high && *high <= TEST_FACE_AGE_MAX
+        }
+        _ => true,
+    };
+    if !faces.iter().all(|face| valid_age(&face.age)) {
+        return Err(invalid_argument(&format!(
+            "An age range is from 0 to {TEST_FACE_AGE_MAX} years, with low at most high"
+        )));
+    }
     Ok(())
 }
 
@@ -494,6 +806,54 @@ fn canonical_json(input: &TestInput) -> String {
         })
         .collect();
     fields.push(format!(r#""instances":[{}]"#, instances.join(",")));
+    if let Some(detections) = &input.detections {
+        fields.push(format!(r#""detections":{}"#, detections_json(detections)));
+    }
+    format!("{{{}}}", fields.join(","))
+}
+
+fn detections_json(detections: &TestDetections) -> String {
+    fn list<T>(name: &str, list: &TestDetectionList<T>, entry: impl Fn(&T) -> String) -> String {
+        match list {
+            TestDetectionList::Unavailable => format!(r#""{name}":"unavailable""#),
+            TestDetectionList::Detected(entries) => {
+                let entries: Vec<String> = entries.iter().map(entry).collect();
+                format!(r#""{name}":[{}]"#, entries.join(","))
+            }
+        }
+    }
+    let located = |[left, top, width, height]: [u32; 4], confidence: Option<u32>| {
+        let mut parts = vec![format!(r#""box":[{left},{top},{width},{height}]"#)];
+        if let Some(confidence) = confidence {
+            parts.push(format!(r#""confidence":{confidence}"#));
+        }
+        parts
+    };
+    let mut fields = Vec::new();
+    if let Some(people) = &detections.people {
+        fields.push(list("people", people, |person| {
+            format!(
+                "{{{}}}",
+                located(person.bounding_box, person.confidence).join(",")
+            )
+        }));
+    }
+    if let Some(faces) = &detections.faces {
+        fields.push(list("faces", faces, |face| {
+            let mut parts = located(face.bounding_box, face.confidence);
+            match face.age {
+                Some(TestFaceAge::Range(TestAgeRange { low, high })) => {
+                    parts.push(format!(r#""age":{{"low":{low},"high":{high}}}"#));
+                }
+                Some(preset) => {
+                    let name = preset.preset_name().expect("an age preset has a name");
+                    parts.push(format!(r#""age":"{name}""#));
+                }
+                None => {}
+            }
+            format!("{{{}}}", parts.join(","))
+        }));
+    }
     format!("{{{}}}", fields.join(","))
 }
 
@@ -515,15 +875,56 @@ fn invalid_argument(message: &str) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{INPUT_QUALIFIERS, QUALIFIERS};
+    use super::{
+        TestFaceAge, INPUT_QUALIFIERS, QUALIFIERS, TEST_DETECTIONS_MAX, TEST_DETECTION_BOX_MAX,
+        TEST_FACE_AGE_MAX, TEST_FACE_AGE_PRESETS,
+    };
     use serde_json::{json, Map, Value};
+
+    fn fixture() -> Value {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata/test-inputs.json");
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    }
+
+    /// The detection limits and age preset names match the contract's `detections`, and every
+    /// preset name decodes to its own age.
+    #[test]
+    fn detection_limits_match_the_contract() {
+        let detections = &fixture()["detections"];
+        assert_eq!(
+            (
+                detections["maxEntries"].as_u64(),
+                detections["boxMax"].as_u64(),
+                detections["ageMax"].as_u64()
+            ),
+            (
+                Some(TEST_DETECTIONS_MAX as u64),
+                Some(u64::from(TEST_DETECTION_BOX_MAX)),
+                Some(u64::from(TEST_FACE_AGE_MAX))
+            )
+        );
+        let mut names: Vec<&str> = detections["agePresets"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        let mut expected = TEST_FACE_AGE_PRESETS.to_vec();
+        names.sort_unstable();
+        expected.sort_unstable();
+        assert_eq!(names, expected);
+        assert_eq!(TestFaceAge::PRESETS.len(), TEST_FACE_AGE_PRESETS.len());
+        for age in TestFaceAge::PRESETS {
+            let name = age.preset_name().unwrap();
+            assert_eq!(TestFaceAge::preset(name), Some(age), "{name}");
+        }
+    }
 
     /// The qualifiers a scenario may list match the contract's `qualifiers` in
     /// `testdata/test-inputs.json`.
     #[test]
     fn scenario_qualifiers_match_the_contract() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/testdata/test-inputs.json");
-        let fixture: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let fixture = fixture();
         let allowed: Map<String, Value> = QUALIFIERS
             .iter()
             .map(|(category, qualifiers)| {

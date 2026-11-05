@@ -728,6 +728,7 @@ pub(super) fn snapshot(asset: &Value) -> Value {
         "upload": {"status": asset["upload"]["status"]},
         "classification": {
             "status": asset["classification"]["status"],
+            "testInput": asset["classification"]["testInput"],
             "moderation": {"status": asset["classification"]["moderation"]["status"]},
         },
         "content": {"status": asset["content"]["status"]},
@@ -1266,7 +1267,9 @@ impl Backend {
         }
     }
 
-    /// `asset` decided as `decision` says (which must not be `pending`), with its report.
+    /// `asset` decided as `decision` says (which must not be `pending`), with its report. Like the
+    /// API for an image with nobody in it, a decided image reports the person and face detection
+    /// its upload turned on.
     fn apply_decision(&mut self, asset: &mut Value, decision: &MockDecision, now: u64) {
         let status = decision.status().as_str();
         apply_outcome(asset, &mut self.storage.content, status, "policy", now);
@@ -1274,6 +1277,16 @@ impl Backend {
             let moderation = &mut asset["classification"]["moderation"];
             for (key, value) in report {
                 moderation[key] = value;
+            }
+        }
+        if asset["type"] != "image" || asset["classification"]["status"] != "completed" {
+            return;
+        }
+        let features = asset["processingOptions"]["features"].clone();
+        for (feature, list) in [("personDetection", "people"), ("faceDetection", "faces")] {
+            if features[feature]["enabled"] == true {
+                asset["classification"][feature] =
+                    json!({"status": "evaluated", "stage": "beta", list: []});
             }
         }
     }
@@ -1922,7 +1935,10 @@ impl Backend {
             },
             "classification": {
                 "status": if open { "pending" } else { "processing" }, "failureReason": null,
-                "updatedAt": now, "completedAt": null, "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": []},
+                "updatedAt": now, "completedAt": null,
+                // The mock never reads test inputs.
+                "testInput": false,
+                "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": []},
             },
         });
         for key in [

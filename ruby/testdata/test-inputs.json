@@ -77,6 +77,147 @@
           ]
         }
       ]
+    },
+    "oneFace": {
+      "instances": [],
+      "detections": {
+        "people": [
+          {
+            "box": [
+              2500,
+              1500,
+              5000,
+              8500
+            ]
+          }
+        ],
+        "faces": [
+          {
+            "box": [
+              3500,
+              2000,
+              3000,
+              3500
+            ]
+          }
+        ]
+      }
+    },
+    "noFace": {
+      "instances": [],
+      "detections": {
+        "people": [],
+        "faces": []
+      }
+    },
+    "adultFace": {
+      "instances": [],
+      "detections": {
+        "people": [
+          {
+            "box": [
+              2500,
+              1500,
+              5000,
+              8500
+            ]
+          }
+        ],
+        "faces": [
+          {
+            "box": [
+              3500,
+              2000,
+              3000,
+              3500
+            ],
+            "age": "adult"
+          }
+        ]
+      }
+    },
+    "minorFace": {
+      "instances": [],
+      "detections": {
+        "people": [
+          {
+            "box": [
+              2500,
+              1500,
+              5000,
+              8500
+            ]
+          }
+        ],
+        "faces": [
+          {
+            "box": [
+              3500,
+              2000,
+              3000,
+              3500
+            ],
+            "age": "minor"
+          }
+        ]
+      }
+    },
+    "group": {
+      "instances": [],
+      "detections": {
+        "people": [
+          {
+            "box": [
+              500,
+              2000,
+              2800,
+              8000
+            ]
+          },
+          {
+            "box": [
+              3600,
+              2000,
+              2800,
+              8000
+            ]
+          },
+          {
+            "box": [
+              6700,
+              2000,
+              2800,
+              8000
+            ]
+          }
+        ],
+        "faces": [
+          {
+            "box": [
+              1200,
+              2500,
+              1400,
+              2000
+            ]
+          },
+          {
+            "box": [
+              4300,
+              2500,
+              1400,
+              2000
+            ]
+          },
+          {
+            "box": [
+              7400,
+              2500,
+              1400,
+              2000
+            ]
+          }
+        ]
+      }
     }
   },
   "signals": {
@@ -596,6 +737,21 @@
       "profanity-support-prevention"
     ]
   },
+  "detections": {
+    "maxEntries": 32,
+    "boxMax": 10000,
+    "ageMax": 120,
+    "agePresets": {
+      "adult": {
+        "low": 25,
+        "high": 35
+      },
+      "minor": {
+        "low": 12,
+        "high": 16
+      }
+    }
+  },
   "text": [
     {
       "name": "signal sexual",
@@ -787,6 +943,172 @@
         ]
       },
       "code": "<!calmlens-test bfd9a7f2760c0ce411e307d5cdecc97a eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGFyYXNzbWVudCIsInF1YWxpZmllcnMiOlsiaGFyYXNzbWVudC1hYnVzZSIsImhhcmFzc21lbnQtZG9jdW1lbnRhcnkiXX0seyJjYXRlZ29yeSI6ImhhcmFzc21lbnQiLCJxdWFsaWZpZXJzIjpbImhhcmFzc21lbnQtdGhyZWF0Il19XX0>"
+    },
+    {
+      "name": "preset oneFace",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                2500,
+                1500,
+                5000,
+                8500
+              ]
+            }
+          ],
+          "faces": [
+            {
+              "box": [
+                3500,
+                2000,
+                3000,
+                3500
+              ]
+            }
+          ]
+        }
+      },
+      "code": "<!calmlens-test f1417c6f9b4cbcd530fa4616dc305c1c eyJpbnN0YW5jZXMiOltdLCJkZXRlY3Rpb25zIjp7InBlb3BsZSI6W3siYm94IjpbMjUwMCwxNTAwLDUwMDAsODUwMF19XSwiZmFjZXMiOlt7ImJveCI6WzM1MDAsMjAwMCwzMDAwLDM1MDBdfV19fQ>"
+    },
+    {
+      "name": "preset noFace",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [],
+          "faces": []
+        }
+      },
+      "code": "<!calmlens-test 193dfa470d3203c7133daa58c5d10517 eyJpbnN0YW5jZXMiOltdLCJkZXRlY3Rpb25zIjp7InBlb3BsZSI6W10sImZhY2VzIjpbXX19>"
+    },
+    {
+      "name": "preset adultFace",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                2500,
+                1500,
+                5000,
+                8500
+              ]
+            }
+          ],
+          "faces": [
+            {
+              "box": [
+                3500,
+                2000,
+                3000,
+                3500
+              ],
+              "age": "adult"
+            }
+          ]
+        }
+      },
+      "code": "<!calmlens-test 17901a89e09eed99a4f578fbee3820b5 eyJpbnN0YW5jZXMiOltdLCJkZXRlY3Rpb25zIjp7InBlb3BsZSI6W3siYm94IjpbMjUwMCwxNTAwLDUwMDAsODUwMF19XSwiZmFjZXMiOlt7ImJveCI6WzM1MDAsMjAwMCwzMDAwLDM1MDBdLCJhZ2UiOiJhZHVsdCJ9XX19>"
+    },
+    {
+      "name": "preset minorFace",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                2500,
+                1500,
+                5000,
+                8500
+              ]
+            }
+          ],
+          "faces": [
+            {
+              "box": [
+                3500,
+                2000,
+                3000,
+                3500
+              ],
+              "age": "minor"
+            }
+          ]
+        }
+      },
+      "code": "<!calmlens-test 67fe52658503a118d94a5fc66a4f618a eyJpbnN0YW5jZXMiOltdLCJkZXRlY3Rpb25zIjp7InBlb3BsZSI6W3siYm94IjpbMjUwMCwxNTAwLDUwMDAsODUwMF19XSwiZmFjZXMiOlt7ImJveCI6WzM1MDAsMjAwMCwzMDAwLDM1MDBdLCJhZ2UiOiJtaW5vciJ9XX19>"
+    },
+    {
+      "name": "preset group",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                500,
+                2000,
+                2800,
+                8000
+              ]
+            },
+            {
+              "box": [
+                3600,
+                2000,
+                2800,
+                8000
+              ]
+            },
+            {
+              "box": [
+                6700,
+                2000,
+                2800,
+                8000
+              ]
+            }
+          ],
+          "faces": [
+            {
+              "box": [
+                1200,
+                2500,
+                1400,
+                2000
+              ]
+            },
+            {
+              "box": [
+                4300,
+                2500,
+                1400,
+                2000
+              ]
+            },
+            {
+              "box": [
+                7400,
+                2500,
+                1400,
+                2000
+              ]
+            }
+          ]
+        }
+      },
+      "code": "<!calmlens-test 42027ac5b40f563d929c84bc1e8a3338 eyJpbnN0YW5jZXMiOltdLCJkZXRlY3Rpb25zIjp7InBlb3BsZSI6W3siYm94IjpbNTAwLDIwMDAsMjgwMCw4MDAwXX0seyJib3giOlszNjAwLDIwMDAsMjgwMCw4MDAwXX0seyJib3giOls2NzAwLDIwMDAsMjgwMCw4MDAwXX1dLCJmYWNlcyI6W3siYm94IjpbMTIwMCwyNTAwLDE0MDAsMjAwMF19LHsiYm94IjpbNDMwMCwyNTAwLDE0MDAsMjAwMF19LHsiYm94IjpbNzQwMCwyNTAwLDE0MDAsMjAwMF19XX19>"
     },
     {
       "name": "explicitActions",
@@ -1532,6 +1854,580 @@
       "code": "<!calmlens-test 8bec9b665d195aa72dc9445b8991c06d eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX0seyJjYXRlZ29yeSI6InByb2Zhbml0eSIsInF1YWxpZmllcnMiOltdfSx7ImNhdGVnb3J5IjoicHJvZmFuaXR5IiwicXVhbGlmaWVycyI6W119LHsiY2F0ZWdvcnkiOiJwcm9mYW5pdHkiLCJxdWFsaWZpZXJzIjpbXX1dfQ>"
     },
     {
+      "name": "detections",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "violence",
+            "qualifiers": []
+          }
+        ],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                0,
+                0,
+                10000,
+                10000
+              ],
+              "confidence": 100
+            },
+            {
+              "box": [
+                9999,
+                9999,
+                1,
+                1
+              ],
+              "confidence": 0
+            }
+          ],
+          "faces": [
+            {
+              "box": [
+                100,
+                200,
+                300,
+                400
+              ],
+              "confidence": 87,
+              "age": "adult"
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "age": "minor"
+            },
+            {
+              "box": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "age": {
+                "low": 0,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                1234,
+                5678,
+                4321,
+                1234
+              ],
+              "confidence": 1,
+              "age": {
+                "low": 17,
+                "high": 17
+              }
+            },
+            {
+              "box": [
+                10000,
+                10000,
+                0,
+                0
+              ]
+            }
+          ]
+        }
+      },
+      "code": "<!calmlens-test 0015c4d9b104687bae0ac5a50d0d0a0a eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoidmlvbGVuY2UiLCJxdWFsaWZpZXJzIjpbXX1dLCJkZXRlY3Rpb25zIjp7InBlb3BsZSI6W3siYm94IjpbMCwwLDEwMDAwLDEwMDAwXSwiY29uZmlkZW5jZSI6MTAwfSx7ImJveCI6Wzk5OTksOTk5OSwxLDFdLCJjb25maWRlbmNlIjowfV0sImZhY2VzIjpbeyJib3giOlsxMDAsMjAwLDMwMCw0MDBdLCJjb25maWRlbmNlIjo4NywiYWdlIjoiYWR1bHQifSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJhZ2UiOiJtaW5vciJ9LHsiYm94IjpbMCwwLDAsMF0sImFnZSI6eyJsb3ciOjAsImhpZ2giOjEyMH19LHsiYm94IjpbMTIzNCw1Njc4LDQzMjEsMTIzNF0sImNvbmZpZGVuY2UiOjEsImFnZSI6eyJsb3ciOjE3LCJoaWdoIjoxN319LHsiYm94IjpbMTAwMDAsMTAwMDAsMCwwXX1dfX0>"
+    },
+    {
+      "name": "detectionsUnavailable",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": "unavailable",
+          "faces": "unavailable"
+        }
+      },
+      "code": "<!calmlens-test c3995a3ed6689a7e959c4e8e137eaa43 eyJpbnN0YW5jZXMiOltdLCJkZXRlY3Rpb25zIjp7InBlb3BsZSI6InVuYXZhaWxhYmxlIiwiZmFjZXMiOiJ1bmF2YWlsYWJsZSJ9fQ>"
+    },
+    {
+      "name": "detectionsEmpty",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {}
+      },
+      "code": "<!calmlens-test 7befbfe03aa3353437f78ce3e27d632b eyJpbnN0YW5jZXMiOltdLCJkZXRlY3Rpb25zIjp7fX0>"
+    },
+    {
+      "name": "detectionsKeyOrder",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "detections": {
+          "faces": [
+            {
+              "age": {
+                "high": 40,
+                "low": 30
+              },
+              "confidence": 50,
+              "box": [
+                10,
+                20,
+                30,
+                40
+              ]
+            }
+          ],
+          "people": [
+            {
+              "confidence": 70,
+              "box": [
+                1,
+                2,
+                3,
+                4
+              ]
+            }
+          ]
+        },
+        "instances": []
+      },
+      "code": "<!calmlens-test 61e44c01ac5c712f85ab0a0288ca8be7 eyJpbnN0YW5jZXMiOltdLCJkZXRlY3Rpb25zIjp7InBlb3BsZSI6W3siYm94IjpbMSwyLDMsNF0sImNvbmZpZGVuY2UiOjcwfV0sImZhY2VzIjpbeyJib3giOlsxMCwyMCwzMCw0MF0sImNvbmZpZGVuY2UiOjUwLCJhZ2UiOnsibG93IjozMCwiaGlnaCI6NDB9fV19fQ>"
+    },
+    {
+      "name": "mostFaces",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            }
+          ]
+        }
+      },
+      "code": "<!calmlens-test 75b62452c044bbe6416a474c6dba0e11 eyJpbnN0YW5jZXMiOltdLCJkZXRlY3Rpb25zIjp7ImZhY2VzIjpbeyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJjb25maWRlbmNlIjoxMDAsImFnZSI6eyJsb3ciOjEwMCwiaGlnaCI6MTIwfX0seyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJjb25maWRlbmNlIjoxMDAsImFnZSI6eyJsb3ciOjEwMCwiaGlnaCI6MTIwfX0seyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJjb25maWRlbmNlIjoxMDAsImFnZSI6eyJsb3ciOjEwMCwiaGlnaCI6MTIwfX0seyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJjb25maWRlbmNlIjoxMDAsImFnZSI6eyJsb3ciOjEwMCwiaGlnaCI6MTIwfX0seyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJjb25maWRlbmNlIjoxMDAsImFnZSI6eyJsb3ciOjEwMCwiaGlnaCI6MTIwfX0seyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJjb25maWRlbmNlIjoxMDAsImFnZSI6eyJsb3ciOjEwMCwiaGlnaCI6MTIwfX0seyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJjb25maWRlbmNlIjoxMDAsImFnZSI6eyJsb3ciOjEwMCwiaGlnaCI6MTIwfX0seyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJjb25maWRlbmNlIjoxMDAsImFnZSI6eyJsb3ciOjEwMCwiaGlnaCI6MTIwfX0seyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJjb25maWRlbmNlIjoxMDAsImFnZSI6eyJsb3ciOjEwMCwiaGlnaCI6MTIwfX0seyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fSx7ImJveCI6WzUwMDAsNTAwMCw1MDAwLDUwMDBdLCJjb25maWRlbmNlIjoxMDAsImFnZSI6eyJsb3ciOjEwMCwiaGlnaCI6MTIwfX0seyJib3giOls1MDAwLDUwMDAsNTAwMCw1MDAwXSwiY29uZmlkZW5jZSI6MTAwLCJhZ2UiOnsibG93IjoxMDAsImhpZ2giOjEyMH19LHsiYm94IjpbNTAwMCw1MDAwLDUwMDAsNTAwMF0sImNvbmZpZGVuY2UiOjEwMCwiYWdlIjp7ImxvdyI6MTAwLCJoaWdoIjoxMjB9fV19fQ>"
+    },
+    {
       "name": "other key",
       "key": "0123456789abcdef0123456789abcdef",
       "signal": "harassment",
@@ -1863,6 +2759,192 @@
       "rgbaSha256": "8babcbf5f2c552c8c4eab633843b6ce851d66ad0bbd4eadf9d1c23d48bfcdf4b"
     },
     {
+      "name": "preset oneFace",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                2500,
+                1500,
+                5000,
+                8500
+              ]
+            }
+          ],
+          "faces": [
+            {
+              "box": [
+                3500,
+                2000,
+                3000,
+                3500
+              ]
+            }
+          ]
+        }
+      },
+      "width": 464,
+      "height": 464,
+      "cells": 29,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr102131103033110221110322102rr003033231103100020200031223rr231102011323011030310033001rr200212302103333011013032000rr112233031033201120211200233rr012313113232011102103032131rr010111122020100203223311111rr221322210103323002130312220rr100331201322321222300230210rr203123312111002122222003123rr121131020032320122220013202rr002331301103030122221131101rr032031231203233103211233200rr201312323001131322203102120rr201210211221221300310003323rr022002203203122131223001122rr020133300002221013212010323rr200233033130021121023023131rr221213233310011111230313323rr200013101123002201121013232rr222213310021112211320021133rr123023212210120113012010212rr110301033220031032223032213rr103300103111310012213201222rr102032100132002100022012102rr013231110022220101123311023rr221121313211210031013322020rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "c350e2a48ec2a3c55e20b273a5fec2fb6895750a98adbe36fcc0819ef1e567ec"
+    },
+    {
+      "name": "preset noFace",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [],
+          "faces": []
+        }
+      },
+      "width": 506,
+      "height": 506,
+      "cells": 23,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrrrr102121031303032211020rr012213311200013113203rr002212203233001033221rr232301002310033001200rr212302103333011013032rr000112233031033201120rr211200233012313113232rr011102103032131010111rr122020100203223311111rr221322210103323002130rr312220100331201322321rr221230213310203233223rr011113302112013123300rr203112123331102033110rr210122313220213331333rr212332033010311231122rr212103100202101221220rr011330113131321230222rr300113033301230231103rr030220023021010021011rr302013123311332300200rrrrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "54fc2d59c8892bfe8b442af9408dd7e6bac5273a343f92f542926b2d2f58038e"
+    },
+    {
+      "name": "preset adultFace",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                2500,
+                1500,
+                5000,
+                8500
+              ]
+            }
+          ],
+          "faces": [
+            {
+              "box": [
+                3500,
+                2000,
+                3000,
+                3500
+              ],
+              "age": "adult"
+            }
+          ]
+        }
+      },
+      "width": 464,
+      "height": 464,
+      "cells": 29,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr102131331320300332022031021rr222002330001131120222013100rr021301012331212301310033001rr200212302103333011013032000rr112233031033201120211200233rr012313113232011102103032131rr010111122020100203223311111rr221322210103323002130312220rr100331201322321222300230210rr203123312111002122222003123rr121131020032320122220013202rr002331301103030122221131101rr032031231203233103211233200rr201312323001131322203102120rr201210211221221300310003323rr022002203203122131223001122rr020133300002221013212010323rr200233033130021121023023131rr221213233310011111320201103rr320000231233200010223030213rr303322001200201213303120031rr112032132210120113012010212rr110301303023331031201122201rr220231112021001120321113212rr301032030320031310300012332rr212231030330313103023222201rr131333212033230102201203100rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "374193e7f2862b1c89a9cdfb9c42c9f0e77f7ade7c653fcd975f7859cb5ae882"
+    },
+    {
+      "name": "preset minorFace",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                2500,
+                1500,
+                5000,
+                8500
+              ]
+            }
+          ],
+          "faces": [
+            {
+              "box": [
+                3500,
+                2000,
+                3000,
+                3500
+              ],
+              "age": "minor"
+            }
+          ]
+        }
+      },
+      "width": 464,
+      "height": 464,
+      "cells": 29,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr102131330120232022320311110rr313213310301023333000022302rr232311133121202123310033001rr200212302103333011013032000rr112233031033201120211200233rr012313113232011102103032131rr010111122020100203223311111rr221322210103323002130312220rr100331201322321222300230210rr203123312111002122222003123rr121131020032320122220013202rr002331301103030122221131101rr032031231203233103211233200rr201312323001131322203102120rr201210211221221300310003323rr022002203203122131223001122rr020133300002221013212010323rr200233033130021121023023131rr221213233310011111320201103rr320000231233200010223030233rr301223321202200113303120031rr112032132210120113012010212rr110301013233103011130013211rr131302010300003313122233111rr001121222203103301021212213rr032212022123333202122123011rr213001202121322321211232300rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "0df48462fb5f125dac759ad7d12e57ec5d8858463c4a18870d4a7b678f0dd43f"
+    },
+    {
+      "name": "preset group",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                500,
+                2000,
+                2800,
+                8000
+              ]
+            },
+            {
+              "box": [
+                3600,
+                2000,
+                2800,
+                8000
+              ]
+            },
+            {
+              "box": [
+                6700,
+                2000,
+                2800,
+                8000
+              ]
+            }
+          ],
+          "faces": [
+            {
+              "box": [
+                1200,
+                2500,
+                1400,
+                2000
+              ]
+            },
+            {
+              "box": [
+                4300,
+                2500,
+                1400,
+                2000
+              ]
+            },
+            {
+              "box": [
+                7400,
+                2500,
+                1400,
+                2000
+              ]
+            }
+          ]
+        }
+      },
+      "width": 468,
+      "height": 468,
+      "cells": 39,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr1021203031200333233212002111112312223rr3202213311221113011300012322332123021rr1333003032211321323222220113220122112rr2202201321211321001232223130233312203rr1132311113203020012312212011020333000rr1320310222000233311023131333301100330rr2003132120330103333032131030101010110rr0310101122303103202002202000333001321rr3012322310103030032021130031023020031rr2003213100013313323101322201001331233rr3211112010123320222222133231000320300rr3013013012111101032221030131033030021rr3121131220002100010120031300201110231rr2123000032023300031022132210013221211rr1033003223012022011312213332110320312rr2123321021110022231100021231011320203rr3211000022110002202122010102311313013rr1021102021031110313233201210231213000rr1223200230201323231201232113223110320rr3022230100331210301130220212200202212rr1131023133331333223013202133323201113rr0321313213132000232312312122200100202rr3031010030222211132101331001313122130rr1302132121002301102012022001203311010rr0022201211212330333203023110302030333rr1220031110003302232330222102021111232rr0331301202320201320220112123222023200rr0221110322013131003223312122100301112rr0002313233202312122202111200000221321rr0210110322102123011323021323102033111rr2001013022031003300031301310221111030rr0310310101013012301102101301213201321rr2220322033323021322103000010100031233rr3102220103310130030322333130012211030rr0020210222213223223102012212103223200rr2213111203300033130130011302222321300rr1312302020203013323003203212313102110rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "5525908893e5ca0127f7bba9c3b47db15b9fb17720457bf859162c46c20133f7"
+    },
+    {
       "name": "explicitActions",
       "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
       "input": {
@@ -2111,6 +3193,600 @@
       "cells": 45,
       "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr1020300201311221230302030310011221313223202rr3220011232133130310232012021100212213312221rr1133232220101203001311013003220131022323023rr3233311110131232203103131110330302001111221rr2022020333330132121122200113331111303133203rr2100323020313310133010213303202023010111012rr1320120131320200331210221310323201023231132rr3111013203303003122002202132103123022321103rr0221222101123223010031022210101120120222313rr0233312332102031130201111030230311121220100rr3112002320113333220220300323121032210003103rr0010012122030230313221300020333232010122322rr0101200122021203332000333012223012333122030rr2313301210321211011233312003303002321003333rr0300113103210110202012030220100013132130221rr3132301010103322001100132330020313122201021rr3321021230332210120220210330200001200333301rr1012022310120030122221000323303333011232010rr3221120220300023011201200303202201011313022rr1021113322000002122223201013200000331212133rr1222203002302022010213332012012132300023031rr3223301233221100331032222100320310220303222rr0212102113032222220103020120320132321101103rr0202200112233221230311232030203232103113231rr0133132221321320323301110312322301223331100rr2313122231103203002013033231112112122032333rr2001021211203301303210110330213210112332101rr2313000320210222320033032300121132320101321rr3201011012033222102133301000313032201102312rr0020031212310132221230331332101331210202101rr3132101102133132111032332103233103223111023rr1330323212000231022213001223210002113032002rr1132320101120113320202313102323320223111133rr3112302202201011323032031032132333013131230rr3110130333023023112231202320331001201131030rr3223221013002130320013123032133230112113000rr1223003221010210000323100021201233133010133rr1000230111322300013012020131102002312201133rr0223020122032110120120033030101232010201230rr0021103223332311011310110032212320333211131rr0212332330031010020330002111332210212323001rr1100111111312211310232102002320333111323030rr0022203010223003213333221011230230103312100rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
       "rgbaSha256": "932de085943a129c44854a3cb2381bba51b9c1f494b38ad86c3e16088638a776"
+    },
+    {
+      "name": "detections",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [
+          {
+            "category": "violence",
+            "qualifiers": []
+          }
+        ],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                0,
+                0,
+                10000,
+                10000
+              ],
+              "confidence": 100
+            },
+            {
+              "box": [
+                9999,
+                9999,
+                1,
+                1
+              ],
+              "confidence": 0
+            }
+          ],
+          "faces": [
+            {
+              "box": [
+                100,
+                200,
+                300,
+                400
+              ],
+              "confidence": 87,
+              "age": "adult"
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "age": "minor"
+            },
+            {
+              "box": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "age": {
+                "low": 0,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                1234,
+                5678,
+                4321,
+                1234
+              ],
+              "confidence": 1,
+              "age": {
+                "low": 17,
+                "high": 17
+              }
+            },
+            {
+              "box": [
+                10000,
+                10000,
+                0,
+                0
+              ]
+            }
+          ]
+        }
+      },
+      "width": 470,
+      "height": 470,
+      "cells": 47,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr102030012132122033310302200300322001322323332rr200210020003032010121111230310033003212210110rr213231320013310013013021201103220332100312331rr111013113220311113111030330200030122130300203rr331101320333222010223311100031332203100321010rr313311033010230303212033010032112133101013123rr030033020022130123320112003113322210133030030rr021130022031021031323223210110221332301122220rr011120332230001021001302300132101223300303122rr100011011022000010022011030032122310021330103rr203101222300002130133330321120122020010311320rr201301313223311313222011330303200003232211321rr200321231312232313303120013311032031010133201rr031030022210033330300113001322010133113020321rr300032023320101210321011231312310010103102101rr221003331003032330231202123011321210103232000rr011303332112101132311023131322130102331213113rr001211300132000133020323200121130030333222300rr321303300211012211000133132220013223001211203rr332120322313112232103103303012111002233321121rr033033321031231110032013232001112102130231033rr201023331221220300003220312310201322303001020rr212233013033211213311232211213300003312102012rr303332012132032101133130033220101223011322031rr322300333021131121323200131030021332233300231rr101300101133202103331002211111133321231312032rr021013232003122120013003332022123032131113131rr132011101220310002000333301233022132020003322rr023030000331220201010220200113132200101102333rr211111133131223312023131022211203313101011002rr132022123032201001133133311113230000132130320rr210003011022221212302131321330110200311320210rr301200213211112113002311102032320230213022301rr131313212032121012010232002023033031102033322rr210020330302223002330200322200132121232123032rr030031233210111100222311201012310113102033331rr000022121323213133000100303313012010102203133rr001013123220022023122210012320202303001322220rr132302103130201333120333110311002301220001202rr321033201122132012013102231301310130132111202rr312220310232030003022120320020101020012102122rr123330301102213120002311020300103131211001123rr333132010111122312212232203102221310101313220rr200102311012020201300001033313301223133111113rr122332310130102033333112211010230310003121330rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "002d454d88e1976dc467b36f532de9b134910c7c4de3b6351c4a42796f86128d"
+    },
+    {
+      "name": "detectionsUnavailable",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": "unavailable",
+          "faces": "unavailable"
+        }
+      },
+      "width": 500,
+      "height": 500,
+      "cells": 25,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrr10213330323030322202122rr30001001331222303331311rr13032212133120113001120rr11231003300120021230210rr33330110130320001122330rr31033201120211200233012rr31311323201110210303213rr10101111220201002032233rr11111221322210103323002rr13031222010033120132220rr23221312102100022332230rr12213012011113132230020rr03033232002033020221310rr02322110331331211201000rr30123320330210323001311rr33222221112330000132130rr23201111110210120001311rr12212330223131321103221rr10303302223011231331113rr01031010320203120213100rr23321211122113220033322rr21022110023230001230100rr10320331320130112122020rrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "c23ccfebdf2abd9a2e13da1475fc288ca29257556d52a9f880fa59c891909047"
+    },
+    {
+      "name": "detectionsEmpty",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {}
+      },
+      "width": 504,
+      "height": 504,
+      "cells": 21,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrr1021201000002221011rr3330023212021020033rr3000100221232101321rr3211132212312223100rr3300120021230210333rr3011013032000112233rr0310332011202112002rr3301231311323201110rr2103032131010111122rr0201002032233111112rr2123001031031212020rr1113001203233223231rr2221033103000111200rr3130130310002301200rr1313100120301033133rr2100203200203311210rr0031211122120303320rr0333113312121012033rr0301331131012302130rrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "9d0b9c958d85477a0689411c3d770d829f4ddc005b417f9d79b9044f8a348e8c"
+    },
+    {
+      "name": "detectionsKeyOrder",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "detections": {
+          "faces": [
+            {
+              "age": {
+                "high": 40,
+                "low": 30
+              },
+              "confidence": 50,
+              "box": [
+                10,
+                20,
+                30,
+                40
+              ]
+            }
+          ],
+          "people": [
+            {
+              "confidence": 70,
+              "box": [
+                1,
+                2,
+                3,
+                4
+              ]
+            }
+          ]
+        },
+        "instances": []
+      },
+      "width": 496,
+      "height": 496,
+      "cells": 31,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr10211202013322132311100112320rr20312103202321313011332223300rr12232002133202310033001200212rr30210333301101303200011223303rr10332011202112002330123131132rr32011102103032131010111122020rr10020322331111122132221010332rr30021303122201003312013223212rr22300230210203123312111002122rr22200332223113203203310000322rr01000121223330100321120301300rr00110120020230320323301110311rr33100003222001233312322100332rr13102123023230113303100120232rr32002003202012110233321030023rr22002012322131201201332320023rr30331300203210330311220113222rr23001031312220111003310000031rr23222010333311121121103200032rr03122133030000122133330100012rr33221031132322131012231113102rr01332200022313002313001013012rr23302212232322100312102121133rr33202013001003003201321003210rr22231333002011303102331333031rr11203211301230100103300223221rr21321311230300020132311003233rr12131122111020211003323222133rr22033122123301010122221302030rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "1c57e5f381fc9fb3b71b40b22396e57fe571f27a3d6395b18fc1e8dd4dd282e8"
+    },
+    {
+      "name": "mostFaces",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            },
+            {
+              "box": [
+                5000,
+                5000,
+                5000,
+                5000
+              ],
+              "confidence": 100,
+              "age": {
+                "low": 100,
+                "high": 120
+              }
+            }
+          ]
+        }
+      },
+      "width": 444,
+      "height": 444,
+      "cells": 111,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr1010322210310302203003102303112312303320110333022030202132220113213302012132320313103000030032330000022021230rr0333210001320223233000123300223311202220100203313032012012203023122023322331021133032310010231210002002221112rr3330231212301032311231230213103310012312133013011223030032133123201032001113312101230200023003132121130103120rr2303113003121100013112231113122210000211323311000210213201113321012102133031321000130023230120123322011322312rr3330111223100333201023110103300213333100102311103000130123001102031022310013311311112131330310022211132121223rr2220223213312332110103302113033123323100200020033301101330212032011322001033130012121301033031331210302322310rr1202312121001233220030202033021112220102213001321303212031123230112002022031121002223110231300333301212310120rr2310230020101303212232032323312033123120033121101033032000030230201213111232200313122133121032322031020231220rr2113113012303033001122331121131322031031233211002012232010032100130320303201121220301310321003310232202111013rr2221112312132311110333202133122331003222023132231021032122131201303221100011213322301222330113221333302103030rr2113232101221113212102120323101010021330011120230102022023321010203332133233313232010121130312211110310301310rr0032232131122020233210010332000132111330001123022021330333202033320201230323301020230311010132303002013313232rr0123323012002101231001013030020321130023120031231203221111030221222100112300102221133202102130221233311323201rr3002112123121110020032031221103230211220302220100212310000020103331103323030202211210231212203203222300112102rr3022211122310000013313330310133330023021223312032021200321202111330302311310112213012002032233012032220213211rr2321300013113120221031121031320031201223111001321310111102232112220213331001333221330211132201230301003102103rr0303030331130120320211201130333210112230020120133230011030320202300032000303312003002200011102333101101122220rr0013131323001322203023321032323020330110201202201221210312100223332013113112222001222311020211133201032302013rr0231122330122220331213220100221302313011332300103221032233103133211333201033331213202103302110102313312012130rr3321011230211222311102330100233113222001020231323302321220331212203223203102203003102113022020102212132330121rr3220123131213230000330120301212211230331303013212233111112013321111223120133300322200113212113002113320302303rr0010312233311100322203200323221113111323311011023310203200232001012202212223030102103013132120222320113021220rr1111102323102231203301013020031313302023210332301203332133111113123031002033231133131322200002221302302011233rr3101330201300203211031200203112132333000302302230110222211030300032000032332313122123331203202113031021011021rr0321202300123212113203233302012023110221201132201001210203333021102203022213131323010112111031001130333110122rr1232023013332330200311033100201301002023033011103333032002322120011030133000102231012212110230301113131130330rr3223121232312203132331103102002113003033201033310322201010220302132000212003223112122030201022133130331030231rr3000202103323000022021020313132230012301312012013231203303122121323201113132131030002230111212120222000002202rr0312200123311213301301132113103312022021121123120102021122321112231311102030322210012130131020123323021121110rr3032332101112013102112232221130203323210022231302112003323111213132132030131020030230300331230300200213332101rr3023311130312020210112212002203112231303333121020232120021032230300032322100230303321112022200122331333330013rr2313313023123011112303101132323310103130022030010332211132130320210123023121021212332120221211231302210120210rr3122103223020031020123000021320113213133323212313030120321120101023130231231223011211323332200022222112321122rr2200120223313132110331212113122123321011031032120000021302211310202223011102203132330303220100321021301212110rr2203132033030123321003121031001100333311112020232301333310021321223333020131300323301211110300213301032212002rr2020233221033233312213130323001103112120021022311103331231312321010311331310101103210002330133213001222030232rr3131222012323011123120010102020231030121231300031302323101002231110031112331103130210200201322311200200212203rr0001010131020331113230000302032321200233320133221213230131231100233211001110303310212333300112303123200010122rr0010022110233101132313131120313203123330111221232210220323203300332310113320113233100322100000200032301001210rr2130321111020030330300322233011330213332111023323111220312321011221220202212032021312300103213201101302212131rr0032321100000320331211022331122331003233002131101302300201310301313213232232103313033323000032121001213022100rr1303102032130112222023123221231200301220210203200202313103013303233011123331321311323031131213313002112012012rr0320001203223010011312223001103330023120322221100133221312302133311310213203132002111002222123012233021132132rr1332001032311020120223323002231301332203311021230312112232301001102302002000322101110201332011020220100022123rr3310032121321232323110320301201311122311113102013300000133131322200232210110212002132011320003123122133132331rr0020233212000303333000220303310111322031232313133320323203013002001011003013130100323130020130033230003231110rr0320212321011131001222201323131221312213333313012012002012003123110120212022001003220213222102230102213110010rr0211011311233303203022312112313122232112222001021203023211022301202013213320312132130033023221112022020201121rr3333103321023313111123130320200323330020202203132012101302013013130223031021021322030001233110003111330110103rr0321322212132310213212212302311102013033110111023030203020333130020330213203330323211133030030121131030031031rr3203023200100002033320011223000011203333011111302202013031333003323003120220030123030331111001222200221310332rr1012232321320311123220112303112202011112012323120120233121001132222330013230101223102333010332200123232023211rr1231212112332110113313132121113023101123122232110103331013232011232310103130120232111022133230221223322303220rr2312022112233031122210033022013333103022021333303212020133130211030020331120322322010230231323001212333131130rr0132211012311232233023232003132021120023131003033031011112223312123111223201323321133133323211031031310303210rr2311302022122002232301121020133320002233200132012312201223123122230203201033021031213322001210232102300302333rr1011311232310120322313333113232002023312122221110133121331201200223210031300223100130313110120302330100230211rr2303100330002322123121220220030022020131110230111212121222301123312133201232210002031110321211110201201200202rr3332211122011232010113220100123310330010302131121220232123221320330300331011100301311010023233001102333232022rr2231202112101320000023110132120100103031130313323323201121332332211132231113120002313013021201012300323201210rr3003031321000320022230120020322030131231323311302213020220103223010030021220303113220212311313012213011202303rr3220013222010133121122301022201132120202320020030020212210101311313321213132313113313022221001122120302201123rr3210121113131021301022120120301210221211230311201111032122111130013302102233221330213322210222311303110023103rr1132130320120321311200202323011312203022023123221003031311330302021210312202003203312011323133021100233120121rr2122323001323321022321033311002230001323303311300332303301023323001113303301212322310003310023030110212213132rr0303302121231231112232101321302202100313222111220103322113222023213200122000221200112213033103210313130130323rr1212220331322300312330102131233222010230221323201213230320303312132310111213113022003323011131212130120121312rr2133120022330101030031223313010201203101312012321112202132233110122321103301033001000332213112120222303332110rr0313232211330301303011230223101102002333000323120222200232221133313313212212103003103012130023020111113333230rr1123310113101133301001020100223311333130212300303323031002001223111003122010002030233030021221302033102333120rr2330311300301101311231312103002213003113002202031231001110311022331013220002302132331202232120331320211030121rr2301010332310001102033302003332001022211233000001300012022010013103132213121122313123133331110021222211222123rr2233013322101333211131121203301001002100103012012002010323111120020312131122223013332013322110022123131221312rr2210312322203022320100212123101112133011113202123310132032302002120321213023131132330001033022130100102201200rr3102013332012323321133310332230100201212010013231003303002022132110022033122220031220300222322223201202213123rr0313033330311313312213013010322232033120023120020130322000003233011013112233002122130003121322321120121221212rr3221113112102032211322021010202223230022320213323121322000033111112221221123022230301232223310021330332100232rr2013023203022020103301013102113330112203001010223231312022120320032303111320201221310122211133120011313010121rr1312222102102103102020031322111000021230220131333311022033232001302133020221303210131311231332303111320223213rr0010022010010020133301103211202203100322301033111120321210121031130001322021301131321332201333213002030002212rr0131221103202222230012033002122220020101032130101300231010312323323211022212132331122332102230001221213001210rr0123112030130131003131320301130222210122020222020133233123320023213131131130220210301330220212203222212111303rr0132130102220312212013230301013131322330113201121031321222232110310313202200302211121231033310101022030003200rr3321302202102122032303113131331301101231311300210333211023300110020033122001231000211213332011311312203013231rr1130023210230002220300232103331111012322022231103221032233121220301101220312313113202211102013323320000203131rr1013122233301133101032230023230123330001332202210111331202100332310103331132321103022101323012333110003211012rr2321110123121030301302301111220112322200233323022220312222102221031322200032022213213102022221113302212120013rr1322111300303331202223320122320313330002131331211310110211212301233233223012002132221000022131103213033011012rr3033101230112332033221211231323210110210303111032302301303022322012233301321200132320102313202132112132203223rr0231322322010010230230300133320002120321223013022331211301233310320202312333013012003023212002223110033131333rr2000002332120331002331011311131301213001301202312113303300110003322023001221220130202022131010220113212021232rr3031221121232002300100220301111212311112013012202103333211322231233010013300102123210320012302031131222230323rr2313213311003210101021013310110233330211203333320022311203112001100002023010012122100003021132312123333200123rr1323222101330311331210022130330202011123203012013103103111323000220202232120120332032133031333313303013030221rr1010230300310213203231122203123313010123130012203032220113302012133021132303023001122122200120030003101132232rr0123300201321330130320220222033132201321113231001100221300301330222310111010200032232001232203001030322013301rr3011000013121323311230133112233323102021320003201233111330000222303023312332303013101331231100210230200003320rr1030232320001313003003203210011120101233133302310103332230201131312121223011130103303233133220333110131013303rr0313223033103320133302301222200220313020203120112232102110003132100132312112320032213112030031033020033103120rr2223100131303210232312130333202031301320313221012130122212231230200203120020002312121122221111332303322331322rr0123011233310010002112031011101233020311311303011013001110012132023231203211302101222020110200302232231320201rr2200333221133032120323122112123320212112221221322000022032131303331210131010012203101000321333330312221311002rr2213200003221133301322230223130132201011122110102320202131321331033313311011021210112312233122101131231002223rr3320331231130131303222120132103221133132222330123303331313230033023033230231012011003120312230101331110301223rr1303330303220003323021202020120200001023233202102211023202111323132231123212323310000211212221020210331023203rr1102300200213110301323021230320313210210110003231123332200320003131210311030113031201121223030200030120101320rr1120131030011312220000113333002321023232202133203312303030023332311223223122210113120122301222323133302110132rr0031313023023103301313221021013110221332031103030310101312222322131100120122200102021133203022203121320300002rr1333010313030020302131003221311333311132020230211332200122011122121011033023301113111102003102031332102131310rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "ad48f42b7c0449a380c537aacae1616bdfb97a59120458ef84ed597310f0ff96"
     },
     {
       "name": "other key",
@@ -3714,6 +5390,763 @@
       "typed": true
     },
     {
+      "name": "more than 32 faces",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "more than 32 people",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            },
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "box value over 10000",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                10001,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "negative box value",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                0,
+                -1,
+                1,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "box wider than the image",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                6000,
+                0,
+                5000,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "box taller than the image",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                0,
+                5001,
+                1,
+                5000
+              ]
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "confidence over 100",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "confidence": 101
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "negative confidence",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "confidence": -1
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "age above 120",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "age": {
+                "low": 20,
+                "high": 121
+              }
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "negative age",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "age": {
+                "low": -1,
+                "high": 10
+              }
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
+      "name": "age range low above high",
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "age": {
+                "low": 30,
+                "high": 20
+              }
+            }
+          ]
+        }
+      },
+      "kind": "text",
+      "typed": true
+    },
+    {
       "name": "too large",
       "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
       "input": {
@@ -4712,6 +7145,290 @@
             "action": null
           }
         ]
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "fractional box value",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0.5,
+                0,
+                1,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "box with three values",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "box with five values",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "text box value",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                "0",
+                0,
+                1,
+                1
+              ]
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "missing box",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "confidence": 50
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "fractional confidence",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "confidence": 99.5
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "fractional age",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "age": {
+                "low": 1.5,
+                "high": 4
+              }
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "unknown age preset",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "age": "teen"
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "age without high",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "age": {
+                "low": 4
+              }
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "person with an age",
+      "input": {
+        "instances": [],
+        "detections": {
+          "people": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "age": "adult"
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "unknown face field",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [
+            {
+              "box": [
+                0,
+                0,
+                1,
+                1
+              ],
+              "name": "Ada"
+            }
+          ]
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "unknown detections field",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": [],
+          "animals": []
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "other unavailable spelling",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": "missing"
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "null faces",
+      "input": {
+        "instances": [],
+        "detections": {
+          "faces": null
+        }
+      },
+      "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
+      "kind": "text",
+      "typed": false
+    },
+    {
+      "name": "detections list",
+      "input": {
+        "instances": [],
+        "detections": []
       },
       "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
       "kind": "text",

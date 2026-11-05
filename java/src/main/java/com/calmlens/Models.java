@@ -1709,6 +1709,8 @@ public final class Models {
    *     {@code processing-error}; null unless {@code status} is {@code failed}
    * @param updatedAt when classification state last changed
    * @param completedAt when classification finished
+   * @param testInput whether the results came from one of the project's test inputs rather than
+   *     analysing the content; never use test results, such as age ranges, for real decisions
    * @param moderation safety findings and decisions
    * @param personDetection person detection result
    * @param faceDetection face detection result
@@ -1721,7 +1723,7 @@ public final class Models {
    */
   public record AssetClassification(AssetClassificationStatus status, String failureReason,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
-      @JsonAdapter(Json.EpochMillis.class) Instant completedAt,
+      @JsonAdapter(Json.EpochMillis.class) Instant completedAt, Boolean testInput,
       AssetModeration moderation, PersonDetectionResult personDetection,
       FaceDetectionResult faceDetection, LinkDetectionResult linkDetection,
       LinkSafetyResult linkSafety,
@@ -2664,7 +2666,13 @@ public final class Models {
   /** @param status the asset's classification status */
   public record EventAssetUpload(String status) {}
 
-  public record EventAssetClassification(AssetClassificationStatus status, EventAssetModeration moderation) {}
+  /**
+   * @param status the asset's classification status
+   * @param testInput whether the results came from one of the project's test inputs rather than
+   *     analysing the content; never use test results, such as age ranges, for real decisions
+   * @param moderation the moderation decision at the time
+   */
+  public record EventAssetClassification(AssetClassificationStatus status, Boolean testInput, EventAssetModeration moderation) {}
 
   /** @param status the moderation decision in force */
   public record EventAssetModeration(AssetModerationStatus status) {}

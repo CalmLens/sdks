@@ -18,8 +18,8 @@ import (
 )
 
 // TestInput is a test scenario: the qualifying instances found, and optionally regional delivery
-// actions and categories left unassessed. A nil list is omitted from the signed scenario; a non-nil
-// empty list is sent as an empty list.
+// actions, categories left unassessed and person and face detection results. A nil list is omitted
+// from the signed scenario; a non-nil empty list is sent as an empty list.
 type TestInput struct {
 	// RegionalActions restrict delivery in up to 7 regions, each listed once.
 	RegionalActions []TestRegionalAction `json:"regionalActions"`
@@ -27,6 +27,8 @@ type TestInput struct {
 	UnassessedCategories []string `json:"unassessedCategories"`
 	// Instances are the qualifying instances, at most 128.
 	Instances []TestInstance `json:"instances"`
+	// Detections are the person and face detection results to report, or nil for none.
+	Detections *TestDetections `json:"detections,omitempty"`
 }
 
 // TestInstance is one qualifying instance of a category.
@@ -69,12 +71,28 @@ type TestInputPresetSet struct {
 	RegionalDelivery TestInput `json:"regionalDelivery"`
 	Germany          TestInput `json:"germany"`
 	Mixed            TestInput `json:"mixed"`
+	// OneFace is one person with one face, without an age.
+	OneFace TestInput `json:"oneFace"`
+	// NoFace is person and face detection finding nobody.
+	NoFace TestInput `json:"noFace"`
+	// AdultFace is one person with an adult's face.
+	AdultFace TestInput `json:"adultFace"`
+	// MinorFace is one person with a minor's face.
+	MinorFace TestInput `json:"minorFace"`
+	// Group is three people, each with a face.
+	Group TestInput `json:"group"`
 }
 
 // TestInputPresets returns the built-in test scenarios, freshly allocated so they can be edited.
 func TestInputPresets() TestInputPresetSet {
 	one := func(category string, qualifiers ...string) TestInput {
 		return TestInput{Instances: []TestInstance{{Category: category, Qualifiers: qualifiers}}}
+	}
+	face := func(age TestFaceAge) TestInput {
+		return TestInput{Instances: []TestInstance{}, Detections: &TestDetections{
+			People: TestPersonList{{Box: TestBox{2500, 1500, 5000, 8500}}},
+			Faces:  TestFaceList{{Box: TestBox{3500, 2000, 3000, 3500}, Age: age}},
+		}}
 	}
 	return TestInputPresetSet{
 		Clean:      TestInput{Instances: []TestInstance{}},
@@ -88,6 +106,14 @@ func TestInputPresets() TestInputPresetSet {
 		Mixed: TestInput{Instances: []TestInstance{
 			{Category: "harassment", Qualifiers: []string{"harassment-abuse", "harassment-documentary"}},
 			{Category: "harassment", Qualifiers: []string{"harassment-threat"}},
+		}},
+		OneFace:   face(nil),
+		NoFace:    TestInput{Instances: []TestInstance{}, Detections: &TestDetections{People: TestPersonList{}, Faces: TestFaceList{}}},
+		AdultFace: face(TestAgeAdult),
+		MinorFace: face(TestAgeMinor),
+		Group: TestInput{Instances: []TestInstance{}, Detections: &TestDetections{
+			People: TestPersonList{{Box: TestBox{500, 2000, 2800, 8000}}, {Box: TestBox{3600, 2000, 2800, 8000}}, {Box: TestBox{6700, 2000, 2800, 8000}}},
+			Faces:  TestFaceList{{Box: TestBox{1200, 2500, 1400, 2000}}, {Box: TestBox{4300, 2500, 1400, 2000}}, {Box: TestBox{7400, 2500, 1400, 2000}}},
 		}},
 	}
 }
@@ -239,7 +265,7 @@ func validateTestInput(input TestInput) error {
 			return invalidTestInput("Regional action must be one of %s, not %q", strings.Join(regionalTestActions, ", "), regional.Action)
 		}
 	}
-	return nil
+	return validateTestDetections(input.Detections)
 }
 
 // canonicalTestInput is the scenario's JSON in the backend's key order. Every string is a
@@ -281,6 +307,9 @@ func canonicalTestInput(input TestInput) []byte {
 		list("qualifiers", len(instance.Qualifiers), strs(instance.Qualifiers))
 		b = append(b, '}')
 	})
+	if input.Detections != nil {
+		b = appendTestDetections(append(b, `,"detections":`...), input.Detections)
+	}
 	return append(b, '}')
 }
 

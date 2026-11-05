@@ -180,9 +180,12 @@ type AssetClassification struct {
 	Status string `json:"status"`
 	// FailureReason is why processing failed (an AssetFailureReason constant) while Status is
 	// ClassificationStatusFailed; nil otherwise.
-	FailureReason   *string                `json:"failureReason"`
-	UpdatedAt       *int64                 `json:"updatedAt"`
-	CompletedAt     *int64                 `json:"completedAt"`
+	FailureReason *string `json:"failureReason"`
+	UpdatedAt     *int64  `json:"updatedAt"`
+	CompletedAt   *int64  `json:"completedAt"`
+	// TestInput is whether the results came from one of the project's test inputs rather than
+	// analysing the content. Never use test results, such as age ranges, for real decisions.
+	TestInput       bool                   `json:"testInput"`
 	Moderation      AssetModeration        `json:"moderation"`
 	PersonDetection *PersonDetectionResult `json:"personDetection,omitempty"`
 	FaceDetection   *FaceDetectionResult   `json:"faceDetection,omitempty"`

@@ -20,8 +20,14 @@ module CalmLens
   # 1) and `action` (`allow`, `limit`, `age-restrict` or `block`, on every instance or none) are
   # optional. `unassessedCategories` lists categories reported as not assessed, none with instances;
   # `regionalActions` gives up to one `limit`, `age-restrict` or `block` action for each of
-  # {REGIONS}. Values are Strings and Numerics. An absent list is left out of the signed scenario;
-  # an empty one is sent as `[]`. Anything else raises `sdk/invalid-argument`.
+  # {REGIONS}. `detections` (optional, `people` and `faces` each optional) sets the person and face
+  # detection results a test image reports: each list holds at most 32 entries, or is the String
+  # `'unavailable'` to report the feature as not evaluated. An entry has a `box`, `[left, top, width,
+  # height]` as Integers in basis points of the image (0 to 10000, inside it), and an optional
+  # Integer `confidence` from 0 to 100; a face may also have an `age`, `'adult'`, `'minor'` or
+  # `{ 'low' => 30, 'high' => 40 }` (Integers from 0 to 120). Values are Strings and Numerics. An
+  # absent list is left out of the signed scenario; an empty one is sent as `[]`. Anything else
+  # raises `sdk/invalid-argument`.
   #
   # @example
   #   code = CalmLens::TestInputs.generate_text_code('harassment.insult', test_input_key)
@@ -47,8 +53,11 @@ module CalmLens
       value.each { |item| deep_freeze.call(item) } if value.is_a?(Array)
       value.freeze
     end
+    person = { 'box' => [2500, 1500, 5000, 8500] }
+    face = ->(age = nil) { { 'box' => [3500, 2000, 3000, 3500], **(age ? { 'age' => age } : {}) } }
     # Ready-made scenarios (deeply frozen): a clean input, a limited one, adult images and text,
-    # regional delivery, content restricted in Germany, and mixed instances in one category.
+    # regional delivery, content restricted in Germany, mixed instances in one category, and test
+    # images with one person and face, nobody, an adult's face, a minor's face and a group of three.
     PRESETS = deep_freeze.call(
       clean: { 'instances' => [] },
       limited: one.call('harassment', 'harassment-abuse'),
@@ -59,7 +68,15 @@ module CalmLens
                                                                     { 'region' => 'FR', 'action' => 'limit' }] },
       germany: one.call('hate', 'hate-symbol', 'hate-nazi-symbols-public-display'),
       mixed: { 'instances' => [{ 'category' => 'harassment', 'qualifiers' => %w[harassment-abuse harassment-documentary] },
-                               { 'category' => 'harassment', 'qualifiers' => ['harassment-threat'] }] }
+                               { 'category' => 'harassment', 'qualifiers' => ['harassment-threat'] }] },
+      one_face: { 'instances' => [], 'detections' => { 'people' => [person], 'faces' => [face.call] } },
+      no_face: { 'instances' => [], 'detections' => { 'people' => [], 'faces' => [] } },
+      adult_face: { 'instances' => [], 'detections' => { 'people' => [person], 'faces' => [face.call('adult')] } },
+      minor_face: { 'instances' => [], 'detections' => { 'people' => [person], 'faces' => [face.call('minor')] } },
+      group: { 'instances' => [], 'detections' => {
+        'people' => [500, 3600, 6700].map { |left| { 'box' => [left, 2000, 2800, 8000] } },
+        'faces' => [1200, 4300, 7400].map { |left| { 'box' => [left, 2500, 1400, 2000] } }
+      } }
     )
 
     HEX_WORDS = %w[zero one two three four five six seven eight nine alpha bravo charlie delta echo foxtrot].freeze

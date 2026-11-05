@@ -1,5 +1,5 @@
 import { i as EventFacts } from "./EventCatalog-CzSpo84N.js";
-import { n as EventAsset, r as TypedEvent, t as Event } from "./Event-CgnVG2ad.js";
+import { n as EventAsset, r as TypedEvent, t as Event } from "./Event-CHk227cW.js";
 import * as zod from "zod";
 export declare const WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery";
 export declare const WEBHOOK_TIMESTAMP_HEADER = "x-calmlens-timestamp";
@@ -35,6 +35,7 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
         pending: "pending";
         processing: "processing";
       }>;
+      testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
         status: zod.ZodEnum<{
           "age-restricted": "age-restricted";
@@ -85,6 +86,7 @@ export declare const WEBHOOK_EVENT_PAYLOAD_SCHEMA: zod.ZodDiscriminatedUnion<[zo
         pending: "pending";
         processing: "processing";
       }>;
+      testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
         status: zod.ZodEnum<{
           "age-restricted": "age-restricted";

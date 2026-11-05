@@ -62,6 +62,7 @@ class ModelsTest {
     },
     "classification": {
       "status": "completed",
+      "testInput": true,
       "moderation": {
         "status": "purged"
       }
@@ -71,7 +72,7 @@ class ModelsTest {
         """, Models.Event.class);
     assertEquals(new Models.EventAsset("asset-1", "ext-1", "preset-1",
         new Models.EventAssetUpload("completed"),
-        new Models.EventAssetClassification(Models.AssetClassificationStatus.COMPLETED, new Models.EventAssetModeration(Models.AssetModerationStatus.PURGED)),
+        new Models.EventAssetClassification(Models.AssetClassificationStatus.COMPLETED, Boolean.TRUE, new Models.EventAssetModeration(Models.AssetModerationStatus.PURGED)),
         new Models.EventAssetContent(Models.AssetContentStatus.REMOVED)), event.asset());
   }
 

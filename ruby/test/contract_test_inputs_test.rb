@@ -31,6 +31,25 @@ class ContractTestInputsTest < Minitest::Test
     presets = TestInputs::PRESETS.transform_keys { |name| name.to_s.gsub(/_([a-z])/) { Regexp.last_match(1).upcase } }
     assert_equal FIXTURE['presets'], presets
     assert_raises(FrozenError) { TestInputs::PRESETS[:mixed]['instances'][0]['qualifiers'] << 'harassment-threat' }
+    assert_raises(FrozenError) { TestInputs::PRESETS[:group]['detections']['faces'][0]['box'][0] = 0 }
+  end
+
+  # The detection limits and age presets a scenario accepts are the fixture's.
+  def test_detection_limits_match_the_fixture
+    limits = FIXTURE['detections']
+    classification = CalmLens::MockClassification
+    assert_equal [limits['maxEntries'], limits['boxMax'], limits['ageMax'], limits['agePresets'].keys],
+                 [classification::TEST_DETECTIONS_MAX, classification::TEST_DETECTION_BOX_MAX, classification::TEST_FACE_AGE_MAX,
+                  classification::TEST_FACE_AGE_PRESETS]
+    face = ->(box, age) { { 'instances' => [], 'detections' => { 'faces' => [{ 'box' => box, 'age' => age }] } } }
+    max = limits['boxMax']
+    assert accepts?(face.call([0, 0, max, max], { 'low' => 0, 'high' => limits['ageMax'] }))
+    refute accepts?(face.call([0, 0, max + 1, 0], 'adult'))
+    refute accepts?(face.call([0, 0, 1, 1], { 'low' => 0, 'high' => limits['ageMax'] + 1 }))
+    limits['agePresets'].each_key { |preset| assert accepts?(face.call([0, 0, 1, 1], preset)), preset }
+    list = ->(size) { { 'instances' => [], 'detections' => { 'people' => Array.new(size) { { 'box' => [0, 0, 1, 1] } } } } }
+    assert accepts?(list.call(limits['maxEntries']))
+    refute accepts?(list.call(limits['maxEntries'] + 1))
   end
 
   def test_signals_match_the_fixture
@@ -66,6 +85,41 @@ class ContractTestInputsTest < Minitest::Test
       TestInputs.generate_text_code({ 'instances' => [], instances: [] }, KEY)
     end
     assert_equal CalmLens::SdkErrorCodes::INVALID_ARGUMENT, error.code
+  end
+
+  def test_detection_keys_accept_symbols
+    expected = FIXTURE['text'].find { |item| item['name'] == 'detectionsKeyOrder' }
+    symbolized = JSON.parse(JSON.generate(expected['input']), symbolize_names: true)
+    assert_equal expected['code'], TestInputs.generate_text_code(symbolized, expected['key'])
+  end
+
+  # Each detection key given as both a String and a Symbol is refused rather than one winning.
+  def test_a_detection_key_given_in_two_forms_is_refused
+    box = [0, 0, 1, 1]
+    duplicated = {
+      'detections' => { 'instances' => [], 'detections' => {}, detections: {} },
+      'people' => { 'instances' => [], 'detections' => { 'people' => [], people: [] } },
+      'faces' => { 'instances' => [], 'detections' => { 'faces' => [], faces: [] } },
+      'box' => { 'instances' => [], 'detections' => { 'faces' => [{ 'box' => box, box: box }] } },
+      'confidence' => { 'instances' => [], 'detections' => { 'people' => [{ 'box' => box, 'confidence' => 1, confidence: 1 }] } },
+      'age' => { 'instances' => [], 'detections' => { 'faces' => [{ 'box' => box, 'age' => 'adult', age: 'adult' }] } },
+      'low' => { 'instances' => [], 'detections' => { 'faces' => [{ 'box' => box, 'age' => { 'low' => 1, low: 1, 'high' => 2 } }] } },
+      'high' => { 'instances' => [], 'detections' => { 'faces' => [{ 'box' => box, 'age' => { 'low' => 1, 'high' => 2, high: 2 } }] } }
+    }
+    duplicated.each do |key, input|
+      error = assert_raises(CalmLens::InvalidArgumentError, key) { TestInputs.generate_text_code(input, KEY) }
+      assert_equal CalmLens::SdkErrorCodes::INVALID_ARGUMENT, error.code
+      assert accepts?(string_keys_only(input)), "#{key} once is accepted"
+    end
+  end
+
+  # `value` without its Symbol keys.
+  def string_keys_only(value)
+    case value
+    when Hash then value.reject { |key, _| key.is_a?(Symbol) }.transform_values { |item| string_keys_only(item) }
+    when Array then value.map { |item| string_keys_only(item) }
+    else value
+    end
   end
 
   def test_signal_inputs_are_new_hashes

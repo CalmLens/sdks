@@ -564,6 +564,8 @@ final class MockApi {
     classification.add("failureReason", JsonNull.INSTANCE);
     classification.addProperty("updatedAt", now);
     classification.add("completedAt", JsonNull.INSTANCE);
+    // The mock never reads test inputs.
+    classification.addProperty("testInput", false);
     classification.add("moderation", moderation);
     asset.add("classification", classification);
 
@@ -623,9 +625,31 @@ final class MockApi {
     return options.decide(new MockCalmLensServerClient.ModerationInput(copy, new MockCalmLensServerClient.Content(bytes, text), trigger, queued));
   }
 
-  /** Applies a decided or failed {@code decision} and its report. */
+  /**
+   * Applies a decided or failed {@code decision} and its report. Like the API for an image with
+   * nobody in it, a decided image reports the person and face detection its upload turned on.
+   */
   private void decided(JsonObject asset, MockDecision decision) {
     applyOutcome(asset, decision.status(), "policy", now(), decision.report());
+    JsonObject classification = asset.getAsJsonObject("classification");
+    if (!"completed".equals(str(classification, "status")) || !"image".equals(str(asset, "type"))) return;
+    if (featureEnabled(asset, "personDetection")) classification.add("personDetection", evaluated("people"));
+    if (featureEnabled(asset, "faceDetection")) classification.add("faceDetection", evaluated("faces"));
+  }
+
+  /** Whether the asset's {@code processingOptions.features.<feature>.enabled} is true. */
+  private static boolean featureEnabled(JsonObject asset, String feature) {
+    JsonElement enabled = path(asset, "processingOptions.features." + feature + ".enabled");
+    return enabled != null && enabled.isJsonPrimitive() && enabled.getAsJsonPrimitive().isBoolean() && enabled.getAsBoolean();
+  }
+
+  /** An evaluated beta detection result that found nothing. */
+  private static JsonObject evaluated(String list) {
+    JsonObject result = new JsonObject();
+    result.addProperty("status", "evaluated");
+    result.addProperty("stage", "beta");
+    result.add(list, new JsonArray());
+    return result;
   }
 
   /**
@@ -1895,6 +1919,7 @@ final class MockApi {
     upload.add("status", path(asset, "upload.status"));
     moderation.add("status", path(asset, "classification.moderation.status"));
     classification.add("status", path(asset, "classification.status"));
+    classification.add("testInput", path(asset, "classification.testInput"));
     classification.add("moderation", moderation);
     content.add("status", path(asset, "content.status"));
     snapshot.add("upload", upload);

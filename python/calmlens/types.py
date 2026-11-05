@@ -766,6 +766,9 @@ class _AssetClassificationRequired(TypedDict):
     failureReason: Optional[AssetClassificationFailureReason]
     updatedAt: Optional[int]
     completedAt: Optional[int]
+    #: Whether the results came from one of the project's test inputs rather than analysing the
+    #: content. Never use test results, such as age ranges, for real decisions.
+    testInput: bool
     moderation: AssetModeration
 
 
@@ -1148,6 +1151,9 @@ class EventAssetModeration(TypedDict):
 
 class EventAssetClassification(TypedDict):
     status: AssetClassificationStatus
+    #: Whether the results came from one of the project's test inputs rather than analysing the
+    #: content. Never use test results, such as age ranges, for real decisions.
+    testInput: bool
     moderation: EventAssetModeration
 
 

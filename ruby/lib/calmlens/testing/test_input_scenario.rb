@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'classification'
+require_relative 'test_input_detections'
 
 module CalmLens
   # The scenario checks behind the signed test inputs (test_inputs.rb).
@@ -23,6 +24,7 @@ module CalmLens
         when Hash then "{#{value.map { |key, item| "\"#{key}\":#{canonical_json(item)}" }.join(',')}}"
         when Array then "[#{value.map { |item| canonical_json(item) }.join(',')}]"
         when Float then js_number(value)
+        when Integer then value.to_s
         else "\"#{value}\""
         end
       end
@@ -49,7 +51,7 @@ module CalmLens
 
       # Checks a scenario and returns it with camelCase String keys in canonical order.
       def validate(input)
-        input = fields(input, 'scenario', %w[regionalActions unassessedCategories instances], %w[instances])
+        input = fields(input, 'scenario', %w[regionalActions unassessedCategories instances detections], %w[instances])
         instances = array(input['instances'], 'instances', 128).map { |instance| check_instance(instance) }
         with_action = instances.count { |instance| instance.key?('action') }
         check([0, instances.size].include?(with_action), 'Set an action for every instance or omit all actions')
@@ -72,7 +74,9 @@ module CalmLens
           end
           checked['unassessedCategories'] = unassessed
         end
-        checked.merge('instances' => instances)
+        checked['instances'] = instances
+        checked['detections'] = Detections.validate(input['detections']) if input.key?('detections')
+        checked
       end
 
       def check_instance(instance)

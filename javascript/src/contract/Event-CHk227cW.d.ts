@@ -1,4 +1,4 @@
-import "./Asset-CQt2Rst2.js";
+import "./Asset-CQ-rbpKu.js";
 import { i as EventFacts, o as EventType } from "./EventCatalog-CzSpo84N.js";
 import "./Page-DNdKkX2B.js";
 import * as zod from "zod";
@@ -19,6 +19,7 @@ declare const EVENT_ASSET_SCHEMA: zod.ZodObject<{
       pending: "pending";
       processing: "processing";
     }>;
+    testInput: zod.ZodBoolean;
     moderation: zod.ZodObject<{
       status: zod.ZodEnum<{
         "age-restricted": "age-restricted";
@@ -99,6 +100,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
         pending: "pending";
         processing: "processing";
       }>;
+      testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
         status: zod.ZodEnum<{
           "age-restricted": "age-restricted";
@@ -188,6 +190,7 @@ declare const PUBLIC_EVENT_SCHEMA: zod.ZodObject<{
         pending: "pending";
         processing: "processing";
       }>;
+      testInput: zod.ZodBoolean;
       moderation: zod.ZodObject<{
         status: zod.ZodEnum<{
           "age-restricted": "age-restricted";

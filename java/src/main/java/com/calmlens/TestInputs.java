@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -24,6 +25,7 @@ import javax.crypto.spec.SecretKeySpec;
  *
  * <pre>{@code
  * String text = TestInputs.generateTestTextCode(TestInputs.LIMITED, testInputKey);
+ * byte[] faces = TestInputs.paintTestImage(TestInputs.ADULT_FACE, testInputKey).png();
  * byte[] png = TestInputs.paintTestImage("violence", testInputKey).png();
  * String phrase = TestInputs.generateMediaTestCode("violence", testInputKey);
  * }</pre>
@@ -73,13 +75,25 @@ public final class TestInputs {
   public static final TestInput ADULT_TEXT = one("sexual", "sexual-explicit-language");
   /** No findings, but blocked in DE, age-restricted in GB and limited in FR. */
   public static final TestInput REGIONAL_DELIVERY = new TestInput(List.of(
-      new TestInput.RegionalAction("DE", "block"), new TestInput.RegionalAction("GB", "age-restrict"), new TestInput.RegionalAction("FR", "limit")), null, List.of());
+      new TestInput.RegionalAction("DE", "block"), new TestInput.RegionalAction("GB", "age-restrict"), new TestInput.RegionalAction("FR", "limit")), null, List.of(), null);
   /** A Nazi symbol on public display, which German law restricts. */
   public static final TestInput GERMANY = one("hate", "hate-symbol", "hate-nazi-symbols-public-display");
   /** Documentary harassment abuse alongside a harassment threat. */
   public static final TestInput MIXED = new TestInput(List.of(
       new TestInput.Instance("harassment", List.of("harassment-abuse", "harassment-documentary")),
       new TestInput.Instance("harassment", List.of("harassment-threat"))));
+  /** One person with one face, without an age. */
+  public static final TestInput ONE_FACE = detected(List.of(person(2500, 1500, 5000, 8500)), List.of(face(3500, 2000, 3000, 3500, null)));
+  /** Person and face detection that found nobody. */
+  public static final TestInput NO_FACE = detected(List.of(), List.of());
+  /** One person with one face estimated as an adult. */
+  public static final TestInput ADULT_FACE = detected(List.of(person(2500, 1500, 5000, 8500)), List.of(face(3500, 2000, 3000, 3500, TestInput.FaceAge.ADULT)));
+  /** One person with one face estimated as a minor. */
+  public static final TestInput MINOR_FACE = detected(List.of(person(2500, 1500, 5000, 8500)), List.of(face(3500, 2000, 3000, 3500, TestInput.FaceAge.MINOR)));
+  /** Three people side by side, each with a face without an age. */
+  public static final TestInput GROUP = detected(
+      List.of(person(500, 2000, 2800, 8000), person(3600, 2000, 2800, 8000), person(6700, 2000, 2800, 8000)),
+      List.of(face(1200, 2500, 1400, 2000, null), face(4300, 2500, 1400, 2000, null), face(7400, 2500, 1400, 2000, null)));
 
   /**
    * The signals {@link #testInputForSignal(String, Kind)} accepts: the 8 categories and {@code
@@ -107,6 +121,16 @@ public final class TestInputs {
   private static final String[] WORDS = {"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "alpha", "bravo", "charlie", "delta", "echo", "foxtrot"};
   private static TestInput one(String category, String... qualifiers) {
     return new TestInput(List.of(new TestInput.Instance(category, List.of(qualifiers))));
+  }
+
+  private static TestInput detected(List<TestInput.Person> people, List<TestInput.Face> faces) {
+    return new TestInput(List.of()).withDetections(new TestInput.Detections(TestInput.DetectionList.of(people), TestInput.DetectionList.of(faces)));
+  }
+
+  private static TestInput.Person person(int left, int top, int width, int height) { return new TestInput.Person(new TestInput.Box(left, top, width, height)); }
+
+  private static TestInput.Face face(int left, int top, int width, int height, TestInput.FaceAge age) {
+    return new TestInput.Face(new TestInput.Box(left, top, width, height)).withAge(age);
   }
 
   /**
@@ -262,6 +286,38 @@ public final class TestInputs {
         if (!in(REGIONAL_ACTIONS, action.action())) throw invalid("Regional action must be one of " + String.join(", ", REGIONAL_ACTIONS));
       }
     }
+    TestInput.Detections detections = input.detections();
+    if (detections != null) {
+      for (TestInput.Person person : entries(detections.people())) {
+        if (person == null) throw invalid("Each person needs a box");
+        checkDetection(person.box(), person.confidence());
+      }
+      for (TestInput.Face face : entries(detections.faces())) {
+        if (face == null) throw invalid("Each face needs a box");
+        checkDetection(face.box(), face.confidence());
+        if (face.age() instanceof TestInput.FaceAge.Preset preset && !in(MockClassification.TEST_FACE_AGE_PRESETS, preset.name()))
+          throw invalid("A face's age preset must be one of " + String.join(", ", MockClassification.TEST_FACE_AGE_PRESETS));
+        if (face.age() instanceof TestInput.FaceAge.Range range
+            && !(range.low() >= 0 && range.low() <= range.high() && range.high() <= MockClassification.TEST_FACE_AGE_MAX))
+          throw invalid("A face's age range needs whole years from 0 to " + MockClassification.TEST_FACE_AGE_MAX + ", low no higher than high");
+      }
+    }
+  }
+
+  /** A detection list's entries: none when it is left out or unavailable. */
+  private static <T> List<T> entries(TestInput.DetectionList<T> list) {
+    if (!(list instanceof TestInput.DetectionList.Entries<T> found)) return List.of();
+    if (found.entries() == null || found.entries().size() > MockClassification.TEST_DETECTIONS_MAX)
+      throw invalid("A detection list has at most " + MockClassification.TEST_DETECTIONS_MAX + " entries");
+    return found.entries();
+  }
+
+  private static void checkDetection(TestInput.Box box, Integer confidence) {
+    int max = MockClassification.TEST_DETECTION_BOX_MAX;
+    if (box == null || !IntStream.of(box.left(), box.top(), box.width(), box.height()).allMatch(value -> value >= 0 && value <= max)
+        || box.left() + box.width() > max || box.top() + box.height() > max)
+      throw invalid("A detection box needs left, top, width and height from 0 to " + max + " basis points, inside the image");
+    if (confidence != null && !(confidence >= 0 && confidence <= 100)) throw invalid("Confidence must be a whole number from 0 to 100");
   }
 
   /** The scenario's JSON in the backend's key order. Every string is a validated ASCII token, so none needs escaping. */
@@ -280,7 +336,29 @@ public final class TestInputs {
       if (instance.action() != null) json.append("\"action\":\"").append(instance.action()).append("\",");
       json.append("\"qualifiers\":").append(strings(instance.qualifiers())).append('}');
     }
-    return json.append("]}").toString();
+    json.append(']');
+    TestInput.Detections detections = input.detections();
+    if (detections != null) {
+      json.append(",\"detections\":{");
+      if (detections.people() != null) json.append("\"people\":").append(detectionList(detections.people(), person -> detection(person.box(), person.confidence(), null)));
+      if (detections.faces() != null)
+        json.append(detections.people() != null ? "," : "").append("\"faces\":").append(detectionList(detections.faces(), face -> detection(face.box(), face.confidence(), face.age())));
+      json.append('}');
+    }
+    return json.append('}').toString();
+  }
+
+  private static <T> String detectionList(TestInput.DetectionList<T> list, java.util.function.Function<T, String> entry) {
+    if (list instanceof TestInput.DetectionList.Entries<T> found) return found.entries().stream().map(entry).collect(Collectors.joining(",", "[", "]"));
+    return "\"unavailable\"";
+  }
+
+  private static String detection(TestInput.Box box, Integer confidence, TestInput.FaceAge age) {
+    StringBuilder json = new StringBuilder("{\"box\":[").append(box.left()).append(',').append(box.top()).append(',').append(box.width()).append(',').append(box.height()).append(']');
+    if (confidence != null) json.append(",\"confidence\":").append(confidence);
+    if (age instanceof TestInput.FaceAge.Preset preset) json.append(",\"age\":\"").append(preset.name()).append('"');
+    else if (age instanceof TestInput.FaceAge.Range range) json.append(",\"age\":{\"low\":").append(range.low()).append(",\"high\":").append(range.high()).append('}');
+    return json.append('}').toString();
   }
 
   private static String strings(List<String> values) {

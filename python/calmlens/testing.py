@@ -41,7 +41,9 @@ from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAUL
                      _HEX_COLOUR, _UNSET, _check_transform_options, _invalid, _invalid_upload_mime_type,
                      _is_accepted_upload_mime_type, _json, _merge, _sign_upload_token)
 from ._signed_test_inputs import (MEDIA_TEST_SIGNALS, TEST_INPUT_PRESETS, TEXT_TEST_SIGNALS, ClassificationTestSignal,
-                                  PaintedTestImage, SignedTestAction, SignedTestInput, SignedTestInstance,
+                                  PaintedTestImage, SignedTestAction, SignedTestDetectedFace,
+                                  SignedTestDetectedPerson, SignedTestDetections, SignedTestFaceAge,
+                                  SignedTestFaceAgePreset, SignedTestFaceAgeRange, SignedTestInput, SignedTestInstance,
                                   SignedTestRegion, SignedTestRegionalAction, SignedTestRegionalActionName,
                                   generate_media_test_code, generate_test_text_code, paint_test_image,
                                   signal_test_input)
@@ -57,7 +59,8 @@ __all__ = ["MockCalmLensServerClient", "MOCK_PROJECT_ID", "MockRequest", "MockOp
            "mock_decision", "sign_upload_token",
            "ClassificationTestSignal", "SignedTestInput", "SignedTestInstance", "SignedTestAction",
            "SignedTestRegionalAction", "SignedTestRegion", "SignedTestRegionalActionName",
-           "TEST_INPUT_PRESETS", "TEXT_TEST_SIGNALS", "MEDIA_TEST_SIGNALS", "generate_test_text_code",
+           "SignedTestDetections", "SignedTestDetectedPerson", "SignedTestDetectedFace", "SignedTestFaceAge",
+           "SignedTestFaceAgePreset", "SignedTestFaceAgeRange", "TEST_INPUT_PRESETS", "TEXT_TEST_SIGNALS", "MEDIA_TEST_SIGNALS", "generate_test_text_code",
            "generate_media_test_code", "signal_test_input", "paint_test_image", "PaintedTestImage"]
 
 _MOCK_OPTIONS = {"database_storage", "image_storage", "create_id", "now", "moderate", "signed_url_base_url"}
@@ -696,6 +699,7 @@ def _event_asset(asset: Mapping[str, Any]) -> EventAsset:
     return {"id": asset["id"], "externalId": asset.get("externalId"), "uploadPresetId": asset.get("uploadPresetId"),
             "upload": {"status": asset["upload"]["status"]},
             "classification": {"status": asset["classification"]["status"],
+                               "testInput": asset["classification"]["testInput"],
                                "moderation": {"status": asset["classification"]["moderation"]["status"]}},
             "content": {"status": asset["content"]["status"]}}
 
@@ -1453,7 +1457,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             "upload": {"status": "completed" if final else "uploading", "updatedAt": now,
                        "partsReceived": None if final else 1},
             "classification": {"status": "processing" if final else "pending", "failureReason": None, "updatedAt": now,
-                               "completedAt": None,
+                               # The mock never reads test inputs.
+                               "completedAt": None, "testInput": False,
                                "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": []}},
         }
         if not final:
@@ -1499,8 +1504,17 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return _to_decision(self.moderate(moderation))
 
     def _decided(self, asset: dict[str, Any], decision: MockDecision) -> None:
-        """Decide ``asset`` as ``decision`` says, with its report."""
+        """Decide ``asset`` as ``decision`` says, with its report. Like the API for an image with
+        nobody in it, a decided image reports the person and face detection its upload turned on."""
         self._apply_outcome(asset, decision.status, "policy", decision.report())
+        classification = asset["classification"]
+        if classification["status"] != "completed" or asset["type"] != "image":
+            return
+        features = (asset.get("processingOptions") or {}).get("features") or {}
+        if (features.get("personDetection") or {}).get("enabled") is True:
+            classification["personDetection"] = {"status": "evaluated", "stage": "beta", "people": []}
+        if (features.get("faceDetection") or {}).get("enabled") is True:
+            classification["faceDetection"] = {"status": "evaluated", "stage": "beta", "faces": []}
 
     def _moderate_stored(self, asset: dict[str, Any], trigger: MockModerationTrigger,
                          decision: MockDecision | None = None) -> None:

@@ -8,6 +8,7 @@ require 'json'
 module ContractFixtures
   DIR = File.expand_path('../testdata', __dir__)
 
-  # The parsed testdata/<name>.json.
-  def fixture(name) = JSON.parse(File.read("#{DIR}/#{name}.json", encoding: 'UTF-8'))
+  # The parsed testdata/<name>.json. A key given twice in one object fails rather than the last
+  # one winning, so a duplicated scenario or detection key cannot pass as one field.
+  def fixture(name) = JSON.parse(File.read("#{DIR}/#{name}.json", encoding: 'UTF-8'), allow_duplicate_key: false)
 end

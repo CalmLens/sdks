@@ -134,7 +134,7 @@ pub fn whole_numbers(value: Value) -> Value {
 
 /// Whether a typed result serialized to JSON equals the API's JSON `expected`. Typed models
 /// write every field they declare, so a field `expected` lacks must hold that field's empty
-/// default (`null`, `""`, `[]` or `{}`); every field `expected` has must be equal. Returns the
+/// default (`null`, `false`, `""`, `[]` or `{}`); every field `expected` has must be equal. Returns the
 /// path of the first difference.
 pub fn compare_typed(actual: &Value, expected: &Value) -> Result<(), String> {
     fn walk(actual: &Value, expected: &Value, path: &str) -> Result<(), String> {
@@ -149,7 +149,7 @@ pub fn compare_typed(actual: &Value, expected: &Value) -> Result<(), String> {
                 }
                 for (key, value) in actual {
                     let empty = match value {
-                        Value::Null => true,
+                        Value::Null | Value::Bool(false) => true,
                         Value::String(text) => text.is_empty(),
                         Value::Array(items) => items.is_empty(),
                         Value::Object(map) => map.is_empty(),

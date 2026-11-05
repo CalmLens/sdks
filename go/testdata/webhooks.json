@@ -1566,6 +1566,7 @@
           },
           "classification": {
             "status": "completed",
+            "testInput": false,
             "moderation": {
               "status": "blocked"
             }
@@ -1618,6 +1619,7 @@
           },
           "classification": {
             "status": "completed",
+            "testInput": false,
             "moderation": {
               "status": "blocked"
             }
@@ -1652,7 +1654,7 @@
         ],
         "createdAt": 1700000000000
       },
-      "body": "{\"id\":\"event-test-send\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"status\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"decided-by\",\"value\":\"automated\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-test-send\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"status\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"decided-by\",\"value\":\"automated\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "deliveryId": "delivery-test",
       "timestampSeconds": 1700000000,
@@ -1660,7 +1662,7 @@
         "content-type": "application/json",
         "x-calmlens-delivery": "delivery-test",
         "x-calmlens-timestamp": "1700000000",
-        "x-calmlens-signature": "v1=39eed379696560075d400d64eb59022356bf7117ea6f32aceb8f07496f8904ed"
+        "x-calmlens-signature": "v1=7a0b7652ff0f52c9129119746f4a0120da724ee99f91460a18953adb5fbd8c4b"
       },
       "isTest": true
     }

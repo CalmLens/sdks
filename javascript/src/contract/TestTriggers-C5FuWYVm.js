@@ -358,6 +358,48 @@ function testInputForSignal(signal, kind = "text") {
 	}
 }
 const getImageTestCategories = () => [...TEXT_CODE_SIGNALS];
+/** Each detection list holds at most this many entries; 32 faces fit a test image. */
+const TEST_DETECTIONS_MAX = 32;
+/** Box values are integer basis points of the image width and height: 10000 is the full side. */
+const TEST_DETECTION_BOX_MAX = 1e4;
+/** Age presets and the range a custom estimate may use. */
+const TEST_FACE_AGE_PRESETS = {
+	adult: {
+		low: 25,
+		high: 35
+	},
+	minor: {
+		low: 12,
+		high: 16
+	}
+};
+const TEST_FACE_AGE_MAX = 120;
+const basisPoints = z.number().int().min(0).max(TEST_DETECTION_BOX_MAX);
+const detectionShape = {
+	box: z.tuple([
+		basisPoints,
+		basisPoints,
+		basisPoints,
+		basisPoints
+	]),
+	confidence: z.number().int().min(0).max(100).optional()
+};
+const fitsImage = ({ box: [left, top, width, height] }) => left + width <= 1e4 && top + height <= 1e4;
+const BOX_MESSAGE = msg("A box must lie inside the image: left + width and top + height are at most 10000.");
+const ageYears = z.number().int().min(0).max(120);
+const TEST_DETECTED_PERSON_SCHEMA = z.object(detectionShape).strict().refine(fitsImage, BOX_MESSAGE);
+const TEST_DETECTED_FACE_SCHEMA = z.object({
+	...detectionShape,
+	age: z.union([z.enum(["adult", "minor"]), z.object({
+		low: ageYears,
+		high: ageYears
+	}).strict().refine(({ low, high }) => low <= high, msg("An age range's low must not be above its high."))]).optional()
+}).strict().refine(fitsImage, BOX_MESSAGE);
+/** Person and face detection results a test image reports instead of running detection. */
+const TEST_DETECTIONS_SCHEMA = z.object({
+	people: z.union([z.array(TEST_DETECTED_PERSON_SCHEMA).max(32), z.literal("unavailable")]).optional(),
+	faces: z.union([z.array(TEST_DETECTED_FACE_SCHEMA).max(32), z.literal("unavailable")]).optional()
+}).strict();
 /** Each row is one qualifying instance. Unselected qualifiers are explicitly absent. */
 const TEST_INPUT_SCHEMA = z.object({
 	regionalActions: TEST_REGIONAL_ACTIONS_SCHEMA.optional(),
@@ -377,7 +419,8 @@ const TEST_INPUT_SCHEMA = z.object({
 			code: "custom",
 			message: "Choose unique content qualifiers from this category; input-type facts are automatic."
 		});
-	})).max(128)
+	})).max(128),
+	detections: TEST_DETECTIONS_SCHEMA.optional()
 }).strict().superRefine((scenario, context) => {
 	if (scenario.instances.some((instance) => instance.action !== void 0) && scenario.instances.some((instance) => instance.action === void 0)) context.addIssue({
 		code: "custom",
@@ -430,7 +473,116 @@ const TEST_INPUT_PRESETS = {
 	}, {
 		category: "harassment",
 		qualifiers: ["harassment-threat"]
-	}] }
+	}] },
+	oneFace: {
+		instances: [],
+		detections: {
+			people: [{ box: [
+				2500,
+				1500,
+				5e3,
+				8500
+			] }],
+			faces: [{ box: [
+				3500,
+				2e3,
+				3e3,
+				3500
+			] }]
+		}
+	},
+	noFace: {
+		instances: [],
+		detections: {
+			people: [],
+			faces: []
+		}
+	},
+	adultFace: {
+		instances: [],
+		detections: {
+			people: [{ box: [
+				2500,
+				1500,
+				5e3,
+				8500
+			] }],
+			faces: [{
+				box: [
+					3500,
+					2e3,
+					3e3,
+					3500
+				],
+				age: "adult"
+			}]
+		}
+	},
+	minorFace: {
+		instances: [],
+		detections: {
+			people: [{ box: [
+				2500,
+				1500,
+				5e3,
+				8500
+			] }],
+			faces: [{
+				box: [
+					3500,
+					2e3,
+					3e3,
+					3500
+				],
+				age: "minor"
+			}]
+		}
+	},
+	group: {
+		instances: [],
+		detections: {
+			people: [
+				{ box: [
+					500,
+					2e3,
+					2800,
+					8e3
+				] },
+				{ box: [
+					3600,
+					2e3,
+					2800,
+					8e3
+				] },
+				{ box: [
+					6700,
+					2e3,
+					2800,
+					8e3
+				] }
+			],
+			faces: [
+				{ box: [
+					1200,
+					2500,
+					1400,
+					2e3
+				] },
+				{ box: [
+					4300,
+					2500,
+					1400,
+					2e3
+				] },
+				{ box: [
+					7400,
+					2500,
+					1400,
+					2e3
+				] }
+			]
+		}
+	}
 };
 /**
 * A text code as it appears in the text being moderated. Text extracted from a document (a PDF, or
@@ -532,4 +684,4 @@ async function detectTestImage(image, key) {
 	if (json.some((byte) => byte > 127)) return;
 	return detectTestTrigger(`<!calmlens-test ${[...data.subarray(2, 18)].map((byte) => byte.toString(16).padStart(2, "0")).join("")} ${base64Url(json)}>`, key);
 }
-export { generateTestTextCode as a, paintTestImage as c, detectTestTrigger as i, testInputForSignal as l, TEST_INPUT_PRESETS as n, getImageTestCategories as o, detectTestImage as r, getTestInputTag as s, TEST_INPUT_KEY_PATTERN as t };
+export { TEST_INPUT_KEY_PATTERN as a, detectTestTrigger as c, getTestInputTag as d, paintTestImage as f, TEST_FACE_AGE_PRESETS as i, generateTestTextCode as l, TEST_DETECTION_BOX_MAX as n, TEST_INPUT_PRESETS as o, testInputForSignal as p, TEST_FACE_AGE_MAX as r, detectTestImage as s, TEST_DETECTIONS_MAX as t, getImageTestCategories as u };

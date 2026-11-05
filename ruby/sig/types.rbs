@@ -135,6 +135,9 @@ module CalmLens
     "failureReason" => asset_classification_failure_reason?,
     "updatedAt" => Integer?,
     "completedAt" => Integer?,
+    # Whether the results came from one of the project's test inputs rather than analysing the
+    # content. Never use test results, such as age ranges, for real decisions.
+    "testInput" => bool,
     "moderation" => asset_moderation,
     ?"personDetection" => person_detection_result,
     ?"faceDetection" => face_detection_result,
@@ -690,7 +693,10 @@ module CalmLens
     ?"uploadPresetId" => String?,
     ?"externalId" => String?,
     "upload" => { "status" => "uploading" | "completed" },
-    "classification" => { "status" => asset_classification_status, "moderation" => { "status" => asset_moderation_status } },
+    # `testInput`: whether the results came from one of the project's test inputs rather than
+    # analysing the content. Never use test results, such as age ranges, for real decisions.
+    "classification" => { "status" => asset_classification_status, "testInput" => bool,
+                          "moderation" => { "status" => asset_moderation_status } },
     "content" => { "status" => asset_content_status }
   }
   # An `events.list` item, and the body of its webhook delivery.

@@ -2,7 +2,8 @@ package calmlenstest
 
 // Replays testdata/test-inputs.json (packages/sdk-contract/testInputs.ts): the backend verifies
 // these exact codes, images and phrases. Untyped rejections (unknown fields, wrong value types)
-// cannot be expressed with TestInput and are skipped.
+// cannot be expressed with TestInput and are skipped, except those in detections, which
+// TestDetections refuses when decoding JSON.
 
 import (
 	"bytes"
@@ -13,6 +14,7 @@ import (
 	"image"
 	"image/png"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -40,6 +42,10 @@ type testInputFixture struct {
 	Images          []testInputCase
 	ImageRejections []testInputCase
 	Rejections      []testInputCase
+	Detections      struct {
+		MaxEntries, BoxMax, AgeMax int
+		AgePresets                 map[string]TestAgeRange
+	}
 }
 
 // decodeStrict decodes raw into a T, failing on fields T does not have.
@@ -82,6 +88,22 @@ func TestTestInputsContract(t *testing.T) {
 	t.Run("qualifiers", func(t *testing.T) {
 		if got := testInputQualifiers(); !reflect.DeepEqual(got, fixture.Qualifiers) {
 			t.Errorf("allowed qualifiers = %v, want %v", got, fixture.Qualifiers)
+		}
+	})
+	t.Run("detection limits", func(t *testing.T) {
+		limits := fixture.Detections
+		if testDetectionsMax != limits.MaxEntries || testDetectionBoxMax != limits.BoxMax || testFaceAgeMax != limits.AgeMax {
+			t.Errorf("limits = %d entries, box %d, age %d; fixture %+v", testDetectionsMax, testDetectionBoxMax, testFaceAgeMax, limits)
+		}
+		names := []string{}
+		for name := range limits.AgePresets {
+			names = append(names, name)
+		}
+		slices.Sort(names)
+		want := slices.Clone(testFaceAgePresets)
+		slices.Sort(want)
+		if !reflect.DeepEqual(names, want) {
+			t.Errorf("age presets = %q, fixture %q", testFaceAgePresets, names)
 		}
 	})
 	for _, c := range fixture.SignalInputs {
@@ -165,10 +187,22 @@ func TestTestInputsContract(t *testing.T) {
 	}
 	for _, c := range fixture.Rejections {
 		t.Run("rejects "+c.Name+" "+string(c.Kind), func(t *testing.T) {
-			if !c.Typed {
-				t.Skip("untyped input: not expressible as a TestInput")
-			}
 			var err error
+			if !c.Typed {
+				var fields map[string]json.RawMessage
+				if json.Unmarshal(c.Input, &fields) != nil || fields["detections"] == nil {
+					t.Skip("untyped input: not expressible as a TestInput")
+				}
+				var input TestInput
+				if err = json.Unmarshal(c.Input, &input); err == nil {
+					_, err = GenerateTestTextCode(input, c.Key)
+				}
+				var sdkError *calmlens.Error
+				if !errors.As(err, &sdkError) || sdkError.Code != calmlens.CodeSDKInvalidArgument {
+					t.Errorf("error = %v, want %s", err, calmlens.CodeSDKInvalidArgument)
+				}
+				return
+			}
 			switch c.Kind {
 			case "media":
 				_, err = GenerateMediaTestCode(c.Signal, c.Key)
@@ -218,4 +252,58 @@ func abs(value int) int {
 		return -value
 	}
 	return value
+}
+
+func TestTestDetectionsRefuseRepeatedKeys(t *testing.T) {
+	for key, detections := range map[string]string{
+		"people":     `{"people":[],"people":[]}`,
+		"faces":      `{"faces":"unavailable","faces":[]}`,
+		"box":        `{"faces":[{"box":[0,0,1,1],"box":[0,0,2,2]}]}`,
+		"confidence": `{"people":[{"box":[0,0,1,1],"confidence":5,"confidence":6}]}`,
+		"age":        `{"faces":[{"box":[0,0,1,1],"age":"adult","age":"minor"}]}`,
+		"low":        `{"faces":[{"box":[0,0,1,1],"age":{"low":1,"low":2,"high":3}}]}`,
+		"high":       `{"faces":[{"box":[0,0,1,1],"age":{"low":1,"high":2,"high":3}}]}`,
+	} {
+		t.Run(key, func(t *testing.T) {
+			var input TestInput
+			err := json.Unmarshal([]byte(`{"instances":[],"detections":`+detections+`}`), &input)
+			var sdkError *calmlens.Error
+			if !errors.As(err, &sdkError) || sdkError.Code != calmlens.CodeSDKInvalidArgument {
+				t.Errorf("error = %v, want %s", err, calmlens.CodeSDKInvalidArgument)
+			}
+		})
+	}
+}
+
+// Values only Go can build: they bypass the JSON decoder's checks.
+func TestTestDetectionsRejectUnsupportedValues(t *testing.T) {
+	for name, detections := range map[string]TestDetections{
+		"unknown age preset":  {Faces: TestFaceList{{Age: TestAgePreset("teen")}}},
+		"unavailable pointer": {People: &TestUnavailable{}},
+		"age range pointer":   {Faces: TestFaceList{{Age: &TestAgeRange{Low: 1, High: 2}}}},
+		"person list pointer": {People: &TestPersonList{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := GenerateTestTextCode(TestInput{Instances: []TestInstance{}, Detections: &detections}, "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d")
+			var sdkError *calmlens.Error
+			if !errors.As(err, &sdkError) || sdkError.Code != calmlens.CodeSDKInvalidArgument {
+				t.Errorf("error = %v, want %s", err, calmlens.CodeSDKInvalidArgument)
+			}
+		})
+	}
+}
+
+func TestTestDetectionsNilListsAreSentEmpty(t *testing.T) {
+	const key = "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d"
+	empty, err := GenerateTestTextCode(TestInputPresets().NoFace, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nilLists, err := GenerateTestTextCode(TestInput{Instances: []TestInstance{}, Detections: &TestDetections{People: TestPersonList(nil), Faces: TestFaceList(nil)}}, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nilLists != empty {
+		t.Errorf("nil lists sign %s, want the empty lists' %s", nilLists, empty)
+	}
 }

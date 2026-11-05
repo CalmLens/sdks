@@ -2,11 +2,17 @@ package com.calmlens;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
@@ -36,7 +42,30 @@ class TestInputsTest {
     return tests.stream();
   }
 
-  private static TestInput input(JsonElement json) { return Fixtures.JSON.fromJson(json, TestInput.class); }
+  /**
+   * Decodes fixture scenarios: a box is a {@code [left, top, width, height]} array, a detection
+   * list is an array or {@code "unavailable"}, and an age is a preset name or a {@code {low, high}}
+   * range.
+   */
+  private static final Gson SCENARIOS = new GsonBuilder()
+      .registerTypeAdapter(TestInput.Box.class, (JsonDeserializer<TestInput.Box>) (json, type, context) -> {
+        JsonArray box = json.getAsJsonArray();
+        if (box.size() != 4) throw new JsonParseException("a box has 4 values");
+        return new TestInput.Box(box.get(0).getAsInt(), box.get(1).getAsInt(), box.get(2).getAsInt(), box.get(3).getAsInt());
+      })
+      .registerTypeAdapter(TestInput.FaceAge.class, (JsonDeserializer<TestInput.FaceAge>) (json, type, context) -> json.isJsonPrimitive()
+          ? new TestInput.FaceAge.Preset(json.getAsString())
+          : context.deserialize(json, TestInput.FaceAge.Range.class))
+      .registerTypeAdapter(TestInput.DetectionList.class, (JsonDeserializer<TestInput.DetectionList<?>>) (json, type, context) -> {
+        if (json.isJsonPrimitive() && json.getAsString().equals("unavailable")) return TestInput.DetectionList.unavailable();
+        Type entry = ((ParameterizedType) type).getActualTypeArguments()[0];
+        List<Object> entries = new ArrayList<>();
+        json.getAsJsonArray().forEach(item -> entries.add(context.deserialize(item, entry)));
+        return TestInput.DetectionList.of(entries);
+      })
+      .create();
+
+  private static TestInput input(JsonElement json) { return SCENARIOS.fromJson(json, TestInput.class); }
 
   private static List<String> strings(JsonElement json) {
     List<String> values = new ArrayList<>();
@@ -60,6 +89,33 @@ class TestInputsTest {
       actual.put(name, (TestInput) TestInputs.class.getField(name.replaceAll("([A-Z])", "_$1").toUpperCase()).get(null));
     }
     assertEquals(expected, actual);
+  }
+
+  @Test
+  void detectionLimitsMatchTheFixture() throws Exception {
+    JsonObject detections = fixture().getAsJsonObject("detections");
+    assertEquals(List.of(detections.get("maxEntries").getAsInt(), detections.get("boxMax").getAsInt(), detections.get("ageMax").getAsInt()),
+        List.of(MockClassification.TEST_DETECTIONS_MAX, MockClassification.TEST_DETECTION_BOX_MAX, MockClassification.TEST_FACE_AGE_MAX));
+    List<String> presets = List.copyOf(detections.getAsJsonObject("agePresets").keySet());
+    assertEquals(presets, MockClassification.TEST_FACE_AGE_PRESETS);
+    assertEquals(presets, Stream.of(TestInput.FaceAge.ADULT, TestInput.FaceAge.MINOR).map(age -> ((TestInput.FaceAge.Preset) age).name()).toList());
+  }
+
+  /** Scenarios only Java can build: null entries, and box values whose sums overflow an int. */
+  @Test
+  void rejectsDetectionsOnlyJavaCanExpress() {
+    TestInput.Box box = new TestInput.Box(0, 0, 1, 1);
+    List<TestInput.Detections> invalid = List.of(
+        new TestInput.Detections(TestInput.DetectionList.of((List<TestInput.Person>) null), null),
+        new TestInput.Detections(TestInput.DetectionList.of(java.util.Arrays.asList(new TestInput.Person(box), null)), null),
+        new TestInput.Detections(null, TestInput.DetectionList.of(new TestInput.Face(null))),
+        new TestInput.Detections(null, TestInput.DetectionList.of(new TestInput.Face(new TestInput.Box(Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 1)))),
+        new TestInput.Detections(TestInput.DetectionList.of(new TestInput.Person(new TestInput.Box(0, 1, 1, Integer.MAX_VALUE))), null));
+    for (TestInput.Detections detections : invalid) {
+      CalmLensException error = assertThrows(CalmLensException.class,
+          () -> TestInputs.generateTestTextCode(TestInputs.CLEAN.withDetections(detections), "0123456789abcdef0123456789abcdef"), detections.toString());
+      assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, error.getCode());
+    }
   }
 
   @Test

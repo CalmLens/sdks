@@ -2,8 +2,8 @@
 mod common;
 use calmlens::testing::{
     generate_media_test_code, generate_test_text_code, paint_test_image, test_input_for_signal,
-    TestImage, TestInput, TestInputKind, TestInputPreset, TestScenario, MEDIA_TEST_SIGNALS,
-    TEST_INPUT_SIGNALS,
+    TestImage, TestInput, TestInputKind, TestInputPreset, TestPerson, TestScenario,
+    MEDIA_TEST_SIGNALS, TEST_INPUT_SIGNALS,
 };
 use calmlens::ErrorCode;
 use common::{fixture, typed};
@@ -42,6 +42,11 @@ fn presets_and_signal_shortcuts_match_the_contract() {
             "regionalDelivery" => TestInputPreset::RegionalDelivery,
             "germany" => TestInputPreset::Germany,
             "mixed" => TestInputPreset::Mixed,
+            "oneFace" => TestInputPreset::OneFace,
+            "noFace" => TestInputPreset::NoFace,
+            "adultFace" => TestInputPreset::AdultFace,
+            "minorFace" => TestInputPreset::MinorFace,
+            "group" => TestInputPreset::Group,
             other => panic!("unknown preset {other}"),
         };
         assert_eq!(
@@ -191,13 +196,33 @@ fn test_images_match_the_contract() {
     }
 }
 
-/// Untyped cases (unknown fields, wrong value types) cannot be expressed in the typed scenario.
+/// Whether `value` holds a negative number, which the scenario's unsigned detection values
+/// cannot hold.
+fn has_negative(value: &Value) -> bool {
+    match value {
+        Value::Number(number) => number.as_f64().is_some_and(|n| n < 0.0),
+        Value::Array(values) => values.iter().any(has_negative),
+        Value::Object(fields) => fields.values().any(has_negative),
+        _ => false,
+    }
+}
+
+/// Untyped cases (unknown fields, wrong value types) cannot be expressed in the typed scenario;
+/// neither can negative detection values, which its unsigned fields refuse when decoding.
 #[test]
 fn invalid_test_inputs_are_invalid_arguments() {
     let fixtures = fixture("test-inputs");
     let cases = fixtures["rejections"].as_array().unwrap();
     for case in cases.iter().filter(|case| case["typed"] == true) {
         let name = format!("{} ({})", case["name"], case["kind"]);
+        if let Some(input) = case
+            .get("input")
+            .filter(|input| has_negative(&input["detections"]))
+        {
+            let decoded = serde_json::from_value::<TestInput>(input.clone());
+            assert!(decoded.is_err(), "{name}: decoded");
+            continue;
+        }
         let error = match case["kind"].as_str().unwrap() {
             "text" => with_scenario(case, |s| generate_test_text_code(s, key(case))),
             "media" => generate_media_test_code(case["signal"].as_str().unwrap(), key(case)),
@@ -205,5 +230,70 @@ fn invalid_test_inputs_are_invalid_arguments() {
         }
         .unwrap_err();
         assert_eq!(error.code(), &ErrorCode::InvalidArgument, "{name}");
+    }
+}
+
+/// Detection scenarios the typed fields cannot express (fractional, missing or unknown values,
+/// other spellings, `null`) are refused when decoding.
+#[test]
+fn untyped_detection_inputs_are_refused_when_decoding() {
+    let fixtures = fixture("test-inputs");
+    let cases: Vec<&Value> = fixtures["rejections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|case| case["typed"] == false && case["input"].get("detections").is_some())
+        .collect();
+    assert!(cases.len() >= 10, "{} untyped detection cases", cases.len());
+    for case in cases {
+        let decoded = serde_json::from_value::<TestInput>(case["input"].clone());
+        assert!(decoded.is_err(), "{}", case["name"]);
+    }
+}
+
+/// A detection key given twice in a JSON scenario is refused rather than the last one winning;
+/// each scenario is valid with either copy alone.
+#[test]
+fn duplicated_detection_keys_are_refused() {
+    let valid = r#"{"instances":[],"detections":{"people":[{"box":[0,0,1,1],"confidence":5}],"faces":[{"box":[0,0,1,1],"age":{"low":1,"high":2}}]}}"#;
+    let decoded: TestInput = serde_json::from_str(valid).unwrap();
+    assert_eq!(
+        decoded.detections.unwrap().people.unwrap(),
+        vec![TestPerson {
+            bounding_box: [0, 0, 1, 1],
+            confidence: Some(5),
+        }]
+        .into()
+    );
+    for duplicated in [
+        r#"{"instances":[],"detections":{},"detections":{}}"#,
+        r#"{"instances":[],"detections":{"people":[],"people":[]}}"#,
+        r#"{"instances":[],"detections":{"faces":[],"faces":"unavailable"}}"#,
+        r#"{"instances":[],"detections":{"people":[{"box":[0,0,1,1],"box":[0,0,2,2]}]}}"#,
+        r#"{"instances":[],"detections":{"people":[{"box":[0,0,1,1],"confidence":1,"confidence":2}]}}"#,
+        r#"{"instances":[],"detections":{"faces":[{"box":[0,0,1,1],"age":"adult","age":"minor"}]}}"#,
+        r#"{"instances":[],"detections":{"faces":[{"box":[0,0,1,1],"age":{"low":1,"low":2,"high":3}}]}}"#,
+        r#"{"instances":[],"detections":{"faces":[{"box":[0,0,1,1],"age":{"low":1,"high":2,"high":3}}]}}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<TestInput>(duplicated).is_err(),
+            "{duplicated}"
+        );
+    }
+}
+
+/// Detection objects given as lists of their values are refused.
+#[test]
+fn detection_objects_given_as_lists_are_refused() {
+    for listed in [
+        r#"{"instances":[],"detections":[[]]}"#,
+        r#"{"instances":[],"detections":{"people":[[[0,0,1,1]]]}}"#,
+        r#"{"instances":[],"detections":{"faces":[[[0,0,1,1],5]]}}"#,
+        r#"{"instances":[],"detections":{"faces":[{"box":[0,0,1,1],"age":[1,2]}]}}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<TestInput>(listed).is_err(),
+            "{listed}"
+        );
     }
 }
