@@ -45,18 +45,20 @@ module CalmLens
     # Searches assets by meaning or keyword.
     # @option options [String] :query
     # @option options [String] :mode `hybrid`, `semantic` or `keyword`
-    # @option options [Integer] :limit
+    # @option options [Integer] :page_size how many results, 1 to 20 (default 10)
     # @return [Hash] `{'query', 'items' => [{'asset', 'score', 'matchedFields'}], 'semanticStatus'}`
     def search(options = {})
       call(options, __method__) { |api, request| request('GET', project('assets/search'), query: api, request_options: request) }
     end
 
-    # Lists one page of assets.
+    # Lists one page of assets, newest first unless `sort` says otherwise.
     # @option options [String] :cursor from the previous page
     # @option options [Integer] :page_size 1 to 100, default 50
-    # @option options [String] :filter an RSQL filter such as `classification.moderation.status==allowed`
-    # @option options [Array<Hash>] :ordering `[{field: 'createdAt', direction: 'desc'}]`
-    # @return [Hash] a cursor page: items, nextCursor, hasMore, pageSize and ordering.
+    # @option options [String, nil] :filter an RSQL filter such as `classification.moderation.status==allowed`;
+    #   `folderId==fldr_…` lists one folder's assets and `folderId==null` the project root's
+    # @option options [String] :sort `createdAt` and `id`, comma-separated, descending when prefixed
+    #   with `-`, such as `-createdAt,id`; `-createdAt` by default
+    # @return [Hash] a cursor page: items, nextCursor and hasMore.
     def list(options = {})
       call(options, __method__) do |api, request|
         request('GET', project('assets'), query: api, request_options: request)
@@ -70,14 +72,14 @@ module CalmLens
     def each(options = {}, &block)
       return enum_for(:each, options) unless block
 
-      api, request = call(options, __method__) { |*split| split }
-      listing = pages(api['cursor']) { |index| list(api.merge('cursor' => index, 'request_options' => request)) }
-      listing.each { |page| page['items'].each(&block) }
-      nil
+      each_item(options, __method__, method(:list), &block)
     end
 
     # Lists one page of an asset's children, such as frames extracted from a video.
     # @option options [String] :asset_id
+    # @option options [String] :cursor
+    # @option options [Integer] :page_size
+    # @option options [String] :sort as for {#list}
     # @return [Hash] a page like {#list}
     def list_children(options)
       call(options, __method__) do |api, request|
@@ -92,12 +94,22 @@ module CalmLens
     # @option options [String] :asset_id
     # @option options [String] :cursor
     # @option options [Integer] :page_size
-    # @return [Hash] a cursor page of timeline segments: items, nextCursor, hasMore, pageSize and ordering.
+    # @return [Hash] a cursor page of timeline segments: items, nextCursor and hasMore.
     def list_timeline(options)
       call(options, __method__) do |api, request|
         query = without(api, 'assetId')
         request('GET', project("assets/#{Internal.segment(api['assetId'])}/timeline"), query: query, request_options: request)
       end
+    end
+
+    # Iterates every segment of an audio or video asset's findings timeline, in time order.
+    # @param options [Hash] the options of {#list_timeline}
+    # @yieldparam segment [Hash]
+    # @return [Enumerator, nil] an Enumerator when no block is given.
+    def each_timeline_segment(options, &block)
+      return enum_for(:each_timeline_segment, options) unless block
+
+      each_item(options, __method__, method(:list_timeline), &block)
     end
 
     # Iterates every child of an asset, fetching pages as needed.
@@ -107,10 +119,7 @@ module CalmLens
     def each_child(options, &block)
       return enum_for(:each_child, options) unless block
 
-      api, request = call(options, __method__) { |*split| split }
-      listing = pages(api['cursor']) { |index| list_children(api.merge('cursor' => index, 'request_options' => request)) }
-      listing.each { |page| page['items'].each(&block) }
-      nil
+      each_item(options, __method__, method(:list_children), &block)
     end
 
     # @option options [String] :asset_id
@@ -251,7 +260,8 @@ module CalmLens
       end
     end
 
-    # Uploads content and queues moderation; the call returns before classification finishes.
+    # Uploads content and returns without waiting for its decision (`wait=false`), with
+    # `classification.status` `queued`.
     # Watch for `asset.allowed`, `asset.limited`, `asset.age-restricted`, `asset.blocked` and
     # `asset.purged` events or retrieve the asset later.
     #
@@ -282,7 +292,7 @@ module CalmLens
     #   {ModerationContext::USED_ITEMS} that fit in {ModerationContext::USED_CHARACTERS} characters.
     # @return [Hash] the asset
     def create(options)
-      call(options, __method__) { |api, request| submit(api, request, true) }
+      call(options, __method__) { |api, request| submit(api, request, false) }
     end
 
     # Uploads content and waits for the moderation decision where the content type supports it.
@@ -297,15 +307,17 @@ module CalmLens
           raise Internal.invalid('Text to classify must be a non-empty string', ErrorCodes::INVALID_UPLOAD_PAYLOAD)
         end
 
-        submit(api, request, false)
+        submit(api, request, true)
       end
     end
 
     # Uploads a later part of a multipart upload started with {#create} or {#classify} and `part:`.
-    # The queue mode chosen at the start applies; pass `queue:` only to override it.
+    # Whether the final part waits for the decision was chosen when the upload started; pass `wait:`
+    # only to override it.
     # @option options [String] :asset_id
     # @option options [Hash] :part `{data:, part_number:, is_final:}`; part numbers start at 2.
-    # @option options [Boolean] :queue
+    # @option options [Boolean] :wait `true` to wait for the decision, `false` to return with the
+    #   asset `queued`
     # @return [Hash] the asset; `classification.status` stays `uploading` until the final part.
     def upload_part(options)
       call(options, __method__) do |api, request|
@@ -320,7 +332,7 @@ module CalmLens
         end
 
         body = UploadBody.from(part, multipart: true, part_size: !@session.defer_upload_checks)
-        send_part(api['assetId'], number, part.fetch('isFinal', false), body, api.fetch('queue', nil), request)
+        send_part(api['assetId'], number, part.fetch('isFinal', false), body, api.fetch('wait', nil), request)
       end
     end
 
@@ -352,7 +364,7 @@ module CalmLens
       end
     end
 
-    def submit(options, request_options, queue)
+    def submit(options, request_options, wait)
       raise Internal.invalid('Asset name is required', ErrorCodes::INVALID_UPLOAD_PAYLOAD) if options['name'].to_s.empty?
       unless %w[content part url].one? { |key| options.key?(key) } && !options.key?('isFinal')
         raise Internal.invalid('Supply exactly one of content, part, or url; isFinal belongs in part',
@@ -360,7 +372,7 @@ module CalmLens
       end
       options = with_used_context(options)
       if options.key?('url')
-        return expect_asset(request('POST', project('assets'), query: { 'queue' => queue }, body: options,
+        return expect_asset(request('POST', project('assets'), query: { 'wait' => wait }, body: options,
                                                                idempotent: true, request_options: request_options))
       end
 
@@ -374,10 +386,10 @@ module CalmLens
       end
 
       body = UploadBody.from(content, multipart: multipart, part_size: !@session.defer_upload_checks)
-      return upload_in_parts(options, request_options, queue, mime, body) if !multipart && splits?(content, body)
+      return upload_in_parts(options, request_options, wait, mime, body) if !multipart && splits?(content, body)
 
       check_upload_size(mime, body.size) unless multipart || @session.defer_upload_checks
-      query = options.slice(*SUBMIT_QUERY_KEYS).merge('queue' => queue, 'contentType' => content['type'],
+      query = options.slice(*SUBMIT_QUERY_KEYS).merge('wait' => wait, 'contentType' => content['type'],
                                                       'sizeInBytes' => body.size)
       query.merge!(first_part_query(options, content, mime, body)) if multipart
       expect_asset(request('POST', project('assets'),
@@ -394,7 +406,7 @@ module CalmLens
     # Uploads `body` as a multipart upload of `part_size_bytes` parts and returns the final part's
     # asset. Part `n` after the first carries the key `<key>:part-<n>`, so repeating the call with
     # the same key replays the parts the API already has and sends the rest.
-    def upload_in_parts(options, request_options, queue, mime, body)
+    def upload_in_parts(options, request_options, wait, mime, body)
       key = request_options[:idempotency_key] || SecureRandom.uuid
       if key.length > MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH
         raise Internal.invalid("idempotency_key can have at most #{MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH} characters " \
@@ -410,7 +422,7 @@ module CalmLens
       piece = ->(number) { body.slice((number - 1) * part_size, [part_size, total - ((number - 1) * part_size)].min) }
       first = piece.call(1)
       type = options.dig('content', 'type')
-      query = options.slice(*SUBMIT_QUERY_KEYS).merge('queue' => queue, 'contentType' => type, 'sizeInBytes' => first.size,
+      query = options.slice(*SUBMIT_QUERY_KEYS).merge('wait' => wait, 'contentType' => type, 'sizeInBytes' => first.size,
                                                       'partNumber' => 1, 'isFinal' => false, 'totalSizeInBytes' => total)
       asset = expect_asset(request('POST', project('assets'),
                                    query: query, raw: first, idempotent: true, upload: true,
@@ -446,9 +458,9 @@ module CalmLens
       asset
     end
 
-    def send_part(asset_id, number, final, body, queue, request_options)
+    def send_part(asset_id, number, final, body, wait, request_options)
       query = { 'partNumber' => number, 'isFinal' => final, 'sizeInBytes' => body.size }
-      query['queue'] = queue unless queue.nil?
+      query['wait'] = wait unless wait.nil?
       headers = { 'Content-Type' => 'application/octet-stream', 'X-CalmLens-Upload' => 'part' }
       expect_asset(request('POST', "/assets/#{Internal.segment(asset_id)}/part", query: query, raw: body, idempotent: true,
                                                                                  request_options: request_options, upload: true,

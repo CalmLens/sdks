@@ -121,6 +121,7 @@ module CalmLens
     attr_reader upload_tokens: UploadTokens
     attr_reader events: Events
     attr_reader cdn: CDN
+    attr_reader lenses: Lenses
     attr_reader project_id: String
     attr_reader base_url: String
     attr_reader cdn_base_url: String
@@ -165,6 +166,8 @@ module CalmLens
     def each_child: (list_asset_children_options options) { (asset) -> void } -> nil
                   | (list_asset_children_options options) -> Enumerator[asset, nil]
     def list_timeline: (list_asset_timeline_options options) -> asset_timeline_page
+    def each_timeline_segment: (list_asset_timeline_options options) { (media_segment) -> void } -> nil
+                             | (list_asset_timeline_options options) -> Enumerator[media_segment, nil]
     def retrieve: (asset_id_options options) -> asset
     def wait_for_decision: (wait_for_decision_options options) -> asset
     def update: (update_asset_options options) -> asset
@@ -184,6 +187,8 @@ module CalmLens
 
   class Folders < Resource
     def list: (?list_folders_options options) -> folder_page
+    def each: (?list_folders_options options) { (folder) -> void } -> nil
+            | (?list_folders_options options) -> Enumerator[folder, nil]
     def create: (create_folder_options options) -> folder
     def retrieve: (folder_id_options options) -> folder
     def update: (update_folder_options options) -> folder
@@ -193,24 +198,43 @@ module CalmLens
 
   class HashLists < Resource
     def list: (?list_hash_lists_options options) -> hash_list_page
+    def each: (?list_hash_lists_options options) { (hash_list) -> void } -> nil
+            | (?list_hash_lists_options options) -> Enumerator[hash_list, nil]
     def retrieve: (hash_list_id_options options) -> hash_list
     def create: (create_hash_list_options options) -> hash_list
     def update: (update_hash_list_options options) -> hash_list
     def delete: (hash_list_id_options options) -> nil
     def list_entries: (list_hash_list_entries_options options) -> hash_list_entry_page
+    def each_entry: (list_hash_list_entries_options options) { (hash_list_entry) -> void } -> nil
+                  | (list_hash_list_entries_options options) -> Enumerator[hash_list_entry, nil]
     def add_entry: (add_hash_list_entry_options options) -> hash_list_entry
     def remove_entry: (hash_list_entry_id_options options) -> nil
   end
 
   class Policies < Resource
-    def list: (?list_policies_options options) -> policy_list
+    def list: (?list_policies_options options) -> policy_page
+    def each: (?list_policies_options options) { (policy) -> void } -> nil
+            | (?list_policies_options options) -> Enumerator[policy, nil]
     def retrieve: (policy_id_options options) -> policy
+    # The policy the project moderates with.
+    def retrieve_assigned: (?request_only_options options) -> policy
     def create: (create_policy_options options) -> policy
     def update: (update_policy_options options) -> policy
-    def apply_preset: (apply_policy_preset_options options) -> policy
+    def reset: (restore_policy_options options) -> policy
+    def upgrade: (restore_policy_options options) -> policy
     def set_automatic_updates: (set_policy_automatic_updates_options options) -> policy
     def delete: (policy_id_options options) -> nil
     def assign: (assign_policy_options options) -> policy
+  end
+
+  class Lenses < Resource
+    def list: (?list_lenses_options options) -> lens_page
+    def each: (?list_lenses_options options) { (lens) -> void } -> nil
+            | (?list_lenses_options options) -> Enumerator[lens, nil]
+    def create: (create_lens_options options) -> lens
+    def retrieve: (lens_id_options options) -> lens
+    def update: (update_lens_options options) -> lens
+    def delete: (lens_id_options options) -> nil
   end
 
   class UploadTokens < Resource
@@ -302,6 +326,15 @@ module CalmLens
                            ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
     def self.test_event?: (WebhookEvent | Hash[String, untyped] event) -> bool
     def self.newer_asset_event?: (WebhookEvent | Hash[String, untyped] event, Integer? last_sequence) -> bool
+  # The value of an event's fact by key (the first, when the event repeats it), or nil without one.
+  def self.get_event_fact: (WebhookEvent | Hash[String, untyped] event, String key) -> event_fact_value
+  # An event's facts as values by key; a repeated key keeps its first value.
+  def self.get_event_facts: (WebhookEvent | Hash[String, untyped] event) -> Hash[String, event_fact_value]
+  end
+
+  module EventFacts
+    def self.value: (WebhookEvent | Hash[String, untyped] event, String key) -> event_fact_value
+    def self.values: (WebhookEvent | Hash[String, untyped] event) -> Hash[String, event_fact_value]
   end
 
   def self.create_webhook_signature_header: (payload: String, timestamp: String | Integer, secret: String) -> String
@@ -315,6 +348,10 @@ module CalmLens
                                  ?headers: webhook_headers?, ?tolerance_seconds: Integer, ?now: number) -> WebhookEvent
   def self.test_webhook_event?: (WebhookEvent | Hash[String, untyped] event) -> bool
   def self.newer_asset_event?: (WebhookEvent | Hash[String, untyped] event, Integer? last_sequence) -> bool
+  # The value of an event's fact by key (the first, when the event repeats it), or nil without one.
+  def self.get_event_fact: (WebhookEvent | Hash[String, untyped] event, String key) -> event_fact_value
+  # An event's facts as values by key; a repeated key keeps its first value.
+  def self.get_event_facts: (WebhookEvent | Hash[String, untyped] event) -> Hash[String, event_fact_value]
 
   # require 'calmlens/testing'
   module Testing

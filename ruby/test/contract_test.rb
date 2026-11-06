@@ -159,9 +159,10 @@ class ContractTest < Minitest::Test
     case operation
     when 'cdn.serve' then served(mock.cdn.serve(args))
     when 'cdn.getAssetInfo' then json(mock.cdn.get_asset_info(args['url'], viewer_claims: args['viewerClaims']))
-    when 'assets.iterate' then json(mock.assets.each(args).to_a)
-    when 'assets.iterateChildren' then json(mock.assets.each_child(args).to_a)
     when 'events.pages' then json(mock.events.each_page(args).to_a)
+    when *ITERATORS.keys
+      *resources, method = ITERATORS[operation].split('.')
+      json(resources.reduce(mock) { |value, resource| value.public_send(resource) }.public_send(method, args).to_a)
     when 'assets.waitForDecision'
       json(mock.assets.wait_for_decision(args.except('timeoutMs').merge('timeout' => args['timeoutMs'] / 1000.0)))
     else
@@ -288,6 +289,7 @@ class ContractTest < Minitest::Test
   # surface.json (packages/sdk-contract/surface.ts): every capability a server SDK must offer exists
   # under its Ruby name.
   SURFACE = fixture('surface')
+  ITERATORS = iterators
 
   def client(transport = ->(request) { flunk "Sent #{request.url}" })
     CalmLens::ServerClient.new(api_key: 'key', project_id: 'project-1', max_retries: 0, transport: transport)

@@ -11,4 +11,11 @@ module ContractFixtures
   # The parsed testdata/<name>.json. A key given twice in one object fails rather than the last
   # one winning, so a duplicated scenario or detection key cannot pass as one field.
   def fixture(name) = JSON.parse(File.read("#{DIR}/#{name}.json", encoding: 'UTF-8'), allow_duplicate_key: false)
+
+  # The Ruby method of each list iterator surface.json names, by operation: `hash_lists.each_entry`
+  # for `hashLists.iterateEntries`. Events iterate by page (`events.each_page`).
+  def iterators
+    fixture('surface')['capabilities'].select { |capability| capability['id'].split('.').last.start_with?('iterate') }
+                                      .to_h { |capability| [capability['id'], capability['names']['ruby']] }
+  end
 end

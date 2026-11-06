@@ -34,7 +34,7 @@ uploaded = client.assets.create(name: 'photo.jpg', content: { type: 'image/jpeg'
                                 request_options: { idempotency_key: 'upload-1', timeout: 60 })
 first = client.assets.classify(name: 'big.png', part: { type: 'image/png', base64: 'AAAA', is_final: false },
                                total_size_in_bytes: 12_000_000)
-client.assets.upload_part(asset_id: first['id'], part: { part_number: 2, data: 'bytes', is_final: true }, queue: true)
+client.assets.upload_part(asset_id: first['id'], part: { part_number: 2, data: 'bytes', is_final: true }, wait: false)
 client.assets.classify(name: 'page', url: 'https://example.com')
 reply = client.text.classify(text: 'Same to you', author_id: 'user-9',
                              context: { items: [{ text: 'Nice photo!', author_id: 'user-1' }, { text: 'Thanks' }] })
@@ -43,13 +43,14 @@ author = reply['authorId']
 used = CalmLens::ModerationContext.select_items([{ text: 'Nice photo!' }]).map { |post| post['text'] }
 limits = [CalmLens::ModerationContext::USED_ITEMS, CalmLens::ModerationContext::USED_CHARACTERS]
 
-page = client.assets.list(page_size: 20, filter: 'classification.moderation.status==allowed',
-                          ordering: [{ field: 'createdAt', direction: 'desc' }])
+page = client.assets.list(page_size: 20, filter: 'classification.moderation.status==allowed;folderId==null',
+                          sort: '-createdAt,id')
 names = page['items'].map { |item| item['name'] }
 more = page['hasMore']
 client.assets.each(filter: 'classification.moderation.status==blocked') { |item| item['id'] }
-children = client.assets.each_child(asset_id: uploaded['id']).to_a
-results = client.assets.search(query: 'cat', mode: 'semantic', limit: 5)
+children = client.assets.each_child(asset_id: uploaded['id'], sort: 'createdAt').to_a
+segments = client.assets.each_timeline_segment(asset_id: uploaded['id']).map { |segment| segment['startSeconds'] }
+results = client.assets.search(query: 'cat', mode: 'semantic', page_size: 5)
 matched = results['items'].map { |result| [result['asset']['id'], result['score'], result['matchedFields']] }
 updated = client.assets.update(asset_id: uploaded['id'], tags: %w[a b], description: nil)
 client.assets.move(asset_id: updated['id'], folder_id: nil)
@@ -69,8 +70,10 @@ client.assets.delete(asset_id: updated['id'])
 folder = client.folders.create(name: 'Inbox', parent_id: nil)
 client.folders.update(folder_id: folder['id'], name: 'Archive')
 client.folders.move(folder_id: folder['id'], parent_id: nil)
-folders = client.folders.list(ordering: [{ field: 'createdAt', direction: 'desc' }], page_size: 20)
+folders = client.folders.list(sort: '-createdAt', page_size: 20)
 folders['items'].map { |item| item['parentId'] }
+folders['ancestors'].map { |item| item['name'] }
+client.folders.each(parent_id: folder['id'], sort: 'name') { |item| item['name'] }
 client.folders.list(cursor: folders['nextCursor']) if folders['nextCursor']
 client.folders.retrieve(folder_id: folder['id'])
 client.folders.delete(folder_id: folder['id'])
@@ -79,19 +82,46 @@ hash_list = client.hash_lists.create(name: 'Removed images', action: 'block', de
 client.hash_lists.update(hash_list_id: hash_list['id'], action: 'flag', description: nil)
 hash_lists = client.hash_lists.list(page_size: 20)
 hash_lists['items'].map { |item| item['action'] }
+client.hash_lists.each(sort: 'createdAt') { |item| item['name'] }
 client.hash_lists.list(cursor: hash_lists['nextCursor']) if hash_lists['nextCursor']
 client.hash_lists.retrieve(hash_list_id: hash_list['id'])
 entry = client.hash_lists.add_entry(hash_list_id: hash_list['id'], hash: '0' * 64, quality: 90, label: 'Report 1042')
 client.hash_lists.add_entry(hash_list_id: hash_list['id'], asset_id: 'asset-1')
 entries = client.hash_lists.list_entries(hash_list_id: hash_list['id'], page_size: 50)
 client.hash_lists.list_entries(hash_list_id: hash_list['id'], cursor: entries['nextCursor']) if entries['nextCursor']
+client.hash_lists.each_entry(hash_list_id: hash_list['id']) { |item| item['hash'] }
 client.hash_lists.remove_entry(entry_id: entry['id'])
 client.hash_lists.delete(hash_list_id: hash_list['id'])
 
-lenses = client.ensure_lenses(lenses: [{ identifier: 'thumb', name: 'Thumb', type: 'image', active: true, version: 2,
+lenses = client.ensure_lenses(lenses: [{ identifier: 'thumb', name: 'Thumb', type: 'image', active: true,
                                          transform: { width: 128, format: 'webp' } }])
 lens = client.ensure_lens(identifier: 'small', name: 'Small', type: 'image', active: true)
 lens_width = lenses.first&.dig('transform', 'width')
+card = client.lenses.create(identifier: 'card', name: 'Card', type: 'image', active: true, description: nil,
+                            transform: { width: 600 })
+client.lenses.update(lens_id: card['id'], name: 'Wide card', transform: { width: 1200 })
+client.lenses.retrieve(lens_id: card['id'])['identifier']
+lens_page = client.lenses.list(page_size: 10, sort: '-createdAt')
+lens_names = lens_page['items'].map { |item| item['name'] } if lens_page['hasMore']
+client.lenses.each { |item| item['active'] }
+client.lenses.delete(lens_id: card['id'])
+
+policy = client.policies.retrieve_assigned
+mode = policy['preset']&.fetch('mode')
+policies = client.policies.list(page_size: 10, sort: 'createdAt')
+policies['items'].map { |item| item['projectIds'] }
+client.policies.each { |item| item['name'] }
+custom = client.policies.create(name: 'Strict', settings: policy['settings'])
+client.policies.update(policy_id: custom['id'], revision: custom['revision'], name: 'Stricter')
+kids = client.policies.create(preset_id: 'children-platform')
+preset_version = kids['preset']&.fetch('version') || 1
+client.policies.reset(policy_id: kids['id'], revision: kids['revision'], preset_version: preset_version)
+client.policies.upgrade(policy_id: kids['id'], revision: kids['revision'], preset_version: preset_version)
+client.policies.set_automatic_updates(policy_id: policy['id'], enabled: false, revision: policy['revision'],
+                                      preset_version: policy['preset']&.fetch('latestVersion') || 1)
+client.policies.assign(policy_id: kids['id'])
+client.policies.delete(policy_id: custom['id'])
+token = client.upload_tokens.sign(upload_preset_id: 'preset-1', external_id: 'post-42', expires_in: 120)['token']
 
 url = client.cdn.get_asset_url(asset_id: 'post-1', resource: 'preview', lens: lens['identifier'], viewer_claims: { age_confirmed: true })
 renditions = asset['content']['hls']&.fetch('renditions')&.map { |rendition| [rendition['kind'], rendition['bandwidth']] }
@@ -122,6 +152,8 @@ webhook = CalmLens.parse_webhook_event(payload: '{}', signature: 'v1=x', timesta
 webhook_status = webhook.asset&.dig('classification', 'moderation', 'status')
 webhook_test = webhook.test?
 webhook_actor = webhook.actor&.fetch('type')
+flagged = CalmLens.get_event_fact(webhook, 'flagged-categories')
+webhook_facts = CalmLens.get_event_facts(webhook).keys
 client.close
 
 # @type var moderate: ^(CalmLens::MockModerationInput) -> (CalmLens::MockDecision::status | CalmLens::MockDecision)
@@ -155,4 +187,4 @@ phrase = CalmLens::TestInputs.generate_media_code('violence', test_input_key)
 [status, processing, failure, reviews, removal, format, camera, score, ages, names, more, children, matched, expires, available,
  lens_width, url,
  renditions, embed, hls, bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered, fetched, signed, scored,
- phrase, automated, regional, flagged_links, batched, webhook_actor]
+ phrase, automated, regional, flagged_links, batched, webhook_actor, segments, lens_names, mode, token, flagged, webhook_facts]

@@ -151,7 +151,7 @@ module CalmLens
             raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Unexpected lens response')
           end
 
-          # A new version of a lens replaces the cached definition with the same identifier.
+          # A changed lens replaces the cached definition with the same identifier.
           chunk.keys.zip(returned).each do |key, lens|
             @lenses.delete_if { |_, saved| saved['identifier'] == lens['identifier'] }
             @lenses[key] = lens
@@ -163,6 +163,12 @@ module CalmLens
           JSON.parse(JSON.generate(@lenses[key]))
         end
       end
+    end
+
+    # Drops the cached definitions of the lenses the block selects, which lenses.create, update
+    # and delete changed, so ensure_lenses sends their definitions again.
+    def forget_lenses(&selected)
+      @lens_lock.synchronize { @lenses.delete_if { |_, lens| selected.call(lens) } }
     end
 
     def headers_for(extra, authenticate: true)
@@ -178,7 +184,7 @@ module CalmLens
     def lens_key(lens)
       fields = { 'identifier' => lens['identifier'], 'name' => lens['name'], 'description' => lens['description'],
                  'type' => lens['type'], 'transform' => lens['transform'] }
-      %w[active version].each { |name| fields[name] = lens[name] if lens.key?(name) }
+      fields['active'] = lens['active'] if lens.key?('active')
       JSON.generate(canonical(fields))
     end
 

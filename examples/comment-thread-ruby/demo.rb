@@ -81,7 +81,6 @@ module Calmthread
                                            'reviewedAt' => (Time.now.to_f * 1000).to_i, 'applied' => true }
           client.enqueue_event(type: type, asset_id: id, title: EVENT_LABELS[type], actor: { type: 'user', id: nil }, facts: [
                                  { key: 'asset-type', value: 'text' },
-                                 { key: 'reviewer-name', value: 'Demo reviewer' },
                                  { key: 'note', value: note }
                                ])
         end

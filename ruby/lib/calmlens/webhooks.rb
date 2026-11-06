@@ -253,4 +253,10 @@ module CalmLens
 
   # @see Webhooks.newer_asset_event?
   def self.newer_asset_event?(...) = Webhooks.newer_asset_event?(...)
+
+  # @see EventFacts.value
+  def self.get_event_fact(...) = EventFacts.value(...)
+
+  # @see EventFacts.values
+  def self.get_event_facts(...) = EventFacts.values(...)
 end

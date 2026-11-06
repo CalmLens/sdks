@@ -88,10 +88,11 @@ module CalmLens
       return if undecided?
 
       evaluated = (MockClassification::CATEGORIES - @not_evaluated).map { |category| [category, @flags.dig(category, :score) || 0] }
-      { 'raw' => { 'categories' => MockClassification::CATEGORIES.to_h { |category| [category, category_report(category)] } },
+      { 'raw' => { 'categories' => MockClassification::CATEGORIES.to_h { |category| [category, category_report(category)] },
+                   'hashMatches' => [] },
         'categories' => evaluated.to_h { |category, value| [category, { 'score' => value, 'action' => action(value) }] },
-        'explanationComplete' => true, 'source' => 'policy', 'automatedStatus' => @status,
-        'regions' => [], 'flaggedCategories' => evaluated.reject { |_, value| action(value) == 'allow' }.map(&:first) }
+        'explanationComplete' => true, 'source' => 'policy', 'rule' => nil, 'automatedStatus' => @status,
+        'regions' => [], 'linkSafety' => nil, 'flaggedCategories' => evaluated.reject { |_, value| action(value) == 'allow' }.map(&:first) }
     end
 
     def inspect = "#<#{self.class.name} #{@status}>"

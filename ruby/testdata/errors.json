@@ -2241,7 +2241,39 @@
     }
   },
   {
-    "code": "lens/version-conflict",
+    "code": "lens/not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-lens-not-found"
+      },
+      "body": {
+        "code": "lens/not-found",
+        "message": "Lens not found. Check the lens ID or identifier in the portal.",
+        "requestId": "req-lens-not-found",
+        "details": {
+          "reason": "lens_not_found"
+        }
+      }
+    },
+    "expected": {
+      "code": "lens/not-found",
+      "status": 404,
+      "requestId": "req-lens-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "lens_not_found"
+      }
+    }
+  },
+  {
+    "code": "lens/identifier-taken",
     "status": 409,
     "operation": "assets.retrieve",
     "args": {
@@ -2251,24 +2283,24 @@
       "status": 409,
       "headers": {
         "content-type": "application/json",
-        "x-request-id": "req-lens-version-conflict"
+        "x-request-id": "req-lens-identifier-taken"
       },
       "body": {
-        "code": "lens/version-conflict",
-        "message": "Lens updates require a version greater than the current version.",
-        "requestId": "req-lens-version-conflict",
+        "code": "lens/identifier-taken",
+        "message": "The project already has a lens with this identifier. Update that lens, or give this one another identifier.",
+        "requestId": "req-lens-identifier-taken",
         "details": {
-          "reason": "lens_version_conflict"
+          "reason": "lens_identifier_taken"
         }
       }
     },
     "expected": {
-      "code": "lens/version-conflict",
+      "code": "lens/identifier-taken",
       "status": 409,
-      "requestId": "req-lens-version-conflict",
+      "requestId": "req-lens-identifier-taken",
       "retryAfter": null,
       "details": {
-        "reason": "lens_version_conflict"
+        "reason": "lens_identifier_taken"
       }
     }
   },

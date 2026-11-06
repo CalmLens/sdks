@@ -55,7 +55,6 @@ module Calmthread
   # this app shows. Other keys are not shown.
   FACT_LABELS = {
     'asset-name' => 'Asset',
-    'reviewer-name' => 'Reviewer',
     'note' => 'Note'
   }.freeze
   # Only reviewer decisions change a reply: moderation status events whose `actor` is a `user` (a
@@ -234,7 +233,7 @@ module Calmthread
       @lock.synchronize { @replies.find { |reply| reply[:id] == reply_id }&.dup }
     end
 
-    # Publishes a held reply. `review` records the decision ({ decision:, reviewer:, note:, at: }).
+    # Publishes a held reply. `review` records the decision ({ decision:, note:, at: }).
     def publish(reply_id, review = nil)
       @lock.synchronize do
         reply = @replies.find { |item| item[:id] == reply_id && item[:state] == :held }
@@ -346,7 +345,7 @@ module Calmthread
 
       # Act on the asset's current status, never on the event's snapshot.
       status = Calmthread.current_status(client.assets.retrieve(asset_id: asset_id), asset_id, reply)
-      review = { decision: status, reviewer: fact(facts, 'reviewer-name'), note: fact(facts, 'note'), at: Time.now }
+      review = { decision: status, note: note(event), at: Time.now }
       outcome = if HELD_STATUSES.include?(status) && !%w[asset.allowed asset.limited].include?(event['type'])
                   remove(reply, client, review)
                 elsif SHOWN_STATUSES.include?(status) && reply[:state] == :held && allowed_elsewhere?(reply, asset_id, client)
@@ -360,8 +359,9 @@ module Calmthread
       outcome
     end
 
-    def fact(facts, key)
-      value = facts.find { |item| item['key'] == key }&.fetch('value', nil)
+    # The reviewer's note, when the event carries one.
+    def note(event)
+      value = CalmLens.get_event_fact(event, 'note')
       value.is_a?(String) && !value.empty? ? value[0, 200] : nil
     end
 

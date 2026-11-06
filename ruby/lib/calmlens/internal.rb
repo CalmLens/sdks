@@ -138,24 +138,9 @@ module CalmLens
       end
     end
 
-    # Encodes query values the way the API's parser expects: strings as-is, everything else as
-    # JSON, and ordering as `ordering[i][field]` pairs.
+    # Encodes query values the way the API's parser expects: strings as-is, everything else as JSON.
     def query(params)
-      encoded = {}
-      params.each do |key, value|
-        next if value.nil?
-
-        if key == 'ordering' && value.is_a?(Array)
-          value.each_with_index do |order, index|
-            raise invalid('Each ordering entry must be a Hash') unless order.is_a?(Hash)
-
-            order.each { |name, item| encoded["ordering[#{index}][#{name}]"] = item.to_s }
-          end
-        else
-          encoded[key] = value.is_a?(String) ? value : JSON.generate(value)
-        end
-      end
-      encoded
+      params.compact.transform_values { |value| value.is_a?(String) ? value : JSON.generate(value) }
     end
   end
   private_constant :Internal

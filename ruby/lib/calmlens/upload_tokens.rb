@@ -26,7 +26,7 @@ module CalmLens
     # Signs a single-use token. Hand it to the browser as its bearer token; give each upload its own.
     # @option options [String] :upload_preset_id the preset the token may upload through
     # @option options [String] :external_id the external ID the uploaded asset gets (not empty)
-    # @option options [Integer] :expires_in_seconds lifetime, 1 to 3600 (default 600)
+    # @option options [Integer] :expires_in lifetime in seconds, 1 to 3600 (default 600)
     # @return [Hash] `{'token' => String, 'expiresAt' => Integer}` (milliseconds since the Unix epoch)
     def sign(options)
       call(options, __method__) { UploadTokens.sign_at(@api_key, options, now: (Time.now.to_f * 1000).to_i, nonce: SecureRandom.uuid) }
@@ -39,9 +39,9 @@ module CalmLens
       api, = Internal.options(options)
       preset_id = api['uploadPresetId']
       Internal.segment(preset_id)
-      ttl = api.fetch('expiresInSeconds', DEFAULT_TTL_SECONDS)
+      ttl = api.fetch('expiresIn', DEFAULT_TTL_SECONDS)
       unless ttl.is_a?(Integer) && ttl.between?(1, MAX_TTL_SECONDS)
-        raise Internal.invalid("expiresInSeconds must be a whole number from 1 to #{MAX_TTL_SECONDS}")
+        raise Internal.invalid("expiresIn must be a whole number from 1 to #{MAX_TTL_SECONDS}")
       end
 
       external_id = api['externalId']

@@ -56,17 +56,20 @@ class ContractClientTest < Minitest::Test
     raise IterationFailed.new(items, e)
   end
 
-  # Calls an operation named like the JavaScript client's method, with JavaScript option names.
+  ITERATORS = iterators
+
+  # Calls an operation named like the JavaScript client's method, with JavaScript option names. An
+  # iterator's result is what it yields, in order.
   def invoke(client, operation, args)
-    case operation
-    when 'assets.iterate' then collect { |items| client.assets.each(args) { |asset| items << asset } }
-    when 'assets.iterateChildren' then collect { |items| client.assets.each_child(args) { |asset| items << asset } }
-    when 'events.iterate' then collect { |pages| client.events.each_page(args) { |page| pages << page } }
-    else
-      *resources, method = operation.split('.')
-      target = resources.reduce(client) { |value, resource| value.public_send(snake_name(resource)) }
-      target.public_send(snake_name(method), args)
+    if (name = ITERATORS[operation])
+      *resources, method = name.split('.')
+      target = resources.reduce(client) { |value, resource| value.public_send(resource) }
+      return collect { |items| target.public_send(method, args) { |item| items << item } }
     end
+
+    *resources, method = operation.split('.')
+    target = resources.reduce(client) { |value, resource| value.public_send(snake_name(resource)) }
+    target.public_send(snake_name(method), args)
   end
 
   # Translates JavaScript-only options: the Idempotency-Key and waitForDecision's milliseconds.

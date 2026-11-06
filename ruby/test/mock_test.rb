@@ -188,25 +188,22 @@ class MockTest < Minitest::Test
     assert_equal CalmLens::ErrorCodes::ASSET_NOT_FOUND, error.code
   end
 
-  def test_filters_ordering_and_pagination_are_applied
+  def test_filters_sort_and_pagination_are_applied
     clock = 0
     mock = CalmLens::MockServerClient.new(now: -> { clock += 1 }, moderate: lambda { |input|
       input.asset['name'].start_with?('bad') ? 'blocked' : 'allowed'
     })
     %w[good-b bad-a good-a good-c].each { |name| mock.assets.classify(name: name, content: { plain_text: name, type: 'text/plain' }) }
 
-    page = mock.assets.list(filter: 'classification.moderation.status==allowed', ordering: [{ field: 'createdAt', direction: 'asc' }],
-                            page_size: 2)
+    page = mock.assets.list(filter: 'classification.moderation.status==allowed', sort: 'createdAt', page_size: 2)
     assert_equal [%w[good-b good-a], true], [page['items'].map { |asset| asset['name'] }, page['hasMore']]
     assert_equal(%w[good-c good-a bad-a good-b], mock.assets.each.map { |asset| asset['name'] })
-    either = mock.assets.list(filter: 'classification.moderation.status==blocked,name==good-c',
-                              ordering: [{ field: 'createdAt', direction: 'asc' }])
+    either = mock.assets.list(filter: 'classification.moderation.status==blocked,name==good-c', sort: 'createdAt')
     assert_equal(%w[bad-a good-c], either['items'].map { |asset| asset['name'] })
-    ascending = mock.assets.each(filter: 'name==good-*;classification.moderation.status!=blocked', page_size: 1,
-                                 ordering: [{ field: 'createdAt', direction: 'asc' }])
+    ascending = mock.assets.each(filter: 'name==good-*;classification.moderation.status!=blocked', page_size: 1, sort: 'createdAt')
     assert_equal(%w[good-b good-a good-c], ascending.map { |asset| asset['name'] })
     by_name = lambda do |filter|
-      mock.assets.each(filter: filter, ordering: [{ field: 'createdAt', direction: 'asc' }]).map { |asset| asset['name'] }
+      mock.assets.each(filter: filter, sort: 'createdAt').map { |asset| asset['name'] }
     end
     created = mock.assets.each.to_h { |asset| [asset['name'], asset['createdAt']] }
     assert_equal %w[bad-a good-c], by_name.call("name=in=(bad-a,\"good-c\");createdAt>#{created['good-b']}")

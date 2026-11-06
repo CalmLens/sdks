@@ -72,12 +72,28 @@ class ServerClientTest < Minitest::Test
       CalmLens::Response.new(status: 200, body: JSON.generate('lenses' => [{ 'id' => 'lens-1', 'identifier' => 'thumb' }]))
     end
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport)
-    lens = { identifier: 'thumb', name: 'Thumb', type: 'image', active: true, version: 1,
-             transform: { width: 1, fit: 'cover' } }
+    lens = { identifier: 'thumb', name: 'Thumb', type: 'image', active: true, transform: { width: 1, fit: 'cover' } }
     reordered = lens.merge(transform: { fit: 'cover', width: 1 })
     results = [lens, reordered].map { |definition| Thread.new { client.ensure_lens(definition) } }.map(&:value)
     assert_equal([%w[lens-1 thumb]] * 2, results.map { |saved| saved.values_at('id', 'identifier') })
     assert_equal 1, sent.size
+  end
+
+  def test_a_lens_changed_through_lenses_update_is_sent_again_by_ensure_lens
+    methods = []
+    transport = lambda do |request|
+      methods << request.method
+      saved = { 'id' => 'lens-thumb', 'identifier' => 'thumb', 'name' => 'Thumb' }
+      body = request.method == 'PATCH' ? saved.merge('name' => 'Renamed') : { 'lenses' => [saved] }
+      CalmLens::Response.new(status: 200, body: JSON.generate(body))
+    end
+    client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport)
+    lens = { identifier: 'thumb', name: 'Thumb', type: 'image', active: true }
+    2.times { client.ensure_lens(lens) }
+    assert_equal %w[PUT], methods
+    client.lenses.update(lens_id: 'lens-thumb', name: 'Renamed')
+    client.ensure_lens(lens)
+    assert_equal %w[PUT PATCH PUT], methods
   end
 
   def test_transport_failures_keep_their_cause

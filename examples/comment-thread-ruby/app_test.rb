@@ -98,7 +98,7 @@ class SubmissionTest < Minitest::Test
     assert_equal 4, moderations.size
     moderations.each { |item| assert_equal HOLD_POLICY, JSON.parse(item.query['processingOptions']) }
     assert_equal ['Calmthread display name', 'Calmthread reply'] * 2, moderations.map { |item| item.query['name'] }
-    assert_equal ['false'] * 4, moderations.map { |item| item.query['queue'] }
+    assert_equal ['true'] * 4, moderations.map { |item| item.query['wait'] }
     reply = app.discussion.replies.last
     assert_equal ["#{reply[:id]}:name", "#{reply[:id]}:text"], moderations.first(2).map { |item| item.query['externalId'] }
     assert_equal({ name: 'name-1', text: 'text-1' }, reply[:asset_ids])
@@ -273,16 +273,16 @@ class ReviewTest < Minitest::Test
   def test_reviewer_allowing_releases_the_reply_once_every_field_is_allowed
     app, mock = held_app
     # The event snapshot is stale on purpose; the retrieved assets decide.
-    mock.enqueue(body: page_of(event('e1', 'asset.allowed', 'text-1', [{ 'key' => 'reviewer-name', 'value' => 'Sam' }], snapshot: 'blocked')))
+    mock.enqueue(body: page_of(event('e1', 'asset.allowed', 'text-1', [{ 'key' => 'note', 'value' => 'Fine in context' }], snapshot: 'blocked')))
         .enqueue(body: asset('text-1', 'allowed')).enqueue(body: asset('name-1', 'allowed'))
     _, headers, = sync(app)
     assert_equal '/?notice=applied&count=1', headers['location']
     assert_equal [:published], states(app)
     assert_equal [%w[GET /assets/text-1], %w[GET /assets/name-1]], calls(mock).last(2)
     assert_includes home(app), 'Held reply text'
-    assert_equal({ decision: 'allowed', reviewer: 'Sam', note: nil }, app.discussion.replies.first[:review].except(:at))
+    assert_equal({ decision: 'allowed', note: 'Fine in context' }, app.discussion.replies.first[:review].except(:at))
     entry = app.discussion.activity.first
-    assert_equal [:released, :feed, [{ label: 'Reviewer', value: 'Sam', url: nil }]], entry.values_at(:kind, :via, :facts)
+    assert_equal [:released, :feed, [{ label: 'Note', value: 'Fine in context', url: nil }]], entry.values_at(:kind, :via, :facts)
     assert_equal 'c1', app.feed.cursor
   end
 
@@ -326,7 +326,7 @@ class ReviewTest < Minitest::Test
     # The record stays for its author, without its name or text.
     reply = app.discussion.replies.first
     assert_equal [:removed, nil, nil], reply.values_at(:state, :name, :text)
-    assert_equal({ decision: 'blocked', reviewer: nil, note: 'Off topic' }, reply[:review].except(:at))
+    assert_equal({ decision: 'blocked', note: 'Off topic' }, reply[:review].except(:at))
     assert_equal [reply[:id]], app.discussion.visible_to(Calmthread.author_id(token(app))).map { |item| item[:id] }
     assert_empty app.discussion.visible_to(nil)
     refute_includes home_as_author(app), 'Held reply text'
@@ -429,7 +429,7 @@ class ReviewTest < Minitest::Test
     assert_equal ['profanity'], app.discussion.replies.first[:flagged]
     released = app.discussion.activity.find { |entry| entry[:kind] == :released }
     assert_equal :demo, released[:via]
-    assert_includes released[:facts], { label: 'Reviewer', value: 'Demo reviewer', url: nil }
+    assert_includes released[:facts], { label: 'Note', value: 'Friendly banter in context.', url: nil }
     assert_equal 400, review.(allow, 'allow'), 'a published reply is no longer held'
     assert_equal 400, review.(block, 'block')
     app.discussion.submit('Cy', 'Held', 'held')
@@ -458,7 +458,7 @@ class WebhookTest < Minitest::Test
 
   def test_tampered_deliveries_are_rejected_and_verified_ones_are_acknowledged_before_any_request
     app, mock = held_app(webhook_secret: SECRET)
-    body = delivery('evt-1', 'asset.allowed', 'text-1', [{ 'key' => 'reviewer-name', 'value' => 'Sam' }])
+    body = delivery('evt-1', 'asset.allowed', 'text-1', [{ 'key' => 'note', 'value' => 'Approved by Sam' }])
     before = mock.requests.size
     assert_equal 401, deliver(app, body, signature: 'v1=bad').first
     signed = CalmLens.create_webhook_signature_header(payload: body, timestamp: Time.now.to_i, secret: SECRET)
@@ -538,11 +538,11 @@ class RequestTest < Minitest::Test
   def test_fact_links_allow_only_http_urls_and_registered_keys
     facts = Calmthread.display_facts([
                                        { 'key' => 'note', 'value' => 'See', 'url' => 'https://portal.example/assets/1' },
-                                       { 'key' => 'reviewer-name', 'value' => 'Sam', 'url' => 'javascript:alert(1)' },
+                                       { 'key' => 'note', 'value' => 'Sam', 'url' => 'javascript:alert(1)' },
                                        { 'key' => 'asset-name', 'value' => 'Calmthread reply', 'url' => '/portal/assets/1' },
                                        { 'key' => 'unregistered', 'value' => 'x' }
                                      ])
-    assert_equal [['Note', 'See', 'https://portal.example/assets/1'], ['Reviewer', 'Sam', nil],
+    assert_equal [['Note', 'See', 'https://portal.example/assets/1'], ['Note', 'Sam', nil],
                   ['Asset', 'Calmthread reply', nil]], facts.map(&:values)
   end
 

@@ -21,7 +21,7 @@ module CalmLens
       'assets.waitForDecision' => %w[assetId timeout].freeze,
       'cdn.getAssetUrl' => %w[assetId externalId lens projectId resource transform viewerClaims].freeze,
       'cdn.serve' => %w[assetId externalId init lens projectId resource transform viewerClaims].freeze,
-      'uploadTokens.sign' => %w[expiresInSeconds externalId uploadPresetId].freeze
+      'uploadTokens.sign' => %w[expiresIn externalId uploadPresetId].freeze
     }.freeze
     private_constant :LOCAL_OPTION_KEYS
 
@@ -30,9 +30,10 @@ module CalmLens
     # `sdk/invalid-argument` instead of being silently dropped.
     # An option given as nil is left out, as if omitted, unless the API takes null for it
     # (Internal::NULLABLE_OPTION_KEYS), such as `description: nil` to clear a description;
-    # `keep_nil: true` sends every option as given, as for a lens definition.
-    def call(options, method, keep_nil: false)
-      operation = [self.class::OPERATIONS, Internal.camelize(method)].compact.join('.')
+    # `keep_nil: true` sends every option as given, as for a lens definition. `prefix` names the
+    # operation's resource, the resource's own unless the method belongs to the client itself.
+    def call(options, method, keep_nil: false, prefix: self.class::OPERATIONS)
+      operation = [prefix, Internal.camelize(method)].compact.join('.')
       check_option_keys(options, operation)
       api, request = Internal.options(options)
       nullable = Internal::NULLABLE_OPTION_KEYS.fetch(operation, [])
@@ -82,6 +83,23 @@ module CalmLens
           cursor = following
         end
       end
+    end
+
+    # A list's response, once it is a cursor page: a Hash with an `items` Array. `what` names the
+    # items in the `sdk/invalid-response` error otherwise.
+    def cursor_page(response, what)
+      return response if response.is_a?(Hash) && response['items'].is_a?(Array)
+
+      raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, "Invalid #{what} page")
+    end
+
+    # Iterates the items of every page `list` returns for `options`, from its `cursor`, yielding each
+    # to `block`. `method` names the public iterator, whose options are checked like the list's.
+    def each_item(options, method, list, &block)
+      api, request = call(options, method) { |*split| split }
+      listing = pages(api['cursor']) { |cursor| list.call(api.merge('cursor' => cursor, 'request_options' => request)) }
+      listing.each { |page| page['items'].each(&block) }
+      nil
     end
 
     # Records a cursor an iteration sends, raising `sdk/invalid-response` (with `details['cursor']`)

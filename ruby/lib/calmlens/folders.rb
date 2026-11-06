@@ -6,22 +6,27 @@ module CalmLens
     # The prefix of this resource's operations in Internal::OPTION_KEYS.
     OPERATIONS = 'folders'
 
-    # Lists one page of child folders, sorted by name unless `ordering` says otherwise.
+    # Lists one page of child folders, sorted by name unless `sort` says otherwise.
     # @option options [String] :parent_id list this folder's children; omit for the project root
     # @option options [String] :cursor the previous page's `nextCursor`
     # @option options [Integer] :page_size 1 to 100, default 50
-    # @option options [Array<Hash>] :ordering one `{field: 'name' | 'createdAt', direction: 'asc' | 'desc'}`
+    # @option options [String] :sort `name` (the default) or `createdAt`, descending when prefixed with `-`
     # @option options [String] :search only children whose name contains it
-    # @return [Hash] a cursor page (items, nextCursor, hasMore, pageSize, ordering) with ancestors.
+    # @return [Hash] a cursor page (items, nextCursor, hasMore) with ancestors.
     def list(options = {})
       call(options, __method__) do |api, request|
-        response = request('GET', project('folders'), query: api, request_options: request)
-        valid = response.is_a?(Hash) && response['items'].is_a?(Array) && response['ancestors'].is_a?(Array) &&
-                [true, false].include?(response['hasMore'])
-        raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Invalid folder page') unless valid
-
-        response
+        cursor_page(request('GET', project('folders'), query: api, request_options: request), 'folder')
       end
+    end
+
+    # Iterates every child folder of `parent_id` (or the project root), fetching pages as needed.
+    # @param options [Hash] the options of {#list}; `cursor` sets the starting position.
+    # @yieldparam folder [Hash]
+    # @return [Enumerator, nil] an Enumerator when no block is given.
+    def each(options = {}, &block)
+      return enum_for(:each, options) unless block
+
+      each_item(options, __method__, method(:list), &block)
     end
 
     # @option options [String] :name

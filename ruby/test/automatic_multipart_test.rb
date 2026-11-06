@@ -60,8 +60,8 @@ class AutomaticMultipartTest < Minitest::Test
     assert_equal(%w[false false true], sent.map { |request| request.query['isFinal'] })
     assert_equal([5 * MIB, 5 * MIB, MIB].map(&:to_s), sent.map { |request| request.query['sizeInBytes'] })
     assert_equal (11 * MIB).to_s, sent[0].query['totalSizeInBytes']
-    # The queue choice goes with the first part, which saves it for the upload.
-    assert_equal(['false', nil, nil], sent.map { |request| request.query['queue'] })
+    # Whether to wait goes with the first part, which saves it for the upload.
+    assert_equal(['true', nil, nil], sent.map { |request| request.query['wait'] })
     assert_equal file, sent.map(&:body).join
   end
 

@@ -49,6 +49,8 @@ module CalmLens
     attr_reader :events
     # @return [CDN]
     attr_reader :cdn
+    # @return [Lenses]
+    attr_reader :lenses
 
     # @param api_key [String] a project API key. Keep it on your server.
     # @param project_id [String]
@@ -119,11 +121,11 @@ module CalmLens
       nil
     end
 
-    # Creates or updates named lenses (saved transforms) and returns them. Definitions
-    # this client already saved are not sent again. Supplying the same definition and version is
-    # idempotent; changing a lens needs a higher `version`. More than 100 new definitions are sent in
-    # consecutive requests, in order.
-    # @option options [Array<Hash>] :lenses `[{identifier:, name:, type:, version:, transform:, ...}]`
+    # Creates named lenses (saved transforms), or changes them to these definitions, and returns
+    # them. Definitions this client already saved are not sent again, and sending the same
+    # definition again returns the lens unchanged. More than 100 new definitions are sent in
+    # consecutive requests, in order. {#lenses} manages lenses one by one.
+    # @option options [Array<Hash>] :lenses `[{identifier:, name:, type:, active:, transform:, ...}]`
     # @return [Array<Hash>] the saved lenses, in the given order.
     def ensure_lenses(options) = @lenses.ensure_lenses(options)
 

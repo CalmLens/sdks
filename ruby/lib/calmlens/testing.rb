@@ -67,7 +67,9 @@ module CalmLens
                               retry explain wait_for_decision remove_content delete batch],
                    folders: %i[list retrieve create update delete move],
                    hash_lists: %i[list retrieve create update delete list_entries add_entry remove_entry],
-                   policies: %i[list retrieve create update apply_preset set_automatic_updates delete assign],
+                   policies: %i[list retrieve retrieve_assigned create update reset upgrade set_automatic_updates delete
+                                assign],
+                   lenses: %i[list create retrieve update delete],
                    text: %i[classify], events: %i[list],
                    cdn: %i[serve sign_asset_url get_asset_info] }.freeze
     private_constant :OPERATIONS

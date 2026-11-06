@@ -8,18 +8,26 @@ module CalmLens
     # The prefix of this resource's operations in Internal::OPTION_KEYS.
     OPERATIONS = 'hashLists'
 
-    # Lists one page of the project's hash lists, newest first.
+    # Lists one page of the project's hash lists, newest first unless `sort` says otherwise.
     # @option options [String] :cursor the previous page's `nextCursor`
     # @option options [Integer] :page_size 1 to 100, default 50
-    # @return [Hash] a cursor page: items, nextCursor, hasMore, pageSize and ordering.
+    # @option options [String] :sort `createdAt` and `id`, comma-separated, descending when prefixed
+    #   with `-`; `-createdAt` by default
+    # @return [Hash] a cursor page: items, nextCursor and hasMore.
     def list(options = {})
       call(options, __method__) do |api, request|
-        response = request('GET', project('hash-lists'), query: api, request_options: request)
-        valid = response.is_a?(Hash) && response['items'].is_a?(Array)
-        raise InvalidResponseError.new(SdkErrorCodes::INVALID_RESPONSE, 'Invalid hash list page') unless valid
-
-        response
+        cursor_page(request('GET', project('hash-lists'), query: api, request_options: request), 'hash list')
       end
+    end
+
+    # Iterates every hash list, fetching pages as needed.
+    # @param options [Hash] the options of {#list}; `cursor` sets the starting position.
+    # @yieldparam hash_list [Hash]
+    # @return [Enumerator, nil] an Enumerator when no block is given.
+    def each(options = {}, &block)
+      return enum_for(:each, options) unless block
+
+      each_item(options, __method__, method(:list), &block)
     end
 
     # @option options [String] :hash_list_id
@@ -58,15 +66,27 @@ module CalmLens
       end
     end
 
-    # Lists one page of a list's entries, newest first.
+    # Lists one page of a list's entries, newest first unless `sort` says otherwise.
     # @option options [String] :hash_list_id
     # @option options [String] :cursor the previous page's `nextCursor`
     # @option options [Integer] :page_size 1 to 100, default 50
-    # @return [Hash] a cursor page: items, nextCursor, hasMore, pageSize and ordering.
+    # @option options [String] :sort `createdAt` and `id`, comma-separated, descending when prefixed
+    #   with `-`; `-createdAt` by default
+    # @return [Hash] a cursor page: items, nextCursor and hasMore.
     def list_entries(options)
       call(options, __method__) do |api, request|
         request('GET', "#{list_path(api)}/entries", query: without(api, 'hashListId'), request_options: request)
       end
+    end
+
+    # Iterates every entry of a list, fetching pages as needed.
+    # @param options [Hash] the options of {#list_entries}; `cursor` sets the starting position.
+    # @yieldparam entry [Hash]
+    # @return [Enumerator, nil] an Enumerator when no block is given.
+    def each_entry(options, &block)
+      return enum_for(:each_entry, options) unless block
+
+      each_item(options, __method__, method(:list_entries), &block)
     end
 
     # Adds a PDQ hash, or an image asset's hash; a hash already in the list returns its entry.

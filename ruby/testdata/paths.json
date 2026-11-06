@@ -144,6 +144,29 @@
         "policyId": ".."
       },
       "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "policies.reset",
+      "options": {
+        "policyId": "..",
+        "revision": 1,
+        "presetVersion": 1
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "lenses.retrieve",
+      "options": {
+        "lensId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "lenses.delete",
+      "options": {
+        "lensId": "."
+      },
+      "error": "sdk/invalid-argument"
     }
   ],
   "cdnUrls": [

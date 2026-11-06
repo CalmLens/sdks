@@ -158,14 +158,16 @@ module CalmLens
     # content. Never use test results, such as age ranges, for real decisions.
     "testInput" => bool,
     "moderation" => asset_moderation,
-    ?"personDetection" => person_detection_result,
-    ?"faceDetection" => face_detection_result,
-    ?"linkDetection" => link_detection_result,
-    # Preview. Where the asset's links lead; present when the project's policy acts on links.
-    ?"linkSafety" => link_safety_result,
-    ?"aiGeneratedDetection" => ai_generated_detection_result,
-    # Where OCR found text, and personal information within it; redaction transforms blur these regions.
-    ?"textRegions" => Array[text_region]
+    # OCR's result for an image processed with OCR turned on; `nil` when OCR didn't run.
+    "ocr" => ocr_result?,
+    # Link detection's result for an image; `nil` when it didn't run.
+    "linkDetection" => link_detection_result?,
+    # Preview. Person and face detection's results; `nil` when they didn't run.
+    ?"personDetection" => person_detection_result?,
+    ?"faceDetection" => face_detection_result?,
+    # Preview. Where the asset's links lead when the project's policy acts on links; otherwise `nil`.
+    ?"linkSafety" => link_safety_result?,
+    ?"aiGeneratedDetection" => ai_generated_detection_result?
   }
   # Who made a review: a person (`user`, also when an assistant's key acts for one) or an API key
   # (`api-key`), with the user's or API key's ID, `nil` only when it was not recorded.
@@ -188,23 +190,29 @@ module CalmLens
     "rule" => String,
     ?"category" => String
   }
+  # What decided the automated status: the `policy`'s categories, the asset's `children`, a
+  # `hash-list` match, a `mandatory-rule` or `link-safety`.
+  type moderation_source = "policy" | "children" | "hash-list" | "mandatory-rule" | "link-safety"
+  # Every field but `status`, `manualReviews`, `flaggedCategories`, `regions` and `timeline` is `nil`
+  # until moderation decides.
   type asset_moderation = {
     "manualReviews" => Array[asset_review],
     "status" => asset_moderation_status,
-    # The policy's original decision, absent before one; a reviewer's decision can change `status`
-    # without changing it.
-    ?"automatedStatus" => asset_moderation_decision,
-    ?"source" => String, ?"rule" => String,
+    # The policy's original decision; a reviewer's decision can change `status` without changing it.
+    "automatedStatus" => asset_moderation_decision?,
+    "source" => moderation_source?,
+    # The mandatory rule that decided, when `source` is `mandatory-rule`; otherwise `nil`.
+    "rule" => String?,
     "flaggedCategories" => Array[String], "regions" => Array[regional_decision],
-    ?"explanationComplete" => bool,
-    ?"categories" => Hash[String, category_policy_score],
-    # Preview. What the policy's link-safety section made of the asset's links; absent when the
+    "explanationComplete" => bool?,
+    "categories" => Hash[String, category_policy_score]?,
+    # Preview. What the policy's link-safety section made of the asset's links; `nil` when the
     # policy doesn't act on links.
-    ?"linkSafety" => link_safety_decision,
+    ?"linkSafety" => link_safety_decision?,
     # An audio or video asset's findings timeline: how many segments `assets.list_timeline` lists.
     # `null` for other assets and media without findings.
     "timeline" => moderation_timeline?,
-    ?"raw" => moderation_raw
+    "raw" => moderation_raw?
   }
   # ASSET_CONTENT_SCHEMA. `format` is the MIME type.
   type asset_content = {
@@ -250,12 +258,14 @@ module CalmLens
     ?"externalId" => String?,
     ?"externalUrl" => String?,
     "type" => asset_type,
-    ?"metadata" => Array[metadata_item]?,
+    # Empty when the asset has none.
+    "metadata" => Array[metadata_item],
     ?"authorId" => String?,
     # The earlier posts CalmLens used; null once the content is removed.
     ?"context" => moderation_context?,
-    ?"tags" => Array[String]?,
-    ?"visibility" => asset_visibility?,
+    # Empty when the asset has none.
+    "tags" => Array[String],
+    "visibility" => asset_visibility,
     "upload" => asset_upload,
     "classification" => asset_classification,
     "content" => asset_content
@@ -310,18 +320,15 @@ module CalmLens
   type age_range = { "low" => Integer, "high" => Integer }
   type detected_person = { "box" => bounding_box, "confidence" => number }
   type detected_face = { "box" => bounding_box, "confidence" => number, ?"ageRange" => age_range }
-  type processing_feature_stage = "beta" | "ga"
   # `status: "evaluated"` carries `people`; `"not-evaluated"` carries `reason`.
   type person_detection_result = {
     "status" => "evaluated" | "not-evaluated",
-    "stage" => processing_feature_stage,
     ?"people" => Array[detected_person],
     ?"reason" => not_evaluated_reason
   }
   # `status: "evaluated"` carries `faces`; `"not-evaluated"` carries `reason`.
   type face_detection_result = {
     "status" => "evaluated" | "not-evaluated",
-    "stage" => processing_feature_stage,
     ?"faces" => Array[detected_face],
     ?"reason" => not_evaluated_reason
   }
@@ -331,7 +338,6 @@ module CalmLens
   # `status: "evaluated"` carries `qrCodes` and `links`; `"not-evaluated"` carries `reason`.
   type link_detection_result = {
     "status" => "evaluated" | "not-evaluated",
-    "stage" => processing_feature_stage,
     ?"qrCodes" => Array[detected_qr_code],
     ?"links" => Array[detected_link],
     ?"reason" => not_evaluated_reason
@@ -369,7 +375,6 @@ module CalmLens
   # Preview. `status: "evaluated"` carries `links`; `"not-evaluated"` carries `reason`.
   type link_safety_result = {
     "status" => "evaluated" | "not-evaluated",
-    "stage" => processing_feature_stage,
     ?"links" => Array[checked_link],
     ?"reason" => not_evaluated_reason
   }
@@ -397,34 +402,31 @@ module CalmLens
   # `status: "evaluated"` carries `provenance` and `signals`; `"not-evaluated"` carries `reason`.
   type ai_generated_detection_result = {
     "status" => "evaluated" | "not-evaluated",
-    "stage" => processing_feature_stage,
     ?"provenance" => "ai-generated" | "ai-edited" | "unknown",
     ?"signals" => Array[provenance_signal],
     ?"reason" => not_evaluated_reason
   }
   # Where OCR found text in an image, and whether it is personal information.
   type text_region = { "box" => bounding_box, "personalInformation" => bool }
-  # Results of the features requested in `processingOptions.features`. OCR stores extracted text on the image
-  # asset instead of a result here.
-  type processing_feature_results = {
-    ?"personDetection" => person_detection_result,
-    ?"faceDetection" => face_detection_result,
-    ?"linkDetection" => link_detection_result,
-    ?"linkSafety" => link_safety_result,
-    ?"aiGeneratedDetection" => ai_generated_detection_result
+  # `status: "evaluated"` carries `textRegions`, where OCR found text (redaction transforms blur
+  # these regions); `"not-evaluated"` carries `reason`. The text itself is `content.extractedText`.
+  type ocr_result = {
+    "status" => "evaluated" | "not-evaluated",
+    ?"textRegions" => Array[text_region],
+    ?"reason" => not_evaluated_reason
   }
 
   # How strongly each assessed category meets the policy and what the policy does with it.
   type policy_rule_snapshot = {
     "when" => Array[String], "action" => flagged_content_action,
-    ?"name" => String, ?"match" => "all", ?"unless" => Array[String]
+    ?"name" => String, ?"unless" => Array[String]
   }
   # What decided a category's action: its `default` action, a policy score `below-threshold`, or the
   # `allowance` or `restriction` rules listed by `indexes` (at least one, the decisive rule first).
   type category_policy_source = { "kind" => "default" | "below-threshold" } |
                                 { "kind" => "allowance" | "restriction", "indexes" => Array[Integer] }
   type category_policy_settings_snapshot = {
-    "categoryAction" => flagged_content_action,
+    "action" => flagged_content_action,
     "allowances" => Array[policy_rule_snapshot], "restrictions" => Array[policy_rule_snapshot]
   }
   type category_policy_score = {
@@ -434,29 +436,26 @@ module CalmLens
   type moderation_timeline = { "segmentCount" => Integer }
   type moderation_raw = {
     "categories" => classification_categories,
-    ?"hashMatches" => Array[hash_match]
+    # Empty when the image matched no hash list entry.
+    "hashMatches" => Array[hash_match]
   }
 
   # ---- Pages and search (Page.ts, AssetSearch.ts) --------------------------------------------
 
-  type order_direction = "asc" | "desc"
-  type order_input = { field: String, direction: order_direction }
-  type order = { "field" => String, "direction" => order_direction }
+  # A list's sort: comma-separated fields, each ascending unless prefixed with `-`, such as
+  # `-createdAt,id`.
+  type sort = String
 
   type asset_page = {
     "items" => Array[asset],
     "hasMore" => bool,
-    "nextCursor" => String?,
-    "pageSize" => Integer,
-    "ordering" => Array[order]
+    "nextCursor" => String?
   }
   # One page of an audio or video asset's findings timeline, in time order.
   type asset_timeline_page = {
     "items" => Array[media_segment],
     "hasMore" => bool,
-    "nextCursor" => String?,
-    "pageSize" => Integer,
-    "ordering" => Array[order]
+    "nextCursor" => String?
   }
 
   type asset_search_mode = "keyword" | "semantic" | "hybrid"
@@ -610,20 +609,18 @@ module CalmLens
   type transform_input = String | image_transform_options_input
 
   type lens_type = "image" | "video" | "audio" | "document" | "website"
-  # ENSURE_LENS_BODY_SCHEMA. Changing a saved lens needs a greater `version` (default 1).
+  # ENSURE_LENS_BODY_SCHEMA: a lens definition, which the CDN serves once it is saved.
   type lens_definition = {
     identifier: String,
     name: String,
     type: lens_type,
     active: bool,
     ?description: String?,
-    ?version: Integer,
     ?transform: image_transform_options_input?
   }
   type lens = {
     "id" => String,
     ?"projectId" => String?,
-    "version" => Integer,
     "identifier" => String,
     "name" => String,
     ?"description" => String?,
@@ -632,6 +629,11 @@ module CalmLens
     ?"transform" => image_transform_options?,
     "createdAt" => Integer,
     ?"updatedAt" => Integer
+  }
+  type lens_page = {
+    "items" => Array[lens],
+    "hasMore" => bool,
+    "nextCursor" => String?
   }
 
   # ---- Folders (Folder.ts) --------------------------------------------------------------------
@@ -684,53 +686,61 @@ module CalmLens
   type hash_list_entry_page = {
     "items" => Array[hash_list_entry],
     "hasMore" => bool,
-    "nextCursor" => String?,
-    "pageSize" => Integer,
-    "ordering" => Array[order]
+    "nextCursor" => String?
   }
 
   # ---- Policies (Policy.ts) ---------------------------------------------------------------------
 
   type policy_preset_id = "general-community" | "children-platform" | "education-support" | "wholesome-community"
-  # What a policy does with one category: `action` when its policy score reaches 0.5 (default
-  # `block`), allowances that let covered content through or act on it more softly, and
-  # restrictions, which outweigh allowances.
+  # What a policy does with one category: `action` when its policy score reaches 0.5, allowances
+  # that let covered content through or act on it more softly, and restrictions, which outweigh
+  # allowances.
   type category_policy_settings = {
-    ?"action" => flagged_content_action,
-    ?"allowances" => Array[policy_rule_snapshot],
-    ?"restrictions" => Array[policy_rule_snapshot]
+    "action" => flagged_content_action,
+    "allowances" => Array[policy_rule_snapshot],
+    "restrictions" => Array[policy_rule_snapshot]
   }
-  # Settings by category (`sexual`, `violence`, ...), and optionally link safety.
+  # Settings for every category, and optionally link safety.
   type policy_settings = {
-    "categorySettings" => Hash[String, category_policy_settings],
+    "categorySettings" => {
+      "sexual" => category_policy_settings,
+      "violence" => category_policy_settings,
+      "self-harm" => category_policy_settings,
+      "harassment" => category_policy_settings,
+      "hate" => category_policy_settings,
+      "criminal-activity" => category_policy_settings,
+      "personal-information" => category_policy_settings,
+      "profanity" => category_policy_settings
+    },
     ?"linkSafety" => link_safety_settings
   }
+  # How a policy relates to its preset: `live` follows the latest release (the organisation's own
+  # preset policy with automatic updates on), `pinned` is the organisation's own preset policy held
+  # at one release, and `copy` is a policy made from a preset.
+  type policy_preset_mode = "live" | "pinned" | "copy"
   # Where a policy started from a built-in preset. `version` is the release it is pinned to,
-  # `latestVersion` the newest; `own` is whether this is the organisation's own policy for the preset
-  # rather than a copy made from it. An organisation has at most one per preset, and only it can
-  # follow automatic updates.
+  # `latestVersion` the newest.
   type policy_preset_origin = {
     "id" => policy_preset_id,
     "version" => Integer,
     "latestVersion" => Integer,
-    "own" => bool
+    "mode" => policy_preset_mode
   }
-  # A moderation policy. Policies belong to the project's organisation and its projects share them.
-  # Send `revision` with each change; a policy changed since is refused with `policy/revision-conflict`.
+  # A moderation policy. Policies belong to the organisation and its projects share them. Send
+  # `revision` with each change; a policy changed since is refused with `policy/revision-conflict`.
   type policy = {
     "id" => String,
     "name" => String,
     "description" => String,
     "settings" => policy_settings,
     "revision" => Integer,
-    "automaticUpdates" => bool,
     "preset" => policy_preset_origin?,
     "projectIds" => Array[String],
     "createdAt" => Integer,
     "updatedAt" => Integer
   }
-  # Every policy of the project's organisation, oldest first, and the one the project moderates with.
-  type policy_list = { "policies" => Array[policy], "projectPolicyId" => String }
+  # A page of the organisation's policies, oldest first unless `sort` says otherwise.
+  type policy_page = { "items" => Array[policy], "hasMore" => bool, "nextCursor" => String? }
 
   # ---- Events and webhooks (Event.ts, EventCatalog.ts, WebhookPayload.ts) ----------------------
 
@@ -809,23 +819,25 @@ module CalmLens
   type asset_search_options = {
     query: String,
     ?mode: asset_search_mode,
-    ?limit: Integer,
+    # How many results, 1 to 20 (default 10).
+    ?page_size: Integer,
     ?request_options: request_options
   }
   type list_assets_options = {
     ?cursor: String,
     ?page_size: Integer,
-    ?ordering: Array[order_input],
-    # An RSQL filter such as `classification.moderation.status==allowed`.
+    # `createdAt` and `id`; `-createdAt` by default.
+    ?sort: sort,
+    # An RSQL filter such as `classification.moderation.status==allowed`; `folderId==fldr_…` lists
+    # one folder's assets.
     ?filter: String?,
-    ?folder_id: String?,
     ?request_options: request_options
   }
   type list_asset_children_options = {
     asset_id: String,
     ?cursor: String,
     ?page_size: Integer,
-    ?ordering: Array[order_input],
+    ?sort: sort,
     ?request_options: request_options
   }
   type list_asset_timeline_options = {
@@ -943,7 +955,8 @@ module CalmLens
                           ?processing_options: processing_options_input?,
                           ?request_options: request_options
                         }
-  type upload_part_options = { asset_id: String, part: upload_part, ?queue: bool, ?request_options: request_options }
+  # `wait` overrides whether the final part waits for the decision, chosen when the upload started.
+  type upload_part_options = { asset_id: String, part: upload_part, ?wait: bool, ?request_options: request_options }
 
   # Options of {Text#classify}: the text, with the shared asset fields. `name` defaults to `text`.
   type moderate_text_options = {
@@ -967,19 +980,19 @@ module CalmLens
   type sign_upload_token_options = {
     upload_preset_id: String,
     ?external_id: String,
-    ?expires_in_seconds: Integer,
+    # Seconds the token can start an upload, 1 to 3600; 600 by default.
+    ?expires_in: Integer,
     ?request_options: request_options
   }
   type signed_upload_token = { "token" => String, "expiresAt" => Integer }
 
-  type folder_order_input = { field: "name" | "createdAt", direction: order_direction }
   type list_folders_options = {
     ?parent_id: String,
     ?cursor: String,
     # 1 to 100, default 50.
     ?page_size: Integer,
-    # At most one entry; the default is `name` ascending.
-    ?ordering: Array[folder_order_input],
+    # `name` (the default) or `createdAt`, descending when prefixed with `-`.
+    ?sort: sort,
     ?search: String,
     ?request_options: request_options
   }
@@ -987,39 +1000,36 @@ module CalmLens
     "items" => Array[folder],
     "ancestors" => Array[folder],
     "hasMore" => bool,
-    "nextCursor" => String?,
-    "pageSize" => Integer,
-    "ordering" => Array[order]
+    "nextCursor" => String?
   }
   type folder_id_options = { folder_id: String, ?request_options: request_options }
   type create_folder_options = { name: String, ?parent_id: String?, ?request_options: request_options }
   type update_folder_options = { folder_id: String, ?name: String, ?request_options: request_options }
   type move_folder_options = { folder_id: String, parent_id: String?, ?request_options: request_options }
-  # 1 to 100 lists per page, default 50.
-  type list_hash_lists_options = { ?cursor: String, ?page_size: Integer, ?request_options: request_options }
+  # 1 to 100 lists per page, default 50; `sort` is `createdAt` and `id`, `-createdAt` by default.
+  type list_hash_lists_options = { ?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options }
   type hash_list_page = {
     "items" => Array[hash_list],
     "hasMore" => bool,
-    "nextCursor" => String?,
-    "pageSize" => Integer,
-    "ordering" => Array[order]
+    "nextCursor" => String?
   }
   type hash_list_id_options = { hash_list_id: String, ?request_options: request_options }
   type create_hash_list_options = { name: String, action: hash_list_action, ?description: String?, ?request_options: request_options }
   type update_hash_list_options = { hash_list_id: String, ?name: String, ?description: String?, ?action: hash_list_action,
                                     ?request_options: request_options }
-  type list_hash_list_entries_options = { hash_list_id: String, ?cursor: String, ?page_size: Integer,
+  type list_hash_list_entries_options = { hash_list_id: String, ?cursor: String, ?page_size: Integer, ?sort: sort,
                                           ?request_options: request_options }
   type add_hash_list_entry_options = { hash_list_id: String, ?hash: String, ?quality: number, ?asset_id: String, ?label: String,
                                        ?request_options: request_options }
   type hash_list_entry_id_options = { entry_id: String, ?request_options: request_options }
 
   # Policy settings as options: snake_case Symbol keys, or a policy's `settings` as the API returned it.
-  type policy_rule_input = { when: Array[String], action: flagged_content_action, ?name: String, ?match: "all", ?unless: Array[String] }
+  type policy_rule_input = { when: Array[String], action: flagged_content_action, ?name: String, ?unless: Array[String] }
+  # Every category needs its `action`, `allowances` and `restrictions`.
   type category_policy_settings_input = {
-    ?action: flagged_content_action,
-    ?allowances: Array[policy_rule_input],
-    ?restrictions: Array[policy_rule_input]
+    action: flagged_content_action,
+    allowances: Array[policy_rule_input],
+    restrictions: Array[policy_rule_input]
   }
   type link_safety_settings_input = {
     verdict_actions: Hash[String | Symbol, link_safety_action],
@@ -1029,7 +1039,9 @@ module CalmLens
     category_settings: Hash[String | Symbol, category_policy_settings_input],
     ?link_safety: link_safety_settings_input
   }
-  type list_policies_options = { ?request_options: request_options }
+  # `sort` is `createdAt` and `id`, `createdAt` (oldest first) by default.
+  type list_policies_options = { ?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options }
+  type request_only_options = { ?request_options: request_options }
   type policy_id_options = { policy_id: String, ?request_options: request_options }
   # Send `settings` (defining every category) with a `name`, or `preset_id` to copy the latest
   # release of a built-in preset, named after it unless you give a `name`.
@@ -1037,10 +1049,10 @@ module CalmLens
                                  ?preset_id: policy_preset_id, ?request_options: request_options }
   type update_policy_options = { policy_id: String, revision: Integer, ?name: String, ?description: String,
                                  ?settings: policy_settings_input, ?request_options: request_options }
-  # `reset` restores the pinned preset version (send `preset.version`); `update` moves an unchanged
-  # copy to the latest release (send `preset.latestVersion`).
-  type apply_policy_preset_options = { policy_id: String, operation: "reset" | "update", revision: Integer,
-                                       preset_version: Integer, ?request_options: request_options }
+  # `reset` restores the pinned release (send `preset.version`); `upgrade` moves an unchanged
+  # `pinned` or `copy` policy to the latest release (send `preset.latestVersion`).
+  type restore_policy_options = { policy_id: String, revision: Integer, preset_version: Integer,
+                                  ?request_options: request_options }
   type set_policy_automatic_updates_options = { policy_id: String, enabled: bool, revision: Integer,
                                                 preset_version: Integer, ?request_options: request_options }
   type assign_policy_options = { policy_id: String, ?request_options: request_options }
@@ -1057,7 +1069,20 @@ module CalmLens
     type: lens_type,
     active: bool,
     ?description: String?,
-    ?version: Integer,
+    ?transform: image_transform_options_input?,
+    ?request_options: request_options
+  }
+  # `sort` is `createdAt` and `id`, `-createdAt` (newest first) by default.
+  type list_lenses_options = { ?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options }
+  type lens_id_options = { lens_id: String, ?request_options: request_options }
+  # The identifier must be new to the project.
+  type create_lens_options = ensure_lens_options
+  type update_lens_options = {
+    lens_id: String,
+    ?name: String,
+    ?description: String?,
+    ?type: lens_type,
+    ?active: bool,
     ?transform: image_transform_options_input?,
     ?request_options: request_options
   }

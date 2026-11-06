@@ -37,13 +37,13 @@ module CalmLens
                        :hash_list_entries, keyword_init: true)
 
     # A stateful stand-in for the CalmLens API and CDN. It stores assets and folders, applies
-    # filters and ordering, serves stored bytes, and answers errors with the API's codes, statuses,
+    # filters and sorting, serves stored bytes, and answers errors with the API's codes, statuses,
     # details and body shape, checking requests in the API's order. It moderates through the
     # `moderate` callback rather than classifying content, and does not run transforms or index for
     # semantic search.
     # @api private
     class FakeAPI
-      JSON_QUERY = %w[queue isFinal sizeInBytes totalSizeInBytes partNumber pageSize limit processingOptions metadata
+      JSON_QUERY = %w[wait isFinal sizeInBytes totalSizeInBytes partNumber pageSize processingOptions metadata
                       tags context].freeze
       # Keyword search fields, in the order matches are reported, and where each value sits in the asset.
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
@@ -51,7 +51,7 @@ module CalmLens
                         'content.format' => %w[content format], 'content.extension' => %w[content extension],
                         'classification.moderation.status' => %w[classification moderation status] }.freeze
       MAX_SEARCH_TOKENS = 8
-      MAX_SEARCH_LIMIT = 20
+      MAX_SEARCH_PAGE_SIZE = 20
       MAX_SEARCH_QUERY_LENGTH = 200
       # Every API cursor list returns this many items unless `pageSize` says otherwise.
       DEFAULT_PAGE_SIZE = 50
@@ -91,6 +91,15 @@ module CalmLens
       SPREADSHEET_MIME_TYPES = %w[application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
                                   application/vnd.ms-excel.sheet.macroenabled.12 application/vnd.ms-excel
                                   application/vnd.oasis.opendocument.spreadsheet].freeze
+      # The settings of the mock's presets: every category with its default action (`allow` for
+      # personal information and profanity, `block` otherwise) and no rules. The mock holds no
+      # built-in preset settings, and uploads are never decided by a policy.
+      PRESET_SETTINGS = {
+        'categorySettings' => MockClassification::CATEGORIES.to_h do |category|
+          [category, { 'action' => %w[personal-information profanity].include?(category) ? 'allow' : 'block',
+                       'allowances' => [], 'restrictions' => [] }]
+        end
+      }.freeze
       # The built-in presets the mock knows, by display name.
       PRESET_NAMES = { 'general-community' => 'General', 'children-platform' => 'Kids',
                        'education-support' => 'Learning and support', 'wholesome-community' => 'Teen-safe' }.freeze
@@ -164,7 +173,7 @@ module CalmLens
         item = own_asset(asset_id)
         return unless item
 
-        record_decision(item, decision, nil, nil)
+        record_decision(item, decision, nil, false)
         deep_copy(item)
       end
 
@@ -216,15 +225,13 @@ module CalmLens
 
       # Applies a reviewer's decision like `decideAssetManually` in the API: the status and the review,
       # then (for `purged`) the content removal and its event, then `asset.<decision>`. Either way the
-      # review is the mock API key's, which has no ID. A decision through the API (with
-      # `reviewer_name`) has the API key as its events' actor and names the reviewer in the event;
-      # the test hook's is a reviewer's (a `user`).
-      def record_decision(item, decision, note, reviewer_name)
+      # review is the mock API key's, which has no ID. A decision through the API (`by_api_key`) has
+      # the API key as its events' actor; the test hook's is a reviewer's (a `user`).
+      def record_decision(item, decision, note, by_api_key)
         apply_outcome(item, decision, 'requested')
         review = { 'id' => @create_id.call('rev'), 'decision' => decision, 'note' => note,
                    'decidedBy' => { 'type' => 'api-key', 'id' => nil }, 'reviewedAt' => @now.call, 'applied' => true }
-        actor = reviewer_name ? API_KEY_ACTOR : REVIEWER_ACTOR
-        reviewer_facts = reviewer_name ? [{ 'key' => 'reviewer-name', 'value' => reviewer_name }] : []
+        actor = by_api_key ? API_KEY_ACTOR : REVIEWER_ACTOR
         item['classification']['moderation']['manualReviews'] << review
         lifecycle_event('asset.content-removed', item, actor: actor) if decision == 'purged'
         # Like the event catalog: only allowing and limiting are low severity.
@@ -233,12 +240,11 @@ module CalmLens
                   'actor' => deep_copy(actor),
                   'facts' => [{ 'key' => 'asset-type', 'value' => item['type'] },
                               { 'key' => 'asset-name', 'value' => item['name'], 'url' => "https://calmlens.com/go/asset/#{item['id']}" },
-                              *reviewer_facts, { 'key' => 'note', 'value' => note }])
+                              { 'key' => 'note', 'value' => note }])
       end
 
-      # `POST /assets/:id/decision` as the API validates and applies it. The mock's key is unnamed, so its
-      # event names the reviewer `An API key`. An asset still uploading or processing is
-      # refused with `asset/processing`.
+      # `POST /assets/:id/decision` as the API validates and applies it, with the API key as its
+      # events' actor. An asset still uploading or processing is refused with `asset/processing`.
       def decide_request(item, json)
         decision = json['decision']
         invalid!('validation/invalid-union', 'decision') unless REVIEW_DECISIONS.include?(decision)
@@ -255,7 +261,7 @@ module CalmLens
         fail!(ErrorCodes::ASSET_DECISION_UNCHANGED) if status == decision
         fail!(ErrorCodes::ASSET_CONTENT_PURGED) if status == 'purged' && decision != 'blocked'
 
-        record_decision(item, decision, note, 'An API key')
+        record_decision(item, decision, note, true)
         item
       end
 
@@ -379,6 +385,8 @@ module CalmLens
                when 'folders' then folder(method, parts, json)
                when 'hash-lists' then hash_list(method, parts, query, json)
                when 'hash-list-entries' then remove_hash_list_entry(method, parts)
+               when 'policies' then policies(method, parts, query, json)
+               when 'lenses' then lens(method, parts, json)
                else route_not_found!(method, parts)
                end
         data.is_a?(Response) ? data : respond(200, deep_copy(data))
@@ -393,21 +401,21 @@ module CalmLens
         case [method, parts[2..], upload]
         in ['GET', ['events'], _] then events(query)
         in ['PUT', ['lenses'], _] then lenses(json.fetch('lenses', []))
+        in ['GET', ['lenses'], _] then page(@state.lenses.values, query, JSON.generate(['lenses', @project_id]))
+        in ['POST', ['lenses'], _] then create_lens(json)
         in ['GET', ['folders'], _] then folder_page(query)
         in ['POST', ['folders'], _] then create_folder(json)
         in ['GET', ['hash-lists'], _] then page(project_hash_lists, query, JSON.generate([@project_id]))
         in ['POST', ['hash-lists'], _] then create_hash_list(json)
-        in ['GET', ['policies'], _] then policy_list
-        in ['POST', ['policies'], _] then create_policy(json)
+        in ['GET', ['policy'], _] then show_policy(find_policy(ensure_policies))
         in ['PUT', ['policy'], _] then show_policy(assign_policy(json))
-        in [_, ['policies', String => policy_id, *rest], _] then policy(method, policy_id, rest, json)
         in ['GET', ['assets'], _] then list(query)
         in ['GET', ['assets', 'search'], _] then search(query)
         in ['GET', ['assets', String => asset_id, 'timeline'], _] then timeline(asset_id, query)
         in ['POST', ['assets', 'batch'], _] then batch(json)
         in ['POST', ['signed-asset-urls'], _] then sign_asset_url(json)
-        in ['POST', ['assets'], nil] then create_asset(json, query['queue'] == true, url: json['url'])
-        in ['POST', ['assets'], 'content'] then create_asset(query, query['queue'] == true, data: body)
+        in ['POST', ['assets'], nil] then create_asset(json, query['wait'] == false, url: json['url'])
+        in ['POST', ['assets'], 'content'] then create_asset(query, query['wait'] == false, data: body)
         in ['POST', ['assets'], 'part'] then start_multipart(query, body)
         else route_not_found!(method, parts)
         end
@@ -471,22 +479,19 @@ module CalmLens
       def list(query)
         # Like the API: the query schema is checked before the filter.
         page_query(query)
-        items = project_assets
-        items = items.select { |item| item['folderId'] == query['folderId'] } if query.key?('folderId')
-        page(RSQL.filter(items, query['filter']), query, JSON.generate([@project_id, query['filter'], query['folderId']]))
+        page(RSQL.filter(project_assets, query['filter']), query, JSON.generate([@project_id, query['filter']]))
       end
 
       # Like the API: one keyset page of a parent's child folders, optionally matching `search`, by
-      # `name` ascending unless `ordering` (one entry, `name` or `createdAt`) says otherwise, with an
+      # `name` ascending unless `sort` (one field, `name` or `createdAt`) says otherwise, with an
       # `id` tie-breaker, and the ancestors of the parent and the listed folders. Names compare by
       # code point, so case matters.
       def folder_page(query)
         found = project_folders.select do |f|
           f['parentId'] == query['parentId'] && (!query['search'] || f['name'].downcase.include?(query['search'].downcase))
         end
-        invalid!('validation/too-big', 'ordering') if ordering(query, nil).size > 1
         scope = JSON.generate([@project_id, query['parentId'], query['search']])
-        result = page(found, query, scope, fields: %w[name createdAt], default: { 'field' => 'name', 'direction' => 'asc' })
+        result = page(found, query, scope, fields: %w[name createdAt], max: 1, default: { 'field' => 'name', 'direction' => 'asc' })
         page = result['items']
         ids = ([query['parentId']] + page.map { |f| f['id'] }).compact.uniq
         queue = ids.dup
@@ -536,30 +541,52 @@ module CalmLens
           'excludedTypes' => [] }
       end
 
-      # Saves lenses in order, like the API: an unchanged definition returns the stored lens, a
-      # change needs a greater version, and lenses before a conflict stay saved.
+      # Saves lenses in order, like the API: a new identifier creates a lens, an unchanged
+      # definition returns the stored lens and a changed one updates it in place.
       def lenses(definitions)
         { 'lenses' => definitions.map { |definition| save_lens(definition) } }
       end
 
       def save_lens(definition)
-        now = @now.call
         old = @state.lenses[definition['identifier']]
-        unless old
-          lens = { 'id' => @create_id.call('lens'), 'projectId' => @project_id }.merge(definition)
-          return @state.lenses[definition['identifier']] = lens.merge('createdAt' => now, 'updatedAt' => now)
-        end
+        return new_lens(definition) unless old
 
         same = %w[name type active].all? { |key| old[key] == definition[key] } &&
                old['description'] == definition['description'] && canonical(old['transform']) == canonical(definition['transform'])
-        return old if same && old['version'] == definition['version']
-        if definition['version'].to_i > old['version'].to_i
-          return @state.lenses[old['identifier']] =
-                   old.merge(definition).merge('updatedAt' => now)
-        end
+        return old if same
 
-        fail!(ErrorCodes::LENS_VERSION_CONFLICT, details: { 'currentVersion' => old['version'], 'minimumVersion' => old['version'] + 1,
-                                                            'requestedVersion' => definition['version'] })
+        @state.lenses[old['identifier']] = old.merge(definition).merge('updatedAt' => @now.call)
+      end
+
+      def new_lens(definition)
+        now = @now.call
+        lens = { 'id' => @create_id.call('lens'), 'projectId' => @project_id }.merge(definition)
+        @state.lenses[definition['identifier']] = lens.merge('createdAt' => now, 'updatedAt' => now)
+      end
+
+      # POST /projects/:id/lenses: like the API, the identifier must be new to the project.
+      def create_lens(json)
+        identifier = json['identifier']
+        invalid!('validation/invalid-type', 'identifier') unless identifier.is_a?(String) && !identifier.empty?
+        fail!(ErrorCodes::LENS_IDENTIFIER_TAKEN, details: { 'identifier' => identifier }) if @state.lenses.key?(identifier)
+
+        # Like the API, a new lens is 201 Created.
+        respond(201, deep_copy(new_lens(json)))
+      end
+
+      # GET, PATCH and DELETE /lenses/:id. An update keeps the identifier and changes the rest of
+      # the definition, as ensuring the changed definition would.
+      def lens(method, parts, json)
+        item = @state.lenses.values.find { |lens| lens['id'] == parts[1] && lens['projectId'] == @project_id }
+        fail!(ErrorCodes::LENS_NOT_FOUND) unless item && parts.size == 2
+        case method
+        when 'GET' then item
+        when 'PATCH' then save_lens(item.merge(json.except('identifier', 'id', 'projectId', 'createdAt', 'updatedAt')))
+        when 'DELETE'
+          @state.lenses.delete(item['identifier'])
+          {}
+        else route_not_found!(method, parts)
+        end
       end
 
       def canonical(value)
@@ -576,7 +603,7 @@ module CalmLens
         text = query['query'].to_s.strip
         invalid!('validation/too-small', 'query') if text.empty?
         invalid!('validation/too-big', 'query') if text.length > MAX_SEARCH_QUERY_LENGTH
-        limit = check_range(query.fetch('limit', 10), 'limit', MAX_SEARCH_LIMIT)
+        limit = check_range(query.fetch('pageSize', 10), 'pageSize', MAX_SEARCH_PAGE_SIZE)
         normalized = text.downcase
         tokens = normalized.split(/\s+/).uniq.first(MAX_SEARCH_TOKENS)
         items = project_assets.filter_map do |item|
@@ -631,9 +658,9 @@ module CalmLens
                   'folderId' => options['folderId'], 'uploadPresetId' => options['uploadPresetId'],
                   'createdAt' => now, 'updatedAt' => now, 'name' => options['name'], 'description' => options['description'],
                   'externalId' => options['externalId'], 'externalUrl' => url || options['externalUrl'],
-                  'type' => kind(mime, url), 'metadata' => options['metadata'], 'authorId' => options['authorId'],
+                  'type' => kind(mime, url), 'metadata' => options['metadata'] || [], 'authorId' => options['authorId'],
                   # Like the API, only the posts CalmLens uses are kept, and only while the content is held.
-                  'context' => context.empty? ? nil : { 'items' => context }, 'tags' => options['tags'],
+                  'context' => context.empty? ? nil : { 'items' => context }, 'tags' => options['tags'] || [],
                   'visibility' => options.fetch('visibility', 'private'),
                   **sections(now: now, open: open, keep: keep, format: mime, size: data&.bytesize) }
         @state.assets[asset['id']] = asset
@@ -659,8 +686,13 @@ module CalmLens
           'classification' => { 'status' => open ? 'queued' : 'processing', 'failureReason' => nil, 'updatedAt' => now,
                                 # The mock never reads test inputs.
                                 'completedAt' => nil, 'progress' => nil, 'testInput' => false,
-                                'moderation' => { 'status' => 'pending', 'manualReviews' => [],
-                                                  'flaggedCategories' => [], 'regions' => [], 'timeline' => nil } }
+                                # Like the API, moderation's results are null until it decides, and a
+                                # feature's result is null until it has run.
+                                'moderation' => { 'status' => 'pending', 'manualReviews' => [], 'automatedStatus' => nil,
+                                                  'source' => nil, 'rule' => nil, 'explanationComplete' => nil,
+                                                  'categories' => nil, 'flaggedCategories' => [], 'regions' => [],
+                                                  'raw' => nil, 'timeline' => nil },
+                                'ocr' => nil, 'linkDetection' => nil }
         }
       end
 
@@ -689,7 +721,7 @@ module CalmLens
       end
 
       # In the API's order: a declared total, then a single final part as the whole upload, then the
-      # part itself. The queue mode and declared total are saved with an open upload.
+      # part itself. Whether to wait and the declared total are saved with an open upload.
       def start_multipart(query, data)
         check_upload(query)
         total = query['totalSizeInBytes']
@@ -702,8 +734,8 @@ module CalmLens
         check_part_size(size, final)
         fail!(total_size_error(total, size, false)) if !final && total_size_error(total, size, false)
 
-        asset = create_asset(query, query['queue'] == true, data: data, open: !final)
-        @state.uploads[asset['id']] = { 'queue' => query['queue'] == true, 'total' => total } unless final
+        asset = create_asset(query, query['wait'] == false, data: data, open: !final)
+        @state.uploads[asset['id']] = { 'queue' => query['wait'] == false, 'total' => total } unless final
         asset
       end
 
@@ -739,18 +771,23 @@ module CalmLens
       # Without `moderate`, queued work stays pending until completed, which allows it.
       def default_moderation(trigger, queued) = queued && trigger != 'complete' ? 'pending' : 'allowed'
 
-      # Applies `decision` to `asset` with its report. Like the API for an image with nobody in it, a
-      # decided image reports the person and face detection its upload turned on.
+      # Applies `decision` to `asset` with its report. The mock reads no text, QR codes, people or
+      # faces in an image, so a decided image reports that the features its upload ran found nothing:
+      # OCR and person and face detection when turned on, link detection unless turned off.
       def decided(asset, decision)
         apply_outcome(asset, decision.status, 'policy', decision.report)
         classification = asset['classification']
         return asset unless classification['status'] == 'completed' && asset['type'] == 'image'
 
         processing = @processing_options[asset['id']]
-        features = processing.is_a?(Hash) ? processing['features'] : nil
-        enabled = ->(name) { features.is_a?(Hash) && features[name].is_a?(Hash) && features[name]['enabled'] == true }
+        features = processing.is_a?(Hash) && processing['features'].is_a?(Hash) ? processing['features'] : {}
+        setting = ->(name) { features[name].is_a?(Hash) ? features[name]['enabled'] : nil }
+        classification['ocr'] = { 'status' => 'evaluated', 'textRegions' => [] } if setting.call('ocr') == true
+        unless setting.call('linkDetection') == false
+          classification['linkDetection'] = { 'status' => 'evaluated', 'qrCodes' => [], 'links' => [] }
+        end
         { 'personDetection' => 'people', 'faceDetection' => 'faces' }.each do |feature, list|
-          classification[feature] = { 'status' => 'evaluated', 'stage' => 'beta', list => [] } if enabled.call(feature)
+          classification[feature] = { 'status' => 'evaluated', list => [] } if setting.call(feature) == true
         end
         asset
       end
@@ -1030,7 +1067,8 @@ module CalmLens
         return item unless final
 
         @state.uploads.delete(item['id'])
-        queue = query.key?('queue') ? query['queue'] == true : upload.fetch('queue', false)
+        # `wait=false` queues the final part; without `wait`, the upload's saved choice applies.
+        queue = query.key?('wait') ? query['wait'] == false : upload.fetch('queue', false)
         apply_outcome(item, 'pending')
         upload_completed(item, queue)
       end
@@ -1093,28 +1131,37 @@ module CalmLens
       end
 
       # Policies: the project starts on the organisation's own General preset policy, following
-      # automatic updates. The mock holds no built-in preset settings: a preset's settings are
-      # `{ 'categorySettings' => {} }` at version 1, and uploads are never decided by a policy.
-      def new_policy(name, settings, description: '', automatic_updates: false, preset: nil)
+      # automatic updates (mode `live`). The mock's presets have one release, version 1, with
+      # PRESET_SETTINGS. A stored policy is the API's shape without `projectIds`, with its preset's
+      # `id`, `version` and `own`, whether it follows its preset (`followsPreset`) and its reset
+      # `baseline`.
+      def new_policy(name, settings, description: '', follows_preset: false, preset: nil)
         now = @now.call
         item = { 'id' => @create_id.call('pol'), 'name' => name, 'description' => description, 'settings' => settings,
-                 'revision' => 1, 'automaticUpdates' => automatic_updates, 'preset' => preset,
+                 'revision' => 1, 'followsPreset' => follows_preset, 'preset' => preset,
                  'baseline' => deep_copy(settings), 'createdAt' => now, 'updatedAt' => now }
         @policies[item['id']] = item
       end
 
+      # The project's policy, after creating the organisation's own General policy on first use.
       def ensure_policies
-        return if @project_policy_id
+        return @project_policy_id if @project_policy_id
 
         preset = { 'id' => 'general-community', 'version' => 1, 'own' => true }
-        @project_policy_id = new_policy(PRESET_NAMES['general-community'], { 'categorySettings' => {} },
-                                        automatic_updates: true, preset: preset)['id']
+        @project_policy_id = new_policy(PRESET_NAMES['general-community'], deep_copy(PRESET_SETTINGS),
+                                        follows_preset: true, preset: preset)['id']
       end
 
-      # A stored policy as the API shows it.
+      # A stored policy as the API shows it: an own preset policy is `live` while it follows its
+      # preset and `pinned` otherwise; any other preset policy is a `copy`.
       def show_policy(item)
-        shown = item.except('baseline')
-        shown['preset'] = item['preset'].merge('latestVersion' => 1) if item['preset']
+        shown = item.except('baseline', 'followsPreset')
+        if (preset = item['preset'])
+          mode = if preset['own'] then item['followsPreset'] ? 'live' : 'pinned'
+                 else 'copy'
+                 end
+          shown['preset'] = { 'id' => preset['id'], 'version' => preset['version'], 'latestVersion' => 1, 'mode' => mode }
+        end
         shown.merge('projectIds' => item['id'] == @project_policy_id ? [@project_id] : [])
       end
 
@@ -1123,9 +1170,39 @@ module CalmLens
         @policies[id] || fail!(ErrorCodes::POLICY_NOT_FOUND)
       end
 
-      def policy_list
+      # `/policies` and `/policies/:id[/action]`, the API key's organisation's policies.
+      def policies(method, parts, query, json)
+        _, id, *rest = parts
+        if id.nil?
+          return policy_page(query) if method == 'GET'
+          return create_policy(json) if method == 'POST'
+
+          route_not_found!(method, parts)
+        end
+        policy(method, id, rest, json)
+      end
+
+      # A page of the organisation's policies, oldest first unless `sort` says otherwise.
+      def policy_page(query)
         ensure_policies
-        { 'policies' => @policies.values.map { |item| show_policy(item) }, 'projectPolicyId' => @project_policy_id }
+        page(@policies.values.map { |item| show_policy(item) }, query, JSON.generate(['policies', @project_id]),
+             default: { 'field' => 'createdAt', 'direction' => 'asc' })
+      end
+
+      # Refuses settings the API refuses (MODERATION_POLICY_SETTINGS_SCHEMA): every category, each
+      # with an `action` and its `allowances` and `restrictions` lists, and no other category.
+      def check_policy_settings(settings)
+        categories = settings.is_a?(Hash) ? settings['categorySettings'] : nil
+        invalid!('validation/invalid-type', 'settings.categorySettings') unless categories.is_a?(Hash)
+        MockClassification::CATEGORIES.each do |category|
+          path = "settings.categorySettings.#{category}"
+          value = categories[category]
+          invalid!('validation/invalid-type', path) unless value.is_a?(Hash)
+          %w[allowances restrictions].each { |key| invalid!('validation/invalid-type', "#{path}.#{key}") unless value[key].is_a?(Array) }
+          invalid!('validation/invalid-value', "#{path}.action") unless value['action'].is_a?(String)
+        end
+        unknown = categories.keys.find { |key| !MockClassification::CATEGORIES.include?(key) }
+        invalid!('validation/unknown-field', "settings.categorySettings.#{unknown}") if unknown
       end
 
       def create_policy(json)
@@ -1135,10 +1212,11 @@ module CalmLens
         if settings.nil? == preset_id.nil? || (preset_id && !PRESET_NAMES.key?(preset_id)) || (preset_id.nil? && !named)
           fail!(ErrorCodes::INVALID_VALUE, 'Send settings with a name, or presetId')
         end
+        check_policy_settings(settings) unless preset_id
         description = json['description'].is_a?(String) ? json['description'] : ''
         item = if preset_id
                  origin = { 'id' => preset_id, 'version' => 1, 'own' => false }
-                 new_policy(named ? name.strip : PRESET_NAMES[preset_id], { 'categorySettings' => {} },
+                 new_policy(named ? name.strip : PRESET_NAMES[preset_id], deep_copy(PRESET_SETTINGS),
                             description: description, preset: origin)
                else
                  new_policy(name.strip, settings, description: description)
@@ -1170,26 +1248,29 @@ module CalmLens
           fail!(ErrorCodes::POLICY_IN_USE) if item['id'] == @project_policy_id
           @policies.delete(id)
           {}
-        in ['POST', ['preset']] then apply_policy_preset(item, json)
+        in ['POST', ['reset']] then restore_policy(item, 'reset', json)
+        in ['POST', ['upgrade']] then restore_policy(item, 'upgrade', json)
         in ['PUT', ['automatic-updates']] then set_policy_automatic_updates(item, json)
         else route_not_found!(method, ['policies', id, *rest])
         end
       end
 
       def update_policy(item, json)
+        check_policy_settings(json['settings']) if json.key?('settings')
         values = %w[name description].select { |key| json[key].is_a?(String) }
                                      .to_h { |key| [key, key == 'name' ? json[key].strip : json[key]] }
         values['settings'] = json['settings'] if json.key?('settings')
-        # Saving a policy that follows its preset pins it as a copy.
-        save_policy(item, json['revision'], values.merge('automaticUpdates' => false))
+        # Saving a `live` policy pins it.
+        save_policy(item, json['revision'], values.merge('followsPreset' => false))
       end
 
-      def apply_policy_preset(item, json)
+      # Resets a `pinned` or `copy` policy to its preset release, or upgrades it to the latest.
+      def restore_policy(item, operation, json)
         preset = item['preset']
-        fail!(ErrorCodes::POLICY_NO_PRESET) if preset.nil? || item['automaticUpdates']
+        fail!(ErrorCodes::POLICY_NO_PRESET) if preset.nil? || item['followsPreset']
         fail!(ErrorCodes::POLICY_PRESET_VERSION_CONFLICT) unless json['presetVersion'] == preset['version']
-        # The mock's presets have one release, so an update never has a newer one to apply.
-        fail!(ErrorCodes::POLICY_PRESET_UPDATE_UNAVAILABLE) if json['operation'] == 'update'
+        # The mock's presets have one release, so an upgrade never has a newer one to apply.
+        fail!(ErrorCodes::POLICY_PRESET_UPDATE_UNAVAILABLE) if operation == 'upgrade'
 
         save_policy(item, json['revision'], 'settings' => deep_copy(item['baseline']))
       end
@@ -1197,11 +1278,11 @@ module CalmLens
       def set_policy_automatic_updates(item, json)
         enabled = json['enabled'] == true
         preset = item['preset']
-        fail!(ErrorCodes::POLICY_AUTOMATIC_UPDATES_UNAVAILABLE) if preset.nil? || !preset['own'] || item['automaticUpdates'] == enabled
+        fail!(ErrorCodes::POLICY_AUTOMATIC_UPDATES_UNAVAILABLE) if preset.nil? || !preset['own'] || item['followsPreset'] == enabled
         fail!(ErrorCodes::POLICY_REVISION_CONFLICT) unless json['revision'] == item['revision']
         fail!(ErrorCodes::POLICY_PRESET_VERSION_CONFLICT) unless json['presetVersion'] == 1
 
-        values = { 'automaticUpdates' => enabled }
+        values = { 'followsPreset' => enabled }
         values.merge!('name' => PRESET_NAMES[preset['id']], 'description' => '', 'settings' => deep_copy(item['baseline'])) if enabled
         save_policy(item, json['revision'], values)
       end
@@ -1295,30 +1376,37 @@ module CalmLens
       def timeline(id, query)
         item = own_asset(id)
         fail!(ErrorCodes::ASSET_NOT_FOUND) unless item
-        size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
+        check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
         fail!(ErrorCodes::ASSET_HELD, details: { 'hold' => 'safety' }) if item['content']['safetyHold']
         fail!(ErrorCodes::INVALID_CURSOR) if query.key?('cursor')
 
-        { 'items' => [], 'nextCursor' => nil, 'pageSize' => size, 'hasMore' => false, 'ordering' => [] }
+        { 'items' => [], 'nextCursor' => nil, 'hasMore' => false }
       end
 
-      # The page size and ordering, refused like the API's query schema: each ordering entry's field
-      # and direction are enum values.
-      def page_query(query, fields = %w[createdAt id], default = { 'field' => 'createdAt', 'direction' => 'desc' })
+      # The page size and sort, refused like the API's query schema: `sort` is comma-separated
+      # fields from `fields`, each descending when prefixed with `-`, none repeated and at most `max`
+      # (`validation/invalid-value` at `sort` otherwise). Without one, `default` applies.
+      def page_query(query, fields = %w[createdAt id], default = { 'field' => 'createdAt', 'direction' => 'desc' }, max: 2)
         size = check_range(query.fetch('pageSize', DEFAULT_PAGE_SIZE), 'pageSize', MAX_PAGE_SIZE)
-        ordering = ordering(query, default)
-        ordering.each_with_index do |rule, index|
-          invalid!('validation/invalid-value', "ordering.#{index}.field") unless fields.include?(rule['field'])
-          invalid!('validation/invalid-value', "ordering.#{index}.direction") unless %w[asc desc].include?(rule['direction'])
-        end
-        [size, ordering]
+        [size, query.key?('sort') ? parse_sort(query['sort'], fields, max) : [default.dup]]
       end
 
-      # One keyset page like the API's: ordered by `fields` (`createdAt` descending by default; an `id`
+      def parse_sort(value, fields, max)
+        sort = value.to_s.split(',', -1).map(&:strip).map do |part|
+          field = part.delete_prefix('-')
+          invalid!('validation/invalid-value', 'sort') unless part.match?(/\A-?[A-Za-z][A-Za-z0-9.]*\z/) && fields.include?(field)
+          { 'field' => field, 'direction' => part.start_with?('-') ? 'desc' : 'asc' }
+        end
+        fields_sent = sort.map { |rule| rule['field'] }
+        invalid!('validation/invalid-value', 'sort') if sort.empty? || fields_sent.uniq.size != fields_sent.size || sort.size > max
+        sort
+      end
+
+      # One keyset page like the API's: sorted by `sort` (`createdAt` descending by default; an `id`
       # tie-breaker is added), starting after the cursor's values. The cursor is tied to `scope` (the
-      # filter, folder or parent) and the ordering, so it only continues the query it came from.
-      def page(items, query, scope, fields: %w[createdAt id], default: { 'field' => 'createdAt', 'direction' => 'desc' })
-        size, ordering = page_query(query, fields, default)
+      # filter, folder or parent) and the sort, so it only continues the query it came from.
+      def page(items, query, scope, fields: %w[createdAt id], max: 2, default: { 'field' => 'createdAt', 'direction' => 'desc' })
+        size, ordering = page_query(query, fields, default, max: max)
         ordering << { 'field' => 'id', 'direction' => ordering.first['direction'] } unless ordering.any? { |o| o['field'] == 'id' }
         signature = JSON.generate([scope, ordering])
         sorted = items.sort { |a, b| compare_items(a, b, ordering) }
@@ -1328,12 +1416,8 @@ module CalmLens
         end
         selected = sorted.first(size)
         more = sorted.size > size
-        cursor = if more
-                   [JSON.generate({ 'scope' => signature, 'values' => ordering.map do |o|
-                     selected.last[o['field']]
-                   end })].pack('m0')
-                 end
-        { 'items' => selected, 'pageSize' => size, 'hasMore' => more, 'ordering' => ordering, 'nextCursor' => cursor }
+        cursor = ([JSON.generate({ 'scope' => signature, 'values' => ordering.map { |o| selected.last[o['field']] } })].pack('m0') if more)
+        { 'items' => selected, 'hasMore' => more, 'nextCursor' => cursor }
       end
 
       def cursor_values(cursor, signature, ordering)
@@ -1354,15 +1438,6 @@ module CalmLens
           return rule['direction'] == 'desc' ? result.negative? : result.positive? unless result.zero?
         end
         false
-      end
-
-      def ordering(query, default)
-        entries = query.keys.filter_map { |key| key.match(/\Aordering\[(\d+)\]\[(field|direction)\]\z/) }
-        return [default&.dup].compact if entries.empty?
-
-        entries.group_by { |match| Integer(match[1], 10) }.sort.map do |_, matches|
-          matches.to_h { |match| [match[2], query[match[0]]] }
-        end
       end
 
       def compare_items(left, right, ordering)

@@ -101,6 +101,22 @@ class ContractWebhooksTest < Minitest::Test
   end
   each_case('webhook_asset_sequence', WEBHOOKS['assetSequences']) { |entry| entry['name'] }
 
+  # Each lookup reads the event as received (a Hash) and as a parsed delivery's facts.
+  def replay_event_fact(entry)
+    [entry['event'], CalmLens::WebhookEvent.new(facts: entry['event']['facts'])].each do |event|
+      value = CalmLens.get_event_fact(event, entry['key'])
+      entry['value'].nil? ? assert_nil(value, entry['name']) : assert_equal(entry['value'], value, entry['name'])
+    end
+  end
+  each_case('event_fact', WEBHOOKS['factLookups']) { |entry| entry['name'] }
+
+  def replay_event_facts(entry)
+    [entry['event'], CalmLens::WebhookEvent.new(facts: entry['event']['facts'])].each do |event|
+      assert_equal entry['facts'], CalmLens.get_event_facts(event), entry['name']
+    end
+  end
+  each_case('event_facts', WEBHOOKS['factObjects']) { |entry| entry['name'] }
+
   def replay_webhook_round_trip(entry)
     assert_equal entry['payload'], CalmLens.to_webhook_event_payload(entry['event'])
     assert_equal entry['body'], JSON.generate(entry['payload'])
