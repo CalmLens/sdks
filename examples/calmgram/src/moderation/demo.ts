@@ -169,7 +169,7 @@ const isDemoAssetId = (assetId: string) => /^demo-[0-9a-f-]+$/.test(assetId);
 
 /**
  * Serves allowed and limited photos, and age-restricted ones only with `ageConfirmed`, like the CalmLens
- * CDN's `?ageConfirmed=true` opt-in.
+ * CDN's `ageConfirmed` viewer claim.
  */
 export const readDemoUpload = async (
   kv: KVNamespace,

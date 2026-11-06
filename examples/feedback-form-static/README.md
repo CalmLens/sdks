@@ -27,9 +27,10 @@ const controller = createUploadController({
       description, // The category, message and reply address
       content: { data: file, type: file.type },
     });
-    return { assetId: asset.id, status: asset.status };
+    return { assetId: asset.id, status: asset.classification.moderation?.status };
   },
-  checkStatus: async (assetId) => (await statusClient.assets.retrieve({ assetId })).status,
+  checkStatus: async (assetId) =>
+    (await statusClient.assets.retrieve({ assetId })).classification.moderation?.status,
 });
 uploader.controller = controller;
 

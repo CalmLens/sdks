@@ -1,4 +1,7 @@
-import { getAssetUrl } from "calmlens/app";
+import { CalmLensAppClient } from "calmlens/app";
+
+// Builds public CDN URLs without a request or an API key.
+const calmlens = new CalmLensAppClient({ uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P" });
 
 export function renderAvatar(container, { projectId, assetId, status, name }) {
   const fallback = () => {
@@ -13,9 +16,9 @@ export function renderAvatar(container, { projectId, assetId, status, name }) {
 
   const img = document.createElement("img");
   img.className = "avatar";
-  img.src = getAssetUrl({
+  img.src = calmlens.cdn.getAssetUrl({
     projectId,
-    assetIdentifier: assetId,
+    assetId,
     resource: "rendered",
     lens: "avatar",
   });

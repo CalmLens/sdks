@@ -1,4 +1,4 @@
-// Defines <calmlens-uploader> and <calmlens-media>. In plain HTML, write the element in your
+// Defines <calmlens-uploader> and <calmlens-asset>. In plain HTML, write the element in your
 // markup instead: <calmlens-uploader upload-preset-id="…" token-url="/api/upload-token">.
 import "calmlens/elements";
 

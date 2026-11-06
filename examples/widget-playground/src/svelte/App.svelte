@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { CalmLensMedia, CalmLensUploader } from "calmlens/svelte";
-  import { ACCEPT, GALLERY_SIZES, GALLERY_WIDTHS, MAX_FILE_SIZE, playground } from "../playground";
+  import { CalmLensAsset, type CalmLensUpload, CalmLensUploader } from "calmlens/svelte";
+  import { ACCEPT, fetchAssetUrl, GALLERY_SIZES, GALLERY_WIDTHS, MAX_FILE_SIZE, playground } from "../playground";
 </script>
 
 <section class="panel">
@@ -12,7 +12,7 @@
     accept={ACCEPT}
     maxFileSize={MAX_FILE_SIZE}
     multiple={$playground.multiple}
-    onUploaded={(upload) => playground.addUpload(upload, "Svelte")}
+    onUploaded={(upload: CalmLensUpload) => playground.addUpload(upload, "Svelte")}
   />
 </section>
 <section class="panel">
@@ -23,18 +23,14 @@
   <ul class="gallery">
     {#each $playground.items as item (item.assetId)}
       <li>
-        <CalmLensMedia
-          projectId={$playground.config.projectId}
-          assetId={item.assetId}
-          status={item.status}
+        <CalmLensAsset
+          src={item.src}
+          onExpired={() => fetchAssetUrl(item.assetId)}
           viewerClaims={{ ageConfirmed: $playground.ageConfirmed }}
-          type={item.type}
           alt={item.name}
           aspectRatio={item.aspectRatio}
-          widths={GALLERY_WIDTHS}
-          sizes={GALLERY_SIZES}
-          cdnBaseUrl={$playground.config.cdnBaseUrl}
-          onReveal={playground.reveal}
+          image={{ widths: GALLERY_WIDTHS, sizes: GALLERY_SIZES }}
+          onAgeConfirmRequest={playground.reveal}
         />
         <p class="caption">
           {item.name} <span class="chip" data-status={item.status}>{item.status ?? "submitted"}</span>

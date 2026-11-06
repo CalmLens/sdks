@@ -194,49 +194,51 @@ for (const tab of TABS) {
   });
 }
 
-test("regional blocks use explicit viewer claims and request no media", async ({ page }) => {
+test("a regional refusal follows the CDN's info for the viewer's claims and requests no media", async ({
+  page,
+}) => {
   await open(page, "elements");
-  const requested: string[] = [];
-  page.on("request", (request) => {
-    if (request.url().includes("/assets/project-regional/asset-regional/"))
-      requested.push(request.url());
+  const requested: URL[] = [];
+  // The CDN decides availability for the claims the info request carries: blocked in DE here.
+  await page.route("**/mock-cdn/v1/assets/project-regional/asset-regional/**", (route) => {
+    const url = new URL(route.request().url());
+    requested.push(url);
+    if (!url.pathname.endsWith("/info")) {
+      return route.fulfill({ status: 403, json: { code: "asset/not-available" } });
+    }
+    const claims = JSON.parse(url.searchParams.get("viewerClaims") ?? "{}");
+    return route.fulfill({
+      json: {
+        id: "asset-regional",
+        projectId: "project-regional",
+        type: "image",
+        externalUrl: null,
+        content: { width: 240, height: 160, rendered: null, preview: null, hls: null },
+        availability: claims.region === "DE" ? "unavailable" : "available",
+      },
+    });
   });
   await page.evaluate(() => {
-    const media = document.createElement("calmlens-media") as HTMLElement & {
-      asset: unknown;
+    const asset = document.createElement("calmlens-asset") as HTMLElement & {
       messages: Record<string, string>;
     };
-    media.id = "regional-notice-fixture";
-    media.setAttribute("viewer-claims", JSON.stringify({ region: "DE" }));
-    media.setAttribute("cdn-base-url", `${location.origin}/mock-cdn/v1`);
-    media.messages = { regionalUnavailable: "msg:regional", unavailable: "msg:unavailable" };
-    media.asset = {
-      id: "asset-regional",
-      projectId: "project-regional",
-      classification: {
-        moderation: {
-          status: "allowed",
-          regions: [{ region: "DE", action: "block" }],
-        },
-      },
-    };
-    document.body.append(media);
+    asset.id = "regional-notice-fixture";
+    asset.setAttribute(
+      "src",
+      `${location.origin}/mock-cdn/v1/assets/project-regional/asset-regional`,
+    );
+    asset.setAttribute("viewer-claims", JSON.stringify({ region: "DE" }));
+    asset.setAttribute("alt", "Regional photo");
+    asset.messages = { unavailable: "msg:unavailable" };
+    document.body.append(asset);
   });
   const fixture = page.locator("#regional-notice-fixture");
   await expect(fixture.getByText("msg:unavailable", { exact: true })).toBeVisible();
-  await expect(fixture.getByRole("img")).toHaveCount(0);
-  await fixture.evaluate((node) => {
-    const media = node as HTMLElement & {
-      asset: { classification: { moderation: { status: string } } };
-    };
-    media.asset = {
-      ...media.asset,
-      classification: {
-        moderation: { ...media.asset.classification.moderation, status: "blocked" },
-      },
-    };
+  await expect(fixture.getByRole("img", { name: "Regional photo" })).toHaveCount(0);
+  expect(requested.map((url) => url.pathname)).toEqual([
+    "/mock-cdn/v1/assets/project-regional/asset-regional/info",
+  ]);
+  expect(JSON.parse(requested[0]?.searchParams.get("viewerClaims") ?? "null")).toEqual({
+    region: "DE",
   });
-  await expect(fixture.getByText("msg:unavailable", { exact: true })).toBeVisible();
-  await expect(fixture.getByText("msg:regional", { exact: true })).toHaveCount(0);
-  expect(requested).toEqual([]);
 });

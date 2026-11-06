@@ -1,4 +1,7 @@
-import { getAssetUrl } from "calmlens/app";
+import { CalmLensAppClient } from "calmlens/app";
+
+// Builds public CDN URLs without a request or an API key.
+const calmlens = new CalmLensAppClient({ uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P" });
 
 // aspectRatio is width divided by height, which you store when the image is uploaded.
 export function renderSensitiveImage(
@@ -6,7 +9,7 @@ export function renderSensitiveImage(
   { projectId, assetId, status, ageConfirmed, alt, aspectRatio, onReveal },
 ) {
   const restricted = status === "age-restricted";
-  const asset = { projectId, assetIdentifier: assetId };
+  const asset = { projectId, assetId };
   const figure = document.createElement("figure");
   figure.style.cssText = `aspect-ratio: ${aspectRatio}; margin: 0; position: relative`;
   const img = document.createElement("img");
@@ -15,10 +18,14 @@ export function renderSensitiveImage(
 
   if (!restricted || ageConfirmed) {
     // Claims make the response private and uncacheable: send them only when needed.
-    img.src = getAssetUrl(restricted ? { ...asset, viewerClaims: { ageConfirmed } } : asset);
+    img.src = calmlens.cdn.getAssetUrl({
+      ...asset,
+      resource: "rendered",
+      ...(restricted ? { viewerClaims: { ageConfirmed } } : {}),
+    });
     img.alt = alt;
   } else {
-    img.src = getAssetUrl({ ...asset, resource: "placeholder" });
+    img.src = calmlens.cdn.getAssetUrl({ ...asset, resource: "placeholder" });
     img.alt = "";
     const button = Object.assign(document.createElement("button"), {
       type: "button",

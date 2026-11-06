@@ -1,7 +1,14 @@
 // The web components, as plain HTML would use them (and Angular, Solid or Lit, which use
 // custom elements the same way).
 import "calmlens/elements";
-import { ACCEPT, GALLERY_SIZES, GALLERY_WIDTHS, MAX_FILE_SIZE, playground } from "./playground";
+import {
+  ACCEPT,
+  fetchAssetUrl,
+  GALLERY_SIZES,
+  GALLERY_WIDTHS,
+  MAX_FILE_SIZE,
+  playground,
+} from "./playground";
 
 export const mount = (target: HTMLElement) => {
   const { config } = playground.get();
@@ -30,23 +37,20 @@ export const mount = (target: HTMLElement) => {
     empty.hidden = items.length > 0;
     gallery.replaceChildren(
       ...items.map((item) => {
-        const media = document.createElement("calmlens-media");
+        const media = document.createElement("calmlens-asset");
         const attributes: Record<string, string | undefined> = {
-          "project-id": config.projectId,
-          "asset-id": item.assetId,
-          status: item.status,
-          type: item.type,
+          src: item.src,
           alt: item.name,
           "aspect-ratio": item.aspectRatio?.toString(),
           widths: GALLERY_WIDTHS.join(","),
           sizes: GALLERY_SIZES,
-          "cdn-base-url": config.cdnBaseUrl,
         };
         for (const [name, value] of Object.entries(attributes)) {
           if (value !== undefined) media.setAttribute(name, value);
         }
         media.setAttribute("viewer-claims", JSON.stringify({ ageConfirmed }));
-        media.addEventListener("calmlens-reveal", playground.reveal);
+        media.onExpired = () => fetchAssetUrl(item.assetId);
+        media.addEventListener("calmlens-age-confirm-request", playground.reveal);
         const caption = document.createElement("p");
         caption.className = "caption";
         const chip = Object.assign(document.createElement("span"), {

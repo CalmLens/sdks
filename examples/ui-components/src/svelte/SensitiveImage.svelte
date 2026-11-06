@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { getAssetUrl } from "calmlens/app";
+  import { CalmLensAppClient } from "calmlens/app";
+
+  // Builds public CDN URLs without a request or an API key.
+  const calmlens = new CalmLensAppClient({ uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P" });
 
   type Props = {
     projectId: string;
@@ -14,15 +17,23 @@
   let { projectId, assetId, status, ageConfirmed, alt, aspectRatio, onReveal }: Props = $props();
 
   const restricted = $derived(status === "age-restricted");
-  const asset = $derived({ projectId, assetIdentifier: assetId });
+  const asset = $derived({ projectId, assetId });
+  // Claims make the response private and uncacheable: send them only when needed.
+  const contentUrl = $derived(
+    calmlens.cdn.getAssetUrl({
+      ...asset,
+      resource: "rendered",
+      ...(restricted ? { viewerClaims: { ageConfirmed } } : {}),
+    }),
+  );
+  const placeholderUrl = $derived(calmlens.cdn.getAssetUrl({ ...asset, resource: "placeholder" }));
 </script>
 
 <figure class="sensitive" style:aspect-ratio={aspectRatio}>
   {#if !restricted || ageConfirmed}
-    <!-- Claims make the response private and uncacheable: send them only when needed. -->
-    <img src={getAssetUrl(restricted ? { ...asset, viewerClaims: { ageConfirmed } } : asset)} {alt} />
+    <img src={contentUrl} {alt} />
   {:else}
-    <img src={getAssetUrl({ ...asset, resource: "placeholder" })} alt="" />
+    <img src={placeholderUrl} alt="" />
     <figcaption>Sensitive content <button type="button" onclick={onReveal}>View</button></figcaption>
   {/if}
 </figure>

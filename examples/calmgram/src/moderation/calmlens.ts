@@ -181,7 +181,8 @@ export const createCalmLensProvider = (options: {
     imageUrl(assetId, variant, { ageConfirmed = false } = {}) {
       // Use the unguessable asset ID, not our externalId (post IDs appear in app URLs).
       return client.cdn.getAssetUrl({
-        assetIdentifier: assetId,
+        assetId,
+        resource: "rendered",
         lens: variant === "feed" ? "calmgram-feed" : "calmgram-thumb",
         // The CDN refuses an age-restricted asset's plain URL. `viewerClaims.ageConfirmed=true` opts in,
         // so only build it for viewers this app has decided may see sensitive media.
@@ -192,8 +193,7 @@ export const createCalmLensProvider = (options: {
     placeholderUrl(assetId) {
       // A small blurred PNG rendered from the asset's ThumbHash. The CDN serves it for public
       // assets whatever their moderation status (but never for purged ones).
-      const { cdnBaseUrl, projectId } = client.toJSON();
-      return `${cdnBaseUrl}/assets/${encodeURIComponent(projectId)}/${encodeURIComponent(assetId)}/placeholder`;
+      return client.cdn.getAssetUrl({ assetId, resource: "placeholder" });
     },
 
     async deleteAsset(assetId) {

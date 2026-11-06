@@ -1,4 +1,7 @@
-import { getAssetUrl } from "calmlens/app";
+import { CalmLensAppClient } from "calmlens/app";
+
+// Builds public CDN URLs without a request or an API key.
+const calmlens = new CalmLensAppClient({ uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P" });
 
 type SensitiveImageProps = {
   projectId: string;
@@ -23,19 +26,27 @@ export function SensitiveImage({
   onReveal,
 }: SensitiveImageProps) {
   const restricted = status === "age-restricted";
-  const asset = { projectId, assetIdentifier: assetId };
+  const asset = { projectId, assetId };
   return (
     <figure style={{ aspectRatio, margin: 0, position: "relative" }}>
       {!restricted || ageConfirmed ? (
         <img
           // Claims make the response private and uncacheable: send them only when needed.
-          src={getAssetUrl(restricted ? { ...asset, viewerClaims: { ageConfirmed } } : asset)}
+          src={calmlens.cdn.getAssetUrl({
+            ...asset,
+            resource: "rendered",
+            ...(restricted ? { viewerClaims: { ageConfirmed } } : {}),
+          })}
           alt={alt}
           style={fill}
         />
       ) : (
         <>
-          <img src={getAssetUrl({ ...asset, resource: "placeholder" })} alt="" style={fill} />
+          <img
+            src={calmlens.cdn.getAssetUrl({ ...asset, resource: "placeholder" })}
+            alt=""
+            style={fill}
+          />
           <figcaption
             style={{ position: "absolute", inset: 0, display: "grid", placeContent: "center" }}
           >

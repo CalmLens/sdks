@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { getAssetUrl } from "calmlens/app";
+import { CalmLensAppClient } from "calmlens/app";
 import { computed } from "vue";
+
+// Builds public CDN URLs without a request or an API key.
+const calmlens = new CalmLensAppClient({ uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P" });
 
 const props = defineProps<{
   projectId: string;
@@ -14,12 +17,16 @@ const props = defineProps<{
 const emit = defineEmits<{ reveal: [] }>();
 
 const restricted = computed(() => props.status === "age-restricted");
-const asset = computed(() => ({ projectId: props.projectId, assetIdentifier: props.assetId }));
+const asset = computed(() => ({ projectId: props.projectId, assetId: props.assetId }));
 // Claims make the response private and uncacheable: send them only when needed.
 const contentUrl = computed(() =>
-  getAssetUrl(restricted.value ? { ...asset.value, viewerClaims: { ageConfirmed: props.ageConfirmed } } : asset.value),
+  calmlens.cdn.getAssetUrl({
+    ...asset.value,
+    resource: "rendered",
+    ...(restricted.value ? { viewerClaims: { ageConfirmed: props.ageConfirmed } } : {}),
+  }),
 );
-const placeholderUrl = computed(() => getAssetUrl({ ...asset.value, resource: "placeholder" }));
+const placeholderUrl = computed(() => calmlens.cdn.getAssetUrl({ ...asset.value, resource: "placeholder" }));
 </script>
 
 <template>

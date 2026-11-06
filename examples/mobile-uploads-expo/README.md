@@ -15,8 +15,8 @@ never holds an API key: a tiny token server signs a single-use upload token for 
  2. POST /upload-token  ───────────►  client.uploadTokens.sign({ uploadPresetId, externalId })
                         ◄───────────  { token, expiresAt }   (signed locally, no CalmLens request)
  3. Upload  ── Authorization: Bearer <token> ──►  CalmLens
-            ◄── { id, status: "pending" } ──────
- 4. Check the upload with the same token until the status is no longer "pending"
+            ◄── { id, classification: { status: "queued", moderation: { status: "pending" } } }
+ 4. Check the upload with the same token until the moderation status is no longer "pending"
 ```
 
 - [`server/index.ts`](server/index.ts) holds the API key and returns a new token on
@@ -77,11 +77,14 @@ confirmed it (`ageRangeDeclaration: "confirmed"`) or Google checked it with a ca
 digital ID (`ageRangeSource` `TIER_C` or `TIER_D`). Require that where the law asks for a verified
 age.
 
-This app shows the photo from the phone itself. To show other people's age-restricted uploads
-from the CDN once the check passes, build the URL with `getAssetUrl({ ..., ageConfirmed: true })`;
-the CDN refuses age-restricted assets on plain public URLs. If CalmLens itself must refuse everyone
-your server hasn't approved, have your server return
-[signed URLs](https://calmlens.com/docs/guides/delivering-assets#age-restricted-assets) instead.
+This app shows the photo from the phone itself. To show other people's uploads from the CDN, render
+`CalmLensAsset` from `calmlens/react-native` with the asset URL (`cdn.getAssetUrl({ assetId })`)
+and, once the check passes, `viewerClaims={{ ageConfirmed: true }}`: the CDN refuses
+age-restricted assets without that claim, and the component shows its age notice instead. If
+CalmLens itself must refuse everyone your server hasn't approved, make the assets private and have
+your server return
+[signed asset URLs](https://calmlens.com/docs/guides/delivering-assets#age-restricted-assets)
+from `cdn.signAssetUrl` instead.
 
 The iOS age range needs the `com.apple.developer.declared-age-range` entitlement, which
 [`app.json`](app.json) sets, and a real device signed in to an Apple Account. Simulators may not

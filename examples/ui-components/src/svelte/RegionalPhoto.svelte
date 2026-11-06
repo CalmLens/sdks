@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { Asset } from "calmlens/app";
-  import { CalmLensMedia } from "calmlens/svelte";
+  import { CalmLensAsset } from "calmlens/svelte";
 
-  // Your app supplies optional viewer context to the CDN.
-  let { asset, region, ageConfirmed }: { asset: Asset; region: string; ageConfirmed: boolean } = $props();
+  // Your app supplies optional viewer context to the CDN. src is the asset URL: public, or signed
+  // by your server for a private asset.
+  let { src, region, ageConfirmed }: { src: string; region: string; ageConfirmed: boolean } = $props();
 </script>
 
-<CalmLensMedia {asset} viewerClaims={{ region, ageConfirmed }} alt="Uploaded photo" />
+<CalmLensAsset {src} viewerClaims={{ region, ageConfirmed }} alt="Uploaded photo" />

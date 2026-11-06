@@ -1,5 +1,8 @@
-import { getAssetUrl } from "calmlens/app";
+import { CalmLensAppClient } from "calmlens/app";
 import { useState } from "react";
+
+// Builds public CDN URLs without a request or an API key.
+const calmlens = new CalmLensAppClient({ uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P" });
 
 type AvatarProps = { projectId: string; assetId?: string; status?: string; name: string };
 
@@ -12,9 +15,9 @@ export function Avatar({ projectId, assetId, status, name }: AvatarProps) {
       </span>
     );
   }
-  const src = getAssetUrl({
+  const src = calmlens.cdn.getAssetUrl({
     projectId,
-    assetIdentifier: assetId,
+    assetId,
     resource: "rendered",
     lens: "avatar",
   });

@@ -6,16 +6,16 @@ export type PlaygroundConfig = {
   mode: "mock" | "live";
   projectId: string;
   uploadPresetId: string;
-  /** Set in mock mode, where the dev server answers the upload API and CDN. */
+  /** Set in mock mode, where the dev server answers the upload API. */
   baseUrl?: string;
-  cdnBaseUrl?: string;
 };
 
 export type GalleryItem = {
   assetId: string;
   status?: AssetModerationStatus;
+  /** The asset URL, signed by the playground's server. */
+  src: string;
   name: string;
-  type: "image" | "video" | "audio";
   /** Width divided by height, which a real app stores with the upload. */
   aspectRatio?: number;
   framework: string;
@@ -31,10 +31,19 @@ export type PlaygroundState = {
 
 const response = await fetch("/api/config");
 const config = (await response.json()) as PlaygroundConfig;
-if (config.mode === "mock") {
-  config.baseUrl = new URL("/mock-api/v1", location.origin).href;
-  config.cdnBaseUrl = new URL("/mock-cdn/v1", location.origin).href;
-}
+if (config.mode === "mock") config.baseUrl = new URL("/mock-api/v1", location.origin).href;
+
+/**
+ * The asset's URL, signed by the playground's server with `cdn.signAssetUrl`, as your server
+ * would sign a private asset's for each viewer. `CalmLensAsset` calls it again once it expires.
+ */
+export const fetchAssetUrl = async (assetId: string): Promise<string> => {
+  const response = await fetch(`/api/assets/${encodeURIComponent(assetId)}/url`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error(`The asset URL wasn't signed (${response.status})`);
+  return ((await response.json()) as { url: string }).url;
+};
 
 let state: PlaygroundState = { config, items: [], ageConfirmed: false, multiple: true };
 const listeners = new Set<(state: PlaygroundState) => void>();
@@ -67,8 +76,8 @@ export const playground = {
     const item: GalleryItem = {
       assetId: upload.assetId,
       status: upload.status,
+      src: await fetchAssetUrl(upload.assetId),
       name: upload.file.name,
-      type,
       aspectRatio,
       framework,
     };

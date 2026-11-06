@@ -1,6 +1,13 @@
-import { CalmLensMedia, CalmLensUploader } from "calmlens/react";
+import { CalmLensAsset, CalmLensUploader } from "calmlens/react";
 import { useSyncExternalStore } from "react";
-import { ACCEPT, GALLERY_SIZES, GALLERY_WIDTHS, MAX_FILE_SIZE, playground } from "../playground";
+import {
+  ACCEPT,
+  fetchAssetUrl,
+  GALLERY_SIZES,
+  GALLERY_WIDTHS,
+  MAX_FILE_SIZE,
+  playground,
+} from "../playground";
 
 export function App() {
   const { config, items, ageConfirmed, multiple } = useSyncExternalStore(
@@ -27,18 +34,14 @@ export function App() {
         <ul className="gallery">
           {items.map((item) => (
             <li key={item.assetId}>
-              <CalmLensMedia
-                projectId={config.projectId}
-                assetId={item.assetId}
-                status={item.status}
-                viewerClaims={{ ageConfirmed: ageConfirmed }}
-                type={item.type}
+              <CalmLensAsset
+                src={item.src}
+                onExpired={() => fetchAssetUrl(item.assetId)}
+                viewerClaims={{ ageConfirmed }}
                 alt={item.name}
                 aspectRatio={item.aspectRatio}
-                widths={GALLERY_WIDTHS}
-                sizes={GALLERY_SIZES}
-                cdnBaseUrl={config.cdnBaseUrl}
-                onReveal={playground.reveal}
+                image={{ widths: GALLERY_WIDTHS, sizes: GALLERY_SIZES }}
+                onAgeConfirmRequest={playground.reveal}
               />
               <p className="caption">
                 {item.name}{" "}

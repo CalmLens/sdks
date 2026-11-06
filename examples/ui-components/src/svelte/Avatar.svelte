@@ -1,10 +1,13 @@
 <script lang="ts">
-  import { getAssetUrl } from "calmlens/app";
+  import { CalmLensAppClient } from "calmlens/app";
+
+  // Builds public CDN URLs without a request or an API key.
+  const calmlens = new CalmLensAppClient({ uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P" });
 
   let { projectId, assetId, status, name }: { projectId: string; assetId?: string; status?: string; name: string } = $props();
   let failed = $state(false);
   const src = $derived(
-    assetId ? getAssetUrl({ projectId, assetIdentifier: assetId, resource: "rendered", lens: "avatar" }) : undefined,
+    assetId ? calmlens.cdn.getAssetUrl({ projectId, assetId, resource: "rendered", lens: "avatar" }) : undefined,
   );
 </script>
 

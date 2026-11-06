@@ -1,5 +1,5 @@
-// The playground's server, run inside Vite's dev server. It signs upload tokens and tells the
-// page which project to use. Without CalmLens credentials it also answers the upload API and CDN
+// The playground's server, run inside Vite's dev server. It signs upload tokens and asset URLs,
+// and tells the page which project to use. Without CalmLens credentials it also answers the upload API and CDN
 // with the SDK's mock clients, keeping files in memory, so every component can be tried offline.
 import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -43,7 +43,7 @@ const SAMPLES: Record<string, { path: string; type: string }> = {
 const mockServer = new MockCalmLensServerClient({
   apiKey: createMockApiKey([
     {
-      actions: ["assets:create", "assets:read", "assets:update"],
+      actions: ["assets:create", "assets:read", "assets:update", "assets:download"],
       folderId: null,
       includeSubfolders: true,
     },
@@ -102,11 +102,20 @@ const readSlowly = async (request: IncomingMessage) => {
 };
 
 const answer = (response: ServerResponse, status: number, upload: UploadedAsset) =>
-  json(response, status, {
-    ...upload,
-    status:
-      Date.now() - (uploadedAt.get(upload.id) ?? 0) < MOCK_CHECK_MS ? "pending" : upload.status,
-  });
+  json(
+    response,
+    status,
+    Date.now() - (uploadedAt.get(upload.id) ?? 0) < MOCK_CHECK_MS
+      ? {
+          ...upload,
+          classification: {
+            ...upload.classification,
+            status: "processing",
+            moderation: { status: "pending" },
+          },
+        }
+      : upload,
+  );
 
 const mockApi = async (request: IncomingMessage, response: ServerResponse, url: URL) => {
   const route = url.pathname.match(
@@ -166,20 +175,17 @@ const mockApi = async (request: IncomingMessage, response: ServerResponse, url: 
   }
 };
 
+/** Where the mock's CDN lives: the asset URLs it signs start here. */
+const MOCK_CDN_BASE_URL = mockServer.toJSON().cdnBaseUrl;
+/** Where the page reaches the mock CDN: `/mock-cdn/v1` on this dev server. */
+const PAGE_CDN_PATH = "/mock-cdn/v1";
+
 const mockCdn = async (response: ServerResponse, url: URL) => {
-  const route = url.pathname.match(
-    /^\/mock-cdn\/v1\/assets\/([^/]+)\/([^/]+)\/(original|rendered|placeholder)/,
+  // The mock CDN serves every resource beneath an asset URL, as a browser fetches it, with the
+  // same moderation gate as the real one; it ignores lenses and transforms.
+  const served = await mockServer.fetchCdn(
+    `${MOCK_CDN_BASE_URL}${url.pathname.slice(PAGE_CDN_PATH.length)}${url.search}`,
   );
-  if (!route || route[1] !== MOCK_PROJECT_ID)
-    return json(response, 404, { code: "asset/not-found" });
-  // The mock CDN applies the moderation gate; it ignores lenses and transforms.
-  const served = await mockServer.cdn.serve({
-    assetIdentifier: route[2] ?? "",
-    resource: route[3] as "original" | "rendered" | "placeholder",
-    viewerClaims: url.searchParams.has("viewerClaims")
-      ? JSON.parse(url.searchParams.get("viewerClaims")!)
-      : undefined,
-  });
   response.writeHead(served.status, {
     "Content-Type": served.headers.get("content-type") ?? "application/octet-stream",
     "Cache-Control": "no-store",
@@ -187,16 +193,39 @@ const mockCdn = async (response: ServerResponse, url: URL) => {
   response.end(Buffer.from(await served.arrayBuffer()));
 };
 
+const liveClient = () =>
+  new CalmLensServerClient({
+    apiKey: env.apiKey ?? "",
+    projectId: env.projectId ?? "",
+    baseUrl: env.apiUrl,
+    cdnBaseUrl: env.cdnUrl,
+  });
+
+/**
+ * Signs an asset URL for the gallery with `cdn.signAssetUrl`, which works for public and private
+ * assets alike. `CalmLensAsset` asks for a new one once it expires. A real app checks that the
+ * viewer may see the asset first.
+ */
+const signAssetUrl = async (
+  request: IncomingMessage,
+  response: ServerResponse,
+  assetId: string,
+) => {
+  if (!live) {
+    const { url, expiresAt } = await mockServer.cdn.signAssetUrl({ assetId });
+    // The page reaches the mock CDN through this dev server.
+    const page = `http://${request.headers.host}${PAGE_CDN_PATH}`;
+    return json(response, 200, { url: page + url.slice(MOCK_CDN_BASE_URL.length), expiresAt });
+  }
+  json(response, 200, await liveClient().cdn.signAssetUrl({ assetId }));
+};
+
 const signToken = async (response: ServerResponse) => {
   if (!live) {
     const { token } = await mockServer.uploadTokens.sign({ uploadPresetId: MOCK_PRESET_ID });
     return json(response, 200, { token });
   }
-  const client = new CalmLensServerClient({
-    apiKey: env.apiKey ?? "",
-    projectId: env.projectId ?? "",
-    baseUrl: env.apiUrl,
-  });
+  const client = liveClient();
   // A real app checks the signed-in user here and passes the ID of the record being created as
   // `externalId`; see the upload component guide.
   const { token } = await client.uploadTokens.sign({ uploadPresetId: env.uploadPresetId ?? "" });
@@ -219,11 +248,15 @@ export const playgroundServer = (): Plugin => ({
             mode: live ? "live" : "mock",
             projectId: live ? env.projectId : MOCK_PROJECT_ID,
             uploadPresetId: live ? env.uploadPresetId : MOCK_PRESET_ID,
-            ...(live && { baseUrl: env.apiUrl, cdnBaseUrl: env.cdnUrl }),
+            ...(live && { baseUrl: env.apiUrl }),
           });
         }
         if (url.pathname === "/api/upload-token" && request.method === "POST") {
           return await signToken(response);
+        }
+        const assetUrl = url.pathname.match(/^\/api\/assets\/([^/]+)\/url$/);
+        if (assetUrl && request.method === "POST") {
+          return await signAssetUrl(request, response, decodeURIComponent(assetUrl[1] ?? ""));
         }
         if (url.pathname.startsWith("/samples/")) {
           const sample = SAMPLES[url.pathname.slice("/samples/".length)];

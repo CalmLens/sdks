@@ -28,11 +28,12 @@
 
     let asset = await client.assets.create({ name: file.name, content: { data: file, type: file.type } });
     stage = "checking";
-    for (let delay = 1000; asset.status === "pending" && delay <= 8000; delay *= 2) {
+    const status = () => asset.classification.moderation?.status ?? "pending";
+    for (let delay = 1000; status() === "pending" && delay <= 8000; delay *= 2) {
       await new Promise((resolve) => setTimeout(resolve, delay));
       asset = await client.assets.retrieve({ assetId: asset.id });
     }
-    return { assetId: asset.id, status: asset.status ?? "pending" };
+    return { assetId: asset.id, status: status() };
   }
 
   async function handleChange(event: Event) {

@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { getAssetUrl } from "calmlens/app";
+import { CalmLensAppClient } from "calmlens/app";
 import { computed, ref } from "vue";
+
+// Builds public CDN URLs without a request or an API key.
+const calmlens = new CalmLensAppClient({ uploadPresetId: "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P" });
 
 const props = defineProps<{ projectId: string; assetId?: string; status?: string; name: string }>();
 const failed = ref(false);
 const src = computed(() =>
   props.assetId
-    ? getAssetUrl({ projectId: props.projectId, assetIdentifier: props.assetId, resource: "rendered", lens: "avatar" })
+    ? calmlens.cdn.getAssetUrl({ projectId: props.projectId, assetId: props.assetId, resource: "rendered", lens: "avatar" })
     : undefined,
 );
 </script>

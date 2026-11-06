@@ -1,8 +1,8 @@
 # Widget playground
 
-Try the CalmLens upload widget and media component in React, Vue, Svelte and web components on
+Try the CalmLens upload widget and asset component in React, Vue, Svelte and web components on
 one page. Upload in one library and the shared gallery renders the result with each library's
-media component, so you can compare them side by side.
+`CalmLensAsset`, so you can compare them side by side.
 
 ## Run it
 
@@ -39,8 +39,10 @@ CALMLENS_API_KEY=... CALMLENS_PROJECT_ID=... CALMLENS_UPLOAD_PRESET_ID=... bun r
 ```
 
 Set `CALMLENS_API_URL` and `CALMLENS_CDN_URL` too to use a CalmLens instance other than the hosted
-one. The dev server signs an upload token for each file at `POST /api/upload-token`. A real app checks
-who is asking and passes the ID of the record being created as `externalId`; see
+one. The dev server signs an upload token for each file at `POST /api/upload-token`, and each
+gallery item's asset URL with `cdn.signAssetUrl` at `POST /api/assets/:assetId/url`, so the API key
+needs the share permission. A real app checks who is asking and passes the ID of the record being
+created as `externalId`; see
 [Build an upload component](https://calmlens.com/docs/guides/upload-component).
 
 ## What to look at
@@ -50,8 +52,8 @@ who is asking and passes the ID of the record being created as `externalId`; see
 | [`src/react/App.tsx`](src/react/App.tsx)                     | `calmlens/react`                                                      |
 | [`src/vue/App.vue`](src/vue/App.vue)                         | `calmlens/vue`                                                        |
 | [`src/svelte/App.svelte`](src/svelte/App.svelte)             | `calmlens/svelte`                                                     |
-| [`src/elements.ts`](src/elements.ts)                         | `<calmlens-uploader>` and `<calmlens-media>` from `calmlens/elements` |
-| [`server/playground-server.ts`](server/playground-server.ts) | Token signing and the mock API and CDN                                |
+| [`src/elements.ts`](src/elements.ts)                         | `<calmlens-uploader>` and `<calmlens-asset>` from `calmlens/elements` |
+| [`server/playground-server.ts`](server/playground-server.ts) | Token and asset URL signing, and the mock API and CDN                 |
 
 "Viewer may see sensitive media" stands in for your app's own age check: off, age-restricted
 images stay behind the blurred placeholder; on, they load with the `ageConfirmed` opt-in.
