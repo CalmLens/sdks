@@ -226,7 +226,7 @@ func (s *AssetsService) ListChildren(ctx context.Context, options ListAssetChild
 	if err != nil {
 		return nil, err
 	}
-	params, err := query(ListAssetsOptions{Cursor: options.Cursor, PageSize: options.PageSize, Ordering: options.Ordering})
+	params, err := query(ListAssetsOptions{Cursor: options.Cursor, PageSize: options.PageSize, Sort: options.Sort})
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,8 @@ func (s *AssetsService) ListChildren(ctx context.Context, options ListAssetChild
 
 // ListTimeline returns one page of an audio or video asset's findings timeline, in time order,
 // from the client's project. Classification.Moderation.Timeline.SegmentCount says how many
-// segments there are. Pass each page's NextCursor back unchanged; cursors are opaque.
+// segments there are. Pass each page's NextCursor back unchanged; cursors are opaque. Use
+// ListTimelineAll to iterate over every page.
 func (s *AssetsService) ListTimeline(ctx context.Context, options ListAssetTimelineOptions) (*AssetTimelinePage, error) {
 	asset, err := resourcePath("assets", options.AssetID, "/timeline")
 	if err != nil {
@@ -260,8 +261,9 @@ func (s *AssetsService) ListTimeline(ctx context.Context, options ListAssetTimel
 	return &result, nil
 }
 
-// List returns one page of child folders, sorted by name unless options.Ordering says
-// otherwise. Pass the page's NextCursor as Cursor for the next page.
+// List returns one page of child folders, sorted by name unless options.Sort says otherwise.
+// Pass the page's NextCursor as Cursor for the next page, or use ListAll to iterate over every
+// page.
 func (s *FoldersService) List(ctx context.Context, options ListFoldersOptions) (*FolderPage, error) {
 	params, err := query(options)
 	if err != nil {
@@ -353,7 +355,8 @@ func (s *TextService) Classify(ctx context.Context, options ClassifyTextOptions)
 // also block close ones.
 type HashListsService struct{ c *ServerClient }
 
-// List returns one page of the project's hash lists, newest first.
+// List returns one page of the project's hash lists, newest first unless options.Sort says
+// otherwise. Use ListAll to iterate over every page.
 func (s *HashListsService) List(ctx context.Context, options ListHashListsOptions) (*HashListPage, error) {
 	params, err := query(options)
 	if err != nil {
@@ -394,13 +397,14 @@ func (s *HashListsService) Delete(ctx context.Context, options HashListIDOptions
 	return s.c.request(ctx, "DELETE", path, nil, nil, nil)
 }
 
-// ListEntries returns one page of a hash list's entries, newest first.
+// ListEntries returns one page of a hash list's entries, newest first unless options.Sort says
+// otherwise. Use ListEntriesAll to iterate over every page.
 func (s *HashListsService) ListEntries(ctx context.Context, options ListHashListEntriesOptions) (*HashListEntryPage, error) {
 	path, err := resourcePath("hash-lists", options.HashListID, "/entries")
 	if err != nil {
 		return nil, err
 	}
-	params, err := query(ListAssetsOptions{Cursor: options.Cursor, PageSize: options.PageSize})
+	params, err := query(ListHashListsOptions{Cursor: options.Cursor, PageSize: options.PageSize, Sort: options.Sort})
 	if err != nil {
 		return nil, err
 	}

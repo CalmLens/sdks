@@ -407,10 +407,10 @@ func TestTimelineFromTheFindingsTimeline(t *testing.T) {
 	pages := map[string]string{
 		"": `{"items":[{"source":"clip","startSeconds":29,"endSeconds":60,"categories":{
 			"hate":{"status":"evaluated","score":0.1,"likelihood":"very-unlikely"},
-			"violence":{"status":"not-evaluated","reason":"unavailable"}}}],"hasMore":true,"nextCursor":"page-2","pageSize":1,"ordering":[]}`,
+			"violence":{"status":"not-evaluated","reason":"unavailable"}}}],"hasMore":true,"nextCursor":"page-2"}`,
 		"page-2": `{"items":[{"source":"clip","startSeconds":0,"endSeconds":30,"categories":{
 			"violence":{"status":"evaluated","score":0.91,"likelihood":"very-likely"},
-			"harassment":{"status":"partial","score":0.45,"likelihood":"possible"}}}],"hasMore":false,"nextCursor":null,"pageSize":1,"ordering":[]}`,
+			"harassment":{"status":"partial","score":0.45,"likelihood":"possible"}}}],"hasMore":false,"nextCursor":null}`,
 	}
 	var mu sync.Mutex
 	cursors := []string{}

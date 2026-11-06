@@ -34,7 +34,7 @@
       "options": {
         "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
         "externalId": "post-42",
-        "expiresInSeconds": 120
+        "expiresIn": 120
       },
       "now": 1700000000000,
       "nonce": "00000000-0000-4000-8000-000000000001",
@@ -60,7 +60,7 @@
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
         "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
-        "expiresInSeconds": 1
+        "expiresIn": 1
       },
       "now": 1700000000000,
       "nonce": "00000000-0000-4000-8000-000000000001",
@@ -85,7 +85,7 @@
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
         "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
-        "expiresInSeconds": 3600
+        "expiresIn": 3600
       },
       "now": 1700000000000,
       "nonce": "00000000-0000-4000-8000-000000000001",
@@ -210,7 +210,7 @@
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
         "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
-        "expiresInSeconds": 0
+        "expiresIn": 0
       },
       "error": "sdk/invalid-argument"
     },
@@ -219,7 +219,7 @@
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
         "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
-        "expiresInSeconds": -1
+        "expiresIn": -1
       },
       "error": "sdk/invalid-argument"
     },
@@ -228,7 +228,7 @@
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
         "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
-        "expiresInSeconds": 3601
+        "expiresIn": 3601
       },
       "error": "sdk/invalid-argument"
     },
@@ -237,7 +237,7 @@
       "apiKey": "clsk_use_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHabcdef",
       "options": {
         "uploadPresetId": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
-        "expiresInSeconds": 1.5
+        "expiresIn": 1.5
       },
       "error": "sdk/invalid-argument"
     },

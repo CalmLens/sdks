@@ -115,8 +115,10 @@ type ServerClient struct {
 	Folders *FoldersService
 	// HashLists manages hash lists of images the project blocks or flags.
 	HashLists *HashListsService
-	// Policies manages the moderation policies of the project's organisation.
+	// Policies manages the moderation policies of the API key's organisation.
 	Policies *PoliciesService
+	// Lenses manages the project's lenses.
+	Lenses *LensesService
 	// Events reads the project event feed.
 	Events *EventsService
 	// CDN builds CDN URLs and fetches content.
@@ -211,6 +213,7 @@ func (c *ServerClient) services() {
 	c.Assets, c.Text = &AssetsService{c}, &TextService{c}
 	c.Folders, c.Events, c.CDN = &FoldersService{c}, &EventsService{c}, &CDNService{c}
 	c.UploadTokens, c.HashLists, c.Policies = &UploadTokensService{c}, &HashListsService{c}, &PoliciesService{c}
+	c.Lenses = &LensesService{c}
 }
 
 // RequestOptions changes the deadlines and retries of the calls made through the client
@@ -319,7 +322,7 @@ func resourcePath(kind, id, suffix string) (string, error) {
 	return "/" + kind + "/" + escaped + suffix, nil
 }
 
-// query encodes options as query parameters, JSON-encoding nested values.
+// query encodes options as query parameters: strings and numbers as text, nested values as JSON.
 func query(values any) (url.Values, error) {
 	b, err := json.Marshal(values)
 	if err != nil {
@@ -339,17 +342,6 @@ func query(values any) (url.Values, error) {
 			result.Set(key, text)
 		} else {
 			result.Set(key, string(raw))
-		}
-	}
-	if raw, ok := fields["ordering"]; ok {
-		var orders []Order
-		if err := json.Unmarshal(raw, &orders); err != nil {
-			return nil, argumentError("Could not encode ordering", err)
-		}
-		result.Del("ordering")
-		for i, order := range orders {
-			result.Set(fmt.Sprintf("ordering[%d][field]", i), order.Field)
-			result.Set(fmt.Sprintf("ordering[%d][direction]", i), order.Direction)
 		}
 	}
 	return result, nil
@@ -609,7 +601,8 @@ func decodeJSON(data []byte, out any) error {
 	return nil
 }
 
-// EnsureLens creates or updates one lens by identifier and returns it. See EnsureLenses.
+// EnsureLens creates a lens, or changes it to this definition, by identifier and returns it.
+// See EnsureLenses.
 func (c *ServerClient) EnsureLens(ctx context.Context, options EnsureLensOptions) (*Lens, error) {
 	lenses, err := c.EnsureLenses(ctx, EnsureLensesOptions{Lenses: []EnsureLensOptions{options}})
 	if err != nil {
@@ -628,9 +621,12 @@ type lensCache struct {
 // EnsureLensesMaxPerRequest is the most lens definitions EnsureLenses sends in one request.
 const EnsureLensesMaxPerRequest = 100
 
-// EnsureLenses creates or updates lenses by identifier. Definitions are cached per client:
-// repeated and concurrent calls with the same definitions are sent once. More than
-// EnsureLensesMaxPerRequest new definitions are sent in consecutive requests, in order.
+// EnsureLenses creates each lens, or changes it to the definition sent, by identifier. An
+// unchanged lens is returned as it is, so applications can send their lenses every time they
+// start. Definitions are cached per client: repeated and concurrent calls with the same
+// definitions are sent once, until Lenses.Create, Lenses.Update or Lenses.Delete changes the
+// lens. More than EnsureLensesMaxPerRequest new definitions are sent in consecutive requests, in
+// order.
 func (c *ServerClient) EnsureLenses(ctx context.Context, options EnsureLensesOptions) ([]Lens, error) {
 	if len(options.Lenses) == 0 {
 		return nil, invalid(CodeSDKInvalidArgument, "At least one lens is required")

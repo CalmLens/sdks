@@ -185,8 +185,8 @@ func readAgain(raw io.Reader, size int64) *source {
 	return nil
 }
 
-// Create submits an asset and queues processing: the result is usually pending. Supply
-// exactly one of Content, Part or URL.
+// Create submits an asset and returns without waiting for its decision (it sends wait=false):
+// the asset is usually ClassificationStatusQueued. Supply exactly one of Content, Part or URL.
 //
 // Content larger than Options.PartSizeBytes whose size is known and that the SDK can read
 // again (Bytes, Base64, or Data that is an io.ReaderAt or io.Seeker with SizeInBytes) is
@@ -194,7 +194,7 @@ func readAgain(raw io.Reader, size int64) *source {
 // retried on its own, and calling again with the same IdempotencyKey (at most 240 characters)
 // resumes an interrupted upload. Streams and text go in one request.
 func (s *AssetsService) Create(ctx context.Context, options SubmitAssetOptions) (*Asset, error) {
-	return s.submit(ctx, options, true)
+	return s.submit(ctx, options, false)
 }
 
 // Classify submits an asset and waits for classification where supported (audio and video
@@ -203,7 +203,7 @@ func (s *AssetsService) Classify(ctx context.Context, options SubmitAssetOptions
 	if options.Content != nil && options.Content.PlainText != nil && strings.TrimSpace(*options.Content.PlainText) == "" {
 		return nil, invalid(CodeInvalidUploadPayload, "Text to classify must be a non-empty string")
 	}
-	return s.submit(ctx, options, false)
+	return s.submit(ctx, options, true)
 }
 
 func idempotencyKey(key string) string {
@@ -213,7 +213,9 @@ func idempotencyKey(key string) string {
 	return key
 }
 
-func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, queue bool) (*Asset, error) {
+// submit uploads an asset; wait says whether the response waits for its decision. A multipart
+// upload saves the choice with its first part.
+func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, wait bool) (*Asset, error) {
 	if options.Name == "" {
 		return nil, invalid(CodeInvalidUploadPayload, "Asset name is required")
 	}
@@ -234,7 +236,7 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	key := idempotencyKey(options.IdempotencyKey)
 	var result Asset
 	if options.URL != "" {
-		err := s.c.send(ctx, call{method: "POST", path: s.c.project("assets"), params: url.Values{"queue": {strconv.FormatBool(queue)}}, body: options, idempotencyKey: key}, &result)
+		err := s.c.send(ctx, call{method: "POST", path: s.c.project("assets"), params: url.Values{"wait": {strconv.FormatBool(wait)}}, body: options, idempotencyKey: key}, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -311,7 +313,7 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	if err != nil {
 		return nil, err
 	}
-	params.Set("queue", strconv.FormatBool(queue))
+	params.Set("wait", strconv.FormatBool(wait))
 	params.Set("contentType", content.Type)
 	if split != nil {
 		return s.submitInParts(ctx, params, content.Type, split, key)
@@ -400,9 +402,9 @@ func partNumber(value any) (int, bool) {
 	return 0, false
 }
 
-// UploadPart sends part 2 or later of a multipart upload. Send parts sequentially. The queue
-// mode chosen when the upload started is saved by CalmLens and applies to the final part
-// unless Queue overrides it.
+// UploadPart sends part 2 or later of a multipart upload. Send parts sequentially. Whether the
+// final part waits for the decision was chosen when the upload started and is saved by CalmLens;
+// Wait overrides it.
 func (s *AssetsService) UploadPart(ctx context.Context, options UploadAssetPartOptions) (*Asset, error) {
 	return s.uploadPart(ctx, options)
 }
@@ -426,8 +428,8 @@ func (s *AssetsService) uploadPart(ctx context.Context, options UploadAssetPartO
 		}
 	}
 	params := url.Values{"partNumber": {strconv.Itoa(part.PartNumber)}, "isFinal": {strconv.FormatBool(part.IsFinal)}, "sizeInBytes": {strconv.FormatInt(*size, 10)}}
-	if options.Queue != nil {
-		params.Set("queue", strconv.FormatBool(*options.Queue))
+	if options.Wait != nil {
+		params.Set("wait", strconv.FormatBool(*options.Wait))
 	}
 	var result Asset
 	err = s.c.send(ctx, call{method: "POST", path: path, params: params, raw: raw, size: *size, headers: http.Header{"X-Calmlens-Upload": {"part"}}, idempotencyKey: idempotencyKey(options.IdempotencyKey), binary: true}, &result)

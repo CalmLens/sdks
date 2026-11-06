@@ -79,8 +79,8 @@ func TestContentLargerThanPartSizeIsSentInPartsWithDerivedKeys(t *testing.T) {
 	equal(t, "isFinal", sentQuery(h, "isFinal"), []string{"false", "false", "true"})
 	equal(t, "sizeInBytes", sentQuery(h, "sizeInBytes"), []string{"5242880", "5242880", "1048576"})
 	equal(t, "totalSizeInBytes", sentQuery(h, "totalSizeInBytes"), []string{"11534336", "", ""})
-	// The queue choice goes with the first part, which saves it for the upload.
-	equal(t, "queue", sentQuery(h, "queue"), []string{"false", "", ""})
+	// Whether to wait goes with the first part, which saves it for the upload.
+	equal(t, "wait", sentQuery(h, "wait"), []string{"true", "", ""})
 	if h.calls[0].Header.Get("X-CalmLens-Upload") != "part" || h.calls[0].Header.Get("Content-Type") != "video/mp4" {
 		t.Fatal(h.calls[0].Header)
 	}

@@ -1922,5 +1922,336 @@
       "lastSequence": 3,
       "newer": true
     }
+  ],
+  "factLookups": [
+    {
+      "name": "a fact with a link",
+      "event": {
+        "id": "event-1",
+        "projectId": "project-1",
+        "type": "asset.blocked",
+        "severity": "high",
+        "title": "Asset blocked",
+        "description": null,
+        "assetId": "asset-1",
+        "assetSequence": 3,
+        "asset": {
+          "id": "asset-1"
+        },
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "photo.jpg",
+            "url": "https://calmlens.com/go/asset/asset-1"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "hate",
+              "violence"
+            ]
+          },
+          {
+            "key": "previous-status",
+            "value": null
+          },
+          {
+            "key": "test",
+            "value": true
+          },
+          {
+            "key": "asset-name",
+            "value": "a repeated key keeps its first value"
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "key": "asset-name",
+      "value": "photo.jpg"
+    },
+    {
+      "name": "a list value",
+      "event": {
+        "id": "event-1",
+        "projectId": "project-1",
+        "type": "asset.blocked",
+        "severity": "high",
+        "title": "Asset blocked",
+        "description": null,
+        "assetId": "asset-1",
+        "assetSequence": 3,
+        "asset": {
+          "id": "asset-1"
+        },
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "photo.jpg",
+            "url": "https://calmlens.com/go/asset/asset-1"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "hate",
+              "violence"
+            ]
+          },
+          {
+            "key": "previous-status",
+            "value": null
+          },
+          {
+            "key": "test",
+            "value": true
+          },
+          {
+            "key": "asset-name",
+            "value": "a repeated key keeps its first value"
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "key": "flagged-categories",
+      "value": [
+        "hate",
+        "violence"
+      ]
+    },
+    {
+      "name": "a null value",
+      "event": {
+        "id": "event-1",
+        "projectId": "project-1",
+        "type": "asset.blocked",
+        "severity": "high",
+        "title": "Asset blocked",
+        "description": null,
+        "assetId": "asset-1",
+        "assetSequence": 3,
+        "asset": {
+          "id": "asset-1"
+        },
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "photo.jpg",
+            "url": "https://calmlens.com/go/asset/asset-1"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "hate",
+              "violence"
+            ]
+          },
+          {
+            "key": "previous-status",
+            "value": null
+          },
+          {
+            "key": "test",
+            "value": true
+          },
+          {
+            "key": "asset-name",
+            "value": "a repeated key keeps its first value"
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "key": "previous-status",
+      "value": null
+    },
+    {
+      "name": "the test fact",
+      "event": {
+        "id": "event-1",
+        "projectId": "project-1",
+        "type": "asset.blocked",
+        "severity": "high",
+        "title": "Asset blocked",
+        "description": null,
+        "assetId": "asset-1",
+        "assetSequence": 3,
+        "asset": {
+          "id": "asset-1"
+        },
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "photo.jpg",
+            "url": "https://calmlens.com/go/asset/asset-1"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "hate",
+              "violence"
+            ]
+          },
+          {
+            "key": "previous-status",
+            "value": null
+          },
+          {
+            "key": "test",
+            "value": true
+          },
+          {
+            "key": "asset-name",
+            "value": "a repeated key keeps its first value"
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "key": "test",
+      "value": true
+    },
+    {
+      "name": "a key the event lacks",
+      "event": {
+        "id": "event-1",
+        "projectId": "project-1",
+        "type": "asset.blocked",
+        "severity": "high",
+        "title": "Asset blocked",
+        "description": null,
+        "assetId": "asset-1",
+        "assetSequence": 3,
+        "asset": {
+          "id": "asset-1"
+        },
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "photo.jpg",
+            "url": "https://calmlens.com/go/asset/asset-1"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "hate",
+              "violence"
+            ]
+          },
+          {
+            "key": "previous-status",
+            "value": null
+          },
+          {
+            "key": "test",
+            "value": true
+          },
+          {
+            "key": "asset-name",
+            "value": "a repeated key keeps its first value"
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "key": "batch-id",
+      "value": null
+    }
+  ],
+  "factObjects": [
+    {
+      "name": "every fact by key",
+      "event": {
+        "id": "event-1",
+        "projectId": "project-1",
+        "type": "asset.blocked",
+        "severity": "high",
+        "title": "Asset blocked",
+        "description": null,
+        "assetId": "asset-1",
+        "assetSequence": 3,
+        "asset": {
+          "id": "asset-1"
+        },
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "facts": [
+          {
+            "key": "asset-name",
+            "value": "photo.jpg",
+            "url": "https://calmlens.com/go/asset/asset-1"
+          },
+          {
+            "key": "flagged-categories",
+            "value": [
+              "hate",
+              "violence"
+            ]
+          },
+          {
+            "key": "previous-status",
+            "value": null
+          },
+          {
+            "key": "test",
+            "value": true
+          },
+          {
+            "key": "asset-name",
+            "value": "a repeated key keeps its first value"
+          }
+        ],
+        "createdAt": 1700000000000
+      },
+      "facts": {
+        "asset-name": "photo.jpg",
+        "flagged-categories": [
+          "hate",
+          "violence"
+        ],
+        "previous-status": null,
+        "test": true
+      }
+    },
+    {
+      "name": "an event without facts",
+      "event": {
+        "id": "event-1",
+        "projectId": "project-1",
+        "type": "asset.blocked",
+        "severity": "high",
+        "title": "Asset blocked",
+        "description": null,
+        "assetId": "asset-1",
+        "assetSequence": 3,
+        "asset": {
+          "id": "asset-1"
+        },
+        "actor": {
+          "type": "automated",
+          "id": null
+        },
+        "facts": [],
+        "createdAt": 1700000000000
+      },
+      "facts": {}
+    }
   ]
 }

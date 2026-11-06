@@ -850,32 +850,24 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 		switch route := strings.Join(parts[2:], "/"); {
 		case route == "events":
 			return []string{"events.list", "events.pages"}
+		case route == "lenses" && method == "GET":
+			return []string{"lenses.list", "lenses.iterate"}
+		case route == "lenses" && method == "POST":
+			return []string{"lenses.create"}
 		case route == "lenses":
 			return []string{"ensureLenses", "ensureLens"}
 		case route == "folders" && method == "GET":
-			return []string{"folders.list"}
+			return []string{"folders.list", "folders.iterate"}
 		case route == "folders":
 			return []string{"folders.create"}
 		case route == "hash-lists" && method == "GET":
-			return []string{"hashLists.list"}
+			return []string{"hashLists.list", "hashLists.iterate"}
 		case route == "hash-lists":
 			return []string{"hashLists.create"}
-		case route == "policies" && method == "GET":
-			return []string{"policies.list"}
-		case route == "policies":
-			return []string{"policies.create"}
+		case route == "policy" && method == "GET":
+			return []string{"policies.retrieveAssigned"}
 		case route == "policy":
 			return []string{"policies.assign"}
-		case parts[2] == "policies" && strings.HasSuffix(route, "/preset"):
-			return []string{"policies.applyPreset"}
-		case parts[2] == "policies" && strings.HasSuffix(route, "/automatic-updates"):
-			return []string{"policies.setAutomaticUpdates"}
-		case parts[2] == "policies" && method == "GET":
-			return []string{"policies.retrieve"}
-		case parts[2] == "policies" && method == "PATCH":
-			return []string{"policies.update"}
-		case parts[2] == "policies":
-			return []string{"policies.delete"}
 		case route == "assets" && method == "GET":
 			return []string{"assets.list", "assets.iterate"}
 		case route == "assets/search":
@@ -885,23 +877,48 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 		case route == "signed-asset-urls":
 			return []string{"cdn.signAssetUrl"}
 		case len(parts) == 5 && parts[2] == "assets" && parts[4] == "timeline":
-			return []string{"assets.listTimeline"}
-		case route == "assets" && q.Get("queue") == "false":
-			return []string{"assets.classify", "text.classify"}
-		case route == "assets":
+			return []string{"assets.listTimeline", "assets.iterateTimeline"}
+		case route == "assets" && q.Get("wait") == "false":
 			return []string{"assets.create"}
+		case route == "assets":
+			return []string{"assets.classify", "text.classify"}
 		}
 		return nil
+	}
+	if parts[0] == "policies" {
+		switch suffix := strings.Join(parts[min(len(parts), 2):], "/"); {
+		case len(parts) == 1 && method == "GET":
+			return []string{"policies.list", "policies.iterate"}
+		case len(parts) == 1:
+			return []string{"policies.create"}
+		case suffix == "reset":
+			return []string{"policies.reset"}
+		case suffix == "upgrade":
+			return []string{"policies.upgrade"}
+		case suffix == "automatic-updates":
+			return []string{"policies.setAutomaticUpdates"}
+		case method == "GET":
+			return []string{"policies.retrieve"}
+		case method == "PATCH":
+			return []string{"policies.update"}
+		}
+		return []string{"policies.delete"}
 	}
 	if len(parts) < 2 {
 		return nil
 	}
 	suffix := strings.Join(parts[2:], "/")
 	switch {
+	case parts[0] == "lenses" && method == "GET":
+		return []string{"lenses.retrieve"}
+	case parts[0] == "lenses" && method == "PATCH":
+		return []string{"lenses.update"}
+	case parts[0] == "lenses":
+		return []string{"lenses.delete"}
 	case parts[0] == "hash-list-entries":
 		return []string{"hashLists.removeEntry"}
 	case parts[0] == "hash-lists" && suffix == "entries" && method == "GET":
-		return []string{"hashLists.listEntries"}
+		return []string{"hashLists.listEntries", "hashLists.iterateEntries"}
 	case parts[0] == "hash-lists" && suffix == "entries":
 		return []string{"hashLists.addEntry"}
 	case parts[0] == "hash-lists" && method == "GET":
@@ -949,14 +966,18 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 var mockOperations = []string{
 	"assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision",
 	"assets.update", "assets.listChildren", "assets.iterateChildren", "assets.listTimeline",
-	"assets.create", "assets.classify", "assets.uploadPart", "assets.move", "assets.retry",
-	"assets.explain", "assets.decide", "assets.removeContent", "assets.delete", "assets.batch",
-	"text.classify", "cdn.serve", "cdn.getAssetInfo", "cdn.signAssetUrl", "events.list", "events.pages", "folders.list", "folders.retrieve",
+	"assets.iterateTimeline", "assets.create", "assets.classify", "assets.uploadPart", "assets.move",
+	"assets.retry", "assets.explain", "assets.decide", "assets.removeContent", "assets.delete",
+	"assets.batch", "text.classify", "cdn.serve", "cdn.getAssetInfo", "cdn.signAssetUrl",
+	"events.list", "events.pages", "folders.list", "folders.iterate", "folders.retrieve",
 	"folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
-	"hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete",
-	"hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "policies.list",
-	"policies.retrieve", "policies.create", "policies.update", "policies.applyPreset",
-	"policies.setAutomaticUpdates", "policies.delete", "policies.assign", "ensureLens", "ensureLenses",
+	"hashLists.iterate", "hashLists.retrieve", "hashLists.create", "hashLists.update",
+	"hashLists.delete", "hashLists.listEntries", "hashLists.iterateEntries", "hashLists.addEntry",
+	"hashLists.removeEntry", "policies.list", "policies.iterate", "policies.retrieve",
+	"policies.create", "policies.update", "policies.reset", "policies.upgrade",
+	"policies.setAutomaticUpdates", "policies.delete", "policies.retrieveAssigned",
+	"policies.assign", "lenses.list", "lenses.iterate", "lenses.create", "lenses.retrieve",
+	"lenses.update", "lenses.delete", "ensureLens", "ensureLenses",
 }
 
 // jsonResponse encodes result, or err as the API's error body and status.
@@ -985,7 +1006,7 @@ func (m *MockServerClient) jsonResponse(req *http.Request, header http.Header, r
 // entry sets its own status.
 func successStatus(operations []string) int {
 	switch {
-	case contains(operations, "folders.create"), contains(operations, "hashLists.create"), contains(operations, "policies.create"):
+	case contains(operations, "folders.create"), contains(operations, "hashLists.create"), contains(operations, "policies.create"), contains(operations, "lenses.create"):
 		return http.StatusCreated
 	case contains(operations, "assets.batch"):
 		return http.StatusAccepted
@@ -1109,7 +1130,7 @@ const (
 	defaultPageSize     = 50
 	maxEventsPageSize   = 100
 	maxPageSize         = 100
-	maxSearchLimit      = 20
+	maxSearchPageSize   = 20
 	maxSearchQuery      = 200
 	maxFolderPageSize   = 100
 	minMultipartPart    = 5 * 1024 * 1024
@@ -1137,6 +1158,9 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 		}
 	}
 	now := m.options.Now()
+	if len(parts) >= 1 && parts[0] == "policies" {
+		return m.policyRoute(method, parts[1:], body, q)
+	}
 	if len(parts) < 2 {
 		return nil, errUnknownRoute
 	}
@@ -1150,6 +1174,12 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 			return m.listEvents(q)
 		case route == "lenses" && method == "PUT":
 			return m.ensureLenses(body, now)
+		case route == "lenses" && method == "GET":
+			return m.listLenses(q)
+		case route == "lenses" && method == "POST":
+			return m.createLens(body, now)
+		case route == "policy":
+			return m.projectPolicyRoute(method, body)
 		case route == "folders" && method == "GET":
 			return m.listFolders(q)
 		case route == "folders" && method == "POST":
@@ -1159,8 +1189,7 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 		case route == "hash-lists" && method == "POST":
 			return m.createHashList(body, now)
 		case route == "assets" && method == "GET":
-			folder, hasFolder := q["folderId"]
-			return m.page(func(a calmlens.JSON) bool { return !hasFolder || a["folderId"] == folder[0] }, q, "assets:"+q.Get("filter")+":"+strings.Join(folder, ""))
+			return m.page(func(calmlens.JSON) bool { return true }, q, "assets:"+q.Get("filter"))
 		case route == "assets/search" && method == "GET":
 			return m.search(q)
 		case route == "assets/batch" && method == "POST":
@@ -1171,8 +1200,6 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 			return m.listTimeline(parts[3], q)
 		case route == "assets" && method == "POST":
 			return m.createAsset(headers.Get("X-CalmLens-Upload"), headers.Get("Content-Type"), body, q, raw, now)
-		case parts[2] == "policies", parts[2] == "policy":
-			return m.policyRoute(method, parts[2:], body)
 		}
 		return nil, errUnknownRoute
 	}
@@ -1188,6 +1215,8 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 		return m.folderRoute(method, id, suffix, body, now)
 	case "hash-lists":
 		return m.hashListRoute(method, id, suffix, body, q, now)
+	case "lenses":
+		return m.lensRoute(method, id, suffix, body, now)
 	case "hash-list-entries":
 		entry := m.DatabaseStorage.HashListEntries[id]
 		if method != "DELETE" || suffix != "" {
@@ -1210,8 +1239,7 @@ func (m *MockServerClient) listTimeline(id string, q url.Values) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
-	if err != nil {
+	if _, err = intRange(q, "pageSize", defaultPageSize, 1, maxPageSize); err != nil {
 		return nil, err
 	}
 	if section(a, "content")["safetyHold"] != nil {
@@ -1220,7 +1248,7 @@ func (m *MockServerClient) listTimeline(id string, q url.Values) (any, error) {
 	if q.Has("cursor") {
 		return nil, fail(calmlens.CodeInvalidCursor)
 	}
-	return calmlens.JSON{"items": []any{}, "nextCursor": nil, "pageSize": size, "hasMore": false, "ordering": []any{}}, nil
+	return calmlens.JSON{"items": []any{}, "nextCursor": nil, "hasMore": false}, nil
 }
 
 // listEvents reads the feed like the API: without cursor, no events and a nextCursor for now;
@@ -1282,55 +1310,124 @@ func sortedUnique(values []string) []string {
 	return slices.Compact(sorted)
 }
 
+// lensFields are the fields of a lens definition.
+var lensFields = []string{"name", "description", "type", "active", "transform"}
+
 // ensureLenses saves each definition in order like the API: a new identifier is created, an
-// unchanged definition returns the stored lens, and a change needs a greater version. Lenses
-// before a conflict stay saved.
+// unchanged definition returns the stored lens, and a changed one is updated in place.
 func (m *MockServerClient) ensureLenses(body calmlens.JSON, now int64) (any, error) {
 	definitions, _ := body["lenses"].([]any)
+	if len(definitions) == 0 {
+		return nil, validation("validation/too-small", "lenses")
+	}
 	result := []calmlens.JSON{}
 	for _, value := range definitions {
 		definition, ok := value.(map[string]any)
 		if !ok {
 			return nil, fail(calmlens.CodeInvalidUploadPayload)
 		}
-		id := text(definition["identifier"])
-		old := m.lenses[id]
+		old := m.lenses[text(definition["identifier"])]
 		if old == nil {
-			lens := calmlens.JSON{"id": m.options.CreateID("lens"), "projectId": m.options.ProjectID, "createdAt": now, "updatedAt": now}
-			for key, item := range definition {
-				lens[key] = item
-			}
-			m.lenses[id] = lens
-			result = append(result, lens)
+			result = append(result, m.saveNewLens(definition, now))
 			continue
 		}
-		same := true
-		for _, key := range []string{"name", "description", "type", "active", "transform", "version"} {
-			a, _ := json.Marshal(old[key])
-			b, _ := json.Marshal(definition[key])
-			same = same && bytes.Equal(a, b)
-		}
-		switch {
-		case same:
-			result = append(result, old)
-		case number(definition["version"]) > number(old["version"]):
-			lens := calmlens.JSON{}
-			for key, item := range old {
-				lens[key] = item
-			}
-			for key, item := range definition {
-				lens[key] = item
-			}
-			lens["updatedAt"] = now
-			m.lenses[id] = lens
-			result = append(result, lens)
-		default:
-			failure := fail(calmlens.CodeLensVersionConflict).(*apiError)
-			failure.details = calmlens.JSON{"currentVersion": old["version"], "minimumVersion": number(old["version"]) + 1, "requestedVersion": definition["version"]}
-			return nil, failure
-		}
+		result = append(result, m.changeLens(old, definition, now))
 	}
 	return calmlens.JSON{"lenses": result}, nil
+}
+
+// saveNewLens stores a lens from definition.
+func (m *MockServerClient) saveNewLens(definition map[string]any, now int64) calmlens.JSON {
+	lens := calmlens.JSON{"id": m.options.CreateID("lens"), "projectId": m.options.ProjectID, "description": nil, "createdAt": now, "updatedAt": now}
+	for key, item := range definition {
+		lens[key] = item
+	}
+	m.lenses[text(lens["identifier"])] = lens
+	return lens
+}
+
+// changeLens returns old unchanged when changes leave its definition as it is, and otherwise
+// stores it with changes applied.
+func (m *MockServerClient) changeLens(old calmlens.JSON, changes map[string]any, now int64) calmlens.JSON {
+	same := true
+	for _, key := range lensFields {
+		if item, ok := changes[key]; ok {
+			a, _ := json.Marshal(old[key])
+			b, _ := json.Marshal(item)
+			same = same && bytes.Equal(a, b)
+		}
+	}
+	if same {
+		return old
+	}
+	lens := calmlens.JSON{}
+	for key, item := range old {
+		lens[key] = item
+	}
+	for _, key := range lensFields {
+		if item, ok := changes[key]; ok {
+			lens[key] = item
+		}
+	}
+	lens["updatedAt"] = now
+	m.lenses[text(lens["identifier"])] = lens
+	return lens
+}
+
+// listLenses pages the project's lenses, newest first unless sort says otherwise.
+func (m *MockServerClient) listLenses(q url.Values) (any, error) {
+	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
+	if err != nil {
+		return nil, err
+	}
+	ordering, err := cursorOrdering(q, sortRule{Field: "createdAt", Direction: sortDescending})
+	if err != nil {
+		return nil, err
+	}
+	items := []calmlens.JSON{}
+	for _, lens := range m.lenses {
+		items = append(items, lens)
+	}
+	return keysetPage(items, ordering, q.Get("cursor"), "lenses", size)
+}
+
+// createLens creates a lens whose identifier is new to the project, like the API.
+func (m *MockServerClient) createLens(body calmlens.JSON, now int64) (any, error) {
+	identifier := text(body["identifier"])
+	if identifier == "" {
+		return nil, validation("validation/invalid-type", "identifier")
+	}
+	if m.lenses[identifier] != nil {
+		failure := fail(calmlens.CodeLensIdentifierTaken).(*apiError)
+		failure.details = calmlens.JSON{"identifier": identifier}
+		return nil, failure
+	}
+	return m.saveNewLens(body, now), nil
+}
+
+// lensRoute answers /lenses/:id: retrieve, update (any definition field but the identifier)
+// and delete.
+func (m *MockServerClient) lensRoute(method, id, suffix string, body calmlens.JSON, now int64) (any, error) {
+	if suffix != "" || method != "GET" && method != "PATCH" && method != "DELETE" {
+		return nil, errUnknownRoute
+	}
+	var lens calmlens.JSON
+	for _, candidate := range m.lenses {
+		if candidate["id"] == id {
+			lens = candidate
+		}
+	}
+	if lens == nil {
+		return nil, fail(calmlens.CodeLensNotFound)
+	}
+	switch method {
+	case "PATCH":
+		return m.changeLens(lens, body, now), nil
+	case "DELETE":
+		delete(m.lenses, text(lens["identifier"]))
+		return calmlens.JSON{}, nil
+	}
+	return lens, nil
 }
 
 // createAsset handles POST .../assets. The X-CalmLens-Upload header picks the mode: absent is
@@ -1390,7 +1487,8 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 			kind = calmlens.AssetTypeMultimediaDocument
 		}
 	}
-	queue := q.Get("queue") == "true"
+	// wait=false queues the asset; a multipart upload saves the choice for its final part.
+	queue := q.Get("wait") == "false"
 	open := multipart && q.Get("isFinal") != "true"
 	var total *int64
 	if multipart {
@@ -1441,6 +1539,13 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 		}
 		return nil
 	}
+	// Like the API, metadata and tags are lists, empty when none were given.
+	orEmpty := func(key string) any {
+		if value := orNull(key); value != nil {
+			return value
+		}
+		return []any{}
+	}
 	processingOptions := orNull("processingOptions")
 	if processingOptions == nil {
 		processingOptions = calmlens.JSON{"keepContentAfterProcessing": false}
@@ -1468,7 +1573,7 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 		"folderId": orNull("folderId"), "uploadPresetId": orNull("uploadPresetId"),
 		"createdAt": now, "updatedAt": now, "name": options["name"],
 		"description": orNull("description"), "externalId": orNull("externalId"), "externalUrl": externalURL,
-		"type": kind, "metadata": orNull("metadata"), "authorId": orNull("authorId"), "context": used, "tags": orNull("tags"),
+		"type": kind, "metadata": orEmpty("metadata"), "authorId": orNull("authorId"), "context": used, "tags": orEmpty("tags"),
 		"visibility": visibility,
 	}
 	m.processingOptions[id] = asJSON(processingOptions)
@@ -1484,7 +1589,12 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
 	// The mock never reads test inputs.
 	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil, "progress": nil,
-		"testInput": false, "moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{}, "flaggedCategories": []any{}, "regions": []any{}, "timeline": nil}}
+		"testInput": false, "moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{},
+			// Like the API, moderation's findings are null until moderation decides.
+			"automatedStatus": nil, "source": nil, "rule": nil, "explanationComplete": nil, "categories": nil, "raw": nil, "linkSafety": nil,
+			"flaggedCategories": []any{}, "regions": []any{}, "timeline": nil},
+		// Like the API, a feature's result is null until it has run.
+		"ocr": nil, "linkDetection": nil}
 	if open {
 		uploadState["status"] = "uploading"
 		uploadState["partsReceived"] = 1
@@ -1609,8 +1719,9 @@ func (m *MockServerClient) decisionFor(a calmlens.JSON, trigger string, queued b
 }
 
 // decide applies a moderation decision to a processing asset, with its report; a pending
-// decision leaves it processing. Like the API for an image with nobody in it, a decided image
-// reports the person and face detection its upload turned on.
+// decision leaves it processing. Like the API for an image with no text, QR codes or people in
+// it, a decided image reports OCR and person and face detection when its upload turned them on,
+// and link detection unless it turned it off.
 func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
 	if decision.status == OutcomePending {
 		return
@@ -1621,11 +1732,17 @@ func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
 		return
 	}
 	features := asJSON(m.processingOptions[a["id"].(string)]["features"])
+	if enabled, _ := asJSON(features["ocr"])["enabled"].(bool); enabled {
+		classification["ocr"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "textRegions": []any{}}
+	}
+	if enabled, set := asJSON(features["linkDetection"])["enabled"].(bool); enabled || !set {
+		classification["linkDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "qrCodes": []any{}, "links": []any{}}
+	}
 	if enabled, _ := asJSON(features["personDetection"])["enabled"].(bool); enabled {
-		classification["personDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "stage": calmlens.FeatureStageBeta, "people": []any{}}
+		classification["personDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "people": []any{}}
 	}
 	if enabled, _ := asJSON(features["faceDetection"])["enabled"].(bool); enabled {
-		classification["faceDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "stage": calmlens.FeatureStageBeta, "faces": []any{}}
+		classification["faceDetection"] = calmlens.JSON{"status": calmlens.ResultEvaluated, "faces": []any{}}
 	}
 }
 
@@ -2052,7 +2169,7 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		}
 		moderation := section(classification, "moderation")
 		if body["rerun"] != true {
-			// Like the API: the evidence is completed and every action stays as decided.
+			// Like the API: the explanation is completed and every action stays as decided.
 			if moderation["explanationComplete"] == false {
 				moderation["explanationComplete"] = true
 				a["updatedAt"] = now
@@ -2131,9 +2248,10 @@ func (m *MockServerClient) uploadPart(a calmlens.JSON, id string, q url.Values, 
 	}
 	// Like the API, a completed upload no longer counts parts.
 	progress["partsReceived"] = nil
+	// Without wait, the choice saved when the upload started applies.
 	queue := state.queue
-	if override := q.Get("queue"); override != "" {
-		queue = override == "true"
+	if override := q.Get("wait"); override != "" {
+		queue = override == "false"
 	}
 	delete(m.uploads, id)
 	m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy, nil)
@@ -2156,22 +2274,12 @@ func (m *MockServerClient) listFolders(q url.Values) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Like the API: one ordering by name (the default, ascending) or createdAt, then the ID in
-	// the same direction. Names compare by code point, so case matters.
-	order := calmlens.Order{Field: "name", Direction: calmlens.OrderAscending}
-	if q.Has("ordering[1][field]") {
-		return nil, validation("validation/too-big", "ordering")
+	// Like the API: a sort of one field, name (the default, ascending) or createdAt, then the ID
+	// in the same direction. Names compare by code point, so case matters.
+	ordering, err := sortOrder(q, []string{"name", "createdAt"}, 1, sortRule{Field: "name", Direction: sortAscending})
+	if err != nil {
+		return nil, err
 	}
-	if q.Has("ordering[0][field]") {
-		order = calmlens.Order{Field: q.Get("ordering[0][field]"), Direction: q.Get("ordering[0][direction]")}
-		if order.Field != "name" && order.Field != "createdAt" {
-			return nil, validation("validation/invalid-value", "ordering.0.field")
-		}
-		if order.Direction != calmlens.OrderAscending && order.Direction != calmlens.OrderDescending {
-			return nil, validation("validation/invalid-value", "ordering.0.direction")
-		}
-	}
-	ordering := []calmlens.Order{order, {Field: "id", Direction: order.Direction}}
 	search := strings.ToLower(strings.TrimSpace(q.Get("search")))
 	folders := []calmlens.JSON{}
 	for _, f := range db.Folders {
@@ -2284,22 +2392,21 @@ func (m *MockServerClient) folderRoute(method, id, suffix string, body calmlens.
 	return f, nil
 }
 
-// pageCursor is the position a page ends at, for the query (scope and ordering) it belongs to.
+// pageCursor is the position a page ends at, for the query (scope and sort) it belongs to.
 type pageCursor struct {
 	Scope  string `json:"scope"`
 	Values []any  `json:"values"`
 }
 
-// page lists project assets accepted by include, applying the RSQL filter, ordering and
-// pagination from the query like the API. A cursor continues only the query (scope and
-// ordering) it came from.
+// page lists project assets accepted by include, applying the RSQL filter, sort and pagination
+// from the query like the API. A cursor continues only the query (scope and sort) it came from.
 func (m *MockServerClient) page(include func(calmlens.JSON) bool, q url.Values, scope string) (any, error) {
-	// Like the API: the query schema (page size, ordering) first, then the filter.
+	// Like the API: the query schema (page size, sort) first, then the filter.
 	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
 	if err != nil {
 		return nil, err
 	}
-	ordering, err := cursorOrdering(q)
+	ordering, err := cursorOrdering(q, sortRule{Field: "createdAt", Direction: sortDescending})
 	if err != nil {
 		return nil, err
 	}
@@ -2318,30 +2425,58 @@ func (m *MockServerClient) page(include func(calmlens.JSON) bool, q url.Values, 
 	return keysetPage(items, ordering, q.Get("cursor"), scope, size)
 }
 
-// cursorOrdering reads a cursor list's ordering by createdAt or id, newest first by default,
-// with the id tie-breaker added like the API.
-func cursorOrdering(q url.Values) ([]calmlens.Order, error) {
-	ordering := []calmlens.Order{}
-	for i := 0; q.Has(fmt.Sprintf("ordering[%d][field]", i)); i++ {
-		order := calmlens.Order{Field: q.Get(fmt.Sprintf("ordering[%d][field]", i)), Direction: q.Get(fmt.Sprintf("ordering[%d][direction]", i))}
-		if order.Field != "createdAt" && order.Field != "id" {
-			return nil, validation("validation/invalid-value", fmt.Sprintf("ordering.%d.field", i))
+// Sort directions of sortRule.
+const (
+	sortAscending  = "asc"
+	sortDescending = "desc"
+)
+
+// sortRule is one field of a list's sort and its direction.
+type sortRule struct {
+	Field     string `json:"field"`
+	Direction string `json:"direction"`
+}
+
+// sortPart is one field of a sort query value, as the API's sortQueryField reads it: a field
+// name, descending when prefixed with "-".
+var sortPart = regexp.MustCompile(`^-?[A-Za-z][A-Za-z0-9.]*$`)
+
+// sortOrder reads a list's sort query value like the API: comma-separated fields from fields,
+// each descending when prefixed with "-", none repeated and at most max, refused with
+// validation/invalid-value at "sort". Without a sort, fallback applies. The id tie-breaker is
+// added in the first field's direction.
+func sortOrder(q url.Values, fields []string, max int, fallback sortRule) ([]sortRule, error) {
+	ordering := []sortRule{}
+	if q.Has("sort") {
+		for _, part := range strings.Split(q.Get("sort"), ",") {
+			part = strings.TrimSpace(part)
+			field := strings.TrimPrefix(part, "-")
+			if !sortPart.MatchString(part) || !contains(fields, field) || slices.ContainsFunc(ordering, func(rule sortRule) bool { return rule.Field == field }) {
+				return nil, validation("validation/invalid-value", "sort")
+			}
+			direction := sortAscending
+			if strings.HasPrefix(part, "-") {
+				direction = sortDescending
+			}
+			ordering = append(ordering, sortRule{Field: field, Direction: direction})
 		}
-		if order.Direction != calmlens.OrderAscending && order.Direction != calmlens.OrderDescending {
-			return nil, validation("validation/invalid-value", fmt.Sprintf("ordering.%d.direction", i))
+		if len(ordering) > max {
+			return nil, validation("validation/invalid-value", "sort")
 		}
-		ordering = append(ordering, order)
-	}
-	if len(ordering) > 2 {
-		return nil, validation("validation/too-big", "ordering")
 	}
 	if len(ordering) == 0 {
-		ordering = append(ordering, calmlens.Order{Field: "createdAt", Direction: calmlens.OrderDescending})
+		ordering = append(ordering, fallback)
 	}
-	if !slices.ContainsFunc(ordering, func(order calmlens.Order) bool { return order.Field == "id" }) {
-		ordering = append(ordering, calmlens.Order{Field: "id", Direction: ordering[0].Direction})
+	if !slices.ContainsFunc(ordering, func(rule sortRule) bool { return rule.Field == "id" }) {
+		ordering = append(ordering, sortRule{Field: "id", Direction: ordering[0].Direction})
 	}
 	return ordering, nil
+}
+
+// cursorOrdering reads a cursor list's sort of at most two fields, createdAt and id, like the
+// API; fallback applies without one.
+func cursorOrdering(q url.Values, fallback sortRule) ([]sortRule, error) {
+	return sortOrder(q, []string{"createdAt", "id"}, 2, fallback)
 }
 
 // compareValues orders two values numerically when both are numbers, otherwise as text.
@@ -2360,17 +2495,17 @@ func compareValues(left any, right string) int {
 	return strings.Compare(fmt.Sprint(left), right)
 }
 
-// keysetPage sorts items by ordering (which ends with the id tie-breaker) and returns the page
+// keysetPage sorts items by the sort ordering (which ends with the id tie-breaker) and returns the page
 // of up to size items after cursor, like the API's cursor lists. A cursor holds the ordering
-// values of the last item it follows and continues only the query (scope and ordering) it came
+// values of the last item it follows and continues only the query (scope and sort) it came
 // from; id and name values are text, the others numbers.
-func keysetPage(items []calmlens.JSON, ordering []calmlens.Order, encoded, scope string, size int) (calmlens.JSON, error) {
+func keysetPage(items []calmlens.JSON, ordering []sortRule, encoded, scope string, size int) (calmlens.JSON, error) {
 	signature, _ := json.Marshal([]any{scope, ordering})
 	compareItems := func(item calmlens.JSON, values []any) int {
 		for i, order := range ordering {
 			result := compareValues(lookup(item, order.Field), fmt.Sprint(values[i]))
 			if result != 0 {
-				if order.Direction == calmlens.OrderDescending {
+				if order.Direction == sortDescending {
 					return -result
 				}
 				return result
@@ -2414,7 +2549,7 @@ func keysetPage(items []calmlens.JSON, ordering []calmlens.Order, encoded, scope
 		raw, _ := json.Marshal(cursor)
 		next = base64.StdEncoding.EncodeToString(raw)
 	}
-	return calmlens.JSON{"items": items[:end], "nextCursor": next, "pageSize": size, "ordering": ordering, "hasMore": end < len(items)}, nil
+	return calmlens.JSON{"items": items[:end], "nextCursor": next, "hasMore": end < len(items)}, nil
 }
 
 // maxSearchTokens is how many distinct query words the API searches for.
@@ -2429,7 +2564,7 @@ var searchFields = []string{"name", "id", "externalId", "description", "tags", "
 // external ID or name first, then prefixes, then name and tag substrings), then newest first.
 // Semantic search is not simulated, so semanticStatus is "disabled".
 func (m *MockServerClient) search(q url.Values) (any, error) {
-	// Like the API's query schema: a trimmed query of 1 to 200 characters, a limit of 1 to 20.
+	// Like the API's query schema: a trimmed query of 1 to 200 characters, 1 to 20 results.
 	queryText := strings.TrimSpace(q.Get("query"))
 	if queryText == "" {
 		return nil, validation("validation/too-small", "query")
@@ -2437,7 +2572,7 @@ func (m *MockServerClient) search(q url.Values) (any, error) {
 	if len([]rune(queryText)) > maxSearchQuery {
 		return nil, validation("validation/too-big", "query")
 	}
-	limit, err := intRange(q, "limit", 10, 1, maxSearchLimit)
+	limit, err := intRange(q, "pageSize", 10, 1, maxSearchPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -2883,14 +3018,13 @@ func newestFirst(items []calmlens.JSON) {
 	})
 }
 
-// listHashLists pages the project's hash lists, newest first unless ordering says otherwise,
-// 10 to a page by default.
+// listHashLists pages the project's hash lists, newest first unless sort says otherwise.
 func (m *MockServerClient) listHashLists(q url.Values) (any, error) {
 	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
 	if err != nil {
 		return nil, err
 	}
-	ordering, err := cursorOrdering(q)
+	ordering, err := cursorOrdering(q, sortRule{Field: "createdAt", Direction: sortDescending})
 	if err != nil {
 		return nil, err
 	}
@@ -2957,10 +3091,13 @@ func (m *MockServerClient) hashListRoute(method, id, suffix string, body calmlen
 	return list, nil
 }
 
-// listHashListEntries pages a list's entries newest first. The cursor is the base64 offset of
-// the next page.
+// listHashListEntries pages a list's entries, newest first unless sort says otherwise.
 func (m *MockServerClient) listHashListEntries(id string, q url.Values) (any, error) {
 	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
+	if err != nil {
+		return nil, err
+	}
+	ordering, err := cursorOrdering(q, sortRule{Field: "createdAt", Direction: sortDescending})
 	if err != nil {
 		return nil, err
 	}
@@ -2970,25 +3107,7 @@ func (m *MockServerClient) listHashListEntries(id string, q url.Values) (any, er
 			entries = append(entries, entry)
 		}
 	}
-	newestFirst(entries)
-	start := 0
-	if encoded := q.Get("cursor"); encoded != "" {
-		raw, err := base64.StdEncoding.DecodeString(encoded)
-		if err == nil {
-			start, err = strconv.Atoi(string(raw))
-		}
-		if err != nil || start < 0 {
-			return nil, fail(calmlens.CodeInvalidCursor)
-		}
-	}
-	start = min(start, len(entries))
-	end := min(start+size, len(entries))
-	var next any
-	if end < len(entries) {
-		next = base64.StdEncoding.EncodeToString([]byte(strconv.Itoa(end)))
-	}
-	ordering := []calmlens.Order{{Field: "createdAt", Direction: calmlens.OrderDescending}, {Field: "id", Direction: calmlens.OrderDescending}}
-	return calmlens.JSON{"items": entries[start:end], "hasMore": end < len(entries), "nextCursor": next, "pageSize": size, "ordering": ordering}, nil
+	return keysetPage(entries, ordering, q.Get("cursor"), "hash-list-entries:"+id, size)
 }
 
 // addHashListEntry adds a hash, or an image asset's perceptual hash, answering 201 for a new

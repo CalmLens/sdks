@@ -172,7 +172,7 @@ func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
 		t.Fatalf("%+v", create)
 	}
 	upload := requests[1]
-	if upload.Path != "/projects/my project/assets" || upload.Header.Get("X-CalmLens-Upload") != "content" || upload.Query.Get("queue") != "true" || upload.Query.Get("folderId") != folder.ID || string(upload.RawBody) != "hi" || upload.Body != nil {
+	if upload.Path != "/projects/my project/assets" || upload.Header.Get("X-CalmLens-Upload") != "content" || upload.Query.Get("wait") != "false" || upload.Query.Get("folderId") != folder.ID || string(upload.RawBody) != "hi" || upload.Body != nil {
 		t.Fatalf("%+v", upload)
 	}
 	if requests[2].Method != "GET" || requests[2].Path != "/assets/"+a.ID || !reflect.DeepEqual(create.Status, calmlens.Ptr(http.StatusCreated)) || !reflect.DeepEqual(requests[2].Status, calmlens.Ptr(http.StatusOK)) {
@@ -285,7 +285,7 @@ func TestMockErrorsUseAPIStatusesAndShape(t *testing.T) {
 	}
 }
 
-func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
+func TestMockListHonoursFilterSortAndFolder(t *testing.T) {
 	now := int64(0)
 	c, _ := NewServerClient(Options{Now: func() int64 { now++; return now }})
 	ctx := context.Background()
@@ -312,20 +312,22 @@ func TestMockListHonoursFilterOrderingAndFolder(t *testing.T) {
 		}
 		return fmt.Sprint(out)
 	}
-	desc := []calmlens.Order{{Field: "createdAt", Direction: calmlens.OrderDescending}}
-	if got := names(calmlens.ListAssetsOptions{Ordering: desc}); got != "[c a b]" {
+	if got := names(calmlens.ListAssetsOptions{Sort: "-createdAt"}); got != "[c a b]" {
 		t.Fatal(got)
 	}
-	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.status==pending"), Ordering: desc}); got != "[c b]" {
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.status==pending"), Sort: "-createdAt"}); got != "[c b]" {
 		t.Fatal(got)
 	}
-	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.status==blocked,name=in=(b,x)"), Ordering: desc}); got != "[a b]" {
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.moderation.status==blocked,name=in=(b,x)"), Sort: "-createdAt"}); got != "[a b]" {
 		t.Fatal(got)
 	}
-	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.status==processing;content.format==text/plain"), Ordering: []calmlens.Order{{Field: "createdAt", Direction: calmlens.OrderAscending}}}); got != "[b a c]" {
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("classification.status==processing;content.format==text/plain"), Sort: "createdAt"}); got != "[b a c]" {
 		t.Fatal(got)
 	}
-	if got := names(calmlens.ListAssetsOptions{FolderID: &folder.ID}); got != "[c a]" {
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("folderId==" + folder.ID)}); got != "[c a]" {
+		t.Fatal(got)
+	}
+	if got := names(calmlens.ListAssetsOptions{Filter: calmlens.Ptr("folderId==null")}); got != "[b]" {
 		t.Fatal(got)
 	}
 }
@@ -820,7 +822,7 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 		code                      string
 		details                   map[string]any
 	}{
-		{"JSON metadata object", "POST", assets, "queue=false", jsonHeader, `{"name":"x","url":"https://example.com","metadata":{"a":1}}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata")},
+		{"JSON metadata object", "POST", assets, "wait=true", jsonHeader, `{"name":"x","url":"https://example.com","metadata":{"a":1}}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata")},
 		{"raw upload metadata item not an object", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`["source"]`), upload("content"), "hello", calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata.0")},
 		{"raw upload metadata id not a string", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":7,"value":1}]`), upload("content"), "hello", calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata.0.id")},
 		{"raw upload metadata without a value", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":"source"}]`), upload("content"), "hello", calmlens.CodeInvalidRequest, issue("validation/invalid-value", "metadata.0.value")},

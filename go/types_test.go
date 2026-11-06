@@ -10,7 +10,7 @@ import (
 
 func TestAssetTypedFieldsDecode(t *testing.T) {
 	var a Asset
-	err := json.Unmarshal([]byte(`{"id":"a","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"policy","updatedAt":1760000000600,"format":"image/png","extension":"png","sizeInBytes":2048,"checksums":{"sha256":"abc","md5":null},"width":640,"height":480,"perceptualHash":"ph","perceptualHashQuality":88,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"hls":{"renditions":[{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]},"preview":{"width":1200,"height":300,"thumbhash":"th","averageColor":"#fff"},"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":1760000000500,"partsReceived":3},"classification":{"status":"completed","updatedAt":1760000000500,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"Fine","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":1760000000700,"applied":true}],"status":"age-restricted","categories":{},"explanationComplete":true,"source":"hash-list","flaggedCategories":[],"automatedStatus":"allowed","regions":[{"region":"DE","status":"blocked","rule":"de-jugendschutz","category":"violence"}],"raw":{"categories":{"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},"sexual-fictional":{"status":"not-evaluated","reason":"not-supported"}}},"hate":{"status":"not-evaluated","reason":"unavailable"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]}},"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}],"completedAt":1760000000700}}`), &a)
+	err := json.Unmarshal([]byte(`{"id":"a","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"policy","updatedAt":1760000000600,"format":"image/png","extension":"png","sizeInBytes":2048,"checksums":{"sha256":"abc","md5":null},"width":640,"height":480,"perceptualHash":"ph","perceptualHashQuality":88,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"hls":{"renditions":[{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]},"preview":{"width":1200,"height":300,"thumbhash":"th","averageColor":"#fff"},"safetyHold":{"placedAt":1760000000000,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":1760000000500,"partsReceived":3},"classification":{"status":"completed","updatedAt":1760000000500,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"Fine","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":1760000000700,"applied":true}],"status":"age-restricted","categories":{},"explanationComplete":true,"source":"hash-list","flaggedCategories":[],"automatedStatus":"allowed","regions":[{"region":"DE","status":"blocked","rule":"de-jugendschutz","category":"violence"}],"raw":{"categories":{"sexual":{"status":"evaluated","score":0.9,"likelihood":"very-likely","qualifiers":{"sexual-nudity":{"status":"evaluated","someScore":0.8,"allScore":0.5,"likelihood":"likely"},"sexual-fictional":{"status":"not-evaluated","reason":"not-supported"}}},"hate":{"status":"not-evaluated","reason":"unavailable"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]}},"linkDetection":{"status":"evaluated","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"ocr":{"status":"evaluated","textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}]},"completedAt":1760000000700}}`), &a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,8 +78,8 @@ func TestAssetTypedFieldsDecode(t *testing.T) {
 	if ai := a.Classification.AIGeneratedDetection; ai.Provenance != "ai-generated" || !reflect.DeepEqual(ai.Signals, []ProvenanceSignal{{Kind: "c2pa", Value: "trainedAlgorithmicMedia"}}) {
 		t.Fatalf("AI-generated detection: %+v", ai)
 	}
-	if regions := a.Classification.TextRegions; !reflect.DeepEqual(regions, []TextRegion{{Box: BoundingBox{Left: 0.5, Top: 0.5, Width: 0.1, Height: 0.1}, PersonalInformation: true}}) {
-		t.Fatalf("text regions: %+v", regions)
+	if ocr := a.Classification.OCR; ocr.Status != ResultEvaluated || !reflect.DeepEqual(ocr.TextRegions, []TextRegion{{Box: BoundingBox{Left: 0.5, Top: 0.5, Width: 0.1, Height: 0.1}, PersonalInformation: true}}) {
+		t.Fatalf("OCR: %+v", ocr)
 	}
 }
 
@@ -223,15 +223,15 @@ func TestImageTransformOptionsDecode(t *testing.T) {
 
 func TestEnsureLensSendsTypedTransform(t *testing.T) {
 	c, h := setup(t)
-	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: LensTypeImage, Active: true, Version: 1,
+	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: LensTypeImage, Active: true,
 		Transform: ImageTransformOptions{Format: ImageFormatAVIF, Width: Ptr(128)}}
-	h.result = JSON{"lenses": []JSON{{"id": "l", "identifier": "thumb", "name": "Thumb", "type": "image", "active": true, "version": 1,
+	h.result = JSON{"lenses": []JSON{{"id": "l", "identifier": "thumb", "name": "Thumb", "type": "image", "active": true,
 		"transform": JSON{"format": "avif", "width": 128}}}}
 	result, err := c.EnsureLens(context.Background(), lens)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"lenses":[{"identifier":"thumb","name":"Thumb","description":null,"type":"image","active":true,"transform":{"format":"avif","width":128},"version":1}]}`
+	want := `{"lenses":[{"identifier":"thumb","name":"Thumb","description":null,"type":"image","active":true,"transform":{"format":"avif","width":128}}]}`
 	if string(h.bodies[0]) != want {
 		t.Fatalf("sent %s", h.bodies[0])
 	}
@@ -398,7 +398,7 @@ func TestEventFactsDecodeAssetDecisionsAndBatchRemovals(t *testing.T) {
 	var page EventsPage
 	err := json.Unmarshal([]byte(`{"items":[
 		{"id":"a","type":"asset.blocked","severity":"high","actor":{"type":"automated","id":null},"facts":[{"key":"asset-name","value":"cat.jpg"},{"key":"flagged-categories","value":["violence"]}]},
-		{"id":"r","type":"asset.allowed","severity":"low","actor":{"type":"api-key","id":"key-1"},"facts":[{"key":"reviewer-name","value":"An API key"},{"key":"note","value":"Fine"}]},
+		{"id":"r","type":"asset.allowed","severity":"low","actor":{"type":"api-key","id":"key-1"},"facts":[{"key":"note","value":"Fine"}]},
 		{"id":"b","type":"asset.content-removed","severity":"low","actor":{"type":"api-key","id":"key-1"},"facts":[{"key":"asset-name","value":"cat.jpg"},{"key":"asset-type","value":"image"},{"key":"batch-id","value":"batch_1"}]}],
 		"nextCursor":"c","hasMore":false}`), &page)
 	if err != nil {
@@ -409,7 +409,7 @@ func TestEventFactsDecodeAssetDecisionsAndBatchRemovals(t *testing.T) {
 		t.Fatalf("automated %+v %+v %v", page.Items[0].Actor, automated, err)
 	}
 	var reviewed AssetDecisionFacts
-	if err = page.Items[1].Facts.Decode(&reviewed); err != nil || page.Items[1].Actor.Type != ActorAPIKey || *page.Items[1].Actor.ID != "key-1" || reviewed.FlaggedCategories != nil || *reviewed.ReviewerName != "An API key" || *reviewed.Note != "Fine" {
+	if err = page.Items[1].Facts.Decode(&reviewed); err != nil || page.Items[1].Actor.Type != ActorAPIKey || *page.Items[1].Actor.ID != "key-1" || reviewed.FlaggedCategories != nil || *reviewed.Note != "Fine" {
 		t.Fatalf("reviewed %+v %+v %v", page.Items[1].Actor, reviewed, err)
 	}
 	var removed AssetRemovedFacts
@@ -423,15 +423,15 @@ func TestEventFactsDecodeAssetDecisionsAndBatchRemovals(t *testing.T) {
 
 func TestReportPolicySnapshotDecode(t *testing.T) {
 	var policy AssetModeration
-	if err := json.Unmarshal([]byte(`{"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","indexes":[1,0]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedStatus":"purged","linkSafety":{"action":"block","links":[{"url":"https://example.com/login","finalUrl":"https://phish.example/","redirects":1,"source":"text","verdict":"phishing","evidence":[]}],"settings":{"verdictActions":{"phishing":"block"}}}}`), &policy); err != nil {
+	if err := json.Unmarshal([]byte(`{"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","indexes":[1,0]},"settings":{"action":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedStatus":"purged","linkSafety":{"action":"block","links":[{"url":"https://example.com/login","finalUrl":"https://phish.example/","redirects":1,"source":"text","verdict":"phishing","evidence":[]}],"settings":{"verdictActions":{"phishing":"block"}}}}`), &policy); err != nil {
 		t.Fatal(err)
 	}
 	category := policy.Categories["violence"]
-	if category.Settings.CategoryAction != "block" || category.Settings.Restrictions[0].Name != "snapshot-rule" {
+	if category.Settings.Action != "block" || category.Settings.Restrictions[0].Name != "snapshot-rule" {
 		t.Fatalf("lost category snapshot: %#v", category)
 	}
 	rule := category.Settings.Restrictions[0]
-	if rule.Match != "all" || !reflect.DeepEqual(rule.Unless, []string{"violence-documentary"}) || !reflect.DeepEqual(category.Source.Indexes, []int{1, 0}) {
+	if !reflect.DeepEqual(rule.Unless, []string{"violence-documentary"}) || !reflect.DeepEqual(category.Source.Indexes, []int{1, 0}) {
 		t.Fatalf("lost condition snapshot: %#v %#v", rule, category.Source)
 	}
 	if links := policy.LinkSafety.Links; len(links) != 1 || links[0].URL != "https://example.com/login" || *links[0].FinalURL != "https://phish.example/" || links[0].Redirects != 1 || links[0].Verdict != LinkVerdictPhishing {

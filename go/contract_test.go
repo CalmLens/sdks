@@ -277,6 +277,17 @@ func TestWebhookContract(t *testing.T) {
 			Headers          map[string]string
 			IsTest           bool
 		}
+		FactLookups []struct {
+			Name  string
+			Event json.RawMessage
+			Key   string
+			Value any
+		}
+		FactObjects []struct {
+			Name  string
+			Event json.RawMessage
+			Facts map[string]any
+		}
 	}](t, "webhooks.json")
 	at := func(now int64) WebhookOption { return WithNow(time.Unix(now, 0)) }
 	for _, f := range fixtures.Parsing {
@@ -408,6 +419,28 @@ func TestWebhookContract(t *testing.T) {
 			}
 		})
 	}
+	for _, fixture := range fixtures.FactLookups {
+		t.Run("reads "+fixture.Name+" with GetEventFact", func(t *testing.T) {
+			var event Event
+			if err := decodeJSON(fixture.Event, &event); err != nil {
+				t.Fatal(err)
+			}
+			if got := plain(t, GetEventFact(&event, fixture.Key)); !reflect.DeepEqual(got, fixture.Value) {
+				t.Fatalf("GetEventFact(%q) = %#v, want %#v", fixture.Key, got, fixture.Value)
+			}
+		})
+	}
+	for _, fixture := range fixtures.FactObjects {
+		t.Run("reads "+fixture.Name+" with GetEventFacts", func(t *testing.T) {
+			var event Event
+			if err := decodeJSON(fixture.Event, &event); err != nil {
+				t.Fatal(err)
+			}
+			if got := plain(t, GetEventFacts(&event)); !reflect.DeepEqual(got, plain(t, fixture.Facts)) {
+				t.Fatalf("GetEventFacts = %#v, want %#v", got, fixture.Facts)
+			}
+		})
+	}
 	for _, fixture := range fixtures.RoundTrips {
 		t.Run("round trip: "+fixture.Name, func(t *testing.T) {
 			var event Event
@@ -516,23 +549,23 @@ func TestRejections(t *testing.T) {
 // ---- upload-tokens.json ---------------------------------------------------------------------
 
 type tokenOptions struct {
-	UploadPresetID   string   `json:"uploadPresetId"`
-	ExternalID       *string  `json:"externalId"`
-	ExpiresInSeconds *float64 `json:"expiresInSeconds"`
+	UploadPresetID string   `json:"uploadPresetId"`
+	ExternalID     *string  `json:"externalId"`
+	ExpiresIn      *float64 `json:"expiresIn"`
 }
 
 // typed converts fixture token options. reason names a lifetime Go's int field cannot express:
 // a fraction, or 0, which means the default lifetime.
 func (o tokenOptions) typed() (options SignUploadTokenOptions, reason string) {
 	options = SignUploadTokenOptions{UploadPresetID: o.UploadPresetID, ExternalID: o.ExternalID}
-	if o.ExpiresInSeconds != nil {
-		switch seconds := *o.ExpiresInSeconds; {
+	if o.ExpiresIn != nil {
+		switch seconds := *o.ExpiresIn; {
 		case seconds != float64(int(seconds)):
-			return options, "SignUploadTokenOptions.ExpiresInSeconds is an int, which cannot hold a fraction"
+			return options, "SignUploadTokenOptions.ExpiresIn is an int, which cannot hold a fraction"
 		case seconds == 0:
-			return options, "SignUploadTokenOptions.ExpiresInSeconds zero means the default lifetime"
+			return options, "SignUploadTokenOptions.ExpiresIn zero means the default lifetime"
 		}
-		options.ExpiresInSeconds = int(*o.ExpiresInSeconds)
+		options.ExpiresIn = int(*o.ExpiresIn)
 	}
 	return options, ""
 }
@@ -619,8 +652,8 @@ func TestUploadTokenContract(t *testing.T) {
 		t.Run("refuses "+c.Name, func(t *testing.T) {
 			options, reason := c.Options.typed()
 			if reason != "" {
-				if options.ExpiresInSeconds != 0 {
-					t.Fatalf("%s, yet the lifetime is %d", reason, options.ExpiresInSeconds)
+				if options.ExpiresIn != 0 {
+					t.Fatalf("%s, yet the lifetime is %d", reason, options.ExpiresIn)
 				}
 				t.Skip(reason)
 			}

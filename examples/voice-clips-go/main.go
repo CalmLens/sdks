@@ -750,7 +750,7 @@ func (a *app) startUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := newKey()
-	signed, err := a.client.UploadTokens.Sign(r.Context(), calmlens.SignUploadTokenOptions{UploadPresetID: a.preset, ExternalID: &key, ExpiresInSeconds: uploadTokenSeconds})
+	signed, err := a.client.UploadTokens.Sign(r.Context(), calmlens.SignUploadTokenOptions{UploadPresetID: a.preset, ExternalID: &key, ExpiresIn: uploadTokenSeconds})
 	if err != nil {
 		log.Printf("Signing an upload token failed: %v", err)
 		http.Error(w, "Could not prepare the upload.", 500)

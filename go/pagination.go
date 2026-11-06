@@ -2,76 +2,193 @@ package calmlens
 
 import "context"
 
-// AssetIterator walks every asset across pages. It fetches pages lazily:
+// Iterator walks every item of a cursor list across pages. It fetches pages lazily, keeps
+// the list's options and follows each page's NextCursor while HasMore is true:
 //
-//	it := client.Assets.ListAll(calmlens.ListAssetsOptions{PageSize: 100})
+//	it := client.Folders.ListAll(calmlens.ListFoldersOptions{PageSize: 100})
 //	for it.Next(ctx) {
-//		asset := it.Asset()
+//		folder := it.Item()
 //	}
 //	if err := it.Err(); err != nil { ... }
 //
 // On Go 1.23 or later, range over All instead:
 //
-//	for asset, err := range client.Assets.ListAll(options).All(ctx) { ... }
+//	for folder, err := range client.Folders.ListAll(options).All(ctx) { ... }
 //
-// An iterator is not safe for concurrent use.
-type AssetIterator struct {
-	fetch func(context.Context, string) (*AssetPage, error)
-	index string
-	page  *AssetPage
-	pos   int
-	err   error
-	done  bool
+// A page that says more follow but repeats a cursor already returned fails with
+// sdk/invalid-response (Details {"cursor"}). An iterator is not safe for concurrent use.
+type Iterator[T any] struct {
+	fetch  func(context.Context, string) ([]T, string, bool, error)
+	cursor string
+	items  []T
+	pos    int
+	err    error
+	done   bool
 	// sent holds the cursors returned so far, so a page that repeats one fails instead of
 	// looping.
 	sent map[string]bool
 }
 
-// ListAll iterates over every asset matching options, starting at options.Cursor.
-func (s *AssetsService) ListAll(options ListAssetsOptions) *AssetIterator {
-	return &AssetIterator{index: options.Cursor, fetch: func(ctx context.Context, index string) (*AssetPage, error) {
-		options.Cursor = index
-		return s.List(ctx, options)
-	}}
+// newIterator starts at cursor; fetch returns a page's items, NextCursor and HasMore.
+func newIterator[T any](cursor string, fetch func(context.Context, string) ([]T, string, bool, error)) *Iterator[T] {
+	return &Iterator[T]{cursor: cursor, fetch: fetch}
 }
 
-// ListChildrenAll iterates over every child of an asset, starting at options.Cursor.
-func (s *AssetsService) ListChildrenAll(options ListAssetChildrenOptions) *AssetIterator {
-	return &AssetIterator{index: options.Cursor, fetch: func(ctx context.Context, index string) (*AssetPage, error) {
-		options.Cursor = index
-		return s.ListChildren(ctx, options)
-	}}
-}
-
-// Next advances to the next asset, fetching the next page when needed. It returns false
-// when there are no more assets or a request failed; check Err afterwards.
-func (it *AssetIterator) Next(ctx context.Context) bool {
+// Next advances to the next item, fetching the next page when needed. It returns false when
+// there are no more items or a request failed; check Err afterwards.
+func (it *Iterator[T]) Next(ctx context.Context) bool {
 	for {
 		if it.err != nil {
 			return false
 		}
-		if it.page != nil && it.pos < len(it.page.Items) {
+		if it.pos < len(it.items) {
 			it.pos++
 			return true
 		}
 		if it.done {
 			return false
 		}
-		page, err := it.fetch(ctx, it.index)
+		items, next, hasMore, err := it.fetch(ctx, it.cursor)
 		if err != nil {
 			it.err = err
 			return false
 		}
-		more := page.NextCursor != "" && page.HasMore && len(page.Items) > 0
+		more := next != "" && hasMore && len(items) > 0
 		if more {
-			if it.err = repeatedCursor(&it.sent, page.NextCursor); it.err != nil {
+			if it.err = repeatedCursor(&it.sent, next); it.err != nil {
 				return false
 			}
 		}
-		it.page, it.pos = page, 0
-		it.index = page.NextCursor
+		it.items, it.pos = items, 0
+		it.cursor = next
 		it.done = !more
 	}
+}
+
+// Item returns the current item. Call it only after Next returned true.
+func (it *Iterator[T]) Item() T { return it.items[it.pos-1] }
+
+// Err returns the error that stopped iteration, if any.
+func (it *Iterator[T]) Err() error { return it.err }
+
+// All returns a range-over-func sequence (Go 1.23+) of items. A failure is yielded once with
+// a zero item and ends the sequence.
+func (it *Iterator[T]) All(ctx context.Context) func(yield func(T, error) bool) {
+	return func(yield func(T, error) bool) {
+		for it.Next(ctx) {
+			if !yield(it.Item(), nil) {
+				return
+			}
+		}
+		if it.err != nil {
+			var zero T
+			yield(zero, it.err)
+		}
+	}
+}
+
+// AssetIterator walks every asset across pages, as Iterator does; Asset returns the current
+// asset and Page the page it came from:
+//
+//	it := client.Assets.ListAll(calmlens.ListAssetsOptions{PageSize: 100})
+//	for it.Next(ctx) {
+//		asset := it.Asset()
+//	}
+//	if err := it.Err(); err != nil { ... }
+type AssetIterator struct {
+	Iterator[Asset]
+	page *AssetPage
+}
+
+func newAssetIterator(cursor string, list func(context.Context, string) (*AssetPage, error)) *AssetIterator {
+	it := &AssetIterator{}
+	it.Iterator = Iterator[Asset]{cursor: cursor, fetch: func(ctx context.Context, cursor string) ([]Asset, string, bool, error) {
+		page, err := list(ctx, cursor)
+		if err != nil {
+			return nil, "", false, err
+		}
+		it.page = page
+		return page.Items, page.NextCursor, page.HasMore, nil
+	}}
+	return it
+}
+
+// ListAll iterates over every asset matching options, starting at options.Cursor.
+func (s *AssetsService) ListAll(options ListAssetsOptions) *AssetIterator {
+	return newAssetIterator(options.Cursor, func(ctx context.Context, cursor string) (*AssetPage, error) {
+		options.Cursor = cursor
+		return s.List(ctx, options)
+	})
+}
+
+// ListChildrenAll iterates over every child of an asset, starting at options.Cursor.
+func (s *AssetsService) ListChildrenAll(options ListAssetChildrenOptions) *AssetIterator {
+	return newAssetIterator(options.Cursor, func(ctx context.Context, cursor string) (*AssetPage, error) {
+		options.Cursor = cursor
+		return s.ListChildren(ctx, options)
+	})
+}
+
+// ListTimelineAll iterates over every segment of an audio or video asset's findings timeline,
+// in time order, starting at options.Cursor.
+func (s *AssetsService) ListTimelineAll(options ListAssetTimelineOptions) *Iterator[MediaClassificationSegment] {
+	return newIterator(options.Cursor, func(ctx context.Context, cursor string) ([]MediaClassificationSegment, string, bool, error) {
+		options.Cursor = cursor
+		page, err := s.ListTimeline(ctx, options)
+		if err != nil {
+			return nil, "", false, err
+		}
+		return page.Items, page.NextCursor, page.HasMore, nil
+	})
+}
+
+// ListAll iterates over every child folder of options.ParentID (or the root), starting at
+// options.Cursor.
+func (s *FoldersService) ListAll(options ListFoldersOptions) *Iterator[Folder] {
+	return newIterator(options.Cursor, func(ctx context.Context, cursor string) ([]Folder, string, bool, error) {
+		options.Cursor = cursor
+		page, err := s.List(ctx, options)
+		if err != nil {
+			return nil, "", false, err
+		}
+		return page.Items, page.NextCursor, page.HasMore, nil
+	})
+}
+
+// ListAll iterates over every hash list of the project, starting at options.Cursor.
+func (s *HashListsService) ListAll(options ListHashListsOptions) *Iterator[HashList] {
+	return newIterator(options.Cursor, func(ctx context.Context, cursor string) ([]HashList, string, bool, error) {
+		options.Cursor = cursor
+		page, err := s.List(ctx, options)
+		if err != nil {
+			return nil, "", false, err
+		}
+		return page.Items, page.NextCursor, page.HasMore, nil
+	})
+}
+
+// ListEntriesAll iterates over every entry of a hash list, starting at options.Cursor.
+func (s *HashListsService) ListEntriesAll(options ListHashListEntriesOptions) *Iterator[HashListEntry] {
+	return newIterator(options.Cursor, func(ctx context.Context, cursor string) ([]HashListEntry, string, bool, error) {
+		options.Cursor = cursor
+		page, err := s.ListEntries(ctx, options)
+		if err != nil {
+			return nil, "", false, err
+		}
+		return page.Items, page.NextCursor, page.HasMore, nil
+	})
+}
+
+// ListAll iterates over every lens of the project, starting at options.Cursor.
+func (s *LensesService) ListAll(options ListLensesOptions) *Iterator[Lens] {
+	return newIterator(options.Cursor, func(ctx context.Context, cursor string) ([]Lens, string, bool, error) {
+		options.Cursor = cursor
+		page, err := s.List(ctx, options)
+		if err != nil {
+			return nil, "", false, err
+		}
+		return page.Items, page.NextCursor, page.HasMore, nil
+	})
 }
 
 // repeatedCursor records cursor in sent and fails with sdk/invalid-response (Details
@@ -88,28 +205,10 @@ func repeatedCursor(sent *map[string]bool, cursor string) error {
 }
 
 // Asset returns the current asset. Call it only after Next returned true.
-func (it *AssetIterator) Asset() Asset { return it.page.Items[it.pos-1] }
+func (it *AssetIterator) Asset() Asset { return it.Item() }
 
 // Page returns the most recently fetched page, or nil before the first fetch.
 func (it *AssetIterator) Page() *AssetPage { return it.page }
-
-// Err returns the error that stopped iteration, if any.
-func (it *AssetIterator) Err() error { return it.err }
-
-// All returns a range-over-func sequence (Go 1.23+) of assets. A failure is yielded once
-// with a zero Asset and ends the sequence.
-func (it *AssetIterator) All(ctx context.Context) func(yield func(Asset, error) bool) {
-	return func(yield func(Asset, error) bool) {
-		for it.Next(ctx) {
-			if !yield(it.Asset(), nil) {
-				return
-			}
-		}
-		if it.err != nil {
-			yield(Asset{}, it.err)
-		}
-	}
-}
 
 // EventIterator follows the event feed cursor until no more events are available.
 //

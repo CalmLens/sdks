@@ -30,8 +30,8 @@ type SignUploadTokenOptions struct {
 	UploadPresetID string
 	// ExternalID becomes the external ID of the uploaded asset when set (must not be empty).
 	ExternalID *string
-	// ExpiresInSeconds is the token's lifetime, from 1 to 3600. Zero means 600.
-	ExpiresInSeconds int
+	// ExpiresIn is the token's lifetime in seconds, from 1 to 3600. Zero means 600.
+	ExpiresIn int
 }
 
 // SignedUploadToken is a signed upload token and when it expires.
@@ -77,12 +77,12 @@ func signUploadToken(apiKey string, options SignUploadTokenOptions, now time.Tim
 	if options.UploadPresetID == "." || options.UploadPresetID == ".." {
 		return nil, invalid(CodeSDKInvalidArgument, `Upload preset ID cannot be "." or ".."`)
 	}
-	ttl := options.ExpiresInSeconds
+	ttl := options.ExpiresIn
 	if ttl == 0 {
 		ttl = uploadTokenDefaultTTLSeconds
 	}
 	if ttl < 1 || ttl > uploadTokenMaxTTLSeconds {
-		return nil, invalid(CodeSDKInvalidArgument, fmt.Sprintf("ExpiresInSeconds must be a whole number from 1 to %d", uploadTokenMaxTTLSeconds))
+		return nil, invalid(CodeSDKInvalidArgument, fmt.Sprintf("ExpiresIn must be a whole number from 1 to %d", uploadTokenMaxTTLSeconds))
 	}
 	if options.ExternalID != nil && *options.ExternalID == "" {
 		return nil, invalid(CodeSDKInvalidArgument, "ExternalID must be a non-empty string")

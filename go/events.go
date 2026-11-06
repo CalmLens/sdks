@@ -48,7 +48,6 @@ const (
 	FactFileFormat               = "file-format"
 	FactModerationStatus         = "moderation-status"
 	FactFlaggedCategories        = "flagged-categories"
-	FactReviewerName             = "reviewer-name"
 	FactNote                     = "note"
 	FactPreviousStatus           = "previous-status"
 	FactFailureReason            = "failure-reason"
@@ -190,6 +189,33 @@ func (facts EventFacts) Get(key string) (EventFact, bool) {
 	return EventFact{}, false
 }
 
+// GetEventFact returns the value of one of event's facts by key, the first when the key repeats,
+// or nil when the event doesn't carry it. A fact's URL, when it has one, is on the fact in
+// event.Facts.
+func GetEventFact(event *Event, key string) any {
+	if event == nil {
+		return nil
+	}
+	fact, _ := event.Facts.Get(key)
+	return fact.Value
+}
+
+// GetEventFacts returns event's facts as values by key, such as
+// {"flagged-categories": ["hate"]}. A key the event repeats keeps its first value, as
+// GetEventFact reads it.
+func GetEventFacts(event *Event) map[string]any {
+	values := map[string]any{}
+	if event == nil {
+		return values
+	}
+	for _, fact := range event.Facts {
+		if _, seen := values[fact.Key]; !seen {
+			values[fact.Key] = fact.Value
+		}
+	}
+	return values
+}
+
 // IsTest reports whether the facts mark a test send ({Key: FactTest, Value: true}).
 func (facts EventFacts) IsTest() bool {
 	fact, ok := facts.Get(FactTest)
@@ -240,13 +266,11 @@ type AssetClassifiedFacts struct {
 // status. The event's Actor says who set it: ActorAutomated moderation, an ActorUser (a reviewer
 // in the portal, or an assistant acting for one) or an ActorAPIKey through the API.
 // FlaggedCategories, when present, are the parent policy categories whose findings decided the
-// status. ReviewerName and Note are set only for reviewer decisions; ReviewerName stays in the
-// portal and is nil on webhook deliveries.
+// status. Note is set only for reviewer decisions.
 type AssetDecisionFacts struct {
 	AssetName         *string  `json:"asset-name"`
 	AssetType         *string  `json:"asset-type"`
 	FlaggedCategories []string `json:"flagged-categories"`
-	ReviewerName      *string  `json:"reviewer-name"`
 	Note              *string  `json:"note"`
 }
 

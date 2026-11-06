@@ -237,10 +237,11 @@ func (d *Decision) report() calmlens.JSON {
 		}
 	}
 	return calmlens.JSON{
-		"raw":                 calmlens.JSON{"categories": categories},
+		"raw":                 calmlens.JSON{"categories": categories, "hashMatches": []any{}},
 		"categories":          policyCategories,
 		"explanationComplete": true,
-		"source":              "policy", "automatedStatus": d.status, "regions": []any{}, "flaggedCategories": flagged,
+		"source":              "policy", "rule": nil, "automatedStatus": d.status, "regions": []any{}, "flaggedCategories": flagged,
+		"linkSafety": nil,
 	}
 }
 

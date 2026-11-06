@@ -145,8 +145,10 @@ const (
 	CodeFolderNotEmpty = "folder/not-empty"
 	// CodeFolderParentCycle is returned with HTTP 409.
 	CodeFolderParentCycle = "folder/parent-cycle"
-	// CodeLensVersionConflict is returned with HTTP 409.
-	CodeLensVersionConflict = "lens/version-conflict"
+	// CodeLensNotFound is returned with HTTP 404.
+	CodeLensNotFound = "lens/not-found"
+	// CodeLensIdentifierTaken is returned with HTTP 409.
+	CodeLensIdentifierTaken = "lens/identifier-taken"
 	// CodeLensIdentifierReserved is returned with HTTP 409.
 	CodeLensIdentifierReserved = "lens/identifier-reserved"
 	// CodeHashListNotFound is returned with HTTP 404.
@@ -292,7 +294,8 @@ var publicErrorStatuses = map[string]int{
 	CodeDuplicateFolderName:               409,
 	CodeFolderNotEmpty:                    409,
 	CodeFolderParentCycle:                 409,
-	CodeLensVersionConflict:               409,
+	CodeLensNotFound:                      404,
+	CodeLensIdentifierTaken:               409,
 	CodeLensIdentifierReserved:            409,
 	CodeHashListNotFound:                  404,
 	CodeHashListEntryNotFound:             404,

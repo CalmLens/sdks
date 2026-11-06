@@ -370,21 +370,35 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 	case "hashLists.removeEntry":
 		return fixtureCall{}, c.HashLists.RemoveEntry(ctx, into[HashListEntryIDOptions](t, args))
 	case "policies.list":
-		return one(c.Policies.List(ctx))
+		return one(c.Policies.List(ctx, into[ListPoliciesOptions](t, args)))
+	case "policies.retrieveAssigned":
+		return one(c.Policies.RetrieveAssigned(ctx))
 	case "policies.retrieve":
 		return one(c.Policies.Retrieve(ctx, into[PolicyIDOptions](t, args)))
 	case "policies.create":
 		return one(c.Policies.Create(ctx, into[CreatePolicyOptions](t, args)))
 	case "policies.update":
 		return one(c.Policies.Update(ctx, into[UpdatePolicyOptions](t, args)))
-	case "policies.applyPreset":
-		return one(c.Policies.ApplyPreset(ctx, into[ApplyPolicyPresetOptions](t, args)))
+	case "policies.reset":
+		return one(c.Policies.Reset(ctx, into[ResetPolicyOptions](t, args)))
+	case "policies.upgrade":
+		return one(c.Policies.Upgrade(ctx, into[UpgradePolicyOptions](t, args)))
 	case "policies.setAutomaticUpdates":
 		return one(c.Policies.SetAutomaticUpdates(ctx, into[SetPolicyAutomaticUpdatesOptions](t, args)))
 	case "policies.delete":
 		return fixtureCall{}, c.Policies.Delete(ctx, into[PolicyIDOptions](t, args))
 	case "policies.assign":
 		return one(c.Policies.Assign(ctx, into[AssignPolicyOptions](t, args)))
+	case "lenses.list":
+		return one(c.Lenses.List(ctx, into[ListLensesOptions](t, args)))
+	case "lenses.create":
+		return one(c.Lenses.Create(ctx, into[CreateLensOptions](t, args)))
+	case "lenses.retrieve":
+		return one(c.Lenses.Retrieve(ctx, into[LensIDOptions](t, args)))
+	case "lenses.update":
+		return one(c.Lenses.Update(ctx, into[UpdateLensOptions](t, args)))
+	case "lenses.delete":
+		return fixtureCall{}, c.Lenses.Delete(ctx, into[LensIDOptions](t, args))
 	case "ensureLens":
 		return one(c.EnsureLens(ctx, into[EnsureLensOptions](t, args)))
 	case "ensureLenses":
@@ -396,11 +410,19 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		} else {
 			it = c.Assets.ListChildrenAll(into[ListAssetChildrenOptions](t, args))
 		}
-		items := []Asset{}
-		for it.Next(ctx) {
-			items = append(items, it.Asset())
-		}
-		return fixtureCall{result: items, partial: items}, it.Err()
+		return collect(ctx, &it.Iterator)
+	case "assets.iterateTimeline":
+		return collect(ctx, c.Assets.ListTimelineAll(into[ListAssetTimelineOptions](t, args)))
+	case "folders.iterate":
+		return collect(ctx, c.Folders.ListAll(into[ListFoldersOptions](t, args)))
+	case "hashLists.iterate":
+		return collect(ctx, c.HashLists.ListAll(into[ListHashListsOptions](t, args)))
+	case "hashLists.iterateEntries":
+		return collect(ctx, c.HashLists.ListEntriesAll(into[ListHashListEntriesOptions](t, args)))
+	case "policies.iterate":
+		return collect(ctx, c.Policies.ListAll(into[ListPoliciesOptions](t, args)))
+	case "lenses.iterate":
+		return collect(ctx, c.Lenses.ListAll(into[ListLensesOptions](t, args)))
 	case "events.iterate":
 		it := c.Events.ListAll(into[ListEventsOptions](t, args))
 		pages := []EventsPage{}
@@ -423,6 +445,15 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 	}
 	t.Fatalf("unhandled operation %s", operation)
 	return fixtureCall{}, nil
+}
+
+// collect gathers every item an iterator yields, with those yielded before a failure as partial.
+func collect[T any](ctx context.Context, it *Iterator[T]) (fixtureCall, error) {
+	items := []T{}
+	for it.Next(ctx) {
+		items = append(items, it.Item())
+	}
+	return fixtureCall{result: items, partial: items}, it.Err()
 }
 
 // plain turns a value into plain JSON values (float64 numbers) for comparison.

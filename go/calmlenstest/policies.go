@@ -2,6 +2,7 @@ package calmlenstest
 
 import (
 	"encoding/json"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -10,8 +11,8 @@ import (
 
 // ---- Policies -------------------------------------------------------------------------------
 // The project starts on the organisation's own General preset policy, following automatic
-// updates. The mock holds no built-in preset settings: a preset's settings are
-// {"categorySettings": {}} at version 1, and uploads are never decided by a policy.
+// updates. The mock's presets have one release, version 1, with mockPresetSettings, and uploads
+// are never decided by a policy.
 
 // mockPresetNames are the built-in presets the mock knows, by display name.
 var mockPresetNames = map[string]string{
@@ -27,7 +28,9 @@ type mockPolicy struct {
 	id, name, description string
 	settings, baseline    any
 	revision              int
-	automaticUpdates      bool
+	// followsPreset is whether the organisation's own preset policy follows its preset (mode
+	// live).
+	followsPreset bool
 	// presetID is empty for a policy that did not start from a preset; presetOwn is whether it
 	// is the organisation's own policy for the preset rather than a copy.
 	presetID             string
@@ -35,14 +38,57 @@ type mockPolicy struct {
 	createdAt, updatedAt int64
 }
 
-// policyStore holds the organisation's policies, oldest first, and the project's policy.
+// policyStore holds the organisation's policies and the project's policy.
 type policyStore struct {
 	byID          map[string]*mockPolicy
-	order         []string
 	projectPolicy string
 }
 
-func emptyPolicySettings() any { return calmlens.JSON{"categorySettings": calmlens.JSON{}} }
+// mockPresetSettings are the settings of the mock's presets: every category with its default
+// action (allow for personal information and profanity, block otherwise) and no rules. The mock
+// holds no built-in preset settings.
+func mockPresetSettings() any {
+	categories := calmlens.JSON{}
+	for _, category := range mockCategories {
+		action := calmlens.ModerationActionBlock
+		if category == calmlens.CategoryPersonalInformation || category == calmlens.CategoryProfanity {
+			action = calmlens.ModerationActionAllow
+		}
+		categories[category] = calmlens.JSON{"action": action, "allowances": []any{}, "restrictions": []any{}}
+	}
+	return calmlens.JSON{"categorySettings": categories}
+}
+
+// checkPolicySettings refuses settings the API refuses: every category, each with an action and
+// its allowances and restrictions lists, and no other category. The first problem is reported.
+func checkPolicySettings(settings any) error {
+	object, _ := settings.(map[string]any)
+	categories, ok := object["categorySettings"].(map[string]any)
+	if !ok {
+		return validation(calmlens.CodeInvalidType, "settings.categorySettings")
+	}
+	for _, category := range mockCategories {
+		path := "settings.categorySettings." + category
+		value, ok := categories[category].(map[string]any)
+		if !ok {
+			return validation(calmlens.CodeInvalidType, path)
+		}
+		for _, key := range []string{"allowances", "restrictions"} {
+			if _, ok := value[key].([]any); !ok {
+				return validation(calmlens.CodeInvalidType, path+"."+key)
+			}
+		}
+		if _, ok := value["action"].(string); !ok {
+			return validation(calmlens.CodeInvalidValue, path+".action")
+		}
+	}
+	for key := range categories {
+		if !slices.Contains(mockCategories, key) {
+			return validation(calmlens.CodeUnknownField, "settings.categorySettings."+key)
+		}
+	}
+	return nil
+}
 
 // cloneJSON deep-copies a decoded JSON value.
 func cloneJSON(value any) any {
@@ -52,13 +98,15 @@ func cloneJSON(value any) any {
 	return out
 }
 
+// ensurePolicies creates the organisation's own General policy on first use, and makes it the
+// project's.
 func (m *MockServerClient) ensurePolicies() {
 	if m.policies.projectPolicy != "" {
 		return
 	}
 	m.policies.byID = map[string]*mockPolicy{}
-	general := m.newPolicy(mockPresetNames[calmlens.PolicyPresetGeneral], "", emptyPolicySettings(), calmlens.PolicyPresetGeneral, true)
-	general.automaticUpdates = true
+	general := m.newPolicy(mockPresetNames[calmlens.PolicyPresetGeneral], "", mockPresetSettings(), calmlens.PolicyPresetGeneral, true)
+	general.followsPreset = true
 	m.policies.projectPolicy = general.id
 }
 
@@ -66,20 +114,26 @@ func (m *MockServerClient) newPolicy(name, description string, settings any, pre
 	now := m.options.Now()
 	policy := &mockPolicy{id: m.options.CreateID("pol"), name: name, description: description, settings: settings, baseline: cloneJSON(settings), revision: 1, presetID: presetID, presetOwn: presetOwn, createdAt: now, updatedAt: now}
 	m.policies.byID[policy.id] = policy
-	m.policies.order = append(m.policies.order, policy.id)
 	return policy
 }
 
 func (m *MockServerClient) policyJSON(policy *mockPolicy) calmlens.JSON {
 	var preset any
 	if policy.presetID != "" {
-		preset = calmlens.JSON{"id": policy.presetID, "version": 1, "latestVersion": 1, "own": policy.presetOwn}
+		mode := calmlens.PolicyPresetModeCopy
+		switch {
+		case policy.presetOwn && policy.followsPreset:
+			mode = calmlens.PolicyPresetModeLive
+		case policy.presetOwn:
+			mode = calmlens.PolicyPresetModePinned
+		}
+		preset = calmlens.JSON{"id": policy.presetID, "version": 1, "latestVersion": 1, "mode": mode}
 	}
 	projects := []string{}
 	if policy.id == m.policies.projectPolicy {
 		projects = append(projects, m.options.ProjectID)
 	}
-	return calmlens.JSON{"id": policy.id, "name": policy.name, "description": policy.description, "settings": cloneJSON(policy.settings), "revision": policy.revision, "automaticUpdates": policy.automaticUpdates, "preset": preset, "projectIds": projects, "createdAt": policy.createdAt, "updatedAt": policy.updatedAt}
+	return calmlens.JSON{"id": policy.id, "name": policy.name, "description": policy.description, "settings": cloneJSON(policy.settings), "revision": policy.revision, "preset": preset, "projectIds": projects, "createdAt": policy.createdAt, "updatedAt": policy.updatedAt}
 }
 
 func (m *MockServerClient) findPolicy(id string) (*mockPolicy, error) {
@@ -97,12 +151,13 @@ func isNumber(value any, want int) bool {
 	return ok && n == float64(want)
 }
 
-// policyRoute answers /projects/:id/policies[/...] and /projects/:id/policy.
-func (m *MockServerClient) policyRoute(method string, parts []string, body calmlens.JSON) (any, error) {
-	if parts[0] == "policy" {
-		if method != "PUT" || len(parts) != 1 {
-			return nil, errUnknownRoute
-		}
+// projectPolicyRoute answers /projects/:id/policy: the project's policy, and assigning one.
+func (m *MockServerClient) projectPolicyRoute(method string, body calmlens.JSON) (any, error) {
+	switch method {
+	case "GET":
+		m.ensurePolicies()
+		return m.policyJSON(m.policies.byID[m.policies.projectPolicy]), nil
+	case "PUT":
 		policy, err := m.findPolicy(text(body["policyId"]))
 		if err != nil {
 			return nil, err
@@ -110,30 +165,48 @@ func (m *MockServerClient) policyRoute(method string, parts []string, body calml
 		m.policies.projectPolicy = policy.id
 		return m.policyJSON(policy), nil
 	}
-	if len(parts) == 1 {
+	return nil, errUnknownRoute
+}
+
+// listPolicies pages the organisation's policies, oldest first unless sort says otherwise.
+func (m *MockServerClient) listPolicies(q url.Values) (any, error) {
+	size, err := intRange(q, "pageSize", defaultPageSize, 1, maxPageSize)
+	if err != nil {
+		return nil, err
+	}
+	ordering, err := cursorOrdering(q, sortRule{Field: "createdAt", Direction: sortAscending})
+	if err != nil {
+		return nil, err
+	}
+	m.ensurePolicies()
+	items := []calmlens.JSON{}
+	for _, policy := range m.policies.byID {
+		items = append(items, m.policyJSON(policy))
+	}
+	return keysetPage(items, ordering, q.Get("cursor"), "policies", size)
+}
+
+// policyRoute answers /policies[/...]; parts follow "policies".
+func (m *MockServerClient) policyRoute(method string, parts []string, body calmlens.JSON, q url.Values) (any, error) {
+	if len(parts) == 0 {
 		switch method {
 		case "GET":
-			m.ensurePolicies()
-			policies := []calmlens.JSON{}
-			for _, id := range m.policies.order {
-				policies = append(policies, m.policyJSON(m.policies.byID[id]))
-			}
-			return calmlens.JSON{"policies": policies, "projectPolicyId": m.policies.projectPolicy}, nil
+			return m.listPolicies(q)
 		case "POST":
 			return m.createPolicy(body)
 		}
 		return nil, errUnknownRoute
 	}
-	if len(parts) > 3 {
+	if len(parts) > 2 {
 		return nil, errUnknownRoute
 	}
-	action := strings.Join(parts[2:], "/")
+	action := strings.Join(parts[1:], "/")
 	switch method + " " + action {
-	case "GET ", "PATCH ", "DELETE ", "POST preset", "PUT automatic-updates":
+	case "GET ", "PATCH ", "DELETE ", "POST reset", "POST upgrade", "PUT automatic-updates":
 	default:
 		return nil, errUnknownRoute
 	}
-	policy, err := m.findPolicy(parts[1])
+	policy, err := m.findPolicy(parts[0])
 	if err != nil {
 		return nil, err
 	}
@@ -147,10 +220,11 @@ func (m *MockServerClient) policyRoute(method string, parts []string, body calml
 			return nil, fail(calmlens.CodePolicyInUse)
 		}
 		delete(m.policies.byID, policy.id)
-		m.policies.order = slices.DeleteFunc(m.policies.order, func(id string) bool { return id == policy.id })
 		return calmlens.JSON{}, nil
-	case "POST preset":
-		return m.applyPolicyPreset(policy, body)
+	case "POST reset":
+		return m.restorePolicy(policy, false, body)
+	case "POST upgrade":
+		return m.restorePolicy(policy, true, body)
 	default:
 		return m.setPolicyAutomaticUpdates(policy, body)
 	}
@@ -171,7 +245,10 @@ func (m *MockServerClient) createPolicy(body calmlens.JSON) (any, error) {
 		if name == "" {
 			name = mockPresetNames[preset]
 		}
-		return m.policyJSON(m.newPolicy(name, description, emptyPolicySettings(), preset, false)), nil
+		return m.policyJSON(m.newPolicy(name, description, mockPresetSettings(), preset, false)), nil
+	}
+	if err := checkPolicySettings(settings); err != nil {
+		return nil, err
 	}
 	return m.policyJSON(m.newPolicy(name, description, settings, "", false)), nil
 }
@@ -188,6 +265,11 @@ func (m *MockServerClient) savePolicy(policy *mockPolicy, revision any, change f
 }
 
 func (m *MockServerClient) updatePolicy(policy *mockPolicy, body calmlens.JSON) (any, error) {
+	if settings, ok := body["settings"]; ok {
+		if err := checkPolicySettings(settings); err != nil {
+			return nil, err
+		}
+	}
 	return m.savePolicy(policy, body["revision"], func() {
 		if name, ok := body["name"].(string); ok {
 			policy.name = strings.TrimSpace(name)
@@ -198,20 +280,22 @@ func (m *MockServerClient) updatePolicy(policy *mockPolicy, body calmlens.JSON) 
 		if settings, ok := body["settings"]; ok {
 			policy.settings = settings
 		}
-		// Saving a policy that follows its preset pins it as a copy.
-		policy.automaticUpdates = false
+		// Saving a live policy pins it.
+		policy.followsPreset = false
 	})
 }
 
-func (m *MockServerClient) applyPolicyPreset(policy *mockPolicy, body calmlens.JSON) (any, error) {
-	if policy.presetID == "" || policy.automaticUpdates {
+// restorePolicy resets a pinned policy or copy to its preset release, or upgrades it to the
+// latest (upgrade).
+func (m *MockServerClient) restorePolicy(policy *mockPolicy, upgrade bool, body calmlens.JSON) (any, error) {
+	if policy.presetID == "" || policy.followsPreset {
 		return nil, fail(calmlens.CodePolicyNoPreset)
 	}
 	if !isNumber(body["presetVersion"], 1) {
 		return nil, fail(calmlens.CodePolicyPresetVersionConflict)
 	}
-	// The mock's presets have one release, so an update never has a newer one to apply.
-	if body["operation"] == calmlens.PolicyPresetUpdate {
+	// The mock's presets have one release, so an upgrade never has a newer one to apply.
+	if upgrade {
 		return nil, fail(calmlens.CodePolicyPresetUpdateUnavailable)
 	}
 	return m.savePolicy(policy, body["revision"], func() { policy.settings = cloneJSON(policy.baseline) })
@@ -219,7 +303,7 @@ func (m *MockServerClient) applyPolicyPreset(policy *mockPolicy, body calmlens.J
 
 func (m *MockServerClient) setPolicyAutomaticUpdates(policy *mockPolicy, body calmlens.JSON) (any, error) {
 	enabled := body["enabled"] == true
-	if !policy.presetOwn || policy.automaticUpdates == enabled {
+	if !policy.presetOwn || policy.followsPreset == enabled {
 		return nil, fail(calmlens.CodePolicyAutomaticUpdatesUnavailable)
 	}
 	if !isNumber(body["revision"], policy.revision) {
@@ -229,7 +313,7 @@ func (m *MockServerClient) setPolicyAutomaticUpdates(policy *mockPolicy, body ca
 		return nil, fail(calmlens.CodePolicyPresetVersionConflict)
 	}
 	return m.savePolicy(policy, body["revision"], func() {
-		policy.automaticUpdates = enabled
+		policy.followsPreset = enabled
 		if enabled {
 			policy.name, policy.description = mockPresetNames[policy.presetID], ""
 			policy.settings = cloneJSON(policy.baseline)

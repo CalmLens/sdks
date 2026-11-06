@@ -39,6 +39,8 @@ var surfaceFunctions = map[string]any{
 	"ToWebhookEventPayload":         calmlens.ToWebhookEventPayload,
 	"VerifyWebhookRequest":          calmlens.VerifyWebhookRequest,
 	"IsNewerAssetEvent":             calmlens.IsNewerAssetEvent,
+	"GetEventFact":                  calmlens.GetEventFact,
+	"GetEventFacts":                 calmlens.GetEventFacts,
 	"EventFacts.IsTest":             calmlens.EventFacts.IsTest,
 	"calmlenstest.SignUploadToken":  SignUploadToken,
 	"calmlenstest.NewServerClient":  NewServerClient,
@@ -491,8 +493,8 @@ func resolve(value any, saved map[string]any) any {
 }
 
 // normalize turns a typed result into plain JSON values with the API's field names. Assets and
-// events are their Raw JSON; AssetPage reports "no next page" as an empty NextCursor, which the
-// API sends as null.
+// events are their Raw JSON; pages report "no next page" as an empty NextCursor, which the API
+// sends as null.
 func normalize(t *testing.T, value any) any {
 	t.Helper()
 	data, err := json.Marshal(value)
@@ -513,26 +515,10 @@ func normalize(t *testing.T, value any) any {
 		}
 		return items
 	case *calmlens.AssetPage:
-		page := out.(map[string]any)
-		page["items"] = normalize(t, typed.Items)
-		if typed.NextCursor == "" {
-			page["nextCursor"] = nil
-		}
+		out.(map[string]any)["items"] = normalize(t, typed.Items)
 	case *calmlens.AssetSearchResponse:
 		for i, item := range typed.Items {
 			out.(map[string]any)["items"].([]any)[i].(map[string]any)["asset"] = normalize(t, item.Asset.Raw)
-		}
-	case *calmlens.FolderPage:
-		if typed.NextCursor == "" {
-			out.(map[string]any)["nextCursor"] = nil
-		}
-	case *calmlens.AssetTimelinePage:
-		if typed.NextCursor == "" {
-			out.(map[string]any)["nextCursor"] = nil
-		}
-	case *calmlens.HashListPage:
-		if typed.NextCursor == "" {
-			out.(map[string]any)["nextCursor"] = nil
 		}
 	case *calmlens.EventsPage:
 		events := []any{}
@@ -546,6 +532,9 @@ func normalize(t *testing.T, value any) any {
 			pages = append(pages, normalize(t, &typed[i]))
 		}
 		return pages
+	}
+	if page, ok := out.(map[string]any); ok && page["nextCursor"] == "" {
+		page["nextCursor"] = nil
 	}
 	return out
 }
@@ -605,7 +594,7 @@ func submit(t *testing.T, args map[string]any) calmlens.SubmitAssetOptions {
 // means "use the default", so the request carries no value for the API to refuse.
 func inexpressible(t *testing.T, operation string, args map[string]any) string {
 	t.Helper()
-	for _, key := range []string{"pageSize", "limit"} {
+	for _, key := range []string{"pageSize"} {
 		if value, ok := args[key]; ok && value == float64(0) {
 			return fmt.Sprintf("%s's %s of 0 means the default in Go", operation, key)
 		}
@@ -729,11 +718,15 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		} else {
 			it = m.Assets.ListChildrenAll(decode[calmlens.ListAssetChildrenOptions](t, args))
 		}
-		items := []calmlens.Asset{}
-		for it.Next(ctx) {
-			items = append(items, it.Asset())
-		}
-		result, err = items, it.Err()
+		result, err = collect(ctx, &it.Iterator)
+	case "assets.iterateTimeline":
+		result, err = collect(ctx, m.Assets.ListTimelineAll(decode[calmlens.ListAssetTimelineOptions](t, args)))
+	case "folders.iterate":
+		result, err = collect(ctx, m.Folders.ListAll(decode[calmlens.ListFoldersOptions](t, args)))
+	case "hashLists.iterate":
+		result, err = collect(ctx, m.HashLists.ListAll(decode[calmlens.ListHashListsOptions](t, args)))
+	case "hashLists.iterateEntries":
+		result, err = collect(ctx, m.HashLists.ListEntriesAll(decode[calmlens.ListHashListEntriesOptions](t, args)))
 	case "events.list":
 		result, err = m.Events.List(ctx, decode[calmlens.ListEventsOptions](t, args))
 	case "events.pages":
@@ -774,21 +767,39 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 	case "hashLists.removeEntry":
 		err = m.HashLists.RemoveEntry(ctx, decode[calmlens.HashListEntryIDOptions](t, args))
 	case "policies.list":
-		result, err = m.Policies.List(ctx)
+		result, err = m.Policies.List(ctx, decode[calmlens.ListPoliciesOptions](t, args))
+	case "policies.iterate":
+		result, err = collect(ctx, m.Policies.ListAll(decode[calmlens.ListPoliciesOptions](t, args)))
+	case "policies.retrieveAssigned":
+		result, err = m.Policies.RetrieveAssigned(ctx)
 	case "policies.retrieve":
 		result, err = m.Policies.Retrieve(ctx, decode[calmlens.PolicyIDOptions](t, args))
 	case "policies.create":
 		result, err = m.Policies.Create(ctx, decode[calmlens.CreatePolicyOptions](t, args))
 	case "policies.update":
 		result, err = m.Policies.Update(ctx, decode[calmlens.UpdatePolicyOptions](t, args))
-	case "policies.applyPreset":
-		result, err = m.Policies.ApplyPreset(ctx, decode[calmlens.ApplyPolicyPresetOptions](t, args))
+	case "policies.reset":
+		result, err = m.Policies.Reset(ctx, decode[calmlens.ResetPolicyOptions](t, args))
+	case "policies.upgrade":
+		result, err = m.Policies.Upgrade(ctx, decode[calmlens.UpgradePolicyOptions](t, args))
 	case "policies.setAutomaticUpdates":
 		result, err = m.Policies.SetAutomaticUpdates(ctx, decode[calmlens.SetPolicyAutomaticUpdatesOptions](t, args))
 	case "policies.delete":
 		err = m.Policies.Delete(ctx, decode[calmlens.PolicyIDOptions](t, args))
 	case "policies.assign":
 		result, err = m.Policies.Assign(ctx, decode[calmlens.AssignPolicyOptions](t, args))
+	case "lenses.list":
+		result, err = m.Lenses.List(ctx, decode[calmlens.ListLensesOptions](t, args))
+	case "lenses.iterate":
+		result, err = collect(ctx, m.Lenses.ListAll(decode[calmlens.ListLensesOptions](t, args)))
+	case "lenses.create":
+		result, err = m.Lenses.Create(ctx, decode[calmlens.CreateLensOptions](t, args))
+	case "lenses.retrieve":
+		result, err = m.Lenses.Retrieve(ctx, decode[calmlens.LensIDOptions](t, args))
+	case "lenses.update":
+		result, err = m.Lenses.Update(ctx, decode[calmlens.UpdateLensOptions](t, args))
+	case "lenses.delete":
+		err = m.Lenses.Delete(ctx, decode[calmlens.LensIDOptions](t, args))
 	case "ensureLens":
 		result, err = m.EnsureLens(ctx, decode[calmlens.EnsureLensOptions](t, args))
 	case "ensureLenses":
@@ -803,6 +814,15 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		return nil, nil
 	}
 	return normalize(t, result), nil
+}
+
+// collect gathers every item an iterator yields.
+func collect[T any](ctx context.Context, it *calmlens.Iterator[T]) ([]T, error) {
+	items := []T{}
+	for it.Next(ctx) {
+		items = append(items, it.Item())
+	}
+	return items, it.Err()
 }
 
 // served is what a cdn.serve or mock.fetchCdn step returns.

@@ -95,7 +95,7 @@ func TestTextAndRawUploads(t *testing.T) {
 		t.Fatal("incorrect body or headers")
 	}
 	q := h.last().URL.Query()
-	if q.Get("queue") != "false" || q.Get("name") != "text" || q.Get("metadata") != `[{"id":"x","value":false}]` || q.Get("tags") != `["a b","c"]` || q.Get("processingOptions") != `{"keepContentAfterProcessing":false}` {
+	if q.Get("wait") != "true" || q.Get("name") != "text" || q.Get("metadata") != `[{"id":"x","value":false}]` || q.Get("tags") != `["a b","c"]` || q.Get("processingOptions") != `{"keepContentAfterProcessing":false}` {
 		t.Fatal(q)
 	}
 	if !strings.Contains(h.last().URL.EscapedPath(), "p%20%2F%3F") {
@@ -120,7 +120,7 @@ func TestTextAndRawUploads(t *testing.T) {
 		t.Fatal("JSON metadata must remain an array")
 	}
 }
-func TestMultipartLeavesQueueModeToTheServer(t *testing.T) {
+func TestMultipartLeavesTheWaitChoiceToTheServer(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
 	size := int64(10 * 1024 * 1024)
@@ -131,22 +131,22 @@ func TestMultipartLeavesQueueModeToTheServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	first := h.last().URL.Query()
-	if first.Get("partNumber") != "1" || first.Get("queue") != "true" || first.Get("totalSizeInBytes") != "12582912" {
+	if first.Get("partNumber") != "1" || first.Get("wait") != "false" || first.Get("totalSizeInBytes") != "12582912" {
 		t.Fatal(h.last().URL)
 	}
-	// A fresh client finishing an upload sends no queue mode: the server applies the saved one.
+	// A fresh client finishing an upload sends no wait choice: the server applies the saved one.
 	other, h2 := setup(t)
 	if _, err = other.Assets.UploadPart(ctx, UploadAssetPartOptions{AssetID: "a", Part: Content{PartNumber: 2, IsFinal: true, Data: bytes.NewReader(make([]byte, size)), SizeInBytes: &size}}); err != nil {
 		t.Fatal(err)
 	}
-	if q := h2.last().URL.Query(); q.Has("queue") || q.Get("sizeInBytes") != "10485760" || h2.last().ContentLength != size {
+	if q := h2.last().URL.Query(); q.Has("wait") || q.Get("sizeInBytes") != "10485760" || h2.last().ContentLength != size {
 		t.Fatal("part request", h2.last().URL, h2.last().ContentLength)
 	}
-	if _, err = other.Assets.UploadPart(ctx, UploadAssetPartOptions{AssetID: "a", Queue: Ptr(false), Part: Content{PartNumber: 2, IsFinal: true, Bytes: []byte("x")}}); err != nil {
+	if _, err = other.Assets.UploadPart(ctx, UploadAssetPartOptions{AssetID: "a", Wait: Ptr(true), Part: Content{PartNumber: 2, IsFinal: true, Bytes: []byte("x")}}); err != nil {
 		t.Fatal(err)
 	}
-	if h2.last().URL.Query().Get("queue") != "false" {
-		t.Fatal("queue override not sent", h2.last().URL)
+	if h2.last().URL.Query().Get("wait") != "true" {
+		t.Fatal("wait override not sent", h2.last().URL)
 	}
 	// A declared image total above the maximum is rejected before any byte is sent.
 	huge := int64(21 * 1024 * 1024)
@@ -270,7 +270,7 @@ func TestResponsesKeepUnknownFieldsAndIntegerPrecision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if asset.Raw["content"].(JSON)["image"].(JSON)["big"] != json.Number("9007199254740993") || asset.Raw["newField"] != "kept" || *asset.Visibility != "unlisted" || asset.Classification.Moderation.Status != "future-status" || asset.Classification.Moderation.Raw.Categories["x"].Status != "future-status" {
+	if asset.Raw["content"].(JSON)["image"].(JSON)["big"] != json.Number("9007199254740993") || asset.Raw["newField"] != "kept" || asset.Visibility != "unlisted" || asset.Classification.Moderation.Status != "future-status" || asset.Classification.Moderation.Raw.Categories["x"].Status != "future-status" {
 		t.Fatalf("%#v", asset.Raw)
 	}
 }
@@ -348,7 +348,7 @@ func TestIteratorsFollowEveryPage(t *testing.T) {
 func TestLensCache(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
-	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true, Version: 1, Transform: ImageTransformOptions{Width: Ptr(20)}}
+	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true, Transform: ImageTransformOptions{Width: Ptr(20)}}
 	h.result = JSON{"lenses": []Lens{{ID: "l", EnsureLensOptions: lens}}}
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
@@ -373,24 +373,58 @@ func TestLensCache(t *testing.T) {
 	if again.Transform.(JSON)["width"] != json.Number("20") {
 		t.Fatal("cache mutated")
 	}
-	lens.Version = 2
-	h.status = 409
-	h.result = JSON{"code": "lens/version-conflict"}
-	if _, err = c.EnsureLens(ctx, lens); err == nil {
-		t.Fatal("expected conflict")
+	// A changed definition is sent, and replaces the lens's cached one.
+	changed := lens
+	changed.Name = "Thumb 2"
+	h.result = JSON{"lenses": []Lens{{ID: "l", EnsureLensOptions: changed}}}
+	if _, err = c.EnsureLens(ctx, changed); err != nil {
+		t.Fatal(err)
 	}
-	h.status = 200
 	h.result = JSON{"lenses": []Lens{{ID: "l", EnsureLensOptions: lens}}}
 	if _, err = c.EnsureLens(ctx, lens); err != nil {
 		t.Fatal(err)
 	}
-	lens.Version = 1
-	h.result = JSON{"lenses": []Lens{{ID: "l", EnsureLensOptions: lens}}}
-	if _, err = c.EnsureLens(ctx, lens); err != nil {
-		t.Fatal(err)
-	}
-	if len(h.calls) != 4 {
+	if len(h.calls) != 3 {
 		t.Fatal(len(h.calls))
+	}
+}
+
+func TestLensChangesDropTheEnsuredDefinition(t *testing.T) {
+	ctx := context.Background()
+	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true}
+	stored := Lens{ID: "lens-1", EnsureLensOptions: lens}
+	for name, change := range map[string]func(*ServerClient) error{
+		"update": func(c *ServerClient) error {
+			_, err := c.Lenses.Update(ctx, UpdateLensOptions{LensID: "lens-1", Name: Ptr("Renamed")})
+			return err
+		},
+		"delete": func(c *ServerClient) error { return c.Lenses.Delete(ctx, LensIDOptions{LensID: "lens-1"}) },
+		"create": func(c *ServerClient) error {
+			_, err := c.Lenses.Create(ctx, CreateLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true})
+			return err
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c, h := setup(t)
+			h.next = []reply{{status: 200, result: JSON{"lenses": []Lens{stored}}}, {status: 200, result: stored}}
+			h.result = JSON{"lenses": []Lens{stored}}
+			if _, err := c.EnsureLens(ctx, lens); err != nil {
+				t.Fatal(err)
+			}
+			if err := change(c); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := c.EnsureLens(ctx, lens); err != nil {
+				t.Fatal(err)
+			}
+			methods := []string{}
+			for _, call := range h.calls {
+				methods = append(methods, call.Method)
+			}
+			if want := []string{"PUT", map[string]string{"update": "PATCH", "delete": "DELETE", "create": "POST"}[name], "PUT"}; !reflect.DeepEqual(methods, want) {
+				t.Fatalf("requests %v, want %v", methods, want)
+			}
+		})
 	}
 }
 func TestCDNURLsAndServeHeaders(t *testing.T) {
@@ -553,7 +587,7 @@ func TestWaitForDecisionStopsWhenCancelled(t *testing.T) {
 func TestWithRequestOptionsChangesRetriesAndSharesTheLensCache(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
-	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true, Version: 1}
+	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true}
 	h.result = JSON{"lenses": []Lens{{ID: "l", EnsureLensOptions: lens}}}
 	if _, err := c.EnsureLens(ctx, lens); err != nil {
 		t.Fatal(err)

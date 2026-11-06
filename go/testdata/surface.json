@@ -110,7 +110,7 @@
     {
       "id": "assets.uploadPart",
       "kind": "method",
-      "description": "Upload a sequential part for an in-progress asset upload. Each non-final part must be at least 5 MiB, an upload has at most 10,000 parts, and image uploads in parts must total at most 20 MiB. The final part is classified with the `queue` choice saved when the upload started unless you pass `queue` here. To stream raw bytes instead of JSON, send the `X-CalmLens-Upload: part` header and pass `partNumber`, `isFinal` and `sizeInBytes` as query parameters.",
+      "description": "Upload a sequential part for an in-progress asset upload. Each non-final part must be at least 5 MiB, an upload has at most 10,000 parts, and image uploads in parts must total at most 20 MiB. The final part uses the `wait` choice saved when the upload started unless you pass `wait` here. To stream raw bytes instead of JSON, send the `X-CalmLens-Upload: part` header and pass `partNumber`, `isFinal` and `sizeInBytes` as query parameters.",
       "names": {
         "javascript": "assets.uploadPart",
         "python": "assets.upload_part",
@@ -138,7 +138,7 @@
     {
       "id": "assets.search",
       "kind": "method",
-      "description": "Search accessible assets by keyword or natural language. Images are indexed automatically; enable audio and video search in project settings to include those media types. Results are the best `limit` matches (at most 20), ranked by relevance, so this endpoint has no cursor: refine the query, or list assets with a filter, to see more.",
+      "description": "Search accessible assets by keyword or natural language. Images are indexed automatically; enable audio and video search in project settings to include those media types. Results are the best `pageSize` matches (at most 20), ranked by relevance, so this endpoint has no cursor: refine the query, or list assets with a filter, to see more.",
       "names": {
         "javascript": "assets.search",
         "python": "assets.search",
@@ -320,7 +320,7 @@
     {
       "id": "ensureLenses",
       "kind": "method",
-      "description": "Create lenses or update them with their next versions",
+      "description": "Create each lens, or change it to the definition sent, by identifier. An unchanged lens is returned as it is, so applications can send their lenses every time they start.",
       "names": {
         "javascript": "ensureLenses",
         "python": "ensure_lenses",
@@ -329,6 +329,76 @@
         "java": "ensureLenses",
         "ruby": "ensure_lenses",
         "php": "ensureLenses"
+      }
+    },
+    {
+      "id": "lenses.list",
+      "kind": "method",
+      "description": "List a page of the project's lenses, newest first. The built-in lenses are always available and aren't listed.",
+      "names": {
+        "javascript": "lenses.list",
+        "python": "lenses.list",
+        "go": "Lenses.List",
+        "rust": "lenses().list",
+        "java": "lenses.list",
+        "ruby": "lenses.list",
+        "php": "lenses->list"
+      }
+    },
+    {
+      "id": "lenses.create",
+      "kind": "method",
+      "description": "Create a lens. Its identifier must be new to the project.",
+      "names": {
+        "javascript": "lenses.create",
+        "python": "lenses.create",
+        "go": "Lenses.Create",
+        "rust": "lenses().create",
+        "java": "lenses.create",
+        "ruby": "lenses.create",
+        "php": "lenses->create"
+      }
+    },
+    {
+      "id": "lenses.retrieve",
+      "kind": "method",
+      "description": "Get one of the project's lenses by ID",
+      "names": {
+        "javascript": "lenses.retrieve",
+        "python": "lenses.retrieve",
+        "go": "Lenses.Retrieve",
+        "rust": "lenses().retrieve",
+        "java": "lenses.retrieve",
+        "ruby": "lenses.retrieve",
+        "php": "lenses->retrieve"
+      }
+    },
+    {
+      "id": "lenses.update",
+      "kind": "method",
+      "description": "Change a lens's name, description, type, transform or whether the CDN serves it. The CDN serves the new transform from then on.",
+      "names": {
+        "javascript": "lenses.update",
+        "python": "lenses.update",
+        "go": "Lenses.Update",
+        "rust": "lenses().update",
+        "java": "lenses.update",
+        "ruby": "lenses.update",
+        "php": "lenses->update"
+      }
+    },
+    {
+      "id": "lenses.delete",
+      "kind": "method",
+      "description": "Delete a lens. URLs that select it stop being served; files the CDN already delivered may stay in caches until they expire.",
+      "names": {
+        "javascript": "lenses.delete",
+        "python": "lenses.delete",
+        "go": "Lenses.Delete",
+        "rust": "lenses().delete",
+        "java": "lenses.delete",
+        "ruby": "lenses.delete",
+        "php": "lenses->delete"
       }
     },
     {
@@ -460,7 +530,7 @@
     {
       "id": "policies.list",
       "kind": "method",
-      "description": "List the moderation policies of the project's organisation, and which one the project uses. Policies are shared by the organisation's projects.",
+      "description": "List a page of the moderation policies of the API key's organisation, oldest first. Policies are shared by the organisation's projects; Get Project Policy says which one a project uses.",
       "names": {
         "javascript": "policies.list",
         "python": "policies.list",
@@ -488,7 +558,7 @@
     {
       "id": "policies.create",
       "kind": "method",
-      "description": "Create a moderation policy in the project's organisation, from settings or as a copy of a built-in preset. It moderates nothing until you assign it to a project or name it on an upload preset.",
+      "description": "Create a moderation policy in the API key's organisation, from settings or as a copy of a built-in preset. It moderates nothing until you assign it to a project or name it on an upload preset.",
       "names": {
         "javascript": "policies.create",
         "python": "policies.create",
@@ -502,7 +572,7 @@
     {
       "id": "policies.update",
       "kind": "method",
-      "description": "Change a policy's name, description or settings. Changes apply to later moderation. Saving a policy that follows automatic updates pins it as a copy under the same ID. Only policies that no other project uses or owns can be changed through a project's key.",
+      "description": "Change a policy's name, description or settings. Changes apply to later moderation. Saving a `live` policy pins it as a copy under the same ID. Only policies that no other project uses can be changed through a project's key.",
       "names": {
         "javascript": "policies.update",
         "python": "policies.update",
@@ -514,23 +584,37 @@
       }
     },
     {
-      "id": "policies.applyPreset",
+      "id": "policies.reset",
       "kind": "method",
-      "description": "Reset a policy copied from a preset to its pinned preset version, or update an unchanged copy to the latest preset release",
+      "description": "Restore the settings of the preset release a `pinned` or `copy` policy is pinned to, discarding its edits",
       "names": {
-        "javascript": "policies.applyPreset",
-        "python": "policies.apply_preset",
-        "go": "Policies.ApplyPreset",
-        "rust": "policies().apply_preset",
-        "java": "policies.applyPreset",
-        "ruby": "policies.apply_preset",
-        "php": "policies->applyPreset"
+        "javascript": "policies.reset",
+        "python": "policies.reset",
+        "go": "Policies.Reset",
+        "rust": "policies().reset",
+        "java": "policies.reset",
+        "ruby": "policies.reset",
+        "php": "policies->reset"
+      }
+    },
+    {
+      "id": "policies.upgrade",
+      "kind": "method",
+      "description": "Move a `pinned` or `copy` policy whose settings are unchanged from its preset release to the latest release of the preset",
+      "names": {
+        "javascript": "policies.upgrade",
+        "python": "policies.upgrade",
+        "go": "Policies.Upgrade",
+        "rust": "policies().upgrade",
+        "java": "policies.upgrade",
+        "ruby": "policies.upgrade",
+        "php": "policies->upgrade"
       }
     },
     {
       "id": "policies.setAutomaticUpdates",
       "kind": "method",
-      "description": "Switch automatic updates on or off for one of the organisation's own preset policies. A policy that follows automatic updates always has the latest preset settings.",
+      "description": "Switch automatic updates on or off for one of the organisation's own preset policies: on turns a `pinned` policy `live`, so it always has the latest preset settings, and off pins a `live` policy at its current preset release.",
       "names": {
         "javascript": "policies.setAutomaticUpdates",
         "python": "policies.set_automatic_updates",
@@ -544,7 +628,7 @@
     {
       "id": "policies.delete",
       "kind": "method",
-      "description": "Delete a policy that no project or upload preset uses. Only policies that no other project owns can be deleted through a project's key.",
+      "description": "Delete a policy that no project or upload preset uses. Only policies that no other project uses can be deleted through a project's key.",
       "names": {
         "javascript": "policies.delete",
         "python": "policies.delete",
@@ -553,6 +637,20 @@
         "java": "policies.delete",
         "ruby": "policies.delete",
         "php": "policies->delete"
+      }
+    },
+    {
+      "id": "policies.retrieveAssigned",
+      "kind": "method",
+      "description": "Get the policy the project moderates with. Uploads through an upload preset that names its own policy use that one instead.",
+      "names": {
+        "javascript": "policies.retrieveAssigned",
+        "python": "policies.retrieve_assigned",
+        "go": "Policies.RetrieveAssigned",
+        "rust": "policies().retrieve_assigned",
+        "java": "policies.retrieveAssigned",
+        "ruby": "policies.retrieve_assigned",
+        "php": "policies->retrieveAssigned"
       }
     },
     {
@@ -640,6 +738,90 @@
       }
     },
     {
+      "id": "assets.iterateTimeline",
+      "kind": "method",
+      "description": "Iterates every segment of an asset's findings timeline across pages.",
+      "names": {
+        "javascript": "assets.iterateTimeline",
+        "python": "assets.iter_timeline",
+        "go": "Assets.ListTimelineAll",
+        "rust": "assets().iterate_timeline",
+        "java": "assets.iterateTimeline",
+        "ruby": "assets.each_timeline_segment",
+        "php": "assets->eachTimelineSegment"
+      }
+    },
+    {
+      "id": "folders.iterate",
+      "kind": "method",
+      "description": "Iterates every child folder across pages.",
+      "names": {
+        "javascript": "folders.iterate",
+        "python": "folders.iter",
+        "go": "Folders.ListAll",
+        "rust": "folders().iterate",
+        "java": "folders.iterate",
+        "ruby": "folders.each",
+        "php": "folders->each"
+      }
+    },
+    {
+      "id": "hashLists.iterate",
+      "kind": "method",
+      "description": "Iterates every hash list across pages.",
+      "names": {
+        "javascript": "hashLists.iterate",
+        "python": "hash_lists.iter",
+        "go": "HashLists.ListAll",
+        "rust": "hash_lists().iterate",
+        "java": "hashLists.iterate",
+        "ruby": "hash_lists.each",
+        "php": "hashLists->each"
+      }
+    },
+    {
+      "id": "hashLists.iterateEntries",
+      "kind": "method",
+      "description": "Iterates every entry of a hash list across pages.",
+      "names": {
+        "javascript": "hashLists.iterateEntries",
+        "python": "hash_lists.iter_entries",
+        "go": "HashLists.ListEntriesAll",
+        "rust": "hash_lists().iterate_entries",
+        "java": "hashLists.iterateEntries",
+        "ruby": "hash_lists.each_entry",
+        "php": "hashLists->eachEntry"
+      }
+    },
+    {
+      "id": "policies.iterate",
+      "kind": "method",
+      "description": "Iterates every policy of the organisation across pages.",
+      "names": {
+        "javascript": "policies.iterate",
+        "python": "policies.iter",
+        "go": "Policies.ListAll",
+        "rust": "policies().iterate",
+        "java": "policies.iterate",
+        "ruby": "policies.each",
+        "php": "policies->each"
+      }
+    },
+    {
+      "id": "lenses.iterate",
+      "kind": "method",
+      "description": "Iterates every lens of the project across pages.",
+      "names": {
+        "javascript": "lenses.iterate",
+        "python": "lenses.iter",
+        "go": "Lenses.ListAll",
+        "rust": "lenses().iterate",
+        "java": "lenses.iterate",
+        "ruby": "lenses.each",
+        "php": "lenses->each"
+      }
+    },
+    {
       "id": "events.iterate",
       "kind": "method",
       "description": "Iterates events after a cursor across pages.",
@@ -721,6 +903,34 @@
         "java": "cdn.serve",
         "ruby": "cdn.serve",
         "php": "cdn->serve"
+      }
+    },
+    {
+      "id": "events.fact",
+      "kind": "function",
+      "description": "Reads one of an event's facts by key: its value, or none when the event lacks it.",
+      "names": {
+        "javascript": "getEventFact",
+        "python": "get_event_fact",
+        "go": "GetEventFact",
+        "rust": "get_event_fact",
+        "java": "CalmLensServerClient.getEventFact",
+        "ruby": "CalmLens.get_event_fact",
+        "php": "Webhooks::eventFact"
+      }
+    },
+    {
+      "id": "events.facts",
+      "kind": "function",
+      "description": "An event's facts as values by key, the first value of a repeated key.",
+      "names": {
+        "javascript": "getEventFacts",
+        "python": "get_event_facts",
+        "go": "GetEventFacts",
+        "rust": "get_event_facts",
+        "java": "CalmLensServerClient.getEventFacts",
+        "ruby": "CalmLens.get_event_facts",
+        "php": "Webhooks::eventFacts"
       }
     },
     {
@@ -1873,7 +2083,12 @@
       "retryable": false
     },
     {
-      "code": "lens/version-conflict",
+      "code": "lens/not-found",
+      "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "lens/identifier-taken",
       "status": 409,
       "retryable": false
     },
@@ -2142,7 +2357,7 @@
       "id": "uploadTokenExpiresInSeconds",
       "value": 600,
       "unit": "seconds",
-      "description": "uploadTokens.sign's expiresInSeconds when omitted.",
+      "description": "uploadTokens.sign's expiresIn when omitted.",
       "observedBy": []
     },
     {
