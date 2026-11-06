@@ -32,6 +32,8 @@ final class Session
     public bool $deferUploadChecks = false;
     /** Content larger than this that the client can read again is uploaded in parts of this size. */
     public int $partSizeBytes = 8 * 1024 * 1024;
+    /** @var array<string, array> The lenses `ensureLenses` saw, by definition, so an unchanged one sends nothing. */
+    public array $ensuredLenses = [];
 
     public function __construct(
         #[\SensitiveParameter] private string $apiKey,

@@ -62,7 +62,7 @@ final class ClientTest extends TestCase
             'assets.retrieve' => fn () => $client->assets->retrieve(['assetId' => 'a', 'assetID' => 'b']),
             'assets.waitForDecision' => fn () => $client->assets->waitForDecision(['assetId' => 'a', 'timeoutSeconds' => 5]),
             'assets.listChildren' => fn () => iterator_to_array($client->assets->eachChild(['assetId' => 'a', 'filter' => 'name==a'])),
-            'assets.listTimeline' => fn () => $client->assets->listTimeline(['assetId' => 'a', 'ordering' => []]),
+            'assets.listTimeline' => fn () => $client->assets->listTimeline(['assetId' => 'a', 'sort' => 'createdAt']),
             'cdn.getAssetUrl' => fn () => $client->cdn->getAssetUrl(['assetId' => 'a', 'lenz' => 'thumbnail']),
             'uploadTokens.sign' => fn () => $client->uploadTokens->sign(['uploadPresetId' => 'preset_1', 'external' => 'x']),
             'ensureLenses' => fn () => $client->ensureLenses(['lens' => [['identifier' => 'thumbnail']]]),
@@ -138,7 +138,7 @@ final class ClientTest extends TestCase
         }
     }
 
-    public function testLensCacheBatchesAndInvalidatesOldVersions(): void
+    public function testLensCacheBatchesAndInvalidatesChangedDefinitions(): void
     {
         $calls = [];
         $client = new ServerClient('key', 'p', httpClient: new Client(['handler' => function ($request) use (&$calls) {
@@ -146,16 +146,45 @@ final class ClientTest extends TestCase
             $calls[] = $body['lenses'];
             return Create::promiseFor(new Response(200, [], json_encode($body)));
         }]));
-        $lenses = array_map(fn ($i) => ['identifier' => 'lens-' . $i, 'version' => 1, 'type' => 'image'], range(1, 101));
+        $lenses = array_map(fn ($i) => ['identifier' => 'lens-' . $i, 'name' => 'Lens', 'type' => 'image'], range(1, 101));
         self::assertSame($lenses, $client->ensureLenses(['lenses' => $lenses]));
         self::assertSame([100, 1], array_map('count', $calls));
         self::assertSame($lenses, $client->ensureLenses(['lenses' => $lenses]));
         self::assertCount(2, $calls);
-        $client->ensureLens(['identifier' => 'lens-1', 'version' => 2, 'type' => 'image']);
+        $client->ensureLens(['identifier' => 'lens-1', 'name' => 'Renamed', 'type' => 'image']);
         $client->ensureLens($lenses[0]);
         self::assertCount(4, $calls);
-        self::assertSame(2, $calls[2][0]['version']);
-        self::assertSame(1, $calls[3][0]['version']);
+        self::assertSame('Renamed', $calls[2][0]['name']);
+        self::assertSame('Lens', $calls[3][0]['name']);
+    }
+
+    /** A lens changed through `lenses` no longer has the definition `ensureLens` cached, so it is sent again. */
+    public function testLensChangesDropTheEnsureCache(): void
+    {
+        $definition = ['identifier' => 'thumb', 'name' => 'Thumb', 'type' => 'image', 'active' => true];
+        $lens = ['id' => 'lens-1', 'projectId' => 'p'] + $definition;
+        $methods = [];
+        $client = new ServerClient('key', 'p', httpClient: new Client(['handler' => function ($request) use (&$methods, $lens) {
+            $methods[] = $request->getMethod();
+            $body = match ($request->getMethod()) {
+                'PUT' => ['lenses' => [$lens]],
+                'DELETE' => new \stdClass(),
+                default => $lens,
+            };
+            return Create::promiseFor(new Response(200, [], json_encode($body)));
+        }]));
+        $client->ensureLens($definition);
+        $client->ensureLens($definition);
+        self::assertSame(['PUT'], $methods);
+        $client->lenses->update(['lensId' => 'lens-1', 'name' => 'Renamed']);
+        $client->ensureLens($definition);
+        self::assertSame(['PUT', 'PATCH', 'PUT'], $methods);
+        $client->lenses->delete(['lensId' => 'lens-1']);
+        $client->ensureLens($definition);
+        self::assertSame(['PUT', 'PATCH', 'PUT', 'DELETE', 'PUT'], $methods);
+        $client->lenses->create($definition);
+        $client->ensureLens($definition);
+        self::assertSame(['PUT', 'PATCH', 'PUT', 'DELETE', 'PUT', 'POST', 'PUT'], $methods);
     }
 
     public function testCdnStreamsBytesAndProtectsAuthenticationHeader(): void

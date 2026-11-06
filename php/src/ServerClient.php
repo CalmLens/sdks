@@ -31,12 +31,12 @@ final class ServerClient
     public readonly Folders $folders;
     public readonly HashLists $hashLists;
     public readonly Policies $policies;
+    public readonly Lenses $lenses;
     public readonly Events $events;
     public readonly Text $text;
     public readonly Cdn $cdn;
     public readonly UploadTokens $uploadTokens;
     private Session $session;
-    private array $lenses = [];
 
     /**
      * @param float $timeout seconds each API request attempt may take, reading the response included.
@@ -77,6 +77,7 @@ final class ServerClient
         $this->folders = new Folders($this->session);
         $this->hashLists = new HashLists($this->session);
         $this->policies = new Policies($this->session);
+        $this->lenses = new Lenses($this->session);
         $this->events = new Events($this->session);
         $this->text = new Text($this->assets);
         $this->cdn = new Cdn($this->session);
@@ -85,6 +86,10 @@ final class ServerClient
 
     public function __debugInfo(): array { return ['projectId' => $this->projectId]; }
 
+    /**
+     * Creates a named lens, or changes it to this definition. Sending the same definition again
+     * returns the lens unchanged, from the client's lens cache once it has seen it.
+     */
     public function ensureLens(array $options): array
     {
         Values::knownOptions($options, 'ensureLens');
@@ -93,6 +98,10 @@ final class ServerClient
         return $this->ensureLenses(['lenses' => [$options], 'requestOptions' => $request])[0];
     }
 
+    /**
+     * Creates or changes several named lenses, as `ensureLens` does. New definitions are sent in
+     * one request, or in consecutive requests of at most `ENSURE_LENSES_BATCH_SIZE`, in order.
+     */
     public function ensureLenses(array $options): array
     {
         Values::knownOptions($options, 'ensureLenses');
@@ -108,11 +117,11 @@ final class ServerClient
             }
             $key = Values::json(Values::canonical($definition));
             $keys[] = $key;
-            if (!isset($this->lenses[$key])) {
+            if (!isset($this->session->ensuredLenses[$key])) {
                 $missing[$key] = $definition;
             }
         }
-        $resolved = $this->lenses;
+        $resolved = $this->session->ensuredLenses;
         foreach (array_chunk($missing, self::ENSURE_LENSES_BATCH_SIZE, true) as $chunk) {
             $sent = array_values($chunk);
             $response = $this->session->request('PUT', $this->session->project('lenses'), body: ['lenses' => $sent], options: $options['requestOptions'] ?? []);
@@ -126,12 +135,12 @@ final class ServerClient
                 }
             }
             foreach (array_keys($chunk) as $index => $key) {
-                foreach ($this->lenses as $oldKey => $old) {
+                foreach ($this->session->ensuredLenses as $oldKey => $old) {
                     if ($old['identifier'] === $returned[$index]['identifier']) {
-                        unset($this->lenses[$oldKey]);
+                        unset($this->session->ensuredLenses[$oldKey]);
                     }
                 }
-                $resolved[$key] = $this->lenses[$key] = $returned[$index];
+                $resolved[$key] = $this->session->ensuredLenses[$key] = $returned[$index];
             }
         }
         return array_map(fn ($key) => $resolved[$key], $keys);

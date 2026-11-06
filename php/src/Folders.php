@@ -13,17 +13,25 @@ final class Folders extends Resource
     /**
      * One page of child folders (the project root without `parentId`), optionally matching a name
      * `search`. Pass the page's `nextCursor` as `cursor` for the next page; `pageSize` is 1 to 100
-     * (50 by default) and `ordering` one `name` (the default) or `createdAt` clause.
+     * (50 by default) and `sort` is `name` (the default) or `createdAt`, descending when prefixed
+     * with `-`.
      */
     public function list(array $options = []): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
         $page = $this->session->request('GET', $this->session->project('folders'), query: $api, options: $request);
-        if (!is_array($page) || !is_array($page['items'] ?? null) || !is_array($page['ancestors'] ?? null) || !is_bool($page['hasMore'] ?? null)) {
+        if (!is_array($page) || !is_array($page['items'] ?? null) || !is_array($page['ancestors'] ?? []) || !is_bool($page['hasMore'] ?? null)) {
             throw CalmLensException::create('sdk/invalid-response', 'Invalid folder page');
         }
         return $page;
     }
+
+    /** Yields every child folder `list` would, fetching pages as needed. */
+    public function each(array $options = []): \Generator
+    {
+        yield from $this->items($this->list(...), $options);
+    }
+
     public function create(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);

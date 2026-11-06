@@ -47,7 +47,7 @@ use Psr\Http\Message\ResponseInterface;
  * `asset.content-removed` and `asset.retried`. Every event names its `actor`: the mock API key
  * (`['type' => 'api-key', 'id' => null]`, as mock keys have no ID) for what the client does,
  * `automated` moderation for the pipeline's decisions, and a `user` for `decide`. The project starts on the organisation's own
- * General preset policy; the mock's presets have one release (version 1) and no settings, and policies never decide uploads.
+ * General preset policy, `live`; the mock's presets have one release (version 1), every category at its default action with no rules, and policies never decide uploads.
  *
  * Like the CDN, a safety hold refuses every resource, the placeholder included, with 403
  * `asset/not-available`. Then it checks delivery: blocked, purged and failed assets, and assets whose
@@ -106,14 +106,16 @@ final class MockServerClient
     /** An event type's shape (`resource.action`), as the mock checks `types` without the catalog. */
     private const EVENT_TYPE_PATTERN = '/^[a-z][a-z-]*\.[a-z][a-z-]*$/D';
     /** The client methods `failNextRequest` can target. */
-    public const OPERATIONS = ['assets.list', 'assets.search', 'assets.retrieve', 'assets.waitForDecision', 'assets.update',
-        'assets.listChildren', 'assets.listTimeline', 'assets.create', 'assets.classify', 'assets.uploadPart', 'assets.move',
-        'assets.retry', 'assets.explain', 'assets.decide', 'assets.removeContent', 'assets.delete', 'assets.batch', 'text.classify',
-        'cdn.serve', 'cdn.getAssetInfo', 'cdn.signAssetUrl', 'events.list', 'folders.list', 'folders.retrieve', 'folders.create', 'folders.update', 'folders.delete',
-        'folders.move', 'hashLists.list', 'hashLists.retrieve', 'hashLists.create', 'hashLists.update', 'hashLists.delete',
-        'hashLists.listEntries', 'hashLists.addEntry', 'hashLists.removeEntry', 'policies.list', 'policies.retrieve',
-        'policies.create', 'policies.update', 'policies.applyPreset', 'policies.setAutomaticUpdates', 'policies.delete',
-        'policies.assign', 'ensureLens', 'ensureLenses'];
+    public const OPERATIONS = ['assets.list', 'assets.each', 'assets.search', 'assets.retrieve', 'assets.waitForDecision', 'assets.update',
+        'assets.listChildren', 'assets.eachChild', 'assets.listTimeline', 'assets.eachTimelineSegment', 'assets.create', 'assets.classify',
+        'assets.uploadPart', 'assets.move', 'assets.retry', 'assets.explain', 'assets.decide', 'assets.removeContent', 'assets.delete',
+        'assets.batch', 'text.classify', 'cdn.serve', 'cdn.getAssetInfo', 'cdn.signAssetUrl', 'events.list', 'folders.list', 'folders.each',
+        'folders.retrieve', 'folders.create', 'folders.update', 'folders.delete', 'folders.move', 'hashLists.list', 'hashLists.each',
+        'hashLists.retrieve', 'hashLists.create', 'hashLists.update', 'hashLists.delete', 'hashLists.listEntries', 'hashLists.eachEntry',
+        'hashLists.addEntry', 'hashLists.removeEntry', 'policies.list', 'policies.each', 'policies.retrieve', 'policies.create',
+        'policies.update', 'policies.reset', 'policies.upgrade', 'policies.setAutomaticUpdates', 'policies.delete',
+        'policies.retrieveAssigned', 'policies.assign', 'lenses.list', 'lenses.each', 'lenses.create', 'lenses.retrieve',
+        'lenses.update', 'lenses.delete', 'ensureLens', 'ensureLenses'];
     private const ACTIVE_CONTENT_TYPES = ['image/svg+xml', 'application/xhtml+xml', 'text/html', 'application/xml', 'text/xml'];
 
     /** @var array<string, array> Assets by ID, with the API's field names. Change them to arrange a test. */
@@ -453,38 +455,45 @@ final class MockServerClient
         }
         $method = $request->getMethod();
         if (($parts[0] ?? null) === 'projects') {
-            if (($parts[2] ?? null) === 'policies' && isset($parts[3]) && count($parts) <= 5) {
-                $name = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'POST preset' => 'applyPreset',
-                    'PUT automatic-updates' => 'setAutomaticUpdates'][$method . ' ' . ($parts[4] ?? '')] ?? null;
-                return $name === null ? [] : ["policies.$name"];
-            }
             if (self::isTimelineRoute($method, $parts)) {
-                return ['assets.listTimeline'];
+                return ['assets.listTimeline', 'assets.eachTimelineSegment'];
             }
             $route = $method . ' ' . implode('/', array_slice($parts, 2));
             return match ($route) {
                 'GET events' => ['events.list'],
                 'PUT lenses' => ['ensureLenses', 'ensureLens'],
-                'GET folders' => ['folders.list'],
+                'GET lenses' => ['lenses.list', 'lenses.each'],
+                'POST lenses' => ['lenses.create'],
+                'GET folders' => ['folders.list', 'folders.each'],
                 'POST folders' => ['folders.create'],
-                'GET hash-lists' => ['hashLists.list'],
+                'GET hash-lists' => ['hashLists.list', 'hashLists.each'],
                 'POST hash-lists' => ['hashLists.create'],
-                'GET policies' => ['policies.list'],
-                'POST policies' => ['policies.create'],
+                'GET policy' => ['policies.retrieveAssigned'],
                 'PUT policy' => ['policies.assign'],
-                'GET assets' => ['assets.list'],
+                'GET assets' => ['assets.list', 'assets.each'],
                 'GET assets/search' => ['assets.search'],
                 'POST assets/batch' => ['assets.batch'],
                 'POST signed-asset-urls' => ['cdn.signAssetUrl'],
-                'POST assets' => self::flag($query['queue'] ?? null) ? ['assets.create'] : ['assets.classify', 'text.classify'],
+                'POST assets' => self::waits($query) ? ['assets.classify', 'text.classify'] : ['assets.create'],
                 default => [],
             };
         }
         $suffix = $parts[2] ?? '';
         $resource = $parts[0] ?? '';
+        if ($resource === 'policies' && count($parts) <= 3) {
+            $name = isset($parts[1])
+                ? ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'POST reset' => 'reset', 'POST upgrade' => 'upgrade',
+                    'PUT automatic-updates' => 'setAutomaticUpdates'][$method . ' ' . $suffix] ?? null
+                : ['GET' => 'list', 'POST' => 'create'][$method] ?? null;
+            return $name === null ? [] : ($name === 'list' ? ['policies.list', 'policies.each'] : ["policies.$name"]);
+        }
+        if ($resource === 'lenses' && isset($parts[1]) && !isset($parts[2])) {
+            $name = ['GET' => 'retrieve', 'PATCH' => 'update', 'DELETE' => 'delete'][$method] ?? null;
+            return $name === null ? [] : ["lenses.$name"];
+        }
         if ($resource === 'hash-lists' && isset($parts[1])) {
             $name = ['GET ' => 'retrieve', 'PATCH ' => 'update', 'DELETE ' => 'delete', 'GET entries' => 'listEntries', 'POST entries' => 'addEntry'][$method . ' ' . $suffix] ?? null;
-            return $name === null ? [] : ["hashLists.$name"];
+            return $name === null ? [] : ($name === 'listEntries' ? ['hashLists.listEntries', 'hashLists.eachEntry'] : ["hashLists.$name"]);
         }
         if ($resource === 'hash-list-entries' && isset($parts[1])) {
             return $method === 'DELETE' && $suffix === '' ? ['hashLists.removeEntry'] : [];
@@ -496,7 +505,11 @@ final class MockServerClient
         if ($name === null || !in_array($resource, ['assets', 'folders'], true)) {
             return [];
         }
-        return $name === 'retrieve' && $resource === 'assets' ? ['assets.retrieve', 'assets.waitForDecision'] : ["$resource.$name"];
+        return match (true) {
+            $name === 'retrieve' && $resource === 'assets' => ['assets.retrieve', 'assets.waitForDecision'],
+            $name === 'listChildren' => ['assets.listChildren', 'assets.eachChild'],
+            default => ["$resource.$name"],
+        };
     }
 
     /**
@@ -667,9 +680,6 @@ final class MockServerClient
             if (($parts[1] ?? null) !== $this->projectId) {
                 self::fail(ErrorCodes::API_KEY_PROJECT_MISMATCH);
             }
-            if (($parts[2] ?? null) === 'policies' && isset($parts[3]) && count($parts) <= 5) {
-                return $this->policyRoute($method, $parts[3], $parts[4] ?? '', $json);
-            }
             if (self::isTimelineRoute($method, $parts)) {
                 return $this->timeline($parts[3], $query);
             }
@@ -677,21 +687,35 @@ final class MockServerClient
             return match (true) {
                 $route === 'GET events' => $this->listEvents($query),
                 $route === 'PUT lenses' => $this->saveLenses($json['lenses'] ?? []),
+                $route === 'GET lenses' => $this->page($this->lenses, $query, Values::json(['lenses', $this->projectId])),
+                $route === 'POST lenses' => $this->createLens($json),
                 $route === 'GET folders' => $this->listFolders($query),
                 $route === 'POST folders' => $this->createFolder($json),
                 $route === 'GET hash-lists' => $this->page($this->hashLists, $query, $this->projectId . '/hash-lists'),
                 $route === 'POST hash-lists' => $this->createHashList($json),
-                $route === 'GET policies' => $this->listPolicies(),
-                $route === 'POST policies' => $this->createPolicy($json),
+                $route === 'GET policy' => $this->toPolicy($this->policy($this->ensurePolicies())),
                 $route === 'PUT policy' => $this->assignPolicy($json),
                 $route === 'GET assets' => $this->listAssets($query),
                 $route === 'GET assets/search' => $this->search($query),
                 $route === 'POST assets/batch' => $this->batch($json),
                 $route === 'POST signed-asset-urls' => $this->signAssetUrl($json),
-                $route === 'POST assets' && $upload === '' => $this->createAsset($json, self::flag($query['queue'] ?? null), null, false),
-                $route === 'POST assets' && in_array($upload, ['content', 'part'], true) => $this->createAsset($query, self::flag($query['queue'] ?? null), $body, $upload === 'part'),
+                $route === 'POST assets' && $upload === '' => $this->createAsset($json, !self::waits($query), null, false),
+                $route === 'POST assets' && in_array($upload, ['content', 'part'], true) => $this->createAsset($query, !self::waits($query), $body, $upload === 'part'),
                 default => throw new \LogicException("MockServerClient does not emulate $route; enqueue a response for it"),
             };
+        }
+        if (($parts[0] ?? null) === 'policies' && count($parts) <= 3) {
+            if (!isset($parts[1])) {
+                return match ($method) {
+                    'GET' => $this->listPolicies($query),
+                    'POST' => $this->createPolicy($json),
+                    default => throw new \LogicException("MockServerClient does not emulate $method /policies; enqueue a response for it"),
+                };
+            }
+            return $this->policyRoute($method, $parts[1], $parts[2] ?? '', $json);
+        }
+        if (($parts[0] ?? null) === 'lenses' && isset($parts[1]) && !isset($parts[2])) {
+            return $this->lensRoute($method, $parts[1], $json);
         }
         if (($parts[0] ?? null) === 'folders' && isset($parts[1])) {
             return $this->folderRoute($method, $parts[1], $parts[2] ?? '', $json);
@@ -787,6 +811,9 @@ final class MockServerClient
     }
 
     private static function flag(mixed $value): bool { return $value === 'true' || $value === true; }
+
+    /** Whether an upload waits for its decision: unless it sends `wait=false`, like the API. */
+    private static function waits(array $query): bool { return ($query['wait'] ?? null) !== 'false'; }
 
     /** `GET /projects/:projectId/assets/:assetId/timeline`. */
     private static function isTimelineRoute(string $method, array $parts): bool
@@ -910,8 +937,8 @@ final class MockServerClient
             'createdAt' => $now, 'updatedAt' => $now, 'name' => $options['name'] ?? null,
             'description' => $options['description'] ?? null, 'externalId' => $options['externalId'] ?? null,
             'externalUrl' => $url ?? ($multipart ? null : ($options['externalUrl'] ?? null)),
-            'type' => $type, 'metadata' => $decode('metadata'),
-            'authorId' => $options['authorId'] ?? null, 'context' => $context === [] ? null : ['items' => $context], 'tags' => $decode('tags'),
+            'type' => $type, 'metadata' => $decode('metadata') ?? [],
+            'authorId' => $options['authorId'] ?? null, 'context' => $context === [] ? null : ['items' => $context], 'tags' => $decode('tags') ?? [],
             'visibility' => $options['visibility'] ?? 'private',
             'content' => ['status' => $keep ? 'stored' : 'temporary', 'removalReason' => null, 'updatedAt' => $now,
                 'safetyHold' => null, 'format' => $mime === '' ? null : $mime, 'extension' => null, 'sizeInBytes' => $size,
@@ -924,7 +951,11 @@ final class MockServerClient
             'classification' => ['status' => $final ? 'processing' : 'queued', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
                 // The mock analyses nothing in sections, and never reads test inputs.
                 'progress' => null, 'testInput' => false,
-                'moderation' => ['status' => 'pending', 'manualReviews' => [], 'flaggedCategories' => [], 'regions' => [], 'timeline' => null]],
+                'moderation' => ['status' => 'pending', 'manualReviews' => [], 'automatedStatus' => null, 'source' => null, 'rule' => null,
+                    'explanationComplete' => null, 'categories' => null, 'flaggedCategories' => [], 'regions' => [], 'raw' => null,
+                    'linkSafety' => null, 'timeline' => null],
+                // Like the API, a feature's result is null until it has run.
+                'ocr' => null, 'linkDetection' => null],
         ];
         if ($bytes !== null && $final) {
             $asset['content'] = array_replace($asset['content'], self::rendering($asset, false));
@@ -964,7 +995,9 @@ final class MockServerClient
 
     /**
      * Stores `$asset` decided as `$decision` says, with its report. Like the API for an image with
-     * nobody in it, a decided image reports the person and face detection its upload turned on.
+     * no text, QR codes, links, people or faces in it, a decided image reports the features its
+     * upload turned on as finding nothing: OCR and person and face detection when requested, link
+     * detection unless turned off.
      */
     private function decided(array $asset, MockDecision $decision): array
     {
@@ -973,11 +1006,17 @@ final class MockServerClient
             return $next;
         }
         $features = $this->processingOptions[$asset['id']]['features'] ?? null;
+        if (($features['ocr']['enabled'] ?? null) === true) {
+            $next['classification']['ocr'] = ['status' => 'evaluated', 'textRegions' => []];
+        }
+        if (($features['linkDetection']['enabled'] ?? null) !== false) {
+            $next['classification']['linkDetection'] = ['status' => 'evaluated', 'qrCodes' => [], 'links' => []];
+        }
         if (($features['personDetection']['enabled'] ?? null) === true) {
-            $next['classification']['personDetection'] = ['status' => 'evaluated', 'stage' => 'beta', 'people' => []];
+            $next['classification']['personDetection'] = ['status' => 'evaluated', 'people' => []];
         }
         if (($features['faceDetection']['enabled'] ?? null) === true) {
-            $next['classification']['faceDetection'] = ['status' => 'evaluated', 'stage' => 'beta', 'faces' => []];
+            $next['classification']['faceDetection'] = ['status' => 'evaluated', 'faces' => []];
         }
         return $this->assets[$next['id']] = $next;
     }
@@ -1064,8 +1103,8 @@ final class MockServerClient
         if (!$final) {
             return $asset;
         }
-        // The queue mode saved when the upload started, unless this part overrides it.
-        $queue = array_key_exists('queue', $query) ? self::flag($query['queue']) : $upload['queue'];
+        // `wait=false` queues the final part; without `wait`, the choice saved when the upload started applies.
+        $queue = array_key_exists('wait', $query) ? !self::waits($query) : $upload['queue'];
         unset($this->uploads[$id]);
         return $this->finish($this->applyOutcome($asset, 'pending'), $queue);
     }
@@ -1352,9 +1391,7 @@ final class MockServerClient
 
     private function listAssets(array $query): array
     {
-        $folderId = $query['folderId'] ?? null;
-        $items = array_filter($this->assets, fn ($asset) => $folderId === null || $asset['folderId'] === $folderId);
-        return $this->page($items, $query, Values::json([$this->projectId, $query['filter'] ?? null, $folderId]));
+        return $this->page($this->assets, $query, Values::json([$this->projectId, $query['filter'] ?? null]));
     }
 
     /** A page size from the query, refused like the API's schema outside 1 to `$max`. */
@@ -1384,48 +1421,65 @@ final class MockServerClient
     private function timeline(string $assetId, array $query): array
     {
         $asset = $this->assets[$assetId] ?? self::fail(ErrorCodes::ASSET_NOT_FOUND, null, 'Asset not found');
-        $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
+        self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
         if (($asset['content']['safetyHold'] ?? null) !== null) {
             self::fail(ErrorCodes::ASSET_HELD, null, 'This asset is held', ['hold' => 'safety']);
         }
         if (array_key_exists('cursor', $query)) {
             self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
         }
-        return ['items' => [], 'nextCursor' => null, 'pageSize' => $size, 'hasMore' => false, 'ordering' => []];
+        return ['items' => [], 'nextCursor' => null, 'hasMore' => false];
     }
 
     /**
-     * One keyset page like the API's: the query's ordering is checked first, like its schema
-     * (`createdAt` or `id`, at most two), then the filter, then the cursor. Ordered with an `id`
-     * tie-breaker, resuming after the cursor's values. A cursor only continues the query
-     * (`$scope` and ordering) it came from.
+     * A `sort` query value as the API reads it: comma-separated fields from `$fields`, each
+     * descending when prefixed with `-`, none repeated and at most `$max`; anything else is
+     * `validation/invalid-value` at `sort`. Null when the query sends none.
+     *
+     * @return ?list<array{field: string, direction: string}>
      */
-    private function page(array $items, array $query, string $scope): array
+    private static function sort(array $query, array $fields, int $max): ?array
+    {
+        if (!array_key_exists('sort', $query)) {
+            return null;
+        }
+        $value = $query['sort'];
+        $sort = [];
+        foreach (is_string($value) ? explode(',', $value) : [null] as $part) {
+            $part = trim((string) $part);
+            $field = ltrim($part, '-');
+            if (!preg_match('/^-?[A-Za-z][A-Za-z0-9.]*$/D', $part) || !in_array($field, $fields, true)
+                || in_array($field, array_column($sort, 'field'), true)) {
+                self::invalid(ErrorCodes::INVALID_VALUE, 'sort');
+            }
+            $sort[] = ['field' => $field, 'direction' => str_starts_with($part, '-') ? 'desc' : 'asc'];
+        }
+        if (count($sort) > $max) {
+            self::invalid(ErrorCodes::INVALID_VALUE, 'sort');
+        }
+        return $sort;
+    }
+
+    /**
+     * One keyset page like the API's: the query's `sort` is checked first, like its schema
+     * (`createdAt` or `id`, at most two), then the filter, then the cursor. Ordered by `sort`
+     * (`$defaultSort` without one) with an `id` tie-breaker, resuming after the cursor's values. A
+     * cursor only continues the query (`$scope` and sort) it came from.
+     */
+    private function page(array $items, array $query, string $scope, array $defaultSort = [['field' => 'createdAt', 'direction' => 'desc']]): array
     {
         $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
-        $ordering = is_array($query['ordering'] ?? null) && $query['ordering'] !== [] ? array_values($query['ordering']) : [['field' => 'createdAt', 'direction' => 'desc']];
-        foreach ($ordering as $i => $order) {
-            if (!in_array($order['field'] ?? null, ['createdAt', 'id'], true)) {
-                self::invalid(ErrorCodes::INVALID_VALUE, "ordering.$i.field");
-            }
-            $ordering[$i]['direction'] ??= 'asc';
-            if (!in_array($ordering[$i]['direction'], ['asc', 'desc'], true)) {
-                self::invalid(ErrorCodes::INVALID_VALUE, "ordering.$i.direction");
-            }
-        }
-        if (count($ordering) > 2) {
-            self::invalid('validation/too-big', 'ordering');
-        }
+        $sort = self::sort($query, ['createdAt', 'id'], 2) ?: $defaultSort;
         $items = array_values($items);
         if (($query['filter'] ?? '') !== '') {
             $items = array_values(array_filter($items, self::filter((string) $query['filter'])));
         }
-        if (!in_array('id', array_column($ordering, 'field'), true)) {
-            $ordering[] = ['field' => 'id', 'direction' => $ordering[0]['direction']];
+        if (!in_array('id', array_column($sort, 'field'), true)) {
+            $sort[] = ['field' => 'id', 'direction' => $sort[0]['direction']];
         }
         $compare = fn ($a, $b): int => is_string($a) || is_string($b) ? strcmp((string) $a, (string) $b) : $a <=> $b;
-        usort($items, function (array $a, array $b) use ($ordering, $compare): int {
-            foreach ($ordering as $order) {
+        usort($items, function (array $a, array $b) use ($sort, $compare): int {
+            foreach ($sort as $order) {
                 $result = $compare($a[$order['field']] ?? null, $b[$order['field']] ?? null);
                 if ($result !== 0) {
                     return $order['direction'] === 'desc' ? -$result : $result;
@@ -1433,17 +1487,17 @@ final class MockServerClient
             }
             return 0;
         });
-        $signature = Values::json([$scope, $ordering]);
+        $signature = Values::json([$scope, $sort]);
         if (isset($query['cursor'])) {
             $decoded = base64_decode((string) $query['cursor'], true);
             $cursor = $decoded === false ? null : json_decode($decoded, true);
             $after = $cursor['values'] ?? null;
-            if (!is_array($cursor) || ($cursor['scope'] ?? null) !== $signature || !is_array($after) || !array_is_list($after) || count($after) !== count($ordering)) {
+            if (!is_array($cursor) || ($cursor['scope'] ?? null) !== $signature || !is_array($after) || !array_is_list($after) || count($after) !== count($sort)) {
                 self::fail(ErrorCodes::INVALID_CURSOR, null, 'The cursor is invalid or belongs to a different query.');
             }
             // Keyset: resume strictly after the last returned item's values.
-            $items = array_values(array_filter($items, function (array $item) use ($ordering, $after, $compare): bool {
-                foreach ($ordering as $i => $order) {
+            $items = array_values(array_filter($items, function (array $item) use ($sort, $after, $compare): bool {
+                foreach ($sort as $i => $order) {
                     $result = $compare($item[$order['field']] ?? null, $after[$i]);
                     if ($result !== 0) {
                         return ($order['direction'] === 'desc' ? -$result : $result) > 0;
@@ -1456,8 +1510,8 @@ final class MockServerClient
         $taken = array_slice($items, 0, $size);
         $last = $taken === [] ? null : $taken[array_key_last($taken)];
         $cursor = $more && $last !== null
-            ? base64_encode(Values::json(['scope' => $signature, 'values' => array_map(fn (array $order) => $last[$order['field']] ?? null, $ordering)])) : null;
-        return ['items' => $taken, 'pageSize' => $size, 'hasMore' => $more, 'ordering' => $ordering, 'nextCursor' => $cursor];
+            ? base64_encode(Values::json(['scope' => $signature, 'values' => array_map(fn (array $order) => $last[$order['field']] ?? null, $sort)])) : null;
+        return ['items' => $taken, 'hasMore' => $more, 'nextCursor' => $cursor];
     }
 
     /**
@@ -1690,7 +1744,7 @@ final class MockServerClient
      */
     private function search(array $query): array
     {
-        // Like the API's query schema: a trimmed query of 1 to 200 characters, a limit of 1 to 20.
+        // Like the API's query schema: a trimmed query of 1 to 200 characters, 1 to 20 results.
         $text = trim((string) ($query['query'] ?? ''));
         if ($text === '') {
             self::invalid('validation/too-small', 'query');
@@ -1698,7 +1752,7 @@ final class MockServerClient
         if (mb_strlen($text) > 200) {
             self::invalid('validation/too-big', 'query');
         }
-        $limit = self::size($query, 'limit', 10, 20);
+        $limit = self::size($query, 'pageSize', 10, 20);
         $normalized = strtolower($text);
         $tokens = array_slice(array_values(array_unique(preg_split('/\s+/', $normalized))), 0, 8);
         $items = [];
@@ -1784,18 +1838,8 @@ final class MockServerClient
         $size = self::size($query, 'pageSize', self::DEFAULT_PAGE_SIZE, self::MAX_PAGE_SIZE);
         $search = strtolower((string) ($query['search'] ?? ''));
         $parentId = $query['parentId'] ?? null;
-        $ordering = is_array($query['ordering'] ?? null) ? array_values($query['ordering']) : [];
-        if (count($ordering) > 1) {
-            self::invalid('validation/too-big', 'ordering');
-        }
-        $field = $ordering[0]['field'] ?? 'name';
-        $direction = $ordering[0]['direction'] ?? 'asc';
-        if (!in_array($field, ['name', 'createdAt'], true)) {
-            self::invalid('validation/invalid-value', 'ordering.0.field');
-        }
-        if (!in_array($direction, ['asc', 'desc'], true)) {
-            self::invalid('validation/invalid-value', 'ordering.0.direction');
-        }
+        // The folder list sorts by one field, `name` or `createdAt`.
+        ['field' => $field, 'direction' => $direction] = (self::sort($query, ['name', 'createdAt'], 1) ?: [['field' => 'name', 'direction' => 'asc']])[0];
         $sign = $direction === 'desc' ? -1 : 1;
         // Like the database: names compare by code point, so case matters; IDs break ties.
         $compare = fn ($a, $b, string $aId, string $bId): int => $sign * ((is_string($a) ? strcmp($a, (string) $b) : $a <=> $b) ?: strcmp($aId, $bId));
@@ -1827,8 +1871,7 @@ final class MockServerClient
         $ancestors = array_values(array_filter($this->folders, fn ($folder) => isset($ids[$folder['id']]) && !in_array($folder['id'], $inPage, true)));
         $last = $page === [] ? null : $page[array_key_last($page)];
         $next = $more ? base64_encode(Values::json(['scope' => $signature, 'value' => $last[$field], 'id' => $last['id']])) : null;
-        return ['items' => $page, 'ancestors' => $ancestors, 'nextCursor' => $next, 'pageSize' => $size, 'hasMore' => $more,
-            'ordering' => [['field' => $field, 'direction' => $direction]]];
+        return ['items' => $page, 'ancestors' => $ancestors, 'nextCursor' => $next, 'hasMore' => $more];
     }
 
     private function folderRoute(string $method, string $id, string $suffix, array $json): ?array
@@ -1999,31 +2042,77 @@ final class MockServerClient
     }
 
     // Policies: the project starts on the organisation's own General preset policy, following
-    // automatic updates. The mock holds no built-in preset settings: a preset's settings are
-    // `{"categorySettings": {}}` at version 1, and uploads are never decided by a policy.
+    // automatic updates (mode `live`). The mock's presets have one release, version 1, with
+    // `presetSettings()`, and uploads are never decided by a policy.
 
     /** The built-in presets the mock knows, by display name. */
     private const PRESET_NAMES = ['general-community' => 'General', 'children-platform' => 'Kids',
         'education-support' => 'Learning and support', 'wholesome-community' => 'Teen-safe'];
 
-    /** @var array<string, array> Policies by ID, without `preset.latestVersion` and `projectIds`, each with its reset `baseline`. */
+    /**
+     * @var array<string, array> Policies by ID, without `preset.latestVersion`, `preset.mode` and
+     *   `projectIds`, each with its reset `baseline`, its `preset.own` and whether it follows its
+     *   preset (`followsPreset`, mode `live`).
+     */
     private array $policies = [];
     private ?string $projectPolicyId = null;
 
-    private function ensurePolicies(): void
+    /** The project's policy, after creating the organisation's own General policy on first use. */
+    private function ensurePolicies(): string
     {
-        if ($this->projectPolicyId === null) {
-            $this->projectPolicyId = $this->newPolicy('General', '', self::emptySettings(), true, 'general-community', true)['id'];
+        return $this->projectPolicyId ??= $this->newPolicy('General', '', self::presetSettings(), true, 'general-community', true)['id'];
+    }
+
+    /**
+     * The settings of the mock's presets: every category with its default action (`allow` for
+     * personal information and profanity, `block` otherwise) and no rules.
+     */
+    private static function presetSettings(): array
+    {
+        $categories = [];
+        foreach (Classification::CATEGORIES as $category) {
+            $categories[$category] = ['action' => in_array($category, ['personal-information', 'profanity'], true) ? 'allow' : 'block',
+                'allowances' => [], 'restrictions' => []];
+        }
+        return ['categorySettings' => $categories];
+    }
+
+    /**
+     * Refuses settings the API refuses: every category, each with an `action` and its `allowances`
+     * and `restrictions` lists, and no other category.
+     */
+    private static function checkPolicySettings(mixed $settings): void
+    {
+        $categories = is_array($settings) ? ($settings['categorySettings'] ?? null) : null;
+        if (!is_array($categories) || ($categories !== [] && array_is_list($categories))) {
+            self::invalid('validation/invalid-type', 'settings.categorySettings');
+        }
+        foreach (Classification::CATEGORIES as $category) {
+            $value = $categories[$category] ?? null;
+            if (!is_array($value) || ($value !== [] && array_is_list($value))) {
+                self::invalid('validation/invalid-type', "settings.categorySettings.$category");
+            }
+            foreach (['allowances', 'restrictions'] as $key) {
+                if (!is_array($value[$key] ?? null) || !array_is_list($value[$key])) {
+                    self::invalid('validation/invalid-type', "settings.categorySettings.$category.$key");
+                }
+            }
+            if (!is_string($value['action'] ?? null)) {
+                self::invalid(ErrorCodes::INVALID_VALUE, "settings.categorySettings.$category.action");
+            }
+        }
+        foreach (array_keys($categories) as $key) {
+            if (!in_array($key, Classification::CATEGORIES, true)) {
+                self::invalid('validation/unknown-field', "settings.categorySettings.$key");
+            }
         }
     }
 
-    private static function emptySettings(): array { return ['categorySettings' => new \stdClass()]; }
-
-    private function newPolicy(string $name, string $description, array $settings, bool $automaticUpdates, ?string $preset, bool $presetOwn): array
+    private function newPolicy(string $name, string $description, array $settings, bool $followsPreset, ?string $preset, bool $presetOwn): array
     {
         $now = ($this->now)();
         $policy = ['id' => ($this->createId)('pol'), 'name' => $name, 'description' => $description, 'settings' => $settings,
-            'revision' => 1, 'automaticUpdates' => $automaticUpdates,
+            'revision' => 1, 'followsPreset' => $followsPreset,
             'preset' => $preset === null ? null : ['id' => $preset, 'version' => 1, 'own' => $presetOwn],
             'createdAt' => $now, 'updatedAt' => $now, 'baseline' => $settings];
         return $this->policies[$policy['id']] = $policy;
@@ -2032,9 +2121,11 @@ final class MockServerClient
     /** A stored policy as the API shows it. */
     private function toPolicy(array $policy): array
     {
-        $shown = array_diff_key($policy, ['baseline' => true, 'createdAt' => true, 'updatedAt' => true]);
+        $shown = array_diff_key($policy, ['baseline' => true, 'followsPreset' => true, 'createdAt' => true, 'updatedAt' => true]);
         if ($shown['preset'] !== null) {
-            $shown['preset']['latestVersion'] = 1;
+            $preset = $shown['preset'];
+            $shown['preset'] = ['id' => $preset['id'], 'version' => $preset['version'], 'latestVersion' => 1,
+                'mode' => $preset['own'] ? ($policy['followsPreset'] ? 'live' : 'pinned') : 'copy'];
         }
         return $shown + ['projectIds' => $policy['id'] === $this->projectPolicyId ? [$this->projectId] : [],
             'createdAt' => $policy['createdAt'], 'updatedAt' => $policy['updatedAt']];
@@ -2046,11 +2137,12 @@ final class MockServerClient
         return (is_string($id) ? $this->policies[$id] ?? null : null) ?? self::fail(ErrorCodes::POLICY_NOT_FOUND, null, 'Policy not found.');
     }
 
-    private function listPolicies(): array
+    /** A page of the organisation's policies, oldest first unless `sort` says otherwise. */
+    private function listPolicies(array $query): array
     {
         $this->ensurePolicies();
-        return ['policies' => array_values(array_map(fn (array $policy) => $this->toPolicy($policy), $this->policies)),
-            'projectPolicyId' => $this->projectPolicyId];
+        return $this->page(array_map(fn (array $policy) => $this->toPolicy($policy), $this->policies), $query,
+            Values::json(['policies', $this->projectId]), [['field' => 'createdAt', 'direction' => 'asc']]);
     }
 
     private function createPolicy(array $json): array
@@ -2060,11 +2152,14 @@ final class MockServerClient
         $preset = is_string($json['presetId'] ?? null) ? $json['presetId'] : null;
         $settings = $json['settings'] ?? null;
         if (($settings === null) === ($preset === null) || ($preset !== null && !isset(self::PRESET_NAMES[$preset]))
-            || ($preset === null && (!is_string($name) || trim($name) === '')) || ($settings !== null && !is_array($settings))) {
+            || ($preset === null && (!is_string($name) || trim($name) === ''))) {
             self::fail(ErrorCodes::INVALID_VALUE, null, 'Send settings with a name, or presetId');
         }
+        if ($preset === null) {
+            self::checkPolicySettings($settings);
+        }
         $policy = $this->newPolicy(is_string($name) && trim($name) !== '' ? trim($name) : self::PRESET_NAMES[$preset],
-            is_string($json['description'] ?? null) ? $json['description'] : '', $preset !== null ? self::emptySettings() : $settings,
+            is_string($json['description'] ?? null) ? $json['description'] : '', $preset !== null ? self::presetSettings() : $settings,
             false, $preset, false);
         // Like the API, a new policy is 201 Created.
         $this->status = 201;
@@ -2081,7 +2176,7 @@ final class MockServerClient
         return $this->toPolicy($this->policies[$policy['id']] = $saved);
     }
 
-    /** GET, PATCH and DELETE /projects/:id/policies/:policyId, its preset and its automatic updates, like the API. */
+    /** GET, PATCH and DELETE /policies/:policyId, its reset, upgrade and automatic updates, like the API. */
     private function policyRoute(string $method, string $id, string $action, array $json): ?array
     {
         $policy = $this->policy($id);
@@ -2090,13 +2185,16 @@ final class MockServerClient
             case 'GET ':
                 return $this->toPolicy($policy);
             case 'PATCH ':
+                if (array_key_exists('settings', $json)) {
+                    self::checkPolicySettings($json['settings']);
+                }
                 return $this->savePolicy($policy, $json['revision'] ?? null, array_filter([
                     'name' => is_string($json['name'] ?? null) ? trim($json['name']) : null,
                     'description' => is_string($json['description'] ?? null) ? $json['description'] : null,
                     'settings' => $json['settings'] ?? null,
                 ], fn ($value) => $value !== null) + [
-                    // Saving a policy that follows its preset pins it as a copy.
-                    'automaticUpdates' => false,
+                    // Saving a `live` policy pins it.
+                    'followsPreset' => false,
                 ]);
             case 'DELETE ':
                 if ($id === $this->projectPolicyId) {
@@ -2104,21 +2202,22 @@ final class MockServerClient
                 }
                 unset($this->policies[$id]);
                 return null;
-            case 'POST preset':
-                if ($preset === null || $policy['automaticUpdates']) {
+            case 'POST reset':
+            case 'POST upgrade':
+                if ($preset === null || $policy['followsPreset']) {
                     self::fail(ErrorCodes::POLICY_NO_PRESET, null, 'This policy has no preset baseline.');
                 }
                 if (($json['presetVersion'] ?? null) !== $preset['version']) {
                     self::fail(ErrorCodes::POLICY_PRESET_VERSION_CONFLICT, null, 'The preset changed.');
                 }
-                // The mock's presets have one release, so an update never has a newer one to apply.
-                if (($json['operation'] ?? null) === 'update') {
-                    self::fail(ErrorCodes::POLICY_PRESET_UPDATE_UNAVAILABLE, null, 'Only an unchanged copy of an older preset version can be updated.');
+                // The mock's presets have one release, so an upgrade never has a newer one to apply.
+                if ($action === 'upgrade') {
+                    self::fail(ErrorCodes::POLICY_PRESET_UPDATE_UNAVAILABLE, null, 'Only an unchanged policy on an older preset release can be upgraded.');
                 }
                 return $this->savePolicy($policy, $json['revision'] ?? null, ['settings' => $policy['baseline']]);
             case 'PUT automatic-updates':
                 $enabled = ($json['enabled'] ?? null) === true;
-                if (!($preset['own'] ?? false) || $policy['automaticUpdates'] === $enabled) {
+                if (!($preset['own'] ?? false) || $policy['followsPreset'] === $enabled) {
                     self::fail(ErrorCodes::POLICY_AUTOMATIC_UPDATES_UNAVAILABLE, null, "Automatic updates can't be switched this way for this policy.");
                 }
                 if (($json['revision'] ?? null) !== $policy['revision']) {
@@ -2127,10 +2226,10 @@ final class MockServerClient
                 if (($json['presetVersion'] ?? null) !== 1) {
                     self::fail(ErrorCodes::POLICY_PRESET_VERSION_CONFLICT, null, 'The preset changed.');
                 }
-                return $this->savePolicy($policy, $json['revision'], ['automaticUpdates' => $enabled] + ($enabled
+                return $this->savePolicy($policy, $json['revision'], ['followsPreset' => $enabled] + ($enabled
                     ? ['name' => self::PRESET_NAMES[$preset['id']], 'description' => '', 'settings' => $policy['baseline']] : []));
         }
-        throw new \LogicException("MockServerClient does not emulate $method /projects/{$this->projectId}/policies/$id/$action; enqueue a response for it");
+        throw new \LogicException("MockServerClient does not emulate $method /policies/$id/$action; enqueue a response for it");
     }
 
     private function assignPolicy(array $json): array
@@ -2141,38 +2240,78 @@ final class MockServerClient
     }
 
     /**
-     * Saves each definition in order, like the API: an unchanged one returns the stored lens, a
-     * changed one needs a greater version (`lens/version-conflict` otherwise, after the earlier
-     * definitions are saved).
+     * Saves each definition in order, like the API: a new identifier creates a lens, an unchanged
+     * definition returns the stored lens, and a changed one updates it in place.
      */
     private function saveLenses(array $definitions): array
     {
         $saved = [];
         foreach ($definitions as $definition) {
             $old = $this->lenses[$definition['identifier']] ?? null;
-            $now = ($this->now)();
-            if ($old === null) {
-                $saved[] = $this->lenses[$definition['identifier']] = ['id' => ($this->createId)('lens'), 'projectId' => $this->projectId]
-                    + $definition + ['createdAt' => $now, 'updatedAt' => $now];
-                continue;
-            }
-            $same = ($old['name'] ?? null) === ($definition['name'] ?? null)
-                && ($old['description'] ?? null) === ($definition['description'] ?? null)
-                && ($old['type'] ?? null) === ($definition['type'] ?? null)
-                && ($old['active'] ?? null) === ($definition['active'] ?? null)
-                && Values::json(Values::canonical($old['transform'] ?? null)) === Values::json(Values::canonical($definition['transform'] ?? null));
-            if ($same && ($old['version'] ?? null) === ($definition['version'] ?? null)) {
-                $saved[] = $old;
-                continue;
-            }
-            if (($definition['version'] ?? 0) > ($old['version'] ?? 0)) {
-                $saved[] = $this->lenses[$definition['identifier']] = array_replace($old, $definition, ['updatedAt' => $now]);
-                continue;
-            }
-            self::fail(ErrorCodes::LENS_VERSION_CONFLICT, null, 'A changed lens needs a greater version',
-                ['currentVersion' => $old['version'], 'minimumVersion' => $old['version'] + 1, 'requestedVersion' => $definition['version'] ?? null]);
+            $saved[] = $old === null ? $this->saveNewLens($definition) : $this->changeLens($old, $definition);
         }
         return ['lenses' => $saved];
+    }
+
+    private function saveNewLens(array $definition): array
+    {
+        $now = ($this->now)();
+        return $this->lenses[$definition['identifier']] = ['id' => ($this->createId)('lens'), 'projectId' => $this->projectId]
+            + $definition + ['createdAt' => $now, 'updatedAt' => $now];
+    }
+
+    /** `$old` with `$definition`'s fields, saved unless nothing changed. */
+    private function changeLens(array $old, array $definition): array
+    {
+        $same = true;
+        foreach (['name', 'description', 'type', 'active'] as $field) {
+            if (array_key_exists($field, $definition) && ($old[$field] ?? null) !== $definition[$field]) {
+                $same = false;
+            }
+        }
+        if (array_key_exists('transform', $definition)
+            && Values::json(Values::canonical($old['transform'] ?? null)) !== Values::json(Values::canonical($definition['transform']))) {
+            $same = false;
+        }
+        if ($same) {
+            return $old;
+        }
+        return $this->lenses[$old['identifier']] = array_replace($old, $definition, ['updatedAt' => ($this->now)()]);
+    }
+
+    /** POST /projects/:projectId/lenses: a lens whose identifier is new to the project. */
+    private function createLens(array $json): array
+    {
+        if (!is_string($json['identifier'] ?? null) || $json['identifier'] === '') {
+            self::invalid('validation/invalid-type', 'identifier');
+        }
+        if (isset($this->lenses[$json['identifier']])) {
+            self::fail(ErrorCodes::LENS_IDENTIFIER_TAKEN, null, 'The project already has a lens with this identifier.', ['identifier' => $json['identifier']]);
+        }
+        $this->status = 201;
+        return $this->saveNewLens($json);
+    }
+
+    /** GET, PATCH and DELETE /lenses/:lensId, like the API; an update can't change the identifier. */
+    private function lensRoute(string $method, string $id, array $json): ?array
+    {
+        $lens = null;
+        foreach ($this->lenses as $candidate) {
+            if ($candidate['id'] === $id) {
+                $lens = $candidate;
+            }
+        }
+        $lens ??= self::fail(ErrorCodes::LENS_NOT_FOUND, null, 'Lens not found.');
+        switch ($method) {
+            case 'GET':
+                return $lens;
+            case 'PATCH':
+                return $this->changeLens($lens, array_diff_key($json, ['identifier' => true, 'id' => true, 'projectId' => true]));
+            case 'DELETE':
+                unset($this->lenses[$lens['identifier']]);
+                return null;
+        }
+        throw new \LogicException("MockServerClient does not emulate $method /lenses/$id; enqueue a response for it");
     }
 
     private function canDownload(?string $folderId): bool

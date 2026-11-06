@@ -18,10 +18,10 @@ final class Moderation
     /** Statuses that are decisions. Anything else CalmLens may add later is treated as pending. */
     public const DECIDED = ['allowed', 'limited', 'age-restricted', 'blocked', 'purged'];
 
-    // Lenses are named, versioned CDN transformations. Bump `version` when you change one.
+    // Lenses are named CDN transformations. ensureLens creates this one, or changes it to this definition.
     private const FEED_LENS = [
         'identifier' => 'chirp-feed', 'name' => 'Chirp timeline image', 'description' => null,
-        'type' => 'image', 'active' => true, 'version' => 1,
+        'type' => 'image', 'active' => true,
         'transform' => ['fit' => 'scale-down', 'width' => 1200, 'format' => 'webp'],
     ];
 

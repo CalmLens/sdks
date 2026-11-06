@@ -10,16 +10,17 @@ final class UploadTokens
 {
     public const PREFIX = 'clut_';
     public const SIGNING_CONTEXT = 'calmlens-upload-token:v1:';
-    /** Token lifetime in seconds when `expiresInSeconds` is omitted. */
-    public const DEFAULT_EXPIRES_IN_SECONDS = 600;
-    public const MAX_EXPIRES_IN_SECONDS = 3600;
+    /** Token lifetime in seconds when `expiresIn` is omitted. */
+    public const DEFAULT_EXPIRES_IN = 600;
+    /** The longest token lifetime, in seconds. */
+    public const MAX_EXPIRES_IN = 3600;
 
     public function __construct(#[\SensitiveParameter] private string $apiKey) {}
     public function __debugInfo(): array { return ['apiKey' => '[REDACTED]']; }
 
     /**
      * Signs a token locally for `uploadPresetId`, optionally with an `externalId` and an
-     * `expiresInSeconds` lifetime (1 to 3600, default 600). `expiresAt` is Unix milliseconds.
+     * `expiresIn` lifetime in seconds (1 to 3600, default 600). `expiresAt` is Unix milliseconds.
      *
      * @return array{token: string, expiresAt: int}
      */
@@ -37,9 +38,9 @@ final class UploadTokens
         Values::knownOptions($options, 'uploadTokens.sign');
         $preset = $options['uploadPresetId'] ?? null;
         Values::segment($preset);
-        $ttl = $options['expiresInSeconds'] ?? self::DEFAULT_EXPIRES_IN_SECONDS;
-        if (!is_int($ttl) || $ttl < 1 || $ttl > self::MAX_EXPIRES_IN_SECONDS) {
-            Values::invalid('expiresInSeconds must be an integer from 1 to 3600');
+        $ttl = $options['expiresIn'] ?? self::DEFAULT_EXPIRES_IN;
+        if (!is_int($ttl) || $ttl < 1 || $ttl > self::MAX_EXPIRES_IN) {
+            Values::invalid('expiresIn must be an integer from 1 to 3600');
         }
         if (array_key_exists('externalId', $options) && (!is_string($options['externalId']) || $options['externalId'] === '')) {
             Values::invalid('externalId must be non-empty');

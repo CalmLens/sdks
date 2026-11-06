@@ -154,6 +154,39 @@ final class Webhooks
     }
 
     /**
+     * The value of one of an event's facts, by key, such as `flagged-categories` (a list of
+     * categories) on `asset.blocked`, or null when the event doesn't carry it. A key the event
+     * repeats gives its first value. The fact's `url`, when it has one, is on the fact in
+     * `$event['facts']`.
+     */
+    public static function eventFact(array $event, string $key): mixed
+    {
+        foreach ($event['facts'] ?? [] as $fact) {
+            if (is_array($fact) && ($fact['key'] ?? null) === $key) {
+                return $fact['value'] ?? null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * An event's facts as values by key, such as `['flagged-categories' => ['hate']]`. A key the
+     * event repeats keeps its first value, as `eventFact` reads it.
+     *
+     * @return array<string, mixed>
+     */
+    public static function eventFacts(array $event): array
+    {
+        $values = [];
+        foreach ($event['facts'] ?? [] as $fact) {
+            if (is_array($fact) && is_string($fact['key'] ?? null) && !array_key_exists($fact['key'], $values)) {
+                $values[$fact['key']] = $fact['value'] ?? null;
+            }
+        }
+        return $values;
+    }
+
+    /**
      * Whether to apply `event` after `lastSequence`, the highest `assetSequence` you have applied for
      * its asset (null when none). Deliveries can arrive out of order: an event about an asset is newer
      * only with a higher `assetSequence`, so a retried or repeated delivery of an earlier one returns

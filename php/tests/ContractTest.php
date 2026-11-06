@@ -130,7 +130,7 @@ final class ContractTest extends TestCase
             return Create::promiseFor(new Response(200, [], json_encode($fixture['response'])));
         };
         $client = new ServerClient('key', 'project-1', maxRetries: 0, httpClient: new Client(['handler' => $handler]));
-        self::assertSame(self::expectedResult($fixture), self::invoke($client, $fixture['operation'], $fixture['options']));
+        self::assertSame(self::expectedResult($fixture), self::invoke($client, $fixture['operation'], $fixture['options'] ?? []));
         self::assertSame(1, $calls);
     }
 
@@ -140,7 +140,7 @@ final class ContractTest extends TestCase
     {
         $mock = new MockServerClient(projectId: 'project-1');
         $mock->enqueueJson($fixture['response']);
-        self::assertSame(self::expectedResult($fixture), self::invoke($mock->client(), $fixture['operation'], $fixture['options']));
+        self::assertSame(self::expectedResult($fixture), self::invoke($mock->client(), $fixture['operation'], $fixture['options'] ?? []));
         self::assertEquals($fixture['request'], self::captured($mock->requests()[0]->request));
         self::assertSame(0, $mock->pending());
     }
@@ -274,6 +274,24 @@ final class ContractTest extends TestCase
         return $args;
     }
 
+    /**
+     * Collects what a list's iterator yields, for an `<resource>.iterate…` operation, under its PHP
+     * name in surface.json (such as `hashLists->eachEntry`); null for any other operation.
+     */
+    private static function iterator(ServerClient $client, string $operation, array $args): ?array
+    {
+        if (!preg_match('/^\w+\.iterate/', $operation)) {
+            return null;
+        }
+        foreach (self::fixtures('surface')['capabilities'] as $capability) {
+            if ($capability['id'] === $operation) {
+                [$resource, $method] = explode('->', $capability['names']['php']);
+                return self::collect($client->{$resource}->{$method}($args));
+            }
+        }
+        self::fail("No PHP name for $operation");
+    }
+
     /** Collects an iterator, attaching what it yielded to a failure. */
     private static function collect(iterable $items): array
     {
@@ -291,12 +309,8 @@ final class ContractTest extends TestCase
     private static function runClientStep(ServerClient $client, string $operation, array $args): mixed
     {
         $args = self::phpArgs($operation, $args);
-        return match ($operation) {
-            'assets.iterate' => self::collect($client->assets->each($args)),
-            'assets.iterateChildren' => self::collect($client->assets->eachChild($args)),
-            'events.iterate' => self::collect($client->events->eachPage($args)),
-            default => self::invoke($client, $operation, $args),
-        };
+        return $operation === 'events.iterate' ? self::collect($client->events->eachPage($args))
+            : (self::iterator($client, $operation, $args) ?? self::invoke($client, $operation, $args));
     }
 
     /** An API error body's `details` is always an object; the decoded fixture holds an empty one as `[]`. */
@@ -565,6 +579,12 @@ final class ContractTest extends TestCase
             case 'assetSequences':
                 self::assertSame($entry['newer'], Webhooks::isNewerAssetEvent($entry['event'], $entry['lastSequence']));
                 return;
+            case 'factLookups':
+                self::assertSame($entry['value'], Webhooks::eventFact($entry['event'], $entry['key']));
+                return;
+            case 'factObjects':
+                self::assertSame($entry['facts'], Webhooks::eventFacts($entry['event']));
+                return;
             case 'roundTrips':
                 self::assertSameJson($entry['payload'], Webhooks::toPayload($entry['event']));
                 $headers = Webhooks::createHeaders($entry['body'], $entry['deliveryId'], $entry['secret'], $entry['timestampSeconds']);
@@ -605,7 +625,7 @@ final class ContractTest extends TestCase
                 [$body, $signature] = explode('.', substr($signed['token'], strlen($fixture['prefix'])), 2);
                 self::assertSame(hash_hmac('sha256', $fixture['signingContext'] . $body, $entry['expected']['signingSecret']), $signature);
                 $claims = json_decode(base64_decode(strtr($body, '-_', '+/'), true), true);
-                $lifetime = ($entry['options']['expiresInSeconds'] ?? $fixture['defaultExpiresInSeconds']) * 1000;
+                $lifetime = ($entry['options']['expiresIn'] ?? $fixture['defaultExpiresInSeconds']) * 1000;
                 self::assertSame(array_diff_key($entry['expected']['claims'], ['n' => 0, 'e' => 0]), array_diff_key($claims, ['n' => 0, 'e' => 0]));
                 self::assertNotSame($entry['nonce'], $claims['n']);
                 self::assertMatchesRegularExpression('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/D', $claims['n']);
@@ -633,7 +653,7 @@ final class ContractTest extends TestCase
     {
         $fixture = self::fixtures('upload-tokens');
         self::assertSame([$fixture['prefix'], $fixture['signingContext'], $fixture['defaultExpiresInSeconds'], $fixture['maxExpiresInSeconds']],
-            [UploadTokens::PREFIX, UploadTokens::SIGNING_CONTEXT, UploadTokens::DEFAULT_EXPIRES_IN_SECONDS, UploadTokens::MAX_EXPIRES_IN_SECONDS]);
+            [UploadTokens::PREFIX, UploadTokens::SIGNING_CONTEXT, UploadTokens::DEFAULT_EXPIRES_IN, UploadTokens::MAX_EXPIRES_IN]);
     }
 
     // surface.json retryable: whether an error is retryable follows from its code and status alone.
@@ -679,7 +699,7 @@ final class ContractTest extends TestCase
             'retryAfterMaxMs' => Session::RETRY_AFTER_MAX_MS,
             'maxResponseBytes' => ServerClient::DEFAULT_MAX_RESPONSE_BYTES,
             'signedUrlExpiresIn' => Cdn::DEFAULT_SIGNED_URL_EXPIRES_IN,
-            'uploadTokenExpiresInSeconds' => UploadTokens::DEFAULT_EXPIRES_IN_SECONDS,
+            'uploadTokenExpiresInSeconds' => UploadTokens::DEFAULT_EXPIRES_IN,
             'waitForDecisionTimeoutMs' => Assets::DEFAULT_DECISION_TIMEOUT * 1000,
             'waitForDecisionFirstIntervalMs' => Assets::DECISION_FIRST_INTERVAL * 1000,
             'waitForDecisionIntervalFactor' => Assets::DECISION_INTERVAL_FACTOR,
@@ -853,7 +873,7 @@ final class ContractTest extends TestCase
 
     /**
      * A `moderate` callable that records what it was given and answers by asset name, then by
-     * queue mode for uploads, and otherwise like the mock's default.
+     * whether an upload is queued, and otherwise like the mock's default.
      */
     private static function recordingModerate(array $spec, array &$calls): Closure
     {
@@ -903,14 +923,10 @@ final class ContractTest extends TestCase
                 return ['status' => $response->getStatusCode(), 'code' => $json['code'] ?? null, 'body' => $body, 'response' => $response];
             case 'cdn.getAssetInfo':
                 return $client->cdn->getAssetInfo($args['url'], array_diff_key($args, ['url' => true]));
-            case 'assets.iterate':
-                return self::collect($client->assets->each($args));
-            case 'assets.iterateChildren':
-                return self::collect($client->assets->eachChild($args));
             case 'events.pages':
                 return self::collect($client->events->eachPage($args));
         }
-        return self::invoke($client, $operation, self::phpArgs($operation, $args));
+        return self::iterator($client, $operation, $args) ?? self::invoke($client, $operation, self::phpArgs($operation, $args));
     }
 
     private static function checkCdn(array $want, array $result, string $label): void

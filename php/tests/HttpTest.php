@@ -60,7 +60,7 @@ final class HttpTest extends TestCase
             self::assertSame('local-key', $received['apiKey']);
             self::assertSame('image/png', $received['contentType']);
             self::assertSame('[{"id":"source","value":"a&b"}]', $received['query']['metadata']);
-            self::assertSame('true', $received['query']['queue']);
+            self::assertSame('false', $received['query']['wait']);
             self::assertMatchesRegularExpression('/^[a-f0-9-]{36}$/', $received['idempotencyKey']);
         } finally {
             fclose($file);

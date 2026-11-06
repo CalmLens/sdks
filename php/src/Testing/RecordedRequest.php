@@ -13,7 +13,7 @@ final class RecordedRequest
      * @param string $path the path after the API (or CDN) base URL, each segment decoded, such as
      *   `/assets/asset_5Gm2Rk8XqT3wLp9VbN4c` or `/projects/project-1/assets`.
      * @param array<string, string> $query the query parameters as sent, decoded, such as
-     *   `['ordering[0][field]' => 'createdAt']`.
+     *   `['sort' => '-createdAt']`.
      * @param ?int $status the HTTP status of the response, or null when the request failed without one.
      * @param RequestInterface $request the PSR-7 request, with a readable body and its headers.
      */

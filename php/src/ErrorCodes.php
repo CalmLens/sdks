@@ -82,7 +82,8 @@ final class ErrorCodes
     public const DUPLICATE_FOLDER_NAME = 'folder/duplicate-name';
     public const FOLDER_NOT_EMPTY = 'folder/not-empty';
     public const FOLDER_PARENT_CYCLE = 'folder/parent-cycle';
-    public const LENS_VERSION_CONFLICT = 'lens/version-conflict';
+    public const LENS_NOT_FOUND = 'lens/not-found';
+    public const LENS_IDENTIFIER_TAKEN = 'lens/identifier-taken';
     public const LENS_IDENTIFIER_RESERVED = 'lens/identifier-reserved';
     public const HASH_LIST_NOT_FOUND = 'hash-list/not-found';
     public const HASH_LIST_ENTRY_NOT_FOUND = 'hash-list-entry/not-found';
@@ -192,7 +193,8 @@ final class ErrorCodes
         'folder/duplicate-name' => 409,
         'folder/not-empty' => 409,
         'folder/parent-cycle' => 409,
-        'lens/version-conflict' => 409,
+        'lens/not-found' => 404,
+        'lens/identifier-taken' => 409,
         'lens/identifier-reserved' => 409,
         'hash-list/not-found' => 404,
         'hash-list-entry/not-found' => 404,

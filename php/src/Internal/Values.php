@@ -16,7 +16,7 @@ final class Values
         'cdn.getAssetInfo' => ['viewerClaims'],
         'cdn.getAssetUrl' => ['assetId', 'externalId', 'lens', 'projectId', 'resource', 'transform', 'viewerClaims'],
         'cdn.serve' => ['assetId', 'externalId', 'init', 'lens', 'projectId', 'resource', 'transform', 'viewerClaims'],
-        'uploadTokens.sign' => ['expiresInSeconds', 'externalId', 'uploadPresetId'],
+        'uploadTokens.sign' => ['expiresIn', 'externalId', 'uploadPresetId'],
     ];
 
     /** Fails with `sdk/invalid-argument` for an option `$operation` doesn't take, such as a misspelt key. */
@@ -127,23 +127,19 @@ final class Values
         }
     }
 
+    /**
+     * Serialises a query the way the API reads it: plain values as text and structured values
+     * (such as an upload's `metadata`, `tags`, `processingOptions` and `context`) as JSON. Every key
+     * and value is percent-encoded and null values are left out.
+     */
     public static function query(array $values): string
     {
         $pairs = [];
-        $append = function (string $key, mixed $value) use (&$append, &$pairs): void {
-            if ($value === null) {
-                return;
-            }
-            if (is_array($value) || is_object($value)) {
-                foreach ($value as $child => $item) {
-                    $append($key . '[' . $child . ']', $item);
-                }
-            } else {
-                $pairs[] = rawurlencode($key) . '=' . rawurlencode(self::scalar($value));
-            }
-        };
         foreach ($values as $key => $value) {
-            $append((string) $key, in_array($key, ['metadata', 'tags', 'processingOptions', 'context'], true) && $value !== null ? self::json($value) : $value);
+            if ($value !== null) {
+                $text = is_array($value) || is_object($value) ? self::json($value) : self::scalar($value);
+                $pairs[] = rawurlencode((string) $key) . '=' . rawurlencode($text);
+            }
         }
         return implode('&', $pairs);
     }

@@ -41,18 +41,29 @@ final class Assets extends Resource
     /** The longest `idempotencyKey` of an upload sent in parts: each part's key adds `:part-<n>`. */
     public const MAX_SPLIT_IDEMPOTENCY_KEY_LENGTH = 240;
 
+    /**
+     * The best `pageSize` matches (1 to 20, 10 by default) for a keyword or natural-language `query`,
+     * ranked by relevance. Search has no cursor: refine the query, or list with a filter, for more.
+     */
     public function search(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('GET', $this->session->project('assets/search'), query: $api, options: $request);
     }
 
+    /**
+     * One page of the project's assets. `filter` is an RSQL filter, such as `folderId==fldr_…` (or
+     * `folderId==null` for the root); `sort` is `createdAt` and `id`, comma-separated, each
+     * descending when prefixed with `-` (`-createdAt` by default). Pass the page's `nextCursor` as
+     * `cursor` for the next page; `pageSize` is 1 to 100 (50 by default).
+     */
     public function list(array $options = []): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
         return $this->session->request('GET', $this->session->project('assets'), query: $api, options: $request);
     }
 
+    /** One page of an asset's child assets, with the same `cursor`, `pageSize` and `sort` as `list`. */
     public function listChildren(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -73,18 +84,22 @@ final class Assets extends Resource
         return $this->session->request('GET', $path . '/timeline', query: $api, options: $request);
     }
 
+    /** Yields every asset `list` would, fetching pages as needed. */
     public function each(array $options = []): \Generator
     {
-        foreach ($this->pages($this->list(...), $options) as $page) {
-            yield from $page['items'];
-        }
+        yield from $this->items($this->list(...), $options);
     }
 
+    /** Yields every child of the asset `assetId`, fetching pages as needed. */
     public function eachChild(array $options): \Generator
     {
-        foreach ($this->pages($this->listChildren(...), $options) as $page) {
-            yield from $page['items'];
-        }
+        yield from $this->items($this->listChildren(...), $options);
+    }
+
+    /** Yields every segment of an audio or video asset's findings timeline, in time order. */
+    public function eachTimelineSegment(array $options): \Generator
+    {
+        yield from $this->items($this->listTimeline(...), $options);
     }
 
     public function retrieve(array $options): array
@@ -198,16 +213,22 @@ final class Assets extends Resource
         return $this->session->request('POST', $path . '/move', body: ['folderId' => $api['folderId']], options: $request);
     }
 
-    public function create(array $options): array { return $this->submit($options, true); }
+    /**
+     * Uploads an asset and returns without waiting for its decision (`wait=false`), with
+     * `classification.status` `queued`.
+     */
+    public function create(array $options): array { return $this->submit($options, false); }
+
+    /** Uploads an asset and waits for its moderation decision (`wait=true`). */
     public function classify(array $options): array
     {
         if (isset($options['content']['plainText']) && (!is_string($options['content']['plainText']) || trim($options['content']['plainText']) === '')) {
             Values::invalid('Text must not be blank', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
         }
-        return $this->submit($options, false);
+        return $this->submit($options, true);
     }
 
-    private function submit(array $options, bool $queue): array
+    private function submit(array $options, bool $wait): array
     {
         [$api, $request] = $this->split($options, 'create');
         if (!is_string($api['name'] ?? null) || $api['name'] === ''
@@ -222,7 +243,7 @@ final class Assets extends Resource
             $api['context'] = ['items' => ModerationContext::select($api['context']['items'])];
         }
         if (array_key_exists('url', $api)) {
-            return self::asset($this->session->request('POST', $this->session->project('assets'), query: ['queue' => $queue], body: $api, idempotent: true, options: $request));
+            return self::asset($this->session->request('POST', $this->session->project('assets'), query: ['wait' => $wait], body: $api, idempotent: true, options: $request));
         }
         $multipart = array_key_exists('part', $api);
         $content = $api[$multipart ? 'part' : 'content'];
@@ -257,7 +278,7 @@ final class Assets extends Resource
             self::checkSize($baseMime, $body->getSize(), $split);
         }
         $query = array_intersect_key($api, array_flip(['name', 'description', 'processingOptions', 'visibility', 'metadata', 'tags', 'authorId', 'context', 'externalId', 'externalUrl', 'folderId', 'uploadPresetId']));
-        $query += ['queue' => $queue, 'contentType' => $mime, 'sizeInBytes' => $body->getSize()];
+        $query += ['wait' => $wait, 'contentType' => $mime, 'sizeInBytes' => $body->getSize()];
         if ($split) {
             return $this->submitInParts($query, $mime, $body, $request);
         }
@@ -335,6 +356,10 @@ final class Assets extends Resource
         return $asset;
     }
 
+    /**
+     * Uploads the next part of a multipart upload. Whether the final part waits for the decision was
+     * chosen when the upload started; pass `wait` (a boolean) to override it.
+     */
     public function uploadPart(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -345,11 +370,11 @@ final class Assets extends Resource
         }
         $body = UploadBody::from($part, true, !$this->session->deferUploadChecks);
         $query = ['partNumber' => $part['partNumber'], 'isFinal' => $part['isFinal'] ?? false, 'sizeInBytes' => $body->getSize()];
-        if (array_key_exists('queue', $api)) {
-            if (!is_bool($api['queue'])) {
-                Values::invalid('queue must be a boolean');
+        if (array_key_exists('wait', $api)) {
+            if (!is_bool($api['wait'])) {
+                Values::invalid('wait must be a boolean');
             }
-            $query['queue'] = $api['queue'];
+            $query['wait'] = $api['wait'];
         }
         return self::asset($this->session->request('POST', $path . '/part', query: $query, raw: $body,
             headers: ['X-CalmLens-Upload' => 'part'], idempotent: true, options: $request, upload: true));

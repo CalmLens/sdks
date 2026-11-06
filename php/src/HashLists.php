@@ -12,7 +12,11 @@ final class HashLists extends Resource
 {
     protected const OPERATIONS = 'hashLists';
 
-    /** One page of the project's hash lists; pass the page's `nextCursor` as `cursor` and a `pageSize` (1 to 100, 50 by default). */
+    /**
+     * One page of the project's hash lists, newest first unless `sort` (`createdAt` and `id`,
+     * descending when prefixed with `-`) says otherwise. Pass the page's `nextCursor` as `cursor`
+     * and a `pageSize` (1 to 100, 50 by default).
+     */
     public function list(array $options = []): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -21,6 +25,12 @@ final class HashLists extends Resource
             throw CalmLensException::create('sdk/invalid-response', 'Invalid hash list page');
         }
         return $page;
+    }
+
+    /** Yields every hash list, fetching pages as needed. */
+    public function each(array $options = []): \Generator
+    {
+        yield from $this->items($this->list(...), $options);
     }
 
     public function retrieve(array $options): array
@@ -51,7 +61,7 @@ final class HashLists extends Resource
         $this->session->request('DELETE', $this->path($api, 'hash-lists', 'hashListId'), options: $request);
     }
 
-    /** One page of a list's entries, newest first; pass `cursor` and `pageSize` to page. */
+    /** One page of a list's entries, newest first unless `sort` says otherwise; pass `cursor` and `pageSize` to page. */
     public function listEntries(array $options): array
     {
         [$api, $request] = $this->split($options, __FUNCTION__);
@@ -61,6 +71,12 @@ final class HashLists extends Resource
             throw CalmLensException::create('sdk/invalid-response', 'Invalid hash list entry page');
         }
         return $page;
+    }
+
+    /** Yields every entry of the list `hashListId`, fetching pages as needed. */
+    public function eachEntry(array $options): \Generator
+    {
+        yield from $this->items($this->listEntries(...), $options);
     }
 
     /**

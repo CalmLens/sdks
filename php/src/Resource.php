@@ -42,9 +42,9 @@ abstract class Resource
     }
 
     /**
-     * Pages through a list by following `nextCursor` as `cursor`. Asset pages stop without a next
-     * cursor, when `hasMore` is false or at an empty page; event pages (`$events`) when `hasMore`
-     * is false. A page with more to follow that hands back a cursor already sent fails with
+     * Pages through a list by following `nextCursor` as `cursor`, keeping the other options. Cursor
+     * lists stop without a next cursor, when `hasMore` is false or at an empty page; event pages
+     * (`$events`) when `hasMore` is false. A page with more to follow that hands back a cursor already sent fails with
      * `sdk/invalid-response` (`details.cursor`) rather than loop, and is not yielded.
      */
     protected function pages(callable $fetch, array $options, bool $events = false): \Generator
@@ -76,5 +76,13 @@ abstract class Resource
             }
             $options['cursor'] = $next;
         } while (true);
+    }
+
+    /** Yields every item of a cursor list, fetching its pages with `$fetch` as needed. */
+    protected function items(callable $fetch, array $options): \Generator
+    {
+        foreach ($this->pages($fetch, $options) as $page) {
+            yield from $page['items'];
+        }
     }
 }
