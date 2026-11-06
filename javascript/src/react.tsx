@@ -1,5 +1,5 @@
 "use client";
-// React components for uploads and media: `CalmLensUploader`, `CalmLensMedia` and the
+// React components for uploads and assets: `CalmLensUploader`, `CalmLensAsset` and the
 // `useCalmLensUpload` hook for your own upload UI. They also work in Preact through
 // `preact/compat`.
 
@@ -7,11 +7,26 @@ import {
   type CSSProperties,
   type DragEvent,
   type HTMLAttributes,
+  type ReactNode,
+  type SyntheticEvent,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import {
+  AssetSession,
+  getAssetAspectRatio,
+  getAssetView,
+  getAssetViewKey,
+  getPeakHeights,
+  getPlayedPercent,
+} from "./ui/Asset";
+import {
+  AssetViewerMount,
+  getMountedViewerOptions,
+  isMountedViewerKind,
+} from "./ui/AssetViewerMount";
 import type {
   UploadControllerOptions,
   UploaderProps,
@@ -19,27 +34,14 @@ import type {
 } from "./ui/BrowserUpload";
 import { renderFileIconSvg } from "./ui/FileIcons";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
-import {
-  getMediaState,
-  getPeakHeights,
-  getPlayedPercent,
-  MediaUrlSigner,
-  resolveMediaProps,
-} from "./ui/Media";
 import { MediaStreamPlayer } from "./ui/MediaStream";
 import {
   describeUploader,
   describeUploadItem,
-  getMediaUnavailableMessage,
+  formatMessage,
   resolveMessages,
 } from "./ui/Messages";
-import {
-  getMediaAspectRatio,
-  getMediaLoadKey,
-  getShownPlaceholder,
-  MEDIA_FILE_ICON_SIZE,
-  type MediaProps,
-} from "./ui/Props";
+import { ASSET_FILE_ICON_SIZE, type AssetProps } from "./ui/Props";
 import {
   useOwnController,
   useCalmLensUpload as useSharedCalmLensUpload,
@@ -298,9 +300,17 @@ export function CalmLensUploader({
   );
 }
 
-export type CalmLensMediaProps = MediaProps &
+export type CalmLensAssetProps = AssetProps &
   StyleOptions &
-  Omit<HTMLAttributes<HTMLElement>, "children" | "placeholder">;
+  Omit<
+    HTMLAttributes<HTMLElement>,
+    "children" | "placeholder" | "onLoad" | "onError" | "onPlay" | "onEnded" | "onTimeUpdate"
+  > & {
+    /** Replaces the unavailable notice. */
+    renderUnavailable?: () => ReactNode;
+    /** Replaces the age notice; call `confirm` from your own reveal button. */
+    renderAgeGate?: (props: { placeholderUrl?: string; confirm?: () => void }) => ReactNode;
+  };
 
 type LoadState = "loading" | "loaded" | "error";
 
@@ -320,12 +330,12 @@ const Waveform = ({
     <span key={index} style={{ height: `${height}%` }} />
   ));
   return (
-    <div className="calmlens-media__waveform">
-      {url && <img className="calmlens-media__wave" src={url} alt="" aria-hidden="true" />}
+    <div className="calmlens-asset__waveform">
+      {url && <img className="calmlens-asset__wave" src={url} alt="" aria-hidden="true" />}
       {peaks && (
         // Decorative: the audio element's own controls report its progress.
         <div
-          className="calmlens-media__progress"
+          className="calmlens-asset__progress"
           role="progressbar"
           aria-hidden="true"
           aria-valuemin={0}
@@ -333,8 +343,8 @@ const Waveform = ({
           aria-valuenow={played}
           style={{ "--calmlens-played": `${played}%` } as CSSProperties}
         >
-          <div className="calmlens-media__peaks">{bars}</div>
-          <div className="calmlens-media__peaks" data-played="">
+          <div className="calmlens-asset__peaks">{bars}</div>
+          <div className="calmlens-asset__peaks" data-played="">
             {bars}
           </div>
         </div>
@@ -344,123 +354,190 @@ const Waveform = ({
 };
 
 /**
- * Shows an asset from the CalmLens CDN: an image with responsive widths and a blurred placeholder
- * while it loads, a video with its poster, audio with its waveform, a PDF, or a file's preview
- * still or icon. Age-restricted assets stay behind the placeholder and a reveal button until
- * `ageConfirmed` is set; blocked and purged assets show an unavailable notice.
+ * Shows any asset from its asset URL (public, or signed by your server), natively in the page: an
+ * image with responsive widths, a website's screenshot and link, video and audio with their
+ * adaptive stream, a document, text or spreadsheet viewer, or a preview still or file icon. It
+ * reads `{src}/info` once mounted, unless `info` is given, in which case the first render, on the
+ * server too, is the real element. Age-restricted content stays behind its blurred placeholder
+ * and a reveal button; content the CDN refuses shows the unavailable notice.
  */
-export function CalmLensMedia(input: CalmLensMediaProps) {
+export function CalmLensAsset(props: CalmLensAssetProps) {
   const {
-    asset: _asset,
-    projectId,
-    assetId,
-    status,
-    contentRemoved,
-    type,
-    hasPreview,
-    hasStream,
-    stream,
-    peaks,
-    resource,
-    lens,
-    transform,
-    widths,
-    url,
-    getSignedUrl,
-    placeholder,
-    placeholderHash,
-    placeholderUrl: customPlaceholderUrl,
-    cdnBaseUrl,
+    src,
+    display,
     viewerClaims,
+    info,
+    image,
+    video,
+    document: documentOptions,
+    spreadsheet,
+    onExpired,
     alt = "",
-    aspectRatio,
-    width,
-    height,
-    sizes,
-    averageColor,
     fit,
-    position,
+    aspectRatio,
     lazy = true,
     fetchPriority,
-    controls = true,
     messages: overrides,
+    onLoad,
+    onError,
+    onAvailabilityChange,
+    onAgeConfirmRequest,
+    onPlay,
+    onEnded,
+    onTimeUpdate,
+    renderUnavailable,
+    renderAgeGate,
     unstyled,
-    onReveal,
     className,
     style,
     ...attributes
-  } = resolveMediaProps(input);
-  const messages = useMemo(() => resolveMessages(overrides), [overrides]);
+  } = props;
   const options = {
-    asset: _asset,
-    projectId,
-    assetId,
-    status,
-    contentRemoved,
-    type,
-    hasPreview,
-    hasStream,
-    stream,
-    peaks,
-    resource,
-    lens,
-    transform,
-    widths,
-    url,
-    getSignedUrl,
-    placeholder,
-    placeholderHash,
-    placeholderUrl: customPlaceholderUrl,
-    cdnBaseUrl,
+    src,
+    display,
     viewerClaims,
+    info,
+    image,
+    video,
+    document: documentOptions,
+    spreadsheet,
+    onExpired,
+    alt,
   };
-  const [, setSigned] = useState(0);
-  const [signer] = useState(() => new MediaUrlSigner(() => setSigned((count) => count + 1)));
-  const [streams] = useState(() => new MediaStreamPlayer(signer));
-  const state = getMediaState(options, signer.urls(options));
-  const loadKey = getMediaLoadKey(state);
+  const messages = useMemo(() => resolveMessages(overrides), [overrides]);
+  const [, setVersion] = useState(0);
+  const [session] = useState(() => new AssetSession(() => setVersion((count) => count + 1)));
+  const [streams] = useState(
+    () =>
+      new MediaStreamPlayer((media) => {
+        session.mediaFailed({
+          position: media.currentTime || 0,
+          playing: !media.paused && !media.ended,
+        });
+        return true;
+      }),
+  );
+  const [viewers] = useState(() => new AssetViewerMount());
+  const [mounted, setMounted] = useState(false);
+  const state = session.update(options);
+  const view = getAssetView(options, state);
+  const loadKey = getAssetViewKey(view);
   const [load, setLoad] = useState<{ key: string; state: LoadState }>({
     key: loadKey,
     state: "loading",
   });
   const current = load.key === loadKey ? load : { key: loadKey, state: "loading" as const };
   const [played, setPlayed] = useState(0);
-  const image = useRef<HTMLImageElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const media = useRef<HTMLVideoElement & HTMLAudioElement>(null);
+  const viewerRoot = useRef<HTMLDivElement>(null);
+  const callbacks = useRef({ onLoad, onError, onAvailabilityChange });
+  callbacks.current = { onLoad, onError, onAvailabilityChange };
 
+  useEffect(() => setMounted(true), []);
+  // The info is read once mounted, never during server rendering.
+  useEffect(() => session.load());
   // An image that loaded before hydration fires no load event.
   useEffect(() => {
-    if (image.current?.complete && image.current.naturalWidth > 0) {
+    if (imageRef.current?.complete && imageRef.current.naturalWidth > 0) {
       setLoad({ key: loadKey, state: "loaded" });
     }
   }, [loadKey]);
+  useEffect(() => {
+    if (current.state === "loaded") callbacks.current.onLoad?.();
+    if (current.state === "error") callbacks.current.onError?.();
+  }, [current.state]);
+  const availability =
+    view.kind === "unavailable"
+      ? "unavailable"
+      : view.kind === "age-restricted"
+        ? "age-restricted"
+        : view.kind === "pending"
+          ? undefined
+          : "available";
+  useEffect(() => {
+    if (availability) callbacks.current.onAvailabilityChange?.(availability);
+  }, [availability]);
 
-  const ratio = getMediaAspectRatio({ aspectRatio, width, height });
-  const failed = current.state === "error";
-  const kind = failed ? "unavailable" : state.kind;
-  const placeholderUrl = failed
-    ? undefined
-    : getShownPlaceholder(state, current.state === "loaded");
-  const onMediaError = (element: HTMLMediaElement) => {
-    if (!streams.recover(element)) setLoad({ key: loadKey, state: "error" });
-  };
+  const viewerKind = isMountedViewerKind(view.kind) && mounted ? view.kind : undefined;
+  // Every render: the viewer loads again only when what it shows changed.
+  useEffect(() => {
+    viewers.update(
+      viewerRoot.current,
+      viewerKind,
+      getMountedViewerOptions(options, session),
+      (viewerState) => {
+        if (viewerState !== "loading") setLoad({ key: loadKey, state: viewerState });
+      },
+    );
+  });
+  useEffect(() => () => viewers.destroy(), [viewers]);
   // A video or audio stream plays through its element, so it starts after the render.
-  useEffect(() => streams.update(failed ? null : media.current, state));
+  useEffect(() => streams.update(media.current, view));
   useEffect(() => () => streams.stop(), [streams]);
+
+  const ratio = getAssetAspectRatio(view, state.info, aspectRatio);
+  const placeholderUrl =
+    "placeholderUrl" in view &&
+    (view.kind === "age-restricted" || view.kind === "pending" || current.state !== "loaded")
+      ? view.placeholderUrl
+      : undefined;
+  const onMediaError = (element: HTMLMediaElement) => {
+    if (streams.recover(element)) return;
+    session.mediaFailed({
+      position: element.currentTime || 0,
+      playing: !element.paused && !element.ended,
+    });
+  };
+  const playerEvents = {
+    onLoadedMetadata: (event: SyntheticEvent<HTMLMediaElement>) => {
+      session.mediaLoaded(event.currentTarget);
+      setLoad({ key: loadKey, state: "loaded" });
+    },
+    onError: (event: SyntheticEvent<HTMLMediaElement>) => onMediaError(event.currentTarget),
+    onPlay,
+    onEnded,
+    onTimeUpdate: (event: SyntheticEvent<HTMLMediaElement>) => {
+      setPlayed(getPlayedPercent(event.currentTarget));
+      onTimeUpdate?.(event.currentTarget.currentTime);
+    },
+  };
+  const confirm = onAgeConfirmRequest;
+  const imageElement = (shown: Extract<typeof view, { kind: "image" | "website" }>) => (
+    <img
+      key={loadKey}
+      ref={imageRef}
+      className="calmlens-asset__content"
+      src={shown.src}
+      srcSet={shown.srcSet}
+      sizes={shown.srcSet ? image?.sizes : undefined}
+      alt={alt}
+      width={shown.width}
+      height={shown.height}
+      loading={lazy ? "lazy" : undefined}
+      decoding="async"
+      fetchPriority={fetchPriority}
+      onLoad={() => {
+        session.loaded();
+        setLoad({ key: loadKey, state: "loaded" });
+      }}
+      onError={() => session.failed()}
+    />
+  );
 
   return (
     <figure
       {...attributes}
-      className={joinClassNames("calmlens-media", className)}
-      data-kind={state.kind}
+      className={joinClassNames("calmlens-asset", className)}
+      data-kind={view.kind}
       data-state={current.state}
       data-sized={ratio ? "" : undefined}
+      aria-busy={view.kind === "pending" ? true : undefined}
       style={
         {
           aspectRatio: ratio,
-          backgroundColor: averageColor,
+          backgroundColor: state.info?.content?.preview?.averageColor ?? undefined,
           "--calmlens-fit": fit,
-          "--calmlens-position": position,
           ...style,
         } as CSSProperties
       }
@@ -468,111 +545,125 @@ export function CalmLensMedia(input: CalmLensMediaProps) {
       <CalmLensStyles unstyled={unstyled} />
       {placeholderUrl && (
         <img
-          className="calmlens-media__placeholder"
+          className="calmlens-asset__placeholder"
           src={placeholderUrl}
           alt=""
           aria-hidden="true"
         />
       )}
-      {state.kind === "image" && !failed && (
-        <img
-          key={loadKey}
-          ref={image}
-          className="calmlens-media__content"
-          src={state.src}
-          srcSet={state.srcSet}
-          sizes={sizes}
-          alt={alt}
-          width={width}
-          height={height}
-          loading={lazy ? "lazy" : undefined}
-          decoding="async"
-          fetchPriority={fetchPriority}
-          onLoad={() => setLoad({ key: loadKey, state: "loaded" })}
-          onError={() => setLoad({ key: loadKey, state: "error" })}
-        />
+      {view.kind === "image" && imageElement(view)}
+      {view.kind === "website" && (
+        <>
+          {view.link && (
+            <div className="calmlens-asset__bar">
+              <a
+                className="calmlens-button"
+                href={view.link}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+              >
+                {formatMessage(messages.openWebsite, {
+                  host: new URL(view.link).host,
+                })}
+              </a>
+            </div>
+          )}
+          <section
+            className="calmlens-asset__scroll"
+            aria-label={alt || undefined}
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: the screenshot scrolls, so keyboards must reach it
+            tabIndex={0}
+          >
+            {imageElement(view)}
+          </section>
+        </>
       )}
-      {state.kind === "video" && !failed && (
-        // biome-ignore lint/a11y/useMediaCaption: captions come from your app, as <track> children are not supported here
+      {view.kind === "video" && (
         <video
           ref={media}
-          className="calmlens-media__content"
-          src={state.stream ? undefined : state.src}
-          poster={state.poster}
-          controls={controls}
+          className="calmlens-asset__content"
+          src={view.stream ? undefined : view.src}
+          poster={view.poster}
+          controls={video?.controls ?? true}
+          autoPlay={video?.autoPlay}
+          muted={video?.muted}
+          loop={video?.loop}
           playsInline
           preload="metadata"
           aria-label={alt || undefined}
-          onLoadedMetadata={(event) => signer.loaded(event.currentTarget)}
-          onError={(event) => onMediaError(event.currentTarget)}
+          {...playerEvents}
         />
       )}
-      {state.kind === "audio" && !failed && (
+      {view.kind === "audio" && (
         <>
-          <Waveform url={state.waveformUrl} peaks={state.peaks} played={played} />
-          {/* biome-ignore lint/a11y/useMediaCaption: audio has no captions track to add here */}
+          <Waveform url={view.waveformUrl} peaks={view.peaks} played={played} />
           <audio
             ref={media}
-            className="calmlens-media__content"
-            src={state.stream ? undefined : state.src}
-            controls={controls}
+            className="calmlens-asset__content"
+            src={view.stream ? undefined : view.src}
+            controls={video?.controls ?? true}
+            autoPlay={video?.autoPlay}
+            muted={video?.muted}
+            loop={video?.loop}
             preload="metadata"
             aria-label={alt || undefined}
-            onLoadedMetadata={(event) => signer.loaded(event.currentTarget)}
-            onTimeUpdate={(event) => setPlayed(getPlayedPercent(event.currentTarget))}
-            onError={(event) => onMediaError(event.currentTarget)}
+            {...playerEvents}
           />
         </>
       )}
-      {state.kind === "pdf" && (
+      {view.kind === "document" && !viewerKind && (
         <>
-          <iframe
-            className="calmlens-media__content"
-            src={state.src}
-            title={alt || messages.pdfTitle}
-          />
+          {view.still && (
+            <img className="calmlens-asset__content" src={view.still} alt={alt} decoding="async" />
+          )}
           <a
-            className="calmlens-button calmlens-media__open"
-            href={state.src}
+            className="calmlens-button calmlens-asset__open"
+            href={view.src}
             target="_blank"
             rel="noopener noreferrer"
           >
-            {messages.openPdf}
+            {messages.openDocument}
           </a>
         </>
       )}
-      {state.kind === "file" && (
+      {/* The viewer owns this element's children; React renders none. */}
+      {viewerKind && <div ref={viewerRoot} className="calmlens-asset__viewer" />}
+      {view.kind === "file" && (
         <span
-          className="calmlens-media__file"
+          className="calmlens-asset__file"
           role="img"
           aria-label={alt || undefined}
           aria-hidden={alt ? undefined : "true"}
           dangerouslySetInnerHTML={{
-            __html: renderFileIconSvg({ family: state.icon, extension: "" }, MEDIA_FILE_ICON_SIZE),
+            __html: renderFileIconSvg({ family: view.icon, extension: "" }, ASSET_FILE_ICON_SIZE),
           }}
         />
       )}
-      {state.kind === "gated" && (
-        <figcaption className="calmlens-media__notice">
-          <strong>{messages.sensitiveTitle}</strong>
-          <p>{messages.sensitiveBody}</p>
-          {onReveal && (
-            <button type="button" className="calmlens-button" onClick={onReveal}>
-              {messages.reveal}
-            </button>
-          )}
-        </figcaption>
-      )}
-      {kind === "unavailable" && (
-        <figcaption className="calmlens-media__notice">
-          <p>
-            <Icon name="unavailable" />
-            <span className="calmlens-media__label">
-              {getMediaUnavailableMessage(state, messages)}
-            </span>
-          </p>
-        </figcaption>
-      )}
+      {view.kind === "age-restricted" &&
+        (renderAgeGate ? (
+          renderAgeGate({ placeholderUrl: view.placeholderUrl, confirm })
+        ) : (
+          <figcaption className="calmlens-asset__notice">
+            <strong>{messages.sensitiveTitle}</strong>
+            <p>{messages.sensitiveBody}</p>
+            {confirm && (
+              <button type="button" className="calmlens-button" onClick={confirm}>
+                {messages.reveal}
+              </button>
+            )}
+          </figcaption>
+        ))}
+      {view.kind === "unavailable" &&
+        (renderUnavailable ? (
+          renderUnavailable()
+        ) : (
+          <figcaption className="calmlens-asset__notice">
+            <p>
+              <Icon name="unavailable" />
+              <span className="calmlens-asset__label">{messages.unavailable}</span>
+            </p>
+          </figcaption>
+        ))}
     </figure>
   );
 }

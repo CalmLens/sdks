@@ -4,7 +4,6 @@
 
 import { defineComponent, h, onBeforeUnmount, onMounted, type PropType, ref, watch } from "vue";
 import type { ViewerClaims } from "../client/CalmLensTypes";
-import type { GetSignedMediaUrl } from "../ui/Media";
 import {
   ASSET_VIEWERS,
   type AssetViewer,
@@ -20,11 +19,14 @@ const viewer = <K extends AssetViewerName>(name: string, kind: K) =>
   defineComponent({
     name,
     props: {
-      /** The asset to show, from the API. */
+      /** The asset URL, public or signed. */
+      src: { type: String, required: true as const },
+      /** The asset's display info (`getAssetInfo`), or the asset from the API. */
       asset: { type: Object as PropType<ViewerAsset>, required: true as const },
-      getSignedUrl: optional(Function as PropType<GetSignedMediaUrl>),
+      /** Returns a fresh asset URL once a signed one expires. */
+      onExpired: optional(Function as PropType<() => string | Promise<string>>),
+      onUnavailable: optional(Function as PropType<() => void>),
       viewerClaims: optional(Object as PropType<ViewerClaims>),
-      cdnBaseUrl: optional(String),
       label: optional(String),
       messages: optional(Object as PropType<Partial<ViewerMessages>>),
       /** Images: the `sizes` of a public image's responsive widths. */
@@ -37,6 +39,8 @@ const viewer = <K extends AssetViewerName>(name: string, kind: K) =>
       pageSize: optional(Number),
       /** Documents: where pdf.js loads its worker, fonts and decoders from. */
       pdf: optional(Object as PropType<PdfAssetOptions>),
+      /** Documents: the page shown first. */
+      initialPage: optional(Number),
     },
     setup(props) {
       const root = ref<HTMLElement>();

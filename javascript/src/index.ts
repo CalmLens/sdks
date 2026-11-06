@@ -2,6 +2,7 @@
 // `calmlens/server` (with an API key, on your server) or `calmlens/app` (in browsers
 // and React Native apps, through an upload preset).
 
+export { CDN_RESOURCES, getAssetInfo } from "./client/CalmLensCdn";
 export type {
   CalmLensErrorCode,
   CalmLensErrorDetails,
@@ -14,6 +15,7 @@ export type {
   AddHashListEntryOptions,
   ApplyPolicyPresetOptions,
   Asset,
+  AssetAvailability,
   AssetBatchOperation,
   AssetChecksums,
   AssetChildrenPage,
@@ -42,13 +44,14 @@ export type {
   BatchAssetsResponse,
   CalmLensAppClientOptions,
   CalmLensServerClientOptions,
+  CdnAssetLocation,
+  CdnAssetReference,
   CdnAssetUrlOptions,
   CdnResource,
   CdnServeOptions,
   CdnTransform,
   ClassifyTextOptions,
   ConnectionOptions,
-  CreateAssetSignedUrlOptions,
   CreateFolderOptions,
   CreateHashListOptions,
   CreateMultipartUploadPartOptions,
@@ -59,7 +62,7 @@ export type {
   EnsureLensOptions,
   ExplainAssetOptions,
   FolderIdOptions,
-  GetAssetUrlOptions,
+  GetAssetInfoOptions,
   HashList,
   HashListEntry,
   HashListEntryIdOptions,
@@ -90,9 +93,9 @@ export type {
   RetryAssetOptions,
   SearchAssetsOptions,
   SetPolicyAutomaticUpdatesOptions,
-  SignedCdnResource,
+  SignAssetUrlOptions,
+  SignedAssetUrl,
   SignedUploadToken,
-  SignedUrl,
   SignUploadTokenOptions,
   StreamingFeatureOptions,
   SubmitAssetOptions,
@@ -109,7 +112,7 @@ export type {
   WebhookHeadersInput,
   WebhookPayloadInput,
 } from "./client/CalmLensTypes";
-export { DEFAULT_CDN_BASE_URL, getAssetUrl, SIGNED_CDN_RESOURCES } from "./client/CalmLensUtils";
+export { DEFAULT_CDN_BASE_URL } from "./client/CalmLensUtils";
 export { SDK_VERSION } from "./client/CalmLensVersion";
 export type {
   AssetHls,
@@ -124,6 +127,7 @@ export type {
   MetadataItem,
   ProcessingOptions,
 } from "./contract/Asset.js";
+export type { AssetInfo } from "./contract/AssetInfo.js";
 export type { AssetSearchMatchField } from "./contract/AssetSearch.js";
 export type {
   ClassificationCategories,

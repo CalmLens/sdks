@@ -1,3 +1,4 @@
+import { buildAssetUrl } from "./CalmLensCdn";
 import {
   CalmLensConnection,
   expectUploadedAsset,
@@ -9,12 +10,18 @@ import { invalidArgument, invalidConfig } from "./CalmLensError";
 import { APP_OPTION_KEYS } from "./CalmLensOptionKeys";
 import type {
   CalmLensAppClientOptions,
+  CdnAssetUrlOptions,
   RetrieveAssetOptions,
   UploadAssetPartOptions,
   UploadedAsset,
   UploadPresetSubmitAssetOptions,
 } from "./CalmLensTypes";
-import { checkOptionKeys, encodePathSegment, validateAppClientOptions } from "./CalmLensUtils";
+import {
+  checkOptionKeys,
+  DEFAULT_CDN_BASE_URL,
+  encodePathSegment,
+  validateAppClientOptions,
+} from "./CalmLensUtils";
 
 const inspectSymbol = Symbol.for("nodejs.util.inspect.custom");
 
@@ -36,12 +43,16 @@ export default class CalmLensAppClient {
   /** The token each upload started with, for its parts and status checks. */
   readonly #uploadTokens = new Map<string, string>();
   readonly #connection: CalmLensConnection;
+  readonly #projectId: string | undefined;
+  readonly #cdnBaseUrl: string;
 
   constructor(options: CalmLensAppClientOptions) {
     validateAppClientOptions(options);
-    const { token, uploadPresetId, ...rest } = options;
+    const { token, uploadPresetId, projectId, cdnBaseUrl, ...rest } = options;
     this.#uploadPresetId = uploadPresetId;
     this.#token = token;
+    this.#projectId = projectId;
+    this.#cdnBaseUrl = (cdnBaseUrl ?? DEFAULT_CDN_BASE_URL).replace(/\/+$/, "");
     this.#connection = new CalmLensConnection(resolveConnectionOptions(rest));
   }
 
@@ -110,6 +121,26 @@ export default class CalmLensAppClient {
     const uploaded = expectUploadedAsset(data);
     if (token) this.#uploadTokens.set(uploaded.id, token);
     return uploaded;
+  }
+
+  /** Public asset URLs, built without a request. */
+  get cdn() {
+    return {
+      /**
+       * Builds a public asset's CDN URL: the asset URL, or a resource URL when `resource` is
+       * given, with its lens or transform and the viewer claims. Private assets need a URL your
+       * server signs with `cdn.signAssetUrl`. The project is the client's `projectId` unless the
+       * call names one.
+       */
+      getAssetUrl: (urlOptions: CdnAssetUrlOptions): string => {
+        const { projectId, ...options } = checked("cdn.getAssetUrl", urlOptions);
+        const project = projectId ?? this.#projectId;
+        if (project === undefined) {
+          throw invalidArgument("Pass projectId, here or in the client's options");
+        }
+        return buildAssetUrl(this.#cdnBaseUrl, project, options as CdnAssetUrlOptions);
+      },
+    };
   }
 
   /** Uploads through the client's upload preset and checks those uploads. */

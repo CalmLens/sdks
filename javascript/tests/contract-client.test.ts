@@ -2,7 +2,9 @@
 // packages/sdk-contract (format in its README.md) to sdks/go/testdata: requests.json, paths.json,
 // errors.json, client-cases.json and surface.json's defaults. The fixtures are recorded from this
 // SDK, so replaying the committed copies is what catches a regression here.
+
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
+import { DEFAULT_SIGNED_URL_EXPIRES_IN } from "../src/client/CalmLensCdn";
 import {
   DEFAULT_MAX_RESPONSE_BYTES,
   DEFAULT_MAX_RETRIES,
@@ -20,7 +22,6 @@ import {
   DECISION_POLL_FIRST_DELAY_MS,
   DECISION_POLL_MAX_DELAY_MS,
   DEFAULT_DECISION_TIMEOUT_MS,
-  DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
 } from "../src/client/CalmLensUtils";
 import { UPLOAD_TOKEN_DEFAULT_TTL_SECONDS } from "../src/contract/UploadToken.js";
 import { CalmLensError, CalmLensServerClient } from "../src/server";
@@ -80,8 +81,13 @@ describe("request fixtures", () => {
     options: unknown;
     request: { method: string; path: string; query: Record<string, string>; body: unknown };
     response: Json;
+    /** What the method returns, when it isn't the response body. */
+    result?: Json;
   }[] = testdata("requests.json");
-  for (const [index, { operation, options, request, response }] of fixtures.entries()) {
+  for (const [
+    index,
+    { operation, options, request, response, result: returned },
+  ] of fixtures.entries()) {
     test(`${index + 1}: ${operation} sends the recorded request and returns the response`, async () => {
       const sent: unknown[] = [];
       const client = new CalmLensServerClient({
@@ -107,11 +113,13 @@ describe("request fixtures", () => {
       expect(sent).toEqual([request]);
       // Deletes return nothing; ensureLenses returns the lenses; everything else the body.
       const expected =
-        operation.endsWith(".delete") || operation === "hashLists.removeEntry"
-          ? undefined
-          : operation === "ensureLenses"
-            ? (response as { lenses: Json }).lenses
-            : response;
+        returned !== undefined
+          ? returned
+          : operation.endsWith(".delete") || operation === "hashLists.removeEntry"
+            ? undefined
+            : operation === "ensureLenses"
+              ? (response as { lenses: Json }).lenses
+              : response;
       expect(result).toEqual(expected);
     });
   }
@@ -496,7 +504,7 @@ describe("client defaults", () => {
     retryAfterMaxMs: RETRY_AFTER_MAX_MS,
     maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
     partSizeBytes: DEFAULT_PART_SIZE_BYTES,
-    signedUrlExpiresInSeconds: DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
+    signedUrlExpiresIn: DEFAULT_SIGNED_URL_EXPIRES_IN,
     uploadTokenExpiresInSeconds: UPLOAD_TOKEN_DEFAULT_TTL_SECONDS,
     waitForDecisionTimeoutMs: DEFAULT_DECISION_TIMEOUT_MS,
     waitForDecisionFirstIntervalMs: DECISION_POLL_FIRST_DELAY_MS,

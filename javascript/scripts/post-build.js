@@ -171,7 +171,7 @@ function runMockClientSanityCheck(targetDir) {
       if (retrieved.id !== asset.id) {
         throw new Error("Mock retrieve sanity check failed");
       }
-      const response = await client.cdn.serve({ assetIdentifier: asset.id });
+      const response = await client.cdn.serve({ assetId: asset.id });
       if (response.status !== 200) {
         throw new Error(`Mock CDN sanity check failed with status ${response.status}`);
       }

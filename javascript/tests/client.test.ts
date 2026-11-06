@@ -291,7 +291,7 @@ describe("deadlines for large transfers", () => {
         cdnBaseUrl: server.url.toString(),
         timeoutMs: 50,
       });
-      const response = await client.cdn.serve({ assetIdentifier: "a" });
+      const response = await client.cdn.serve({ assetId: "a" });
       expect(await response.text()).toBe("first,second");
     } finally {
       server.stop(true);

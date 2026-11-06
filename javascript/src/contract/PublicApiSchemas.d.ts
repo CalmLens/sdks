@@ -6,7 +6,7 @@ import { t as Folder } from "./Folder-D1CVstEY.js";
 import { o as EventType } from "./EventCatalog-CodUobTN.js";
 import { t as CursorPage } from "./Page-DNdKkX2B.js";
 import "./Lens-BBGzDl4v.js";
-import "./PublicErrorCodes-Cc2JE3JX.js";
+import "./PublicErrorCodes-CKfwYGi2.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   parentId: zod.ZodOptional<zod.ZodString>;
@@ -3999,11 +3999,11 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
 }, zod.core.$strict>;
 type AssetTimelineSegment = zod.infer<typeof ASSET_TIMELINE_SEGMENT_SCHEMA>;
 type GetAssetTimelineQuery = zod.infer<typeof GET_ASSET_TIMELINE_QUERY_SCHEMA>;
-declare const POST_ASSET_SIGNED_URL_RESPONSE_SCHEMA: zod.ZodObject<{
+declare const SIGN_ASSET_URL_RESPONSE_SCHEMA: zod.ZodObject<{
   url: zod.ZodString;
   expiresAt: zod.ZodNumber;
 }, zod.core.$strip>;
-type PostAssetSignedUrlResponse = zod.infer<typeof POST_ASSET_SIGNED_URL_RESPONSE_SCHEMA>;
+type SignAssetUrlResponse = zod.infer<typeof SIGN_ASSET_URL_RESPONSE_SCHEMA>;
 declare const PATCH_ASSET_BODY_SCHEMA: zod.ZodObject<{
   name: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
   description: zod.ZodOptional<zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>>;
@@ -4115,4 +4115,4 @@ declare const POST_HASH_LIST_ENTRY_BODY_SCHEMA: zod.ZodObject<{
   label: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
 }, zod.core.$strip>;
 type PostHashListEntryBody = zod.infer<typeof POST_HASH_LIST_ENTRY_BODY_SCHEMA>;
-export type { AssetBatchOperation, AssetTimelineSegment, GetAssetChildrenQuery, GetAssetTimelineQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, GetHashListEntriesResponse, GetHashListsResponse, PatchAssetBody, PatchFolderBody, PatchHashListBody, PostAssetBatchOperationResponse, PostAssetDecisionBody, PostAssetSignedUrlResponse, PostFolderBody, PostHashListBody, PostHashListEntryBody };
+export type { AssetBatchOperation, AssetTimelineSegment, GetAssetChildrenQuery, GetAssetTimelineQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, GetHashListEntriesResponse, GetHashListsResponse, PatchAssetBody, PatchFolderBody, PatchHashListBody, PostAssetBatchOperationResponse, PostAssetDecisionBody, PostFolderBody, PostHashListBody, PostHashListEntryBody, SignAssetUrlResponse };

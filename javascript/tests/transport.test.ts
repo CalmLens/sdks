@@ -35,7 +35,7 @@ test("rejects redirects before credentials reach another origin on every transpo
     for (const call of [
       () => client.assets.classify(upload),
       () => client.assets.retrieve({ assetId: "a" }),
-      () => client.cdn.serve({ assetIdentifier: "a", init: { redirect: "follow" } }),
+      () => client.cdn.serve({ assetId: "a", init: { redirect: "follow" } }),
     ]) {
       const error = await call().then(
         () => undefined,
@@ -82,7 +82,7 @@ test("scoped cancellation applies to REST, uploads and CDN without changing defa
   for (const call of [
     () => scoped.assets.classify(upload),
     () => scoped.assets.retrieve({ assetId: "a" }),
-    () => scoped.cdn.serve({ assetIdentifier: "a" }),
+    () => scoped.cdn.serve({ assetId: "a" }),
   ]) {
     await expect(call()).rejects.toMatchObject({ code: "sdk/cancelled" });
   }
@@ -150,10 +150,7 @@ test("network failures are wrapped as sdk/transport-error with the original caus
     uploadFetch: failingFetch(cause),
     cdnFetch: failingFetch(cause),
   });
-  for (const call of [
-    ...transportCalls(client),
-    () => client.cdn.serve({ assetIdentifier: "a" }),
-  ]) {
+  for (const call of [...transportCalls(client), () => client.cdn.serve({ assetId: "a" })]) {
     const error = await call().catch((error: unknown) => error);
     expect(error).toBeInstanceOf(CalmLensError);
     expect(error).toMatchObject({ code: "sdk/transport-error", cause });

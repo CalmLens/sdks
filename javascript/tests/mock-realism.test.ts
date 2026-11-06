@@ -282,7 +282,7 @@ describe("MockCalmLensServerClient multipart and idempotency", () => {
 describe("MockCalmLensServerClient CDN", () => {
   it("serves JSON errors and content headers like the CDN", async () => {
     const client = createClient();
-    const missing = await client.cdn.serve({ assetIdentifier: "missing" });
+    const missing = await client.cdn.serve({ assetId: "missing" });
     expect(missing.status).toBe(404);
     expect(missing.headers.get("content-type")).toBe("application/json");
     expect(await missing.json()).toMatchObject({ code: "asset/not-found" });
@@ -292,12 +292,12 @@ describe("MockCalmLensServerClient CDN", () => {
       visibility: "public",
       content: { uint8Array: [1, 2, 3], type: "application/pdf" },
     });
-    const served = await client.cdn.serve({ assetIdentifier: asset.id });
+    const served = await client.cdn.serve({ assetId: asset.id });
     expect(served.headers.get("content-length")).toBe("3");
     // Like the CDN, only images carry an ETag (their bytes never change).
     expect(served.headers.get("etag")).toBeNull();
-    expect(served.url).toBe(client.cdn.getAssetUrl({ assetIdentifier: asset.id }));
-    const head = await client.cdn.serve({ assetIdentifier: asset.id, init: { method: "HEAD" } });
+    expect(served.url).toBe(client.cdn.getAssetUrl({ assetId: asset.id, resource: "rendered" }));
+    const head = await client.cdn.serve({ assetId: asset.id, init: { method: "HEAD" } });
     expect(await head.text()).toBe("");
   });
 });

@@ -37,7 +37,11 @@ export type MountedViewer = { container: HTMLElement; unmount: () => void };
 
 export type ViewerBinding = {
   name: string;
-  mount: <K extends AssetViewerName>(kind: K, props: AssetViewerOptionsByKind[K]) => MountedViewer;
+  /** Mounts a viewer; `src` defaults to the public asset URL of the asset's ID and project. */
+  mount: <K extends AssetViewerName>(
+    kind: K,
+    props: Omit<AssetViewerOptionsByKind[K], "src"> & { src?: string },
+  ) => MountedViewer;
 };
 
 const TAGS = {
@@ -51,10 +55,16 @@ const TAGS = {
 /** The elements' options that are attributes rather than properties. */
 const ATTRIBUTES: Record<string, string> = {
   label: "label",
-  cdnBaseUrl: "cdn-base-url",
+  src: "src",
   sizes: "sizes",
   pageSize: "page-size",
+  initialPage: "initial-page",
 };
+
+const withSrc = (props: { src?: string; asset: { id: string; projectId?: string } }) => ({
+  ...props,
+  src: props.src ?? `https://cdn.calmlens.com/v1/assets/${props.asset.projectId}/${props.asset.id}`,
+});
 
 const containerFor = () => document.body.appendChild(document.createElement("div"));
 const done = (container: HTMLElement, unmount: () => void): MountedViewer => ({
@@ -65,7 +75,7 @@ const done = (container: HTMLElement, unmount: () => void): MountedViewer => ({
   },
 });
 
-export const VIEWER_BINDINGS: ViewerBinding[] = [
+const BINDINGS: ViewerBinding[] = [
   {
     name: "React",
     mount: (kind, props) => {
@@ -115,3 +125,9 @@ export const VIEWER_BINDINGS: ViewerBinding[] = [
     },
   },
 ];
+
+/** Every binding, each given the default `src` its tests leave out. */
+export const VIEWER_BINDINGS: ViewerBinding[] = BINDINGS.map((binding) => ({
+  ...binding,
+  mount: (kind, props) => binding.mount(kind, withSrc(props) as never),
+}));

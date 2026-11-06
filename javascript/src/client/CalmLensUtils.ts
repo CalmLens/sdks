@@ -6,11 +6,9 @@ import type {
   BatchAssetsOptions,
   CalmLensAppClientOptions,
   CalmLensServerClientOptions,
-  CdnResource,
   CdnTransform,
   ClassifyTextOptions,
   ConnectionOptions,
-  GetAssetUrlOptions,
   ImageTransformOptions,
   SubmitAssetOptions,
   WaitForAssetDecisionOptions,
@@ -21,7 +19,6 @@ import {
   UPLOAD_MIME_SUFFIXES,
   UPLOAD_MIME_TYPES,
 } from "./CalmLensUploadMimeTypes";
-import { parseViewerClaims } from "./CalmLensViewerClaims";
 
 const assertHttpUrl = (name: string, value: string | undefined) => {
   if (value === undefined) return;
@@ -108,6 +105,8 @@ export const validateAppClientOptions = (options: CalmLensAppClientOptions) => {
   }
   if (!options.uploadPresetId) throw invalidConfig("Upload preset ID is required");
   configPathSegment(options.uploadPresetId, "Upload preset ID");
+  if (options.projectId !== undefined) configPathSegment(options.projectId, "Project ID");
+  assertHttpUrl("cdnBaseUrl", options.cdnBaseUrl);
   if (
     options.token !== undefined &&
     typeof options.token !== "string" &&
@@ -129,14 +128,25 @@ export const validateRequestOptions = (options: {
   assertInteger("maxRetries", options.maxRetries, 0);
 };
 
+/** The options that name an asset's CDN URL and a resource beneath it. */
+const CDN_LOCATION_KEYS = [
+  "assetId",
+  "externalId",
+  "lens",
+  "projectId",
+  "resource",
+  "transform",
+  "viewerClaims",
+];
+
 /**
  * Option keys of methods that send no request of their own, or that take keys of their own beside
  * a request's; CalmLensOptionKeys, generated from the API, has the rest.
  */
 const LOCAL_OPTION_KEYS: Readonly<Record<string, readonly string[]>> = {
   "assets.waitForDecision": ["assetId", "signal", "timeoutMs"],
-  "cdn.getAssetUrl": ["assetIdentifier", "lens", "resource", "transform", "viewerClaims"],
-  "cdn.serve": ["assetIdentifier", "init", "lens", "resource", "transform", "viewerClaims"],
+  "cdn.getAssetUrl": CDN_LOCATION_KEYS,
+  "cdn.serve": [...CDN_LOCATION_KEYS, "init"],
   "uploadTokens.sign": ["expiresInSeconds", "externalId", "uploadPresetId"],
 };
 /** Uploads also take an `idempotencyKey`, which the SDK sends as a header. */
@@ -441,39 +451,6 @@ export const transformSelector = (transform: CdnTransform | undefined): string |
 
 export const DEFAULT_CDN_BASE_URL = `https://cdn.${DOMAIN}/v1`;
 
-/** The CDN resources a signed URL can be created for, as the API accepts them. */
-export const SIGNED_CDN_RESOURCES = ["original", "rendered", "preview", "hls", "embed"] as const;
-
-/**
- * Where each resource is served beneath an asset's CDN path. The HLS stream is its master
- * playlist; its media playlists and segments are the other files beneath `hls/`.
- */
-const CDN_RESOURCE_PATHS: Readonly<Record<CdnResource, string>> = {
-  original: "original",
-  rendered: "rendered",
-  preview: "preview",
-  hls: "hls/index.m3u8",
-  embed: "embed",
-  placeholder: "placeholder",
-};
-
-/**
- * The resources that take no lens or transform: the exact upload, the HLS stream, the embed
- * page and the public placeholder.
- */
-const UNSELECTABLE_CDN_RESOURCES: ReadonlySet<string> = new Set<CdnResource>([
-  "original",
-  "hls",
-  "embed",
-  "placeholder",
-]);
-
-/** A signed URL's lifetime when `expiresInSeconds` is omitted: 15 minutes. */
-export const DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS = 60 * 15;
-
-/** The longest signed URL lifetime the API accepts: 24 hours. */
-const MAX_SIGNED_URL_SECONDS = 60 * 60 * 24;
-
 /** The most assets one `assets.batch` request takes. */
 export const ASSET_BATCH_MAX_ASSETS = 500;
 /** The operations `assets.batch` runs. */
@@ -490,111 +467,6 @@ export const validateBatchAssetsOptions = ({ assetIds, operation }: BatchAssetsO
   if (!(ASSET_BATCH_OPERATIONS as readonly unknown[]).includes(operation)) {
     throw invalidArgument(`operation must be one of ${ASSET_BATCH_OPERATIONS.join(", ")}`);
   }
-};
-
-/**
- * Checks signed URL options as the API does: the `original`, `rendered`, `preview`, `hls` and
- * `embed` resources are signed (a placeholder needs no signature), the original, hls and
- * embed page take no lens or transform, and the lifetime is a whole number of seconds from 1 to 24
- * hours.
- */
-export const validateSignedUrlOptions = (options: {
-  resource?: unknown;
-  lens?: unknown;
-  transform?: unknown;
-  expiresInSeconds?: unknown;
-}): void => {
-  const { resource = "rendered", lens, transform, expiresInSeconds } = options;
-  if (!(SIGNED_CDN_RESOURCES as readonly unknown[]).includes(resource)) {
-    throw invalidArgument(
-      `A signed URL's resource must be one of ${SIGNED_CDN_RESOURCES.join(", ")}`,
-    );
-  }
-  if (
-    UNSELECTABLE_CDN_RESOURCES.has(resource as string) &&
-    (lens !== undefined || transform !== undefined)
-  ) {
-    throw invalidArgument(`The ${resource} resource takes no lens or transform`);
-  }
-  if (
-    expiresInSeconds !== undefined &&
-    (!Number.isInteger(expiresInSeconds) ||
-      (expiresInSeconds as number) < 1 ||
-      (expiresInSeconds as number) > MAX_SIGNED_URL_SECONDS)
-  ) {
-    throw invalidArgument("expiresInSeconds must be a whole number from 1 to 86400");
-  }
-};
-
-/**
- * Builds an asset's CDN URL without a client: no API key and no request, so it works in browsers.
- * `CalmLensServerClient`'s `cdn.getAssetUrl` uses it too.
- *
- * `resource` is `rendered` (default: the displayable file, an image in the best format the browser
- * accepts, a PDF, or browser-safe video or audio), `original` (the exact upload), `preview` (a
- * still image for the asset), `hls` (the HLS master playlist of audio or video's adaptive stream,
- * once `content.hls` is set), `embed` (an HTML page that shows the asset in an iframe) or
- * `placeholder` (a small blurred PNG that the CDN serves publicly for every asset whatever its
- * visibility or moderation status, without requiring age confirmation). Lenses
- * and transforms apply to `preview`, and to `rendered` when it is an image; the CDN refuses them
- * on rendered PDFs, video and audio with `transform/invalid`, and the SDK refuses them on
- * the original, hls, embed and placeholder.
- */
-export const getAssetUrl = ({
-  projectId,
-  assetIdentifier,
-  cdnBaseUrl = DEFAULT_CDN_BASE_URL,
-  resource = "rendered",
-  ...options
-}: GetAssetUrlOptions): string => {
-  if (!Object.hasOwn(CDN_RESOURCE_PATHS, resource)) {
-    throw invalidArgument(`resource must be one of ${Object.keys(CDN_RESOURCE_PATHS).join(", ")}`);
-  }
-  if (
-    UNSELECTABLE_CDN_RESOURCES.has(resource) &&
-    (options.lens !== undefined || options.transform !== undefined)
-  ) {
-    throw invalidArgument(`The ${resource} resource takes no lens or transform`);
-  }
-  const url = `${cdnBaseUrl.replace(/\/+$/, "")}/assets/${encodePathSegment(projectId, "Project ID")}/${encodePathSegment(assetIdentifier, "Asset identifier")}/${CDN_RESOURCE_PATHS[resource]}`;
-  return appendCdnSelector(url, options);
-};
-
-/**
- * Appends a CDN lens (`/@name`) followed by any direct transform selector to an asset URL, and
- * optional JSON `viewerClaims` when supplied.
- */
-export const appendCdnSelector = (
-  url: string,
-  options: {
-    lens?: string;
-    transform?: CdnTransform;
-    viewerClaims?: { region?: string; ageConfirmed?: boolean };
-  },
-): string => {
-  const path = appendCdnPathSelector(url, options);
-  const query = new URLSearchParams();
-  if (options.viewerClaims !== undefined) {
-    const claims = parseViewerClaims(options.viewerClaims);
-    if (!claims) throw invalidArgument("Invalid viewerClaims");
-    query.set("viewerClaims", JSON.stringify(claims));
-  }
-  return query.size ? `${path}?${query}` : path;
-};
-
-const appendCdnPathSelector = (
-  url: string,
-  options: { lens?: string; transform?: CdnTransform },
-): string => {
-  const transform = transformSelector(options.transform);
-  const selector = [
-    ...(options.lens ? [`@${encodePathSegment(options.lens, "Lens")}`] : []),
-    // Structured options are already path-safe: unreserved characters, escapes, `=`, `,`, `.`.
-    ...(transform
-      ? [typeof options.transform === "string" ? encodeURI(transform) : transform]
-      : []),
-  ].join(",");
-  return selector ? `${url}/${selector}` : url;
 };
 
 const appendQueryValue = (parts: string[], key: string, value: unknown): void => {

@@ -47,11 +47,11 @@ class DocumentViewer extends ViewerBase<DocumentViewerOptions> {
     super(root, "document");
   }
 
-  protected describe({ asset, pdf }: DocumentViewerOptions) {
-    return [asset.content?.rendered?.kind, pdf];
+  protected describe({ asset, pdf, initialPage }: DocumentViewerOptions) {
+    return [asset.content?.rendered?.kind, pdf, initialPage];
   }
 
-  /** Opens the document, asking once for a fresh signed URL when it fails, as an expired one does. */
+  /** Opens the document, asking once for a fresh asset URL when it fails, as an expired one does. */
   async #open(signal: AbortSignal): Promise<PdfDocument> {
     let url = this.#url ?? (await this.urls.get("rendered"));
     for (;;) {
@@ -84,7 +84,10 @@ class DocumentViewer extends ViewerBase<DocumentViewerOptions> {
     }
     signal.addEventListener("abort", () => this.#close(document));
     this.#document = document;
-    this.#page = 1;
+    this.#page = Math.min(
+      Math.max(1, Math.trunc(this.options.initialPage ?? 1) || 1),
+      document.numPages,
+    );
     this.#zoom = undefined;
     this.#build();
     await this.#render(signal);

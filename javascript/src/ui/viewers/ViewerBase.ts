@@ -36,7 +36,7 @@ export type ViewerState = "loading" | "loaded" | "error";
 /**
  * What every viewer shares: the element's class and state, its URLs, its messages, and a load
  * that runs again (cancelling the last) only when the options change what is shown. Functions in
- * the options, such as `getSignedUrl`, may change on every render without loading again.
+ * the options, such as `onExpired`, may change on every render without loading again.
  */
 export abstract class ViewerBase<O extends ViewerOptions> implements AssetViewer<O> {
   protected readonly root: HTMLElement;
@@ -66,11 +66,11 @@ export abstract class ViewerBase<O extends ViewerOptions> implements AssetViewer
   update(options: O): void {
     this.options = options;
     if (this.urls) this.urls.options = options;
-    const { asset, cdnBaseUrl, viewerClaims, label, messages } = options;
+    const { asset, viewerClaims, label, messages } = options;
+    // The asset URL isn't part of the key: a fresh signed URL for the same asset loads nothing again.
     const key = JSON.stringify([
       asset.projectId,
       asset.id,
-      cdnBaseUrl,
       viewerClaims,
       label,
       messages,

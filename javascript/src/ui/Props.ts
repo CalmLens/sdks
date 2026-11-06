@@ -1,4 +1,5 @@
-import type { MediaOptions, MediaState } from "./Media";
+import type { AssetAvailability } from "../client/CalmLensTypes";
+import type { AssetOptions } from "./Asset";
 import type { CalmLensMessages } from "./Messages";
 import type { UploadController, UploadControllerOptions, UploadFile } from "./UploadController";
 
@@ -20,73 +21,44 @@ export interface UploaderDisplayOptions<F extends UploadFile = UploadFile> {
 export type UploaderProps<F extends UploadFile = UploadFile> = UploadControllerOptions<F> &
   UploaderDisplayOptions<F>;
 
-/** Props every framework's media component takes, on top of the media options. */
-export interface MediaDisplayOptions {
+/** Props every framework's `CalmLensAsset` takes, on top of the asset options. */
+export interface AssetDisplayOptions {
   /**
-   * Describes the image, and labels a video, audio, PDF or file icon. Leave it empty only for
-   * decorative images.
+   * Describes an image or still, and labels video, audio, documents, text and file icons. Leave it
+   * empty only for decorative images.
    */
   alt?: string;
-  /** Width divided by height, which you store with the upload, so the box keeps its size. */
+  /** How the content fills its box: `contain` (default) or `cover`. */
+  fit?: "contain" | "cover";
+  /** Width divided by height, which reserves the box's size before the info arrives. */
   aspectRatio?: number;
-  /** The intrinsic width, used with `height` for the aspect ratio and the image attributes. */
-  width?: number;
-  height?: number;
-  /** The `sizes` attribute for `widths`, such as `(min-width: 768px) 50vw, 100vw`. */
-  sizes?: string;
-  /** The asset's `content.preview.averageColor`, shown behind the media while it loads. */
-  averageColor?: string;
-  /** How the media fills its box: `cover` (default) or `contain`. */
-  fit?: "cover" | "contain";
-  /** The CSS `object-position`, such as `top` or `30% 50%`. */
-  position?: string;
-  /** Load the image only when it nears the viewport. Defaults to `true`. */
+  /** Load images only when they near the viewport. Defaults to `true`. */
   lazy?: boolean;
   fetchPriority?: "high" | "low" | "auto";
-  /** Video and audio controls. Defaults to `true`. */
-  controls?: boolean;
+  /** Replaces some or all of the text the component shows. */
   messages?: Partial<CalmLensMessages>;
-  /**
-   * Called when the viewer presses the reveal button on age-restricted media. Run your app's own
-   * check, then render again with `ageConfirmed`. Without it, the notice has no button.
-   */
-  onReveal?: () => void;
 }
 
-export type MediaProps = MediaOptions & MediaDisplayOptions;
+/** What `CalmLensAsset` reports, in every binding (as callbacks, events or `on*` props). */
+export interface AssetEventHandlers {
+  /** The content shown loaded: an image, a player's metadata, or a viewer's content. */
+  onLoad?: () => void;
+  /** The content couldn't be shown, after any refresh of the asset URL. */
+  onError?: () => void;
+  /** The viewer's availability became known or changed, from the info or the CDN's refusal. */
+  onAvailabilityChange?: (availability: AssetAvailability) => void;
+  /**
+   * The viewer pressed the reveal button on age-restricted content. Run your app's age check,
+   * then render again with `viewerClaims.ageConfirmed`. Without it, the notice has no button.
+   */
+  onAgeConfirmRequest?: () => void;
+  onPlay?: () => void;
+  onEnded?: () => void;
+  /** Video or audio played on, with its position in seconds. */
+  onTimeUpdate?: (currentTime: number) => void;
+}
 
-/** The aspect ratio a media component's box keeps, if it knows one. */
-export const getMediaAspectRatio = ({ aspectRatio, width, height }: MediaDisplayOptions) =>
-  aspectRatio ?? (width && height ? width / height : undefined);
-
-/** A key that changes whenever a media component must load something new. */
-export const getMediaLoadKey = (state: MediaState): string => {
-  switch (state.kind) {
-    case "image":
-      return `${state.src} ${state.srcSet ?? ""}`;
-    case "video":
-      return `${state.src} ${state.stream ?? ""} ${state.poster ?? ""}`;
-    case "audio":
-      return `${state.src} ${state.stream ?? ""} ${state.waveformUrl ?? ""} ${state.peaks?.length ?? 0}`;
-    case "pdf":
-      return state.src;
-    case "file":
-      return `file ${state.icon}`;
-    case "unavailable":
-      return state.reason === "regional" ? "unavailable-regional" : state.kind;
-    default:
-      return state.kind;
-  }
-};
-
-/**
- * The blurred placeholder a media component shows, if any: behind the age notice, while signed
- * URLs load, and until an image loads.
- */
-export const getShownPlaceholder = (state: MediaState, loaded: boolean): string | undefined =>
-  state.kind === "gated" || state.kind === "pending" || (state.kind === "image" && !loaded)
-    ? state.placeholderUrl
-    : undefined;
+export type AssetProps = AssetOptions & AssetDisplayOptions & AssetEventHandlers;
 
 /** The size of the file icon shown for an asset with nothing else to show. */
-export const MEDIA_FILE_ICON_SIZE = 64;
+export const ASSET_FILE_ICON_SIZE = 64;

@@ -58,7 +58,7 @@ const expectServedBytesToEqual = async (
   assetId: string,
   expectedBytes: Uint8Array,
 ) => {
-  const response = await client.cdn.serve({ assetIdentifier: assetId });
+  const response = await client.cdn.serve({ assetId: assetId });
   expect(response.status).toBe(200);
   expect(new Uint8Array(await response.arrayBuffer())).toEqual(expectedBytes);
 };
@@ -372,21 +372,37 @@ describe("MockCalmLensServerClient", () => {
     expect(children.items[0]?.name).toBe("child");
   });
 
-  it("creates signed URLs without network calls", async () => {
-    const client = createClient({ signedUrlBaseUrl: "https://mock.local" });
-    const asset = await client.assets.create({ name: "site", url: "https://example.com" });
-
-    const signedUrl = await client.assets.createSignedUrl({
-      assetId: asset.id,
-      resource: "rendered",
-      expiresInSeconds: 60,
-      lens: "thumbnail",
+  it("signs asset URLs its CDN serves without the API key until they expire", async () => {
+    let now = 1_700_000_000_000;
+    const client = createClient({ now: () => now }, apiKey, {
+      cdnBaseUrl: "https://mock-cdn.test/v1",
+    });
+    const asset = await client.assets.create({
+      name: "private.png",
+      visibility: "private",
+      content: { base64: pngBase64, type: "image/png" },
     });
 
-    expect(signedUrl.url).toBe(
-      `https://mock.local/assets/${asset.id}/rendered?expiresInSeconds=60&lens=thumbnail`,
+    const signed = await client.cdn.signAssetUrl({ assetId: asset.id, expiresIn: 60 });
+    expect(signed.url).toStartWith(`https://mock-cdn.test/v1/assets/${projectId}/sig_`);
+    expect(signed.expiresAt).toBe(now + 60_000);
+    const rendered = await client.fetchCdn(`${signed.url}/rendered/@thumbnail`);
+    expect(rendered.status).toBe(200);
+    expect(rendered.headers.get("content-type")).toBe("image/png");
+    expect((await client.fetchCdn(`${signed.url}/original`)).status).toBe(403);
+    const unsigned = await client.fetchCdn(
+      client.cdn.getAssetUrl({ assetId: asset.id, resource: "rendered" }),
     );
-    expect(signedUrl.expiresAt).toBe(1_700_000_060_000);
+    expect(await unsigned.json()).toMatchObject({ code: "auth/permission-denied" });
+
+    now += 60_000;
+    const expired = await client.fetchCdn(`${signed.url}/rendered`);
+    expect(expired.status).toBe(403);
+    expect(await expired.json()).toMatchObject({ code: "signed-url/expired" });
+    await expect(client.cdn.getAssetInfo(signed.url)).rejects.toMatchObject({
+      code: "signed-url/expired",
+      status: 403,
+    });
   });
 
   it("builds CDN URLs and serves assets from the standard client", async () => {
@@ -400,7 +416,7 @@ describe("MockCalmLensServerClient", () => {
 
     expect(
       client.cdn.getAssetUrl({
-        assetIdentifier: "asset-id",
+        assetId: "asset-id",
         resource: "rendered",
         lens: "thumbnail",
       }),
@@ -408,7 +424,7 @@ describe("MockCalmLensServerClient", () => {
 
     expect(
       client.cdn.getAssetUrl({
-        assetIdentifier: "asset-id",
+        assetId: "asset-id",
         resource: "rendered",
         lens: "thumbnail",
         viewerClaims: { ageConfirmed: true },
@@ -418,16 +434,16 @@ describe("MockCalmLensServerClient", () => {
     );
     expect(
       client.cdn.getAssetUrl({
-        assetIdentifier: "asset-id",
+        assetId: "asset-id",
+        resource: "rendered",
         viewerClaims: { ageConfirmed: false },
       }),
-    ).toBe(
-      `https://cdn.test/v1/assets/${projectId}/asset-id/rendered?viewerClaims=%7B%22ageConfirmed%22%3Afalse%7D`,
-    );
+    ).toBe(`https://cdn.test/v1/assets/${projectId}/asset-id/rendered`);
 
     expect(
       client.cdn.getAssetUrl({
-        assetIdentifier: "asset-id",
+        assetId: "asset-id",
+        resource: "rendered",
         transform: "width=1024,format=png,blur=2",
       }),
     ).toBe(
@@ -436,14 +452,16 @@ describe("MockCalmLensServerClient", () => {
 
     expect(
       client.cdn.getAssetUrl({
-        assetIdentifier: "asset-id",
+        assetId: "asset-id",
+        resource: "rendered",
         transform: { width: 1024, format: "png" },
       }),
     ).toBe(`https://cdn.test/v1/assets/${projectId}/asset-id/rendered/format=png,width=1024`);
 
     expect(
       client.cdn.getAssetUrl({
-        assetIdentifier: "asset-id",
+        assetId: "asset-id",
+        resource: "rendered",
         transform: { border: { color: "#fff", width: 2 }, format: "webp" },
       }),
     ).toBe(
@@ -452,13 +470,14 @@ describe("MockCalmLensServerClient", () => {
 
     expect(() =>
       client.cdn.getAssetUrl({
-        assetIdentifier: "asset-id",
+        assetId: "asset-id",
+        resource: "rendered",
         transform: { "../width": 10 },
       }),
     ).toThrow(expect.objectContaining({ code: "sdk/invalid-argument" }));
 
     const response = await client.cdn.serve({
-      assetIdentifier: "asset-id",
+      assetId: "asset-id",
       resource: "original",
       init: { headers: { Accept: "image/png" } },
     });
@@ -539,7 +558,7 @@ describe("MockCalmLensServerClient", () => {
     });
 
     const response = await client.cdn.serve({
-      assetIdentifier: asset.id,
+      assetId: asset.id,
       lens: "thumbnail",
     });
 
@@ -565,12 +584,12 @@ describe("MockCalmLensServerClient", () => {
 
     expect(asset.externalId).toBe(externalId);
 
-    const response = await client.cdn.serve({ assetIdentifier: externalId, lens: "thumbnail" });
+    const response = await client.cdn.serve({ externalId, lens: "thumbnail" });
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/png");
     expect(response.headers.get("X-Mock-CalmLens-CDN-URL")).toBe(
-      `https://mock-cdn.test/v1/assets/${projectId}/${externalId}/rendered/@thumbnail`,
+      `https://mock-cdn.test/v1/assets/${projectId}/ext:${externalId}/rendered/@thumbnail`,
     );
     expect(new Uint8Array(await response.arrayBuffer()).length).toBeGreaterThan(0);
   });
@@ -881,7 +900,7 @@ describe("MockCalmLensServerClient", () => {
       processingOptions: { keepContentAfterProcessing: true },
     });
     expect(asset.content.status).toBe("stored");
-    expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(200);
+    expect((await client.cdn.serve({ assetId: asset.id })).status).toBe(200);
 
     const removed = await client.assets.removeContent({ assetId: asset.id });
     expect(removed.id).toBe(asset.id);
@@ -891,7 +910,7 @@ describe("MockCalmLensServerClient", () => {
       removalReason: "requested",
       updatedAt: 1_700_000_000_000,
     });
-    expect((await client.cdn.serve({ assetIdentifier: asset.id })).status).toBe(403);
+    expect((await client.cdn.serve({ assetId: asset.id })).status).toBe(403);
     expect((await client.assets.retrieve({ assetId: asset.id })).content.removalReason).toBe(
       "requested",
     );
@@ -971,8 +990,8 @@ describe("MockCalmLensServerClient", () => {
       cdnBaseUrl: "https://cdn.test/v1/",
       timeoutMs: 5_000,
     });
-    expect(client.cdn.getAssetUrl({ assetIdentifier: "a" })).toBe(
-      `https://cdn.test/v1/assets/${projectId}/a/rendered`,
+    expect(client.cdn.getAssetUrl({ assetId: "a" })).toBe(
+      `https://cdn.test/v1/assets/${projectId}/a`,
     );
     for (const invalid of [
       { apiKey: "" },
@@ -1122,12 +1141,12 @@ describe("MockCalmLensAppClient", () => {
     expect(
       (await app.assets.retrieve({ assetId: good.id })).classification.moderation?.status,
     ).toBe("allowed");
-    const served = await app.server.cdn.serve({ assetIdentifier: good.id });
+    const served = await app.server.cdn.serve({ assetId: good.id });
     expect(new Uint8Array(await served.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
-    expect((await app.server.cdn.serve({ assetIdentifier: bad.id })).status).toBe(403);
-    expect(
-      (await app.server.cdn.serve({ assetIdentifier: bad.id, resource: "placeholder" })).status,
-    ).toBe(200);
+    expect((await app.server.cdn.serve({ assetId: bad.id })).status).toBe(403);
+    expect((await app.server.cdn.serve({ assetId: bad.id, resource: "placeholder" })).status).toBe(
+      200,
+    );
   });
 
   it("applies the preset's token, type and size rules with the API's error codes", async () => {

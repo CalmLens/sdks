@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { waitFor, within } from "@testing-library/dom";
 import type { MediaPlayerSource } from "../src/react-native";
+import type { ViewerAsset } from "../src/ui";
 import { BINDINGS, type Mounted } from "./bindings";
 
 const PROJECT_ID = "proj_8fK2mQx7Lp4NvB3tRz9Y";
-const CDN = "https://cdn.calmlens.com/v1";
+const SRC = `https://cdn.calmlens.com/v1/assets/${PROJECT_ID}/sig_grant`;
 const native = BINDINGS.find((binding) => binding.name === "React Native");
 if (!native) throw new Error("The React Native binding is missing");
-const messages = { openPdf: "msg:open-pdf", play: "msg:play", unavailable: "msg:unavailable" };
+const messages = { play: "msg:play", unavailable: "msg:unavailable" };
 
 let mounted: Mounted | undefined;
 afterEach(() => {
@@ -16,64 +17,55 @@ afterEach(() => {
 });
 
 const view = () => within(mounted?.container ?? document.body);
-type NativeProps = Parameters<typeof native.mountMedia>[0] & {
+type NativeProps = Parameters<typeof native.mountAsset>[0] & {
   renderPlayer?: (source: MediaPlayerSource) => null;
 };
 const mountNative = (props: NativeProps) =>
-  native.mountMedia(props as Parameters<typeof native.mountMedia>[0]);
-const apiAsset = (kind: "video" | "audio" | "pdf", peaks?: number[], stream = false) => ({
+  native.mountAsset(props as Parameters<typeof native.mountAsset>[0]);
+const info = (kind: "video" | "audio", peaks?: number[], stream = false): ViewerAsset => ({
   id: "v1",
   projectId: PROJECT_ID,
-  type: kind === "pdf" ? "multimedia-document" : kind,
-  classification: { moderation: { status: "allowed" as const } },
+  type: kind,
+  externalUrl: null,
+  availability: "available",
   content: {
-    status: "stored",
+    format: null,
     rendered: { kind, width: null, height: null, peaks },
     hls: stream ? { renditions: [] } : null,
     preview: { width: 640, height: 360, thumbhash: null, averageColor: null },
   },
 });
 
-/** Records the pages `Linking.openURL` opens, which react-native-web opens with `window.open`. */
-const captureOpens = () => {
-  const opened: string[] = [];
-  const original = window.open;
-  window.open = ((target?: string | URL) => {
-    opened.push(String(target));
-    return null;
-  }) as typeof window.open;
-  return { opened, restore: () => (window.open = original) };
-};
-
-describe("React Native media", () => {
+describe("React Native CalmLensAsset playback", () => {
   it("hands video to the app's player with the rendered file and its poster", async () => {
     const renderPlayer = mock((_source: MediaPlayerSource) => null);
-    mounted = mountNative({ asset: apiAsset("video"), alt: "A cat chasing a laser", renderPlayer });
+    mounted = mountNative({ src: SRC, info: info("video"), alt: "A laser", renderPlayer });
 
     await waitFor(() =>
       expect(renderPlayer.mock.calls.at(-1)?.[0]).toMatchObject({
         kind: "video",
-        src: `${CDN}/assets/${PROJECT_ID}/v1/rendered`,
-        poster: `${CDN}/assets/${PROJECT_ID}/v1/preview`,
-        alt: "A cat chasing a laser",
+        src: `${SRC}/rendered`,
+        poster: `${SRC}/preview`,
+        alt: "A laser",
+        controls: true,
       }),
     );
   });
 
   it("hands the app's player the stream when there is one, and the rendered file once it fails", async () => {
     const renderPlayer = mock((_source: MediaPlayerSource) => null);
-    mounted = mountNative({ asset: apiAsset("video", undefined, true), renderPlayer });
+    mounted = mountNative({ src: SRC, info: info("video", undefined, true), renderPlayer });
 
     await waitFor(() =>
       expect(renderPlayer.mock.calls.at(-1)?.[0]).toMatchObject({
-        src: `${CDN}/assets/${PROJECT_ID}/v1/hls/index.m3u8`,
+        src: `${SRC}/hls/index.m3u8`,
         streaming: true,
       }),
     );
     renderPlayer.mock.calls.at(-1)?.[0].onError({ position: 8, playing: true });
     await waitFor(() =>
       expect(renderPlayer.mock.calls.at(-1)?.[0]).toMatchObject({
-        src: `${CDN}/assets/${PROJECT_ID}/v1/rendered`,
+        src: `${SRC}/rendered`,
         streaming: false,
         resumeFrom: { position: 8, playing: true },
       }),
@@ -82,86 +74,45 @@ describe("React Native media", () => {
 
   it("hands audio's waveform and peaks to the app's player", async () => {
     const renderPlayer = mock((_source: MediaPlayerSource) => null);
-    mounted = mountNative({ asset: apiAsset("audio", [0.4, 0.8]), renderPlayer });
+    mounted = mountNative({ src: SRC, info: info("audio", [0.4, 0.8]), renderPlayer });
 
     await waitFor(() =>
       expect(renderPlayer.mock.calls.at(-1)?.[0]).toMatchObject({
         kind: "audio",
-        src: `${CDN}/assets/${PROJECT_ID}/v1/rendered`,
-        poster: `${CDN}/assets/${PROJECT_ID}/v1/preview`,
+        src: `${SRC}/rendered`,
+        poster: `${SRC}/preview`,
         peaks: [0.4, 0.8],
       }),
     );
   });
 
-  it("gives a blocked video to no player", async () => {
+  it("gives unavailable video to no player", async () => {
     const renderPlayer = mock((_source: MediaPlayerSource) => null);
     mounted = mountNative({
-      projectId: PROJECT_ID,
-      assetId: "v1",
-      type: "video",
-      status: "blocked",
-      renderPlayer,
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(renderPlayer).not.toHaveBeenCalled();
-  });
-
-  it("shows a video's poster without a player, with a button that opens the file", async () => {
-    const { opened, restore } = captureOpens();
-    try {
-      mounted = mountNative({ asset: apiAsset("video"), alt: "A cat chasing a laser", messages });
-      const poster = await view().findByRole("img", { name: "A cat chasing a laser" });
-      expect(poster.getAttribute("src")).toBe(`${CDN}/assets/${PROJECT_ID}/v1/preview`);
-
-      view().getByRole("link", { name: messages.play }).click();
-      await waitFor(() => expect(opened).toEqual([`${CDN}/assets/${PROJECT_ID}/v1/rendered`]));
-    } finally {
-      restore();
-    }
-  });
-
-  it("opens a PDF from its button", async () => {
-    const { opened, restore } = captureOpens();
-    try {
-      mounted = mountNative({ asset: apiAsset("pdf"), messages });
-      (await view().findByRole("link", { name: messages.openPdf })).click();
-      await waitFor(() => expect(opened).toEqual([`${CDN}/assets/${PROJECT_ID}/v1/rendered`]));
-    } finally {
-      restore();
-    }
-  });
-
-  it("fetches a fresh signed URL when the player fails, and hands it over with where to resume", async () => {
-    let count = 0;
-    const getSignedUrl = mock(
-      async (resource: string) => `https://signed.example/${resource}?n=${++count}`,
-    );
-    const renderPlayer = mock((_source: MediaPlayerSource) => null);
-    mounted = mountNative({
-      projectId: PROJECT_ID,
-      assetId: "v1",
-      type: "video",
-      getSignedUrl,
+      src: SRC,
+      info: { ...info("video"), availability: "unavailable" },
       renderPlayer,
       messages,
     });
-    await waitFor(() =>
-      expect(renderPlayer.mock.calls.at(-1)?.[0].src).toBe("https://signed.example/rendered?n=1"),
-    );
+
+    await view().findByText(messages.unavailable);
+    expect(renderPlayer).not.toHaveBeenCalled();
+  });
+
+  it("hands the player a fresh asset URL from onExpired when it fails, with where to resume", async () => {
+    const fresh = `https://cdn.calmlens.com/v1/assets/${PROJECT_ID}/sig_fresh`;
+    const onExpired = mock(async () => fresh);
+    const renderPlayer = mock((_source: MediaPlayerSource) => null);
+    mounted = mountNative({ src: SRC, info: info("video"), onExpired, renderPlayer, messages });
+    await waitFor(() => expect(renderPlayer.mock.calls.at(-1)?.[0].src).toBe(`${SRC}/rendered`));
 
     renderPlayer.mock.calls.at(-1)?.[0].onError({ position: 12, playing: true });
     await waitFor(() =>
       expect(renderPlayer.mock.calls.at(-1)?.[0]).toMatchObject({
-        src: "https://signed.example/rendered?n=2",
+        src: `${fresh}/rendered`,
         resumeFrom: { position: 12, playing: true },
       }),
     );
-    expect(getSignedUrl.mock.calls).toEqual([["rendered"], ["rendered"]]);
-
-    renderPlayer.mock.calls.at(-1)?.[0].onError();
-    expect(await view().findByText(messages.unavailable)).toBeTruthy();
-    expect(getSignedUrl).toHaveBeenCalledTimes(2);
+    expect(onExpired).toHaveBeenCalledTimes(1);
   });
 });

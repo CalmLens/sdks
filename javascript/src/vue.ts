@@ -1,6 +1,7 @@
-// Vue 3 components for uploads and media: `CalmLensUploader`, `CalmLensMedia` and the
+// Vue 3 components for uploads and assets: `CalmLensUploader`, `CalmLensAsset` and the
 // `useCalmLensUpload` composable for your own upload UI. The uploader emits `uploaded`,
-// `rejected`, `failed` and `removed`; listen for `reveal` on the media component.
+// `rejected`, `failed` and `removed`; `CalmLensAsset` emits `age-confirm-request`, `load`,
+// `error`, `availability-change`, `play`, `ended` and `timeupdate`.
 
 import {
   computed,
@@ -18,7 +19,26 @@ import {
   watch,
   watchEffect,
 } from "vue";
-import type { AssetModerationStatus, CdnTransform } from "./client/CalmLensTypes";
+import type { AssetAvailability, ViewerClaims } from "./client/CalmLensTypes";
+import {
+  type AssetDisplay,
+  type AssetDocumentOptions,
+  type AssetImageOptions,
+  AssetSession,
+  type AssetSpreadsheetOptions,
+  type AssetVideoOptions,
+  type AssetView,
+  getAssetAspectRatio,
+  getAssetView,
+  getAssetViewKey,
+  getPeakHeights,
+  getPlayedPercent,
+} from "./ui/Asset";
+import {
+  AssetViewerMount,
+  getMountedViewerOptions,
+  isMountedViewerKind,
+} from "./ui/AssetViewerMount";
 import type {
   CalmLensUpload,
   UploadControllerOptions,
@@ -27,36 +47,21 @@ import type {
 } from "./ui/BrowserUpload";
 import { renderFileIconSvg } from "./ui/FileIcons";
 import { ICON_ATTRIBUTES, ICONS, type IconName } from "./ui/Icons";
-import {
-  type GetSignedMediaUrl,
-  getMediaState,
-  getPeakHeights,
-  getPlayedPercent,
-  type MediaAsset,
-  type MediaKind,
-  type MediaOptions,
-  MediaUrlSigner,
-  resolveMediaProps,
-} from "./ui/Media";
 import { MediaStreamPlayer } from "./ui/MediaStream";
 import {
   type CalmLensMessages,
   describeUploader,
   describeUploadItem,
-  getMediaUnavailableMessage,
+  formatMessage,
   resolveMessages,
 } from "./ui/Messages";
-import {
-  getMediaAspectRatio,
-  getMediaLoadKey,
-  getShownPlaceholder,
-  MEDIA_FILE_ICON_SIZE,
-} from "./ui/Props";
+import { ASSET_FILE_ICON_SIZE } from "./ui/Props";
 import {
   createUploadController,
   type UploadController,
   type UploadFile,
 } from "./ui/UploadController";
+import type { ViewerAsset } from "./ui/viewers";
 
 export * from "./ui";
 export type {
@@ -377,14 +382,14 @@ const waveform = (
   if (!url && !peaks) return undefined;
   const bars = () =>
     getPeakHeights(peaks ?? []).map((height) => h("span", { style: { height: `${height}%` } }));
-  return h("div", { class: "calmlens-media__waveform" }, [
-    url && h("img", { class: "calmlens-media__wave", src: url, alt: "", "aria-hidden": "true" }),
+  return h("div", { class: "calmlens-asset__waveform" }, [
+    url && h("img", { class: "calmlens-asset__wave", src: url, alt: "", "aria-hidden": "true" }),
     // Decorative: the audio element's own controls report its progress.
     peaks &&
       h(
         "div",
         {
-          class: "calmlens-media__progress",
+          class: "calmlens-asset__progress",
           role: "progressbar",
           "aria-hidden": "true",
           "aria-valuemin": 0,
@@ -393,233 +398,333 @@ const waveform = (
           style: { "--calmlens-played": `${played}%` },
         },
         [
-          h("div", { class: "calmlens-media__peaks" }, bars()),
-          h("div", { class: "calmlens-media__peaks", "data-played": "" }, bars()),
+          h("div", { class: "calmlens-asset__peaks" }, bars()),
+          h("div", { class: "calmlens-asset__peaks", "data-played": "" }, bars()),
         ],
       ),
   ]);
 };
 
 /**
- * Shows an asset from the CalmLens CDN: an image with responsive widths and a blurred placeholder
- * while it loads, a video with its poster, audio with its waveform, a PDF, or a file's preview
- * still or icon. Age-restricted assets stay behind the placeholder and a reveal button until
- * `ageConfirmed` is set; blocked and purged assets show an unavailable notice.
+ * Shows any asset from its asset URL (public, or signed by your server), natively in the page: an
+ * image with responsive widths, a website's screenshot and link, video and audio with their
+ * adaptive stream, a document, text or spreadsheet viewer, or a preview still or file icon. It
+ * reads `{src}/info` once mounted, unless `info` is given, in which case the first render, on the
+ * server too, is the real element. Emits `load`, `error`, `availability-change`, `play`, `ended`
+ * and `timeupdate`; listen for `age-confirm-request` to show the reveal button on age-restricted
+ * content. The `unavailable` and `age-gate` slots (`{ placeholderUrl, confirm }`) replace the
+ * notices.
  */
-export const CalmLensMedia = defineComponent({
-  name: "CalmLensMedia",
+export const CalmLensAsset = defineComponent({
+  name: "CalmLensAsset",
   props: {
-    /** An asset from the API, which supplies the project, ID, status, type and preview. */
-    asset: optional(Object as PropType<MediaAsset>),
-    /** Required without `asset`. */
-    projectId: optional(String),
-    /** Required without `asset`. */
-    assetId: optional(String),
-    status: optional(String as PropType<AssetModerationStatus>),
-    contentRemoved: optional(Boolean),
-    type: optional(String as PropType<MediaKind>),
-    hasPreview: optional(Boolean),
-    hasStream: optional(Boolean),
-    /** Whether video and audio play their adaptive stream when the asset has one. */
-    stream: { type: Boolean, default: true },
-    peaks: optional(Array as PropType<readonly number[]>),
-    resource: optional(String as PropType<"original" | "rendered">),
-    lens: optional(String),
-    transform: optional([String, Object, Array] as PropType<CdnTransform>),
-    widths: optional(Array as PropType<number[]>),
-    url: optional(String),
-    getSignedUrl: optional(Function as PropType<GetSignedMediaUrl>),
-    placeholder: { type: Boolean, default: true },
-    placeholderHash: optional(String),
-    placeholderUrl: optional(String),
-    averageColor: optional(String),
-    cdnBaseUrl: optional(String),
-    viewerClaims: optional(Object as PropType<NonNullable<MediaOptions["viewerClaims"]>>),
+    /** The asset URL, public or signed. Nothing is requested until it is set. */
+    src: optional(String),
+    display: optional(String as PropType<AssetDisplay>),
+    viewerClaims: optional(Object as PropType<ViewerClaims>),
+    /** The asset's display info, prefetched with `getAssetInfo`. */
+    info: optional(Object as PropType<ViewerAsset>),
     alt: { type: String, default: "" },
-    aspectRatio: optional(Number),
-    width: optional(Number),
-    height: optional(Number),
-    sizes: optional(String),
     fit: optional(String as PropType<"cover" | "contain">),
-    position: optional(String),
+    aspectRatio: optional(Number),
     lazy: { type: Boolean, default: true },
     fetchPriority: optional(String as PropType<"high" | "low" | "auto">),
-    controls: { type: Boolean, default: true },
+    image: optional(Object as PropType<AssetImageOptions>),
+    video: optional(Object as PropType<AssetVideoOptions>),
+    document: optional(Object as PropType<AssetDocumentOptions>),
+    spreadsheet: optional(Object as PropType<AssetSpreadsheetOptions>),
+    /** Returns a fresh asset URL from your server once a signed one expires. */
+    onExpired: optional(Function as PropType<() => string | Promise<string>>),
     messages: messagesProp,
-    /** Bound by `@reveal`; declared as a prop so the button shows only when something listens. */
-    onReveal: optional(Function as PropType<() => void>),
+    /** Bound by `@age-confirm-request`; a prop so the reveal button shows only when bound. */
+    onAgeConfirmRequest: optional(Function as PropType<() => void>),
   },
-  setup(props) {
+  emits: {
+    load: () => true,
+    error: () => true,
+    "availability-change": (_availability: AssetAvailability) => true,
+    play: () => true,
+    ended: () => true,
+    timeupdate: (_currentTime: number) => true,
+  },
+  setup(props, { emit, slots }) {
     const messages = computed(() => resolveMessages(props.messages));
-    const resolved = computed(() => resolveMediaProps(props as MediaOptions & typeof props));
-    const signed = ref(0);
-    const signer = new MediaUrlSigner(() => {
-      signed.value++;
+    const version = ref(0);
+    const session = new AssetSession(() => {
+      version.value++;
     });
+    const options = computed(() => ({
+      src: props.src,
+      display: props.display,
+      viewerClaims: props.viewerClaims,
+      info: props.info,
+      image: props.image,
+      video: props.video,
+      document: props.document,
+      spreadsheet: props.spreadsheet,
+      onExpired: props.onExpired,
+      alt: props.alt,
+    }));
     const state = computed(() => {
-      void signed.value;
-      return getMediaState(resolved.value, signer.urls(resolved.value));
+      void version.value;
+      return session.update(options.value);
     });
-    const loadKey = computed(() => getMediaLoadKey(state.value));
+    const view = computed(() => getAssetView(options.value, state.value));
+    const loadKey = computed(() => getAssetViewKey(view.value));
     const load = ref<LoadState>("loading");
     const played = ref(0);
+    const mounted = ref(false);
     const image = ref<HTMLImageElement>();
     const media = ref<HTMLMediaElement>();
-    const streams = new MediaStreamPlayer(signer);
+    const viewerRoot = ref<HTMLElement>();
+    const failedAt = (element: HTMLMediaElement) => ({
+      position: element.currentTime || 0,
+      playing: !element.paused && !element.ended,
+    });
+    const streams = new MediaStreamPlayer((element) => {
+      session.mediaFailed(failedAt(element));
+      return true;
+    });
+    const viewers = new AssetViewerMount();
+    // The info is read once mounted, never during server rendering.
+    watchEffect(() => {
+      void state.value;
+      if (mounted.value) session.load();
+    });
     // A video or audio stream plays through its element, so it starts after the render.
-    watch([media, state], () => streams.update(media.value, state.value), { flush: "post" });
-    onScopeDispose(() => streams.stop());
+    watch([media, view], () => streams.update(media.value, view.value), { flush: "post" });
+    watch(
+      [viewerRoot, view, options, state],
+      () => {
+        const kind = view.value.kind;
+        viewers.update(
+          viewerRoot.value,
+          isMountedViewerKind(kind) ? kind : undefined,
+          getMountedViewerOptions(options.value, session),
+          (viewerState) => {
+            if (viewerState !== "loading") load.value = viewerState;
+          },
+        );
+      },
+      { flush: "post" },
+    );
+    onScopeDispose(() => {
+      streams.stop();
+      viewers.destroy();
+    });
     watch(loadKey, () => {
       load.value = "loading";
     });
-    // An image that loaded before hydration fires no load event.
+    watch(load, (value) => {
+      if (value === "loaded") emit("load");
+      if (value === "error") emit("error");
+    });
+    const availability = computed(() =>
+      view.value.kind === "unavailable"
+        ? "unavailable"
+        : view.value.kind === "age-restricted"
+          ? "age-restricted"
+          : view.value.kind === "pending"
+            ? undefined
+            : "available",
+    );
+    watch(
+      availability,
+      (value) => {
+        if (value) emit("availability-change", value);
+      },
+      { immediate: true },
+    );
     onMounted(() => {
+      mounted.value = true;
+      // An image that loaded before hydration fires no load event.
       if (image.value?.complete && image.value.naturalWidth > 0) load.value = "loaded";
     });
-    const onError = () => {
-      load.value = "error";
-    };
     const onMediaError = (event: Event) => {
-      if (!streams.recover(event.target as HTMLMediaElement)) load.value = "error";
+      const element = event.target as HTMLMediaElement;
+      if (!streams.recover(element)) session.mediaFailed(failedAt(element));
     };
-    const onLoadedMetadata = (event: Event) => signer.loaded(event.target as HTMLMediaElement);
+    const playerEvents = {
+      onLoadedmetadata: (event: Event) => {
+        session.mediaLoaded(event.target as HTMLMediaElement);
+        load.value = "loaded";
+      },
+      onError: onMediaError,
+      onPlay: () => emit("play"),
+      onEnded: () => emit("ended"),
+      onTimeupdate: (event: Event) => {
+        const element = event.target as HTMLMediaElement;
+        played.value = getPlayedPercent(element);
+        emit("timeupdate", element.currentTime);
+      },
+    };
 
     return () => {
-      const current = state.value;
+      const current = view.value;
       const text = messages.value;
-      const view = resolved.value;
-      const ratio = getMediaAspectRatio(view);
-      const failed = load.value === "error";
-      const placeholderUrl = failed
-        ? undefined
-        : getShownPlaceholder(current, load.value === "loaded");
+      const ratio = getAssetAspectRatio(current, state.value.info, props.aspectRatio);
+      const placeholderUrl =
+        "placeholderUrl" in current &&
+        (current.kind === "age-restricted" || current.kind === "pending" || load.value !== "loaded")
+          ? current.placeholderUrl
+          : undefined;
       const notice = (children: VNodeArrayChildren) =>
-        h("figcaption", { class: "calmlens-media__notice" }, children);
+        h("figcaption", { class: "calmlens-asset__notice" }, children);
+      const video = props.video ?? {};
+      const imageElement = (shown: Extract<AssetView, { kind: "image" | "website" }>) =>
+        h("img", {
+          key: loadKey.value,
+          ref: image,
+          class: "calmlens-asset__content",
+          src: shown.src,
+          srcset: shown.srcSet,
+          sizes: shown.srcSet ? props.image?.sizes : undefined,
+          alt: props.alt,
+          width: shown.width,
+          height: shown.height,
+          loading: props.lazy ? "lazy" : undefined,
+          decoding: "async",
+          fetchpriority: props.fetchPriority,
+          onLoad: () => {
+            session.loaded();
+            load.value = "loaded";
+          },
+          onError: () => session.failed(),
+        });
+      const viewerShown = isMountedViewerKind(current.kind) && mounted.value;
+      const confirm = props.onAgeConfirmRequest;
       return h(
         "figure",
         {
-          class: "calmlens-media",
+          class: "calmlens-asset",
           "data-kind": current.kind,
           "data-state": load.value,
           "data-sized": ratio ? "" : undefined,
+          "aria-busy": current.kind === "pending" ? "true" : undefined,
           style: {
             aspectRatio: ratio,
-            backgroundColor: view.averageColor,
+            backgroundColor: state.value.info?.content?.preview?.averageColor ?? undefined,
             "--calmlens-fit": props.fit,
-            "--calmlens-position": props.position,
           },
         },
         [
           placeholderUrl &&
             h("img", {
-              class: "calmlens-media__placeholder",
+              class: "calmlens-asset__placeholder",
               src: placeholderUrl,
               alt: "",
               "aria-hidden": "true",
             }),
-          current.kind === "image" &&
-            !failed &&
-            h("img", {
-              key: loadKey.value,
-              ref: image,
-              class: "calmlens-media__content",
-              src: current.src,
-              srcset: current.srcSet,
-              sizes: props.sizes,
-              alt: props.alt,
-              width: view.width,
-              height: view.height,
-              loading: props.lazy ? "lazy" : undefined,
-              decoding: "async",
-              fetchpriority: props.fetchPriority,
-              onLoad: () => {
-                load.value = "loaded";
+          current.kind === "image" && imageElement(current),
+          current.kind === "website" &&
+            current.link &&
+            h("div", { class: "calmlens-asset__bar" }, [
+              h(
+                "a",
+                {
+                  class: "calmlens-button",
+                  href: current.link,
+                  target: "_blank",
+                  rel: "noopener noreferrer nofollow",
+                },
+                formatMessage(text.openWebsite, { host: new URL(current.link).host }),
+              ),
+            ]),
+          current.kind === "website" &&
+            h(
+              "div",
+              {
+                class: "calmlens-asset__scroll",
+                role: "region",
+                "aria-label": props.alt || undefined,
+                tabindex: 0,
               },
-              onError,
-            }),
+              [imageElement(current)],
+            ),
           current.kind === "video" &&
-            !failed &&
             h("video", {
               ref: media,
-              class: "calmlens-media__content",
+              class: "calmlens-asset__content",
               // A stream sets the element's source itself.
               ...(current.stream ? {} : { src: current.src }),
               poster: current.poster,
-              controls: props.controls,
+              controls: video.controls ?? true,
+              autoplay: video.autoPlay,
+              muted: video.muted,
+              loop: video.loop,
               playsinline: true,
               preload: "metadata",
               "aria-label": props.alt || undefined,
-              onLoadedmetadata: onLoadedMetadata,
-              onError: onMediaError,
+              ...playerEvents,
             }),
+          current.kind === "audio" && waveform(current.waveformUrl, current.peaks, played.value),
           current.kind === "audio" &&
-            !failed &&
-            waveform(current.waveformUrl, current.peaks, played.value),
-          current.kind === "audio" &&
-            !failed &&
             h("audio", {
               ref: media,
-              class: "calmlens-media__content",
+              class: "calmlens-asset__content",
               ...(current.stream ? {} : { src: current.src }),
-              controls: props.controls,
+              controls: video.controls ?? true,
+              autoplay: video.autoPlay,
+              muted: video.muted,
+              loop: video.loop,
               preload: "metadata",
               "aria-label": props.alt || undefined,
-              onLoadedmetadata: onLoadedMetadata,
-              onTimeupdate: (event: Event) => {
-                played.value = getPlayedPercent(event.target as HTMLMediaElement);
-              },
-              onError: onMediaError,
+              ...playerEvents,
             }),
-          current.kind === "pdf" &&
-            h("iframe", {
-              class: "calmlens-media__content",
-              src: current.src,
-              title: props.alt || text.pdfTitle,
+          current.kind === "document" &&
+            !viewerShown &&
+            current.still &&
+            h("img", {
+              class: "calmlens-asset__content",
+              src: current.still,
+              alt: props.alt,
+              decoding: "async",
             }),
-          current.kind === "pdf" &&
+          current.kind === "document" &&
+            !viewerShown &&
             h(
               "a",
               {
-                class: "calmlens-button calmlens-media__open",
+                class: "calmlens-button calmlens-asset__open",
                 href: current.src,
                 target: "_blank",
                 rel: "noopener noreferrer",
               },
-              text.openPdf,
+              text.openDocument,
             ),
+          // The viewer owns this element's children; Vue renders none.
+          viewerShown && h("div", { ref: viewerRoot, class: "calmlens-asset__viewer" }),
           current.kind === "file" &&
             h("span", {
-              class: "calmlens-media__file",
+              class: "calmlens-asset__file",
               role: "img",
               "aria-label": props.alt || undefined,
               "aria-hidden": props.alt ? undefined : "true",
               innerHTML: renderFileIconSvg(
                 { family: current.icon, extension: "" },
-                MEDIA_FILE_ICON_SIZE,
+                ASSET_FILE_ICON_SIZE,
               ),
             }),
-          current.kind === "gated" &&
-            notice([
-              h("strong", text.sensitiveTitle),
-              h("p", text.sensitiveBody),
-              props.onReveal &&
-                h(
-                  "button",
-                  { type: "button", class: "calmlens-button", onClick: props.onReveal },
-                  text.reveal,
-                ),
-            ]),
-          (current.kind === "unavailable" || failed) &&
-            notice([
-              h("p", [
-                icon("unavailable"),
-                h(
-                  "span",
-                  { class: "calmlens-media__label" },
-                  getMediaUnavailableMessage(current, text),
-                ),
-              ]),
-            ]),
+          current.kind === "age-restricted" &&
+            (slots["age-gate"]?.({ placeholderUrl: current.placeholderUrl, confirm }) ??
+              notice([
+                h("strong", text.sensitiveTitle),
+                h("p", text.sensitiveBody),
+                confirm &&
+                  h(
+                    "button",
+                    { type: "button", class: "calmlens-button", onClick: confirm },
+                    text.reveal,
+                  ),
+              ])),
+          current.kind === "unavailable" &&
+            (slots.unavailable?.() ??
+              notice([
+                h("p", [
+                  icon("unavailable"),
+                  h("span", { class: "calmlens-asset__label" }, text.unavailable),
+                ]),
+              ])),
         ],
       );
     };

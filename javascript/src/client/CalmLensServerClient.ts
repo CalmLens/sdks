@@ -1,9 +1,14 @@
+import type { AssetInfo } from "../contract/AssetInfo.js";
 import type { Folder } from "../contract/Folder.js";
 import { stringifyJsonCanonical } from "../contract/JsonUtils.js";
-import type {
-  GetEventsResponse,
-  PostAssetSignedUrlResponse,
-} from "../contract/PublicApiSchemas.js";
+import type { GetEventsResponse, SignAssetUrlResponse } from "../contract/PublicApiSchemas.js";
+import {
+  appendAssetLocation,
+  buildAssetUrl,
+  DEFAULT_SIGNED_URL_EXPIRES_IN,
+  getAssetInfo,
+  validateSignAssetUrlOptions,
+} from "./CalmLensCdn";
 import {
   CalmLensConnection,
   expectAsset,
@@ -33,7 +38,6 @@ import type {
   CdnAssetUrlOptions,
   CdnServeOptions,
   ClassifyTextOptions,
-  CreateAssetSignedUrlOptions,
   CreateFolderOptions,
   CreateHashListOptions,
   CreatePolicyOptions,
@@ -44,6 +48,7 @@ import type {
   ExplainAssetOptions,
   FolderIdOptions,
   FolderPage,
+  GetAssetInfoOptions,
   HashList,
   HashListEntry,
   HashListEntryIdOptions,
@@ -70,6 +75,8 @@ import type {
   RetrieveAssetOptions,
   RetryAssetOptions,
   SetPolicyAutomaticUpdatesOptions,
+  SignAssetUrlOptions,
+  SignedAssetUrl,
   SignedUploadToken,
   SignUploadTokenOptions,
   SubmitAssetOptions,
@@ -85,16 +92,12 @@ import { signUploadTokenWithApiKey } from "./CalmLensUploadTokens";
 import {
   checkOptionKeys,
   DEFAULT_CDN_BASE_URL,
-  DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
   encodePathSegment,
-  getAssetUrl,
   pollForDecision,
   toTextAssetOptions,
-  transformSelector,
   validateBatchAssetsOptions,
   validateRequestOptions,
   validateServerClientOptions,
-  validateSignedUrlOptions,
 } from "./CalmLensUtils";
 import { isBrowserRuntime, isReactNativeRuntime } from "./CalmLensVersion";
 import { verifyWebhookSignature } from "./CalmLensWebhooks";
@@ -270,17 +273,65 @@ export default class CalmLensServerClient {
   get cdn() {
     return {
       /**
-       * Builds a CDN URL for asset content or a preview, without a request. Private assets
-       * need a signed URL (`assets.createSignedUrl`) or an authenticated request; public
-       * age-restricted assets additionally require `viewerClaims.ageConfirmed: true`. Your
-       * platform confirms the viewer's age; CalmLens does not verify this claim, and anyone can
-       * add it to a public URL.
+       * Builds an asset's CDN URL without a request: the asset URL, which every resource is a path
+       * beneath, or a resource URL when `resource` is given, with its lens or transform and the
+       * viewer claims. Use it for public assets; private ones need `cdn.signAssetUrl`. Viewer
+       * claims are your app's unsigned assertions: CalmLens does not verify an age confirmation,
+       * and anyone holding the URL can add it.
        */
       getAssetUrl: (urlOptions: CdnAssetUrlOptions): string => {
-        const { assetIdentifier, ...options } = checked("cdn.getAssetUrl", urlOptions);
-        const { projectId, cdnBaseUrl } = this.#settings;
-        return getAssetUrl({ projectId, cdnBaseUrl, assetIdentifier, ...options });
+        const { projectId, ...options } = checked("cdn.getAssetUrl", urlOptions);
+        return buildAssetUrl(
+          this.#settings.cdnBaseUrl,
+          projectId ?? this.#settings.projectId,
+          options as CdnAssetUrlOptions,
+        );
       },
+
+      /**
+       * Signs a private asset's URL on your server, so browsers and apps can load it without an API
+       * key until it expires. Every resource is a path beneath it, as beneath a public asset URL;
+       * `/original` only when signed with `original: true`. With `resource`, returns that resource's
+       * URL beneath the grant; lenses, transforms and viewer claims are appended as `getAssetUrl`
+       * appends them and aren't part of the signature.
+       */
+      signAssetUrl: async (signOptions: SignAssetUrlOptions): Promise<SignedAssetUrl> => {
+        const options = checked("cdn.signAssetUrl", signOptions);
+        validateSignAssetUrlOptions(options);
+        const { projectId, assetId, externalId, expiresIn, original, ...location } = options;
+        const project = requireId(projectId ?? this.#settings.projectId, "Project ID");
+        const signed = await this.request<SignAssetUrlResponse>(
+          "POST",
+          `/projects/${project}/signed-asset-urls`,
+          {
+            body: {
+              ...(assetId !== undefined ? { assetId } : { externalId }),
+              expiresIn: expiresIn ?? DEFAULT_SIGNED_URL_EXPIRES_IN,
+              original: original ?? false,
+            },
+          },
+        );
+        if (
+          !signed ||
+          typeof signed.url !== "string" ||
+          !signed.url ||
+          typeof signed.expiresAt !== "number"
+        ) {
+          throw new CalmLensError(SDK_ERROR_CODES.INVALID_RESPONSE, {
+            message: "The API returned no signed asset URL",
+          });
+        }
+        return { url: appendAssetLocation(signed.url, location), expiresAt: signed.expiresAt };
+      },
+
+      /**
+       * The display info of an asset URL, public or signed (`{url}/info`): its type, size,
+       * rendered file, preview and stream, and whether the viewer its claims describe can see it.
+       * A server can pass it to `CalmLensAsset` as `info`, so the first render is the real
+       * element.
+       */
+      getAssetInfo: (url: string, options: Omit<GetAssetInfoOptions, "fetch"> = {}) =>
+        getAssetInfo(url, { ...options, fetch: this.#settings.cdnFetch }) as Promise<AssetInfo>,
 
       /**
        * Fetches asset content or a preview from the CDN with the client's API key, and returns
@@ -288,8 +339,8 @@ export default class CalmLensServerClient {
        * returned, not thrown; `timeoutMs` covers only the wait for headers.
        */
       serve: async (options: CdnServeOptions): Promise<Response> => {
-        const { assetIdentifier, init, ...urlOptions } = checked("cdn.serve", options);
-        const url = this.cdn.getAssetUrl({ assetIdentifier, ...urlOptions });
+        const { init, resource = "rendered", ...urlOptions } = checked("cdn.serve", options);
+        const url = this.cdn.getAssetUrl({ ...urlOptions, resource } as CdnAssetUrlOptions);
         const method = (init?.method?.toUpperCase() ?? "GET") as TransportRequest["method"];
         const { response } = await this.#connection.transport.send(
           {
@@ -448,27 +499,6 @@ export default class CalmLensServerClient {
         return expectAsset(
           await this.#connection.uploadPart(`/assets/${encodedAssetId}/part`, options),
         );
-      },
-
-      /**
-       * Creates a short-lived signed CDN URL, so browsers can load private content without
-       * an API key.
-       */
-      createSignedUrl: async (
-        signedUrlOptions: CreateAssetSignedUrlOptions,
-      ): Promise<PostAssetSignedUrlResponse> => {
-        const { assetId, ...options } = checked("assets.createSignedUrl", signedUrlOptions);
-        const encodedAssetId = requireId(assetId, "Asset ID");
-        validateSignedUrlOptions(options);
-        return this.request("POST", `/assets/${encodedAssetId}/signed-url`, {
-          body: {
-            viewerClaims: options.viewerClaims,
-            resource: options.resource,
-            expiresInSeconds: options.expiresInSeconds ?? DEFAULT_SIGNED_URL_EXPIRES_IN_SECONDS,
-            lens: options.lens,
-            transform: transformSelector(options.transform),
-          },
-        });
       },
 
       /** Moves an asset into a folder, or to the project root with `folderId: null`. */

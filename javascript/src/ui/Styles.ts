@@ -10,7 +10,7 @@ import { VIEWER_STYLES } from "./viewers/ViewerStyles";
  */
 export const CALMLENS_STYLES = `
 /* Zero specificity, so a page's own --calmlens-* values win even on the same element. */
-:where(.calmlens-uploader, .calmlens-media) {
+:where(.calmlens-uploader, .calmlens-asset) {
   --calmlens-accent: ${CALMLENS_THEME.accent};
   --calmlens-accent-text: ${CALMLENS_THEME.accentText};
   --calmlens-radius: ${CALMLENS_THEME.radius}px;
@@ -27,7 +27,7 @@ export const CALMLENS_STYLES = `
   box-sizing: border-box;
   font: inherit;
 }
-.calmlens-uploader *, .calmlens-media * { box-sizing: border-box; }
+.calmlens-uploader *, .calmlens-asset * { box-sizing: border-box; }
 .calmlens-uploader { display: grid; gap: 12px; }
 .calmlens-uploader > [hidden] { display: none; }
 .calmlens-dropzone {
@@ -118,59 +118,68 @@ export const CALMLENS_STYLES = `
 }
 .calmlens-icon-button:hover { background: color-mix(in srgb, var(--calmlens-accent) 8%, transparent); border-color: var(--calmlens-border); }
 @media (prefers-reduced-motion: reduce) {
-  .calmlens-progress__bar, .calmlens-dropzone, .calmlens-dropzone__icon, .calmlens-media__content { transition: none; }
+  .calmlens-progress__bar, .calmlens-dropzone, .calmlens-dropzone__icon, .calmlens-asset__content { transition: none; }
   .calmlens-progress:not([aria-valuenow]) .calmlens-progress__bar { animation: none; left: 0; width: 100%; }
 }
 
-.calmlens-media {
+.calmlens-asset {
   position: relative; display: block; overflow: hidden; margin: 0; border-radius: var(--calmlens-media-radius, 0);
   background: var(--calmlens-surface);
 }
-.calmlens-media__placeholder, .calmlens-media__content {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: var(--calmlens-fit, cover);
+.calmlens-asset__placeholder, .calmlens-asset__content {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: var(--calmlens-fit, contain);
   object-position: var(--calmlens-position, center);
 }
-.calmlens-media:not([data-sized]) .calmlens-media__content { position: relative; height: auto; }
-.calmlens-media:not([data-sized])[data-kind="gated"], .calmlens-media:not([data-sized])[data-kind="unavailable"],
-.calmlens-media:not([data-sized])[data-state="error"] { min-height: 160px; }
-.calmlens-media__placeholder { transform: scale(1.1); filter: blur(12px); }
-.calmlens-media__content { opacity: 0; transition: opacity 250ms; }
-.calmlens-media[data-state="loaded"] .calmlens-media__content { opacity: 1; }
-.calmlens-media[data-kind="video"] .calmlens-media__content, .calmlens-media[data-kind="audio"] .calmlens-media__content { opacity: 1; }
-.calmlens-media[data-kind="pdf"] .calmlens-media__content { opacity: 1; border: 0; background: var(--calmlens-background); }
-.calmlens-media[data-kind="pdf"]:not([data-sized]) .calmlens-media__content { height: 480px; }
-.calmlens-media__open { position: absolute; right: 8px; bottom: 8px; text-decoration: none; }
-.calmlens-media__file { position: absolute; inset: 0; display: grid; place-items: center; }
-.calmlens-media:not([data-sized])[data-kind="file"], .calmlens-media:not([data-sized])[data-kind="pending"] { min-height: 160px; }
-.calmlens-media[data-kind="audio"] { background: none; display: grid; gap: 8px; }
-.calmlens-media[data-kind="audio"] .calmlens-media__content { position: static; height: auto; }
+.calmlens-asset:not([data-sized]) .calmlens-asset__content { position: relative; height: auto; }
+.calmlens-asset:not([data-sized])[data-kind="age-restricted"], .calmlens-asset:not([data-sized])[data-kind="unavailable"],
+.calmlens-asset:not([data-sized])[data-state="error"] { min-height: 160px; }
+.calmlens-asset__placeholder { transform: scale(1.1); filter: blur(12px); }
+.calmlens-asset__content { opacity: 0; transition: opacity 250ms; }
+.calmlens-asset[data-state="loaded"] .calmlens-asset__content { opacity: 1; }
+.calmlens-asset[data-kind="video"] .calmlens-asset__content, .calmlens-asset[data-kind="audio"] .calmlens-asset__content { opacity: 1; }
+/* Documents, text and spreadsheets fill the box with their viewer; a document shows its first
+   page's still and an open link until the viewer loads. */
+.calmlens-asset__viewer { position: absolute; inset: 0; }
+.calmlens-asset:not([data-sized])[data-kind="document"], .calmlens-asset:not([data-sized])[data-kind="text"],
+.calmlens-asset:not([data-sized])[data-kind="spreadsheet"] { height: 480px; }
+.calmlens-asset[data-kind="document"] .calmlens-asset__content { opacity: 1; }
+.calmlens-asset__open { position: absolute; right: 8px; bottom: 8px; text-decoration: none; }
+/* A website's screenshot scrolls beneath the link to its page. */
+.calmlens-asset[data-kind="website"] { display: flex; flex-direction: column; }
+.calmlens-asset__bar { position: relative; z-index: 1; padding: 8px; }
+.calmlens-asset__scroll { position: relative; flex: 1; overflow: auto; }
+.calmlens-asset[data-kind="website"] .calmlens-asset__content { position: relative; height: auto; object-fit: initial; }
+.calmlens-asset__file { position: absolute; inset: 0; display: grid; place-items: center; }
+.calmlens-asset:not([data-sized])[data-kind="file"], .calmlens-asset:not([data-sized])[data-kind="pending"] { min-height: 160px; }
+.calmlens-asset[data-kind="audio"] { background: none; display: grid; gap: 8px; }
+.calmlens-asset[data-kind="audio"] .calmlens-asset__content { position: static; height: auto; }
 /* Audio's waveform: the preview still, with the played part of its peaks in the accent colour. */
-.calmlens-media__waveform {
+.calmlens-asset__waveform {
   position: relative; height: var(--calmlens-waveform-height, 64px); border-radius: var(--calmlens-media-radius, 0);
   overflow: hidden; background: var(--calmlens-surface);
 }
-.calmlens-media__wave { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
-.calmlens-media__progress, .calmlens-media__peaks { position: absolute; inset: 0; pointer-events: none; }
-.calmlens-media__peaks { display: flex; align-items: center; gap: 1px; }
-.calmlens-media__peaks > span { flex: 1 1 0; min-width: 1px; border-radius: 1px; background: var(--calmlens-border); }
-.calmlens-media__wave ~ .calmlens-media__progress .calmlens-media__peaks:not([data-played]) { visibility: hidden; }
-.calmlens-media__peaks[data-played] { clip-path: inset(0 calc(100% - var(--calmlens-played, 0%)) 0 0); }
-.calmlens-media__peaks[data-played] > span { background: var(--calmlens-accent); }
-.calmlens-media__notice {
+.calmlens-asset__wave { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.calmlens-asset__progress, .calmlens-asset__peaks { position: absolute; inset: 0; pointer-events: none; }
+.calmlens-asset__peaks { display: flex; align-items: center; gap: 1px; }
+.calmlens-asset__peaks > span { flex: 1 1 0; min-width: 1px; border-radius: 1px; background: var(--calmlens-border); }
+.calmlens-asset__wave ~ .calmlens-asset__progress .calmlens-asset__peaks:not([data-played]) { visibility: hidden; }
+.calmlens-asset__peaks[data-played] { clip-path: inset(0 calc(100% - var(--calmlens-played, 0%)) 0 0); }
+.calmlens-asset__peaks[data-played] > span { background: var(--calmlens-accent); }
+.calmlens-asset__notice {
   position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px;
   padding: 12px; text-align: center; color: #fff; background: rgba(0, 0, 0, 0.45);
 }
-.calmlens-media__notice p { margin: 0; display: flex; gap: 6px; align-items: center; }
+.calmlens-asset__notice p { margin: 0; display: flex; gap: 6px; align-items: center; }
 /* Thumbnails keep the notice's icon and leave its text to screen readers. */
-.calmlens-media[data-sized] { container-type: inline-size; }
+.calmlens-asset[data-sized] { container-type: inline-size; }
 @container (max-width: 119px) {
-  .calmlens-media__label, .calmlens-media__notice > strong, .calmlens-media__notice > p:not(:has(svg)) {
+  .calmlens-asset__label, .calmlens-asset__notice > strong, .calmlens-asset__notice > p:not(:has(svg)) {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
 }
-.calmlens-media__notice strong { font-weight: 600; }
-.calmlens-media__notice .calmlens-button { margin-top: 4px; border-color: #fff; background: #fff; color: #111; }
-.calmlens-media[data-state="error"] .calmlens-media__notice, .calmlens-media[data-kind="unavailable"] .calmlens-media__notice {
+.calmlens-asset__notice strong { font-weight: 600; }
+.calmlens-asset__notice .calmlens-button { margin-top: 4px; border-color: #fff; background: #fff; color: #111; }
+.calmlens-asset[data-state="error"] .calmlens-asset__notice, .calmlens-asset[data-kind="unavailable"] .calmlens-asset__notice {
   color: inherit; background: var(--calmlens-surface);
 }
 ${VIEWER_STYLES}`;

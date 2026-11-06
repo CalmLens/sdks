@@ -16,14 +16,12 @@ const placeholderFor = (asset: ViewerAsset, urls: ViewerUrls): string | undefine
     } catch {}
   }
   // The CDN draws placeholders from the image or the preview still, publicly for every asset.
-  return asset.content?.rendered || asset.content?.preview
-    ? urls.publicUrl("placeholder")
-    : undefined;
+  return asset.content?.rendered || asset.content?.preview ? urls.url("placeholder") : undefined;
 };
 
 /**
- * Loads the rendered image into `image`: the signed URL, asking once for a fresh one when it
- * fails to load (as an expired one does), or public responsive widths.
+ * Loads the rendered image into `image` at responsive widths, asking once for a fresh asset URL
+ * when it fails to load (as an expired signed one does).
  */
 const loadRenderedImage = async (
   urls: ViewerUrls,
@@ -32,6 +30,17 @@ const loadRenderedImage = async (
   signal: AbortSignal,
   done: (outcome: "loaded" | "error") => void,
 ) => {
+  // Widths are selectors beneath the asset URL, which a signed URL serves as freely as a public one.
+  const widths = IMAGE_WIDTHS.filter((candidate) => !width || candidate < width);
+  const setSources = (src: string) => {
+    if (widths.length) {
+      image.srcset = [...widths, ...(width ? [width] : [])]
+        .map((candidate) => `${urls.url("rendered", { width: candidate })} ${candidate}w`)
+        .join(", ");
+      image.sizes = sizes;
+    }
+    image.src = src;
+  };
   image.addEventListener("load", () => {
     urls.loaded("rendered");
     done("loaded");
@@ -41,22 +50,13 @@ const loadRenderedImage = async (
     if (!fresh) return done("error");
     fresh.then(
       (url) => {
-        if (!signal.aborted) image.src = url;
+        if (!signal.aborted) setSources(url);
       },
       () => done("error"),
     );
   });
-  if (!urls.signed) {
-    const widths = IMAGE_WIDTHS.filter((candidate) => !width || candidate < width);
-    if (widths.length) {
-      image.srcset = [...widths, ...(width ? [width] : [])]
-        .map((candidate) => `${urls.publicUrl("rendered", { width: candidate })} ${candidate}w`)
-        .join(", ");
-      image.sizes = sizes;
-    }
-  }
   const url = await urls.get("rendered");
-  if (!signal.aborted) image.src = url;
+  if (!signal.aborted) setSources(url);
 };
 
 /**

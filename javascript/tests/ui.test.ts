@@ -1,368 +1,311 @@
-import { afterEach, describe, expect, it, mock, test } from "bun:test";
+import { afterEach, describe, expect, it, mock } from "bun:test";
 import { getFileIcon, renderFileIconSvg } from "../src/file-icons";
 import { MockCalmLensAppClient } from "../src/testing";
 import {
+  AssetSession,
+  type AssetView,
   type CalmLensUpload,
   createUploadController,
-  getMediaState,
+  getAssetView,
   getPlayedPercent,
-  getSignedMediaResources,
   isFileAccepted,
-  MediaUrlSigner,
-  pickMediaSource,
-  resolveMediaProps,
+  pickAssetSource,
   resolveTheme,
   type UploadFile,
   type UploadItem,
+  type ViewerAsset,
 } from "../src/ui";
 
 const PROJECT_ID = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 const PRESET_ID = "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P";
 const CDN = "https://cdn.calmlens.com/v1";
+const SRC = `${CDN}/assets/${PROJECT_ID}/sig_grant`;
 
-describe("getMediaState", () => {
-  it("serves nothing for blocked and purged assets", () => {
-    for (const status of ["blocked", "purged"] as const) {
-      expect(getMediaState({ projectId: PROJECT_ID, assetId: "a1", status })).toEqual({
-        kind: "unavailable",
-      });
-    }
-  });
-
-  it("keeps age-restricted assets behind the placeholder until the viewer may see them", () => {
-    const options = { projectId: PROJECT_ID, assetId: "a1", status: "age-restricted" as const };
-    expect(getMediaState(options)).toEqual({
-      kind: "gated",
-      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
-    });
-
-    const shown = getMediaState({ ...options, viewerClaims: { ageConfirmed: true } });
-    expect(shown.kind === "image" && shown.src).toBe(
-      `${CDN}/assets/${PROJECT_ID}/a1/rendered?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D`,
-    );
-  });
-
-  it("shows limited assets like allowed ones, without the placeholder or the opt-in", () => {
-    const shown = getMediaState({ projectId: PROJECT_ID, assetId: "a1", status: "limited" });
-    expect(shown.kind === "image" && shown.src).toBe(`${CDN}/assets/${PROJECT_ID}/a1/rendered`);
-  });
-
-  it("offers each width from the rendered resource and falls back to the largest", () => {
-    const state = getMediaState({
-      projectId: PROJECT_ID,
-      assetId: "a1",
-      lens: "card",
-      widths: [800, 400, 400],
-    });
-    const base = `${CDN}/assets/${PROJECT_ID}/a1/rendered/@card`;
-    expect(state).toEqual({
-      kind: "image",
-      src: `${base},width=800`,
-      srcSet: `${base},width=400 400w, ${base},width=800 800w`,
-      sources: [
-        { src: `${base},width=400`, width: 400 },
-        { src: `${base},width=800`, width: 800 },
-      ],
-      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
-    });
-  });
-
-  it("uses a signed URL as given, with the public CDN placeholder", () => {
-    const url = "https://cdn.calmlens.com/v1/assets/p/a1/rendered?exp=1&sig=abc";
-    expect(getMediaState({ projectId: PROJECT_ID, assetId: "a1", url })).toEqual({
-      kind: "image",
-      src: url,
-      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
-    });
-  });
-
-  it("sends only viewer claims that differ from the defaults, and only the region for placeholders", () => {
-    const options = { projectId: PROJECT_ID, assetId: "a1" };
-    const unconfirmed = getMediaState({ ...options, viewerClaims: { ageConfirmed: false } });
-    expect(unconfirmed.kind === "image" && unconfirmed.src).toBe(
-      `${CDN}/assets/${PROJECT_ID}/a1/rendered`,
-    );
-    const both = getMediaState({ ...options, viewerClaims: { region: "US", ageConfirmed: true } });
-    if (both.kind !== "image") throw new Error("expected-image");
-    expect(new URL(both.src).searchParams.get("viewerClaims")).toBe(
-      JSON.stringify({ region: "US", ageConfirmed: true }),
-    );
-    expect(new URL(both.placeholderUrl!).searchParams.get("viewerClaims")).toBe(
-      JSON.stringify({ region: "US" }),
-    );
-  });
-
-  it("draws the placeholder from a stored ThumbHash instead of requesting it", () => {
-    const drawn = getMediaState({
-      projectId: PROJECT_ID,
-      assetId: "a1",
-      status: "age-restricted",
-      placeholderHash: "1QcSHQRnh493V4dIh4eXh1h4kJUI",
-    });
-    expect(
-      drawn.kind === "gated" && drawn.placeholderUrl?.startsWith("data:image/png;base64,"),
-    ).toBe(true);
-
-    const invalid = getMediaState({ projectId: PROJECT_ID, assetId: "a1", placeholderHash: "%%" });
-    expect(invalid.kind === "image" && invalid.placeholderUrl).toBe(
-      `${CDN}/assets/${PROJECT_ID}/a1/placeholder`,
-    );
-  });
-
-  it("takes the source, status, kind and preview from an API asset", () => {
-    const asset = {
-      id: "v1",
-      projectId: PROJECT_ID,
-      type: "video",
-      classification: { moderation: { status: "age-restricted" as const } },
-      content: {
-        rendered: { kind: "video" as const, width: 1280, height: 720 },
-        preview: { thumbhash: null, averageColor: "#112233", width: 640, height: 360 },
-      },
-    };
-    // The placeholder is drawn from the video's preview still.
-    expect(getMediaState({ asset })).toEqual({
-      kind: "gated",
-      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/v1/placeholder`,
-    });
-    expect(resolveMediaProps({ asset, viewerClaims: { ageConfirmed: true } })).toMatchObject({
-      projectId: PROJECT_ID,
-      assetId: "v1",
-      status: "age-restricted",
-      type: "video",
-      hasPreview: true,
-      averageColor: "#112233",
-      width: 1280,
-      height: 720,
-    });
-  });
-
-  it("sizes audio by nothing, as its preview is a waveform", () => {
-    const asset = {
-      id: "s1",
-      projectId: PROJECT_ID,
-      content: {
-        rendered: { kind: "audio" as const, width: null, height: null, peaks: [0.5] },
-        preview: { thumbhash: null, averageColor: null, width: 1200, height: 200 },
-      },
-    };
-    expect(resolveMediaProps({ asset })).toMatchObject({ type: "audio", peaks: [0.5] });
-    expect(resolveMediaProps({ asset }).width).toBeUndefined();
-  });
-
-  it("shows an asset without a rendered file as its preview still, or as a file icon", () => {
-    const asset = (preview: boolean) => ({
-      id: "d1",
-      projectId: PROJECT_ID,
-      type: "plaintext-document",
-      content: {
-        rendered: null,
-        preview: preview ? { thumbhash: null, averageColor: null, width: 600, height: 800 } : null,
-      },
-    });
-    expect(getMediaState({ asset: asset(true), lens: "card" })).toEqual({
-      kind: "image",
-      src: `${CDN}/assets/${PROJECT_ID}/d1/preview/@card`,
-      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/d1/placeholder`,
-    });
-    expect(getMediaState({ asset: asset(false) })).toEqual({ kind: "file", icon: "documents" });
-  });
-
-  it("shows a PDF's rendered file", () => {
-    expect(getMediaState({ projectId: PROJECT_ID, assetId: "p1", type: "pdf" })).toEqual({
-      kind: "pdf",
-      src: `${CDN}/assets/${PROJECT_ID}/p1/rendered`,
-    });
-  });
-
-  it("requests nothing for an asset whose content was removed", () => {
-    const asset = {
-      id: "a2",
-      projectId: PROJECT_ID,
-      type: "image",
-      classification: { moderation: { status: "allowed" as const } },
-      content: { status: "removed", rendered: null, preview: null },
-    };
-    expect(getMediaState({ asset })).toEqual({ kind: "unavailable" });
-  });
-
-  it("lets props win over the asset they are passed with", () => {
-    const asset = {
-      id: "a1",
-      projectId: PROJECT_ID,
-      type: "image",
-      classification: { moderation: { status: "blocked" as const } },
-    };
-    expect(getMediaState({ asset, status: "allowed", assetId: "external-1" })).toMatchObject({
-      kind: "image",
-      src: `${CDN}/assets/${PROJECT_ID}/external-1/rendered`,
-    });
-  });
-
-  it("plays a video's rendered file without a lens, with its preview still as the poster", () => {
-    const options = { projectId: PROJECT_ID, assetId: "v1", type: "video" as const, lens: "card" };
-    expect(getMediaState(options)).toEqual({
-      kind: "video",
-      src: `${CDN}/assets/${PROJECT_ID}/v1/rendered`,
-    });
-    expect(getMediaState({ ...options, hasPreview: true })).toMatchObject({
-      poster: `${CDN}/assets/${PROJECT_ID}/v1/preview`,
-    });
-  });
-
-  it("plays audio's rendered file with its waveform and peaks", () => {
-    expect(
-      getMediaState({
-        projectId: PROJECT_ID,
-        assetId: "s1",
-        type: "audio",
-        hasPreview: true,
-        peaks: [0.1, 0.7],
-      }),
-    ).toEqual({
-      kind: "audio",
-      src: `${CDN}/assets/${PROJECT_ID}/s1/rendered`,
-      waveformUrl: `${CDN}/assets/${PROJECT_ID}/s1/preview`,
-      peaks: [0.1, 0.7],
-    });
-  });
-
-  it("plays the adaptive stream of video or audio that has one, unless streaming is off", () => {
-    const asset = (kind: "video" | "audio" | "image", stream: boolean) => ({
-      id: "v1",
-      projectId: PROJECT_ID,
-      content: {
-        rendered: { kind, width: null, height: null },
-        preview: null,
-        hls: stream ? { renditions: [] } : null,
-      },
-    });
-    const file = `${CDN}/assets/${PROJECT_ID}/v1/rendered`;
-    const stream = `${CDN}/assets/${PROJECT_ID}/v1/hls/index.m3u8`;
-    expect(getMediaState({ asset: asset("video", true), lens: "card" })).toMatchObject({
-      kind: "video",
-      src: file,
-      stream,
-    });
-    expect(getMediaState({ asset: asset("audio", true) })).toMatchObject({
-      kind: "audio",
-      src: file,
-      stream,
-    });
-    expect(getMediaState({ asset: asset("video", true), stream: false })).toMatchObject({
-      kind: "video",
-      stream: undefined,
-    });
-    expect(getMediaState({ asset: asset("video", false) })).toMatchObject({ stream: undefined });
-    expect(getMediaState({ asset: asset("image", true) })).not.toHaveProperty("stream");
-  });
-
-  it("requests no unsigned preview beside a signed URL given as it is", () => {
-    const url = "https://cdn.calmlens.com/v1/assets/p/v1/rendered?exp=1&sig=abc";
-    expect(
-      getMediaState({ projectId: PROJECT_ID, assetId: "v1", type: "video", hasPreview: true, url }),
-    ).toEqual({
-      kind: "video",
-      src: url,
-      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/v1/placeholder`,
-    });
-  });
+const info = (
+  type: string,
+  content: NonNullable<ViewerAsset["content"]>,
+  extra: Partial<ViewerAsset> = {},
+): ViewerAsset => ({
+  id: "asset-1",
+  projectId: PROJECT_ID,
+  type,
+  externalUrl: null,
+  availability: "available",
+  content: { format: null, hls: null, preview: null, rendered: null, ...content },
+  ...extra,
 });
+const IMAGE = info("image", {
+  format: "image/png",
+  rendered: { kind: "image", width: 800, height: 600 },
+  preview: { width: 800, height: 600, thumbhash: null, averageColor: "#123456" },
+});
+const view = (options: Parameters<typeof getAssetView>[0], asset: ViewerAsset, src = SRC) =>
+  getAssetView(options, { src, info: asset, unavailable: false });
 
-describe("signed media URLs", () => {
-  const getSignedUrl = async (resource: string) => `https://signed.example/${resource}`;
-  const video = {
-    projectId: PROJECT_ID,
-    assetId: "v1",
-    type: "video" as const,
-    hasPreview: true,
-    getSignedUrl,
-  };
-
-  it("asks for each resource the state shows, and none for gated or blocked assets", () => {
-    expect(getSignedMediaResources(video).sort()).toEqual(["preview", "rendered"]);
-    expect(getSignedMediaResources({ ...video, type: "image", resource: "original" })).toEqual([
-      "original",
-    ]);
-    expect(getSignedMediaResources({ ...video, status: "age-restricted" })).toEqual([]);
-    expect(getSignedMediaResources({ ...video, status: "blocked" })).toEqual([]);
-    expect(getSignedMediaResources({ ...video, getSignedUrl: undefined })).toEqual([]);
-  });
-
-  it("waits for every signed URL, then shows them; a failed file is unavailable", () => {
-    expect(getMediaState(video, { rendered: "https://signed.example/r" })).toEqual({
-      kind: "pending",
-      placeholderUrl: `${CDN}/assets/${PROJECT_ID}/v1/placeholder`,
-    });
-    expect(
-      getMediaState(video, {
-        rendered: "https://signed.example/r",
-        preview: "https://signed.example/p",
-      }),
-    ).toMatchObject({
-      kind: "video",
-      src: "https://signed.example/r",
-      poster: "https://signed.example/p",
-    });
-    expect(
-      getMediaState(video, { rendered: "https://signed.example/r", preview: null }),
-    ).toMatchObject({
-      kind: "video",
-      src: "https://signed.example/r",
-      poster: undefined,
-    });
-    expect(getMediaState(video, { rendered: null, preview: "https://signed.example/p" })).toEqual({
+describe("getAssetView", () => {
+  it("waits for a src and the info, and is unavailable when the session says so", () => {
+    expect(getAssetView({}, { unavailable: false })).toEqual({ kind: "pending" });
+    expect(getAssetView({}, { src: SRC, unavailable: false })).toEqual({ kind: "pending" });
+    expect(getAssetView({}, { src: SRC, info: IMAGE, unavailable: true })).toEqual({
       kind: "unavailable",
     });
   });
 
-  it("fetches each resource once per asset, and again for a new asset", async () => {
-    const fetch = mock(getSignedUrl);
-    const changed = mock(() => {});
-    const signer = new MediaUrlSigner(changed);
-    signer.urls({ ...video, getSignedUrl: fetch });
-    signer.urls({ ...video, getSignedUrl: fetch });
-    await Bun.sleep(0);
-    expect(fetch.mock.calls.map(([resource]) => resource).sort()).toEqual(["preview", "rendered"]);
-    expect(signer.urls({ ...video, getSignedUrl: fetch })).toEqual({
-      rendered: "https://signed.example/rendered",
-      preview: "https://signed.example/preview",
+  it("shows the info's availability: the notice, or the age gate over the placeholder", () => {
+    expect(view({}, { ...IMAGE, availability: "unavailable" })).toEqual({ kind: "unavailable" });
+    expect(view({}, { ...IMAGE, availability: "age-restricted" })).toEqual({
+      kind: "age-restricted",
+      placeholderUrl: `${SRC}/placeholder`,
     });
-
-    expect(signer.urls({ ...video, assetId: "v2", getSignedUrl: fetch })).toEqual({});
-    await Bun.sleep(0);
-    expect(fetch).toHaveBeenCalledTimes(4);
   });
 
-  it("signs a streamed video's stream beside its file, which plays when the stream can't be signed", async () => {
-    const streamed = { ...video, hasPreview: false, hasStream: true };
-    expect(getSignedMediaResources(streamed).sort()).toEqual(["hls", "rendered"]);
-    expect(getSignedMediaResources({ ...streamed, stream: false })).toEqual(["rendered"]);
+  it("builds every resource beneath the asset URL, with the lens, transform and widths", () => {
+    const shown = view({ image: { lens: "card", widths: [640, 320] } }, IMAGE);
+    expect(shown).toMatchObject({
+      kind: "image",
+      src: `${SRC}/rendered/@card,width=640`,
+      srcSet: `${SRC}/rendered/@card,width=320 320w, ${SRC}/rendered/@card,width=640 640w`,
+      width: 800,
+      height: 600,
+    });
+  });
+
+  it("adds the viewer claims beyond the defaults to every URL, and only the region to the placeholder", () => {
+    const claims = (url: string | undefined) => new URL(url!).searchParams.get("viewerClaims");
+    const shown = view({ viewerClaims: { region: "GB", ageConfirmed: true } }, IMAGE);
+    if (shown.kind !== "image") throw new Error("Expected an image");
+    expect(claims(shown.src)).toBe(JSON.stringify({ region: "GB", ageConfirmed: true }));
+    expect(claims(shown.placeholderUrl)).toBe(JSON.stringify({ region: "GB" }));
+    const unconfirmed = view({ viewerClaims: { ageConfirmed: false } }, IMAGE);
+    if (unconfirmed.kind !== "image") throw new Error("Expected an image");
+    expect(new URL(unconfirmed.src).search).toBe("");
+  });
+
+  it("keeps the viewer claims an asset URL carries, unless the options give their own", () => {
+    const carried = `${SRC}?viewerClaims=${encodeURIComponent('{"region":"DE"}')}`;
+    const shown = view({}, IMAGE, carried);
+    if (shown.kind !== "image") throw new Error("Expected an image");
+    expect(shown.src).toBe(`${SRC}/rendered?viewerClaims=${encodeURIComponent('{"region":"DE"}')}`);
+  });
+
+  it("draws the placeholder from the stored ThumbHash instead of requesting it", () => {
+    const shown = view(
+      {},
+      info("image", {
+        rendered: { kind: "image", width: 4, height: 3 },
+        preview: {
+          width: 4,
+          height: 3,
+          thumbhash: "1QcSHQRnh493V4dIh4eXh1h4kJUI",
+          averageColor: null,
+        },
+      }),
+    );
+    if (shown.kind !== "image") throw new Error("Expected an image");
+    expect(shown.placeholderUrl).toStartWith("data:image/png;base64,");
+  });
+
+  it("plays video and audio from the rendered file, with the stream, poster or waveform", () => {
+    const hls = { renditions: [] };
+    const preview = { width: 640, height: 360, thumbhash: null, averageColor: null };
     expect(
-      getMediaState(streamed, { rendered: "https://signed.example/r", hls: null }),
-    ).toMatchObject({ kind: "video", src: "https://signed.example/r", stream: undefined });
-
-    const fetch = mock(getSignedUrl);
-    const signer = new MediaUrlSigner(() => {});
-    signer.urls({ ...streamed, getSignedUrl: fetch });
-    expect(signer.recover({ position: 30, playing: true }, "hls")).toBe(true);
-    await Bun.sleep(0);
-    expect(fetch.mock.calls.map(([resource]) => resource)).toEqual(["rendered", "hls", "hls"]);
+      view(
+        {},
+        info("video", { rendered: { kind: "video", width: 640, height: 360 }, hls, preview }),
+      ),
+    ).toMatchObject({
+      kind: "video",
+      src: `${SRC}/rendered`,
+      stream: `${SRC}/hls/index.m3u8`,
+      poster: `${SRC}/preview`,
+    });
+    expect(
+      view({ video: { stream: false } }, info("video", { rendered: { kind: "video" }, hls })),
+    ).toMatchObject({ kind: "video", stream: undefined });
+    expect(
+      view({}, info("audio", { rendered: { kind: "audio", peaks: [0.5, 1] }, preview })),
+    ).toEqual({
+      kind: "audio",
+      src: `${SRC}/rendered`,
+      stream: undefined,
+      waveformUrl: `${SRC}/preview`,
+      peaks: [0.5, 1],
+    });
   });
 
-  it("refreshes a failed file once until it loads again", async () => {
-    const fetch = mock(getSignedUrl);
-    const signer = new MediaUrlSigner(() => {});
-    signer.urls({ ...video, hasPreview: false, getSignedUrl: fetch });
-    const playback = { position: 30, playing: true };
+  it("dispatches documents, text, spreadsheets and websites to their viewers", () => {
+    const preview = { width: 600, height: 800, thumbhash: null, averageColor: null };
+    expect(view({}, info("multimedia-document", { rendered: { kind: "pdf" }, preview }))).toEqual({
+      kind: "document",
+      src: `${SRC}/rendered`,
+      still: `${SRC}/preview`,
+    });
+    expect(view({}, info("plaintext-document", {}))).toEqual({ kind: "text" });
+    expect(
+      view(
+        {},
+        info("multimedia-document", {
+          format: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+      ),
+    ).toEqual({ kind: "spreadsheet" });
+    expect(
+      view(
+        {},
+        info(
+          "website",
+          { rendered: { kind: "image", width: 1280, height: 4000 } },
+          { externalUrl: "https://example.com/page" },
+        ),
+      ),
+    ).toMatchObject({ kind: "website", src: `${SRC}/rendered`, link: "https://example.com/page" });
+    expect(
+      view(
+        {},
+        info("website", { rendered: { kind: "image" } }, { externalUrl: "javascript:alert(1)" }),
+      ),
+    ).toMatchObject({ kind: "website", link: undefined });
+  });
 
-    expect(signer.recover(playback)).toBe(true);
-    expect(signer.recover(playback)).toBe(false);
-    signer.loaded();
-    expect(signer.recover(playback)).toBe(true);
-    await Bun.sleep(0);
-    expect(fetch.mock.calls).toEqual([["rendered"], ["rendered"], ["rendered"]]);
-    expect(new MediaUrlSigner(() => {}).recover(playback)).toBe(false);
+  it("shows the preview still for display=preview, whatever the asset type", () => {
+    const preview = { width: 640, height: 360, thumbhash: null, averageColor: null };
+    expect(
+      view(
+        { display: "preview", image: { transform: { width: 200 } } },
+        info("video", { rendered: { kind: "video" }, preview }),
+      ),
+    ).toMatchObject({ kind: "image", src: `${SRC}/preview/width=200` });
+    expect(view({ display: "preview" }, info("plaintext-document", {}))).toEqual({
+      kind: "file",
+      icon: "documents",
+    });
+  });
+});
+
+describe("pickAssetSource", () => {
+  const shown = view({ image: { widths: [400, 800, 1200] } }, IMAGE) as Extract<
+    AssetView,
+    { kind: "image" }
+  >;
+  const base = `${SRC}/rendered`;
+
+  it("loads the smallest width that covers the measured box", () => {
+    expect(pickAssetSource(shown, 401)).toBe(`${base}/width=800`);
+    expect(pickAssetSource(shown, 400)).toBe(`${base}/width=400`);
+  });
+
+  it("loads the largest width for a box wider than every width, or before it is measured", () => {
+    expect(pickAssetSource(shown, 3000)).toBe(`${base}/width=1200`);
+    expect(pickAssetSource(shown, undefined)).toBe(`${base}/width=1200`);
+  });
+});
+
+describe("AssetSession", () => {
+  const originalFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+  const serving = (respond: (url: string) => Response) => {
+    const urls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      urls.push(String(input));
+      return respond(String(input));
+    }) as typeof fetch;
+    return urls;
+  };
+  const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("requests nothing before src, and reads the info once it has one", async () => {
+    const urls = serving(() => Response.json(IMAGE));
+    const changes: number[] = [];
+    const session = new AssetSession(() => changes.push(1));
+    session.update({});
+    session.load();
+    await settled();
+    expect(urls).toEqual([]);
+    session.update({ src: SRC });
+    session.load();
+    session.load();
+    await settled();
+    expect(urls).toEqual([`${SRC}/info`]);
+    expect(session.state.info).toEqual(IMAGE);
+  });
+
+  it("reads no info when it is given", async () => {
+    const urls = serving(() => Response.json(IMAGE));
+    const session = new AssetSession(() => {});
+    session.update({ src: SRC, info: IMAGE });
+    session.load();
+    await settled();
+    expect(urls).toEqual([]);
+  });
+
+  it("refreshes an expired signed URL through onExpired, and loads beneath the fresh one", async () => {
+    const fresh = `${CDN}/assets/${PROJECT_ID}/sig_fresh`;
+    serving((url) =>
+      url.startsWith(SRC)
+        ? Response.json({ code: "signed-url/expired" }, { status: 403 })
+        : Response.json(IMAGE),
+    );
+    const onExpired = mock(async () => fresh);
+    const session = new AssetSession(() => {});
+    session.update({ src: SRC, onExpired });
+    session.load();
+    await settled();
+    await settled();
+    expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(session.state.src).toBe(fresh);
+    session.load();
+    await settled();
+    expect(session.state.info).toEqual(IMAGE);
+  });
+
+  it("is unavailable when an expired URL can't be refreshed", async () => {
+    serving(() => Response.json({ code: "signed-url/expired" }, { status: 403 }));
+    const session = new AssetSession(() => {});
+    session.update({ src: SRC });
+    session.load();
+    await settled();
+    expect(session.state.unavailable).toBe(true);
+  });
+
+  it("follows the CDN when a resource fails: age-restricted or unavailable, whatever the info said", async () => {
+    let availability = "age-restricted";
+    serving(() => Response.json({ ...IMAGE, availability }));
+    const session = new AssetSession(() => {});
+    session.update({ src: SRC, info: IMAGE });
+    session.failed();
+    await settled();
+    expect(session.state.info?.availability).toBe("age-restricted");
+
+    availability = "available";
+    const other = new AssetSession(() => {});
+    other.update({ src: SRC, info: IMAGE });
+    other.failed();
+    await settled();
+    expect(other.state.unavailable).toBe(true);
+  });
+
+  it("retries a failed resource beneath a fresh URL once, then asks the CDN", async () => {
+    const urls = serving(() => Response.json({ ...IMAGE, availability: "unavailable" }));
+    let count = 0;
+    const session = new AssetSession(() => {});
+    session.update({ src: SRC, info: IMAGE, onExpired: async () => `${SRC}${++count}` });
+    session.failed();
+    await settled();
+    expect(session.state.src).toBe(`${SRC}1`);
+    expect(urls).toEqual([]);
+    session.failed();
+    await settled();
+    expect(urls).toEqual([`${SRC}1/info`]);
+    expect(session.state.info?.availability).toBe("unavailable");
+  });
+
+  it("shows the unavailable notice when told the CDN refused the asset", () => {
+    const session = new AssetSession(() => {});
+    session.update({ src: SRC, info: IMAGE });
+    session.unavailable();
+    expect(getAssetView({}, session.state)).toEqual({ kind: "unavailable" });
   });
 });
 
@@ -371,28 +314,6 @@ describe("audio progress", () => {
     expect(getPlayedPercent({ currentTime: 10, duration: 40 })).toBe(25);
     expect(getPlayedPercent({ currentTime: 50, duration: 40 })).toBe(100);
     expect(getPlayedPercent({ currentTime: 3, duration: Number.NaN })).toBe(0);
-  });
-});
-
-describe("pickMediaSource", () => {
-  const state = getMediaState({ projectId: PROJECT_ID, assetId: "a1", widths: [400, 800, 1200] });
-  const base = `${CDN}/assets/${PROJECT_ID}/a1/rendered`;
-  if (state.kind !== "image") throw new Error("Expected an image");
-
-  it("loads the smallest width that covers the measured box", () => {
-    expect(pickMediaSource(state, 401)).toBe(`${base}/width=800`);
-    expect(pickMediaSource(state, 400)).toBe(`${base}/width=400`);
-  });
-
-  it("loads the largest width for a box wider than every width", () => {
-    expect(pickMediaSource(state, 3000)).toBe(`${base}/width=1200`);
-  });
-
-  it("loads the image's own URL before the box is measured or without widths", () => {
-    expect(pickMediaSource(state, undefined)).toBe(`${base}/width=1200`);
-    const plain = getMediaState({ projectId: PROJECT_ID, assetId: "a1" });
-    if (plain.kind !== "image") throw new Error("Expected an image");
-    expect(pickMediaSource(plain, 300)).toBe(base);
   });
 });
 
@@ -754,7 +675,7 @@ describe("UploadController", () => {
 
     expect(uploaded.map(({ status, file }) => [status, file])).toEqual([["allowed", phoneFile]]);
     const served = await created[0]?.server.cdn.serve({
-      assetIdentifier: uploaded[0]?.assetId ?? "",
+      assetId: uploaded[0]?.assetId ?? "",
     });
     expect(new Uint8Array((await served?.arrayBuffer()) ?? new ArrayBuffer(0))).toEqual(bytes);
   });
@@ -875,32 +796,4 @@ describe("getFileIcon", () => {
     expect(icon.extension).toBe("");
     expect(renderFileIconSvg(icon, 40)).not.toContain("onload");
   });
-});
-
-test("regional media uses the viewer country and forwards it on responsive URLs", () => {
-  const asset = {
-    id: "asset-region",
-    projectId: "project-region",
-    classification: {
-      moderation: { status: "allowed" as const, regions: [{ region: "DE", status: "blocked" }] },
-    },
-  };
-  const inferred = getMediaState({ asset });
-  expect(inferred.kind).toBe("image");
-  if (inferred.kind !== "image") throw new Error("expected-image");
-  expect(new URL(inferred.src).searchParams.has("viewerClaims")).toBe(false);
-  const ageClaim = getMediaState({ asset, viewerClaims: { ageConfirmed: true } });
-  expect(ageClaim.kind).toBe("image");
-  if (ageClaim.kind !== "image") throw new Error("expected-image");
-  expect(new URL(ageClaim.src).searchParams.get("viewerClaims")).toBe(
-    JSON.stringify({ ageConfirmed: true }),
-  );
-  expect(getMediaState({ asset, viewerClaims: { region: "DE" } })).toEqual({ kind: "unavailable" });
-  const us = getMediaState({ asset, viewerClaims: { region: "US" }, widths: [320, 640] });
-  expect(us.kind).toBe("image");
-  if (us.kind !== "image") throw new Error("expected-image");
-  expect(new URL(us.src).searchParams.get("viewerClaims")).toBe(JSON.stringify({ region: "US" }));
-  expect(us.sources?.map((source) => new URL(source.src).searchParams.get("viewerClaims"))).toEqual(
-    [JSON.stringify({ region: "US" }), JSON.stringify({ region: "US" })],
-  );
 });

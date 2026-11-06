@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getAssetUrl } from "../src/app";
+import { CalmLensAppClient, getAssetInfo } from "../src/app";
 import type { CdnAssetUrlOptions } from "../src/index";
 import { CalmLensServerClient } from "../src/server";
 
@@ -16,87 +16,100 @@ const codeOf = (build: () => unknown) => {
   throw new Error("Expected an error");
 };
 
-describe("getAssetUrl", () => {
+describe("cdn.getAssetUrl on the app client", () => {
   const cases: CdnAssetUrlOptions[] = [
-    { assetIdentifier: "asset-1" },
-    {
-      assetIdentifier: "a/b c",
-      resource: "rendered",
-      lens: "thumb",
-      viewerClaims: { ageConfirmed: true },
-    },
-    {
-      assetIdentifier: "asset-1",
-      transform: { width: 320, format: "webp" },
-    },
-    { assetIdentifier: "asset-1", resource: "placeholder" },
-    { assetIdentifier: "asset-1", resource: "hls", viewerClaims: { ageConfirmed: true } },
-    { assetIdentifier: "asset-1", resource: "embed" },
+    { assetId: "asset-1" },
+    { externalId: "post/1 ✓", resource: "preview", lens: "thumb" },
+    { assetId: "a/b c", resource: "rendered", viewerClaims: { ageConfirmed: true } },
+    { assetId: "asset-1", resource: "rendered", transform: { width: 320, format: "webp" } },
+    { projectId: "project-2", assetId: "asset-1", resource: "info" },
   ];
 
-  test("builds the same URLs as the server client's cdn.getAssetUrl", () => {
-    const client = new CalmLensServerClient({
+  test("builds the same URLs as the server client, without a request", () => {
+    const settings = { projectId: "project 1", cdnBaseUrl: "http://localhost:6130/v1/" };
+    const server = new CalmLensServerClient({
       apiKey: "key",
-      projectId: "project 1",
-      cdnBaseUrl: "http://localhost:6130/v1/",
+      ...settings,
       fetch: failingFetch,
       cdnFetch: failingFetch,
     });
+    const app = new CalmLensAppClient({ uploadPresetId: "preset-1", ...settings });
     for (const options of cases) {
-      expect(
-        getAssetUrl({
-          projectId: "project 1",
-          cdnBaseUrl: "http://localhost:6130/v1/",
-          ...options,
-        }),
-      ).toBe(client.cdn.getAssetUrl(options));
+      expect(app.cdn.getAssetUrl(options)).toBe(server.cdn.getAssetUrl(options));
     }
   });
 
-  test("serves the HLS stream's master playlist and the embed page", () => {
-    const base = { projectId: "project-1", assetIdentifier: "asset-1" };
-    expect(getAssetUrl({ ...base, resource: "hls" })).toBe(
-      "https://cdn.calmlens.com/v1/assets/project-1/asset-1/hls/index.m3u8",
-    );
-    expect(getAssetUrl({ ...base, resource: "embed" })).toBe(
-      "https://cdn.calmlens.com/v1/assets/project-1/asset-1/embed",
+  test("needs a project, from its options or the call", () => {
+    const app = new CalmLensAppClient({ uploadPresetId: "preset-1" });
+    expect(codeOf(() => app.cdn.getAssetUrl({ assetId: "asset-1" }))).toBe("sdk/invalid-argument");
+    expect(app.cdn.getAssetUrl({ projectId: "project-1", assetId: "asset-1" })).toBe(
+      "https://cdn.calmlens.com/v1/assets/project-1/asset-1",
     );
   });
+});
 
-  test("defaults to the hosted CDN and builds placeholder URLs", () => {
-    expect(getAssetUrl({ projectId: "project-1", assetIdentifier: "asset-1" })).toBe(
-      "https://cdn.calmlens.com/v1/assets/project-1/asset-1/rendered",
-    );
-    expect(
-      getAssetUrl({ projectId: "project-1", assetIdentifier: "asset-1", resource: "placeholder" }),
-    ).toBe("https://cdn.calmlens.com/v1/assets/project-1/asset-1/placeholder");
+describe("getAssetInfo", () => {
+  const info = {
+    id: "asset-1",
+    projectId: "project-1",
+    type: "image",
+    externalUrl: null,
+    content: {
+      format: "image/png",
+      width: 4,
+      height: 3,
+      durationSeconds: null,
+      pageCount: null,
+      rendered: { kind: "image", format: "image/png", width: 4, height: 3 },
+      preview: null,
+      hls: null,
+    },
+    availability: "available",
+  };
+  const recording = (response: () => Response) => {
+    const urls: string[] = [];
+    const fetch = (async (input: RequestInfo | URL) => {
+      urls.push(String(input));
+      return response();
+    }) as typeof globalThis.fetch;
+    return { urls, fetch };
+  };
+
+  test("reads {url}/info, keeping the viewer claims the URL carries", async () => {
+    const { urls, fetch } = recording(() => Response.json(info));
+    const base = "https://cdn.test/v1/assets/project-1/sig_abc";
+    const claims = encodeURIComponent(JSON.stringify({ region: "GB" }));
+    expect(await getAssetInfo(`${base}?viewerClaims=${claims}`, { fetch })).toEqual(info as never);
+    expect(urls).toEqual([`${base}/info?viewerClaims=${claims}`]);
   });
 
-  test("rejects a lens or transform on the original, hls, embed and placeholder, and unknown resources", () => {
-    const base = { projectId: "project-1", assetIdentifier: "asset-1" };
-    for (const resource of ["hls", "embed"] as const) {
-      for (const extra of [{ lens: "thumb" }, { transform: { width: 10 } }]) {
-        expect(codeOf(() => getAssetUrl({ ...base, resource, ...extra }))).toBe(
-          "sdk/invalid-argument",
-        );
-      }
-    }
-    for (const extra of [{ lens: "thumb" }, { transform: "width=10" }]) {
-      expect(codeOf(() => getAssetUrl({ ...base, resource: "placeholder", ...extra }))).toBe(
-        "sdk/invalid-argument",
-      );
-    }
-    for (const extra of [{ lens: "thumb" }, { transform: "width=10" }]) {
-      expect(codeOf(() => getAssetUrl({ ...base, resource: "original", ...extra }))).toBe(
-        "sdk/invalid-argument",
-      );
-    }
-    expect(getAssetUrl({ ...base, resource: "original" })).toBe(
-      "https://cdn.calmlens.com/v1/assets/project-1/asset-1/original",
+  test("sends the claims it is given in place of the URL's, leaving out the defaults", async () => {
+    const { urls, fetch } = recording(() => Response.json(info));
+    const base = "https://cdn.test/v1/assets/project-1/asset-1";
+    await getAssetInfo(`${base}?viewerClaims=%7B%22region%22%3A%22GB%22%7D`, {
+      fetch,
+      viewerClaims: { ageConfirmed: false },
+    });
+    await getAssetInfo(base, { fetch, viewerClaims: { ageConfirmed: true } });
+    expect(urls).toEqual([
+      `${base}/info`,
+      `${base}/info?viewerClaims=${encodeURIComponent('{"ageConfirmed":true}')}`,
+    ]);
+  });
+
+  test("raises the CDN's error code, such as an expired grant's", async () => {
+    const { fetch } = recording(() =>
+      Response.json({ code: "signed-url/expired", message: "Expired" }, { status: 403 }),
     );
-    expect(codeOf(() => getAssetUrl({ ...base, resource: "content" as never }))).toBe(
-      "sdk/invalid-argument",
-    );
-    expect(codeOf(() => getAssetUrl({ ...base, projectId: ".." }))).toBe("sdk/invalid-argument");
+    await expect(
+      getAssetInfo("https://cdn.test/v1/assets/project-1/sig_abc", { fetch }),
+    ).rejects.toMatchObject({ code: "signed-url/expired", status: 403 });
+  });
+
+  test("refuses a body that is not asset info", async () => {
+    const { fetch } = recording(() => Response.json({ id: "asset-1" }));
+    await expect(
+      getAssetInfo("https://cdn.test/v1/assets/project-1/asset-1", { fetch }),
+    ).rejects.toMatchObject({ code: "sdk/invalid-response" });
   });
 });

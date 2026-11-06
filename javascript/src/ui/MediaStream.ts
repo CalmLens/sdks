@@ -1,5 +1,5 @@
 import type Hls from "hls.js";
-import type { MediaState, MediaUrlSigner } from "./Media";
+import type { AssetView } from "./Asset";
 
 /** The MIME type of an HLS playlist, which Safari and iOS play natively. */
 const HLS_MIME_TYPE = "application/vnd.apple.mpegurl";
@@ -24,10 +24,10 @@ type Playback = {
   stop(): void;
 };
 
-/** A video or audio element's source, from its media state, when it has a stream to play. */
-const streamSource = (state: MediaState) =>
-  (state.kind === "video" || state.kind === "audio") && state.stream
-    ? { src: state.src, stream: state.stream }
+/** A video or audio element's source, from its view, when it has a stream to play. */
+const streamSource = (view: AssetView) =>
+  (view.kind === "video" || view.kind === "audio") && view.stream
+    ? { src: view.src, stream: view.stream }
     : undefined;
 
 const play = (
@@ -68,7 +68,7 @@ const play = (
       let refreshing = false;
       player.on(HlsPlayer.Events.ERROR, (_event, data) => {
         if (refreshing || hls !== player) return;
-        // An expired signature: a fresh stream URL replaces this player once it arrives.
+        // An expired signed URL: a fresh asset URL replaces this player once it arrives.
         if (data.response?.code === 403 && onExpired()) {
           refreshing = true;
           player.stopLoad();
@@ -85,28 +85,29 @@ const play = (
 };
 
 /**
- * Plays the adaptive stream of a media component's video or audio, when its state has one: as
- * the element's own source where the browser plays HLS (Safari and iOS), through hls.js where it
- * has Media Source Extensions (hls.js loads only then), and otherwise, or once the stream fails,
- * from the rendered file. Without a stream the component sets the file as the element's `src`
- * itself. Every web framework's media component drives one with its `MediaUrlSigner`.
+ * Plays the adaptive stream of `CalmLensAsset`'s video or audio, when its view has one: as the
+ * element's own source where the browser plays HLS (Safari and iOS), through hls.js where it has
+ * Media Source Extensions (hls.js loads only then), and otherwise, or once the stream fails, from
+ * the rendered file. Without a stream the component sets the file as the element's `src` itself.
+ * `onExpired` runs when the stream's URL is refused, as an expired signed one is; it returns
+ * `true` when a fresh asset URL is on its way, which replaces the stream once it renders.
  */
 export class MediaStreamPlayer {
   #media?: HTMLMediaElement;
   #key?: string;
   #playback?: Playback;
-  readonly #signer: MediaUrlSigner;
+  readonly #onExpired: (media: HTMLMediaElement) => boolean;
 
-  constructor(signer: MediaUrlSigner) {
-    this.#signer = signer;
+  constructor(onExpired: (media: HTMLMediaElement) => boolean) {
+    this.#onExpired = onExpired;
   }
 
   /**
-   * Call after every render with the video or audio element shown (or none) and the state: it
+   * Call after every render with the video or audio element shown (or none) and the view: it
    * starts, replaces or stops the stream when either changed.
    */
-  update(media: HTMLMediaElement | null | undefined, state: MediaState): void {
-    const source = media ? streamSource(state) : undefined;
+  update(media: HTMLMediaElement | null | undefined, view: AssetView): void {
+    const source = media ? streamSource(view) : undefined;
     const key = source && `${source.src}\n${source.stream}`;
     if (media === this.#media && key === this.#key) return;
     const previous = this.#media;
@@ -115,22 +116,19 @@ export class MediaStreamPlayer {
     this.#media = media ?? undefined;
     this.#key = key;
     if (media && source) {
-      this.#playback = play(media, source, () => this.#signer.recoverElement(media, "hls"));
-    } else if (media && stopped && media === previous && "src" in state && state.src) {
+      this.#playback = play(media, source, () => this.#onExpired(media));
+    } else if (media && stopped && media === previous && "src" in view && view.src) {
       // The stream's player cleared the element; the component's own `src` is the file.
-      media.src = state.src;
+      media.src = view.src;
     }
   }
 
   /**
-   * For a video or audio element's `error`: `true` when it is fetching a fresh signed URL for
-   * what failed, or switched from the stream to the rendered file.
+   * For a video or audio element's `error`: `true` when it switched from the stream to the
+   * rendered file. `false` means the file itself failed, for the component's session to handle.
    */
   recover(media: HTMLMediaElement): boolean {
     const playback = media === this.#media ? this.#playback : undefined;
-    if (this.#signer.recoverElement(media, playback?.streaming ? "hls" : "rendered")) {
-      return true;
-    }
     if (!playback?.streaming) return false;
     playback.fallBack();
     return true;

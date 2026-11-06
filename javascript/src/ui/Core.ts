@@ -1,30 +1,28 @@
 // The browser-independent core that every binding shares, React Native's included.
 
-export type { IconName } from "./Icons";
-export { ICON_ATTRIBUTES, ICONS } from "./Icons";
 export type {
-  GetSignedMediaUrl,
-  MediaAsset,
-  MediaImageSource,
-  MediaKind,
-  MediaOptions,
+  AssetDisplay,
+  AssetDocumentOptions,
+  AssetImageOptions,
+  AssetImageSource,
+  AssetOptions,
+  AssetSessionState,
+  AssetSpreadsheetOptions,
+  AssetVideoOptions,
+  AssetView,
   MediaPlayback,
-  MediaRenderedKind,
-  MediaSettings,
-  MediaSource,
-  MediaState,
-  SignedMediaUrls,
-} from "./Media";
+} from "./Asset";
 export {
-  getMediaState,
+  AssetSession,
+  getAssetAspectRatio,
+  getAssetView,
+  getAssetViewKey,
   getPeakHeights,
   getPlayedPercent,
-  getSignedMediaKey,
-  getSignedMediaResources,
-  MediaUrlSigner,
-  pickMediaSource,
-  resolveMediaProps,
-} from "./Media";
+  pickAssetSource,
+} from "./Asset";
+export type { IconName } from "./Icons";
+export { ICON_ATTRIBUTES, ICONS } from "./Icons";
 export type { CalmLensMessages, UploaderView, UploadItemView } from "./Messages";
 export {
   DEFAULT_MESSAGES,
@@ -33,24 +31,19 @@ export {
   formatBytes,
   formatMessage,
   getDropzoneHint,
-  getMediaUnavailableMessage,
   getUploadItemMessage,
   getUploadItemOutcome,
   resolveMessages,
 } from "./Messages";
 export { createProgressFetch, type ProgressFetchOptions } from "./ProgressFetch";
 export type {
-  MediaDisplayOptions,
-  MediaProps,
+  AssetDisplayOptions,
+  AssetEventHandlers,
+  AssetProps,
   UploaderDisplayOptions,
   UploaderProps,
 } from "./Props";
-export {
-  getMediaAspectRatio,
-  getMediaLoadKey,
-  getShownPlaceholder,
-  MEDIA_FILE_ICON_SIZE,
-} from "./Props";
+export { ASSET_FILE_ICON_SIZE } from "./Props";
 export { CALMLENS_STYLES } from "./Styles";
 export type { CalmLensTheme } from "./Theme";
 export { CALMLENS_THEME, resolveTheme } from "./Theme";

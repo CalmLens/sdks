@@ -19,7 +19,6 @@ import {
   checkTransformOptions,
   isAcceptedUploadMimeType,
   parseTransformSelector,
-  SIGNED_CDN_RESOURCES,
 } from "../client/CalmLensUtils";
 import type { ProcessingOptions } from "../contract/Asset.js";
 import { validateAssetPayload } from "../contract/AssetPayload.js";
@@ -90,7 +89,6 @@ const MOCK_OPERATIONS = [
   "assets.create",
   "assets.classify",
   "assets.uploadPart",
-  "assets.createSignedUrl",
   "assets.move",
   "assets.retry",
   "assets.explain",
@@ -100,6 +98,8 @@ const MOCK_OPERATIONS = [
   "assets.batch",
   "text.classify",
   "cdn.serve",
+  "cdn.getAssetInfo",
+  "cdn.signAssetUrl",
   "events.list",
   "events.pages",
   "folders.list",
@@ -205,7 +205,6 @@ export interface MockCalmLensApiOptions {
   createId: (prefix: IdPrefix) => string;
   now: () => number;
   moderate: MockModerate;
-  signedUrlBaseUrl: string;
 }
 
 /**
@@ -452,6 +451,37 @@ const fail = (
  * A request the API's schema refuses: `validation/invalid-request` with HTTP 400, listing the field
  * and its issue code (such as `validation/too-big`) in `details.issues`.
  */
+/**
+ * The mock's grant, the asset segment of a URL `signAssetUrl` signs: `sig_` and the hex of
+ * `{assetId}.{1|0}.{expiresAt}`, its asset, original access and expiry. Every SDK's mock writes it
+ * the same way. It is readable, not signed, as the mock has no secret to keep.
+ */
+const encodeMockGrant = (grant: { assetId: string; original: boolean; expiresAt: number }) =>
+  `sig_${[
+    ...new TextEncoder().encode(`${grant.assetId}.${grant.original ? 1 : 0}.${grant.expiresAt}`),
+  ]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")}`;
+
+/** Reads a mock grant, or `undefined` for a segment the mock didn't sign. */
+const decodeMockGrant = (
+  segment: string,
+): { assetId: string; original: boolean; expiresAt: number } | undefined => {
+  const hex = segment.slice("sig_".length);
+  if (!/^(?:[0-9a-f]{2})+$/.test(hex)) return undefined;
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(
+      Uint8Array.from(hex.match(/../g)!, (pair) => Number.parseInt(pair, 16)),
+    );
+  } catch {
+    return undefined;
+  }
+  const match = /^(.+)\.([01])\.(\d+)$/s.exec(text);
+  if (!match) return undefined;
+  return { assetId: match[1]!, original: match[2] === "1", expiresAt: Number(match[3]) };
+};
+
 const invalidField = (code: string, path: string) =>
   new ApiFailure(400, API_ERROR_CODES.INVALID_REQUEST, `Invalid ${path}`, {
     issues: [{ path, message: `Invalid ${path}`, code }],
@@ -512,7 +542,7 @@ interface MockPolicy extends Omit<Policy, "preset" | "projectIds"> {
 /** The client methods that send a request, the one it is recorded under first. */
 const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
   const { method, segments, query, cdn } = request;
-  if (cdn) return ["cdn.serve"];
+  if (cdn) return segments[3] === "info" ? ["cdn.getAssetInfo"] : ["cdn.serve"];
   const [root] = segments;
   if (root === "projects") {
     const route = segments.slice(2).join("/");
@@ -533,6 +563,8 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
         return ["assets.search"];
       case "assets/batch":
         return ["assets.batch"];
+      case "signed-asset-urls":
+        return ["cdn.signAssetUrl"];
       case "assets":
         if (method === "GET") return ["assets.list", "assets.iterate"];
         if (query.get("queue") === "true") return ["assets.create"];
@@ -592,8 +624,6 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
       return ["assets.removeContent"];
     case "children":
       return ["assets.listChildren", "assets.iterateChildren"];
-    case "signed-url":
-      return ["assets.createSignedUrl"];
     case "part":
       return ["assets.uploadPart"];
     case "move":
@@ -673,6 +703,8 @@ export class MockCalmLensApi {
   grants: PermissionGrant[];
   readonly calls: Array<{ call: MockCalmLensCall; operations: MockCalmLensOperation[] }> = [];
   private readonly options: MockCalmLensApiOptions;
+  /** The CDN base URL of the client sending the current request, for the URLs it signs. */
+  private cdnBaseUrl = "";
   private readonly lenses = new Map<string, Lens>();
   private readonly eventFeed: TypedEvent[] = [];
   /** Each asset's latest `assetSequence`, which the API keeps on the asset row. */
@@ -918,6 +950,7 @@ export class MockCalmLensApi {
   ): Promise<Response> {
     if (init?.signal?.aborted) throw init.signal.reason;
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    this.cdnBaseUrl = endpoints.cdnBaseUrl;
     const cdn = url.startsWith(`${endpoints.cdnBaseUrl}/`);
     const base = cdn ? endpoints.cdnBaseUrl : endpoints.baseUrl;
     if (!url.startsWith(`${base}/`)) {
@@ -1124,6 +1157,8 @@ export class MockCalmLensApi {
           return [200, await this.searchAssets(request.query)];
         case "POST assets/batch":
           return [202, await this.batch(this.json(request))];
+        case "POST signed-asset-urls":
+          return [200, await this.signAssetUrl(this.json(request))];
         case "GET events":
           return [200, this.listEvents(request.query)];
         case "GET folders":
@@ -1183,8 +1218,6 @@ export class MockCalmLensApi {
           return [200, await this.listChildren(id, request.query)];
         case "POST part":
           return [200, await this.uploadPart(id, request)];
-        case "POST signed-url":
-          return [200, await this.createSignedUrl(id, this.json(request))];
         case "POST move":
           return [200, await this.moveAsset(id, this.json(request))];
         case "POST retry":
@@ -1693,32 +1726,51 @@ export class MockCalmLensApi {
     return this.databaseStorage.updateAsset({ ...asset, folderId, updatedAt: this.now() });
   }
 
-  private async createSignedUrl(assetId: string, body: Record<string, unknown>) {
+  /**
+   * Signs an asset URL like the API (`POST /projects/:projectId/signed-asset-urls`): a grant to one
+   * asset, by ID or external ID, until it expires, serving the original only when asked. The mock's
+   * grant is readable (its asset, original access and expiry), unlike the CDN's, and only the
+   * mock's CDN accepts it.
+   */
+  private async signAssetUrl(body: Record<string, unknown>) {
     // Like the API's schema, none of these fields takes null.
-    for (const key of ["viewerClaims", "resource", "lens", "transform", "expiresInSeconds"]) {
-      if (body[key] === null) {
-        throw invalidField(
-          key === "resource" ? "validation/invalid-value" : "validation/invalid-type",
-          key,
-        );
-      }
+    for (const key of ["assetId", "externalId", "expiresIn", "original"]) {
+      if (body[key] === null) throw invalidField("validation/invalid-type", key);
     }
-    const resource = (body.resource as string | undefined) ?? "rendered";
-    if (!(SIGNED_CDN_RESOURCES as readonly string[]).includes(resource)) {
-      throw invalidField("validation/invalid-value", "resource");
+    const { assetId, externalId } = body;
+    if ((assetId === undefined) === (externalId === undefined)) {
+      throw new ApiFailure(
+        400,
+        API_ERROR_CODES.INVALID_REQUEST,
+        "Send either assetId or externalId",
+        {
+          issues: [{ path: "", message: "Send either assetId or externalId", code: "custom" }],
+        },
+      );
     }
-    const asset = await this.findOwnAsset(assetId);
-    const expiresInSeconds = (body.expiresInSeconds as number | undefined) ?? 60 * 15;
-    // Like the API, the URL carries the viewer claims its signature covers.
-    const selector =
-      (body.lens ? `&lens=${encodeURIComponent(String(body.lens))}` : "") +
-      (body.transform ? `&transform=${encodeURIComponent(String(body.transform))}` : "") +
-      (body.viewerClaims
-        ? `&viewerClaims=${encodeURIComponent(JSON.stringify(body.viewerClaims))}`
-        : "");
+    const expiresIn = body.expiresIn ?? 60 * 15;
+    if (typeof expiresIn !== "number" || !Number.isInteger(expiresIn)) {
+      throw invalidField("validation/invalid-type", "expiresIn");
+    }
+    if (expiresIn < 1) throw invalidField("validation/too-small", "expiresIn");
+    if (expiresIn > 60 * 60 * 24) throw invalidField("validation/too-big", "expiresIn");
+    const original = body.original ?? false;
+    if (typeof original !== "boolean") throw invalidField("validation/invalid-type", "original");
+    let asset: Asset | undefined;
+    if (externalId !== undefined) {
+      asset = (await this.databaseStorage.listAssets(this.projectId)).find(
+        (candidate) => candidate.externalId === externalId,
+      );
+      if (!asset) throw fail(API_ERROR_CODES.ASSET_NOT_FOUND);
+    } else {
+      asset = await this.findOwnAsset(String(assetId));
+    }
+    if (asset.content.safetyHold) throw fail(API_ERROR_CODES.ASSET_HELD);
+    const expiresAt = this.now() + expiresIn * 1000;
+    const grant = encodeMockGrant({ assetId: asset.id, original, expiresAt });
     return {
-      url: `${this.options.signedUrlBaseUrl}/assets/${asset.id}/${resource}?expiresInSeconds=${expiresInSeconds}${selector}`,
-      expiresAt: this.now() + expiresInSeconds * 1000,
+      url: `${this.cdnBaseUrl}/assets/${encodeURIComponent(this.projectId)}/${grant}`,
+      expiresAt,
     };
   }
 
@@ -2744,7 +2796,8 @@ export class MockCalmLensApi {
    */
   private async serveCdn(request: MockRequest): Promise<Response> {
     const { url, segments, query } = request;
-    const [root, projectId, assetIdentifier, resource] = segments;
+    const [root, projectId, , resource] = segments;
+    const assetSegment = request.rawSegments[2] ?? "";
     const selectorPath = request.rawSegments.slice(4);
     const notFound = () =>
       this.jsonResponse(404, { code: "asset/not-found", message: "Asset not found" }, url);
@@ -2771,15 +2824,56 @@ export class MockCalmLensApi {
       return invalidTransform();
     }
     const hasSelector = Boolean(selector.lens || selector.options);
-    if ((resource === "original" || resource === "embed") && hasSelector) {
+    if ((resource === "original" || resource === "embed" || resource === "info") && hasSelector) {
       return invalidTransform();
     }
-    if (root !== "assets" || projectId !== this.projectId || !assetIdentifier) return notFound();
+    if (root !== "assets" || projectId !== this.projectId || !assetSegment) return notFound();
     const assets = await this.databaseStorage.listAssets(this.projectId);
-    const asset = assets.find(
-      (asset) => asset.id === assetIdentifier || asset.externalId === assetIdentifier,
-    );
+    // Like the CDN (CdnUtils.ts), the asset is `ext:` and its URL-encoded external ID, a grant
+    // (`sig_…`) or its ID.
+    let grant: ReturnType<typeof decodeMockGrant>;
+    let asset: Asset | undefined;
+    if (assetSegment.startsWith("sig_")) {
+      grant = decodeMockGrant(assetSegment);
+      if (!grant) {
+        return this.jsonResponse(
+          403,
+          { code: "signed-url/invalid", message: "The signed asset URL's grant is invalid" },
+          url,
+        );
+      }
+      if (grant.expiresAt <= this.now()) {
+        return this.jsonResponse(
+          403,
+          { code: "signed-url/expired", message: "The signed URL has expired" },
+          url,
+        );
+      }
+      const grantedId = grant.assetId;
+      asset = assets.find((candidate) => candidate.id === grantedId);
+    } else if (assetSegment.startsWith("ext:")) {
+      let externalId: string | undefined;
+      try {
+        externalId = decodeURIComponent(assetSegment.slice("ext:".length));
+      } catch {}
+      asset = externalId
+        ? assets.find((candidate) => candidate.externalId === externalId)
+        : undefined;
+    } else {
+      const assetId = decodeSegment(assetSegment);
+      asset = assets.find((candidate) => candidate.id === assetId);
+    }
     if (!asset) return notFound();
+    if (resource === "original" && grant && !grant.original) {
+      return this.jsonResponse(
+        403,
+        {
+          code: "signed-url/original-not-granted",
+          message: "This signed asset URL doesn't grant the original file",
+        },
+        url,
+      );
+    }
     const notAvailable = () =>
       this.jsonResponse(
         403,
@@ -2792,6 +2886,7 @@ export class MockCalmLensApi {
     const status = asset.classification.moderation.status;
     const isHead = request.method === "HEAD";
     const { rendered, preview } = asset.content;
+    if (resource === "info") return this.serveInfo(request, asset, Boolean(grant) || canDownload());
     // Like the CDN, a safety hold refuses every resource.
     if (asset.content.safetyHold) return notAvailable();
 
@@ -2835,7 +2930,7 @@ export class MockCalmLensApi {
     if (status === "age-restricted" && claims.ageConfirmed !== true)
       return this.jsonResponse(403, { code: "viewer/age-confirmation-required" }, url);
     const isPrivate = asset.visibility !== "public";
-    if (isPrivate && !canDownload()) {
+    if (isPrivate && !grant && !canDownload()) {
       return this.jsonResponse(
         403,
         {
@@ -2932,6 +3027,67 @@ export class MockCalmLensApi {
       "X-Content-Type-Options": "nosniff",
       "Content-Security-Policy": "sandbox; default-src 'none'",
       ...(isActiveContentType(contentType) ? { "Content-Disposition": "attachment" } : {}),
+    });
+  }
+
+  /**
+   * The display info at `/info`, like the CDN's (AssetInfo.ts): the allowlisted fields and whether
+   * the viewer the claims describe can see the content, decided as the other resources decide it.
+   * A private asset's needs a grant or an API key with `assets:download`.
+   */
+  private serveInfo(request: MockRequest, asset: Asset, authorised: boolean): Response {
+    const { url, query } = request;
+    const isPrivate = asset.visibility !== "public";
+    if (isPrivate && !authorised) {
+      return this.jsonResponse(
+        404,
+        { code: "asset/not-available", message: "Asset is not available" },
+        url,
+      );
+    }
+    let claims: { ageConfirmed?: boolean } = {};
+    try {
+      claims = JSON.parse(
+        query.get("viewerClaims") ?? request.headers.get("X-CalmLens-Viewer-Claims") ?? "{}",
+      );
+    } catch {
+      return this.jsonResponse(400, { code: "viewer-claims/invalid" }, url);
+    }
+    const status = asset.classification.moderation.status;
+    const availability =
+      asset.content.safetyHold ||
+      asset.upload.status === "uploading" ||
+      status === "blocked" ||
+      status === "purged" ||
+      asset.classification.status === "failed" ||
+      asset.content.status === "removed"
+        ? "unavailable"
+        : status === "age-restricted" && claims.ageConfirmed !== true
+          ? "age-restricted"
+          : "available";
+    const { content } = asset;
+    const info = {
+      id: asset.id,
+      projectId: asset.projectId,
+      type: asset.type,
+      externalUrl: asset.externalUrl ?? null,
+      content: {
+        format: content.format,
+        width: content.width,
+        height: content.height,
+        durationSeconds: content.durationSeconds,
+        pageCount: content.pageCount,
+        rendered: content.rendered,
+        preview: content.preview,
+        hls: content.hls,
+      },
+      availability,
+    };
+    const bytes = new TextEncoder().encode(JSON.stringify(info));
+    return this.cdnResponse(request.method === "HEAD", bytes, url, {
+      "Content-Type": "application/json",
+      "Cache-Control": `${isPrivate ? "private" : "public"}, max-age=60`,
+      "Cache-Tag": `asset-${asset.id}`,
     });
   }
 

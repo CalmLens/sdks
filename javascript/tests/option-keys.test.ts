@@ -58,7 +58,7 @@ describe("unknown option keys", () => {
       "events.pages": ["page_size", () => client.events.pages({ page_size: 5 } as never)],
       "cdn.getAssetUrl": [
         "lenz",
-        () => client.cdn.getAssetUrl({ assetIdentifier: "a", lenz: "x" } as never),
+        () => client.cdn.getAssetUrl({ assetId: "a", lenz: "x" } as never),
       ],
       "uploadTokens.sign": [
         "external",

@@ -1,5 +1,4 @@
 import { getFileIcon, renderFileIconSvg } from "./FileIcons";
-import type { MediaState } from "./Media";
 import type { UploadControllerOptions, UploadItem, UploadSnapshot } from "./UploadController";
 
 /** The size of a row's file-type icon, the same as an image preview. */
@@ -45,15 +44,15 @@ export interface CalmLensMessages {
   sensitiveTitle: string;
   sensitiveBody: string;
   reveal: string;
-  /** The link that opens a PDF on its own, for browsers that don't show it in the page. */
-  openPdf: string;
-  /** Names a PDF without `alt`. */
-  pdfTitle: string;
+  /** The link that opens a document on its own, shown until the document viewer loads. */
+  openDocument: string;
+  /** The link to a website asset's page; `{host}` is replaced with its host. */
+  openWebsite: string;
   /** React Native: opens a video or audio without `renderPlayer` in the device's player. */
   play: string;
+  /** React Native: opens a document, text, spreadsheet or website the component doesn't show. */
+  open: string;
   unavailable: string;
-  /** A viewer-specific regional block reported by the asset API. */
-  regionalUnavailable: string;
   [errorCode: string]: string;
 }
 
@@ -89,24 +88,15 @@ export const DEFAULT_MESSAGES: CalmLensMessages = {
   sensitiveTitle: "Sensitive content",
   sensitiveBody: "This may not be suitable for everyone.",
   reveal: "View",
-  openPdf: "Open PDF",
-  pdfTitle: "PDF document",
+  openDocument: "Open document",
+  openWebsite: "Open {host}",
   play: "Play",
+  open: "Open",
   unavailable: "Unavailable",
-  regionalUnavailable: "Unavailable in your region",
 };
 
 export const resolveMessages = (overrides?: Partial<CalmLensMessages>): CalmLensMessages =>
   overrides ? ({ ...DEFAULT_MESSAGES, ...overrides } as CalmLensMessages) : DEFAULT_MESSAGES;
-
-/** The unavailable notice every media binding shows for the same resolved state. */
-export const getMediaUnavailableMessage = (
-  state: MediaState,
-  messages: CalmLensMessages,
-): string =>
-  state.kind === "unavailable" && state.reason === "regional"
-    ? messages.regionalUnavailable
-    : messages.unavailable;
 
 /** Fills `{name}`-style placeholders. */
 export const formatMessage = (message: string, values: Record<string, string>): string =>

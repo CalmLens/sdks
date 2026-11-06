@@ -317,7 +317,12 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	SIGNED_URL_INVALID: new ErrorCode({
 		id: "signed-url/invalid",
-		defaultMessage: "The signed URL's signature doesn't match its asset, resource, lens, transform, expiry or viewer claims. Use the URL exactly as created.",
+		defaultMessage: "The signed asset URL's grant wasn't signed for this project, or was changed after signing. Use the URL as created, adding only resources, selectors and viewer claims.",
+		status: 403
+	}),
+	SIGNED_URL_ORIGINAL_NOT_GRANTED: new ErrorCode({
+		id: "signed-url/original-not-granted",
+		defaultMessage: "This signed asset URL doesn't grant the original file. Sign it with original access.",
 		status: 403
 	}),
 	INVALID_REQUEST: new ErrorCode({

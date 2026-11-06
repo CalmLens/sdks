@@ -1,4 +1,4 @@
-// Mounts the uploader and the media component through each binding, so every behaviour test runs
+// Mounts the uploader and CalmLensAsset through each binding, so every behaviour test runs
 // once per UI library against the same props.
 import { createElement } from "react";
 import { flushSync } from "react-dom";
@@ -9,7 +9,7 @@ import "../src/elements";
 import * as react from "../src/react";
 import * as native from "../src/react-native";
 import * as svelte from "../src/svelte/index.js";
-import type { MediaProps } from "../src/ui";
+import type { AssetProps } from "../src/ui";
 import type { UploaderProps } from "../src/ui/BrowserUpload";
 import * as vue from "../src/vue";
 
@@ -18,7 +18,7 @@ export type Mounted = { container: HTMLElement; unmount: () => void };
 export type Binding = {
   name: string;
   mountUploader: (props: UploaderProps) => Mounted;
-  mountMedia: (props: MediaProps) => Mounted;
+  mountAsset: (props: AssetProps) => Mounted;
   /** Picks files the way the binding's users do: the file input, or the app's picker. */
   pick: (mounted: Mounted, files: File[]) => void;
   /** Finishes loading an image the component shows, successfully or not. */
@@ -31,6 +31,8 @@ export type Binding = {
   rendersHtmlImages: boolean;
   /** Whether video and audio play in the component's own player. */
   playsMedia: boolean;
+  /** Whether documents, text and spreadsheets show in the page through their viewers. */
+  showsViewers: boolean;
 };
 
 /** Picks files with the uploader's file input, as the browser's picker does. */
@@ -51,6 +53,7 @@ const HTML = {
   acceptsDrops: true,
   rendersHtmlImages: true,
   playsMedia: true,
+  showsViewers: true,
 };
 
 /**
@@ -90,6 +93,47 @@ const PROPERTIES = new Set([
   "controller",
 ]);
 
+/** Sets `CalmLensAsset`'s props on `<calmlens-asset>`, as attributes, properties and listeners. */
+const assignAsset = (element: HTMLElement, props: AssetProps) => {
+  const { image, video, document: documentOptions, spreadsheet, ...rest } = props;
+  const record = element as unknown as Record<string, unknown>;
+  const events: Record<string, string> = {
+    onLoad: "calmlens-load",
+    onError: "calmlens-error",
+    onAvailabilityChange: "calmlens-availability-change",
+    onAgeConfirmRequest: "calmlens-age-confirm-request",
+    onPlay: "calmlens-play",
+    onEnded: "calmlens-ended",
+    onTimeUpdate: "calmlens-timeupdate",
+  };
+  for (const [name, value] of Object.entries(rest)) {
+    if (value === undefined) continue;
+    if (name in events) {
+      element.addEventListener(events[name] as string, (event) =>
+        (value as (detail: unknown) => void)((event as CustomEvent).detail),
+      );
+    } else if (["info", "onExpired", "messages"].includes(name)) record[name] = value;
+    else if (name === "viewerClaims") element.setAttribute("viewer-claims", JSON.stringify(value));
+    else if (name === "lazy") element.toggleAttribute("eager", value === false);
+    else element.setAttribute(kebab(name), String(value));
+  }
+  if (image?.lens) element.setAttribute("lens", image.lens);
+  if (typeof image?.transform === "string") element.setAttribute("transform", image.transform);
+  if (image?.widths) element.setAttribute("widths", image.widths.join(","));
+  if (image?.sizes) element.setAttribute("sizes", image.sizes);
+  if (video?.controls === false) element.setAttribute("no-controls", "");
+  if (video?.stream === false) element.setAttribute("no-stream", "");
+  if (video?.autoPlay) element.setAttribute("autoplay", "");
+  if (video?.muted) element.setAttribute("muted", "");
+  if (video?.loop) element.setAttribute("loop", "");
+  if (documentOptions?.initialPage) {
+    element.setAttribute("initial-page", String(documentOptions.initialPage));
+  }
+  if (documentOptions?.pdf) record.pdf = documentOptions.pdf;
+  if (spreadsheet?.pageSize) element.setAttribute("page-size", String(spreadsheet.pageSize));
+  if (spreadsheet?.getText) record.getText = spreadsheet.getText;
+};
+
 /** Sets props on a custom element: plain values as attributes, everything else as properties. */
 const assign = (
   element: HTMLElement,
@@ -125,10 +169,10 @@ export const BINDINGS: Binding[] = [
       flushSync(() => root.render(createElement(react.CalmLensUploader, props)));
       return done(container, () => root.unmount());
     },
-    mountMedia: (props) => {
+    mountAsset: (props) => {
       const container = containerFor();
       const root = createRoot(container);
-      flushSync(() => root.render(createElement(react.CalmLensMedia, props)));
+      flushSync(() => root.render(createElement(react.CalmLensAsset, props)));
       return done(container, () => root.unmount());
     },
   },
@@ -142,9 +186,9 @@ export const BINDINGS: Binding[] = [
       app.mount(container);
       return done(container, () => app.unmount());
     },
-    mountMedia: (props) => {
+    mountAsset: (props) => {
       const container = containerFor();
-      const app = createApp({ render: () => h(vue.CalmLensMedia, props) });
+      const app = createApp({ render: () => h(vue.CalmLensAsset, props) });
       app.mount(container);
       return done(container, () => app.unmount());
     },
@@ -159,9 +203,9 @@ export const BINDINGS: Binding[] = [
       flushSvelte();
       return done(container, () => void unmountSvelte(component));
     },
-    mountMedia: (props) => {
+    mountAsset: (props) => {
       const container = containerFor();
-      const component = mountSvelte(svelte.CalmLensMedia, { target: container, props });
+      const component = mountSvelte(svelte.CalmLensAsset, { target: container, props });
       flushSvelte();
       return done(container, () => void unmountSvelte(component));
     },
@@ -183,10 +227,10 @@ export const BINDINGS: Binding[] = [
       container.append(element);
       return done(container, () => element.remove());
     },
-    mountMedia: (props) => {
+    mountAsset: (props) => {
       const container = containerFor();
-      const element = document.createElement("calmlens-media");
-      assign(element, props as unknown as Record<string, unknown>, { onReveal: "calmlens-reveal" });
+      const element = document.createElement("calmlens-asset");
+      assignAsset(element, props);
       container.append(element);
       return done(container, () => element.remove());
     },
@@ -197,6 +241,7 @@ export const BINDINGS: Binding[] = [
     acceptsDrops: false,
     rendersHtmlImages: false,
     playsMedia: false,
+    showsViewers: false,
     mountUploader: (props) => {
       const container = containerFor();
       const picked = { files: [] as File[] };
@@ -208,10 +253,10 @@ export const BINDINGS: Binding[] = [
       );
       return done(container, () => root.unmount());
     },
-    mountMedia: (props) => {
+    mountAsset: (props) => {
       const container = containerFor();
       const root = createRoot(container);
-      flushSync(() => root.render(createElement(native.CalmLensMedia, props)));
+      flushSync(() => root.render(createElement(native.CalmLensAsset, props)));
       return done(container, () => root.unmount());
     },
     pick: ({ container }, files) => {

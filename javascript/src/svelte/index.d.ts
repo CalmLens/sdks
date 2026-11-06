@@ -1,5 +1,6 @@
-import type { Component } from "svelte";
+import type { Component, Snippet } from "svelte";
 import type {
+  AssetProps,
   CalmLensUpload as CoreCalmLensUpload,
   UploadControllerOptions as CoreUploadControllerOptions,
   UploaderProps as CoreUploaderProps,
@@ -7,7 +8,6 @@ import type {
   UploadSnapshot as CoreUploadSnapshot,
   DocumentViewerOptions,
   ImageViewerOptions,
-  MediaProps,
   SpreadsheetViewerOptions,
   TextViewerOptions,
   UploadController,
@@ -33,11 +33,18 @@ export declare const createUploadController: <F extends UploadFile = File>(
 export declare const CalmLensUploader: Component<UploaderProps>;
 
 /**
- * Shows an asset from the CalmLens CDN with responsive widths and a blurred placeholder while
- * it loads. Age-restricted assets stay behind the placeholder and a reveal button until
- * `ageConfirmed` is set; blocked and purged assets show an unavailable notice.
+ * Shows any asset from its asset URL (public or signed), natively in the page: images, websites,
+ * video and audio with their adaptive stream, documents, text and spreadsheets, or a preview still
+ * or file icon. It reads `{src}/info` once mounted, unless `info` is given. Age-restricted content
+ * stays behind its blurred placeholder and a reveal button; content the CDN refuses shows the
+ * unavailable notice. `renderUnavailable` and `renderAgeGate` snippets replace the notices.
  */
-export declare const CalmLensMedia: Component<MediaProps>;
+export declare const CalmLensAsset: Component<
+  AssetProps & {
+    renderUnavailable?: Snippet;
+    renderAgeGate?: Snippet<[{ placeholderUrl?: string; confirm?: () => void }]>;
+  }
+>;
 
 /** Shows an image asset's rendered file, fitted to the element, over its placeholder (preview). */
 export declare const CalmLensImageViewer: Component<ImageViewerOptions>;

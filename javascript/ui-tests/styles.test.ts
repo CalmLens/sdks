@@ -4,8 +4,9 @@ import { renderToString } from "react-dom/server";
 import * as react from "../src/react";
 import { BINDINGS, type Mounted } from "./bindings";
 
-const media = { projectId: "proj_8fK2mQx7Lp4NvB3tRz9Y", assetId: "a1", alt: "A cat" };
-const STYLESHEET_RULE = ".calmlens-media {";
+const SRC = "https://cdn.calmlens.com/v1/assets/proj_8fK2mQx7Lp4NvB3tRz9Y/asset_1";
+const asset = { src: SRC, alt: "A cat" };
+const STYLESHEET_RULE = ".calmlens-asset {";
 
 let mounted: Mounted | undefined;
 afterEach(() => {
@@ -20,13 +21,13 @@ const pageStyles = () =>
   );
 
 describe("the components' stylesheet", () => {
-  it("is in React's server HTML once, ahead of the media, however many components render", () => {
+  it("is in React's server HTML once, ahead of the asset, however many components render", () => {
     const html = renderToString(
       createElement(
         Fragment,
         null,
-        createElement(react.CalmLensMedia, media),
-        createElement(react.CalmLensMedia, { ...media, assetId: "a2" }),
+        createElement(react.CalmLensAsset, asset),
+        createElement(react.CalmLensAsset, { ...asset, src: `${SRC}2` }),
       ),
     );
     expect(html.split(STYLESHEET_RULE)).toHaveLength(2);
@@ -34,13 +35,13 @@ describe("the components' stylesheet", () => {
   });
 
   it("is left out of React's output when unstyled", () => {
-    const html = renderToString(createElement(react.CalmLensMedia, { ...media, unstyled: true }));
+    const html = renderToString(createElement(react.CalmLensAsset, { ...asset, unstyled: true }));
     expect(html).not.toContain(STYLESHEET_RULE);
   });
 
   for (const binding of BINDINGS.filter((candidate) => candidate.name !== "React"))
     it(`is never added to the page by the ${binding.name} binding`, async () => {
-      mounted = binding.mountMedia(media);
+      mounted = binding.mountAsset({ ...asset, info: undefined });
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(pageStyles()).toHaveLength(0);
     });

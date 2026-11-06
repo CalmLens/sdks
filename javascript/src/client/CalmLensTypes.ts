@@ -14,11 +14,13 @@ import type {
   AssetUpload as SharedAssetUpload,
   ProcessingOptions as SharedProcessingOptions,
 } from "../contract/Asset.js";
+import type { AssetInfo } from "../contract/AssetInfo.js";
 import type { AssetBinaryPayloadInput } from "../contract/AssetPayload.js";
 import type {
   AssetSearchQuery,
   AssetSearchResult as SharedAssetSearchResult,
 } from "../contract/AssetSearch.js";
+import type { ASSET_RESOURCE_PATHS } from "../contract/CdnUtils.js";
 import type { HashList, HashListEntry } from "../contract/HashList.js";
 import type { PUBLIC_LENS_SCHEMA } from "../contract/Lens.js";
 import type { ModerationContext } from "../contract/ModerationContext.js";
@@ -49,12 +51,10 @@ import type {
   PatchHashListBody,
   PostAssetBatchOperationResponse,
   PostAssetDecisionBody,
-  PostAssetSignedUrlResponse,
   PostFolderBody,
   PostHashListBody,
   PostHashListEntryBody,
 } from "../contract/PublicApiSchemas.js";
-import type { SIGNED_CDN_RESOURCES } from "./CalmLensUtils";
 
 // ---- Models -------------------------------------------------------------------------------
 
@@ -136,8 +136,16 @@ export type Asset = Omit<
 /** Digests of an asset's uploaded content. */
 export type AssetChecksums = NonNullable<SharedAssetContent["checksums"]>;
 
-/** A signed CDN URL from `assets.createSignedUrl`, and when it expires. */
-export type SignedUrl = PostAssetSignedUrlResponse;
+/** A signed asset URL from `cdn.signAssetUrl`, and when it expires. */
+export interface SignedAssetUrl {
+  /**
+   * The signed asset URL, or the resource URL beneath it when `resource` was given. Append
+   * resources to the asset URL as to a public one; it stops working at `expiresAt`.
+   */
+  url: string;
+  /** When the URL stops working, in milliseconds since the Unix epoch. */
+  expiresAt: number;
+}
 
 /** One page of assets. */
 export type AssetPage = CursorPage<Asset>;
@@ -347,6 +355,10 @@ export interface CalmLensAppClientOptions extends ConnectionOptions {
   token?: string | (() => string | Promise<string>);
   /** API keys belong on your server, in `CalmLensServerClient`. */
   apiKey?: never;
+  /** The project whose public asset URLs `cdn.getAssetUrl` builds, unless a call names one. */
+  projectId?: string;
+  /** Defaults to `https://cdn.calmlens.com/v1`. */
+  cdnBaseUrl?: string;
 }
 
 export interface SignUploadTokenOptions {
@@ -410,24 +422,15 @@ export interface IdempotencyOptions {
 }
 
 /**
- * The CDN resources a signed URL can be created for: the asset's `original` file, exactly as
- * uploaded; its `rendered` file for display (an image in the best format the client accepts, a
- * PDF, or browser-safe video or audio); its `preview`, a still image that stands for the asset;
- * the `hls` stream of audio or video, its adaptive HLS master playlist (one signature covers every
- * playlist and segment beneath it); or the `embed` page, an HTML page that shows the asset in an
- * iframe.
+ * What a resource URL beneath an asset URL serves: the `original` file exactly as uploaded (with a
+ * signed URL, only when signed with `original`); the `rendered` file for display (an image in the
+ * best format the client accepts, a PDF, or browser-safe video or audio); the `preview` still;
+ * the blurred `placeholder` PNG, public for every asset; the `hls` stream of audio or video (its
+ * master playlist); the `embed` page, which shows the asset in an iframe; or the `info` JSON that
+ * `getAssetInfo` reads. Lenses and transforms apply to `preview`, and to `rendered` when it is an
+ * image; the other resources take none.
  */
-export type SignedCdnResource = (typeof SIGNED_CDN_RESOURCES)[number];
-
-/**
- * What a CDN URL serves: a signed resource (`original`, `rendered`, `preview`, `hls` or
- * `embed`), or the `placeholder`, a small blurred PNG made from the preview that is public for
- * every asset whatever its visibility or moderation status. Defaults to `rendered`; ask for
- * `original` to download the exact file. Lenses and transforms apply to `preview`, and to
- * `rendered` when it is an image; the CDN refuses them on rendered PDFs, video and audio with
- * `transform/invalid`, and the original, hls, embed and placeholder take none.
- */
-export type CdnResource = SignedCdnResource | "placeholder";
+export type CdnResource = keyof typeof ASSET_RESOURCE_PATHS;
 
 /**
  * `processingOptions.features.streaming`: whether to prepare an adaptive (HLS) stream of audio or
@@ -442,43 +445,66 @@ export interface ViewerClaims {
   /**
    * Your platform's confirmation that the viewer passed its age check. Defaults to false,
    * including authenticated requests. Your platform confirms the viewer's age; CalmLens does not
-   * verify this claim. Anyone requesting a public asset's URL can set it, so it doesn't restrict
-   * access: to control who loads an age-restricted asset, make it private and include the claim
-   * in a signed URL, whose signature covers it.
+   * verify this claim. It is never signed: anyone holding an asset URL, public or signed, can
+   * add it, so it doesn't restrict who loads an age-restricted asset; your app decides whom it
+   * gives the URL to.
    */
   ageConfirmed?: boolean;
 }
 
-export interface CdnAssetUrlOptions {
-  /** Viewer country supplied by your integration, including when requests go through a proxy. */
-  viewerClaims?: ViewerClaims;
-  assetIdentifier: string;
-  resource?: CdnResource;
-  lens?: string;
-  transform?: CdnTransform;
-}
-
 /**
- * Options for the standalone `getAssetUrl`: a CDN URL from the project ID alone, with no API key
- * and no request, so it works in browsers.
+ * Whether the viewer an asset URL's claims describe can see the asset now, from its `/info`:
+ * `available`, `age-restricted` until the viewer's age is confirmed, or `unavailable` (held,
+ * blocked in the viewer's region, not yet moderated or removed).
  */
-export interface GetAssetUrlOptions extends CdnAssetUrlOptions {
-  projectId: string;
-  /** Defaults to `https://cdn.calmlens.com/v1`. */
-  cdnBaseUrl?: string;
-}
+export type AssetAvailability = AssetInfo["availability"];
 
-export interface CdnServeOptions extends CdnAssetUrlOptions {
-  init?: RequestInit;
-}
+/** An asset, by its ID or by the external ID it was uploaded with: exactly one of them. */
+export type CdnAssetReference =
+  | { assetId: string; externalId?: undefined }
+  | { externalId: string; assetId?: undefined };
 
-export interface CreateAssetSignedUrlOptions {
-  viewerClaims?: ViewerClaims;
-  assetId: string;
-  resource?: SignedCdnResource;
+/** A resource beneath an asset URL, with its selector and viewer claims. */
+export interface CdnAssetLocation {
+  /** The resource. Left out, the URL is the asset URL, which every resource is a path beneath. */
+  resource?: CdnResource;
+  /** A named lens, such as `thumbnail`. Needs a resource that takes one. */
   lens?: string;
+  /** Transform options, applied after the lens. Needs a resource that takes them. */
   transform?: CdnTransform;
-  expiresInSeconds?: number;
+  /**
+   * The viewer's region and age confirmation, which your app asserts. They are unsigned, sent as
+   * the URL's query, and left out when they are the defaults (no region, age not confirmed).
+   */
+  viewerClaims?: ViewerClaims;
+}
+
+export type CdnAssetUrlOptions = CdnAssetReference &
+  CdnAssetLocation & {
+    /** Defaults to the client's project. */
+    projectId?: string;
+  };
+
+export type CdnServeOptions = CdnAssetUrlOptions & {
+  /** Defaults to `rendered`. */
+  resource?: CdnResource;
+  init?: RequestInit;
+};
+
+export type SignAssetUrlOptions = CdnAssetUrlOptions & {
+  /** How long the URL works, in seconds, from 1 to 86400 (24 hours). Defaults to 900. */
+  expiresIn?: number;
+  /** Whether the URL also serves `/original`, the exact uploaded file. Defaults to `false`. */
+  original?: boolean;
+};
+
+/** Options for `getAssetInfo`. */
+export interface GetAssetInfoOptions {
+  /** Viewer claims to read the info for, in place of any the URL carries. */
+  viewerClaims?: ViewerClaims;
+  /** Overrides `fetch`. */
+  fetch?: typeof fetch;
+  signal?: AbortSignal;
 }
 
 export type EnsureLensOptions = Pick<

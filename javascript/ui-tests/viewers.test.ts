@@ -36,22 +36,21 @@ const asset = (
   id: "a1",
   projectId: PROJECT_ID,
   type: "image",
-  classification: { moderation: { status: "allowed" } },
   ...overrides,
 });
 
 const imageAsset = asset({
   content: {
-    status: "stored",
     rendered: { kind: "image", width: 1200, height: 800 },
     preview: { width: 1200, height: 800, thumbhash: null, averageColor: null },
   },
 });
 
-/** A `getSignedUrl` that signs each resource with a counter, so each fetch has its own URL. */
-const signer = () => {
+/** The signed asset URL a viewer starts with, and the fresh ones `onExpired` returns: `sig_1`, … */
+const SIGNED = "https://signed.example/sig_0";
+const refresher = () => {
   let count = 0;
-  return mock(async (resource: string) => `https://signed.example/${resource}?n=${++count}`);
+  return mock(async () => `https://signed.example/sig_${++count}`);
 };
 
 /** Serves `fetch` from `respond`, recording each URL fetched. */
@@ -133,20 +132,21 @@ afterAll(() => {
 describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
   describe("image", () => {
     it("loads the rendered image from the signed URL and refreshes it once it expires", async () => {
-      const getSignedUrl = signer();
+      const onExpired = refresher();
       mounted = binding.mount("image", {
         asset: imageAsset,
-        getSignedUrl,
+        src: SIGNED,
+        onExpired,
         label: "A harbour",
         messages,
       });
       const view = within(mounted.container);
       const image = await waitFor(() => {
         const found = view.getByRole("img", { name: "A harbour" });
-        expect(found.getAttribute("src")).toBe("https://signed.example/rendered?n=1");
+        expect(found.getAttribute("src")).toBe("https://signed.example/sig_0/rendered");
         return found;
       });
-      expect(getSignedUrl.mock.calls).toEqual([["rendered"]]);
+      expect(onExpired).toHaveBeenCalledTimes(0);
       expect(mounted.container.querySelector("[aria-busy]")?.getAttribute("aria-busy")).toBe(
         "true",
       );
@@ -154,7 +154,7 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
       // An expired signature fails to load: the viewer asks for a fresh URL once.
       image.dispatchEvent(new Event("error"));
       await waitFor(() =>
-        expect(image.getAttribute("src")).toBe("https://signed.example/rendered?n=2"),
+        expect(image.getAttribute("src")).toBe("https://signed.example/sig_1/rendered"),
       );
       image.dispatchEvent(new Event("load"));
       await waitFor(() =>
@@ -166,12 +166,12 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
       // After the fresh URL worked, a later expiry refreshes again.
       image.dispatchEvent(new Event("error"));
       await waitFor(() =>
-        expect(image.getAttribute("src")).toBe("https://signed.example/rendered?n=3"),
+        expect(image.getAttribute("src")).toBe("https://signed.example/sig_2/rendered"),
       );
       // A fresh URL that fails too ends in the failure notice, without asking again.
       image.dispatchEvent(new Event("error"));
       await waitFor(() => expect(view.getByRole("status").textContent).toBe(messages.imageFailed));
-      expect(getSignedUrl).toHaveBeenCalledTimes(3);
+      expect(onExpired).toHaveBeenCalledTimes(2);
       expect(view.queryByRole("img", { name: "A harbour" })).toBeNull();
     });
 
@@ -198,17 +198,17 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
         type: "website",
         externalUrl,
         content: {
-          status: "stored",
           rendered: { kind: "image", width: 1280, height: 4000 },
           preview: null,
         },
       });
 
     it("shows the signed screenshot and links to the original page", async () => {
-      const getSignedUrl = signer();
+      const onExpired = refresher();
       mounted = binding.mount("website", {
         asset: website("https://news.example.org/story?id=7"),
-        getSignedUrl,
+        src: SIGNED,
+        onExpired,
         label: "Story",
         messages,
       });
@@ -218,7 +218,7 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
       expect(link.getAttribute("rel")?.split(" ")).toContain("noopener");
       await waitFor(() =>
         expect(view.getByRole("img", { name: "Story" }).getAttribute("src")).toBe(
-          "https://signed.example/rendered?n=1",
+          "https://signed.example/sig_0/rendered",
         ),
       );
       // The screenshot scrolls in a region keyboards can reach.
@@ -241,7 +241,6 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
         asset: asset({
           type: "plaintext-document",
           content: {
-            status: "stored",
             rendered: null,
             preview: null,
             extractedText: { type: "string", content: hostile },
@@ -259,9 +258,9 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
     });
 
     it("reads a text asset's original file, refreshing an expired signed URL", async () => {
-      const getSignedUrl = signer();
+      const onExpired = refresher();
       const fetched = serve((url) =>
-        url.endsWith("n=1")
+        url.includes("/sig_0/")
           ? new Response("expired", { status: 403 })
           : new Response("Hello <i>there</i>"),
       );
@@ -269,13 +268,13 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
         asset: asset({
           type: "plaintext-document",
           content: {
-            status: "stored",
             rendered: null,
             preview: null,
             extractedText: { type: "document", id: "doc_1" },
           },
         }),
-        getSignedUrl,
+        src: SIGNED,
+        onExpired,
         label: "Notes",
       });
       const region = await waitFor(() =>
@@ -283,22 +282,23 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
       );
       expect(region.textContent).toBe("Hello <i>there</i>");
       expect(region.querySelector("i")).toBeNull();
-      expect(getSignedUrl.mock.calls).toEqual([["original"], ["original"]]);
+      expect(onExpired).toHaveBeenCalledTimes(1);
       expect(fetched).toEqual([
-        "https://signed.example/original?n=1",
-        "https://signed.example/original?n=2",
+        "https://signed.example/sig_0/original",
+        "https://signed.example/sig_1/original",
       ]);
     });
 
     it("shows the failure notice when no text can be read", async () => {
-      const getSignedUrl = signer();
+      const onExpired = refresher();
       serve(() => new Response("gone", { status: 404 }));
       mounted = binding.mount("text", {
         asset: asset({
           type: "plaintext-document",
-          content: { status: "stored", rendered: null, preview: null },
+          content: { rendered: null, preview: null },
         }),
-        getSignedUrl,
+        src: SIGNED,
+        onExpired,
         messages,
       });
       await waitFor(() =>
@@ -306,7 +306,7 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
           messages.textFailed,
         ),
       );
-      expect(getSignedUrl).toHaveBeenCalledTimes(2);
+      expect(onExpired).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -317,7 +317,6 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
     const pdfAsset = asset({
       type: "multimedia-document",
       content: {
-        status: "stored",
         rendered: { kind: "pdf", width: null, height: null },
         preview: null,
       },
@@ -373,31 +372,33 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
     }, 30000);
 
     it("refreshes an expired signed URL before showing the document", async () => {
-      const getSignedUrl = signer();
-      serve((url) => (url.endsWith("n=1") ? new Response("expired", { status: 403 }) : pdf()));
+      const onExpired = refresher();
+      serve((url) => (url.includes("/sig_0/") ? new Response("expired", { status: 403 }) : pdf()));
       mounted = binding.mount("document", {
         asset: pdfAsset,
-        getSignedUrl,
+        src: SIGNED,
+        onExpired,
         label: "Report",
         messages,
       });
       await waitFor(() => expect(page(mounted!.container, 1).textContent).toContain("Hello one"), {
         timeout: 15000,
       });
-      expect(getSignedUrl.mock.calls).toEqual([["rendered"], ["rendered"]]);
+      expect(onExpired).toHaveBeenCalledTimes(1);
       expect(
         within(mounted.container)
           .getByRole("link", { name: messages.openDocument })
           .getAttribute("href"),
-      ).toBe("https://signed.example/rendered?n=2");
+      ).toBe("https://signed.example/sig_1/rendered");
     }, 30000);
 
     it("falls back to a link to the PDF when it can't be rendered", async () => {
-      const getSignedUrl = signer();
+      const onExpired = refresher();
       serve(() => new Response("not a pdf"));
       mounted = binding.mount("document", {
         asset: pdfAsset,
-        getSignedUrl,
+        src: SIGNED,
+        onExpired,
         label: "Report",
         messages,
       });
@@ -409,10 +410,10 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
         },
       );
       expect(view.getByRole("link", { name: messages.openDocument }).getAttribute("href")).toBe(
-        "https://signed.example/rendered?n=2",
+        "https://signed.example/sig_1/rendered",
       );
       expect(view.queryByRole("button", { name: messages.nextPage })).toBeNull();
-      expect(getSignedUrl).toHaveBeenCalledTimes(2);
+      expect(onExpired).toHaveBeenCalledTimes(1);
     }, 30000);
   });
 
@@ -433,7 +434,6 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
     const spreadsheet = asset({
       type: "multimedia-document",
       content: {
-        status: "stored",
         format: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         rendered: null,
         preview: null,
@@ -514,7 +514,6 @@ describe.each(VIEWER_BINDINGS)("$name asset viewers", (binding) => {
         asset: asset({
           type: "plaintext-document",
           content: {
-            status: "stored",
             rendered: null,
             preview: null,
             extractedText: { type: "string", content: '# Sheet "Only"\nRow 2: B=two\n' },

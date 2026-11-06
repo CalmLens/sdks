@@ -9,6 +9,7 @@ export const API_ERROR_CODES = {
   REGIONAL_EVIDENCE_REQUIRED: "asset/regional-evidence-required",
   SIGNED_URL_EXPIRED: "signed-url/expired",
   SIGNED_URL_INVALID: "signed-url/invalid",
+  SIGNED_URL_ORIGINAL_NOT_GRANTED: "signed-url/original-not-granted",
   INVALID_REQUEST: "validation/invalid-request",
   INVALID_TYPE: "validation/invalid-type",
   TOO_SMALL: "validation/too-small",
@@ -145,7 +146,11 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "signed-url/invalid": {
     status: 403,
-    message: "The signed URL's signature doesn't match its asset, resource, lens, transform, expiry or viewer claims. Use the URL exactly as created.",
+    message: "The signed asset URL's grant wasn't signed for this project, or was changed after signing. Use the URL as created, adding only resources, selectors and viewer claims.",
+  },
+  "signed-url/original-not-granted": {
+    status: 403,
+    message: "This signed asset URL doesn't grant the original file. Sign it with original access.",
   },
   "validation/invalid-request": {
     status: 400,

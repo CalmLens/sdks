@@ -69,7 +69,6 @@ export interface MockCalmLensServerClientOptions
      * `completeProcessing`, and everything else is `allowed`.
      */
     moderate?: MockModerate;
-    signedUrlBaseUrl?: string;
   };
 }
 
@@ -119,6 +118,7 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
   readonly databaseStorage: MockDatabaseStorage;
   readonly imageStorage: MockImageStorage;
   readonly #api: MockCalmLensApi;
+  readonly #fetch: typeof fetch;
   readonly #projectId: string;
 
   /**
@@ -139,7 +139,6 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
       createId: mockOptions.createId ?? newId,
       now: mockOptions.now ?? createMonotonicClock(),
       moderate: mockOptions.moderate ?? defaultModerate,
-      signedUrlBaseUrl: mockOptions.signedUrlBaseUrl ?? "mock://calmlens",
     });
     let endpoints: MockEndpoints | undefined;
     super({
@@ -151,6 +150,7 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
     const { baseUrl, cdnBaseUrl } = this.toJSON();
     endpoints = { baseUrl, cdnBaseUrl };
     this.#api = api;
+    this.#fetch = api.createFetch(() => endpoints!);
     this.#projectId = options.projectId;
     this.databaseStorage = api.databaseStorage;
     this.imageStorage = api.imageStorage;
@@ -179,6 +179,15 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
     return this.#api.calls
       .filter(({ operations }) => operations.includes(operation))
       .map(({ call }) => call);
+  }
+
+  /**
+   * Fetches a URL of the mock's CDN as a browser would, without the API key: a signed asset URL
+   * from `cdn.signAssetUrl` (with a resource appended), or a public one from `cdn.getAssetUrl`.
+   * The request is recorded like any other.
+   */
+  fetchCdn(url: string, init?: RequestInit): Promise<Response> {
+    return this.#fetch(url, init);
   }
 
   /** Forgets the requests recorded so far, so `calls` lists only later ones. */

@@ -1,9 +1,8 @@
 // The asset viewers (preview) as custom elements: `<calmlens-image-viewer>`,
 // `<calmlens-website-viewer>`, `<calmlens-text-viewer>`, `<calmlens-document-viewer>` and
-// `<calmlens-spreadsheet-viewer>`. Like `<calmlens-media>`, they render into the page (no shadow
+// `<calmlens-spreadsheet-viewer>`. Like `<calmlens-asset>`, they render into the page (no shadow
 // DOM), so `calmlens/styles.css` and your own CSS apply.
 
-import type { GetSignedMediaUrl } from "../ui/Media";
 import {
   ASSET_VIEWERS,
   type AssetViewer,
@@ -19,22 +18,30 @@ const BaseElement = (
   typeof HTMLElement === "undefined" ? class {} : HTMLElement
 ) as typeof HTMLElement;
 
-const PROPERTIES = ["asset", "getSignedUrl", "getText", "text", "messages", "pdf"] as const;
+const PROPERTIES = ["asset", "onExpired", "getText", "text", "messages", "pdf"] as const;
 
 /**
- * An asset viewer element. Set the `asset` property to an asset from the API, and
- * `getSignedUrl` for a private one; attributes: `label`, `cdn-base-url`, `viewer-claims` (JSON),
- * `sizes` (images) and `page-size` (spreadsheets). The `text` and `getText` properties supply text
+ * An asset viewer element. Set the `src` attribute to the asset URL (public or signed) and the
+ * `asset` property to its display info or the asset from the API, and `onExpired` to refresh a
+ * signed URL; other attributes: `label`, `viewer-claims` (JSON), `sizes` (images), `page-size`
+ * (spreadsheets) and `initial-page` (documents). The `text` and `getText` properties supply text
  * and spreadsheet viewers' text, `messages` replaces their text and `pdf` sets where pdf.js loads
  * its files from.
  */
 abstract class ViewerElement<K extends AssetViewerName> extends BaseElement {
-  static observedAttributes = ["label", "cdn-base-url", "viewer-claims", "sizes", "page-size"];
+  static observedAttributes = [
+    "src",
+    "label",
+    "viewer-claims",
+    "sizes",
+    "page-size",
+    "initial-page",
+  ];
 
   protected abstract readonly kind: K;
   #viewer?: AssetViewer<AssetViewerOptionsByKind[K]>;
   #asset?: ViewerAsset;
-  #getSignedUrl?: GetSignedMediaUrl;
+  #onExpired?: () => string | Promise<string>;
   #getText?: () => Promise<string>;
   #text?: string;
   #messages?: Partial<ViewerMessages>;
@@ -49,12 +56,12 @@ abstract class ViewerElement<K extends AssetViewerName> extends BaseElement {
     this.#render();
   }
 
-  /** Fetches signed URLs for a private asset from your server, and fresh ones once they expire. */
-  get getSignedUrl(): GetSignedMediaUrl | undefined {
-    return this.#getSignedUrl;
+  /** Returns a fresh asset URL from your server once a signed one expires. */
+  get onExpired(): (() => string | Promise<string>) | undefined {
+    return this.#onExpired;
   }
-  set getSignedUrl(value: GetSignedMediaUrl | undefined) {
-    this.#getSignedUrl = value;
+  set onExpired(value: (() => string | Promise<string>) | undefined) {
+    this.#onExpired = value;
     this.#render();
   }
 
@@ -115,21 +122,24 @@ abstract class ViewerElement<K extends AssetViewerName> extends BaseElement {
   }
 
   #render() {
-    if (!this.isConnected || !this.#asset) return;
+    const src = this.getAttribute("src");
+    if (!this.isConnected || !this.#asset || !src) return;
     const pageSize = this.getAttribute("page-size");
+    const initialPage = this.getAttribute("initial-page");
     const claims = this.getAttribute("viewer-claims");
     const options = {
+      src,
       asset: this.#asset,
-      getSignedUrl: this.#getSignedUrl,
+      onExpired: this.#onExpired,
       getText: this.#getText,
       text: this.#text,
       messages: this.#messages,
       pdf: this.#pdf,
       label: this.getAttribute("label") ?? undefined,
-      cdnBaseUrl: this.getAttribute("cdn-base-url") ?? undefined,
       viewerClaims: claims ? JSON.parse(claims) : undefined,
       sizes: this.getAttribute("sizes") ?? undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
+      initialPage: initialPage ? Number(initialPage) : undefined,
     } as AssetViewerOptionsByKind[K];
     if (this.#viewer) this.#viewer.update(options);
     else

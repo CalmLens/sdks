@@ -2,10 +2,11 @@ import type { AssetViewerName, AssetViewerOptionsByKind } from "../ui/viewers";
 
 /** Every option an asset viewer reads; the bindings pass anything else to the element. */
 export const VIEWER_OPTION_NAMES = [
+  "src",
   "asset",
-  "getSignedUrl",
+  "onExpired",
+  "onUnavailable",
   "viewerClaims",
-  "cdnBaseUrl",
   "label",
   "messages",
   "sizes",
@@ -13,6 +14,7 @@ export const VIEWER_OPTION_NAMES = [
   "getText",
   "pageSize",
   "pdf",
+  "initialPage",
 ] as const;
 
 const OPTION_NAMES: ReadonlySet<string> = new Set(VIEWER_OPTION_NAMES);

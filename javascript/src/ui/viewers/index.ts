@@ -1,5 +1,5 @@
 // The asset viewers (preview): image, website, text, document (PDF) and spreadsheet viewers,
-// framework-free so every binding mounts the same ones. Video and audio are `CalmLensMedia`'s.
+// framework-free so every binding mounts the same ones. `CalmLensAsset` shows each through them, and plays video and audio itself.
 
 import { createDocumentViewer } from "./DocumentViewer";
 import { createImageViewer, createWebsiteViewer } from "./ImageViewers";

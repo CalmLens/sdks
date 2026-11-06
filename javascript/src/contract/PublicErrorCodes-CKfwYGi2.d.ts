@@ -14,6 +14,7 @@ declare const PUBLIC_ERROR_CODES: {
   readonly REGIONAL_EVIDENCE_REQUIRED: RequestErrorCode;
   readonly SIGNED_URL_EXPIRED: RequestErrorCode;
   readonly SIGNED_URL_INVALID: RequestErrorCode;
+  readonly SIGNED_URL_ORIGINAL_NOT_GRANTED: RequestErrorCode;
   readonly INVALID_REQUEST: RequestErrorCode;
   readonly INVALID_TYPE: RequestErrorCode;
   readonly TOO_SMALL: RequestErrorCode;

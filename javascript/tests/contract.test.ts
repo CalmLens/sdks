@@ -55,7 +55,11 @@ describe("transform options", () => {
       const client = new server.CalmLensServerClient({ apiKey: "key", projectId: "project-1" });
       let error: unknown;
       try {
-        client.cdn.getAssetUrl({ assetIdentifier: "asset-1", transform: options as never });
+        client.cdn.getAssetUrl({
+          assetId: "asset-1",
+          resource: "rendered",
+          transform: options as never,
+        });
       } catch (caught) {
         error = caught;
       }
@@ -242,8 +246,16 @@ const runScenarioStep = async (
         ...(args.retryAfter !== undefined && { retryAfter: args.retryAfter as number }),
       });
       return null;
+    case "cdn.getAssetInfo": {
+      const { url, ...options } = args as { url: string };
+      return JSON.parse(JSON.stringify(await client.cdn.getAssetInfo(url, options)));
+    }
+    case "mock.fetchCdn":
     case "cdn.serve": {
-      const response = await client.cdn.serve(args as never);
+      const response =
+        operation === "cdn.serve"
+          ? await client.cdn.serve(args as never)
+          : await client.fetchCdn(args.url as string);
       const bytes = new Uint8Array(await response.arrayBuffer());
       const code = response.headers.get("content-type")?.startsWith("application/json")
         ? (JSON.parse(new TextDecoder().decode(bytes)) as { code?: string }).code
@@ -512,12 +524,14 @@ const present = async (capability: Capability): Promise<boolean> => {
     }
     case "cdn-resource":
       return client.cdn
-        .getAssetUrl({ assetIdentifier: "asset-1", resource: name as never })
+        .getAssetUrl({ assetId: "asset-1", resource: name as never })
         .endsWith(`/asset-1/${capability.path}`);
     case "cdn-option":
-      return client.cdn
-        .getAssetUrl({ assetIdentifier: "asset-1", [name]: { ageConfirmed: true } })
-        .endsWith("?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D");
+      return name === "externalId"
+        ? client.cdn.getAssetUrl({ externalId: "a/b" }).endsWith("/ext:a%2Fb")
+        : client.cdn
+            .getAssetUrl({ assetId: "asset-1", [name]: { ageConfirmed: true } })
+            .endsWith("?viewerClaims=%7B%22ageConfirmed%22%3Atrue%7D");
     case "mock-method": {
       const mock = new testing.MockCalmLensServerClient({
         apiKey: testing.createMockApiKey(),

@@ -1,32 +1,60 @@
-import type { ViewerClaims } from "../../client/CalmLensTypes";
-import type { GetSignedMediaUrl, MediaAsset } from "../Media";
+import type { AssetAvailability, ViewerClaims } from "../../client/CalmLensTypes";
 import type { ViewerMessages } from "./ViewerMessages";
 
+/** An asset's displayable file, as `content.rendered` describes it. */
+export interface ViewerRendered {
+  kind: "image" | "video" | "audio" | "pdf";
+  format?: string | null;
+  width?: number | null;
+  height?: number | null;
+  /** Audio's waveform peaks, from 0 to 1. */
+  peaks?: readonly number[] | null;
+}
+
+/** An asset's still image, as `content.preview` describes it. */
+export interface ViewerPreview {
+  width?: number | null;
+  height?: number | null;
+  thumbhash?: string | null;
+  averageColor?: string | null;
+}
+
 /**
- * The parts of an asset, as the API or a webhook returns it, that the asset viewers read. Assets
- * from `CalmLensServerClient` fit as they are.
+ * What the viewers read of an asset: its display info from the CDN (`/info`, `getAssetInfo`) or
+ * the asset as the API returns it, which fits as it is. The extra fields only an API asset has,
+ * such as inline extracted text, are used when present.
  */
-export interface ViewerAsset extends MediaAsset {
+export interface ViewerAsset {
+  id: string;
+  projectId?: string;
+  type?: string | null;
   name?: string | null;
   /** A website's page address, linked from the website viewer. */
   externalUrl?: string | null;
-  content?:
-    | (NonNullable<MediaAsset["content"]> & {
-        /** MIME type of the uploaded file, which tells spreadsheets from other documents. */
-        format?: string | null;
-        /** The text extracted from the content, inline when it is small. */
-        extractedText?:
-          | { type: "string"; content: string }
-          | { type: "document"; id: string }
-          | null;
-      })
-    | null;
+  /** Whether this viewer may see the content, as `/info` reports it. */
+  availability?: AssetAvailability;
+  content?: {
+    /** MIME type of the uploaded file, which tells spreadsheets from other documents. */
+    format?: string | null;
+    width?: number | null;
+    height?: number | null;
+    durationSeconds?: number | null;
+    pageCount?: number | null;
+    /** The displayable file the CDN serves at `/rendered`, or `null` when the asset has none. */
+    rendered?: ViewerRendered | null;
+    /** The still image the CDN serves at `/preview`, or `null` when the asset has none. */
+    preview?: ViewerPreview | null;
+    /** The adaptive (HLS) stream of video or audio, or `null` until one is prepared. */
+    hls?: { renditions?: readonly unknown[] } | null;
+    /** The text extracted from the content, inline when it is small (API assets only). */
+    extractedText?: { type: "string"; content: string } | { type: "document"; id: string } | null;
+  } | null;
 }
 
 /**
  * Which viewer shows an asset: `image` (the rendered image), `website` (its screenshot and a link
  * to the page), `text` (its text), `document` (a PDF, or a document or presentation rendered as
- * one), `spreadsheet` (its sheets), `media` (video and audio, which `CalmLensMedia` plays) or
+ * one), `spreadsheet` (its sheets), `media` (video and audio, which `CalmLensAsset` plays) or
  * `none` when there is nothing to show yet.
  */
 export type AssetViewerKind =
@@ -66,18 +94,22 @@ export const getAssetViewerKind = (asset: ViewerAsset): AssetViewerKind => {
 
 /** The options every asset viewer takes. */
 export interface ViewerOptions {
-  /** The asset to show, from the API. */
+  /**
+   * The asset URL, public (`cdn.getAssetUrl`) or signed (`cdn.signAssetUrl`), which the viewer
+   * loads resources beneath.
+   */
+  src: string;
+  /** The asset's display info (`getAssetInfo`), or the asset from the API. */
   asset: ViewerAsset;
   /**
-   * Fetches a signed URL for one of a private asset's resources from your server, as
-   * `CalmLensMedia`'s does. A viewer asks once per resource it shows, and again when a URL it
-   * loaded stops working, such as once it has expired. Without it, the viewers use public CDN URLs.
+   * Returns a fresh asset URL when the one in use stops working, as a signed URL does once it
+   * expires; your server signs it. Without it, an expired URL shows the viewer's failure notice.
    */
-  getSignedUrl?: GetSignedMediaUrl;
-  /** Optional viewer assertions, added to public CDN URLs. */
+  onExpired?: () => string | Promise<string>;
+  /** Called when the CDN refuses the asset to this viewer (`asset/not-available`). */
+  onUnavailable?: () => void;
+  /** The viewer's region and age confirmation, added to every resource URL. */
   viewerClaims?: ViewerClaims;
-  /** The CDN base URL, for local development. */
-  cdnBaseUrl?: string;
   /** The viewer's accessible name, such as the asset's title. Images use it as their `alt`. */
   label?: string;
   /** Replaces some or all of the text the viewer shows. */
@@ -129,4 +161,6 @@ export interface PdfAssetOptions {
 export interface DocumentViewerOptions extends ViewerOptions {
   /** Where pdf.js loads its worker, fonts and decoders from. */
   pdf?: PdfAssetOptions;
+  /** The page shown first, from 1. Defaults to 1. */
+  initialPage?: number;
 }
