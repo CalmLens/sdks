@@ -1,4 +1,4 @@
-import { n as ClassificationCategory } from "./Classification-B4M1usLX.js";
+import { n as ClassificationCategory } from "./Classification-Q5zGpR8l.js";
 import * as z from "zod";
 interface RgbaImage {
   width: number;

@@ -313,7 +313,7 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly harmOption: false;
     readonly displayName: "Pornographic strangulation or suffocation";
     readonly description: "A pornographic image or video frame showing a person strangling, choking or suffocating another: pressure on the neck from a hand, arm or ligature, or breathing blocked by covering the mouth and nose, smothering or compressing the chest. Realistic staged, generated or computer-made depictions count.";
-    readonly exclusions: "A hand resting on the shoulder, jaw or chest without gripping the throat; collars and choker jewellery; oral sex, including gagging, without breathing deliberately held off; non-sexual violence, combat sport or medical images; drawings or animation that don't look real; reports, education or support that show no such image.";
+    readonly exclusions: "A person alone in the image holding their own throat or miming being choked; a hand resting on the shoulder, jaw or chest without gripping the throat; collars and choker jewellery; oral sex, including gagging, without breathing deliberately held off; non-sexual violence, combat sport or medical images; drawings or animation that don't look real; reports, education or support that show no such image.";
     readonly inputs: readonly ["image"];
   };
   readonly "sexual-incest": {
