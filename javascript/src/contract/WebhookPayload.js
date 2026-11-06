@@ -720,7 +720,7 @@ const ASSET_FAILURE_REASON_SCHEMA = zod.enum([
 	"free-uploads-exhausted",
 	"media-limit",
 	"uploads-paused",
-	"child-failed",
+	"too-many-items",
 	"processing-error"
 ]);
 /** How far sectioned analysis of long audio or video has got. */
@@ -1260,7 +1260,9 @@ zod.object({
 	assetId: idField("asset"),
 	projectId: idField("proj"),
 	childProcessing: CHILD_PROCESSING_SCHEMA.nullish(),
-	manualDecision: MANUAL_DECISION_SCHEMA.nullish()
+	manualDecision: MANUAL_DECISION_SCHEMA.nullish(),
+	/** The children extraction created: fewer existing (one deleted) can't decide the parent. */
+	expectedChildren: zod.number().int().nonnegative().nullish()
 });
 // packages/shared/src/ConnectorType.ts
 /** Where a connector delivers events. Kept apart from `Connector.ts`, which the event catalog can't import. */
@@ -1413,7 +1415,7 @@ const ASSET_FAILURE_REASON_LABELS = {
 	"free-uploads-exhausted": msg("Free uploads used"),
 	"media-limit": msg("Daily media limit"),
 	"uploads-paused": msg("Uploads paused"),
-	"child-failed": msg("Part failed"),
+	"too-many-items": msg("Too many parts"),
 	"processing-error": msg("Processing error")
 };
 const CATEGORY_LABELS = {

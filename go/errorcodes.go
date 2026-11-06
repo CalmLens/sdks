@@ -73,6 +73,8 @@ const (
 	CodePermissionDenied = "auth/permission-denied"
 	// CodeUploadTooLarge is returned with HTTP 413.
 	CodeUploadTooLarge = "upload/too-large"
+	// CodeDocumentTooManyItems is returned with HTTP 422.
+	CodeDocumentTooManyItems = "document/too-many-items"
 	// CodeInvalidImage is returned with HTTP 422.
 	CodeInvalidImage = "image/invalid"
 	// CodeImageTooLarge is returned with HTTP 422.
@@ -258,6 +260,7 @@ var publicErrorStatuses = map[string]int{
 	CodeAPIKeyNotAccepted:                 403,
 	CodePermissionDenied:                  403,
 	CodeUploadTooLarge:                    413,
+	CodeDocumentTooManyItems:              422,
 	CodeInvalidImage:                      422,
 	CodeImageTooLarge:                     422,
 	CodeFreeUploadsExhausted:              403,

@@ -865,7 +865,6 @@ declare const EVENT_TYPE_INFO: {
         queued: "queued";
       }>>>>;
       failureReason: EventFieldDefinition<zod.ZodEnum<{
-        "child-failed": "child-failed";
         "duration-limit": "duration-limit";
         "file-too-large": "file-too-large";
         "free-uploads-exhausted": "free-uploads-exhausted";
@@ -873,6 +872,7 @@ declare const EVENT_TYPE_INFO: {
         "multiple-tracks": "multiple-tracks";
         "processing-error": "processing-error";
         "resolution-limit": "resolution-limit";
+        "too-many-items": "too-many-items";
         "type-mismatch": "type-mismatch";
         "undecodable-content": "undecodable-content";
         "unsupported-format": "unsupported-format";
@@ -885,7 +885,7 @@ declare const EVENT_TYPE_INFO: {
       assetType?: "audio" | "file" | "image" | "multimedia-document" | "plaintext-document" | "video" | "website" | null | undefined;
       parentAsset?: string | undefined;
       previousStatus?: "completed" | "failed" | "processing" | "queued" | null | undefined;
-      failureReason: "child-failed" | "duration-limit" | "file-too-large" | "free-uploads-exhausted" | "media-limit" | "multiple-tracks" | "processing-error" | "resolution-limit" | "type-mismatch" | "undecodable-content" | "unsupported-format" | "uploads-paused";
+      failureReason: "duration-limit" | "file-too-large" | "free-uploads-exhausted" | "media-limit" | "multiple-tracks" | "processing-error" | "resolution-limit" | "too-many-items" | "type-mismatch" | "undecodable-content" | "unsupported-format" | "uploads-paused";
     }>;
     factInfo: {
       label: string;
@@ -927,7 +927,6 @@ declare const EVENT_TYPE_INFO: {
         queued: "queued";
       }>>>;
       failureReason: zod.ZodEnum<{
-        "child-failed": "child-failed";
         "duration-limit": "duration-limit";
         "file-too-large": "file-too-large";
         "free-uploads-exhausted": "free-uploads-exhausted";
@@ -935,6 +934,7 @@ declare const EVENT_TYPE_INFO: {
         "multiple-tracks": "multiple-tracks";
         "processing-error": "processing-error";
         "resolution-limit": "resolution-limit";
+        "too-many-items": "too-many-items";
         "type-mismatch": "type-mismatch";
         "undecodable-content": "undecodable-content";
         "unsupported-format": "unsupported-format";

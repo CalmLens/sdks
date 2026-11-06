@@ -36,6 +36,7 @@ module CalmLens
     API_KEY_NOT_ACCEPTED: String
     PERMISSION_DENIED: String
     UPLOAD_TOO_LARGE: String
+    DOCUMENT_TOO_MANY_ITEMS: String
     INVALID_IMAGE: String
     IMAGE_TOO_LARGE: String
     FREE_UPLOADS_EXHAUSTED: String

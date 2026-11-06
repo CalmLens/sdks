@@ -75,7 +75,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         queued: "queued";
       }>;
       failureReason: zod.ZodNullable<zod.ZodEnum<{
-        "child-failed": "child-failed";
         "duration-limit": "duration-limit";
         "file-too-large": "file-too-large";
         "free-uploads-exhausted": "free-uploads-exhausted";
@@ -83,6 +82,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         "multiple-tracks": "multiple-tracks";
         "processing-error": "processing-error";
         "resolution-limit": "resolution-limit";
+        "too-many-items": "too-many-items";
         "type-mismatch": "type-mismatch";
         "undecodable-content": "undecodable-content";
         "unsupported-format": "unsupported-format";

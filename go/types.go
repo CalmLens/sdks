@@ -109,8 +109,9 @@ const (
 	// AssetFailureReasonUploadsPaused means analysing the asset would pass a limit on the
 	// organisation's usage, such as a spend limit, while uploads are paused.
 	AssetFailureReasonUploadsPaused = "uploads-paused"
-	// AssetFailureReasonChildFailed means a part of the asset, such as an embedded image, failed.
-	AssetFailureReasonChildFailed = "child-failed"
+	// AssetFailureReasonTooManyItems means a document holds more embedded images or audio and
+	// video files than can be moderated.
+	AssetFailureReasonTooManyItems = "too-many-items"
 	// AssetFailureReasonProcessingError means processing failed for another reason; retrying may succeed.
 	AssetFailureReasonProcessingError = "processing-error"
 )

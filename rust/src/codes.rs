@@ -68,6 +68,8 @@ error_codes! {
     PermissionDenied = "auth/permission-denied", 403;
     /// `upload/too-large` (HTTP 413): The file is larger than allowed. details.limitBytes is the limit, and details.source says whether it is the plan's (`plan`) or the upload preset's (`preset`).
     UploadTooLarge = "upload/too-large", 413;
+    /// `document/too-many-items` (HTTP 422): The document holds more embedded images or audio and video files than can be moderated: details.limit is `images` or `media` and details.maximum the most allowed. Split it into smaller documents.
+    DocumentTooManyItems = "document/too-many-items", 422;
     /// `image/invalid` (HTTP 422): The image is corrupt or cannot be decoded. Upload a valid image file.
     InvalidImage = "image/invalid", 422;
     /// `image/too-large` (HTTP 422): The image exceeds a processing limit: details.limit is `bytes`, `pixels` or `dimension`. Reduce its size before uploading.

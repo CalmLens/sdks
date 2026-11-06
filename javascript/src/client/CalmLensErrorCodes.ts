@@ -36,6 +36,7 @@ export const API_ERROR_CODES = {
   API_KEY_NOT_ACCEPTED: "api-key/not-accepted",
   PERMISSION_DENIED: "auth/permission-denied",
   UPLOAD_TOO_LARGE: "upload/too-large",
+  DOCUMENT_TOO_MANY_ITEMS: "document/too-many-items",
   INVALID_IMAGE: "image/invalid",
   IMAGE_TOO_LARGE: "image/too-large",
   FREE_UPLOADS_EXHAUSTED: "usage/free-uploads-exhausted",
@@ -256,6 +257,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "upload/too-large": {
     status: 413,
     message: "The file is larger than allowed. details.limitBytes is the limit, and details.source says whether it is the plan's (`plan`) or the upload preset's (`preset`).",
+  },
+  "document/too-many-items": {
+    status: 422,
+    message: "The document holds more embedded images or audio and video files than can be moderated: details.limit is `images` or `media` and details.maximum the most allowed. Split it into smaller documents.",
   },
   "image/invalid": {
     status: 422,

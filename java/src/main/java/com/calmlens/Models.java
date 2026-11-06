@@ -1902,7 +1902,7 @@ public final class Models {
    * @param failureReason why processing failed: {@code file-too-large}, {@code duration-limit},
    *     {@code resolution-limit}, {@code unsupported-format}, {@code undecodable-content}, {@code
    *     multiple-tracks}, {@code type-mismatch}, {@code free-uploads-exhausted}, {@code
-   *     media-limit}, {@code uploads-paused}, {@code child-failed} or {@code processing-error}; null unless {@code
+   *     media-limit}, {@code uploads-paused}, {@code too-many-items} or {@code processing-error}; null unless {@code
    *     status} is {@code failed}
    * @param progress how far analysis of a long audio or video asset has got, section by section;
    *     null when it isn't analysed in sections

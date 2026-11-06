@@ -271,8 +271,8 @@ string_enum! {
         MediaLimit = "media-limit",
         /// Processing stopped because the organisation's usage limits paused uploads.
         UploadsPaused = "uploads-paused",
-        /// A part of the asset, such as an embedded image, failed.
-        ChildFailed = "child-failed",
+        /// A document holds more embedded images or audio and video files than can be moderated.
+        TooManyItems = "too-many-items",
         /// Processing failed for another reason; retrying may succeed.
         ProcessingError = "processing-error",
     }

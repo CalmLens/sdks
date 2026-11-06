@@ -90,7 +90,7 @@ AssetContentRemovalReason = Union[Literal["policy", "retention", "requested", "p
 AssetClassificationFailureReason = Union[Literal["file-too-large", "duration-limit", "resolution-limit",
                                                  "unsupported-format", "undecodable-content", "multiple-tracks",
                                                  "type-mismatch", "free-uploads-exhausted", "media-limit",
-                                                 "uploads-paused", "child-failed", "processing-error"], str]
+                                                 "uploads-paused", "too-many-items", "processing-error"], str]
 #: Known asset types. New types may be added.
 AssetType = Union[Literal["image", "video", "audio", "plaintext-document", "multimedia-document", "website",
                           "file"], str]

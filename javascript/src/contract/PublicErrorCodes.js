@@ -455,6 +455,11 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "The file is larger than allowed. details.limitBytes is the limit, and details.source says whether it is the plan's (`plan`) or the upload preset's (`preset`).",
 		status: 413
 	}),
+	DOCUMENT_TOO_MANY_ITEMS: new ErrorCode({
+		id: "document/too-many-items",
+		defaultMessage: "The document holds more embedded images or audio and video files than can be moderated: details.limit is `images` or `media` and details.maximum the most allowed. Split it into smaller documents.",
+		status: 422
+	}),
 	INVALID_IMAGE: new ErrorCode({
 		id: "image/invalid",
 		defaultMessage: "The image is corrupt or cannot be decoded. Upload a valid image file.",

@@ -39,6 +39,7 @@ module CalmLens
     API_KEY_NOT_ACCEPTED = 'api-key/not-accepted'
     PERMISSION_DENIED = 'auth/permission-denied'
     UPLOAD_TOO_LARGE = 'upload/too-large'
+    DOCUMENT_TOO_MANY_ITEMS = 'document/too-many-items'
     INVALID_IMAGE = 'image/invalid'
     IMAGE_TOO_LARGE = 'image/too-large'
     FREE_UPLOADS_EXHAUSTED = 'usage/free-uploads-exhausted'
@@ -150,6 +151,7 @@ module CalmLens
       'api-key/not-accepted' => 403,
       'auth/permission-denied' => 403,
       'upload/too-large' => 413,
+      'document/too-many-items' => 422,
       'image/invalid' => 422,
       'image/too-large' => 422,
       'usage/free-uploads-exhausted' => 403,

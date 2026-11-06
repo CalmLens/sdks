@@ -1088,6 +1088,38 @@
     }
   },
   {
+    "code": "document/too-many-items",
+    "status": 422,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-document-too-many-items"
+      },
+      "body": {
+        "code": "document/too-many-items",
+        "message": "The document holds more embedded images or audio and video files than can be moderated: details.limit is `images` or `media` and details.maximum the most allowed. Split it into smaller documents.",
+        "requestId": "req-document-too-many-items",
+        "details": {
+          "reason": "document_too_many_items"
+        }
+      }
+    },
+    "expected": {
+      "code": "document/too-many-items",
+      "status": 422,
+      "requestId": "req-document-too-many-items",
+      "retryAfter": null,
+      "details": {
+        "reason": "document_too_many_items"
+      }
+    }
+  },
+  {
     "code": "image/invalid",
     "status": 422,
     "operation": "assets.retrieve",

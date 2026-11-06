@@ -76,7 +76,7 @@ export type AssetClassificationStatus = KnownAssetClassificationStatus | (string
 /**
  * Why processing failed: `file-too-large`, `duration-limit`, `resolution-limit`,
  * `unsupported-format`, `undecodable-content`, `multiple-tracks`, `type-mismatch`,
- * `free-uploads-exhausted`, `media-limit`, `uploads-paused`, `child-failed` or `processing-error`.
+ * `free-uploads-exhausted`, `media-limit`, `uploads-paused`, `too-many-items` or `processing-error`.
  */
 export type AssetClassificationFailureReason =
   | NonNullable<SharedAssetClassification["failureReason"]>
