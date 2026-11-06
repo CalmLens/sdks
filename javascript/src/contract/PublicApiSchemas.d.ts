@@ -1,7 +1,7 @@
 import { n as HashListEntry, t as HashList } from "./HashList-B-tYWgXP.js";
-import "./Asset-P8vmfvmG.js";
+import "./Asset-AVQOryjb.js";
 import "./AssetPayload-BpPkhqVM.js";
-import { r as TypedEvent } from "./Event-fcqQcX4z.js";
+import { r as TypedEvent } from "./Event-CykaTi_w.js";
 import { t as Folder } from "./Folder-D1CVstEY.js";
 import { o as EventType } from "./EventCatalog-CodUobTN.js";
 import { t as CursorPage } from "./Page-DNdKkX2B.js";
@@ -193,6 +193,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -202,6 +203,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -357,6 +359,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -366,6 +369,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -517,6 +521,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -526,6 +531,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -682,6 +688,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -691,6 +698,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -846,6 +854,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -855,6 +864,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -1006,6 +1016,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -1015,6 +1026,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -1171,6 +1183,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -1180,6 +1193,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -1335,6 +1349,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -1344,6 +1359,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -1495,6 +1511,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -1504,6 +1521,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -1660,6 +1678,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -1669,6 +1688,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -1824,6 +1844,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -1833,6 +1854,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -1984,6 +2006,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -1993,6 +2016,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -2149,6 +2173,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -2158,6 +2183,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -2313,6 +2339,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -2322,6 +2349,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -2473,6 +2501,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -2482,6 +2511,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -2638,6 +2668,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -2647,6 +2678,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -2802,6 +2834,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -2811,6 +2844,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -2962,6 +2996,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -2971,6 +3006,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -3127,6 +3163,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -3136,6 +3173,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -3291,6 +3329,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -3300,6 +3339,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -3451,6 +3491,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -3460,6 +3501,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -3616,6 +3658,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -3625,6 +3668,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -3780,6 +3824,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -3789,6 +3834,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";
@@ -3940,6 +3986,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-extreme": "sexual-extreme";
         "sexual-fictional": "sexual-fictional";
         "sexual-historical": "sexual-historical";
+        "sexual-incest": "sexual-incest";
         "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
         "sexual-minors": "sexual-minors";
         "sexual-non-consensual": "sexual-non-consensual";
@@ -3949,6 +3996,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "sexual-pornographic-media": "sexual-pornographic-media";
         "sexual-revealing-clothing": "sexual-revealing-clothing";
         "sexual-solicitation": "sexual-solicitation";
+        "sexual-strangulation": "sexual-strangulation";
         "sexual-suggestive": "sexual-suggestive";
         "sexual-support-prevention": "sexual-support-prevention";
         "sexual-text": "sexual-text";

@@ -307,6 +307,24 @@ declare const MODERATION_QUALIFIER_INFO: {
     readonly description: "Pornographic content showing or describing sex with an animal or with a dead body, or a sexual act that threatens a person's life or is likely to cause serious injury to the anus, breasts or genitals, including realistic drawn or generated depictions.";
     readonly exclusions: "Consensual adult content without such an act, including bondage, role play or rough play; non-sexual images of animals, death or injury; reports, education, support or discussion that present no such material.";
   };
+  readonly "sexual-strangulation": {
+    readonly category: "sexual";
+    readonly kind: "harm";
+    readonly harmOption: false;
+    readonly displayName: "Pornographic strangulation or suffocation";
+    readonly description: "A pornographic image or video frame showing a person strangling, choking or suffocating another: pressure on the neck from a hand, arm or ligature, or breathing blocked by covering the mouth and nose, smothering or compressing the chest. Realistic staged, generated or computer-made depictions count.";
+    readonly exclusions: "A hand resting on the shoulder, jaw or chest without gripping the throat; collars and choker jewellery; oral sex, including gagging, without breathing deliberately held off; non-sexual violence, combat sport or medical images; drawings or animation that don't look real; reports, education or support that show no such image.";
+    readonly inputs: readonly ["image"];
+  };
+  readonly "sexual-incest": {
+    readonly category: "sexual";
+    readonly kind: "harm";
+    readonly harmOption: false;
+    readonly displayName: "Pornographic incest";
+    readonly description: "A pornographic image or video frame showing sexual activity between people who are, or are presented as, related as parent, grandparent, child, grandchild, brother, sister, half-brother, half-sister, uncle, aunt, nephew or niece, including by adoption. The relationship can be shown by the image or by its caption, title, dialogue or other accompanying text. Realistic staged, generated or computer-made depictions count.";
+    readonly exclusions: "Step, foster and in-law relationships between adults; a family word that is plainly a nickname or fanciful, such as daddy between adult partners; drawings or animation that don't look real; non-sexual family images; reports or discussion that show no such image. Someone presented as under 18 is Sexualised minors.";
+    readonly inputs: readonly ["image"];
+  };
   readonly "sexual-minors": {
     readonly category: "sexual";
     readonly kind: "harm";
@@ -1147,6 +1165,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: z.ZodRecord<z.ZodEnum<{
   "sexual-extreme": "sexual-extreme";
   "sexual-fictional": "sexual-fictional";
   "sexual-historical": "sexual-historical";
+  "sexual-incest": "sexual-incest";
   "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
   "sexual-minors": "sexual-minors";
   "sexual-non-consensual": "sexual-non-consensual";
@@ -1156,6 +1175,7 @@ declare const STRICT_QUALIFIER_RESULTS_SCHEMA: z.ZodRecord<z.ZodEnum<{
   "sexual-pornographic-media": "sexual-pornographic-media";
   "sexual-revealing-clothing": "sexual-revealing-clothing";
   "sexual-solicitation": "sexual-solicitation";
+  "sexual-strangulation": "sexual-strangulation";
   "sexual-suggestive": "sexual-suggestive";
   "sexual-support-prevention": "sexual-support-prevention";
   "sexual-text": "sexual-text";
@@ -1318,6 +1338,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
     "sexual-extreme": "sexual-extreme";
     "sexual-fictional": "sexual-fictional";
     "sexual-historical": "sexual-historical";
+    "sexual-incest": "sexual-incest";
     "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
     "sexual-minors": "sexual-minors";
     "sexual-non-consensual": "sexual-non-consensual";
@@ -1327,6 +1348,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
     "sexual-pornographic-media": "sexual-pornographic-media";
     "sexual-revealing-clothing": "sexual-revealing-clothing";
     "sexual-solicitation": "sexual-solicitation";
+    "sexual-strangulation": "sexual-strangulation";
     "sexual-suggestive": "sexual-suggestive";
     "sexual-support-prevention": "sexual-support-prevention";
     "sexual-text": "sexual-text";
@@ -1492,6 +1514,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
     "sexual-extreme": "sexual-extreme";
     "sexual-fictional": "sexual-fictional";
     "sexual-historical": "sexual-historical";
+    "sexual-incest": "sexual-incest";
     "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
     "sexual-minors": "sexual-minors";
     "sexual-non-consensual": "sexual-non-consensual";
@@ -1501,6 +1524,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
     "sexual-pornographic-media": "sexual-pornographic-media";
     "sexual-revealing-clothing": "sexual-revealing-clothing";
     "sexual-solicitation": "sexual-solicitation";
+    "sexual-strangulation": "sexual-strangulation";
     "sexual-suggestive": "sexual-suggestive";
     "sexual-support-prevention": "sexual-support-prevention";
     "sexual-text": "sexual-text";
@@ -1662,6 +1686,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
     "sexual-extreme": "sexual-extreme";
     "sexual-fictional": "sexual-fictional";
     "sexual-historical": "sexual-historical";
+    "sexual-incest": "sexual-incest";
     "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
     "sexual-minors": "sexual-minors";
     "sexual-non-consensual": "sexual-non-consensual";
@@ -1671,6 +1696,7 @@ declare const CLASSIFICATION_CATEGORY_REPORT_SCHEMA: z.ZodDiscriminatedUnion<[z.
     "sexual-pornographic-media": "sexual-pornographic-media";
     "sexual-revealing-clothing": "sexual-revealing-clothing";
     "sexual-solicitation": "sexual-solicitation";
+    "sexual-strangulation": "sexual-strangulation";
     "sexual-suggestive": "sexual-suggestive";
     "sexual-support-prevention": "sexual-support-prevention";
     "sexual-text": "sexual-text";
@@ -1839,6 +1865,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -1848,6 +1875,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -2013,6 +2041,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -2022,6 +2051,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -2183,6 +2213,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -2192,6 +2223,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -2358,6 +2390,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -2367,6 +2400,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -2532,6 +2566,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -2541,6 +2576,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -2702,6 +2738,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -2711,6 +2748,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -2877,6 +2915,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -2886,6 +2925,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -3051,6 +3091,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -3060,6 +3101,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -3221,6 +3263,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -3230,6 +3273,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -3396,6 +3440,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -3405,6 +3450,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -3570,6 +3616,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -3579,6 +3626,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -3740,6 +3788,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -3749,6 +3798,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -3915,6 +3965,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -3924,6 +3975,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -4089,6 +4141,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -4098,6 +4151,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -4259,6 +4313,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -4268,6 +4323,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -4434,6 +4490,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -4443,6 +4500,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -4608,6 +4666,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -4617,6 +4676,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -4778,6 +4838,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -4787,6 +4848,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -4953,6 +5015,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -4962,6 +5025,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -5127,6 +5191,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -5136,6 +5201,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -5297,6 +5363,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -5306,6 +5373,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -5472,6 +5540,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -5481,6 +5550,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -5646,6 +5716,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -5655,6 +5726,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";
@@ -5816,6 +5888,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-extreme": "sexual-extreme";
       "sexual-fictional": "sexual-fictional";
       "sexual-historical": "sexual-historical";
+      "sexual-incest": "sexual-incest";
       "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
       "sexual-minors": "sexual-minors";
       "sexual-non-consensual": "sexual-non-consensual";
@@ -5825,6 +5898,7 @@ declare const CATEGORIES_SCHEMA: z.ZodObject<{
       "sexual-pornographic-media": "sexual-pornographic-media";
       "sexual-revealing-clothing": "sexual-revealing-clothing";
       "sexual-solicitation": "sexual-solicitation";
+      "sexual-strangulation": "sexual-strangulation";
       "sexual-suggestive": "sexual-suggestive";
       "sexual-support-prevention": "sexual-support-prevention";
       "sexual-text": "sexual-text";

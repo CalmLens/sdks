@@ -304,6 +304,24 @@ const MODERATION_QUALIFIER_INFO = {
 		description: msg("Pornographic content showing or describing sex with an animal or with a dead body, or a sexual act that threatens a person's life or is likely to cause serious injury to the anus, breasts or genitals, including realistic drawn or generated depictions."),
 		exclusions: "Consensual adult content without such an act, including bondage, role play or rough play; non-sexual images of animals, death or injury; reports, education, support or discussion that present no such material."
 	},
+	"sexual-strangulation": {
+		category: "sexual",
+		kind: "harm",
+		harmOption: false,
+		displayName: msg("Pornographic strangulation or suffocation"),
+		description: msg("A pornographic image or video frame showing a person strangling, choking or suffocating another: pressure on the neck from a hand, arm or ligature, or breathing blocked by covering the mouth and nose, smothering or compressing the chest. Realistic staged, generated or computer-made depictions count."),
+		exclusions: "A hand resting on the shoulder, jaw or chest without gripping the throat; collars and choker jewellery; oral sex, including gagging, without breathing deliberately held off; non-sexual violence, combat sport or medical images; drawings or animation that don't look real; reports, education or support that show no such image.",
+		inputs: ["image"]
+	},
+	"sexual-incest": {
+		category: "sexual",
+		kind: "harm",
+		harmOption: false,
+		displayName: msg("Pornographic incest"),
+		description: msg("A pornographic image or video frame showing sexual activity between people who are, or are presented as, related as parent, grandparent, child, grandchild, brother, sister, half-brother, half-sister, uncle, aunt, nephew or niece, including by adoption. The relationship can be shown by the image or by its caption, title, dialogue or other accompanying text. Realistic staged, generated or computer-made depictions count."),
+		exclusions: "Step, foster and in-law relationships between adults; a family word that is plainly a nickname or fanciful, such as daddy between adult partners; drawings or animation that don't look real; non-sexual family images; reports or discussion that show no such image. Someone presented as under 18 is Sexualised minors.",
+		inputs: ["image"]
+	},
 	"sexual-minors": {
 		category: "sexual",
 		kind: "harm",

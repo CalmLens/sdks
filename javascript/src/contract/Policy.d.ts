@@ -116,6 +116,7 @@ declare const POLICY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -125,6 +126,7 @@ declare const POLICY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -254,6 +256,7 @@ declare const POLICY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -263,6 +266,7 @@ declare const POLICY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -401,6 +405,7 @@ declare const POLICY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -410,6 +415,7 @@ declare const POLICY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -539,6 +545,7 @@ declare const POLICY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -548,6 +555,7 @@ declare const POLICY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -751,6 +759,7 @@ declare const GET_POLICIES_RESPONSE_SCHEMA: zod.ZodObject<{
             "sexual-extreme": "sexual-extreme";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-incest": "sexual-incest";
             "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
             "sexual-minors": "sexual-minors";
             "sexual-non-consensual": "sexual-non-consensual";
@@ -760,6 +769,7 @@ declare const GET_POLICIES_RESPONSE_SCHEMA: zod.ZodObject<{
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
+            "sexual-strangulation": "sexual-strangulation";
             "sexual-suggestive": "sexual-suggestive";
             "sexual-support-prevention": "sexual-support-prevention";
             "sexual-text": "sexual-text";
@@ -889,6 +899,7 @@ declare const GET_POLICIES_RESPONSE_SCHEMA: zod.ZodObject<{
             "sexual-extreme": "sexual-extreme";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-incest": "sexual-incest";
             "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
             "sexual-minors": "sexual-minors";
             "sexual-non-consensual": "sexual-non-consensual";
@@ -898,6 +909,7 @@ declare const GET_POLICIES_RESPONSE_SCHEMA: zod.ZodObject<{
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
+            "sexual-strangulation": "sexual-strangulation";
             "sexual-suggestive": "sexual-suggestive";
             "sexual-support-prevention": "sexual-support-prevention";
             "sexual-text": "sexual-text";
@@ -1036,6 +1048,7 @@ declare const GET_POLICIES_RESPONSE_SCHEMA: zod.ZodObject<{
             "sexual-extreme": "sexual-extreme";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-incest": "sexual-incest";
             "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
             "sexual-minors": "sexual-minors";
             "sexual-non-consensual": "sexual-non-consensual";
@@ -1045,6 +1058,7 @@ declare const GET_POLICIES_RESPONSE_SCHEMA: zod.ZodObject<{
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
+            "sexual-strangulation": "sexual-strangulation";
             "sexual-suggestive": "sexual-suggestive";
             "sexual-support-prevention": "sexual-support-prevention";
             "sexual-text": "sexual-text";
@@ -1174,6 +1188,7 @@ declare const GET_POLICIES_RESPONSE_SCHEMA: zod.ZodObject<{
             "sexual-extreme": "sexual-extreme";
             "sexual-fictional": "sexual-fictional";
             "sexual-historical": "sexual-historical";
+            "sexual-incest": "sexual-incest";
             "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
             "sexual-minors": "sexual-minors";
             "sexual-non-consensual": "sexual-non-consensual";
@@ -1183,6 +1198,7 @@ declare const GET_POLICIES_RESPONSE_SCHEMA: zod.ZodObject<{
             "sexual-pornographic-media": "sexual-pornographic-media";
             "sexual-revealing-clothing": "sexual-revealing-clothing";
             "sexual-solicitation": "sexual-solicitation";
+            "sexual-strangulation": "sexual-strangulation";
             "sexual-suggestive": "sexual-suggestive";
             "sexual-support-prevention": "sexual-support-prevention";
             "sexual-text": "sexual-text";
@@ -1386,6 +1402,7 @@ declare const POST_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -1395,6 +1412,7 @@ declare const POST_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -1524,6 +1542,7 @@ declare const POST_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -1533,6 +1552,7 @@ declare const POST_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -1671,6 +1691,7 @@ declare const POST_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -1680,6 +1701,7 @@ declare const POST_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -1809,6 +1831,7 @@ declare const POST_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -1818,6 +1841,7 @@ declare const POST_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -2010,6 +2034,7 @@ declare const PATCH_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -2019,6 +2044,7 @@ declare const PATCH_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -2148,6 +2174,7 @@ declare const PATCH_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -2157,6 +2184,7 @@ declare const PATCH_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -2295,6 +2323,7 @@ declare const PATCH_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -2304,6 +2333,7 @@ declare const PATCH_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";
@@ -2433,6 +2463,7 @@ declare const PATCH_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-extreme": "sexual-extreme";
           "sexual-fictional": "sexual-fictional";
           "sexual-historical": "sexual-historical";
+          "sexual-incest": "sexual-incest";
           "sexual-intimate-image-abuse": "sexual-intimate-image-abuse";
           "sexual-minors": "sexual-minors";
           "sexual-non-consensual": "sexual-non-consensual";
@@ -2442,6 +2473,7 @@ declare const PATCH_POLICY_BODY_SCHEMA: zod.ZodObject<{
           "sexual-pornographic-media": "sexual-pornographic-media";
           "sexual-revealing-clothing": "sexual-revealing-clothing";
           "sexual-solicitation": "sexual-solicitation";
+          "sexual-strangulation": "sexual-strangulation";
           "sexual-suggestive": "sexual-suggestive";
           "sexual-support-prevention": "sexual-support-prevention";
           "sexual-text": "sexual-text";

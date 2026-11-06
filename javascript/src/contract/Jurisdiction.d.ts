@@ -1,2 +1,2 @@
-import { d as VIEWER_CLAIMS_SCHEMA, f as VIEWER_REGION_SCHEMA, u as EU_COUNTRIES } from "./Classification-CadrcBW1.js";
+import { d as VIEWER_CLAIMS_SCHEMA, f as VIEWER_REGION_SCHEMA, u as EU_COUNTRIES } from "./Classification-B4M1usLX.js";
 export { EU_COUNTRIES, VIEWER_CLAIMS_SCHEMA, VIEWER_REGION_SCHEMA };
