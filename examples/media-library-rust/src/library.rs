@@ -211,8 +211,7 @@ impl Library {
                 .list(ListAssets {
                     cursor: cursor.map(str::to_string),
                     page_size: Some(page_size),
-                    filter: Some(list_filter(status)),
-                    folder_id: folder.map(str::to_string),
+                    filter: Some(list_filter(folder, status)),
                     ..Default::default()
                 })
                 .await?),
@@ -226,7 +225,7 @@ impl Library {
         &self,
         query: &str,
         mode: &str,
-        limit: u32,
+        page_size: u32,
     ) -> Result<AssetSearchResponse, Failure> {
         match self {
             Library::Live(client) => Ok(client
@@ -234,11 +233,11 @@ impl Library {
                 .search(SearchAssets {
                     query: query.into(),
                     mode: Some(mode.into()),
-                    limit: Some(limit),
+                    page_size: Some(page_size),
                 })
                 .await?),
             Library::Demo(store) => Ok(Self::with_store(store, |store| {
-                store.search(query, mode, limit as usize)
+                store.search(query, mode, page_size as usize)
             })),
         }
     }
@@ -370,9 +369,13 @@ impl Library {
     }
 }
 
-/// Top-level assets only (no derived children), optionally with one fixed status from
-/// `STATUS_FILTERS`. Any other value lists every status.
-pub fn list_filter(status: &str) -> String {
+/// Top-level assets only (no derived children), optionally in one folder and with one fixed
+/// status from `STATUS_FILTERS`. Any other status lists every status.
+pub fn list_filter(folder: Option<&str>, status: &str) -> String {
+    let scope = match folder {
+        Some(folder) => format!("parentId==null;folderId=={folder}"),
+        None => "parentId==null".into(),
+    };
     let status = match status {
         "allowed" => "classification.moderation.status==allowed",
         "limited" => "classification.moderation.status==limited",
@@ -381,9 +384,9 @@ pub fn list_filter(status: &str) -> String {
         "purged" => "classification.moderation.status==purged",
         "pending" => "classification.moderation.status==pending;classification.status!=failed",
         "failed" => "classification.status==failed",
-        _ => return "parentId==null".into(),
+        _ => return scope,
     };
-    format!("parentId==null;{status}")
+    format!("{scope};{status}")
 }
 
 pub fn lens_definitions() -> Vec<LensDefinition> {
@@ -393,7 +396,6 @@ pub fn lens_definitions() -> Vec<LensDefinition> {
             name: name.into(),
             lens_type: "image".into(),
             active: true,
-            version: 1,
             description: Patch::Missing,
             transform: Patch::Value(ImageTransformOptions {
                 fit: Some(fit.into()),

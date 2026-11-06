@@ -311,10 +311,7 @@ fn unknown_enum_values_and_fields_decode() {
         asset.classification.moderation.status,
         AssetModerationStatus::Unknown("quarantined".into())
     );
-    assert_eq!(
-        asset.visibility,
-        Some(Visibility::Unknown("unlisted".into()))
-    );
+    assert_eq!(asset.visibility, Visibility::Unknown("unlisted".into()));
     assert_eq!(asset.extra["newField"], serde_json::json!({"a": 1}));
     assert_eq!(asset.content.extra["futureContent"], true);
     assert_eq!(
@@ -374,8 +371,8 @@ fn processing_features_serialize_as_the_api_expects() {
 fn report_feature_results_decode() {
     let report: AssetClassification = serde_json::from_str(
         r#"{
-            "personDetection":{"status":"not-evaluated","stage":"beta","reason":"not-supported"},
-            "faceDetection":{"status":"evaluated","stage":"beta","faces":[
+            "personDetection":{"status":"not-evaluated","reason":"not-supported"},
+            "faceDetection":{"status":"evaluated","faces":[
                 {"box":{"left":-0.02,"top":0.2,"width":0.3,"height":0.4},"confidence":0.99,"ageRange":{"low":21,"high":30}},
                 {"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"confidence":0.8}
             ]}}"#,
@@ -388,7 +385,6 @@ fn report_feature_results_decode() {
     assert_eq!(people.people, None);
     let faces = features.face_detection.unwrap();
     assert_eq!(faces.status, Some(FeatureResultStatus::Evaluated));
-    assert_eq!(faces.stage, Some(FeatureStage::Beta));
     let faces = faces.faces.unwrap();
     assert_eq!(faces[0].bounding_box.left, -0.02);
     assert_eq!(faces[0].bounding_box.height, 0.4);
@@ -453,7 +449,6 @@ async fn concurrent_ensure_lenses_send_a_definition_once() {
                 name: "thumb".into(),
                 lens_type: "image".into(),
                 active: true,
-                version: 1,
                 ..Default::default()
             }],
         })

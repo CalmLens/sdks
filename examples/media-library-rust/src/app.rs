@@ -91,12 +91,11 @@ pub const SEARCH_MODES: [(&str, &str); 3] = [
 
 /// Registered fact keys and labels from packages/shared/src/EventCatalog.ts shown in the activity
 /// log. Other keys are not shown.
-const FACT_LABELS: [(&str, &str); 6] = [
+const FACT_LABELS: [(&str, &str); 5] = [
     ("asset-name", "Asset"),
     ("previous-status", "Previous status"),
     ("moderation-status", "Moderation status"),
     ("flagged-categories", "Categories"),
-    ("reviewer-name", "Reviewer"),
     ("note", "Note"),
 ];
 /// `asset.allowed`, `asset.limited`, `asset.age-restricted`, `asset.blocked` and `asset.purged`
@@ -559,12 +558,8 @@ impl AppState {
     /// that it is one of this library's assets.
     async fn apply_claimed(&self, payload: &WebhookEventPayload) -> Result<EventOutcome, Failure> {
         let event_type = payload.event_type.as_str();
-        let facts = &payload.facts;
         let rows = display_facts(payload);
-        if facts
-            .iter()
-            .any(|fact| fact.key == "test" && fact.value == Value::Bool(true))
-        {
+        if calmlens::get_event_fact(payload, "test") == Some(&Value::Bool(true)) {
             self.record(
                 "test",
                 format!(
@@ -648,10 +643,7 @@ impl AppState {
         payload.project_id = self.library.project_id().into();
         payload.actor = Some(Actor::new(ActorType::User, Some("demo-reviewer".into())));
         payload.asset_id = Some(asset_id.into());
-        payload.facts = vec![
-            fact("reviewer-name", "Demo reviewer"),
-            fact("note", "Simulated portal decision"),
-        ];
+        payload.facts = vec![fact("note", "Simulated portal decision")];
         self.apply_event(&payload, None).await?;
         let folder = self.library.retrieve(asset_id).await?.folder_id;
         Ok(location(
@@ -1334,7 +1326,6 @@ pub(crate) fn metadata_value<'a>(asset: &'a Asset, id: &str) -> &'a str {
     asset
         .metadata
         .iter()
-        .flatten()
         .find(|item| item.id == id)
         .and_then(|item| item.value.as_str())
         .unwrap_or("")

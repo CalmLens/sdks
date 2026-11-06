@@ -176,6 +176,10 @@ impl ServerClient {
     pub fn policies(&self) -> PoliciesClient<'_> {
         PoliciesClient(self)
     }
+    /// Lens operations: the project's named CDN transforms.
+    pub fn lenses(&self) -> LensesClient<'_> {
+        LensesClient(self)
+    }
     /// The project's events feed.
     pub fn events(&self) -> EventsClient<'_> {
         EventsClient(self)
@@ -282,6 +286,14 @@ impl AssetsClient<'_> {
         self.0
             .iter(self.0.client.assets().iterate_children(options))
     }
+    /// Every segment of an asset's findings timeline from `options.cursor` on.
+    pub fn iterate_timeline(
+        &self,
+        options: ListTimeline,
+    ) -> Iter<Result<MediaClassificationSegment>> {
+        self.0
+            .iter(self.0.client.assets().iterate_timeline(options))
+    }
 }
 
 /// Folder operations. See [`crate::FoldersClient`].
@@ -301,6 +313,12 @@ blocking_methods!(FoldersClient => folders {
     /// See [`crate::FoldersClient::delete`].
     fn delete(options: FolderId) -> Result<()>;
 });
+impl FoldersClient<'_> {
+    /// Every child folder from `options.cursor` on, fetching pages as the iterator is read.
+    pub fn iterate(&self, options: ListFolders) -> Iter<Result<Folder>> {
+        self.0.iter(self.0.client.folders().iterate(options))
+    }
+}
 
 /// Hash list operations. See [`crate::HashListsClient`].
 #[derive(Debug, Clone, Copy)]
@@ -323,28 +341,71 @@ blocking_methods!(HashListsClient => hash_lists {
     /// See [`crate::HashListsClient::remove_entry`].
     fn remove_entry(options: HashListEntryId) -> Result<()>;
 });
+impl HashListsClient<'_> {
+    /// Every hash list from `options.cursor` on, fetching pages as the iterator is read.
+    pub fn iterate(&self, options: ListHashLists) -> Iter<Result<HashList>> {
+        self.0.iter(self.0.client.hash_lists().iterate(options))
+    }
+    /// Every entry of a hash list from `options.cursor` on.
+    pub fn iterate_entries(&self, options: ListHashListEntries) -> Iter<Result<HashListEntry>> {
+        self.0
+            .iter(self.0.client.hash_lists().iterate_entries(options))
+    }
+}
 
 /// Moderation policy operations. See [`crate::PoliciesClient`].
 #[derive(Debug, Clone, Copy)]
 pub struct PoliciesClient<'a>(&'a ServerClient);
 blocking_methods!(PoliciesClient => policies {
     /// See [`crate::PoliciesClient::list`].
-    fn list() -> Result<PolicyList>;
+    fn list(options: ListPolicies) -> Result<PolicyPage>;
     /// See [`crate::PoliciesClient::retrieve`].
     fn retrieve(options: PolicyId) -> Result<Policy>;
     /// See [`crate::PoliciesClient::create`].
     fn create(options: CreatePolicy) -> Result<Policy>;
     /// See [`crate::PoliciesClient::update`].
     fn update(options: UpdatePolicy) -> Result<Policy>;
-    /// See [`crate::PoliciesClient::apply_preset`].
-    fn apply_preset(options: ApplyPolicyPreset) -> Result<Policy>;
+    /// See [`crate::PoliciesClient::reset`].
+    fn reset(options: ResetPolicy) -> Result<Policy>;
+    /// See [`crate::PoliciesClient::upgrade`].
+    fn upgrade(options: UpgradePolicy) -> Result<Policy>;
     /// See [`crate::PoliciesClient::set_automatic_updates`].
     fn set_automatic_updates(options: SetPolicyAutomaticUpdates) -> Result<Policy>;
     /// See [`crate::PoliciesClient::delete`].
     fn delete(options: PolicyId) -> Result<()>;
+    /// See [`crate::PoliciesClient::retrieve_assigned`].
+    fn retrieve_assigned() -> Result<Policy>;
     /// See [`crate::PoliciesClient::assign`].
     fn assign(options: AssignPolicy) -> Result<Policy>;
 });
+impl PoliciesClient<'_> {
+    /// Every policy of the organisation from `options.cursor` on.
+    pub fn iterate(&self, options: ListPolicies) -> Iter<Result<Policy>> {
+        self.0.iter(self.0.client.policies().iterate(options))
+    }
+}
+
+/// Lens operations. See [`crate::LensesClient`].
+#[derive(Debug, Clone, Copy)]
+pub struct LensesClient<'a>(&'a ServerClient);
+blocking_methods!(LensesClient => lenses {
+    /// See [`crate::LensesClient::list`].
+    fn list(options: ListLenses) -> Result<LensPage>;
+    /// See [`crate::LensesClient::create`].
+    fn create(options: LensDefinition) -> Result<Lens>;
+    /// See [`crate::LensesClient::retrieve`].
+    fn retrieve(options: LensId) -> Result<Lens>;
+    /// See [`crate::LensesClient::update`].
+    fn update(options: UpdateLens) -> Result<Lens>;
+    /// See [`crate::LensesClient::delete`].
+    fn delete(options: LensId) -> Result<()>;
+});
+impl LensesClient<'_> {
+    /// Every lens of the project from `options.cursor` on.
+    pub fn iterate(&self, options: ListLenses) -> Iter<Result<Lens>> {
+        self.0.iter(self.0.client.lenses().iterate(options))
+    }
+}
 
 /// The events feed. See [`crate::EventsClient`].
 #[derive(Debug, Clone, Copy)]

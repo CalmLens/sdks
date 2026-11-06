@@ -140,8 +140,10 @@ error_codes! {
     FolderNotEmpty = "folder/not-empty", 409;
     /// `folder/parent-cycle` (HTTP 409): A folder cannot be moved inside itself or one of its descendants.
     FolderParentCycle = "folder/parent-cycle", 409;
-    /// `lens/version-conflict` (HTTP 409): Lens updates require a version greater than the current version.
-    LensVersionConflict = "lens/version-conflict", 409;
+    /// `lens/not-found` (HTTP 404): Lens not found. Check the lens ID or identifier in the portal.
+    LensNotFound = "lens/not-found", 404;
+    /// `lens/identifier-taken` (HTTP 409): The project already has a lens with this identifier. Update that lens, or give this one another identifier.
+    LensIdentifierTaken = "lens/identifier-taken", 409;
     /// `lens/identifier-reserved` (HTTP 409): The identifier belongs to a built-in lens (thumbnail, sm, md, lg, xl or 2xl). Give the lens another identifier.
     LensIdentifierReserved = "lens/identifier-reserved", 409;
     /// `hash-list/not-found` (HTTP 404): Hash list not found. Check the list ID in the portal.

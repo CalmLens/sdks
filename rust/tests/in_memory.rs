@@ -321,7 +321,7 @@ async fn uploads_send_tags_and_the_asset_keeps_them() {
             .retrieve(AssetId::new(asset.id.clone()))
             .await
             .unwrap();
-        assert_eq!(stored.tags.as_ref(), Some(&tags), "{}", asset.id);
+        assert_eq!(stored.tags, tags, "{}", asset.id);
         assert!(!stored.extra.contains_key("processingOptions"));
     }
 }
@@ -451,16 +451,12 @@ async fn list_filters_orders_and_pages_with_cursors() {
         .await
         .unwrap();
 
-    let ascending = vec![Order {
-        field: "createdAt".into(),
-        direction: SortDirection::Asc,
-    }];
     let first = mock
         .assets()
         .list(ListAssets {
             page_size: Some(2),
             filter: Some("classification.moderation.status==pending".into()),
-            ordering: Some(ascending.clone()),
+            sort: Some("createdAt".into()),
             ..Default::default()
         })
         .await
@@ -476,8 +472,7 @@ async fn list_filters_orders_and_pages_with_cursors() {
             page_size: Some(2),
             cursor: first.next_cursor,
             filter: Some("classification.moderation.status==pending".into()),
-            ordering: Some(ascending),
-            ..Default::default()
+            sort: Some("createdAt".into()),
         })
         .await
         .unwrap();
@@ -505,7 +500,7 @@ async fn list_filters_orders_and_pages_with_cursors() {
     let in_folder = mock
         .assets()
         .list(ListAssets {
-            folder_id: Some(folder.id.clone()),
+            filter: Some(format!("folderId=={}", folder.id)),
             ..Default::default()
         })
         .await
@@ -544,7 +539,7 @@ async fn update_patches_and_search_matches_keywords() {
         .unwrap();
     assert_eq!(updated.description, None);
     assert_eq!(updated.name.as_deref(), Some("holiday photo"));
-    assert_eq!(updated.tags, Some(vec!["beach".to_string()]));
+    assert_eq!(updated.tags, vec!["beach".to_string()]);
 
     let results = mock
         .assets()
@@ -802,6 +797,7 @@ async fn hash_list_entries_come_from_assets_and_go_with_their_list() {
             hash_list_id: list.id.clone(),
             page_size: Some(1),
             cursor: first.next_cursor,
+            sort: None,
         })
         .await
         .unwrap();

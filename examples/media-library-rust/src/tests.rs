@@ -498,7 +498,7 @@ async fn live_upload_sends_folder_metadata_catalogue_id_and_keeps_content() {
     );
     assert_eq!(sent.query_param("visibility"), Some("private"));
     assert_eq!(sent.query_param("contentType"), Some("image/png"));
-    assert_eq!(sent.query_param("queue"), Some("true"));
+    assert_eq!(sent.query_param("wait"), Some("false"));
     let metadata: Value = serde_json::from_str(sent.query_param("metadata").unwrap()).unwrap();
     assert_eq!(
         metadata,
@@ -577,7 +577,7 @@ async fn live_listing_paginates_and_filters_the_folder() {
     mock.enqueue(
         200,
         json!({"items": [asset("asset-1", "allowed")], "nextCursor": "next-token",
-               "pageSize": PAGE_SIZE, "hasMore": true}),
+               "hasMore": true}),
     );
     let response = app
         .get("/?folder=folder-1&cursor=previous-token&status=allowed")
@@ -585,12 +585,11 @@ async fn live_listing_paginates_and_filters_the_folder() {
     assert_eq!(response.status, StatusCode::OK);
     let list = &mock.requests()[2];
     assert_eq!(list.path, "/projects/project-1/assets");
-    assert_eq!(list.query_param("folderId"), Some("folder-1"));
     assert_eq!(list.query_param("cursor"), Some("previous-token"));
     assert_eq!(list.query_param("pageSize"), Some("12"));
     assert_eq!(
         list.query_param("filter"),
-        Some("parentId==null;classification.moderation.status==allowed")
+        Some("parentId==null;folderId==folder-1;classification.moderation.status==allowed")
     );
     let page = response.html();
     assert!(page.contains(r#"href="/?cursor=next-token&amp;folder=folder-1&amp;status=allowed""#));
@@ -600,18 +599,18 @@ async fn live_listing_paginates_and_filters_the_folder() {
 
 #[tokio::test]
 async fn listing_filters_only_accept_known_statuses() {
-    assert_eq!(list_filter(""), "parentId==null");
+    assert_eq!(list_filter(None, ""), "parentId==null");
     assert_eq!(
-        list_filter("limited"),
+        list_filter(None, "limited"),
         "parentId==null;classification.moderation.status==limited"
     );
     // A failed upload has no decision, so it is listed under "failed", never "pending".
     assert_eq!(
-        list_filter("failed"),
+        list_filter(None, "failed"),
         "parentId==null;classification.status==failed"
     );
     assert_eq!(
-        list_filter("pending"),
+        list_filter(None, "pending"),
         "parentId==null;classification.moderation.status==pending;classification.status!=failed"
     );
     let mock = MockServerClient::new().unwrap();
@@ -650,7 +649,7 @@ async fn live_search_sends_the_query_and_shows_matched_fields_and_semantic_statu
     assert_eq!(search.path, "/projects/project-1/assets/search");
     assert_eq!(search.query_param("query"), Some("cyclists at sunrise"));
     assert_eq!(search.query_param("mode"), Some("semantic"));
-    assert_eq!(search.query_param("limit"), Some("20"));
+    assert_eq!(search.query_param("pageSize"), Some("20"));
     assert!(page.contains(r#"data-semantic-status="indexing""#));
     assert!(page.contains(r#"data-matched-fields="visual""#));
     assert!(page.contains(r#"src="/assets/asset-7/thumb""#));
@@ -736,8 +735,7 @@ async fn demo_thumbnails_appear_only_for_allowed_images() {
 async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
-    let lens_reply =
-        |identifier: &str| json!({"lenses": [{"identifier": identifier, "version": 1}]});
+    let lens_reply = |identifier: &str| json!({"lenses": [{"identifier": identifier}]});
     mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(200, lens_reply(THUMB_LENS));
     mock.enqueue(
@@ -1046,7 +1044,7 @@ async fn simulated_reviewer_blocking_stops_delivery() {
     assert!(activity[0]
         .facts
         .iter()
-        .any(|fact| fact.label == "Reviewer" && fact.value == "Demo reviewer"));
+        .any(|fact| fact.label == "Note" && fact.value == "Simulated portal decision"));
     assert_eq!(
         app.post("/demo/review", "asset=missing").await.status,
         StatusCode::CONFLICT
@@ -1133,7 +1131,6 @@ async fn verified_webhook_refreshes_from_the_api_and_ignores_replays_and_tests()
         "asset.blocked",
         "asset-1",
         json!([
-            {"key": "reviewer-name", "value": "Sam"},
             {"key": "note", "value": "Not licensed"}
         ]),
     )
@@ -1159,7 +1156,7 @@ async fn verified_webhook_refreshes_from_the_api_and_ignores_replays_and_tests()
     let activity = app.state.activity();
     assert_eq!(activity[0].kind, "review");
     let labels: Vec<&str> = activity[0].facts.iter().map(|f| f.label).collect();
-    assert_eq!(labels, ["Decided by", "Reviewer", "Note"]);
+    assert_eq!(labels, ["Decided by", "Note"]);
     assert_eq!(activity[0].facts[0].value, "A reviewer");
 
     // A replay of the event, or of the delivery under another event ID, changes nothing and

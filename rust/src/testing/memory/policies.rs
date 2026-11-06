@@ -1,9 +1,12 @@
 //! Policies in the in-memory API. The project starts on the organisation's own General preset
-//! policy, following automatic updates. The mock holds no built-in preset settings: a preset's settings are
-//! `{"categorySettings": {}}` at version 1, and uploads are never decided by a policy.
-use super::{fail, unknown_route, Backend, Outcome};
+//! policy, following automatic updates (`live`). The mock's presets have one release, version 1,
+//! with [`preset_settings`], and uploads are never decided by a policy.
+use super::{
+    bounded, cursor_ordering, fail, keyset_page, unknown_route, validation, Backend, Outcome,
+};
 use crate::error::ErrorCode;
 use serde_json::{json, Map, Value};
+use std::collections::HashMap;
 
 /// The built-in presets the mock knows, with their display names.
 const PRESET_NAMES: [(&str, &str); 4] = [
@@ -18,8 +21,68 @@ fn preset_name(preset: &str) -> Option<&'static str> {
         .find(|(id, _)| *id == preset)
         .map(|(_, name)| *name)
 }
-fn empty_settings() -> Value {
-    json!({"categorySettings": {}})
+/// The categories every policy's settings define, in the API's order.
+const CATEGORIES: [&str; 8] = [
+    "sexual",
+    "violence",
+    "self-harm",
+    "harassment",
+    "hate",
+    "criminal-activity",
+    "personal-information",
+    "profanity",
+];
+
+/// The settings of the mock's presets: every category with its default action (`allow` for
+/// personal information and profanity, `block` otherwise) and no rules. The mock holds no
+/// built-in preset settings.
+fn preset_settings() -> Value {
+    let categories: Map<String, Value> = CATEGORIES
+        .iter()
+        .map(|category| {
+            let action = match *category {
+                "personal-information" | "profanity" => "allow",
+                _ => "block",
+            };
+            (
+                (*category).to_owned(),
+                json!({"action": action, "allowances": [], "restrictions": []}),
+            )
+        })
+        .collect();
+    json!({ "categorySettings": categories })
+}
+
+/// Refuses settings the API refuses: every category, each with an `action` and its
+/// `allowances` and `restrictions` lists, and no other category.
+fn check_settings(settings: &Value) -> Outcome<()> {
+    let Some(categories) = settings["categorySettings"].as_object() else {
+        return Err(validation("invalid-type", "settings.categorySettings"));
+    };
+    for category in CATEGORIES {
+        let path = format!("settings.categorySettings.{category}");
+        let Some(value) = categories.get(category).filter(|value| value.is_object()) else {
+            return Err(validation("invalid-type", &path));
+        };
+        for key in ["allowances", "restrictions"] {
+            if !value[key].is_array() {
+                return Err(validation("invalid-type", &format!("{path}.{key}")));
+            }
+        }
+        if !value["action"].is_string() {
+            return Err(validation("invalid-value", &format!("{path}.action")));
+        }
+    }
+    if let Some(unknown) = categories
+        .keys()
+        .find(|key| !CATEGORIES.contains(&key.as_str()))
+    {
+        return Err(validation(
+            "unknown-field",
+            &format!("settings.categorySettings.{unknown}"),
+        ));
+    }
+    Ok(())
 }
 
 /// A stored policy: the API's fields without the derived ones, plus its reset baseline.
@@ -31,7 +94,8 @@ struct StoredPolicy {
     settings: Value,
     baseline: Value,
     revision: u64,
-    automatic_updates: bool,
+    /// Whether the organisation's own preset policy follows its preset (mode `live`).
+    follows_preset: bool,
     /// The preset it started from, if any, and whether it is the organisation's own policy for
     /// the preset rather than a copy.
     preset: Option<(String, bool)>,
@@ -54,11 +118,11 @@ impl Backend {
         let general = self.new_policy(
             "General".into(),
             String::new(),
-            empty_settings(),
+            preset_settings(),
             Some(("general-community".into(), true)),
         );
         let general = &mut self.policies.stored[general];
-        general.automatic_updates = true;
+        general.follows_preset = true;
         self.policies.project_policy = general.id.clone();
     }
     fn new_policy(
@@ -76,7 +140,7 @@ impl Backend {
             baseline: settings.clone(),
             settings,
             revision: 1,
-            automatic_updates: false,
+            follows_preset: false,
             preset,
             created_at: now,
             updated_at: now,
@@ -96,9 +160,13 @@ impl Backend {
             "description": policy.description,
             "settings": policy.settings,
             "revision": policy.revision,
-            "automaticUpdates": policy.automatic_updates,
             "preset": policy.preset.as_ref().map(|(id, own)| json!({
-                "id": id, "version": 1, "latestVersion": 1, "own": own,
+                "id": id, "version": 1, "latestVersion": 1,
+                "mode": match (own, policy.follows_preset) {
+                    (true, true) => "live",
+                    (true, false) => "pinned",
+                    (false, _) => "copy",
+                },
             })),
             "projectIds": projects,
             "createdAt": policy.created_at,
@@ -114,38 +182,50 @@ impl Backend {
             .ok_or_else(|| fail(ErrorCode::PolicyNotFound, "Policy not found"))
     }
 
-    /// `/projects/:id/policies[/...]` and `/projects/:id/policy`, with `route` after the project.
-    pub(super) fn policy_route(
+    /// `/projects/:id/policy`: the project's policy, and assigning it.
+    pub(super) fn project_policy_route(
         &mut self,
         method: &str,
-        route: &[String],
         body: Map<String, Value>,
     ) -> Outcome<Value> {
-        let route: Vec<&str> = route.iter().map(String::as_str).collect();
-        match (method, route.as_slice()) {
-            ("PUT", ["policy"]) => {
+        match method {
+            "GET" => {
+                self.ensure_policies();
+                let id = self.policies.project_policy.clone();
+                let index = self.find_policy(&id)?;
+                Ok(self.policy_json(index))
+            }
+            "PUT" => {
                 let index =
                     self.find_policy(body.get("policyId").and_then(Value::as_str).unwrap_or(""))?;
                 self.policies.project_policy = self.policies.stored[index].id.clone();
                 Ok(self.policy_json(index))
             }
-            ("GET", ["policies"]) => {
-                self.ensure_policies();
-                let policies: Vec<Value> = (0..self.policies.stored.len())
-                    .map(|index| self.policy_json(index))
-                    .collect();
-                Ok(json!({"policies": policies, "projectPolicyId": self.policies.project_policy}))
-            }
-            ("POST", ["policies"]) => self.create_policy(body),
-            ("GET", ["policies", id]) => {
+            _ => Err(unknown_route()),
+        }
+    }
+
+    /// `/policies[/...]`, with `route` after `policies`.
+    pub(super) fn policy_route(
+        &mut self,
+        method: &str,
+        route: &[String],
+        q: &HashMap<String, String>,
+        body: Map<String, Value>,
+    ) -> Outcome<Value> {
+        let route: Vec<&str> = route.iter().map(String::as_str).collect();
+        match (method, route.as_slice()) {
+            ("GET", []) => self.list_policies(q),
+            ("POST", []) => self.create_policy(body),
+            ("GET", [id]) => {
                 let index = self.find_policy(id)?;
                 Ok(self.policy_json(index))
             }
-            ("PATCH", ["policies", id]) => {
+            ("PATCH", [id]) => {
                 let index = self.find_policy(id)?;
                 self.update_policy(index, body)
             }
-            ("DELETE", ["policies", id]) => {
+            ("DELETE", [id]) => {
                 let index = self.find_policy(id)?;
                 if self.policies.stored[index].id == self.policies.project_policy {
                     return Err(fail(
@@ -156,16 +236,34 @@ impl Backend {
                 self.policies.stored.remove(index);
                 Ok(json!({}))
             }
-            ("POST", ["policies", id, "preset"]) => {
+            ("POST", [id, operation @ ("reset" | "upgrade")]) => {
                 let index = self.find_policy(id)?;
-                self.apply_policy_preset(index, body)
+                self.restore_policy(index, operation == &"upgrade", body)
             }
-            ("PUT", ["policies", id, "automatic-updates"]) => {
+            ("PUT", [id, "automatic-updates"]) => {
                 let index = self.find_policy(id)?;
                 self.set_policy_automatic_updates(index, body)
             }
             _ => Err(unknown_route()),
         }
+    }
+
+    /// A page of the organisation's policies, oldest first unless `sort` says otherwise.
+    fn list_policies(&mut self, q: &HashMap<String, String>) -> Outcome<Value> {
+        self.ensure_policies();
+        let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
+        let ordering = cursor_ordering(q, ("createdAt", true))?;
+        let policies: Vec<Value> = (0..self.policies.stored.len())
+            .map(|index| self.policy_json(index))
+            .collect();
+        let scope = json!(["policies", self.options.project_id]).to_string();
+        keyset_page(
+            policies.iter().collect(),
+            &ordering,
+            q.get("cursor"),
+            &scope,
+            size,
+        )
     }
 
     fn create_policy(&mut self, body: Map<String, Value>) -> Outcome<Value> {
@@ -182,15 +280,18 @@ impl Backend {
                 name.unwrap_or(preset_name(preset).unwrap_or_default())
                     .to_owned(),
                 description(&body),
-                empty_settings(),
+                preset_settings(),
                 Some((preset.to_owned(), false)),
             ),
-            (Some(settings), None) if name.is_some() => self.new_policy(
-                name.unwrap_or_default().to_owned(),
-                description(&body),
-                settings,
-                None,
-            ),
+            (Some(settings), None) if name.is_some() => {
+                check_settings(&settings)?;
+                self.new_policy(
+                    name.unwrap_or_default().to_owned(),
+                    description(&body),
+                    settings,
+                    None,
+                )
+            }
             _ => {
                 return Err(fail(
                     ErrorCode::InvalidValue,
@@ -220,6 +321,9 @@ impl Backend {
     }
 
     fn update_policy(&mut self, index: usize, body: Map<String, Value>) -> Outcome<Value> {
+        if let Some(settings) = body.get("settings") {
+            check_settings(settings)?;
+        }
         self.save_policy(index, body.get("revision"), |policy| {
             if let Some(name) = body.get("name").and_then(Value::as_str) {
                 policy.name = name.trim().to_owned();
@@ -230,14 +334,20 @@ impl Backend {
             if let Some(settings) = body.get("settings") {
                 policy.settings = settings.clone();
             }
-            // Saving a policy that follows its preset pins it as a copy.
-            policy.automatic_updates = false;
+            // Saving a `live` policy pins it.
+            policy.follows_preset = false;
         })
     }
 
-    fn apply_policy_preset(&mut self, index: usize, body: Map<String, Value>) -> Outcome<Value> {
+    /// Resets a `pinned` or `copy` policy to its preset release, or upgrades it to the latest.
+    fn restore_policy(
+        &mut self,
+        index: usize,
+        upgrade: bool,
+        body: Map<String, Value>,
+    ) -> Outcome<Value> {
         let policy = &self.policies.stored[index];
-        if policy.preset.is_none() || policy.automatic_updates {
+        if policy.preset.is_none() || policy.follows_preset {
             return Err(fail(
                 ErrorCode::PolicyNoPreset,
                 "This policy has no preset baseline",
@@ -246,8 +356,8 @@ impl Backend {
         if body.get("presetVersion").and_then(Value::as_u64) != Some(1) {
             return Err(preset_version_conflict());
         }
-        // The mock's presets have one release, so an update never has a newer one to apply.
-        if body.get("operation").and_then(Value::as_str) == Some("update") {
+        // The mock's presets have one release, so an upgrade never has a newer one to apply.
+        if upgrade {
             return Err(fail(
                 ErrorCode::PolicyPresetUpdateUnavailable,
                 "Only an unchanged copy of an older preset version can be updated",
@@ -266,7 +376,7 @@ impl Backend {
         let enabled = body.get("enabled") == Some(&Value::Bool(true));
         let policy = &self.policies.stored[index];
         let own = matches!(policy.preset, Some((_, true)));
-        if !own || policy.automatic_updates == enabled {
+        if !own || policy.follows_preset == enabled {
             return Err(fail(
                 ErrorCode::PolicyAutomaticUpdatesUnavailable,
                 "Automatic updates are unavailable for this policy",
@@ -279,7 +389,7 @@ impl Backend {
             return Err(preset_version_conflict());
         }
         self.save_policy(index, body.get("revision"), |policy| {
-            policy.automatic_updates = enabled;
+            policy.follows_preset = enabled;
             if enabled {
                 let preset = policy
                     .preset

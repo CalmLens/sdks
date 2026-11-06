@@ -152,7 +152,7 @@ event's snapshot. In live mode CalmLens is the library's record store, so the ap
 event back to its own records by checking that the asset belongs to the configured project
 and that its `external_id` is a catalogue ID this app issued (`calmlibrary:` followed by the
 catalogue ID). Events for other assets are logged as ignored and change nothing. Known assets
-are logged with the event's registered facts, such as **Reviewer** and **Note**. If retrieval
+are logged with the event's registered facts, such as **Categories** and **Note**. If retrieval
 fails, the handler returns 502 so delivery retries. In demo mode, webhooks work for demo
 assets when the secret is set.
 

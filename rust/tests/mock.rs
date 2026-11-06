@@ -309,7 +309,7 @@ async fn binary_reader_and_stream_content_arrive_unchanged() {
         assert_eq!(sent.body, data);
         assert_eq!(sent.query_param("sizeInBytes"), Some("256"));
         assert_eq!(sent.query_param("contentType"), Some("image/png"));
-        assert_eq!(sent.query_param("queue"), Some("true"));
+        assert_eq!(sent.query_param("wait"), Some("false"));
     }
 
     // A reader that yields fewer bytes than declared fails instead of sending a short body.
@@ -414,13 +414,12 @@ async fn reader_uploads_are_sent_once() {
     assert_eq!(mock.requests().len(), 1);
 }
 
-fn lens(identifier: &str, version: u32) -> LensDefinition {
+fn lens(identifier: &str, name: &str) -> LensDefinition {
     LensDefinition {
         identifier: identifier.into(),
-        name: identifier.into(),
+        name: name.into(),
         lens_type: "image".into(),
         active: true,
-        version,
         ..Default::default()
     }
 }
@@ -432,7 +431,11 @@ async fn ensure_lenses_keeps_request_order_and_caches() {
     mock.enqueue(200, response(&["zeta", "alpha", "mid"]));
     let lenses = mock
         .ensure_lenses(EnsureLenses {
-            lenses: vec![lens("zeta", 1), lens("alpha", 1), lens("mid", 1)],
+            lenses: vec![
+                lens("zeta", "Zeta"),
+                lens("alpha", "Alpha"),
+                lens("mid", "Mid"),
+            ],
         })
         .await
         .unwrap();
@@ -450,7 +453,11 @@ async fn ensure_lenses_keeps_request_order_and_caches() {
     mock.enqueue(200, response(&["alpha"]));
     let lenses = mock
         .ensure_lenses(EnsureLenses {
-            lenses: vec![lens("mid", 1), lens("alpha", 2), lens("zeta", 1)],
+            lenses: vec![
+                lens("mid", "Mid"),
+                lens("alpha", "Alpha 2"),
+                lens("zeta", "Zeta"),
+            ],
         })
         .await
         .unwrap();
@@ -458,14 +465,59 @@ async fn ensure_lenses_keeps_request_order_and_caches() {
     assert_eq!(ids, ["mid", "alpha", "zeta"]);
     assert_eq!(mock.requests().len(), 2);
     assert_eq!(
-        mock.last_request().unwrap().json().unwrap()["lenses"][0]["version"],
-        2
+        mock.last_request().unwrap().json().unwrap()["lenses"][0]["name"],
+        "Alpha 2"
     );
 
     // A response for another lens is refused.
     mock.enqueue(200, response(&["other"]));
-    let error = mock.ensure_lens(lens("new", 1)).await.unwrap_err();
+    let error = mock.ensure_lens(lens("new", "New")).await.unwrap_err();
     assert_eq!(error.code(), &ErrorCode::InvalidResponse);
+}
+
+#[tokio::test]
+async fn a_lens_changed_through_the_lenses_client_is_ensured_again() {
+    let mock = MockServerClient::new().unwrap();
+    let thumb = json!({"id": "lens-thumb", "identifier": "thumb", "name": "Thumb"});
+    let ensured = json!({ "lenses": [thumb.clone()] });
+    mock.enqueue(200, ensured.clone());
+    mock.ensure_lens(lens("thumb", "Thumb")).await.unwrap();
+    mock.ensure_lens(lens("thumb", "Thumb")).await.unwrap();
+    assert_eq!(mock.requests().len(), 1);
+
+    mock.enqueue(
+        200,
+        json!({"id": "lens-thumb", "identifier": "thumb", "name": "Renamed"}),
+    );
+    mock.lenses()
+        .update(UpdateLens {
+            name: Some("Renamed".into()),
+            ..UpdateLens::new("lens-thumb")
+        })
+        .await
+        .unwrap();
+    mock.enqueue(200, ensured.clone());
+    mock.ensure_lens(lens("thumb", "Thumb")).await.unwrap();
+    let methods: Vec<_> = mock.requests().iter().map(|r| r.method.clone()).collect();
+    assert_eq!(methods, ["PUT", "PATCH", "PUT"]);
+
+    // Deleting a lens, or creating one with its identifier, forgets it too.
+    mock.enqueue(200, json!({}));
+    mock.lenses()
+        .delete(LensId::new("lens-thumb"))
+        .await
+        .unwrap();
+    mock.enqueue(200, ensured.clone());
+    mock.ensure_lens(lens("thumb", "Thumb")).await.unwrap();
+    mock.enqueue(201, thumb);
+    mock.lenses().create(lens("thumb", "Thumb")).await.unwrap();
+    mock.enqueue(200, ensured);
+    mock.ensure_lens(lens("thumb", "Thumb")).await.unwrap();
+    let methods: Vec<_> = mock.requests().iter().map(|r| r.method.clone()).collect();
+    assert_eq!(
+        methods,
+        ["PUT", "PATCH", "PUT", "DELETE", "PUT", "POST", "PUT"]
+    );
 }
 
 #[tokio::test]

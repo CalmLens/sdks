@@ -1,5 +1,6 @@
 //! Invokes SDK operations by their shared contract names with JSON options.
 #![allow(dead_code)]
+use futures_util::{stream::BoxStream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 
@@ -23,6 +24,46 @@ fn output<T: Serialize>(result: calmlens::Result<T>) -> calmlens::Result<Value> 
 /// Decodes JSON into a native type, panicking on failure.
 pub fn typed<T: DeserializeOwned>(value: Value) -> T {
     serde_json::from_value(value).unwrap()
+}
+
+/// A list's item iterator by its contract name, such as `folders.iterate`, with JSON options;
+/// `None` for an operation that isn't one. `events.iterate` yields pages.
+pub fn iterator(
+    client: &calmlens::ServerClient,
+    operation: &str,
+    options: Value,
+) -> Option<calmlens::Result<BoxStream<'static, calmlens::Result<Value>>>> {
+    fn values<T: Serialize + Send + 'static>(
+        stream: BoxStream<'static, calmlens::Result<T>>,
+    ) -> BoxStream<'static, calmlens::Result<Value>> {
+        stream
+            .map_ok(|item| serde_json::to_value(item).expect("serializable SDK model"))
+            .boxed()
+    }
+    let stream =
+        |result: calmlens::Result<BoxStream<'static, calmlens::Result<Value>>>| Some(result);
+    match operation {
+        "assets.iterate" => stream(input(options).map(|o| values(client.assets().iterate(o)))),
+        "assets.iterateChildren" => {
+            stream(input(options).map(|o| values(client.assets().iterate_children(o))))
+        }
+        "assets.iterateTimeline" => {
+            stream(input(options).map(|o| values(client.assets().iterate_timeline(o))))
+        }
+        "folders.iterate" => stream(input(options).map(|o| values(client.folders().iterate(o)))),
+        "hashLists.iterate" => {
+            stream(input(options).map(|o| values(client.hash_lists().iterate(o))))
+        }
+        "hashLists.iterateEntries" => {
+            stream(input(options).map(|o| values(client.hash_lists().iterate_entries(o))))
+        }
+        "policies.iterate" => stream(input(options).map(|o| values(client.policies().iterate(o)))),
+        "lenses.iterate" => stream(input(options).map(|o| values(client.lenses().iterate(o)))),
+        "events.iterate" | "events.pages" => {
+            stream(input(options).map(|o| values(client.events().pages(o))))
+        }
+        _ => None,
+    }
 }
 
 pub async fn invoke(
@@ -72,11 +113,12 @@ pub async fn invoke(
         "hashLists.listEntries" => output(client.hash_lists().list_entries(input(options)?).await),
         "hashLists.addEntry" => output(client.hash_lists().add_entry(input(options)?).await),
         "hashLists.removeEntry" => output(client.hash_lists().remove_entry(input(options)?).await),
-        "policies.list" => output(client.policies().list().await),
+        "policies.list" => output(client.policies().list(input(options)?).await),
         "policies.retrieve" => output(client.policies().retrieve(input(options)?).await),
         "policies.create" => output(client.policies().create(input(options)?).await),
         "policies.update" => output(client.policies().update(input(options)?).await),
-        "policies.applyPreset" => output(client.policies().apply_preset(input(options)?).await),
+        "policies.reset" => output(client.policies().reset(input(options)?).await),
+        "policies.upgrade" => output(client.policies().upgrade(input(options)?).await),
         "policies.setAutomaticUpdates" => output(
             client
                 .policies()
@@ -84,7 +126,13 @@ pub async fn invoke(
                 .await,
         ),
         "policies.delete" => output(client.policies().delete(input(options)?).await),
+        "policies.retrieveAssigned" => output(client.policies().retrieve_assigned().await),
         "policies.assign" => output(client.policies().assign(input(options)?).await),
+        "lenses.list" => output(client.lenses().list(input(options)?).await),
+        "lenses.create" => output(client.lenses().create(input(options)?).await),
+        "lenses.retrieve" => output(client.lenses().retrieve(input(options)?).await),
+        "lenses.update" => output(client.lenses().update(input(options)?).await),
+        "lenses.delete" => output(client.lenses().delete(input(options)?).await),
         "events.list" => output(client.events().list(input(options)?).await),
         "ensureLenses" => output(client.ensure_lenses(input(options)?).await),
         "cdn.serve" => {
@@ -143,7 +191,7 @@ pub fn whole_numbers(value: Value) -> Value {
 
 /// Whether a typed result serialized to JSON equals the API's JSON `expected`. Typed models
 /// write every field they declare, so a field `expected` lacks must hold that field's empty
-/// default (`null`, `false`, `""`, `[]` or `{}`); every field `expected` has must be equal. Returns the
+/// default (`null`, `false`, `0`, `""`, `[]` or `{}`); every field `expected` has must be equal. Returns the
 /// path of the first difference.
 pub fn compare_typed(actual: &Value, expected: &Value) -> Result<(), String> {
     fn walk(actual: &Value, expected: &Value, path: &str) -> Result<(), String> {
@@ -157,14 +205,7 @@ pub fn compare_typed(actual: &Value, expected: &Value) -> Result<(), String> {
                     }
                 }
                 for (key, value) in actual {
-                    let empty = match value {
-                        Value::Null | Value::Bool(false) => true,
-                        Value::String(text) => text.is_empty(),
-                        Value::Array(items) => items.is_empty(),
-                        Value::Object(map) => map.is_empty(),
-                        _ => false,
-                    };
-                    if !expected.contains_key(key) && !empty {
+                    if !expected.contains_key(key) && !is_default(value) {
                         return Err(format!("{path}.{key}: unexpected {value}"));
                     }
                 }
@@ -181,6 +222,19 @@ pub fn compare_typed(actual: &Value, expected: &Value) -> Result<(), String> {
         }
     }
     walk(&whole_numbers(actual.clone()), expected, "$")
+}
+
+/// Whether `value` is what a typed model serializes for a field the response left out: `null`,
+/// `false`, zero, an empty string or list, or an object of such values (a defaulted struct).
+fn is_default(value: &Value) -> bool {
+    match value {
+        Value::Null | Value::Bool(false) => true,
+        Value::Number(number) => number.as_f64() == Some(0.0),
+        Value::String(text) => text.is_empty(),
+        Value::Array(items) => items.is_empty(),
+        Value::Object(map) => map.values().all(is_default),
+        _ => false,
+    }
 }
 
 /// An error as the fixtures describe it: `{code, status, requestId, retryAfter, details}`, with

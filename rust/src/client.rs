@@ -381,6 +381,10 @@ impl ServerClient {
     pub fn policies(&self) -> PoliciesClient<'_> {
         PoliciesClient(self)
     }
+    /// Lens operations: the project's named CDN transforms.
+    pub fn lenses(&self) -> LensesClient<'_> {
+        LensesClient(self)
+    }
     /// The project's events feed.
     pub fn events(&self) -> EventsClient<'_> {
         EventsClient(self)
@@ -398,7 +402,8 @@ impl ServerClient {
         UploadTokensClient(self)
     }
 
-    /// Creates or updates a named lens and returns it. See [`ServerClient::ensure_lenses`].
+    /// Creates a named lens, or changes it to this definition, and returns it. See
+    /// [`ServerClient::ensure_lenses`].
     pub async fn ensure_lens(&self, lens: LensDefinition) -> Result<Lens> {
         let mut lenses = self
             .ensure_lenses(EnsureLenses { lenses: vec![lens] })
@@ -407,8 +412,10 @@ impl ServerClient {
             .pop()
             .ok_or_else(|| Error::new(ErrorCode::InvalidResponse, "Unexpected lens response"))
     }
-    /// Creates or updates named lenses and returns them in request order. Definitions this
-    /// client has already ensured are answered from its cache without a request, and
+    /// Creates each named lens, or changes it to the definition sent, by identifier, and returns
+    /// them in request order. An unchanged lens is returned as it is, so applications can send
+    /// their lenses every time they start. Definitions this client has already ensured are
+    /// answered from its cache without a request, and
     /// concurrent calls wait for each other, so one definition is sent once. More than
     /// [`ENSURE_LENSES_MAX_PER_REQUEST`] new definitions are sent in consecutive requests, in order.
     /// A response that does not return each definition's lens at its position fails with
@@ -564,7 +571,7 @@ impl ServerClient {
         })
     }
 
-    async fn submit(&self, options: SubmitAsset, queue: bool) -> Result<Asset> {
+    async fn submit(&self, options: SubmitAsset, wait: bool) -> Result<Asset> {
         if options.name.is_empty() {
             return Err(invalid_payload("Asset name is required"));
         }
@@ -586,7 +593,7 @@ impl ServerClient {
             .map(|context| ModerationContext::new(select_moderation_context_items(&context.items)));
         let mut query = Query::default();
         query.push("name", &options.name);
-        query.push("queue", queue);
+        query.push("wait", wait);
         query.opt("description", options.description.as_ref());
         query.json("processingOptions", options.processing_options.as_ref())?;
         query.opt("visibility", options.visibility.as_ref());
@@ -633,7 +640,7 @@ impl ServerClient {
                 .prepare(
                     Method::POST,
                     &self.project_path("assets")?,
-                    &[("queue".into(), queue.to_string())],
+                    &[("wait".into(), wait.to_string())],
                 )?
                 .header("idempotency-key", &idempotency_key)?
                 .json(&UrlBody {
@@ -769,7 +776,7 @@ impl ServerClient {
             &path,
             (part_number, is_final),
             (body, size),
-            options.queue,
+            options.wait,
             &idempotency_key,
             deadline,
         )
@@ -782,14 +789,14 @@ impl ServerClient {
         path: &str,
         (part_number, is_final): (u32, bool),
         (body, size): (RequestBody, Option<u64>),
-        queue: Option<bool>,
+        wait: Option<bool>,
         idempotency_key: &str,
         deadline: Deadline,
     ) -> Result<Asset> {
         let mut query = Query::default();
         query.push("partNumber", part_number);
         query.push("isFinal", is_final);
-        query.opt("queue", queue);
+        query.opt("wait", wait);
         query.opt("sizeInBytes", size);
         // Later parts carry no Content-Type: the API reads the upload's saved type.
         let mut request = self
@@ -888,8 +895,7 @@ impl ServerClient {
         query.opt("cursor", options.cursor.as_deref());
         query.opt("pageSize", options.page_size);
         query.opt("filter", options.filter.as_ref());
-        query.ordering(options.ordering.as_deref());
-        query.opt("folderId", options.folder_id.as_ref());
+        query.opt("sort", options.sort.as_ref());
         self.call(self.prepare(Method::GET, &self.project_path("assets")?, &query.0)?)
             .await
     }
@@ -899,7 +905,14 @@ impl ServerClient {
         query.opt("cursor", options.cursor.as_deref());
         query.opt("pageSize", options.page_size);
         query.opt("filter", options.filter.as_ref());
-        query.ordering(options.ordering.as_deref());
+        query.opt("sort", options.sort.as_ref());
+        self.call(self.prepare(Method::GET, &path, &query.0)?).await
+    }
+    async fn timeline_page(&self, options: &ListTimeline) -> Result<AssetTimelinePage> {
+        let path = self.project_path(&format!("assets/{}/timeline", id(&options.asset_id)?))?;
+        let mut query = Query::default();
+        query.opt("cursor", options.cursor.as_deref());
+        query.opt("pageSize", options.page_size);
         self.call(self.prepare(Method::GET, &path, &query.0)?).await
     }
     async fn events_page(&self, options: &ListEvents) -> Result<EventsPage> {
@@ -1016,12 +1029,6 @@ impl Query {
         }
         Ok(())
     }
-    fn ordering(&mut self, ordering: Option<&[Order]>) {
-        for (index, order) in ordering.unwrap_or_default().iter().enumerate() {
-            self.push(&format!("ordering[{index}][field]"), &order.field);
-            self.push(&format!("ordering[{index}][direction]"), &order.direction);
-        }
-    }
 }
 
 fn percent_encode(value: &str, keep: &[u8]) -> String {
@@ -1074,11 +1081,11 @@ fn encode_selector(value: &str) -> String {
 #[derive(Debug, Clone, Copy)]
 pub struct AssetsClient<'a>(&'a ServerClient);
 impl AssetsClient<'_> {
-    /// Uploads an asset and queues it for classification, returning straight away
-    /// (`POST /projects/:projectId/assets?queue=true`). Retries reuse one
-    /// `Idempotency-Key`, so a retried upload never creates a second asset.
+    /// Uploads an asset and returns without waiting for its decision
+    /// (`POST /projects/:projectId/assets?wait=false`), with classification status `queued`.
+    /// Retries reuse one `Idempotency-Key`, so a retried upload never creates a second asset.
     pub async fn create(&self, options: SubmitAsset) -> Result<Asset> {
-        self.0.submit(options, true).await
+        self.0.submit(options, false).await
     }
     /// Uploads an asset and waits for its moderation decision.
     pub async fn classify(&self, options: SubmitAsset) -> Result<Asset> {
@@ -1093,19 +1100,19 @@ impl AssetsClient<'_> {
                 ));
             }
         }
-        self.0.submit(options, false).await
+        self.0.submit(options, true).await
     }
-    /// Sends a later multipart part. The final part is classified with the `queue` choice
-    /// saved when the upload started unless `options.queue` overrides it.
+    /// Sends a later multipart part. Whether the final part waits for the decision was chosen
+    /// when the upload started; `options.wait` overrides it.
     pub async fn upload_part(&self, options: UploadPart) -> Result<Asset> {
         self.0.upload_part(options).await
     }
-    /// Searches accessible assets in natural language.
+    /// Searches accessible assets in natural language, returning the best `page_size` matches.
     pub async fn search(&self, options: SearchAssets) -> Result<AssetSearchResponse> {
         let mut query = Query::default();
         query.push("query", &options.query);
         query.opt("mode", options.mode.as_ref());
-        query.opt("limit", options.limit);
+        query.opt("pageSize", options.page_size);
         self.0
             .call(self.0.prepare(
                 Method::GET,
@@ -1131,10 +1138,13 @@ impl AssetsClient<'_> {
                 let client = client.clone();
                 async move {
                     let page = client.list_page(&options).await?;
-                    let next = next_asset_cursor(&page).map(|cursor| ListAssets {
-                        cursor: Some(cursor),
-                        ..options
-                    });
+                    let next =
+                        next_cursor(&page.items, page.has_more, &page.next_cursor).map(|cursor| {
+                            ListAssets {
+                                cursor: Some(cursor),
+                                ..options
+                            }
+                        });
                     Ok((page.items, next))
                 }
             },
@@ -1148,15 +1158,33 @@ impl AssetsClient<'_> {
     /// project. `classification.moderation.timeline.segment_count` says how many segments there
     /// are; pass each page's `next_cursor` back unchanged, as cursors are opaque.
     pub async fn list_timeline(&self, options: ListTimeline) -> Result<AssetTimelinePage> {
-        let path = self
-            .0
-            .project_path(&format!("assets/{}/timeline", id(&options.asset_id)?))?;
-        let mut query = Query::default();
-        query.opt("cursor", options.cursor.as_deref());
-        query.opt("pageSize", options.page_size);
-        self.0
-            .call(self.0.prepare(Method::GET, &path, &query.0)?)
-            .await
+        self.0.timeline_page(&options).await
+    }
+    /// Every segment of an audio or video asset's findings timeline from `options.cursor` on, in
+    /// time order, ending and failing like [`iterate`](Self::iterate).
+    pub fn iterate_timeline(
+        &self,
+        options: ListTimeline,
+    ) -> BoxStream<'static, Result<MediaClassificationSegment>> {
+        let client = self.0.clone();
+        paginate(
+            options,
+            |options| options.cursor.clone(),
+            move |options| {
+                let client = client.clone();
+                async move {
+                    let page = client.timeline_page(&options).await?;
+                    let next =
+                        next_cursor(&page.items, page.has_more, &page.next_cursor).map(|cursor| {
+                            ListTimeline {
+                                cursor: Some(cursor),
+                                ..options
+                            }
+                        });
+                    Ok((page.items, next))
+                }
+            },
+        )
     }
     /// Every child of an asset from `options.cursor` on, ending and failing like
     /// [`iterate`](Self::iterate).
@@ -1169,10 +1197,13 @@ impl AssetsClient<'_> {
                 let client = client.clone();
                 async move {
                     let page = client.children_page(&options).await?;
-                    let next = next_asset_cursor(&page).map(|cursor| ListChildren {
-                        cursor: Some(cursor),
-                        ..options
-                    });
+                    let next =
+                        next_cursor(&page.items, page.has_more, &page.next_cursor).map(|cursor| {
+                            ListChildren {
+                                cursor: Some(cursor),
+                                ..options
+                            }
+                        });
                     Ok((page.items, next))
                 }
             },
@@ -1300,10 +1331,14 @@ impl AssetsClient<'_> {
     }
 }
 
-/// The cursor of the page after `page`, or `None` when the iteration ends there.
-fn next_asset_cursor(page: &AssetPage) -> Option<String> {
-    let more = page.has_more.unwrap_or(false) && !page.items.is_empty();
-    page.next_cursor.clone().filter(|_| more)
+/// The cursor of the page after a page of `items`, or `None` when the iteration ends there.
+fn next_cursor<T>(
+    items: &[T],
+    has_more: Option<bool>,
+    next_cursor: &Option<String>,
+) -> Option<String> {
+    let more = has_more.unwrap_or(false) && !items.is_empty();
+    next_cursor.clone().filter(|_| more)
 }
 
 /// The error for a page that hands back a cursor the iteration already sent, which would
@@ -1374,19 +1409,42 @@ where
 #[derive(Debug, Clone, Copy)]
 pub struct FoldersClient<'a>(&'a ServerClient);
 impl FoldersClient<'_> {
-    /// One page of child folders, sorted by name unless `ordering` says otherwise. Pass the
-    /// page's `next_cursor` as `cursor` for the next page.
+    /// One page of child folders, sorted by name unless `sort` says otherwise. Pass the page's
+    /// `next_cursor` as `cursor` for the next page.
     pub async fn list(&self, options: ListFolders) -> Result<FolderPage> {
         let mut query = Query::default();
         query.opt("parentId", options.parent_id.as_ref());
         query.opt("pageSize", options.page_size);
-        query.ordering(options.ordering.as_deref());
+        query.opt("sort", options.sort.as_ref());
         query.opt("cursor", options.cursor.as_ref());
         query.opt("search", options.search.as_ref());
         let request = self
             .0
             .prepare(Method::GET, &self.0.project_path("folders")?, &query.0)?;
         self.0.call(request).await
+    }
+    /// Every child folder of `options.parent_id` (or the project root) from `options.cursor` on,
+    /// ending and failing like [`AssetsClient::iterate`].
+    pub fn iterate(&self, options: ListFolders) -> BoxStream<'static, Result<Folder>> {
+        let client = self.0.clone();
+        paginate(
+            options,
+            |options| options.cursor.clone(),
+            move |options| {
+                let client = client.clone();
+                async move {
+                    let page = client.folders().list(options.clone()).await?;
+                    let next =
+                        next_cursor(&page.items, page.has_more, &page.next_cursor).map(|cursor| {
+                            ListFolders {
+                                cursor: Some(cursor),
+                                ..options
+                            }
+                        });
+                    Ok((page.items, next))
+                }
+            },
+        )
     }
     /// Creates a folder.
     pub async fn create(&self, options: CreateFolder) -> Result<Folder> {
@@ -1429,16 +1487,40 @@ impl FoldersClient<'_> {
 #[derive(Debug, Clone, Copy)]
 pub struct HashListsClient<'a>(&'a ServerClient);
 impl HashListsClient<'_> {
-    /// One page of the project's hash lists, newest first. Pass the page's `next_cursor` as
-    /// `cursor` for the next page.
+    /// One page of the project's hash lists, newest first unless `sort` says otherwise. Pass
+    /// the page's `next_cursor` as `cursor` for the next page.
     pub async fn list(&self, options: ListHashLists) -> Result<HashListPage> {
         let mut query = Query::default();
         query.opt("cursor", options.cursor.as_ref());
         query.opt("pageSize", options.page_size);
+        query.opt("sort", options.sort.as_ref());
         let request = self
             .0
             .prepare(Method::GET, &self.0.project_path("hash-lists")?, &query.0)?;
         self.0.call(request).await
+    }
+    /// Every hash list from `options.cursor` on, ending and failing like
+    /// [`AssetsClient::iterate`].
+    pub fn iterate(&self, options: ListHashLists) -> BoxStream<'static, Result<HashList>> {
+        let client = self.0.clone();
+        paginate(
+            options,
+            |options| options.cursor.clone(),
+            move |options| {
+                let client = client.clone();
+                async move {
+                    let page = client.hash_lists().list(options.clone()).await?;
+                    let next =
+                        next_cursor(&page.items, page.has_more, &page.next_cursor).map(|cursor| {
+                            ListHashLists {
+                                cursor: Some(cursor),
+                                ..options
+                            }
+                        });
+                    Ok((page.items, next))
+                }
+            },
+        )
     }
     /// Retrieves a hash list.
     pub async fn retrieve(&self, options: HashListId) -> Result<HashList> {
@@ -1467,15 +1549,42 @@ impl HashListsClient<'_> {
             .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
             .await
     }
-    /// One page of a hash list's entries, newest first.
+    /// One page of a hash list's entries, newest first unless `sort` says otherwise.
     pub async fn list_entries(&self, options: ListHashListEntries) -> Result<HashListEntryPage> {
         let path = format!("/hash-lists/{}/entries", id(&options.hash_list_id)?);
         let mut query = Query::default();
         query.opt("cursor", options.cursor.as_ref());
         query.opt("pageSize", options.page_size);
+        query.opt("sort", options.sort.as_ref());
         self.0
             .call(self.0.prepare(Method::GET, &path, &query.0)?)
             .await
+    }
+    /// Every entry of a hash list from `options.cursor` on, ending and failing like
+    /// [`AssetsClient::iterate`].
+    pub fn iterate_entries(
+        &self,
+        options: ListHashListEntries,
+    ) -> BoxStream<'static, Result<HashListEntry>> {
+        let client = self.0.clone();
+        paginate(
+            options,
+            |options| options.cursor.clone(),
+            move |options| {
+                let client = client.clone();
+                async move {
+                    let page = client.hash_lists().list_entries(options.clone()).await?;
+                    let next =
+                        next_cursor(&page.items, page.has_more, &page.next_cursor).map(|cursor| {
+                            ListHashListEntries {
+                                cursor: Some(cursor),
+                                ..options
+                            }
+                        });
+                    Ok((page.items, next))
+                }
+            },
+        )
     }
     /// Adds a hash, or an image asset's perceptual hash, to a hash list. A hash the list
     /// already holds returns its existing entry.
@@ -1495,68 +1604,205 @@ impl HashListsClient<'_> {
 
 /// Moderation policy operations. Get it from [`ServerClient::policies`].
 ///
-/// Policies belong to the project's organisation and its projects share them. Every change sends
+/// Policies belong to the API key's organisation and its projects share them. Every change sends
 /// the policy's `revision`, so a policy changed since is refused. Through a project's key you can
-/// change only policies no other project uses or owns.
+/// change only policies no other project uses.
 #[derive(Debug, Clone, Copy)]
 pub struct PoliciesClient<'a>(&'a ServerClient);
 impl PoliciesClient<'_> {
-    fn path(&self, policy_id: &str, suffix: &str) -> Result<String> {
-        self.0
-            .project_path(&format!("policies/{}{suffix}", id(policy_id)?))
+    fn path(policy_id: &str, suffix: &str) -> Result<String> {
+        Ok(format!("/policies/{}{suffix}", id(policy_id)?))
     }
-    /// Lists the organisation's policies and the ID of the one the project uses.
-    pub async fn list(&self) -> Result<PolicyList> {
-        let path = self.0.project_path("policies")?;
-        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+    /// One page of the organisation's policies, oldest first unless `sort` says otherwise. Pass
+    /// the page's `next_cursor` as `cursor` for the next page.
+    pub async fn list(&self, options: ListPolicies) -> Result<PolicyPage> {
+        let mut query = Query::default();
+        query.opt("cursor", options.cursor.as_ref());
+        query.opt("pageSize", options.page_size);
+        query.opt("sort", options.sort.as_ref());
+        self.0
+            .call(self.0.prepare(Method::GET, "/policies", &query.0)?)
+            .await
+    }
+    /// Every policy of the organisation from `options.cursor` on, ending and failing like
+    /// [`AssetsClient::iterate`].
+    pub fn iterate(&self, options: ListPolicies) -> BoxStream<'static, Result<Policy>> {
+        let client = self.0.clone();
+        paginate(
+            options,
+            |options| options.cursor.clone(),
+            move |options| {
+                let client = client.clone();
+                async move {
+                    let page = client.policies().list(options.clone()).await?;
+                    let next =
+                        next_cursor(&page.items, page.has_more, &page.next_cursor).map(|cursor| {
+                            ListPolicies {
+                                cursor: Some(cursor),
+                                ..options
+                            }
+                        });
+                    Ok((page.items, next))
+                }
+            },
+        )
     }
     /// Retrieves a policy.
     pub async fn retrieve(&self, options: PolicyId) -> Result<Policy> {
-        let path = self.path(&options.policy_id, "")?;
+        let path = Self::path(&options.policy_id, "")?;
         self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
     }
     /// Creates a policy from settings, or a copy of a built-in preset. It moderates nothing until
     /// you assign it to a project or name it on an upload preset.
     pub async fn create(&self, options: CreatePolicy) -> Result<Policy> {
-        let path = self.0.project_path("policies")?;
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare(Method::POST, "/policies", &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Changes a policy's name, description or settings; later moderation uses them. Saving a
-    /// policy that follows automatic updates pins it as a copy under the same ID.
+    /// `live` policy pins it as a copy under the same ID.
     pub async fn update(&self, options: UpdatePolicy) -> Result<Policy> {
-        let path = self.path(&options.policy_id, "")?;
+        let path = Self::path(&options.policy_id, "")?;
         let request = self.0.prepare(Method::PATCH, &path, &[])?.json(&options)?;
         self.0.call(request).await
     }
-    /// Resets a preset copy to its pinned version, or updates an unchanged copy to the latest
-    /// preset release.
-    pub async fn apply_preset(&self, options: ApplyPolicyPreset) -> Result<Policy> {
-        let path = self.path(&options.policy_id, "/preset")?;
+    /// Restores the settings of the preset release a `pinned` or `copy` policy is pinned to,
+    /// discarding its edits.
+    pub async fn reset(&self, options: ResetPolicy) -> Result<Policy> {
+        let path = Self::path(&options.policy_id, "/reset")?;
         let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
         self.0.call(request).await
     }
-    /// Switches automatic updates on or off for the organisation's own preset policy.
+    /// Moves a `pinned` or `copy` policy whose settings are unchanged from its preset release to
+    /// the latest release of the preset.
+    pub async fn upgrade(&self, options: UpgradePolicy) -> Result<Policy> {
+        let path = Self::path(&options.policy_id, "/upgrade")?;
+        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
+    /// Switches automatic updates on (`live`) or off (`pinned`) for the organisation's own
+    /// preset policy.
     pub async fn set_automatic_updates(
         &self,
         options: SetPolicyAutomaticUpdates,
     ) -> Result<Policy> {
-        let path = self.path(&options.policy_id, "/automatic-updates")?;
+        let path = Self::path(&options.policy_id, "/automatic-updates")?;
         let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
         self.0.call(request).await
     }
     /// Deletes a policy that no project or upload preset uses.
     pub async fn delete(&self, options: PolicyId) -> Result<()> {
-        let path = self.path(&options.policy_id, "")?;
+        let path = Self::path(&options.policy_id, "")?;
         self.0
             .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
             .await
+    }
+    /// The policy the project moderates with. Uploads through an upload preset that names its
+    /// own policy use that one instead.
+    pub async fn retrieve_assigned(&self) -> Result<Policy> {
+        let path = self.0.project_path("policy")?;
+        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
     }
     /// Chooses the policy the project moderates with.
     pub async fn assign(&self, options: AssignPolicy) -> Result<Policy> {
         let path = self.0.project_path("policy")?;
         let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
         self.0.call(request).await
+    }
+}
+
+/// The project's lenses: named image transforms the CDN applies at `/@<identifier>`. Get it from
+/// [`ServerClient::lenses`]. The CDN serves files made with each lens's current definition;
+/// [`ServerClient::ensure_lenses`] creates or changes lenses by identifier, for applications that
+/// declare theirs in code.
+#[derive(Debug, Clone, Copy)]
+pub struct LensesClient<'a>(&'a ServerClient);
+impl LensesClient<'_> {
+    fn path(lens_id: &str) -> Result<String> {
+        Ok(format!("/lenses/{}", id(lens_id)?))
+    }
+    /// Drops the lenses `ensure_lens` cached that `changed` matches: a lens changed here no
+    /// longer has the definition cached for it.
+    fn forget(&self, changed: impl Fn(&Lens) -> bool) {
+        let mut cache = self
+            .0
+            .inner
+            .lenses
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        cache.retain(|_, cached| !changed(cached));
+    }
+    /// One page of the project's lenses, newest first unless `sort` says otherwise. The
+    /// built-in lenses are always available and aren't listed.
+    pub async fn list(&self, options: ListLenses) -> Result<LensPage> {
+        let mut query = Query::default();
+        query.opt("cursor", options.cursor.as_ref());
+        query.opt("pageSize", options.page_size);
+        query.opt("sort", options.sort.as_ref());
+        let request = self
+            .0
+            .prepare(Method::GET, &self.0.project_path("lenses")?, &query.0)?;
+        self.0.call(request).await
+    }
+    /// Every lens of the project from `options.cursor` on, ending and failing like
+    /// [`AssetsClient::iterate`].
+    pub fn iterate(&self, options: ListLenses) -> BoxStream<'static, Result<Lens>> {
+        let client = self.0.clone();
+        paginate(
+            options,
+            |options| options.cursor.clone(),
+            move |options| {
+                let client = client.clone();
+                async move {
+                    let page = client.lenses().list(options.clone()).await?;
+                    let next =
+                        next_cursor(&page.items, page.has_more, &page.next_cursor).map(|cursor| {
+                            ListLenses {
+                                cursor: Some(cursor),
+                                ..options
+                            }
+                        });
+                    Ok((page.items, next))
+                }
+            },
+        )
+    }
+    /// Creates a lens; its identifier must be new to the project (`lens/identifier-taken`).
+    pub async fn create(&self, options: LensDefinition) -> Result<Lens> {
+        id(&options.identifier)?;
+        let request = self
+            .0
+            .prepare(Method::POST, &self.0.project_path("lenses")?, &[])?
+            .json(&options)?;
+        let lens: Lens = self.0.call(request).await?;
+        self.forget(|cached| cached.identifier == lens.identifier);
+        Ok(lens)
+    }
+    /// Retrieves one of the project's lenses by ID.
+    pub async fn retrieve(&self, options: LensId) -> Result<Lens> {
+        let path = Self::path(&options.lens_id)?;
+        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+    }
+    /// Changes a lens's name, description, type, transform or whether the CDN serves it. The CDN
+    /// serves the new transform from then on.
+    pub async fn update(&self, options: UpdateLens) -> Result<Lens> {
+        let path = Self::path(&options.lens_id)?;
+        let request = self.0.prepare(Method::PATCH, &path, &[])?.json(&options)?;
+        let lens: Lens = self.0.call(request).await?;
+        self.forget(|cached| cached.id.is_some() && cached.id == lens.id);
+        Ok(lens)
+    }
+    /// Deletes a lens. URLs that select it stop being served; files the CDN already delivered may
+    /// stay in caches until they expire.
+    pub async fn delete(&self, options: LensId) -> Result<()> {
+        let path = Self::path(&options.lens_id)?;
+        self.0
+            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .await?;
+        self.forget(|cached| cached.id.as_deref() == Some(options.lens_id.as_str()));
+        Ok(())
     }
 }
 
@@ -1623,12 +1869,10 @@ pub(crate) fn sign_upload_token(
     use sha2::{Digest, Sha256};
 
     id(&options.upload_preset_id).map_err(|_| invalid_argument("Upload preset ID is required"))?;
-    let ttl = options
-        .expires_in_seconds
-        .unwrap_or(DEFAULT_UPLOAD_TOKEN_SECONDS);
+    let ttl = options.expires_in.unwrap_or(DEFAULT_UPLOAD_TOKEN_SECONDS);
     if !(1..=3600).contains(&ttl) {
         return Err(invalid_argument(
-            "expiresInSeconds must be a whole number from 1 to 3600",
+            "expires_in must be a whole number of seconds from 1 to 3600",
         ));
     }
     if options.external_id.as_deref() == Some("") {

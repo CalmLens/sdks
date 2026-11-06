@@ -569,16 +569,6 @@ string_enum! {
 }
 
 string_enum! {
-    /// A sort direction.
-    SortDirection {
-        /// Ascending.
-        Asc = "asc",
-        /// Descending.
-        Desc = "desc",
-    }
-}
-
-string_enum! {
     /// A CDN resource beneath an asset URL. Only `Rendered` and `Preview` take a lens or
     /// transform, and the CDN refuses them on rendered PDFs, video and audio with
     /// `transform/invalid`.
@@ -1181,16 +1171,6 @@ impl FolderId {
     }
 }
 
-/// A sort order.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Order {
-    /// The field, e.g. `createdAt`.
-    pub field: String,
-    /// The direction.
-    pub direction: SortDirection,
-}
-
 /// Options for listing assets.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1201,15 +1181,14 @@ pub struct ListAssets {
     /// Items per page, 1 to 100.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
-    /// A filter such as `classification.moderation.status==allowed`.
+    /// A filter such as `classification.moderation.status==allowed`, or `folderId==fldr_…`
+    /// (`folderId==null` for the project root) for the assets directly in one folder.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter: Option<String>,
-    /// Sort orders.
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt,id`. Newest first by default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ordering: Option<Vec<Order>>,
-    /// Lists only the assets directly in this folder.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub folder_id: Option<String>,
+    pub sort: Option<String>,
 }
 
 /// Options for listing an asset's children.
@@ -1227,9 +1206,10 @@ pub struct ListChildren {
     /// A filter such as `classification.moderation.status==allowed`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter: Option<String>,
-    /// Sort orders.
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt,id`. Newest first by default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ordering: Option<Vec<Order>>,
+    pub sort: Option<String>,
 }
 
 /// Options for listing an audio or video asset's findings timeline.
@@ -1403,9 +1383,11 @@ pub struct UploadPart {
     pub asset_id: String,
     /// The part, with `part_number` set.
     pub part: Content,
-    /// Overrides the `queue` choice saved when the upload started, for the final part.
+    /// Whether the final part waits for the decision (`true`) or returns with the asset
+    /// `queued` (`false`), overriding the choice saved when the upload started (`classify`
+    /// waits, `create` doesn't).
     #[serde(default)]
-    pub queue: Option<bool>,
+    pub wait: Option<bool>,
     /// The `Idempotency-Key` for this part. The SDK generates one when it is `None`.
     #[serde(default)]
     pub idempotency_key: Option<String>,
@@ -1517,7 +1499,8 @@ pub struct ListEvents {
     pub asset_id: Option<String>,
 }
 
-/// A named lens definition.
+/// A named lens definition, for [`ServerClient::ensure_lenses`](crate::ServerClient::ensure_lenses)
+/// and [`LensesClient::create`](crate::LensesClient::create).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LensDefinition {
@@ -1531,13 +1514,96 @@ pub struct LensDefinition {
     /// The asset type the lens applies to.
     #[serde(rename = "type")]
     pub lens_type: LensType,
-    /// Whether the lens is active.
+    /// Whether the CDN serves the lens.
     pub active: bool,
-    /// The definition version; bump it to change an existing lens.
-    pub version: u32,
     /// The image transform options the lens applies.
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub transform: Patch<ImageTransformOptions>,
+}
+
+/// Options for one page of the project's lenses.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListLenses {
+    /// The previous page's `next_cursor`; omit for the first page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// Lenses per page, 1 to 100 (the API's default is 50).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `createdAt`. Newest first by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
+}
+
+/// Identifies a lens.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LensId {
+    /// The lens ID.
+    pub lens_id: String,
+}
+impl LensId {
+    /// Identifies lens `lens_id`.
+    pub fn new(lens_id: impl Into<String>) -> Self {
+        Self {
+            lens_id: lens_id.into(),
+        }
+    }
+}
+
+/// Changes to a lens; `None` and [`Patch::Missing`] fields are left unchanged. Its identifier
+/// can't change.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateLens {
+    /// The lens ID.
+    #[serde(skip_serializing)]
+    pub lens_id: String,
+    /// The new display name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// The description.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub description: Patch<String>,
+    /// The asset type the lens applies to.
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub lens_type: Option<LensType>,
+    /// Whether the CDN serves the lens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active: Option<bool>,
+    /// The image transform options; the CDN serves the new transform from then on.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub transform: Patch<ImageTransformOptions>,
+}
+impl UpdateLens {
+    /// Changes nothing yet to lens `lens_id`.
+    pub fn new(lens_id: impl Into<String>) -> Self {
+        Self {
+            lens_id: lens_id.into(),
+            ..Self::default()
+        }
+    }
+}
+
+/// A page of the project's lenses.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct LensPage {
+    /// The lenses on this page.
+    #[serde(default)]
+    pub items: Vec<Lens>,
+    /// The cursor for the next page, or None.
+    #[serde(default)]
+    pub next_cursor: Option<String>,
+    /// Whether another page follows.
+    #[serde(default)]
+    pub has_more: Option<bool>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<LensPage, _>")]
+    pub extra: HashMap<String, Value>,
 }
 
 /// Options for [`ServerClient::ensure_lenses`](crate::ServerClient::ensure_lenses).
@@ -1663,21 +1729,21 @@ pub struct Asset {
     /// A link to the asset in your system.
     #[serde(default)]
     pub external_url: Option<String>,
-    /// Metadata items.
+    /// Metadata items; empty when there are none.
     #[serde(default)]
-    pub metadata: Option<Vec<MetadataItem>>,
+    pub metadata: Vec<MetadataItem>,
     /// Your identifier for who wrote the content.
     #[serde(default)]
     pub author_id: Option<String>,
     /// The earlier posts CalmLens used, oldest first; `None` once the content is removed.
     #[serde(default)]
     pub context: Option<ModerationContext>,
-    /// Tags.
+    /// Tags; empty when there are none.
     #[serde(default)]
-    pub tags: Option<Vec<String>>,
+    pub tags: Vec<String>,
     /// CDN visibility.
     #[serde(default)]
-    pub visibility: Option<Visibility>,
+    pub visibility: Visibility,
     /// Where the asset is in the pipeline.
     #[serde(default)]
     pub upload: AssetUpload,
@@ -1774,13 +1840,13 @@ pub struct AssetClassification {
     /// Content-safety findings and the decision in force.
     #[serde(default)]
     pub moderation: AssetModeration,
-    /// Person detections when requested.
+    /// Person detections when requested; `None` until the feature has run.
     #[serde(default)]
     pub person_detection: Option<PersonDetectionResult>,
-    /// Face detections when requested.
+    /// Face detections when requested; `None` until the feature has run.
     #[serde(default)]
     pub face_detection: Option<FaceDetectionResult>,
-    /// Links and QR codes found when requested.
+    /// Links and QR codes found; `None` until link detection has run.
     #[serde(default)]
     pub link_detection: Option<LinkDetectionResult>,
     /// Preview. Every link found in the asset, where it leads and its verdict. Present when the
@@ -1791,9 +1857,9 @@ pub struct AssetClassification {
     /// AI-generation provenance when requested.
     #[serde(default)]
     pub ai_generated_detection: Option<AiGeneratedDetectionResult>,
-    /// Text regions found in the image, which image transforms can redact.
+    /// What OCR found in an image when requested; `None` until it has run.
     #[serde(default)]
-    pub text_regions: Option<Vec<TextRegion>>,
+    pub ocr: Option<OcrResult>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetClassification, _>")]
     pub extra: HashMap<String, Value>,
@@ -1894,9 +1960,9 @@ pub struct AssetModeration {
     /// Whether the saved decision has a complete explanation.
     #[serde(default)]
     pub explanation_complete: Option<bool>,
-    /// Policy-adjusted category results.
+    /// Policy-adjusted category results; `None` until moderation decides.
     #[serde(default)]
-    pub categories: HashMap<ClassificationCategory, CategoryPolicyScore>,
+    pub categories: Option<HashMap<ClassificationCategory, CategoryPolicyScore>>,
     /// Detection findings before policy evaluation.
     #[serde(default)]
     pub raw: Option<ModerationRaw>,
@@ -2022,7 +2088,7 @@ pub struct ModerationRaw {
     pub categories: HashMap<ClassificationCategory, CategoryResult>,
     /// Matches against project hash lists.
     #[serde(default)]
-    pub hash_matches: Option<Vec<HashMatch>>,
+    pub hash_matches: Vec<HashMatch>,
 }
 
 /// How strongly a category meets the policy, from 0 to 1, and what the policy does with it.
@@ -2069,9 +2135,6 @@ pub struct PolicyRuleSnapshot {
     /// Saved when.
     #[serde(default)]
     pub when: Vec<String>,
-    /// Fixed all tag: selected qualifiers apply to the same instance.
-    #[serde(default)]
-    pub r#match: Option<String>,
     /// Same-instance exclusions.
     #[serde(default)]
     pub unless: Option<Vec<String>>,
@@ -2085,9 +2148,9 @@ pub struct PolicyRuleSnapshot {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CategoryPolicySettingsSnapshot {
-    /// Saved category action.
+    /// Saved default action.
     #[serde(default)]
-    pub category_action: String,
+    pub action: String,
     /// Saved allowances.
     #[serde(default)]
     pub allowances: Vec<PolicyRuleSnapshot>,
@@ -2174,16 +2237,6 @@ string_enum! {
 }
 
 string_enum! {
-    /// How mature a feature is. Beta results may change shape.
-    FeatureStage {
-        /// Beta.
-        Beta = "beta",
-        /// Generally available.
-        Ga = "ga",
-    }
-}
-
-string_enum! {
     /// Why a requested feature did not run.
     FeatureNotEvaluatedReason {
         /// The feature does not apply to this asset, e.g. a text asset.
@@ -2221,9 +2274,6 @@ pub struct PersonDetectionResult {
     /// Whether the feature ran.
     #[serde(default)]
     pub status: Option<FeatureResultStatus>,
-    /// The feature's stage.
-    #[serde(default)]
-    pub stage: Option<FeatureStage>,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<FeatureNotEvaluatedReason>,
@@ -2244,9 +2294,6 @@ pub struct FaceDetectionResult {
     /// Whether the feature ran.
     #[serde(default)]
     pub status: Option<FeatureResultStatus>,
-    /// The feature's stage.
-    #[serde(default)]
-    pub stage: Option<FeatureStage>,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<FeatureNotEvaluatedReason>,
@@ -2267,9 +2314,6 @@ pub struct LinkDetectionResult {
     /// Whether the feature ran.
     #[serde(default)]
     pub status: Option<FeatureResultStatus>,
-    /// The feature's stage.
-    #[serde(default)]
-    pub stage: Option<FeatureStage>,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<FeatureNotEvaluatedReason>,
@@ -2335,9 +2379,6 @@ pub struct LinkSafetyResult {
     /// Whether the feature ran.
     #[serde(default)]
     pub status: Option<FeatureResultStatus>,
-    /// The feature's stage.
-    #[serde(default)]
-    pub stage: Option<FeatureStage>,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<FeatureNotEvaluatedReason>,
@@ -2542,9 +2583,6 @@ pub struct AiGeneratedDetectionResult {
     /// Whether the feature ran.
     #[serde(default)]
     pub status: Option<FeatureResultStatus>,
-    /// The feature's stage.
-    #[serde(default)]
-    pub stage: Option<FeatureStage>,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<FeatureNotEvaluatedReason>,
@@ -2575,6 +2613,26 @@ pub struct AiGeneratedSignal {
     pub value: String,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AiGeneratedSignal, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// What OCR found in an image. Its text is in `content.extracted_text`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct OcrResult {
+    /// Whether OCR ran.
+    #[serde(default)]
+    pub status: FeatureResultStatus,
+    /// Why OCR has no findings, when `status` is `NotEvaluated`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<FeatureNotEvaluatedReason>,
+    /// Where OCR found text, and personal information within it, when `status` is `Evaluated`;
+    /// empty when the image has no text. Redaction transforms blur these regions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_regions: Option<Vec<TextRegion>>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<OcrResult, _>")]
     pub extra: HashMap<String, Value>,
 }
 
@@ -2729,15 +2787,9 @@ pub struct AssetPage {
     /// The cursor for the next page, or None.
     #[serde(default)]
     pub next_cursor: Option<String>,
-    /// The page size.
-    #[serde(default)]
-    pub page_size: Option<u32>,
     /// Whether another page follows.
     #[serde(default)]
     pub has_more: Option<bool>,
-    /// The sort orders applied.
-    #[serde(default)]
-    pub ordering: Option<Vec<Order>>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetPage, _>")]
     pub extra: HashMap<String, Value>,
@@ -2764,15 +2816,9 @@ pub struct AssetTimelinePage {
     /// The cursor for the next page, or None.
     #[serde(default)]
     pub next_cursor: Option<String>,
-    /// The page size.
-    #[serde(default)]
-    pub page_size: Option<u32>,
     /// Whether another page follows.
     #[serde(default)]
     pub has_more: Option<bool>,
-    /// The sort orders applied; the timeline is always in time order.
-    #[serde(default)]
-    pub ordering: Option<Vec<Order>>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetTimelinePage, _>")]
     pub extra: HashMap<String, Value>,
@@ -3146,7 +3192,8 @@ impl EventsPage {
     }
 }
 
-/// A lens.
+/// A named image transform the CDN applies to an asset's rendered or preview image, selected
+/// with `/@<identifier>`. The CDN serves files made with its current definition.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3154,7 +3201,8 @@ pub struct Lens {
     /// The lens ID.
     #[serde(default)]
     pub id: Option<String>,
-    /// The identifier.
+    /// The identifier, used in CDN URLs as `@identifier`.
+    #[serde(default)]
     pub identifier: String,
     /// The display name.
     #[serde(default)]
@@ -3162,18 +3210,12 @@ pub struct Lens {
     /// The asset type the lens applies to (`type` on the wire).
     #[serde(default, rename = "type")]
     pub lens_type: Option<LensType>,
-    /// Whether the lens is active.
+    /// Whether the CDN serves the lens.
     #[serde(default)]
     pub active: Option<bool>,
-    /// The definition version.
-    #[serde(default)]
-    pub version: Option<u32>,
-    /// The owning project.
+    /// The owning project; `None` for built-in lenses.
     #[serde(default)]
     pub project_id: Option<String>,
-    /// The user who created the lens.
-    #[serde(default)]
-    pub user_id: Option<String>,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
     pub created_at: Option<u64>,
@@ -4122,9 +4164,9 @@ pub struct SignUploadToken {
     /// The external ID the uploaded asset gets. Must not be empty.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,
-    /// The token's lifetime, from 1 to 3600 seconds. Defaults to 600.
+    /// The token's lifetime in seconds, from 1 to 3600. Defaults to 600.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expires_in_seconds: Option<u32>,
+    pub expires_in: Option<u32>,
 }
 impl SignUploadToken {
     /// A token for `upload_preset_id` with the default lifetime.
@@ -4155,9 +4197,9 @@ pub struct SearchAssets {
     /// How to match; defaults to `Hybrid`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<SearchMode>,
-    /// The maximum number of results.
+    /// How many of the best matches to return, 1 to 20 (the API's default is 10).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub limit: Option<u32>,
+    pub page_size: Option<u32>,
 }
 
 /// One search result.
@@ -4211,15 +4253,9 @@ pub struct FolderPage {
     /// The cursor for the next page, or None.
     #[serde(default)]
     pub next_cursor: Option<String>,
-    /// The page size.
-    #[serde(default)]
-    pub page_size: Option<u32>,
     /// Whether another page follows.
     #[serde(default)]
     pub has_more: Option<bool>,
-    /// The sort orders applied.
-    #[serde(default)]
-    pub ordering: Option<Vec<Order>>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<FolderPage, _>")]
     pub extra: HashMap<String, Value>,
@@ -4238,9 +4274,10 @@ pub struct ListFolders {
     /// Page size from 1 to 100 (the API's default is 50).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
-    /// At most one sort order, by `name` (the default, ascending) or `createdAt`.
+    /// The sort: one field, `name` (the default) or `createdAt`, descending when prefixed with
+    /// `-`, such as `-createdAt`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ordering: Option<Vec<Order>>,
+    pub sort: Option<String>,
     /// Literal folder-name substring.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search: Option<String>,
@@ -4341,15 +4378,9 @@ pub struct HashListPage {
     /// The cursor for the next page, or None.
     #[serde(default)]
     pub next_cursor: Option<String>,
-    /// The page size.
-    #[serde(default)]
-    pub page_size: Option<u32>,
     /// Whether another page follows.
     #[serde(default)]
     pub has_more: Option<bool>,
-    /// The sort orders applied.
-    #[serde(default)]
-    pub ordering: Option<Vec<Order>>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<HashListPage, _>")]
     pub extra: HashMap<String, Value>,
@@ -4365,6 +4396,10 @@ pub struct ListHashLists {
     /// Hash lists per page, 1 to 100 (the API's default is 50).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt,id`. Newest first by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
 }
 
 /// A page of hash list entries, newest first.
@@ -4378,15 +4413,9 @@ pub struct HashListEntryPage {
     /// The cursor for the next page, or None.
     #[serde(default)]
     pub next_cursor: Option<String>,
-    /// The page size.
-    #[serde(default)]
-    pub page_size: Option<u32>,
     /// Whether another page follows.
     #[serde(default)]
     pub has_more: Option<bool>,
-    /// The sort orders applied.
-    #[serde(default)]
-    pub ordering: Option<Vec<Order>>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<HashListEntryPage, _>")]
     pub extra: HashMap<String, Value>,
@@ -4464,9 +4493,13 @@ pub struct ListHashListEntries {
     /// The cursor from a previous page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cursor: Option<String>,
-    /// The page size.
+    /// Entries per page, 1 to 100 (the API's default is 50).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt,id`. Newest first by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
 }
 
 /// Adds a hash to a hash list: set `hash` (and optionally `quality`), or `asset_id` to use an
@@ -4522,27 +4555,23 @@ string_enum! {
 }
 
 string_enum! {
-    /// How a policy rule's qualifiers combine.
-    PolicyRuleMatch {
-        /// Every qualifier applies to the same qualifying instance.
-        All = "all",
+    /// How a policy relates to its built-in preset.
+    PolicyPresetMode {
+        /// The organisation's own preset policy with automatic updates on: it always has the
+        /// latest preset settings.
+        Live = "live",
+        /// The organisation's own preset policy kept at `preset.version`. Only a pinned policy
+        /// can switch automatic updates on.
+        Pinned = "pinned",
+        /// A policy made from the preset.
+        Copy = "copy",
     }
 }
 
-string_enum! {
-    /// What `policies().apply_preset` does.
-    PolicyPresetOperation {
-        /// Restores the settings of the pinned preset version, discarding edits.
-        Reset = "reset",
-        /// Moves an unchanged copy to the latest preset release.
-        Update = "update",
-    }
-}
-
-/// A moderation policy. Policies belong to the project's organisation and its projects share
-/// them; each project moderates with one, and an upload preset can name another for its own
-/// uploads. `revision` counts saved changes and guards every change, separately from the preset
-/// release in `preset.version`.
+/// A moderation policy. Policies belong to the organisation and its projects share them; each
+/// project moderates with one, and an upload preset can name another for its own uploads.
+/// `revision` counts saved changes and guards every change, separately from the preset release in
+/// `preset.version`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4562,10 +4591,6 @@ pub struct Policy {
     /// refused with `policy/revision-conflict`.
     #[serde(default)]
     pub revision: u64,
-    /// Whether the policy follows its preset: it has the latest preset settings until its first
-    /// saved change pins a copy.
-    #[serde(default)]
-    pub automatic_updates: bool,
     /// Where the policy started from a built-in preset, or `None`.
     #[serde(default)]
     pub preset: Option<PolicyPresetOrigin>,
@@ -4594,14 +4619,13 @@ pub struct PolicyPresetOrigin {
     /// The preset release the policy is pinned to; resetting restores its settings.
     #[serde(default)]
     pub version: u64,
-    /// The newest release of the preset. A newer one than `version` can be applied with
-    /// [`PolicyPresetOperation::Update`].
+    /// The newest release of the preset. A `Pinned` or `Copy` policy on an older `version` can
+    /// be upgraded to it with [`PoliciesClient::upgrade`](crate::PoliciesClient::upgrade).
     #[serde(default)]
     pub latest_version: u64,
-    /// Whether this is the organisation's own policy for the preset rather than a copy made from
-    /// it. An organisation has at most one per preset, and only it can follow automatic updates.
+    /// How the policy relates to the preset.
     #[serde(default)]
-    pub own: bool,
+    pub mode: PolicyPresetMode,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<PolicyPresetOrigin, _>")]
     pub extra: HashMap<String, Value>,
@@ -4640,18 +4664,17 @@ impl PolicySettings {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CategoryPolicySettings {
-    /// What happens when the category's policy score reaches 0.5; `None` leaves the API's
-    /// default.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub action: Option<FlaggedContentAction>,
+    /// What happens when the category's policy score reaches 0.5 and no rule decides it.
+    #[serde(default)]
+    pub action: FlaggedContentAction,
     /// Contexts that let content through, or act on it more softly, when all of the category's
     /// content is one of their qualifiers.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub allowances: Option<Vec<PolicyRule>>,
+    #[serde(default)]
+    pub allowances: Vec<PolicyRule>,
     /// Conditions that act on at least one matching qualifying instance. They outweigh
     /// allowances.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub restrictions: Option<Vec<PolicyRule>>,
+    #[serde(default)]
+    pub restrictions: Vec<PolicyRule>,
     /// Fields this SDK version does not know.
     #[serde(
         flatten,
@@ -4663,7 +4686,7 @@ impl CategoryPolicySettings {
     /// Settings that take `action`, with no allowances or restrictions.
     pub fn new(action: FlaggedContentAction) -> Self {
         Self {
-            action: Some(action),
+            action,
             ..Self::default()
         }
     }
@@ -4681,9 +4704,6 @@ pub struct PolicyRule {
     /// The qualifiers that must all apply.
     #[serde(default)]
     pub when: Vec<ModerationQualifier>,
-    /// How the qualifiers combine.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub r#match: Option<PolicyRuleMatch>,
     /// Qualifiers that exclude an instance (restrictions only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unless: Option<Vec<ModerationQualifier>>,
@@ -4705,20 +4725,39 @@ impl PolicyRule {
     }
 }
 
-/// Every policy of the project's organisation, oldest first, and the one the project uses.
+/// A page of the organisation's policies.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct PolicyList {
-    /// The organisation's policies.
+pub struct PolicyPage {
+    /// The policies on this page.
     #[serde(default)]
-    pub policies: Vec<Policy>,
-    /// The ID of the policy the project moderates with.
+    pub items: Vec<Policy>,
+    /// The cursor for the next page, or None.
     #[serde(default)]
-    pub project_policy_id: String,
+    pub next_cursor: Option<String>,
+    /// Whether another page follows.
+    #[serde(default)]
+    pub has_more: Option<bool>,
     /// Fields this SDK version does not know.
-    #[serde(flatten, deserialize_with = "extra_fields::<PolicyList, _>")]
+    #[serde(flatten, deserialize_with = "extra_fields::<PolicyPage, _>")]
     pub extra: HashMap<String, Value>,
+}
+
+/// Options for one page of the organisation's policies.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListPolicies {
+    /// The previous page's `next_cursor`; omit for the first page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// Policies per page, 1 to 100 (the API's default is 50).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt`. Oldest first by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
 }
 
 /// Identifies a policy.
@@ -4803,32 +4842,44 @@ impl UpdatePolicy {
     }
 }
 
-/// Resets a preset copy to its pinned version (`Reset` with `preset_version` = `preset.version`)
-/// or updates an unchanged copy to the latest release (`Update` with `preset.latest_version`).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Restores the settings of the preset release a `Pinned` or `Copy` policy is pinned to,
+/// discarding its edits.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ApplyPolicyPreset {
+pub struct ResetPolicy {
     /// The policy ID.
     #[serde(skip_serializing)]
     pub policy_id: String,
-    /// What to do.
-    pub operation: PolicyPresetOperation,
     /// The policy's current revision.
     pub revision: u64,
-    /// The preset release you reviewed.
+    /// The pinned `preset.version` you reviewed.
     pub preset_version: u64,
 }
 
-/// Switches automatic updates for the organisation's own preset policy. `enabled` replaces the
-/// saved copy with the latest preset, discarding its changes; `false` pins the current preset
-/// version.
+/// Moves a `Pinned` or `Copy` policy whose settings are unchanged from its preset release to the
+/// latest release of the preset.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradePolicy {
+    /// The policy ID.
+    #[serde(skip_serializing)]
+    pub policy_id: String,
+    /// The policy's current revision.
+    pub revision: u64,
+    /// The `preset.latest_version` you reviewed.
+    pub preset_version: u64,
+}
+
+/// Switches automatic updates for the organisation's own preset policy. `enabled` turns a
+/// `Pinned` policy `Live`, replacing its settings with the latest preset's; `false` pins a `Live`
+/// policy at its current preset release.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetPolicyAutomaticUpdates {
     /// The policy ID.
     #[serde(skip_serializing)]
     pub policy_id: String,
-    /// Whether the policy follows its preset.
+    /// Whether the policy follows its preset (`Live`).
     pub enabled: bool,
     /// The policy's current revision.
     pub revision: u64,

@@ -121,7 +121,7 @@ pub(super) struct QueuedFailure {
 
 /// The operation names [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
 /// takes: the JavaScript SDK's method paths.
-pub(super) const OPERATIONS: [&str; 49] = [
+pub(super) const OPERATIONS: [&str; 62] = [
     "assets.create",
     "assets.classify",
     "text.classify",
@@ -136,6 +136,7 @@ pub(super) const OPERATIONS: [&str; 49] = [
     "assets.listChildren",
     "assets.iterateChildren",
     "assets.listTimeline",
+    "assets.iterateTimeline",
     "assets.removeContent",
     "assets.retry",
     "assets.explain",
@@ -143,27 +144,39 @@ pub(super) const OPERATIONS: [&str; 49] = [
     "assets.decide",
     "assets.batch",
     "folders.list",
+    "folders.iterate",
     "folders.create",
     "folders.retrieve",
     "folders.update",
     "folders.delete",
     "folders.move",
     "hashLists.list",
+    "hashLists.iterate",
     "hashLists.retrieve",
     "hashLists.create",
     "hashLists.update",
     "hashLists.delete",
     "hashLists.listEntries",
+    "hashLists.iterateEntries",
     "hashLists.addEntry",
     "hashLists.removeEntry",
     "policies.list",
+    "policies.iterate",
     "policies.retrieve",
     "policies.create",
     "policies.update",
-    "policies.applyPreset",
+    "policies.reset",
+    "policies.upgrade",
     "policies.setAutomaticUpdates",
     "policies.delete",
+    "policies.retrieveAssigned",
     "policies.assign",
+    "lenses.list",
+    "lenses.iterate",
+    "lenses.create",
+    "lenses.retrieve",
+    "lenses.update",
+    "lenses.delete",
     "events.list",
     "events.pages",
     "ensureLens",
@@ -395,6 +408,19 @@ fn is_asset_id(value: &str) -> bool {
 /// A request the API's schema refuses: `validation/invalid-request` with HTTP 400, listing the
 /// field and its issue code (`validation/<issue>`, such as `validation/too-big`) in
 /// `details.issues`.
+/// The asset fields the API always sets: `metadata` and `tags` are lists, empty when there are
+/// none, and `visibility` is `private` unless the asset is public.
+fn always_set(asset: &mut Value) {
+    for key in ["metadata", "tags"] {
+        if asset[key].is_null() {
+            asset[key] = json!([]);
+        }
+    }
+    if asset["visibility"].is_null() {
+        asset["visibility"] = "private".into();
+    }
+}
+
 fn validation(issue: &str, path: &str) -> Failure {
     let message = format!("Invalid {path}");
     let mut failure = fail(ErrorCode::InvalidRequest, &message);
@@ -433,7 +459,7 @@ fn check_metadata(metadata: Option<&Value>) -> Outcome<()> {
 /// mock analyses no audio or video, so it keeps no segments: every timeline is empty, and no
 /// cursor continues one.
 fn timeline_page(asset: &Value, q: &HashMap<String, String>) -> Outcome<Value> {
-    let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
+    bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
     if !asset["content"]["safetyHold"].is_null() {
         let mut failure = fail(ErrorCode::AssetHeld, "This asset is under a safety hold");
         failure.details = json!({ "hold": "safety" });
@@ -442,13 +468,7 @@ fn timeline_page(asset: &Value, q: &HashMap<String, String>) -> Outcome<Value> {
     if q.contains_key("cursor") {
         return Err(fail(ErrorCode::InvalidCursor, "Invalid cursor"));
     }
-    Ok(json!({
-        "items": [],
-        "nextCursor": null,
-        "pageSize": size,
-        "hasMore": false,
-        "ordering": [],
-    }))
+    Ok(json!({ "items": [], "nextCursor": null, "hasMore": false }))
 }
 
 fn bounded(
@@ -1253,7 +1273,9 @@ impl Backend {
         let entries = self.storage.hash_list_entries.len();
         let outcome = self.dispatch(method, &parts, &query, body, raw, headers);
         let status = match operation {
-            Some("folders.create" | "hashLists.create" | "policies.create") => 201,
+            Some("folders.create" | "hashLists.create" | "policies.create" | "lenses.create") => {
+                201
+            }
             Some("hashLists.addEntry") if self.storage.hash_list_entries.len() > entries => 201,
             Some("assets.batch") => 202,
             _ => 200,
@@ -1298,26 +1320,22 @@ impl Backend {
                 match (method, route.join("/").as_str()) {
                     ("GET", "events") => self.list_events(q),
                     ("PUT", "lenses") => self.ensure_lenses(body, now),
+                    ("GET", "lenses") => self.list_lenses(q),
+                    ("POST", "lenses") => self.create_lens(body, now),
                     ("GET", "folders") => self.list_folders(q),
                     ("POST", "folders") => self.create_folder(body, now),
                     ("GET", "hash-lists") => {
-                        // Like the API: newest first unless ordering says otherwise, 50 to a page.
+                        // Like the API: newest first unless sort says otherwise, 50 to a page.
                         let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
-                        let ordering = cursor_ordering(q)?;
+                        let ordering = cursor_ordering(q, NEWEST_FIRST)?;
                         let lists = self.own_hash_lists().collect();
                         let scope = json!(["hash-lists", self.options.project_id]).to_string();
                         keyset_page(lists, &ordering, q.get("cursor"), &scope, size)
                     }
                     ("POST", "hash-lists") => self.create_hash_list(body, now),
                     ("GET", "assets") => {
-                        let folder = q.get("folderId").cloned();
-                        let scope =
-                            json!([self.options.project_id, q.get("filter"), folder]).to_string();
-                        self.page(q, &scope, |asset| {
-                            folder
-                                .as_deref()
-                                .is_none_or(|folder| asset["folderId"] == folder)
-                        })
+                        let scope = json!([self.options.project_id, q.get("filter")]).to_string();
+                        self.page(q, &scope, |_| true)
                     }
                     ("GET", "assets/search") => self.search(q),
                     ("GET", _) if matches!(route, [assets, _, timeline] if assets == "assets" && timeline == "timeline") =>
@@ -1329,10 +1347,7 @@ impl Backend {
                     }
                     ("POST", "assets/batch") => self.batch(body, now),
                     ("POST", "signed-asset-urls") => self.sign_asset_url(body, now),
-                    (_, "policy") => self.policy_route(method, route, body),
-                    (_, path) if path.split('/').next() == Some("policies") => {
-                        self.policy_route(method, route, body)
-                    }
+                    (_, "policy") => self.project_policy_route(method, body),
                     ("POST", "assets") => {
                         self.create_asset(header(headers, "x-calmlens-upload"), body, q, raw, now)
                     }
@@ -1350,6 +1365,8 @@ impl Backend {
             [scope, id, suffix @ ..] if scope == "folders" => {
                 self.folder_route(method, id, &suffix.join("/"), body, now)
             }
+            [scope, route @ ..] if scope == "policies" => self.policy_route(method, route, q, body),
+            [scope, id] if scope == "lenses" => self.lens_route(method, id, body, now),
             [scope, id, suffix @ ..] if scope == "hash-lists" => {
                 self.hash_list_route(method, id, &suffix.join("/"), body, q, now)
             }
@@ -1450,10 +1467,18 @@ impl Backend {
             .processing_options
             .get(text(&asset["id"]))
             .map_or(Value::Null, |options| options["features"].clone());
+        // The mock reads no text, QR codes, people or faces in an image: features find nothing.
+        let classification = &mut asset["classification"];
+        if features["ocr"]["enabled"] == true {
+            classification["ocr"] = json!({"status": "evaluated", "textRegions": []});
+        }
+        if features["linkDetection"]["enabled"] != false {
+            classification["linkDetection"] =
+                json!({"status": "evaluated", "qrCodes": [], "links": []});
+        }
         for (feature, list) in [("personDetection", "people"), ("faceDetection", "faces")] {
             if features[feature]["enabled"] == true {
-                asset["classification"][feature] =
-                    json!({"status": "evaluated", "stage": "beta", list: []});
+                classification[feature] = json!({"status": "evaluated", list: []});
             }
         }
     }
@@ -1638,58 +1663,109 @@ impl Backend {
         }))
     }
 
-    /// Saves each definition in turn, like the API: a lens saved before a later one fails
-    /// stays saved.
+    /// Saves each definition in turn, like the API: a new lens, or a changed definition. A lens
+    /// saved before a later one fails stays saved.
     fn ensure_lenses(&mut self, body: Map<String, Value>, now: u64) -> Outcome<Value> {
         let mut result = Vec::new();
-        for mut definition in body
+        for definition in body
             .get("lenses")
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default()
         {
-            let identifier = text(&definition["identifier"]).to_owned();
-            let old = self.lenses.get(&identifier);
-            let same = old.is_some_and(|old| {
-                [
-                    "name",
-                    "description",
-                    "type",
-                    "active",
-                    "transform",
-                    "version",
-                ]
-                .iter()
-                .all(|key| old[key] == definition[key])
-            });
-            let lens = match old {
-                Some(old) if same => old.clone(),
-                Some(old) if definition["version"].as_u64() <= old["version"].as_u64() => {
-                    let current = old["version"].as_u64().unwrap_or(0);
-                    let mut failure = fail(
-                        ErrorCode::LensVersionConflict,
-                        "Lens updates require a greater version",
-                    );
-                    failure.details = json!({
-                        "currentVersion": current, "minimumVersion": current + 1,
-                        "requestedVersion": definition["version"],
-                    });
-                    return Err(failure);
-                }
-                _ => {
-                    definition["id"] =
-                        old.map_or_else(|| self.create_id("lens").into(), |old| old["id"].clone());
-                    definition["createdAt"] =
-                        old.map_or(now.into(), |old| old["createdAt"].clone());
-                    definition["projectId"] = self.options.project_id.clone().into();
-                    definition["updatedAt"] = now.into();
-                    definition
-                }
-            };
-            self.lenses.insert(identifier, lens.clone());
-            result.push(lens);
+            result.push(self.save_lens(definition, now));
         }
         Ok(json!({ "lenses": result }))
+    }
+
+    /// Saves a lens definition by its identifier: a new lens, the stored one unchanged when the
+    /// definition matches it, or the stored one changed to the definition.
+    fn save_lens(&mut self, mut definition: Value, now: u64) -> Value {
+        let identifier = text(&definition["identifier"]).to_owned();
+        let old = self.lenses.get(&identifier);
+        let same = old.is_some_and(|old| {
+            ["name", "description", "type", "active", "transform"]
+                .iter()
+                .all(|key| old[key] == definition[key])
+        });
+        let lens = match old {
+            Some(old) if same => old.clone(),
+            _ => {
+                definition["id"] =
+                    old.map_or_else(|| self.create_id("lens").into(), |old| old["id"].clone());
+                definition["createdAt"] = old.map_or(now.into(), |old| old["createdAt"].clone());
+                definition["projectId"] = self.options.project_id.clone().into();
+                definition["updatedAt"] = now.into();
+                definition
+            }
+        };
+        self.lenses.insert(identifier, lens.clone());
+        lens
+    }
+
+    /// A page of the project's lenses, newest first unless `sort` says otherwise.
+    fn list_lenses(&self, q: &HashMap<String, String>) -> Outcome<Value> {
+        let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
+        let ordering = cursor_ordering(q, NEWEST_FIRST)?;
+        let scope = json!(["lenses", self.options.project_id]).to_string();
+        keyset_page(
+            self.lenses.values().collect(),
+            &ordering,
+            q.get("cursor"),
+            &scope,
+            size,
+        )
+    }
+
+    /// Creates a lens whose identifier is new to the project.
+    fn create_lens(&mut self, body: Map<String, Value>, now: u64) -> Outcome<Value> {
+        let identifier = body.get("identifier").map_or("", text);
+        if identifier.is_empty() {
+            return Err(validation("invalid-type", "identifier"));
+        }
+        if self.lenses.contains_key(identifier) {
+            let mut failure = fail(
+                ErrorCode::LensIdentifierTaken,
+                "The project already has a lens with this identifier",
+            );
+            failure.details = json!({ "identifier": identifier });
+            return Err(failure);
+        }
+        Ok(self.save_lens(Value::Object(body), now))
+    }
+
+    /// `/lenses/:lensId`: retrieve, update or delete one of the project's lenses.
+    fn lens_route(
+        &mut self,
+        method: &str,
+        id: &str,
+        body: Map<String, Value>,
+        now: u64,
+    ) -> Outcome<Value> {
+        let lens = self
+            .lenses
+            .values()
+            .find(|lens| lens["id"] == id)
+            .cloned()
+            .ok_or_else(|| fail(ErrorCode::LensNotFound, "Lens not found"))?;
+        match method {
+            "GET" => Ok(lens),
+            "PATCH" => {
+                let mut changed = lens;
+                for (key, value) in body {
+                    // A lens keeps its identifier.
+                    if key != "identifier" {
+                        changed[key.as_str()] = value;
+                    }
+                }
+                Ok(self.save_lens(changed, now))
+            }
+            "DELETE" => {
+                self.lenses.remove(text(&lens["identifier"]));
+                Ok(json!({}))
+            }
+            _ => Err(unknown_route()),
+        }
     }
 
     fn list_folders(&self, q: &HashMap<String, String>) -> Outcome<Value> {
@@ -1703,24 +1779,11 @@ impl Backend {
             .filter(|folder| text(&folder["parentId"]) == get("parentId"))
             .filter(|folder| text(&folder["name"]).to_lowercase().contains(&search))
             .collect();
-        // Like the API: one ordering by name (the default, ascending) or createdAt, then the ID
-        // in the same direction. Names compare by code point, so case matters.
-        if q.contains_key("ordering[1][field]") {
-            return Err(validation("too-big", "ordering"));
-        }
-        let (field, ascending) = match q.get("ordering[0][field]") {
-            None => ("name".to_owned(), true),
-            Some(field) => {
-                if field != "name" && field != "createdAt" {
-                    return Err(validation("invalid-value", "ordering.0.field"));
-                }
-                match get("ordering[0][direction]") {
-                    "asc" => (field.clone(), true),
-                    "desc" => (field.clone(), false),
-                    _ => return Err(validation("invalid-value", "ordering.0.direction")),
-                }
-            }
-        };
+        // Like the API: sorted by one field, name (the default, ascending) or createdAt, then the
+        // ID in the same direction. Names compare by code point, so case matters.
+        let (field, ascending) = parse_sort(q, &["name", "createdAt"], 1)?
+            .and_then(|sort| sort.into_iter().next())
+            .unwrap_or_else(|| ("name".to_owned(), true));
         let ordering = [(field, ascending), ("id".to_owned(), ascending)];
         let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
         let scope = json!([self.options.project_id, get("parentId"), search]).to_string();
@@ -1912,34 +1975,17 @@ impl Backend {
                 Ok(json!({}))
             }
             ("GET", "entries") => {
-                let page_size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
+                // Like the API: newest first unless sort says otherwise, 50 to a page.
+                let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
+                let ordering = cursor_ordering(q, NEWEST_FIRST)?;
                 let entries: Vec<&Value> = self
                     .storage
                     .hash_list_entries
                     .iter()
                     .filter(|entry| entry["hashListId"] == id)
-                    .rev()
                     .collect();
-                // Cursors are the number of entries already returned.
-                let start = match q.get("cursor") {
-                    None => 0,
-                    Some(cursor) => cursor
-                        .strip_suffix("_mock")
-                        .and_then(|n| n.parse::<usize>().ok())
-                        .ok_or_else(|| fail(ErrorCode::InvalidCursor, "Invalid cursor"))?,
-                };
-                let end = (start + page_size).min(entries.len());
-                let has_more = end < entries.len();
-                Ok(json!({
-                    "items": entries.get(start..end).unwrap_or_default(),
-                    "hasMore": has_more,
-                    "nextCursor": has_more.then(|| format!("{end}_mock")),
-                    "pageSize": page_size,
-                    "ordering": [
-                        {"field": "createdAt", "direction": "desc"},
-                        {"field": "id", "direction": "desc"},
-                    ],
-                }))
+                let scope = json!(["hash-list-entries", id]).to_string();
+                keyset_page(entries, &ordering, q.get("cursor"), &scope, size)
             }
             ("POST", "entries") => self.add_hash_list_entry(id, body, now),
             _ => Err(unknown_route()),
@@ -2097,7 +2143,8 @@ impl Backend {
                 ));
             }
         }
-        let queue = q.get("queue").is_some_and(|value| value == "true");
+        // `wait=false` queues the work; without `wait`, the upload waits for its decision.
+        let queue = q.get("wait").is_some_and(|value| value == "false");
         let open = multipart && !is_final;
         let processing = options
             .get("processingOptions")
@@ -2123,7 +2170,7 @@ impl Backend {
             "id": id, "projectId": self.options.project_id, "parentId": null,
             "folderId": null, "uploadPresetId": null, "createdAt": now, "updatedAt": now,
             "name": null, "description": null, "externalId": null, "externalUrl": null,
-            "type": kind, "metadata": null, "authorId": null, "context": null, "tags": null,
+            "type": kind, "metadata": [], "authorId": null, "context": null, "tags": [],
             "visibility": "private",
             "content": {
                 "status": if keep { "stored" } else { "temporary" }, "removalReason": null,
@@ -2146,9 +2193,14 @@ impl Backend {
                 // The mock never reads test inputs.
                 "testInput": false,
                 "moderation": {
-                    "status": "pending", "manualReviews": [], "flaggedCategories": [],
-                    "regions": [], "timeline": null,
+                    "status": "pending", "manualReviews": [], "automatedStatus": null,
+                    "source": null, "rule": null, "explanationComplete": null,
+                    "categories": null, "flaggedCategories": [], "regions": [], "raw": null,
+                    "timeline": null, "linkSafety": null,
                 },
+                // Like the API, a feature's result is `null` until it has run.
+                "ocr": null, "personDetection": null, "faceDetection": null,
+                "linkDetection": null, "linkSafety": null,
             },
         });
         self.processing_options.insert(id.clone(), processing);
@@ -2168,6 +2220,7 @@ impl Backend {
                 asset[key] = value.clone();
             }
         }
+        always_set(&mut asset);
         if !context.is_empty() {
             asset["context"] = json!({ "items": context });
         }
@@ -2329,6 +2382,7 @@ impl Backend {
                 for (key, value) in body {
                     asset[key] = value;
                 }
+                always_set(&mut asset);
                 asset["updatedAt"] = now.into();
             }
             ("DELETE", "content") => return Ok(self.remove_content(asset, now, None)),
@@ -2336,7 +2390,9 @@ impl Backend {
                 let (received, is_final) = self.check_part(&asset, q, raw)?;
                 let part: u64 = q["partNumber"].parse().unwrap_or(0);
                 let upload = self.uploads.get(id).expect("open upload");
-                let queue = q.get("queue").map_or(upload.queue, |value| value == "true");
+                // `wait=false` queues the final part; without `wait`, the upload's saved choice
+                // applies.
+                let queue = q.get("wait").map_or(upload.queue, |value| value == "false");
                 let storage = &mut self.storage;
                 let parts = &mut storage.content.get_mut(id).expect("content").parts;
                 parts.insert(part as u32, raw.to_vec());
@@ -2407,18 +2463,18 @@ impl Backend {
         Ok((received, is_final))
     }
 
-    /// Project assets accepted by `include`, filtered, ordered and paged like the API. A cursor
-    /// is tied to `scope` (the filter, folder or parent) and the ordering, so it only continues
-    /// the query it came from.
+    /// Project assets accepted by `include`, filtered, sorted and paged like the API. A cursor
+    /// is tied to `scope` (the filter or parent) and the sort, so it only continues the query it
+    /// came from.
     fn page(
         &self,
         q: &HashMap<String, String>,
         scope: &str,
         include: impl Fn(&Value) -> bool,
     ) -> Outcome<Value> {
-        // In the API's order: the query schema (page size, then ordering), then the filter.
+        // In the API's order: the query schema (page size, then sort), then the filter.
         let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;
-        let ordering = cursor_ordering(q)?;
+        let ordering = cursor_ordering(q, NEWEST_FIRST)?;
         let filter = q
             .get("filter")
             .map(|expression| parse_filter(expression))
@@ -2438,7 +2494,7 @@ impl Backend {
     /// most 8 distinct) must appear in some searchable field. Results rank by the API's keyword
     /// score, then newest first. Semantic search is not simulated.
     fn search(&self, q: &HashMap<String, String>) -> Outcome<Value> {
-        // Like the API's query schema: a trimmed query of 1 to 200 characters, a limit of 1 to 20.
+        // Like the API's query schema: a trimmed query of 1 to 200 characters, 1 to 20 results.
         let query = q.get("query").map_or("", |query| query.trim());
         if query.is_empty() {
             return Err(validation("too-small", "query"));
@@ -2446,7 +2502,7 @@ impl Backend {
         if query.chars().count() > 200 {
             return Err(validation("too-big", "query"));
         }
-        let limit = bounded(q.get("limit"), 10, 1, 20, "limit")?;
+        let page_size = bounded(q.get("pageSize"), 10, 1, 20, "pageSize")?;
         let normalized = query.to_lowercase();
         let mut tokens: Vec<&str> = Vec::new();
         for token in normalized.split_whitespace() {
@@ -2507,7 +2563,7 @@ impl Backend {
         });
         let items: Vec<Value> = matches
             .into_iter()
-            .take(limit)
+            .take(page_size)
             .map(|(score, fields, asset)| json!({"asset": asset, "score": score, "matchedFields": fields}))
             .collect();
         Ok(json!({"query": query, "items": items, "semanticStatus": "disabled"}))
@@ -2880,12 +2936,17 @@ impl Backend {
         }
         let rest = under(url, &self.options.api_base_url)?;
         let parts: Vec<&str> = rest.split('/').filter(|part| !part.is_empty()).collect();
-        let queue = url
+        let no_wait = url
             .query_pairs()
-            .any(|(key, value)| key == "queue" && value == "true");
+            .any(|(key, value)| key == "wait" && value == "false");
         Some(match (method.as_str(), parts.as_slice()) {
             ("GET", ["projects", _, "events"]) => "events.list",
             ("PUT", ["projects", _, "lenses"]) => "ensureLenses",
+            ("GET", ["projects", _, "lenses"]) => "lenses.list",
+            ("POST", ["projects", _, "lenses"]) => "lenses.create",
+            ("GET", ["lenses", _]) => "lenses.retrieve",
+            ("PATCH", ["lenses", _]) => "lenses.update",
+            ("DELETE", ["lenses", _]) => "lenses.delete",
             ("GET", ["projects", _, "folders"]) => "folders.list",
             ("POST", ["projects", _, "folders"]) => "folders.create",
             ("GET", ["projects", _, "assets"]) => "assets.list",
@@ -2893,7 +2954,7 @@ impl Backend {
             ("GET", ["projects", _, "assets", _, "timeline"]) => "assets.listTimeline",
             ("POST", ["projects", _, "assets", "batch"]) => "assets.batch",
             ("POST", ["projects", _, "signed-asset-urls"]) => "cdn.signAssetUrl",
-            ("POST", ["projects", _, "assets"]) if queue => "assets.create",
+            ("POST", ["projects", _, "assets"]) if no_wait => "assets.create",
             ("POST", ["projects", _, "assets"]) => "assets.classify",
             ("GET", ["assets", _]) => "assets.retrieve",
             ("PATCH", ["assets", _]) => "assets.update",
@@ -2917,15 +2978,15 @@ impl Backend {
             ("GET", ["hash-lists", _, "entries"]) => "hashLists.listEntries",
             ("POST", ["hash-lists", _, "entries"]) => "hashLists.addEntry",
             ("DELETE", ["hash-list-entries", _]) => "hashLists.removeEntry",
-            ("GET", ["projects", _, "policies"]) => "policies.list",
-            ("POST", ["projects", _, "policies"]) => "policies.create",
-            ("GET", ["projects", _, "policies", _]) => "policies.retrieve",
-            ("PATCH", ["projects", _, "policies", _]) => "policies.update",
-            ("DELETE", ["projects", _, "policies", _]) => "policies.delete",
-            ("POST", ["projects", _, "policies", _, "preset"]) => "policies.applyPreset",
-            ("PUT", ["projects", _, "policies", _, "automatic-updates"]) => {
-                "policies.setAutomaticUpdates"
-            }
+            ("GET", ["policies"]) => "policies.list",
+            ("POST", ["policies"]) => "policies.create",
+            ("GET", ["policies", _]) => "policies.retrieve",
+            ("PATCH", ["policies", _]) => "policies.update",
+            ("DELETE", ["policies", _]) => "policies.delete",
+            ("POST", ["policies", _, "reset"]) => "policies.reset",
+            ("POST", ["policies", _, "upgrade"]) => "policies.upgrade",
+            ("PUT", ["policies", _, "automatic-updates"]) => "policies.setAutomaticUpdates",
+            ("GET", ["projects", _, "policy"]) => "policies.retrieveAssigned",
             ("PUT", ["projects", _, "policy"]) => "policies.assign",
             _ => return None,
         })
@@ -2942,6 +3003,12 @@ fn covers(target: &str, operation: &str) -> bool {
                 | ("assets.waitForDecision", "assets.retrieve")
                 | ("assets.iterate", "assets.list")
                 | ("assets.iterateChildren", "assets.listChildren")
+                | ("assets.iterateTimeline", "assets.listTimeline")
+                | ("folders.iterate", "folders.list")
+                | ("hashLists.iterate", "hashLists.list")
+                | ("hashLists.iterateEntries", "hashLists.listEntries")
+                | ("policies.iterate", "policies.list")
+                | ("lenses.iterate", "lenses.list")
                 | ("events.pages", "events.list")
                 | ("ensureLens", "ensureLenses")
         )
@@ -3052,42 +3119,54 @@ fn content_purged(asset: &Value) -> bool {
             })
 }
 
-/// A cursor list's ordering by `createdAt` or `id`, as `(field, ascending)`: newest first by
-/// default, with the `id` tie-breaker added like the API.
-fn cursor_ordering(q: &HashMap<String, String>) -> Outcome<Vec<(String, bool)>> {
-    let mut ordering = Vec::new();
-    while let Some(field) = q.get(&format!("ordering[{}][field]", ordering.len())) {
-        let direction = q
-            .get(&format!("ordering[{}][direction]", ordering.len()))
-            .cloned()
-            .unwrap_or_default();
-        // Like CURSOR_PAGE_QUERY_SCHEMA: a field of createdAt or id, then a direction.
-        let index = ordering.len();
-        if !["createdAt", "id"].contains(&field.as_str()) {
-            return Err(validation(
-                "invalid-value",
-                &format!("ordering.{index}.field"),
-            ));
+/// A list's `sort` query value as the API parses it: comma-separated fields from `fields`,
+/// each descending when prefixed with `-`, none repeated and at most `max`, as
+/// `(field, ascending)`. `None` when the request sends none.
+fn parse_sort(
+    q: &HashMap<String, String>,
+    fields: &[&str],
+    max: usize,
+) -> Outcome<Option<Vec<(String, bool)>>> {
+    let Some(value) = q.get("sort") else {
+        return Ok(None);
+    };
+    let refused = || validation("invalid-value", "sort");
+    let mut sort: Vec<(String, bool)> = Vec::new();
+    for part in value.split(',').map(str::trim) {
+        let field = part.strip_prefix('-').unwrap_or(part);
+        let well_formed = field
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic())
+            && field.chars().all(|c| c.is_ascii_alphanumeric() || c == '.');
+        if !well_formed || !fields.contains(&field) || sort.iter().any(|(f, _)| f == field) {
+            return Err(refused());
         }
-        if !["asc", "desc"].contains(&direction.as_str()) {
-            return Err(validation(
-                "invalid-value",
-                &format!("ordering.{index}.direction"),
-            ));
-        }
-        ordering.push((field.clone(), direction == "asc"));
+        sort.push((field.to_owned(), !part.starts_with('-')));
     }
-    if ordering.len() > 2 {
-        return Err(validation("too-big", "ordering"));
+    if sort.len() > max {
+        return Err(refused());
     }
-    if ordering.is_empty() {
-        ordering.push(("createdAt".into(), false));
-    }
+    Ok(Some(sort))
+}
+
+/// A cursor list's ordering by `createdAt` or `id` from its `sort`, as `(field, ascending)`:
+/// `default` without one, with the `id` tie-breaker added like the API.
+fn cursor_ordering(
+    q: &HashMap<String, String>,
+    default: (&str, bool),
+) -> Outcome<Vec<(String, bool)>> {
+    let mut ordering = parse_sort(q, &["createdAt", "id"], 2)?
+        .filter(|sort| !sort.is_empty())
+        .unwrap_or_else(|| vec![(default.0.to_owned(), default.1)]);
     if !ordering.iter().any(|(field, _)| field == "id") {
         ordering.push(("id".into(), ordering[0].1));
     }
     Ok(ordering)
 }
+
+/// Newest first: the default order of most cursor lists.
+const NEWEST_FIRST: (&str, bool) = ("createdAt", false);
 
 /// Sorts `items` by `ordering` (which ends with the `id` tie-breaker) and returns the page of up
 /// to `size` items after `cursor`, like the API's cursor lists. A cursor holds the ordering
@@ -3162,10 +3241,7 @@ fn keyset_page(
         }
         _ => Value::Null,
     };
-    Ok(json!({
-        "items": items, "nextCursor": next_cursor, "pageSize": size, "ordering": ordering_json,
-        "hasMore": has_more,
-    }))
+    Ok(json!({ "items": items, "nextCursor": next_cursor, "hasMore": has_more }))
 }
 
 /// Orders JSON values: null first, then numbers numerically, then everything else as text.

@@ -11,10 +11,10 @@ use calmlens::testing::{
     MockResponse, MockServerClient,
 };
 use calmlens::{
-    AssetsClient, CdnClient, ErrorCode, EventsClient, FoldersClient, HashListsClient,
+    AssetsClient, CdnClient, ErrorCode, EventsClient, FoldersClient, HashListsClient, LensesClient,
     PoliciesClient, ServerClient, TextClient, UploadTokensClient,
 };
-use common::{compare_typed, fixture, input, invoke, typed, whole_numbers};
+use common::{compare_typed, fixture, input, invoke, iterator, typed, whole_numbers};
 use futures_util::FutureExt;
 use serde_json::{json, Map, Value};
 use std::{
@@ -593,6 +593,42 @@ async fn webhook_test_fact_contracts() {
     .await;
 }
 
+// webhooks.json `factLookups` and `factObjects`: an event's facts by key, the first value of a
+// repeated key.
+
+#[tokio::test]
+async fn webhook_fact_contracts() {
+    let fixtures = fixture("webhooks");
+    each_case(
+        "event fact lookups",
+        named(&fixtures["factLookups"], "name"),
+        |c| async move {
+            let event: WebhookEventPayload = typed(c["event"].clone());
+            let key = c["key"].as_str().unwrap();
+            let value = calmlens::get_event_fact(&event, key).cloned();
+            // A fact whose value is null is present; a key the event lacks is not.
+            let present = event.facts.iter().any(|fact| fact.key == key);
+            assert_eq!(value.is_some(), present, "{}", c["name"]);
+            assert_eq!(value.unwrap_or(Value::Null), c["value"], "{}", c["name"]);
+        },
+    )
+    .await;
+    each_case(
+        "event fact objects",
+        named(&fixtures["factObjects"], "name"),
+        |c| async move {
+            let event: WebhookEventPayload = typed(c["event"].clone());
+            assert_eq!(
+                Value::Object(calmlens::get_event_facts(&event)),
+                c["facts"],
+                "{}",
+                c["name"]
+            );
+        },
+    )
+    .await;
+}
+
 #[tokio::test]
 async fn webhook_asset_sequence_contracts() {
     let fixtures = fixture("webhooks");
@@ -772,7 +808,7 @@ async fn upload_token_signing_contracts() {
             compared.remove("e");
             assert_eq!(compared, wanted);
             assert_ne!(claims["n"], expected["claims"]["n"]);
-            let lifetime = c["options"]["expiresInSeconds"]
+            let lifetime = c["options"]["expiresIn"]
                 .as_u64()
                 .unwrap_or(file["defaultExpiresInSeconds"].as_u64().unwrap())
                 * 1000;
@@ -788,13 +824,10 @@ async fn upload_token_signing_contracts() {
 
 /// Lifetimes a `u32` cannot hold, so `SignUploadToken` cannot express them.
 const TOKEN_OPTIONS_REFUSED_BY_TYPE: [(&str, &str); 2] = [
-    (
-        "negative lifetime",
-        "SignUploadToken::expires_in_seconds is a u32",
-    ),
+    ("negative lifetime", "SignUploadToken::expires_in is a u32"),
     (
         "fractional lifetime",
-        "SignUploadToken::expires_in_seconds is a u32",
+        "SignUploadToken::expires_in is a u32",
     ),
 ];
 
@@ -1285,10 +1318,11 @@ async fn run_step(
             Ok(serde_json::to_value(mock.assets().wait_for_decision(request).await?).unwrap())
         }
         "ensureLens" => Ok(serde_json::to_value(mock.ensure_lens(input(args)?).await?).unwrap()),
-        "assets.iterate" => collect(mock.assets().iterate(input(args)?)).await,
-        "assets.iterateChildren" => collect(mock.assets().iterate_children(input(args)?)).await,
-        "events.pages" => collect(mock.events().pages(input(args)?)).await,
-        _ => invoke(mock, operation, args).await,
+        _ => match iterator(mock, operation, args.clone()) {
+            // Iterators yield every item (or, for events, every page) in order.
+            Some(stream) => collect(stream?).await,
+            None => invoke(mock, operation, args).await,
+        },
     }
 }
 
@@ -1562,7 +1596,20 @@ fn references() -> BTreeSet<&'static str> {
         "policies().retrieve" => ServerClient::policies, PoliciesClient::retrieve;
         "policies().create" => ServerClient::policies, PoliciesClient::create;
         "policies().update" => ServerClient::policies, PoliciesClient::update;
-        "policies().apply_preset" => ServerClient::policies, PoliciesClient::apply_preset;
+        "policies().reset" => ServerClient::policies, PoliciesClient::reset;
+        "policies().upgrade" => ServerClient::policies, PoliciesClient::upgrade;
+        "policies().retrieve_assigned" => ServerClient::policies, PoliciesClient::retrieve_assigned;
+        "policies().iterate" => ServerClient::policies, PoliciesClient::iterate;
+        "lenses().list" => ServerClient::lenses, LensesClient::list;
+        "lenses().iterate" => ServerClient::lenses, LensesClient::iterate;
+        "lenses().create" => ServerClient::lenses, LensesClient::create;
+        "lenses().retrieve" => ServerClient::lenses, LensesClient::retrieve;
+        "lenses().update" => ServerClient::lenses, LensesClient::update;
+        "lenses().delete" => ServerClient::lenses, LensesClient::delete;
+        "folders().iterate" => ServerClient::folders, FoldersClient::iterate;
+        "hash_lists().iterate" => ServerClient::hash_lists, HashListsClient::iterate;
+        "hash_lists().iterate_entries" => ServerClient::hash_lists, HashListsClient::iterate_entries;
+        "assets().iterate_timeline" => ServerClient::assets, AssetsClient::iterate_timeline;
         "policies().set_automatic_updates" => ServerClient::policies, PoliciesClient::set_automatic_updates;
         "policies().delete" => ServerClient::policies, PoliciesClient::delete;
         "policies().assign" => ServerClient::policies, PoliciesClient::assign;
@@ -1600,6 +1647,8 @@ fn references() -> BTreeSet<&'static str> {
         "create_webhook_signature_header" => |body: &[u8]| calmlens::create_webhook_signature_header(body, "", "");
         "create_webhook_headers" => |body: &[u8]| calmlens::create_webhook_headers(body, "", 0, "");
         "is_newer_asset_event" => calmlens::is_newer_asset_event;
+        "get_event_fact" => |event: &WebhookEventPayload| calmlens::get_event_fact(event, "").cloned();
+        "get_event_facts" => |event: &WebhookEventPayload| calmlens::get_event_facts(event);
         "models::WebhookEventPayload::from_event" => WebhookEventPayload::from_event;
         "models::WebhookEventPayload::is_test" => WebhookEventPayload::is_test;
         "testing::sign_upload_token" => testing::sign_upload_token;

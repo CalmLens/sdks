@@ -9,7 +9,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use calmlens::models::*;
 use calmlens::testing::{MockResponse, MockServerClient};
 use calmlens::{Error, ServerClient};
-use common::{compare_typed, error_json, fixture, input, invoke, whole_numbers};
+use common::{compare_typed, error_json, fixture, input, invoke, iterator, whole_numbers};
 use futures_util::StreamExt;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
@@ -214,20 +214,10 @@ async fn run(client: &ServerClient, operation: &str, args: &Value) -> Outcome {
         })
     }
     .await;
-    match operation {
-        "assets.iterate" => match input(args.clone()) {
-            Ok(options) => collect(client.assets().iterate(options)).await,
-            Err(error) => Outcome::Failed(error, None),
-        },
-        "assets.iterateChildren" => match input(args.clone()) {
-            Ok(options) => collect(client.assets().iterate_children(options)).await,
-            Err(error) => Outcome::Failed(error, None),
-        },
-        "events.iterate" => match input(args.clone()) {
-            Ok(options) => collect(client.events().pages(options)).await,
-            Err(error) => Outcome::Failed(error, None),
-        },
-        _ => match result {
+    match iterator(client, operation, args.clone()) {
+        Some(Ok(stream)) => collect(stream).await,
+        Some(Err(error)) => Outcome::Failed(error, None),
+        None => match result {
             Ok(value) => Outcome::Value(value),
             Err(error) => Outcome::Failed(error, None),
         },

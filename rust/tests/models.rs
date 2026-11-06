@@ -33,7 +33,7 @@ fn an_hls_stream_decodes_into_typed_renditions() {
 
 #[test]
 fn asset_nested_fields_decode_into_typed_models() {
-    let wire = json!({"id":"asset-1","type":"image","content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"width":10,"height":20,"durationSeconds":null,"pageCount":null,"perceptualHash":"ph","perceptualHashQuality":87,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","cameraModel":null,"lensModel":null,"software":null,"creator":null,"copyright":null,"digitalSourceType":null,"containsLocation":true,"location":null},"rendered":{"kind":"image","format":"image/webp","width":10,"height":20},"preview":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000"},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":7,"applied":true}],"status":"age-restricted","automatedStatus":"limited","flaggedCategories":[],"regions":[{"region":"DE","status":"blocked","rule":"de-jmstv","category":"sexual"}],"timeline":{"segmentCount":3},"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"gambling","evidence":[]}],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","stage":"beta","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}]}});
+    let wire = json!({"id":"asset-1","type":"image","content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"width":10,"height":20,"durationSeconds":null,"pageCount":null,"perceptualHash":"ph","perceptualHashQuality":87,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","cameraModel":null,"lensModel":null,"software":null,"creator":null,"copyright":null,"digitalSourceType":null,"containsLocation":true,"location":null},"rendered":{"kind":"image","format":"image/webp","width":10,"height":20},"preview":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000"},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":7,"applied":true}],"status":"age-restricted","automatedStatus":"limited","flaggedCategories":[],"regions":[{"region":"DE","status":"blocked","rule":"de-jmstv","category":"sexual"}],"timeline":{"segmentCount":3},"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"gambling","evidence":[]}],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"ocr":{"status":"evaluated","textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}]}}});
     let asset: Asset = serde_json::from_value(wire).unwrap();
 
     assert_eq!(asset.asset_type, Some(AssetType::Image));
@@ -170,7 +170,7 @@ fn asset_nested_fields_decode_into_typed_models() {
         report.categories[&ClassificationCategory::Violence].reason,
         Some(NotEvaluatedReason::NotSupported)
     );
-    let hash_match = &report.hash_matches.as_ref().unwrap()[0];
+    let hash_match = &report.hash_matches[0];
     assert_eq!(
         (
             hash_match.hash_list_id.as_str(),
@@ -263,11 +263,13 @@ fn asset_nested_fields_decode_into_typed_models() {
         ),
         (&Some(AiProvenance::AiEdited), &AiSignalKind::C2pa)
     );
-    let region = &asset.classification.text_regions.as_ref().unwrap()[0];
+    let ocr = asset.classification.ocr.as_ref().unwrap();
+    assert_eq!(ocr.status, FeatureResultStatus::Evaluated);
+    let region = &ocr.text_regions.as_ref().unwrap()[0];
     assert!(region.personal_information);
     assert_eq!(region.bounding_box.left, 0.5);
     assert_eq!(moderation.timeline.as_ref().unwrap().segment_count, 3);
-    let page: AssetTimelinePage = serde_json::from_value(json!({"items":[{"source":"frame-text","startSeconds":0,"endSeconds":1,"categories":{"hate":{"status":"partial","likelihood":"unlikely","score":0.1}}}],"nextCursor":null,"pageSize":50,"hasMore":false,"ordering":[]})).unwrap();
+    let page: AssetTimelinePage = serde_json::from_value(json!({"items":[{"source":"frame-text","startSeconds":0,"endSeconds":1,"categories":{"hate":{"status":"partial","likelihood":"unlikely","score":0.1}}}],"nextCursor":null,"hasMore":false})).unwrap();
     let segment = &page.items[0];
     assert_eq!(segment.source, MediaSegmentSource::FrameText);
     assert_eq!(
@@ -549,7 +551,7 @@ fn search_models_use_typed_mode_status_and_fields() {
     let request = SearchAssets {
         query: "beach".into(),
         mode: Some(SearchMode::Semantic),
-        limit: None,
+        page_size: None,
     };
     assert_eq!(
         serde_json::to_value(request).unwrap(),
@@ -612,15 +614,14 @@ fn newer_event_types_decode_to_their_own_variants() {
 
 #[test]
 fn report_policy_snapshot_decodes_into_typed_models() {
-    let policy: AssetModeration = serde_json::from_str(r#"{"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedStatus":"purged"}"#).unwrap();
-    let category = &policy.categories[&ClassificationCategory::Violence];
+    let policy: AssetModeration = serde_json::from_str(r#"{"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","indexes":[0,1]},"settings":{"action":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedStatus":"purged"}"#).unwrap();
+    let category = &policy.categories.as_ref().unwrap()[&ClassificationCategory::Violence];
     let settings = category.settings.as_ref().unwrap();
-    assert_eq!(settings.category_action, "block");
+    assert_eq!(settings.action, "block");
     assert_eq!(
         settings.restrictions[0].name.as_deref(),
         Some("snapshot-rule")
     );
-    assert_eq!(settings.restrictions[0].r#match.as_deref(), Some("all"));
     assert_eq!(
         settings.restrictions[0].unless.as_deref(),
         Some(["violence-documentary".to_string()].as_slice())

@@ -342,7 +342,7 @@ impl DemoStore {
             };
             let at = now.saturating_sub(hours * 3_600_000);
             entry.asset.created_at = Some(at);
-            entry.asset.tags = Some(tags.iter().map(|tag| tag.to_string()).collect());
+            entry.asset.tags = tags.iter().map(|tag| tag.to_string()).collect();
             if photo.is_none() {
                 // A plausible size for the samples that carry no photo bytes.
                 entry.asset.content.size_in_bytes = Some(1_200_000 + hours * 7_300);
@@ -558,9 +558,9 @@ impl DemoStore {
         asset.content.size_in_bytes = Some(upload.bytes.len() as u64);
         asset.external_id = Some(upload.external_id);
         asset.description = upload.description;
-        asset.metadata = Some(upload.metadata);
-        asset.tags = Some(Vec::new());
-        asset.visibility = Some(Visibility::Private);
+        asset.metadata = upload.metadata;
+        asset.tags = Vec::new();
+        asset.visibility = Visibility::Private;
         asset.created_at = Some(now_ms());
         asset.updated_at = asset.created_at;
         self.assets.insert(
@@ -607,7 +607,6 @@ impl DemoStore {
         } else {
             None
         };
-        page.page_size = Some(page_size);
         page
     }
 
@@ -638,8 +637,8 @@ impl DemoStore {
     ) -> Result<Asset, Failure> {
         let asset = &mut self.entry_mut(id)?.asset;
         asset.description = description;
-        asset.tags = Some(tags);
-        asset.metadata = Some(metadata);
+        asset.tags = tags;
+        asset.metadata = metadata;
         asset.updated_at = Some(now_ms());
         Ok(asset.clone())
     }
@@ -752,11 +751,10 @@ fn searchable(field: &str, asset: &Asset) -> String {
     match field {
         "name" => asset.name.clone().unwrap_or_default(),
         "description" => asset.description.clone().unwrap_or_default(),
-        "tags" => asset.tags.clone().unwrap_or_default().join(" "),
+        "tags" => asset.tags.join(" "),
         _ => asset
             .metadata
             .iter()
-            .flatten()
             .filter_map(|item| item.value.as_str())
             .collect::<Vec<_>>()
             .join(" "),

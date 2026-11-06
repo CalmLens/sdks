@@ -625,11 +625,11 @@ fn detail(
         h(or_dash(licence_label(metadata_value(asset, META_LICENCE)))),
         h(or_dash(metadata_value(asset, META_CAMPAIGN))),
     );
-    let tags = asset.tags.clone().unwrap_or_default();
+    let tags = &asset.tags;
     if tags.is_empty() {
         html.push('—');
     }
-    for tag in &tags {
+    for tag in tags {
         let _ = write!(html, r#"<span class="tag">{}</span>"#, h(tag));
     }
     let _ = write!(

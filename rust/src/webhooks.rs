@@ -1,6 +1,6 @@
 //! Webhook signature verification and payload parsing. Available without any client feature.
 use crate::error::ErrorCode;
-use crate::models::WebhookEventPayload;
+use crate::models::{Event, EventFact, WebhookEventPayload};
 use crate::{Error, Result};
 use hmac::{Hmac, Mac};
 use serde_json::{Map, Value};
@@ -209,6 +209,46 @@ fn check_payload(value: &Value) -> std::result::Result<(), &'static str> {
         Some(_) => return Err("facts"),
     }
     Ok(())
+}
+
+/// An event with facts: an [`Event`] from the events feed or a [`WebhookEventPayload`] delivery,
+/// for [`get_event_fact`] and [`get_event_facts`].
+pub trait EventFacts {
+    /// The event's facts, in the order it lists them.
+    fn event_facts(&self) -> &[EventFact];
+}
+impl EventFacts for Event {
+    fn event_facts(&self) -> &[EventFact] {
+        &self.facts
+    }
+}
+impl EventFacts for WebhookEventPayload {
+    fn event_facts(&self) -> &[EventFact] {
+        &self.facts
+    }
+}
+
+/// The value of one of an event's facts, by key, such as `flagged-categories` on an
+/// `asset.blocked` event, or `None` when the event doesn't carry it. A key the event repeats
+/// gives its first value. The fact's `url`, when it has one, is on the fact in `facts`.
+pub fn get_event_fact<'a>(event: &'a impl EventFacts, key: &str) -> Option<&'a Value> {
+    event
+        .event_facts()
+        .iter()
+        .find(|fact| fact.key == key)
+        .map(|fact| &fact.value)
+}
+
+/// An event's facts as values by key, such as `{"flagged-categories": ["hate"]}`. A key the
+/// event repeats keeps its first value, as [`get_event_fact`] reads it.
+pub fn get_event_facts(event: &impl EventFacts) -> Map<String, Value> {
+    let mut values = Map::new();
+    for fact in event.event_facts() {
+        if !values.contains_key(&fact.key) {
+            values.insert(fact.key.clone(), fact.value.clone());
+        }
+    }
+    values
 }
 
 /// Whether to apply `event` after `last_sequence`, the highest

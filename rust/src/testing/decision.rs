@@ -301,12 +301,17 @@ impl MockDecision {
             })
             .collect();
         let mut report = Map::new();
-        report.insert("raw".into(), json!({"categories": categories}));
+        report.insert(
+            "raw".into(),
+            json!({"categories": categories, "hashMatches": []}),
+        );
         report.insert("categories".into(), policy_categories.into());
         report.insert("explanationComplete".into(), true.into());
         report.insert("source".into(), "policy".into());
+        report.insert("rule".into(), Value::Null);
         report.insert("automatedStatus".into(), self.status.as_str().into());
         report.insert("regions".into(), json!([]));
+        report.insert("linkSafety".into(), Value::Null);
         // The mock analyses no audio or video, so a decision has no findings timeline.
         report.insert("timeline".into(), Value::Null);
         report.insert("flaggedCategories".into(), json!(self.flagged_categories()));
