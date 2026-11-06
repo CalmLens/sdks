@@ -82,6 +82,21 @@ public final class Models {
     return value == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(value));
   }
 
+  /**
+   * One page of a cursor list: pass {@code nextCursor} as the next request's {@code cursor} while
+   * {@code hasMore}. The list's {@code iterate} methods do this for you.
+   *
+   * @param <T> the listed item
+   */
+  public interface CursorPage<T> {
+    /** @return the items on this page */
+    List<T> items();
+    /** @return the next page's cursor, or null on the last page */
+    String nextCursor();
+    /** @return whether another page follows */
+    boolean hasMore();
+  }
+
   // ------------------------------------------------------------------ Values
 
   /**
@@ -492,23 +507,6 @@ public final class Models {
       characters += length;
     }
     return List.copyOf(selected);
-  }
-
-  /**
-   * One ordering clause for list requests.
-   *
-   * @param field field name, such as {@code createdAt}
-   * @param direction {@code asc} or {@code desc}
-   */
-  public record Order(String field, String direction) {
-    /** An empty clause. */
-    public Order() { this(null, null); }
-
-    /** @param field the field @return a copy ordering by this field */
-    public Order field(String field) { return new Order(field, direction); }
-
-    /** @param direction {@code asc} or {@code desc} @return a copy with this direction */
-    public Order direction(String direction) { return new Order(field, direction); }
   }
 
   /**
@@ -1197,7 +1195,7 @@ public final class Models {
   public static final class SignUploadToken {
     private String uploadPresetId;
     private String externalId;
-    private Integer expiresInSeconds;
+    private Integer expiresIn;
 
     /** Empty options. */
     public SignUploadToken() {}
@@ -1209,11 +1207,11 @@ public final class Models {
     /** @param value the external ID the uploaded asset gets; must not be empty @return these options */
     public SignUploadToken externalId(String value) { externalId = value; return this; }
     /** @param value lifetime in seconds, from 1 to 3600 (default 600) @return these options */
-    public SignUploadToken expiresInSeconds(Integer value) { expiresInSeconds = value; return this; }
+    public SignUploadToken expiresIn(Integer value) { expiresIn = value; return this; }
 
     String uploadPresetIdValue() { return uploadPresetId; }
     String externalIdValue() { return externalId; }
-    Integer expiresInSecondsValue() { return expiresInSeconds; }
+    Integer expiresInValue() { return expiresIn; }
 
     @Override public String toString() { return describe(this); }
   }
@@ -1333,12 +1331,13 @@ public final class Models {
   public static final class SearchAssets {
     private String query;
     private String mode;
-    private Integer limit;
+    private Integer pageSize;
     public SearchAssets() {}
     public SearchAssets query(String value) { query = value; return this; }
     /** @param value {@code keyword}, {@code semantic} or {@code hybrid} @return these options */
     public SearchAssets mode(String value) { mode = value; return this; }
-    public SearchAssets limit(Integer value) { limit = value; return this; }
+    /** @param value how many of the best matches to return, 1 to 20 (default 10) @return these options */
+    public SearchAssets pageSize(Integer value) { pageSize = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -1347,16 +1346,24 @@ public final class Models {
     private String cursor;
     private Integer pageSize;
     private String filter;
-    private String folderId;
-    private List<Order> ordering;
+    private String sort;
     public ListAssets() {}
+    /** @param value the previous page's {@code nextCursor} @return these options */
     public ListAssets cursor(String value) { cursor = value; return this; }
+    /** @param value assets per page, 1 to 100 (default 50) @return these options */
     public ListAssets pageSize(Integer value) { pageSize = value; return this; }
-    /** @param value a filter such as {@code classification.moderation.status==allowed} @return these options */
+    /**
+     * @param value an RSQL filter such as {@code classification.moderation.status==allowed}, or
+     *     {@code folderId==fldr_...} ({@code folderId==null} for the project root) for one folder's assets
+     * @return these options
+     */
     public ListAssets filter(String value) { filter = value; return this; }
-    /** @param value lists only assets directly in this folder @return these options */
-    public ListAssets folderId(String value) { folderId = value; return this; }
-    public ListAssets ordering(List<Order> value) { ordering = value; return this; }
+    /**
+     * @param value comma-separated {@code createdAt} and {@code id}, each ascending unless prefixed
+     *     with {@code -}, such as {@code -createdAt,id}; newest first when unset
+     * @return these options
+     */
+    public ListAssets sort(String value) { sort = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -1365,20 +1372,21 @@ public final class Models {
     private String assetId;
     private String cursor;
     private Integer pageSize;
-    private String filter;
-    private List<Order> ordering;
+    private String sort;
     public ListChildren() {}
     /** @param assetId the parent asset ID */
     public ListChildren(String assetId) { this.assetId = assetId; }
     public ListChildren assetId(String value) { assetId = value; return this; }
+    /** @param value the previous page's {@code nextCursor} @return these options */
     public ListChildren cursor(String value) { cursor = value; return this; }
+    /** @param value children per page, 1 to 100 (default 50) @return these options */
     public ListChildren pageSize(Integer value) { pageSize = value; return this; }
-    public ListChildren filter(String value) { filter = value; return this; }
-    public ListChildren ordering(List<Order> value) { ordering = value; return this; }
+    /** @param value comma-separated {@code createdAt} and {@code id}, descending when prefixed with {@code -}; newest first when unset @return these options */
+    public ListChildren sort(String value) { sort = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
-  /** Options for {@code assets.listTimeline}. */
+  /** Options for {@code assets.listTimeline} and {@code assets.iterateTimeline}. */
   public static final class ListTimeline {
     private String assetId;
     private String cursor;
@@ -1516,19 +1524,20 @@ public final class Models {
   public static final class UploadPart {
     private String assetId;
     private Content part;
-    private Boolean queue;
+    private Boolean wait;
     public UploadPart() {}
     /** @param assetId the uploading asset @param part the part, with its part number and isFinal */
     public UploadPart(String assetId, Content part) { this.assetId = assetId; this.part = part; }
     public UploadPart assetId(String value) { assetId = value; return this; }
     public UploadPart part(Content value) { part = value; return this; }
     /**
-     * Overrides the queue choice saved when the upload started; leave unset to use it.
+     * Overrides, for the final part, the choice saved when the upload started ({@code classify}
+     * waits, {@code create} doesn't); leave unset to use it.
      *
-     * @param value true to queue processing, false to wait for classification
+     * @param value true to wait for the decision, false to return with the asset {@code queued}
      * @return these options
      */
-    public UploadPart queue(Boolean value) { queue = value; return this; }
+    public UploadPart wait(Boolean value) { wait = value; return this; }
     Content partValue() { return part; }
     @Override public String toString() { return describe(this); }
   }
@@ -1593,21 +1602,19 @@ public final class Models {
    * @param items folders on this page
    * @param ancestors folders on the paths to the listed, selected and parent folders
    * @param nextCursor pass as {@code cursor} to get the next page; null on the last page
-   * @param pageSize page size
    * @param hasMore whether another page follows
-   * @param ordering ordering applied
    */
-  public record FolderPage(List<Folder> items, List<Folder> ancestors, String nextCursor, Integer pageSize, boolean hasMore, List<Order> ordering) {
+  public record FolderPage(List<Folder> items, List<Folder> ancestors, String nextCursor, boolean hasMore) implements CursorPage<Folder> {
     /** Copies collections; missing lists become empty. */
-    public FolderPage { items = listOrEmpty(items); ancestors = listOrEmpty(ancestors); ordering = list(ordering); }
+    public FolderPage { items = listOrEmpty(items); ancestors = listOrEmpty(ancestors); }
   }
 
-  /** Options for {@code folders.list}. */
+  /** Options for {@code folders.list} and {@code folders.iterate}. */
   public static final class ListFolders {
     private String parentId;
     private String cursor;
     private Integer pageSize;
-    private List<Order> ordering;
+    private String sort;
     private String search;
     /** @param value lists this folder's children; unset lists the project root @return these options */
     public ListFolders parentId(String value) { parentId = value; return this; }
@@ -1615,8 +1622,8 @@ public final class Models {
     public ListFolders cursor(String value) { cursor = value; return this; }
     /** @param value folders per page, 1 to 100 (default 50) @return these options */
     public ListFolders pageSize(Integer value) { pageSize = value; return this; }
-    /** @param value one clause ordering by {@code name} (the default, ascending) or {@code createdAt} @return these options */
-    public ListFolders ordering(List<Order> value) { ordering = value; return this; }
+    /** @param value {@code name} (the default) or {@code createdAt}, descending when prefixed with {@code -}, such as {@code -createdAt} @return these options */
+    public ListFolders sort(String value) { sort = value; return this; }
     /** @param value case-insensitive text the folder name contains @return these options */
     public ListFolders search(String value) { search = value; return this; }
     @Override public String toString() { return describe(this); }
@@ -1686,25 +1693,26 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
-  /** A lens definition for {@code ensureLens} and {@code ensureLenses}. */
+  /**
+   * A lens definition for {@code ensureLens}, {@code ensureLenses} and {@code lenses.create}. The
+   * CDN serves files made with each lens's current definition.
+   */
   public static final class LensDefinition {
     private String identifier;
     private String name;
     private Patch<String> description;
     @SerializedName("type") private String lensType;
     private Boolean active;
-    private Integer version;
     private Patch<ImageTransformOptions> transform;
     public LensDefinition() {}
     /**
      * @param identifier stable identifier used in CDN URLs
      * @param name display name
      * @param lensType lens type, such as {@code image}
-     * @param active whether the lens is active
-     * @param version version; raise it to change the transform
+     * @param active whether the CDN serves the lens
      */
-    public LensDefinition(String identifier, String name, String lensType, Boolean active, Integer version) {
-      this.identifier = identifier; this.name = name; this.lensType = lensType; this.active = active; this.version = version;
+    public LensDefinition(String identifier, String name, String lensType, Boolean active) {
+      this.identifier = identifier; this.name = name; this.lensType = lensType; this.active = active;
     }
     public LensDefinition identifier(String value) { identifier = value; return this; }
     public LensDefinition name(String value) { name = value; return this; }
@@ -1712,8 +1720,56 @@ public final class Models {
     /** @param value the lens type ({@code type} in the API) @return this definition */
     public LensDefinition lensType(String value) { lensType = value; return this; }
     public LensDefinition active(Boolean value) { active = value; return this; }
-    public LensDefinition version(Integer value) { version = value; return this; }
     public LensDefinition transform(Patch<ImageTransformOptions> value) { transform = value; return this; }
+    String identifierValue() { return identifier; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Options for {@code lenses.list} and {@code lenses.iterate}. */
+  public static final class ListLenses {
+    private String cursor;
+    private Integer pageSize;
+    private String sort;
+    public ListLenses() {}
+    /** @param value the previous page's {@code nextCursor} @return these options */
+    public ListLenses cursor(String value) { cursor = value; return this; }
+    /** @param value lenses per page, 1 to 100 (default 50) @return these options */
+    public ListLenses pageSize(Integer value) { pageSize = value; return this; }
+    /** @param value comma-separated {@code createdAt} and {@code id}, descending when prefixed with {@code -}; newest first when unset @return these options */
+    public ListLenses sort(String value) { sort = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Identifies one lens, for {@code lenses.retrieve} and {@code lenses.delete}. */
+  public static final class LensId {
+    private String lensId;
+    public LensId() {}
+    /** @param lensId the lens ID */
+    public LensId(String lensId) { this.lensId = lensId; }
+    public LensId lensId(String value) { lensId = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Options for {@code lenses.update}; unset fields keep their value. The identifier can't change. */
+  public static final class UpdateLens {
+    private String lensId;
+    private String name;
+    private Patch<String> description;
+    @SerializedName("type") private String lensType;
+    private Boolean active;
+    private Patch<ImageTransformOptions> transform;
+    public UpdateLens() {}
+    /** @param lensId the lens */
+    public UpdateLens(String lensId) { this.lensId = lensId; }
+    public UpdateLens lensId(String value) { lensId = value; return this; }
+    public UpdateLens name(String value) { name = value; return this; }
+    public UpdateLens description(Patch<String> value) { description = value; return this; }
+    /** @param value the lens type ({@code type} in the API) @return these options */
+    public UpdateLens lensType(String value) { lensType = value; return this; }
+    /** @param value whether the CDN serves the lens @return these options */
+    public UpdateLens active(Boolean value) { active = value; return this; }
+    /** @param value the new transform; the CDN serves files made with it from then on @return these options */
+    public UpdateLens transform(Patch<ImageTransformOptions> value) { transform = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -1855,22 +1911,33 @@ public final class Models {
    * @param testInput whether the results came from one of the project's test inputs rather than
    *     analysing the content; never use test results, such as age ranges, for real decisions
    * @param moderation safety findings and decisions
-   * @param personDetection person detection result
-   * @param faceDetection face detection result
-   * @param linkDetection link detection result
+   * @param ocr text found in the image; null until OCR has run, and when it wasn't requested
+   * @param personDetection person detection result; null until it has run
+   * @param faceDetection face detection result; null until it has run
+   * @param linkDetection link detection result; null until it has run
    * @param linkSafety (preview) where the asset's links lead and their verdicts; set when the
    *     project's policy acts on links
-   * @param aiGeneratedDetection generated-content detection result
-   * @param textRegions text found in the image
+   * @param aiGeneratedDetection generated-content detection result; null until it has run
    */
   public record AssetClassification(AssetClassificationStatus status, String failureReason,
       ClassificationProgress progress, @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       @JsonAdapter(Json.EpochMillis.class) Instant completedAt, Boolean testInput,
-      AssetModeration moderation, PersonDetectionResult personDetection,
+      AssetModeration moderation, OcrResult ocr, PersonDetectionResult personDetection,
       FaceDetectionResult faceDetection, LinkDetectionResult linkDetection,
       LinkSafetyResult linkSafety,
-      AiGeneratedDetectionResult aiGeneratedDetection, List<TextRegion> textRegions) {
-    public AssetClassification { textRegions = list(textRegions); }
+      AiGeneratedDetectionResult aiGeneratedDetection) {}
+
+  /**
+   * An OCR result. {@code textRegions} is set only for {@code evaluated}; {@code reason} only for
+   * {@code not-evaluated}.
+   *
+   * @param status {@code evaluated} or {@code not-evaluated}
+   * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
+   * @param textRegions the text regions found in the image; {@code redact} transform options blur them
+   */
+  public record OcrResult(String status, String reason, List<TextRegion> textRegions) {
+    /** Copies collections so the record stays immutable. */
+    public OcrResult { textRegions = list(textRegions); }
   }
 
   /**
@@ -1878,12 +1945,11 @@ public final class Models {
    * evaluated}; {@code reason} only for {@code not-evaluated}.
    *
    * @param status {@code evaluated} or {@code not-evaluated}
-   * @param stage feature maturity, {@code beta} or {@code ga}; beta results may change shape
    * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
    * @param qrCodes QR codes found in the image
    * @param links links found in QR codes and text
    */
-  public record LinkDetectionResult(String status, String stage, String reason, List<DetectedQrCode> qrCodes, List<DetectedLink> links) {
+  public record LinkDetectionResult(String status, String reason, List<DetectedQrCode> qrCodes, List<DetectedLink> links) {
     /** Copies collections so the record stays immutable. */
     public LinkDetectionResult { qrCodes = list(qrCodes); links = list(links); }
   }
@@ -1910,11 +1976,10 @@ public final class Models {
    * {@code processingOptions.features}.
    *
    * @param status {@code evaluated} or {@code not-evaluated}
-   * @param stage feature maturity, {@code beta} or {@code ga}; beta results may change shape
    * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
    * @param links every link found in the asset, with where it leads and its verdict
    */
-  public record LinkSafetyResult(String status, String stage, String reason, List<CheckedLink> links) {
+  public record LinkSafetyResult(String status, String reason, List<CheckedLink> links) {
     /** Copies collections so the record stays immutable. */
     public LinkSafetyResult { links = list(links); }
   }
@@ -1957,12 +2022,11 @@ public final class Models {
    * {@code signals} are set only for {@code evaluated}; {@code reason} only for {@code not-evaluated}.
    *
    * @param status {@code evaluated} or {@code not-evaluated}
-   * @param stage feature maturity, {@code beta} or {@code ga}; beta results may change shape
    * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
    * @param provenance {@code ai-generated}, {@code ai-edited} or {@code unknown}
    * @param signals the metadata that indicated it
    */
-  public record AiGeneratedDetectionResult(String status, String stage, String reason, String provenance, List<ProvenanceSignal> signals) {
+  public record AiGeneratedDetectionResult(String status, String reason, String provenance, List<ProvenanceSignal> signals) {
     /** Copies collections so the record stays immutable. */
     public AiGeneratedDetectionResult { signals = list(signals); }
   }
@@ -2201,16 +2265,22 @@ public final class Models {
   }
 
   /**
-   * A named allowance or restriction of a category: what it is about ({@code when}), whether
-   * {@code all} or {@code some} of the content must match, the qualifiers that exclude it ({@code
-   * unless}, restrictions only) and its action. A decision keeps its rules as configured then.
+   * A named allowance or restriction of a category: the qualifiers that must all hold for the same
+   * content ({@code when}), the qualifiers that exclude it ({@code unless}, restrictions only) and
+   * its action. A decision keeps its rules as configured then.
    */
-  public record PolicyRuleSnapshot(String name, List<String> when, String action, String match, List<String> unless) {
+  public record PolicyRuleSnapshot(String name, List<String> when, String action, List<String> unless) {
     public PolicyRuleSnapshot { when = list(when); unless = list(unless); }
   }
 
-  /** Historical category settings used to explain the saved decision. */
-  public record CategoryPolicySettingsSnapshot(String categoryAction,
+  /**
+   * Historical category settings used to explain the saved decision.
+   *
+   * @param action the category's default action when its policy score reaches 0.5
+   * @param allowances the category's allowances then
+   * @param restrictions the category's restrictions then
+   */
+  public record CategoryPolicySettingsSnapshot(String action,
       List<PolicyRuleSnapshot> allowances, List<PolicyRuleSnapshot> restrictions) {
     public CategoryPolicySettingsSnapshot { allowances = list(allowances); restrictions = list(restrictions); }
   }
@@ -2266,11 +2336,10 @@ public final class Models {
    * only for {@code not-evaluated}.
    *
    * @param status {@code evaluated} or {@code not-evaluated}
-   * @param stage feature maturity, {@code beta} or {@code ga}; beta results may change shape
    * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
    * @param people detected people
    */
-  public record PersonDetectionResult(String status, String stage, String reason, List<DetectedPerson> people) {
+  public record PersonDetectionResult(String status, String reason, List<DetectedPerson> people) {
     /** Copies collections so the record stays immutable. */
     public PersonDetectionResult { people = list(people); }
   }
@@ -2280,11 +2349,10 @@ public final class Models {
    * for {@code not-evaluated}.
    *
    * @param status {@code evaluated} or {@code not-evaluated}
-   * @param stage feature maturity, {@code beta} or {@code ga}; beta results may change shape
    * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
    * @param faces detected faces
    */
-  public record FaceDetectionResult(String status, String stage, String reason, List<DetectedFace> faces) {
+  public record FaceDetectionResult(String status, String reason, List<DetectedFace> faces) {
     /** Copies collections so the record stays immutable. */
     public FaceDetectionResult { faces = list(faces); }
   }
@@ -2416,13 +2484,11 @@ public final class Models {
    *
    * @param items assets on this page
    * @param nextCursor continuation cursor, or null
-   * @param pageSize page size
    * @param hasMore whether another page follows
-   * @param ordering ordering applied
    */
-  public record AssetPage(List<Asset> items, String nextCursor, Integer pageSize, boolean hasMore, List<Order> ordering) {
+  public record AssetPage(List<Asset> items, String nextCursor, boolean hasMore) implements CursorPage<Asset> {
     /** Copies collections; a missing item list becomes empty. */
-    public AssetPage { items = listOrEmpty(items); ordering = list(ordering); }
+    public AssetPage { items = listOrEmpty(items); }
   }
 
   /**
@@ -2430,13 +2496,11 @@ public final class Models {
    *
    * @param items segments on this page
    * @param nextCursor continuation cursor, or null
-   * @param pageSize page size
    * @param hasMore whether another page follows
-   * @param ordering ordering applied; always empty, as segments are in time order
    */
-  public record AssetTimelinePage(List<MediaClassificationSegment> items, String nextCursor, Integer pageSize, boolean hasMore, List<Order> ordering) {
+  public record AssetTimelinePage(List<MediaClassificationSegment> items, String nextCursor, boolean hasMore) implements CursorPage<MediaClassificationSegment> {
     /** Copies collections; a missing item list becomes empty. */
-    public AssetTimelinePage { items = listOrEmpty(items); ordering = list(ordering); }
+    public AssetTimelinePage { items = listOrEmpty(items); }
   }
 
   /**
@@ -2557,39 +2621,38 @@ public final class Models {
    *
    * @param items hash lists on this page
    * @param nextCursor pass as {@code cursor} to get the next page; null on the last page
-   * @param pageSize page size
    * @param hasMore whether another page follows
-   * @param ordering ordering applied
    */
-  public record HashListPage(List<HashList> items, String nextCursor, Integer pageSize, boolean hasMore, List<Order> ordering) {
+  public record HashListPage(List<HashList> items, String nextCursor, boolean hasMore) implements CursorPage<HashList> {
     /** Copies collections; a missing item list becomes empty. */
-    public HashListPage { items = listOrEmpty(items); ordering = list(ordering); }
+    public HashListPage { items = listOrEmpty(items); }
   }
 
-  /** Options for {@code hashLists.list}. */
+  /** Options for {@code hashLists.list} and {@code hashLists.iterate}. */
   public static final class ListHashLists {
     private String cursor;
     private Integer pageSize;
+    private String sort;
     public ListHashLists() {}
     /** @param value the previous page's {@code nextCursor} @return these options */
     public ListHashLists cursor(String value) { cursor = value; return this; }
     /** @param value hash lists per page, 1 to 100 (default 50) @return these options */
     public ListHashLists pageSize(Integer value) { pageSize = value; return this; }
+    /** @param value comma-separated {@code createdAt} and {@code id}, descending when prefixed with {@code -}; newest first when unset @return these options */
+    public ListHashLists sort(String value) { sort = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
   /**
-   * One page of a hash list's entries, newest first.
+   * One page of a hash list's entries, newest first unless {@code sort} says otherwise.
    *
    * @param items entries on this page
    * @param nextCursor continuation cursor, or null
-   * @param pageSize page size
    * @param hasMore whether another page follows
-   * @param ordering ordering applied
    */
-  public record HashListEntryPage(List<HashListEntry> items, String nextCursor, Integer pageSize, boolean hasMore, List<Order> ordering) {
+  public record HashListEntryPage(List<HashListEntry> items, String nextCursor, boolean hasMore) implements CursorPage<HashListEntry> {
     /** Copies collections; a missing item list becomes empty. */
-    public HashListEntryPage { items = listOrEmpty(items); ordering = list(ordering); }
+    public HashListEntryPage { items = listOrEmpty(items); }
   }
 
   /** Identifies one hash list. */
@@ -2642,17 +2705,22 @@ public final class Models {
     @Override public String toString() { return describe(this); }
   }
 
-  /** Options for {@code hashLists.listEntries}. */
+  /** Options for {@code hashLists.listEntries} and {@code hashLists.iterateEntries}. */
   public static final class ListHashListEntries {
     private String hashListId;
     private String cursor;
     private Integer pageSize;
+    private String sort;
     public ListHashListEntries() {}
     /** @param hashListId the hash list */
     public ListHashListEntries(String hashListId) { this.hashListId = hashListId; }
     public ListHashListEntries hashListId(String value) { hashListId = value; return this; }
+    /** @param value the previous page's {@code nextCursor} @return these options */
     public ListHashListEntries cursor(String value) { cursor = value; return this; }
+    /** @param value entries per page, 1 to 100 (default 50) @return these options */
     public ListHashListEntries pageSize(Integer value) { pageSize = value; return this; }
+    /** @param value comma-separated {@code createdAt} and {@code id}, descending when prefixed with {@code -}; newest first when unset @return these options */
+    public ListHashListEntries sort(String value) { sort = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -2683,45 +2751,46 @@ public final class Models {
   // ------------------------------------------------------------------ Policies
 
   /**
-   * A moderation policy. Policies belong to the project's organisation and its projects share them.
+   * A moderation policy. Policies belong to the organisation and its projects share them.
    *
    * @param id policy ID
    * @param name display name
    * @param description what the policy is for
    * @param settings what the policy does with each category
    * @param revision changes with every saved change; send it with each change
-   * @param automaticUpdates whether the policy follows its preset, always having the latest preset
-   *     settings until its first saved edit pins a copy
    * @param preset the built-in preset it started from, or null
    * @param projectIds projects this policy moderates, as their policy or through an upload preset
    * @param createdAt creation time
    * @param updatedAt last change
    */
-  public record Policy(String id, String name, String description, PolicySettings settings, int revision,
-      boolean automaticUpdates, PolicyPreset preset, List<String> projectIds,
+  public record Policy(String id, String name, String description, PolicySettings settings, Integer revision,
+      PolicyPreset preset, List<String> projectIds,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt) {
-    /** Copies collections; a missing project list becomes empty. */
-    public Policy { projectIds = listOrEmpty(projectIds); }
+    /** Copies collections so the record stays immutable. */
+    public Policy { projectIds = list(projectIds); }
   }
 
   /**
    * Where a policy started from a built-in preset.
    *
    * @param id the preset, such as {@code general-community} or {@code children-platform}
-   * @param version the preset release the policy is pinned to; resetting restores it
-   * @param latestVersion the newest release, which {@code update} applies
-   * @param own whether this is the organisation's own policy for the preset rather than a copy made
-   *     from it; an organisation has at most one per preset, and only it can follow automatic
-   *     updates
+   * @param version the preset release the policy is at; {@code policies.reset} restores a pinned
+   *     or copied policy to it
+   * @param latestVersion the newest release, which {@code policies.upgrade} moves an unchanged
+   *     pinned or copied policy to
+   * @param mode {@code live} for the organisation's own preset policy following automatic updates,
+   *     which always has the latest settings; {@code pinned} for that policy with automatic updates
+   *     off, kept at {@code version}; {@code copy} for a policy made from the preset
    */
-  public record PolicyPreset(String id, int version, int latestVersion, boolean own) {}
+  public record PolicyPreset(String id, int version, int latestVersion, String mode) {}
 
   /**
    * A policy's settings.
    *
-   * @param categorySettings the settings of each category, by category; a new or replaced policy
-   *     defines every category
+   * @param categorySettings the settings of every category, by category: {@code sexual}, {@code
+   *     violence}, {@code self-harm}, {@code harassment}, {@code hate}, {@code criminal-activity},
+   *     {@code personal-information} and {@code profanity}
    * @param linkSafety what happens to assets that link to unsafe destinations (preview), or null
    */
   public record PolicySettings(Map<String, PolicyCategorySettings> categorySettings, LinkSafetySettings linkSafety) {
@@ -2734,8 +2803,10 @@ public final class Models {
    *
    * @param action the action when the category's policy score reaches 0.5: {@code allow}, {@code
    *     limit}, {@code age-restrict}, {@code block} or {@code purge}
-   * @param allowances contexts that let content through, or act on it more softly
-   * @param restrictions conditions that act on matching content; they outweigh allowances
+   * @param allowances contexts that let content through, or act on it more softly; send an empty
+   *     list for none
+   * @param restrictions conditions that act on matching content; they outweigh allowances; send an
+   *     empty list for none
    */
   public record PolicyCategorySettings(String action, List<PolicyRuleSnapshot> allowances, List<PolicyRuleSnapshot> restrictions) {
     /** Copies collections so the record stays immutable. */
@@ -2743,14 +2814,30 @@ public final class Models {
   }
 
   /**
-   * {@code policies.list}: every policy of the project's organisation, oldest first.
+   * One page of the organisation's policies, oldest first unless {@code sort} says otherwise.
    *
-   * @param policies the policies
-   * @param projectPolicyId the policy the project moderates with
+   * @param items policies on this page
+   * @param nextCursor pass as {@code cursor} to get the next page; null on the last page
+   * @param hasMore whether another page follows
    */
-  public record PolicyList(List<Policy> policies, String projectPolicyId) {
-    /** Copies collections; a missing list becomes empty. */
-    public PolicyList { policies = listOrEmpty(policies); }
+  public record PolicyPage(List<Policy> items, String nextCursor, boolean hasMore) implements CursorPage<Policy> {
+    /** Copies collections; a missing item list becomes empty. */
+    public PolicyPage { items = listOrEmpty(items); }
+  }
+
+  /** Options for {@code policies.list} and {@code policies.iterate}. */
+  public static final class ListPolicies {
+    private String cursor;
+    private Integer pageSize;
+    private String sort;
+    public ListPolicies() {}
+    /** @param value the previous page's {@code nextCursor} @return these options */
+    public ListPolicies cursor(String value) { cursor = value; return this; }
+    /** @param value policies per page, 1 to 100 (default 50) @return these options */
+    public ListPolicies pageSize(Integer value) { pageSize = value; return this; }
+    /** @param value comma-separated {@code createdAt} and {@code id}, descending when prefixed with {@code -}; oldest first when unset @return these options */
+    public ListPolicies sort(String value) { sort = value; return this; }
+    @Override public String toString() { return describe(this); }
   }
 
   /** Identifies one policy, for {@code policies.retrieve}, {@code policies.delete} and {@code policies.assign}. */
@@ -2803,34 +2890,55 @@ public final class Models {
   }
 
   /**
-   * Options for {@code policies.applyPreset}: {@code reset} restores the pinned preset version's
-   * settings; {@code update} moves an unchanged copy to the latest release.
+   * Options for {@code policies.reset}: restores the settings of the preset release a {@code
+   * pinned} or {@code copy} policy is at, discarding its edits.
    */
-  public static final class ApplyPolicyPreset {
+  public static final class ResetPolicy {
     private String policyId;
-    private String operation;
     private Integer revision;
     private Integer presetVersion;
-    public ApplyPolicyPreset() {}
+    public ResetPolicy() {}
     /**
      * @param policyId the policy
-     * @param operation {@code reset} or {@code update}
      * @param revision its current revision
-     * @param presetVersion {@code preset.version} to reset, {@code preset.latestVersion} to update
+     * @param presetVersion the {@code preset.version} you reviewed
      */
-    public ApplyPolicyPreset(String policyId, String operation, int revision, int presetVersion) {
-      this.policyId = policyId; this.operation = operation; this.revision = revision; this.presetVersion = presetVersion;
+    public ResetPolicy(String policyId, int revision, int presetVersion) {
+      this.policyId = policyId; this.revision = revision; this.presetVersion = presetVersion;
     }
-    public ApplyPolicyPreset policyId(String value) { policyId = value; return this; }
-    public ApplyPolicyPreset operation(String value) { operation = value; return this; }
-    public ApplyPolicyPreset revision(Integer value) { revision = value; return this; }
-    public ApplyPolicyPreset presetVersion(Integer value) { presetVersion = value; return this; }
+    public ResetPolicy policyId(String value) { policyId = value; return this; }
+    public ResetPolicy revision(Integer value) { revision = value; return this; }
+    public ResetPolicy presetVersion(Integer value) { presetVersion = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
   /**
-   * Options for {@code policies.setAutomaticUpdates}. Switching on replaces a saved copy with the
-   * latest preset, discarding its changes; switching off pins the current version as a copy.
+   * Options for {@code policies.upgrade}: moves a {@code pinned} or {@code copy} policy whose
+   * settings are unchanged from its preset release to the latest release.
+   */
+  public static final class UpgradePolicy {
+    private String policyId;
+    private Integer revision;
+    private Integer presetVersion;
+    public UpgradePolicy() {}
+    /**
+     * @param policyId the policy
+     * @param revision its current revision
+     * @param presetVersion the {@code preset.latestVersion} you reviewed
+     */
+    public UpgradePolicy(String policyId, int revision, int presetVersion) {
+      this.policyId = policyId; this.revision = revision; this.presetVersion = presetVersion;
+    }
+    public UpgradePolicy policyId(String value) { policyId = value; return this; }
+    public UpgradePolicy revision(Integer value) { revision = value; return this; }
+    public UpgradePolicy presetVersion(Integer value) { presetVersion = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /**
+   * Options for {@code policies.setAutomaticUpdates} on the organisation's own preset policy.
+   * Switching on makes a {@code pinned} policy {@code live}, replacing its changes with the latest
+   * preset; switching off pins a {@code live} policy at its current preset release.
    */
   public static final class SetPolicyAutomaticUpdates {
     private String policyId;
@@ -2857,7 +2965,7 @@ public final class Models {
   /**
    * One registered event fact. Render {@code url} only after checking it (see the events docs).
    *
-   * @param key fact key, such as {@code reviewer-name}
+   * @param key fact key, such as {@code flagged-categories}
    * @param value fact value
    * @param url link for the fact, if any
    */
@@ -3029,25 +3137,38 @@ public final class Models {
   }
 
   /**
-   * A lens.
+   * A lens: a named image transform the CDN applies at {@code /@<identifier>}. The CDN serves files
+   * made with its current definition.
    *
    * @param id lens ID
    * @param identifier stable identifier used in CDN URLs
    * @param name display name
    * @param type lens type
-   * @param active whether the lens is active
-   * @param version version
+   * @param active whether the CDN serves the lens
    * @param projectId owning project
    * @param createdAt creation time
    * @param updatedAt last update time
    * @param description description
    * @param transform image transform options
    */
-  public record Lens(String id, String identifier, String name, String type, Boolean active, Integer version,
+  public record Lens(String id, String identifier, String name, String type, Boolean active,
       String projectId,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       String description, ImageTransformOptions transform) {}
+
+  /**
+   * One page of the project's lenses, newest first unless {@code sort} says otherwise. The built-in
+   * lenses are always available and aren't listed.
+   *
+   * @param items lenses on this page
+   * @param nextCursor pass as {@code cursor} to get the next page; null on the last page
+   * @param hasMore whether another page follows
+   */
+  public record LensPage(List<Lens> items, String nextCursor, boolean hasMore) implements CursorPage<Lens> {
+    /** Copies collections; a missing item list becomes empty. */
+    public LensPage { items = listOrEmpty(items); }
+  }
 
   /**
    * A signed asset URL, or a resource URL beneath it. It grants access until it expires, so {@link

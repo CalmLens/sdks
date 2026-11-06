@@ -78,9 +78,10 @@ final class MockApi {
   private record Saved(String fingerprint, int status, byte[] body) {}
 
   private static final Set<String> JSON_QUERY = Set.of("metadata", "tags", "processingOptions", "context");
-  private static final Set<String> INT_QUERY = Set.of("pageSize", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes");
-  private static final Set<String> BOOL_QUERY = Set.of("queue", "isFinal");
-  private static final Pattern ORDERING = Pattern.compile("ordering\\[(\\d+)]\\[(\\w+)]");
+  private static final Set<String> INT_QUERY = Set.of("pageSize", "partNumber", "sizeInBytes", "totalSizeInBytes");
+  private static final Set<String> BOOL_QUERY = Set.of("wait", "isFinal");
+  /** A {@code sort} field: a name, descending when prefixed with {@code -}, as the API's {@code sortQueryField} reads it. */
+  private static final Pattern SORT_FIELD = Pattern.compile("-?[A-Za-z][A-Za-z0-9.]*");
   /** Like the API: 1 to 255 printable ASCII characters, without a space at either end. */
   private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[\\x21-\\x7e](?:[\\x20-\\x7e]{0,253}[\\x21-\\x7e])?");
   private static final long MIB = 1024 * 1024;
@@ -163,13 +164,15 @@ final class MockApi {
   /** Every client method that sends a request, by its JavaScript method path, for {@code failNextRequest}. */
   static final Set<String> OPERATIONS = Set.of(
       "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
-      "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.create", "assets.classify", "assets.uploadPart",
-      "assets.move", "assets.retry", "assets.explain", "assets.decide", "assets.removeContent",
-      "assets.delete", "assets.batch", "text.classify", "cdn.serve", "cdn.getAssetInfo", "cdn.signAssetUrl", "events.list", "events.pages", "folders.list",
-      "folders.retrieve", "folders.create", "folders.update", "folders.delete", "folders.move", "hashLists.list",
-      "hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete", "hashLists.listEntries",
-      "hashLists.addEntry", "hashLists.removeEntry", "policies.list", "policies.retrieve", "policies.create",
-      "policies.update", "policies.applyPreset", "policies.setAutomaticUpdates", "policies.delete", "policies.assign",
+      "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.iterateTimeline", "assets.create",
+      "assets.classify", "assets.uploadPart", "assets.move", "assets.retry", "assets.explain", "assets.decide", "assets.removeContent",
+      "assets.delete", "assets.batch", "text.classify", "cdn.serve", "cdn.getAssetInfo", "cdn.signAssetUrl", "events.list", "events.pages",
+      "folders.list", "folders.iterate", "folders.retrieve", "folders.create", "folders.update", "folders.delete", "folders.move",
+      "hashLists.list", "hashLists.iterate", "hashLists.retrieve", "hashLists.create", "hashLists.update", "hashLists.delete",
+      "hashLists.listEntries", "hashLists.iterateEntries", "hashLists.addEntry", "hashLists.removeEntry",
+      "policies.list", "policies.iterate", "policies.retrieve", "policies.create", "policies.update", "policies.reset",
+      "policies.upgrade", "policies.setAutomaticUpdates", "policies.delete", "policies.retrieveAssigned", "policies.assign",
+      "lenses.list", "lenses.iterate", "lenses.create", "lenses.retrieve", "lenses.update", "lenses.delete",
       "ensureLens", "ensureLenses");
 
   /** A request URL's path after the API or CDN base URL, with its segments decoded. */
@@ -196,33 +199,36 @@ final class MockApi {
     String method = request.method();
     if (parts.size() >= 3 && parts.get(0).equals("projects")) {
       String route = method + " " + String.join("/", parts.subList(2, parts.size()));
-      if (parts.get(2).equals("policies") && (parts.size() == 4 || parts.size() == 5)) {
-        return switch (method + " " + (parts.size() == 5 ? parts.get(4) : "")) {
-          case "GET " -> Set.of("policies.retrieve");
-          case "PATCH " -> Set.of("policies.update");
-          case "DELETE " -> Set.of("policies.delete");
-          case "POST preset" -> Set.of("policies.applyPreset");
-          case "PUT automatic-updates" -> Set.of("policies.setAutomaticUpdates");
-          default -> Set.of();
-        };
-      }
       if (parts.size() == 5 && parts.get(2).equals("assets") && parts.get(4).equals("timeline") && method.equals("GET"))
-        return Set.of("assets.listTimeline");
+        return Set.of("assets.listTimeline", "assets.iterateTimeline");
       return switch (route) {
         case "GET events" -> Set.of("events.list", "events.pages");
         case "PUT lenses" -> Set.of("ensureLens", "ensureLenses");
-        case "GET folders" -> Set.of("folders.list");
+        case "GET lenses" -> Set.of("lenses.list", "lenses.iterate");
+        case "POST lenses" -> Set.of("lenses.create");
+        case "GET folders" -> Set.of("folders.list", "folders.iterate");
         case "POST folders" -> Set.of("folders.create");
-        case "GET hash-lists" -> Set.of("hashLists.list");
+        case "GET hash-lists" -> Set.of("hashLists.list", "hashLists.iterate");
         case "POST hash-lists" -> Set.of("hashLists.create");
-        case "GET policies" -> Set.of("policies.list");
-        case "POST policies" -> Set.of("policies.create");
+        case "GET policy" -> Set.of("policies.retrieveAssigned");
         case "PUT policy" -> Set.of("policies.assign");
         case "GET assets/search" -> Set.of("assets.search");
         case "GET assets" -> Set.of("assets.list", "assets.iterate");
         case "POST assets/batch" -> Set.of("assets.batch");
         case "POST signed-asset-urls" -> Set.of("cdn.signAssetUrl");
-        case "POST assets" -> "false".equals(request.query().get("queue")) ? Set.of("assets.classify", "text.classify") : Set.of("assets.create");
+        case "POST assets" -> "false".equals(request.query().get("wait")) ? Set.of("assets.create") : Set.of("assets.classify", "text.classify");
+        default -> Set.of();
+      };
+    }
+    if (parts.get(0).equals("policies") && parts.size() <= 3) {
+      if (parts.size() == 1) return method.equals("GET") ? Set.of("policies.list", "policies.iterate") : Set.of("policies.create");
+      return switch (method + " " + (parts.size() == 3 ? parts.get(2) : "")) {
+        case "GET " -> Set.of("policies.retrieve");
+        case "PATCH " -> Set.of("policies.update");
+        case "DELETE " -> Set.of("policies.delete");
+        case "POST reset" -> Set.of("policies.reset");
+        case "POST upgrade" -> Set.of("policies.upgrade");
+        case "PUT automatic-updates" -> Set.of("policies.setAutomaticUpdates");
         default -> Set.of();
       };
     }
@@ -246,7 +252,10 @@ final class MockApi {
       case "hash-lists GET " -> Set.of("hashLists.retrieve");
       case "hash-lists PATCH " -> Set.of("hashLists.update");
       case "hash-lists DELETE " -> Set.of("hashLists.delete");
-      case "hash-lists GET entries" -> Set.of("hashLists.listEntries");
+      case "hash-lists GET entries" -> Set.of("hashLists.listEntries", "hashLists.iterateEntries");
+      case "lenses GET " -> Set.of("lenses.retrieve");
+      case "lenses PATCH " -> Set.of("lenses.update");
+      case "lenses DELETE " -> Set.of("lenses.delete");
       case "hash-lists POST entries" -> Set.of("hashLists.addEntry");
       case "hash-list-entries DELETE " -> Set.of("hashLists.removeEntry");
       default -> Set.of();
@@ -337,24 +346,16 @@ final class MockApi {
     }
   }
 
-  /** Decodes query values: numbers, booleans and JSON values, plus {@code ordering[i][key]} and {@code ids[i]}. */
+  /** Decodes query values: numbers, booleans and JSON values. */
   private static JsonObject query(Map<String, String> raw) {
     JsonObject query = new JsonObject();
-    TreeMap<Integer, JsonObject> ordering = new TreeMap<>();
     raw.forEach((key, value) -> {
-      Matcher order = ORDERING.matcher(key);
-      if (order.matches()) ordering.computeIfAbsent(Integer.parseInt(order.group(1)), i -> new JsonObject()).addProperty(order.group(2), value);
-      else if (INT_QUERY.contains(key) && value.matches("-?\\d{1,18}")) query.addProperty(key, Long.parseLong(value));
+      if (INT_QUERY.contains(key) && value.matches("-?\\d{1,18}")) query.addProperty(key, Long.parseLong(value));
       else if (BOOL_QUERY.contains(key) && (value.equals("true") || value.equals("false"))) query.addProperty(key, value.equals("true"));
       else if (JSON_QUERY.contains(key)) {
         try { query.add(key, JsonParser.parseString(value)); } catch (RuntimeException notJson) { query.addProperty(key, value); }
       } else query.addProperty(key, value);
     });
-    if (!ordering.isEmpty()) {
-      JsonArray list = new JsonArray();
-      ordering.values().forEach(list::add);
-      query.add("ordering", list);
-    }
     return query;
   }
 
@@ -368,6 +369,12 @@ final class MockApi {
   private static boolean bool(JsonObject object, String key) {
     JsonElement value = object.get(key);
     return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isBoolean() && value.getAsBoolean();
+  }
+
+  /** Whether {@code object[key]} is {@code false}, as a query's {@code wait=false} reads. */
+  private static boolean isFalse(JsonObject object, String key) {
+    JsonElement value = object.get(key);
+    return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isBoolean() && !value.getAsBoolean();
   }
 
   private static long number(JsonObject object, String key, long fallback, String name, long min, long max) throws Failure {
@@ -424,27 +431,26 @@ final class MockApi {
       switch (method + " " + String.join("/", parts.subList(2, parts.size()))) {
         case "GET events": return events(q);
         case "PUT lenses": return putLenses(body);
+        case "GET lenses": return page(new ArrayList<>(lenses.values()), q, Json.write(new JsonPrimitive(projectId + "/lenses")), null);
+        case "POST lenses": return createLens(body);
         case "GET folders": return listFolders(q);
         case "POST folders": return createFolder(body, now);
-        case "GET hash-lists": return page(projectHashLists(), q, Json.write(new JsonPrimitive(projectId + "/hash-lists")));
+        case "GET hash-lists": return page(projectHashLists(), q, Json.write(new JsonPrimitive(projectId + "/hash-lists")), null);
         case "POST hash-lists": return createHashList(body, now);
-        case "GET policies": return listPolicies();
-        case "POST policies": return createPolicy(body, now);
+        case "GET policy": return toPolicy(policy(ensurePolicies()));
         case "PUT policy": return assignPolicy(body);
         case "GET assets/search": return search(q);
         case "GET assets": {
-          String folderId = str(q, "folderId");
           String filter = str(q, "filter");
           // Like the API, the query is validated before the filter is read.
           bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-          if (q.has("ordering")) checkOrdering(q.getAsJsonArray("ordering"));
-          List<JsonObject> items = projectAssets().stream().filter(asset -> folderId == null || folderId.equals(str(asset, "folderId"))).collect(Collectors.toList());
+          sort(q, List.of("createdAt", "id"), 2);
+          List<JsonObject> items = projectAssets();
           if (filter != null && !filter.isBlank()) items = items.stream().filter(rsql(filter)).collect(Collectors.toList());
           JsonArray scope = new JsonArray();
           scope.add(projectId);
           scope.add(nullable(filter));
-          scope.add(nullable(folderId));
-          return page(items, q, Json.write(scope));
+          return page(items, q, Json.write(scope), null);
         }
         case "POST assets": return createAsset(upload, q, body, raw, now);
         case "POST assets/batch": return batch(body, now);
@@ -453,13 +459,16 @@ final class MockApi {
       }
       if (parts.size() == 5 && parts.get(2).equals("assets") && parts.get(4).equals("timeline") && method.equals("GET"))
         return timeline(asset(parts.get(3)), q);
-      if (parts.get(2).equals("policies") && (parts.size() == 4 || parts.size() == 5))
-        return policyRoute(method, parts.get(3), parts.size() == 5 ? parts.get(4) : "", body, now);
+    } else if (parts.get(0).equals("policies") && parts.size() == 1) {
+      if (method.equals("GET")) return listPolicies(q);
+      if (method.equals("POST")) return createPolicy(body, now);
     } else if (parts.size() == 2 || parts.size() == 3) {
       String suffix = parts.size() == 3 ? parts.get(2) : "";
       if (parts.get(0).equals("assets")) return assetRoute(method, parts.get(1), suffix, q, body, raw, now);
       if (parts.get(0).equals("folders")) return folderRoute(method, parts.get(1), suffix, body, now);
       if (parts.get(0).equals("hash-lists")) return hashListRoute(method, parts.get(1), suffix, q, body, now);
+      if (parts.get(0).equals("policies")) return policyRoute(method, parts.get(1), suffix, body, now);
+      if (parts.get(0).equals("lenses") && parts.size() == 2) return lensRoute(method, parts.get(1), body);
       if (parts.get(0).equals("hash-list-entries") && parts.size() == 2 && method.equals("DELETE")) {
         JsonObject entry = storage.hashListEntries.get(parts.get(1));
         if (entry == null || !projectId.equals(str(entry, "projectId"))) throw new Failure(ErrorCodes.HASH_LIST_ENTRY_NOT_FOUND, "Hash list entry not found");
@@ -534,7 +543,8 @@ final class MockApi {
       throw new Failure(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, 415, CalmLensServerClient.rejectedUploadMimeTypeMessage(mime), Map.of("mimeType", mime, "source", "calmlens"));
     String url = rawUpload ? null : str(o, "url");
     String kind = url != null ? "website" : assetType(mime.toLowerCase(Locale.ROOT));
-    boolean queue = bool(q, "queue"), last = !multipart || bool(q, "isFinal");
+    // wait=false queues the upload; the SDKs send wait=true to wait for the decision.
+    boolean queue = isFalse(q, "wait"), last = !multipart || bool(q, "isFinal");
     long size = raw == null ? 0 : raw.length;
     if (multipart) {
       // In the API's order: a declared total first, then a single final part as the whole upload,
@@ -577,8 +587,8 @@ final class MockApi {
     // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
     asset.add("context", usedContext(o.get("context")));
     asset.addProperty("type", kind);
-    asset.add("metadata", o.has("metadata") ? o.get("metadata").deepCopy() : JsonNull.INSTANCE);
-    asset.add("tags", o.has("tags") ? o.get("tags").deepCopy() : JsonNull.INSTANCE);
+    asset.add("metadata", o.has("metadata") && !o.get("metadata").isJsonNull() ? o.get("metadata").deepCopy() : new JsonArray());
+    asset.add("tags", o.has("tags") && !o.get("tags").isJsonNull() ? o.get("tags").deepCopy() : new JsonArray());
     processingOptions.put(id, processing.getAsJsonObject().deepCopy());
     asset.addProperty("visibility", Objects.requireNonNullElse(str(o, "visibility"), "private"));
     JsonObject content = new JsonObject();
@@ -606,8 +616,12 @@ final class MockApi {
     JsonObject moderation = new JsonObject();
     moderation.addProperty("status", "pending");
     moderation.add("manualReviews", new JsonArray());
+    // Like the API, the decision's fields are null until moderation decides.
+    for (String undecided : List.of("automatedStatus", "source", "rule", "explanationComplete", "categories"))
+      moderation.add(undecided, JsonNull.INSTANCE);
     moderation.add("flaggedCategories", new JsonArray());
     moderation.add("regions", new JsonArray());
+    moderation.add("raw", JsonNull.INSTANCE);
     moderation.add("timeline", JsonNull.INSTANCE);
     JsonObject classification = new JsonObject();
     classification.addProperty("status", last ? "processing" : "queued");
@@ -619,6 +633,9 @@ final class MockApi {
     // The mock never reads test inputs.
     classification.addProperty("testInput", false);
     classification.add("moderation", moderation);
+    // Like the API, a feature's result is null until it has run.
+    classification.add("ocr", JsonNull.INSTANCE);
+    classification.add("linkDetection", JsonNull.INSTANCE);
     asset.add("classification", classification);
 
     if (rawUpload && raw != null) {
@@ -679,29 +696,36 @@ final class MockApi {
   }
 
   /**
-   * Applies a decided or failed {@code decision} and its report. Like the API for an image with
-   * nobody in it, a decided image reports the person and face detection its upload turned on.
+   * Applies a decided or failed {@code decision} and its report. The mock reads no text, QR codes,
+   * people or faces in an image, so like the API for an image without them, a decided image
+   * reports empty results for OCR, person and face detection when its upload turned them on, and
+   * for link detection unless its upload turned it off.
    */
   private void decided(JsonObject asset, MockDecision decision) {
     applyOutcome(asset, decision.status(), "policy", now(), decision.report());
     JsonObject classification = asset.getAsJsonObject("classification");
     if (!"completed".equals(str(classification, "status")) || !"image".equals(str(asset, "type"))) return;
-    if (featureEnabled(asset, "personDetection")) classification.add("personDetection", evaluated("people"));
-    if (featureEnabled(asset, "faceDetection")) classification.add("faceDetection", evaluated("faces"));
+    if (feature(asset, "ocr") == Boolean.TRUE) classification.add("ocr", evaluated("textRegions"));
+    if (feature(asset, "linkDetection") != Boolean.FALSE) {
+      JsonObject links = evaluated("qrCodes");
+      links.add("links", new JsonArray());
+      classification.add("linkDetection", links);
+    }
+    if (feature(asset, "personDetection") == Boolean.TRUE) classification.add("personDetection", evaluated("people"));
+    if (feature(asset, "faceDetection") == Boolean.TRUE) classification.add("faceDetection", evaluated("faces"));
   }
 
-  /** Whether the asset was uploaded with {@code processingOptions.features.<feature>.enabled} true. */
-  private boolean featureEnabled(JsonObject asset, String feature) {
+  /** The asset's {@code processingOptions.features.<feature>.enabled} as uploaded, or null when it wasn't set. */
+  private Boolean feature(JsonObject asset, String feature) {
     JsonObject uploaded = processingOptions.get(str(asset, "id"));
     JsonElement enabled = uploaded == null ? null : path(uploaded, "features." + feature + ".enabled");
-    return enabled != null && enabled.isJsonPrimitive() && enabled.getAsJsonPrimitive().isBoolean() && enabled.getAsBoolean();
+    return enabled != null && enabled.isJsonPrimitive() && enabled.getAsJsonPrimitive().isBoolean() ? enabled.getAsBoolean() : null;
   }
 
-  /** An evaluated beta detection result that found nothing. */
+  /** An evaluated detection result that found nothing. */
   private static JsonObject evaluated(String list) {
     JsonObject result = new JsonObject();
     result.addProperty("status", "evaluated");
-    result.addProperty("stage", "beta");
     result.add(list, new JsonArray());
     return result;
   }
@@ -909,7 +933,8 @@ final class MockApi {
     upload.addProperty("updatedAt", now);
     asset.addProperty("updatedAt", now);
     if (last) {
-      boolean queue = q.has("queue") ? bool(q, "queue") : bool(open, "queue");
+      // wait=false queues the final part; without wait, the upload's saved choice applies.
+      boolean queue = q.has("wait") ? isFalse(q, "wait") : bool(open, "queue");
       uploads.remove(id);
       applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, "policy", now(), null);
       finishUpload(asset, decisionFor(asset, MockCalmLensServerClient.Trigger.UPLOAD, queue));
@@ -1205,7 +1230,7 @@ final class MockApi {
     JsonObject asset = asset(id);
     switch (method + " " + suffix) {
       case "GET ": return asset;
-      case "GET children": return page(projectAssets().stream().filter(child -> id.equals(str(child, "parentId"))).collect(Collectors.toList()), q, Json.write(new JsonPrimitive(id)));
+      case "GET children": return page(projectAssets().stream().filter(child -> id.equals(str(child, "parentId"))).collect(Collectors.toList()), q, Json.write(new JsonPrimitive(id)), null);
       case "DELETE ":
         storage.assets.remove(id);
         storage.content.remove(id);
@@ -1428,20 +1453,36 @@ final class MockApi {
   }
 
   /**
-   * One keyset page like the API's: ordered by {@code createdAt} and {@code id} (an {@code id}
-   * tie-breaker is added), starting after the cursor's values. A cursor is tied to {@code scope}
-   * (the filter, folder or parent) and the ordering, so it only continues the query it came from.
+   * A list's {@code sort} as the API parses it ({@code sortQueryField}): comma-separated fields from
+   * {@code fields}, descending when prefixed with {@code -}, none repeated and at most {@code max},
+   * as {@code {field, direction}} clauses; null when the query has none. Anything else is refused
+   * with {@code validation/invalid-value} at {@code sort}.
    */
-  /** Refuses an ordering the API's schema refuses: at most two rules, each by {@code createdAt} or {@code id}. */
-  private static void checkOrdering(JsonArray ordering) throws Failure {
-    if (ordering.size() > 2) throw Failure.validation("validation/too-big", "ordering");
-    for (int i = 0; i < ordering.size(); i++) {
-      JsonObject order = ordering.get(i).getAsJsonObject();
-      String field = str(order, "field");
-      if (!"createdAt".equals(field) && !"id".equals(field)) throw Failure.validation(ErrorCodes.INVALID_VALUE, "ordering." + i + ".field");
-      String direction = Objects.requireNonNullElse(str(order, "direction"), "asc");
-      if (!direction.equals("asc") && !direction.equals("desc")) throw Failure.validation(ErrorCodes.INVALID_VALUE, "ordering." + i + ".direction");
+  private static JsonArray sort(JsonObject q, List<String> fields, int max) throws Failure {
+    String value = str(q, "sort");
+    if (value == null) return null;
+    JsonArray clauses = new JsonArray();
+    Set<String> seen = new HashSet<>();
+    for (String raw : value.split(",", -1)) {
+      String part = raw.strip();
+      String field = part.startsWith("-") ? part.substring(1) : part;
+      if (!SORT_FIELD.matcher(part).matches() || !fields.contains(field) || !seen.add(field))
+        throw Failure.validation(ErrorCodes.INVALID_VALUE, "sort");
+      JsonObject clause = new JsonObject();
+      clause.addProperty("field", field);
+      clause.addProperty("direction", part.startsWith("-") ? "desc" : "asc");
+      clauses.add(clause);
     }
+    if (clauses.size() > max) throw Failure.validation(ErrorCodes.INVALID_VALUE, "sort");
+    return clauses;
+  }
+
+  /** A single {@code {field, direction}} clause. */
+  private static JsonObject clause(String field, String direction) {
+    JsonObject clause = new JsonObject();
+    clause.addProperty("field", field);
+    clause.addProperty("direction", direction);
+    return clause;
   }
 
   /**
@@ -1450,35 +1491,29 @@ final class MockApi {
    * continues one.
    */
   private JsonObject timeline(JsonObject asset, JsonObject q) throws Failure {
-    int pageSize = (int) bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+    bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
     if (held(asset)) throw Failure.of(ErrorCodes.ASSET_HELD, Map.of("hold", "safety"));
     if (q.has("cursor")) throw new Failure(ErrorCodes.INVALID_CURSOR, "The cursor is invalid or belongs to a different query.");
     JsonObject page = new JsonObject();
     page.add("items", new JsonArray());
     page.add("nextCursor", JsonNull.INSTANCE);
-    page.addProperty("pageSize", pageSize);
     page.addProperty("hasMore", false);
-    page.add("ordering", new JsonArray());
     return page;
   }
 
-  private JsonObject page(List<JsonObject> items, JsonObject q, String scope) throws Failure {
+  /**
+   * One keyset page like the API's (CursorPagination.ts): ordered by the query's {@code sort} of
+   * {@code createdAt} and {@code id} ({@code defaultSort}, or newest first, without one), with an
+   * {@code id} tie-breaker added, starting after the cursor's values. A cursor is tied to {@code
+   * scope} (the filter, list or parent) and the sort, so it only continues the query it came from.
+   */
+  private JsonObject page(List<JsonObject> items, JsonObject q, String scope, JsonObject defaultSort) throws Failure {
     long size = bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
-    JsonArray ordering = new JsonArray();
-    if (q.has("ordering")) q.getAsJsonArray("ordering").forEach(order -> ordering.add(order.deepCopy()));
-    else {
-      JsonObject newest = new JsonObject();
-      newest.addProperty("field", "createdAt");
-      newest.addProperty("direction", "desc");
-      ordering.add(newest);
-    }
-    checkOrdering(ordering);
+    JsonArray requested = sort(q, List.of("createdAt", "id"), 2);
+    JsonArray ordering = requested != null ? requested : new JsonArray();
+    if (ordering.isEmpty()) ordering.add(defaultSort != null ? defaultSort.deepCopy() : clause("createdAt", "desc"));
     boolean byId = false;
-    for (JsonElement element : ordering) {
-      JsonObject order = element.getAsJsonObject();
-      order.addProperty("direction", Objects.requireNonNullElse(str(order, "direction"), "asc"));
-      byId |= "id".equals(str(order, "field"));
-    }
+    for (JsonElement element : ordering) byId |= "id".equals(str(element.getAsJsonObject(), "field"));
     if (!byId) {
       JsonObject tieBreak = new JsonObject();
       tieBreak.addProperty("field", "id");
@@ -1528,9 +1563,7 @@ final class MockApi {
     JsonArray list = new JsonArray();
     selected.forEach(list::add);
     page.add("items", list);
-    page.addProperty("pageSize", size);
     page.addProperty("hasMore", more);
-    page.add("ordering", ordering);
     if (more) {
       JsonObject last = selected.get(selected.size() - 1);
       JsonArray values = new JsonArray();
@@ -1546,18 +1579,18 @@ final class MockApi {
   /** Keyword search fields, in the order matches are reported. */
   private static final List<String> SEARCH_FIELDS = List.of("name", "id", "externalId", "description", "tags", "type",
       "content.format", "content.extension", "classification.moderation.status");
-  private static final int MAX_SEARCH_TOKENS = 8, MAX_SEARCH_LIMIT = 20, MAX_SEARCH_QUERY_LENGTH = 200;
+  private static final int MAX_SEARCH_TOKENS = 8, MAX_SEARCH_PAGE_SIZE = 20, MAX_SEARCH_QUERY_LENGTH = 200;
 
   /**
    * Keyword search like the API: every whitespace-separated token (case-insensitive, at most 8
    * distinct) must appear in some field. Results rank by the API's score, then newest first.
    */
   private JsonObject search(JsonObject q) throws Failure {
-    // Like the API's query schema: a trimmed query of 1 to 200 characters, a limit of 1 to 20.
+    // Like the API's query schema: a trimmed query of 1 to 200 characters, 1 to 20 results.
     String text = Objects.requireNonNullElse(str(q, "query"), "").strip();
     if (text.isEmpty()) throw Failure.validation("validation/too-small", "query");
     if (text.length() > MAX_SEARCH_QUERY_LENGTH) throw Failure.validation("validation/too-big", "query");
-    long limit = bounded(q, "limit", 10, MAX_SEARCH_LIMIT);
+    long limit = bounded(q, "pageSize", 10, MAX_SEARCH_PAGE_SIZE);
     String normalized = text.toLowerCase(Locale.ROOT);
     List<String> tokens = java.util.Arrays.stream(normalized.split("\\s+")).distinct().limit(MAX_SEARCH_TOKENS).toList();
     List<JsonObject> items = new ArrayList<>();
@@ -1621,19 +1654,9 @@ final class MockApi {
   private JsonObject listFolders(JsonObject q) throws Failure {
     long size = bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_FOLDER_PAGE_SIZE);
     String parentId = str(q, "parentId"), search = Objects.requireNonNullElse(str(q, "search"), "").toLowerCase(Locale.ROOT);
-    JsonObject clause = new JsonObject();
-    clause.addProperty("field", "name");
-    clause.addProperty("direction", "asc");
-    if (q.has("ordering")) {
-      JsonArray requested = q.getAsJsonArray("ordering");
-      if (requested.size() > 1) throw Failure.validation("validation/too-big", "ordering");
-      JsonObject order = requested.get(0).getAsJsonObject();
-      String field = str(order, "field"), direction = Objects.requireNonNullElse(str(order, "direction"), "asc");
-      if (!"name".equals(field) && !"createdAt".equals(field)) throw Failure.validation("validation/invalid-value", "ordering.0.field");
-      if (!direction.equals("asc") && !direction.equals("desc")) throw Failure.validation("validation/invalid-value", "ordering.0.direction");
-      clause.addProperty("field", field);
-      clause.addProperty("direction", direction);
-    }
+    // The folder list sorts by one field, name (the default) or createdAt.
+    JsonArray requested = sort(q, List.of("name", "createdAt"), 1);
+    JsonObject clause = requested != null && !requested.isEmpty() ? requested.get(0).getAsJsonObject() : clause("name", "asc");
     String field = str(clause, "field");
     boolean descending = "desc".equals(str(clause, "direction"));
     List<JsonObject> all = projectFolders();
@@ -1676,10 +1699,9 @@ final class MockApi {
       if (parent != null && ids.add(parent)) pending.add(parent);
     }
     JsonObject result = new JsonObject();
-    JsonArray items = new JsonArray(), ancestors = new JsonArray(), ordering = new JsonArray();
+    JsonArray items = new JsonArray(), ancestors = new JsonArray();
     page.forEach(items::add);
     all.stream().filter(f -> ids.contains(str(f, "id")) && !page.contains(f)).forEach(ancestors::add);
-    ordering.add(clause);
     result.add("items", items);
     result.add("ancestors", ancestors);
     if (more) {
@@ -1690,9 +1712,7 @@ final class MockApi {
       next.add("id", last.get("id"));
       result.addProperty("nextCursor", Base64.getEncoder().encodeToString(Json.write(next).getBytes(StandardCharsets.UTF_8)));
     } else result.add("nextCursor", JsonNull.INSTANCE);
-    result.addProperty("pageSize", size);
     result.addProperty("hasMore", more);
-    result.add("ordering", ordering);
     return result;
   }
 
@@ -1807,36 +1827,8 @@ final class MockApi {
         storage.hashListEntries.values().removeIf(entry -> id.equals(str(entry, "hashListId")));
         return null;
       case "GET entries": {
-        int pageSize = (int) bounded(q, "pageSize", DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
         List<JsonObject> entries = storage.hashListEntries.values().stream().filter(entry -> id.equals(str(entry, "hashListId"))).collect(Collectors.toList());
-        Collections.reverse(entries);
-        String cursor = str(q, "cursor");
-        int start = 0;
-        if (cursor != null) {
-          try {
-            start = Integer.parseInt(new String(Base64.getDecoder().decode(cursor), StandardCharsets.UTF_8));
-          } catch (IllegalArgumentException invalid) {
-            start = -1;
-          }
-          if (start < 0) throw new Failure(ErrorCodes.INVALID_CURSOR, "The cursor is invalid or belongs to a different query.");
-        }
-        JsonArray items = new JsonArray();
-        entries.stream().skip(start).limit(pageSize).forEach(items::add);
-        boolean hasMore = start + pageSize < entries.size();
-        JsonObject page = new JsonObject();
-        page.add("items", items);
-        page.addProperty("hasMore", hasMore);
-        page.add("nextCursor", hasMore ? new JsonPrimitive(Base64.getEncoder().encodeToString(String.valueOf(start + pageSize).getBytes(StandardCharsets.UTF_8))) : JsonNull.INSTANCE);
-        page.addProperty("pageSize", pageSize);
-        JsonArray ordering = new JsonArray();
-        for (String field : List.of("createdAt", "id")) {
-          JsonObject order = new JsonObject();
-          order.addProperty("field", field);
-          order.addProperty("direction", "desc");
-          ordering.add(order);
-        }
-        page.add("ordering", ordering);
-        return page;
+        return page(entries, q, Json.write(new JsonPrimitive("hash-list-entries/" + id)), null);
       }
       case "POST entries": {
         String hash = str(body, "hash") == null ? null : str(body, "hash").trim().toLowerCase(Locale.ROOT);
@@ -1889,31 +1881,73 @@ final class MockApi {
 
   // ------------------------------------------------------------------ Policies
   // The project starts on the organisation's own General preset policy, following automatic
-  // updates. The mock holds no built-in preset settings: a preset's settings are
-  // {"categorySettings": {}} at version 1, and uploads are never decided by a policy.
+  // updates. The mock's presets have one release, version 1, with mockPresetSettings().
 
   /** The built-in presets the mock knows, by display name. */
   private static final Map<String, String> PRESET_NAMES = Map.of("general-community", "General",
       "children-platform", "Kids", "education-support", "Learning and support", "wholesome-community", "Teen-safe");
 
-  /** Stored policies in the API's shape, without {@code preset.latestVersion} and {@code projectIds}. */
+  /**
+   * Stored policies in the API's shape, without {@code projectIds}, with {@code preset} as {@code
+   * {id, version, own}} and {@code followsPreset}: whether the organisation's own preset policy
+   * follows its preset (mode {@code live}).
+   */
   private final Map<String, JsonObject> policies = new LinkedHashMap<>();
   /** Each policy's reset baseline: the settings of its preset version. */
   private final Map<String, JsonObject> policyBaselines = new HashMap<>();
   private String projectPolicyId;
 
-  private void ensurePolicies() {
-    if (projectPolicyId != null) return;
-    projectPolicyId = str(newPolicy("General", "", emptySettings(), true, "general-community", true, now()), "id");
+  /** The project's policy, after creating the organisation's own General policy on first use. */
+  private String ensurePolicies() {
+    if (projectPolicyId == null)
+      projectPolicyId = str(newPolicy("General", "", mockPresetSettings(), true, "general-community", true, now()), "id");
+    return projectPolicyId;
   }
 
-  private static JsonObject emptySettings() {
+  /**
+   * The settings of the mock's presets: every category with its default action ({@code allow} for
+   * personal information and profanity, {@code block} otherwise) and no rules. The mock holds no
+   * built-in preset settings, and uploads are never decided by a policy.
+   */
+  private static JsonObject mockPresetSettings() {
+    JsonObject categories = new JsonObject();
+    for (String category : MockClassification.CATEGORIES) {
+      JsonObject settings = new JsonObject();
+      settings.addProperty("action", category.equals("personal-information") || category.equals("profanity") ? "allow" : "block");
+      settings.add("allowances", new JsonArray());
+      settings.add("restrictions", new JsonArray());
+      categories.add(category, settings);
+    }
     JsonObject settings = new JsonObject();
-    settings.add("categorySettings", new JsonObject());
+    settings.add("categorySettings", categories);
     return settings;
   }
 
-  private JsonObject newPolicy(String name, String description, JsonObject settings, boolean automaticUpdates,
+  /**
+   * Refuses settings the API refuses (MODERATION_POLICY_SETTINGS_SCHEMA): every category, each with
+   * an {@code action} and its {@code allowances} and {@code restrictions} lists, and no others.
+   */
+  private static void checkPolicySettings(JsonElement settings) throws Failure {
+    JsonElement categories = settings != null && settings.isJsonObject() ? settings.getAsJsonObject().get("categorySettings") : null;
+    if (categories == null || !categories.isJsonObject()) throw Failure.validation("validation/invalid-type", "settings.categorySettings");
+    JsonObject byCategory = categories.getAsJsonObject();
+    for (String category : MockClassification.CATEGORIES) {
+      String path = "settings.categorySettings." + category;
+      JsonElement value = byCategory.get(category);
+      if (value == null || !value.isJsonObject()) throw Failure.validation("validation/invalid-type", path);
+      for (String key : List.of("allowances", "restrictions")) {
+        JsonElement rules = value.getAsJsonObject().get(key);
+        if (rules == null || !rules.isJsonArray()) throw Failure.validation("validation/invalid-type", path + "." + key);
+      }
+      JsonElement action = value.getAsJsonObject().get("action");
+      if (action == null || !action.isJsonPrimitive() || !action.getAsJsonPrimitive().isString())
+        throw Failure.validation(ErrorCodes.INVALID_VALUE, path + ".action");
+    }
+    for (String key : byCategory.keySet())
+      if (!MockClassification.CATEGORIES.contains(key)) throw Failure.validation("validation/unknown-field", "settings.categorySettings." + key);
+  }
+
+  private JsonObject newPolicy(String name, String description, JsonObject settings, boolean followsPreset,
       String presetId, boolean presetOwn, long now) {
     JsonObject policy = new JsonObject();
     policy.addProperty("id", createId("pol"));
@@ -1921,7 +1955,7 @@ final class MockApi {
     policy.addProperty("description", description);
     policy.add("settings", settings);
     policy.addProperty("revision", 1);
-    policy.addProperty("automaticUpdates", automaticUpdates);
+    policy.addProperty("followsPreset", followsPreset);
     if (presetId == null) policy.add("preset", JsonNull.INSTANCE);
     else {
       JsonObject preset = new JsonObject();
@@ -1937,13 +1971,19 @@ final class MockApi {
     return policy;
   }
 
-  /** A stored policy as the API shows it. */
+  /** A stored policy as the API shows it, its preset's {@code mode} derived. */
   private JsonObject toPolicy(JsonObject stored) {
     JsonObject policy = new JsonObject();
-    for (String key : List.of("id", "name", "description", "settings", "revision", "automaticUpdates")) policy.add(key, stored.get(key).deepCopy());
-    JsonElement preset = stored.get("preset").deepCopy();
-    if (preset.isJsonObject()) preset.getAsJsonObject().addProperty("latestVersion", 1);
-    policy.add("preset", preset);
+    for (String key : List.of("id", "name", "description", "settings", "revision")) policy.add(key, stored.get(key).deepCopy());
+    JsonElement preset = stored.get("preset");
+    if (preset.isJsonObject()) {
+      JsonObject shown = new JsonObject();
+      shown.add("id", preset.getAsJsonObject().get("id"));
+      shown.add("version", preset.getAsJsonObject().get("version"));
+      shown.addProperty("latestVersion", 1);
+      shown.addProperty("mode", bool(preset.getAsJsonObject(), "own") ? bool(stored, "followsPreset") ? "live" : "pinned" : "copy");
+      policy.add("preset", shown);
+    } else policy.add("preset", JsonNull.INSTANCE);
     JsonArray projectIds = new JsonArray();
     if (str(stored, "id").equals(projectPolicyId)) projectIds.add(projectId);
     policy.add("projectIds", projectIds);
@@ -1959,14 +1999,12 @@ final class MockApi {
     return policy;
   }
 
-  private JsonObject listPolicies() {
+  /** A page of the organisation's policies, oldest first unless {@code sort} says otherwise. */
+  private JsonObject listPolicies(JsonObject q) throws Failure {
     ensurePolicies();
-    JsonArray items = new JsonArray();
-    policies.values().forEach(policy -> items.add(toPolicy(policy)));
-    JsonObject list = new JsonObject();
-    list.add("policies", items);
-    list.addProperty("projectPolicyId", projectPolicyId);
-    return list;
+    List<JsonObject> items = new ArrayList<>();
+    for (JsonObject policy : policies.values()) items.add(toPolicy(policy));
+    return page(items, q, Json.write(new JsonPrimitive("policies/" + projectId)), clause("createdAt", "asc"));
   }
 
   private JsonObject createPolicy(JsonObject body, long now) throws Failure {
@@ -1975,11 +2013,12 @@ final class MockApi {
     JsonElement settings = body.get("settings");
     boolean hasSettings = settings != null && !settings.isJsonNull();
     if (hasSettings == (preset != null) || preset != null && !PRESET_NAMES.containsKey(preset)
-        || preset == null && (name == null || name.isBlank()) || hasSettings && !settings.isJsonObject())
+        || preset == null && (name == null || name.isBlank()))
       throw new Failure(ErrorCodes.INVALID_VALUE, "Send settings with a name, or presetId");
+    if (preset == null) checkPolicySettings(settings);
     String description = str(body, "description");
     JsonObject policy = newPolicy(name != null && !name.isBlank() ? name.trim() : PRESET_NAMES.get(preset),
-        description == null ? "" : description, preset != null ? emptySettings() : settings.getAsJsonObject().deepCopy(),
+        description == null ? "" : description, preset != null ? mockPresetSettings() : settings.getAsJsonObject().deepCopy(),
         false, preset, false, now);
     created = true;
     return toPolicy(policy);
@@ -2003,36 +2042,39 @@ final class MockApi {
     switch (method + " " + action) {
       case "GET ": return toPolicy(policy);
       case "PATCH ":
+        if (body.has("settings") && !body.get("settings").isJsonNull()) checkPolicySettings(body.get("settings"));
         return savePolicy(policy, body, now, saved -> {
           if (str(body, "name") != null) saved.addProperty("name", str(body, "name").trim());
           if (str(body, "description") != null) saved.addProperty("description", str(body, "description"));
           if (body.has("settings") && !body.get("settings").isJsonNull()) saved.add("settings", body.get("settings").deepCopy());
-          // Saving a policy that follows its preset pins it as a copy.
-          saved.addProperty("automaticUpdates", false);
+          // Saving a live policy pins it.
+          saved.addProperty("followsPreset", false);
         });
       case "DELETE ":
         if (id.equals(projectPolicyId)) throw new Failure(ErrorCodes.POLICY_IN_USE, "Projects still use this policy");
         policies.remove(id);
         policyBaselines.remove(id);
         return null;
-      case "POST preset":
-        if (preset == null || bool(policy, "automaticUpdates")) throw new Failure(ErrorCodes.POLICY_NO_PRESET, "This policy has no preset baseline");
+      case "POST reset":
+      case "POST upgrade":
+        // Only a pinned or copied policy has a preset release to reset to or upgrade from.
+        if (preset == null || bool(policy, "followsPreset")) throw new Failure(ErrorCodes.POLICY_NO_PRESET, "This policy has no preset baseline");
         if (!presetVersionIs(body, preset.get("version").getAsLong()))
           throw new Failure(ErrorCodes.POLICY_PRESET_VERSION_CONFLICT, "The preset changed");
-        // The mock's presets have one release, so an update never has a newer one to apply.
-        if ("update".equals(str(body, "operation")))
-          throw new Failure(ErrorCodes.POLICY_PRESET_UPDATE_UNAVAILABLE, "Only an unchanged copy of an older preset version can be updated");
+        // The mock's presets have one release, so an upgrade never has a newer one to apply.
+        if (action.equals("upgrade"))
+          throw new Failure(ErrorCodes.POLICY_PRESET_UPDATE_UNAVAILABLE, "Only an unchanged policy at an older preset release can be upgraded");
         return savePolicy(policy, body, now, saved -> saved.add("settings", policyBaselines.get(id).deepCopy()));
       case "PUT automatic-updates": {
         boolean enabled = bool(body, "enabled");
-        if (preset == null || !bool(preset, "own") || bool(policy, "automaticUpdates") == enabled)
+        if (preset == null || !bool(preset, "own") || bool(policy, "followsPreset") == enabled)
           throw new Failure(ErrorCodes.POLICY_AUTOMATIC_UPDATES_UNAVAILABLE, "Automatic updates can't be switched this way for this policy");
         JsonElement revision = body.get("revision");
         if (revision == null || !revision.isJsonPrimitive() || !revision.getAsJsonPrimitive().isNumber() || revision.getAsDouble() != policy.get("revision").getAsLong())
           throw new Failure(ErrorCodes.POLICY_REVISION_CONFLICT, "The policy changed");
         if (!presetVersionIs(body, 1)) throw new Failure(ErrorCodes.POLICY_PRESET_VERSION_CONFLICT, "The preset changed");
         return savePolicy(policy, body, now, saved -> {
-          saved.addProperty("automaticUpdates", enabled);
+          saved.addProperty("followsPreset", enabled);
           if (enabled) {
             saved.addProperty("name", PRESET_NAMES.get(str(preset, "id")));
             saved.addProperty("description", "");
@@ -2040,7 +2082,7 @@ final class MockApi {
           }
         });
       }
-      default: throw unsupported(method, "/projects/" + projectId + "/policies/" + id + (action.isEmpty() ? "" : "/" + action));
+      default: throw unsupported(method, "/policies/" + id + (action.isEmpty() ? "" : "/" + action));
     }
   }
 
@@ -2055,50 +2097,78 @@ final class MockApi {
     return toPolicy(policy);
   }
 
+  // ------------------------------------------------------------------ Lenses
+
+  /** The lens fields a definition sets. */
+  private static final List<String> LENS_FIELDS = List.of("name", "description", "type", "active", "transform");
+
   /**
-   * Saves each definition in order, like the API: an unchanged definition at its version returns
-   * the stored lens, a greater version updates it, anything else conflicts. Lenses saved before a
-   * conflict stay saved.
+   * Saves each definition in order, like the API: a new identifier creates a lens, an unchanged
+   * definition returns the stored lens and a changed one updates it in place.
    */
   private JsonObject putLenses(JsonObject body) throws Failure {
+    JsonElement definitions = body.get("lenses");
+    if (definitions == null || !definitions.isJsonArray() || definitions.getAsJsonArray().isEmpty()) throw Failure.validation("validation/too-small", "lenses");
     JsonArray result = new JsonArray();
-    for (JsonElement element : body.getAsJsonArray("lenses")) {
-      JsonObject definition = element.getAsJsonObject();
-      String identifier = str(definition, "identifier");
-      long version = definition.has("version") && !definition.get("version").isJsonNull() ? definition.get("version").getAsLong() : 1;
-      JsonObject existing = lenses.get(identifier);
-      if (existing == null) {
-        JsonObject lens = new JsonObject();
-        lens.addProperty("id", createId("lens"));
-        lens.addProperty("projectId", projectId);
-        definition.entrySet().forEach(e -> lens.add(e.getKey(), e.getValue().deepCopy()));
-        lens.addProperty("createdAt", now());
-        lens.addProperty("updatedAt", now());
-        lenses.put(identifier, lens);
-        result.add(lens);
-        continue;
-      }
-      long current = existing.get("version").getAsLong();
-      boolean same = List.of("name", "description", "type", "active", "transform").stream()
-          .allMatch(key -> canonical(existing.get(key)).equals(canonical(definition.get(key))));
-      if (same && version == current) { result.add(existing); continue; }
-      if (version > current) {
-        JsonObject lens = existing.deepCopy();
-        definition.entrySet().forEach(e -> lens.add(e.getKey(), e.getValue().deepCopy()));
-        lens.addProperty("updatedAt", now());
-        lenses.put(identifier, lens);
-        result.add(lens);
-        continue;
-      }
-      Map<String, Object> details = new LinkedHashMap<>();
-      details.put("currentVersion", current);
-      details.put("minimumVersion", current + 1);
-      details.put("requestedVersion", version);
-      throw Failure.of(ErrorCodes.LENS_VERSION_CONFLICT, details);
-    }
+    for (JsonElement element : definitions.getAsJsonArray()) result.add(ensureLens(element.getAsJsonObject()));
     JsonObject answer = new JsonObject();
     answer.add("lenses", result);
     return answer;
+  }
+
+  private JsonObject ensureLens(JsonObject definition) {
+    JsonObject existing = lenses.get(str(definition, "identifier"));
+    if (existing == null) return saveNewLens(definition);
+    boolean same = LENS_FIELDS.stream().allMatch(key -> canonical(existing.get(key)).equals(canonical(definition.get(key))));
+    if (same) return existing;
+    JsonObject lens = existing.deepCopy();
+    definition.entrySet().forEach(e -> lens.add(e.getKey(), e.getValue().deepCopy()));
+    lens.addProperty("updatedAt", now());
+    lenses.put(str(lens, "identifier"), lens);
+    return lens;
+  }
+
+  private JsonObject saveNewLens(JsonObject definition) {
+    JsonObject lens = new JsonObject();
+    lens.addProperty("id", createId("lens"));
+    lens.addProperty("projectId", projectId);
+    definition.entrySet().forEach(e -> lens.add(e.getKey(), e.getValue().deepCopy()));
+    long now = now();
+    lens.addProperty("createdAt", now);
+    lens.addProperty("updatedAt", now);
+    lenses.put(str(lens, "identifier"), lens);
+    return lens;
+  }
+
+  /** POST /projects/:id/lenses: a new lens, whose identifier must be new to the project. */
+  private JsonObject createLens(JsonObject body) throws Failure {
+    String identifier = str(body, "identifier");
+    if (identifier == null || identifier.isEmpty()) throw Failure.validation("validation/invalid-type", "identifier");
+    if (lenses.containsKey(identifier)) throw Failure.of(ErrorCodes.LENS_IDENTIFIER_TAKEN, Map.of("identifier", identifier));
+    created = true;
+    return saveNewLens(body);
+  }
+
+  private JsonObject lens(String id) throws Failure {
+    for (JsonObject lens : lenses.values()) if (id.equals(str(lens, "id"))) return lens;
+    throw new Failure(ErrorCodes.LENS_NOT_FOUND, "Lens not found");
+  }
+
+  private JsonElement lensRoute(String method, String id, JsonObject body) throws Failure, IOException {
+    JsonObject lens = lens(id);
+    switch (method) {
+      case "GET": return lens;
+      case "PATCH": {
+        // The identifier can't change.
+        JsonObject definition = lens.deepCopy();
+        body.entrySet().forEach(e -> { if (!e.getKey().equals("identifier")) definition.add(e.getKey(), e.getValue().deepCopy()); });
+        return ensureLens(definition);
+      }
+      case "DELETE":
+        lenses.remove(str(lens, "identifier"));
+        return null;
+      default: throw unsupported(method, "/lenses/" + id);
+    }
   }
 
   /** An event type's shape ({@code resource.action}), as the mock checks {@code types} without the catalog. */

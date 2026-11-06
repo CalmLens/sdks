@@ -101,12 +101,10 @@
               "classification.testInput": false,
               "classification.personDetection": {
                 "status": "evaluated",
-                "stage": "beta",
                 "people": []
               },
               "classification.faceDetection": {
                 "status": "evaluated",
-                "stage": "beta",
                 "faces": []
               }
             },
@@ -134,7 +132,6 @@
               "classification.testInput": false,
               "classification.faceDetection": {
                 "status": "evaluated",
-                "stage": "beta",
                 "faces": []
               }
             },
@@ -276,7 +273,8 @@
                     "likelihood": "very-unlikely",
                     "score": 0
                   }
-                }
+                },
+                "hashMatches": []
               },
               "classification.moderation.automatedStatus": "blocked",
               "classification.moderation.flaggedCategories": [],
@@ -372,7 +370,8 @@
                     "likelihood": "very-unlikely",
                     "score": 0
                   }
-                }
+                },
+                "hashMatches": []
               },
               "classification.moderation.automatedStatus": "blocked",
               "classification.moderation.flaggedCategories": [],
@@ -472,7 +471,8 @@
                     "likelihood": "very-unlikely",
                     "score": 0
                   }
-                }
+                },
+                "hashMatches": []
               },
               "classification.moderation.automatedStatus": "allowed",
               "classification.moderation.flaggedCategories": [],
@@ -614,7 +614,8 @@
                     "likelihood": "very-unlikely",
                     "score": 0
                   }
-                }
+                },
+                "hashMatches": []
               },
               "classification.moderation.automatedStatus": "blocked",
               "classification.moderation.flaggedCategories": [
@@ -716,7 +717,8 @@
                     "likelihood": "likely",
                     "score": 0.7
                   }
-                }
+                },
+                "hashMatches": []
               },
               "classification.moderation.automatedStatus": "limited",
               "classification.moderation.flaggedCategories": [
@@ -2522,16 +2524,57 @@
           "save": "initial",
           "expect": {
             "result": {
-              "policies.length": 1,
-              "policies.0.name": "General",
-              "policies.0.automaticUpdates": true,
-              "policies.0.preset.id": "general-community",
-              "policies.0.preset.own": true,
-              "policies.0.projectIds": [
+              "items.length": 1,
+              "items.0.name": "General",
+              "items.0.preset.id": "general-community",
+              "items.0.preset.mode": "live",
+              "items.0.projectIds": [
                 "project-1"
-              ]
+              ],
+              "hasMore": false,
+              "nextCursor": null
             },
             "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.retrieveAssigned",
+          "save": "general",
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "initial.items.0.id"
+              },
+              "preset.mode": "live"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.create",
+          "args": {
+            "name": "Partial",
+            "settings": {
+              "categorySettings": {
+                "profanity": {
+                  "action": "block"
+                }
+              }
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "validation/invalid-request",
+              "status": 400,
+              "details": {
+                "issues": [
+                  {
+                    "path": "settings.categorySettings.sexual",
+                    "code": "validation/invalid-type"
+                  }
+                ]
+              }
+            }
           }
         },
         {
@@ -2547,12 +2590,55 @@
               },
               "name": "Kids",
               "revision": 1,
-              "automaticUpdates": false,
               "preset.id": "children-platform",
               "preset.version": 1,
               "preset.latestVersion": 1,
-              "preset.own": false,
-              "projectIds": []
+              "preset.mode": "copy",
+              "projectIds": [],
+              "settings": {
+                "categorySettings": {
+                  "sexual": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "violence": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "self-harm": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "harassment": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "hate": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "criminal-activity": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "personal-information": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "profanity": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  }
+                }
+              }
             },
             "httpStatus": 201
           }
@@ -2566,8 +2652,45 @@
             "revision": 2,
             "settings": {
               "categorySettings": {
+                "sexual": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "violence": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "self-harm": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "harassment": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "hate": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "criminal-activity": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "personal-information": {
+                  "action": "allow",
+                  "allowances": [],
+                  "restrictions": []
+                },
                 "profanity": {
-                  "action": "block"
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
                 }
               }
             }
@@ -2589,8 +2712,45 @@
             "name": "Kids section",
             "settings": {
               "categorySettings": {
+                "sexual": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "violence": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "self-harm": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "harassment": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "hate": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "criminal-activity": {
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
+                },
+                "personal-information": {
+                  "action": "allow",
+                  "allowances": [],
+                  "restrictions": []
+                },
                 "profanity": {
-                  "action": "block"
+                  "action": "block",
+                  "allowances": [],
+                  "restrictions": []
                 }
               }
             }
@@ -2605,12 +2765,11 @@
           }
         },
         {
-          "operation": "policies.applyPreset",
+          "operation": "policies.reset",
           "args": {
             "policyId": {
               "$ref": "kids.id"
             },
-            "operation": "reset",
             "revision": 2,
             "presetVersion": 2
           },
@@ -2622,12 +2781,27 @@
           }
         },
         {
-          "operation": "policies.applyPreset",
+          "operation": "policies.upgrade",
           "args": {
             "policyId": {
               "$ref": "kids.id"
             },
-            "operation": "reset",
+            "revision": 2,
+            "presetVersion": 1
+          },
+          "expect": {
+            "error": {
+              "code": "policy/preset-update-unavailable",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "policies.reset",
+          "args": {
+            "policyId": {
+              "$ref": "kids.id"
+            },
             "revision": 2,
             "presetVersion": 1
           },
@@ -2635,7 +2809,48 @@
             "result": {
               "revision": 3,
               "settings": {
-                "categorySettings": {}
+                "categorySettings": {
+                  "sexual": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "violence": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "self-harm": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "harassment": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "hate": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "criminal-activity": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "personal-information": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "profanity": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  }
+                }
               }
             },
             "httpStatus": 200
@@ -2693,10 +2908,58 @@
         },
         {
           "operation": "policies.list",
+          "args": {
+            "pageSize": 1
+          },
+          "save": "first",
           "expect": {
             "result": {
-              "policies.length": 2,
-              "projectPolicyId": {
+              "items.length": 1,
+              "items.0.name": "General",
+              "hasMore": true
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.list",
+          "args": {
+            "pageSize": 1,
+            "cursor": {
+              "$ref": "first.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.0.id": {
+                "$ref": "kids.id"
+              },
+              "hasMore": false,
+              "nextCursor": null
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.list",
+          "args": {
+            "sort": "-createdAt"
+          },
+          "expect": {
+            "result": {
+              "items.0.id": {
+                "$ref": "kids.id"
+              },
+              "items.length": 2
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "policies.retrieveAssigned",
+          "expect": {
+            "result": {
+              "id": {
                 "$ref": "kids.id"
               }
             },
@@ -2707,7 +2970,7 @@
           "operation": "policies.assign",
           "args": {
             "policyId": {
-              "$ref": "initial.projectPolicyId"
+              "$ref": "general.id"
             }
           },
           "expect": {
@@ -2746,7 +3009,7 @@
       "mock": {},
       "steps": [
         {
-          "operation": "policies.list",
+          "operation": "policies.retrieveAssigned",
           "save": "initial",
           "expect": {
             "httpStatus": 200
@@ -2756,7 +3019,7 @@
           "operation": "policies.setAutomaticUpdates",
           "args": {
             "policyId": {
-              "$ref": "initial.projectPolicyId"
+              "$ref": "initial.id"
             },
             "enabled": false,
             "revision": 1,
@@ -2764,7 +3027,7 @@
           },
           "expect": {
             "result": {
-              "automaticUpdates": false,
+              "preset.mode": "pinned",
               "revision": 2
             },
             "httpStatus": 200
@@ -2774,7 +3037,7 @@
           "operation": "policies.update",
           "args": {
             "policyId": {
-              "$ref": "initial.projectPolicyId"
+              "$ref": "initial.id"
             },
             "revision": 2,
             "name": "Our rules"
@@ -2782,7 +3045,7 @@
           "expect": {
             "result": {
               "name": "Our rules",
-              "automaticUpdates": false,
+              "preset.mode": "pinned",
               "revision": 3
             },
             "httpStatus": 200
@@ -2792,7 +3055,7 @@
           "operation": "policies.setAutomaticUpdates",
           "args": {
             "policyId": {
-              "$ref": "initial.projectPolicyId"
+              "$ref": "initial.id"
             },
             "enabled": true,
             "revision": 3,
@@ -2801,7 +3064,7 @@
           "expect": {
             "result": {
               "name": "General",
-              "automaticUpdates": true,
+              "preset.mode": "live",
               "revision": 4
             },
             "httpStatus": 200
@@ -3198,7 +3461,7 @@
           "operation": "assets.search",
           "args": {
             "query": "image",
-            "limit": 2
+            "pageSize": 2
           },
           "expect": {
             "result": {
@@ -3553,12 +3816,7 @@
         {
           "operation": "assets.list",
           "args": {
-            "ordering": [
-              {
-                "field": "name",
-                "direction": "asc"
-              }
-            ]
+            "sort": "name"
           },
           "expect": {
             "error": {
@@ -3567,7 +3825,7 @@
               "details": {
                 "issues": [
                   {
-                    "path": "ordering.0.field",
+                    "path": "sort",
                     "code": "validation/invalid-value"
                   }
                 ]
@@ -3856,12 +4114,7 @@
           "operation": "assets.list",
           "args": {
             "pageSize": 2,
-            "ordering": [
-              {
-                "field": "createdAt",
-                "direction": "desc"
-              }
-            ]
+            "sort": "-createdAt"
           },
           "save": "first",
           "expect": {
@@ -3896,12 +4149,7 @@
           "operation": "assets.list",
           "args": {
             "pageSize": 2,
-            "ordering": [
-              {
-                "field": "createdAt",
-                "direction": "desc"
-              }
-            ],
+            "sort": "-createdAt",
             "cursor": {
               "$ref": "first.nextCursor"
             }
@@ -3922,12 +4170,7 @@
           "operation": "assets.list",
           "args": {
             "pageSize": 2,
-            "ordering": [
-              {
-                "field": "createdAt",
-                "direction": "desc"
-              }
-            ]
+            "sort": "-createdAt"
           },
           "save": "again",
           "expect": {
@@ -3957,12 +4200,7 @@
           "operation": "assets.list",
           "args": {
             "pageSize": 2,
-            "ordering": [
-              {
-                "field": "createdAt",
-                "direction": "desc"
-              }
-            ],
+            "sort": "-createdAt",
             "cursor": {
               "$ref": "again.nextCursor"
             }
@@ -4131,8 +4369,8 @@
           "expect": {
             "result": {
               "description": "first",
-              "tags": null,
-              "metadata": null,
+              "tags": [],
+              "metadata": [],
               "folderId": null
             },
             "httpStatus": 200
@@ -4364,8 +4602,13 @@
         {
           "operation": "assets.list",
           "args": {
-            "folderId": {
-              "$ref": "folder.id"
+            "filter": {
+              "$concat": [
+                "folderId==",
+                {
+                  "$ref": "folder.id"
+                }
+              ]
             }
           },
           "expect": {
@@ -4396,8 +4639,13 @@
         {
           "operation": "assets.list",
           "args": {
-            "folderId": {
-              "$ref": "folder.id"
+            "filter": {
+              "$concat": [
+                "folderId==",
+                {
+                  "$ref": "folder.id"
+                }
+              ]
             }
           },
           "expect": {
@@ -4521,8 +4769,7 @@
             "result": {
               "items.length": 0,
               "hasMore": false,
-              "nextCursor": null,
-              "pageSize": 50
+              "nextCursor": null
             },
             "httpStatus": 200
           }
@@ -4584,8 +4831,7 @@
             "result": {
               "items.length": 0,
               "hasMore": false,
-              "nextCursor": null,
-              "pageSize": 50
+              "nextCursor": null
             },
             "httpStatus": 200
           }
@@ -6116,18 +6362,7 @@
           "expect": {
             "result": {
               "items.length": 50,
-              "pageSize": 50,
-              "hasMore": true,
-              "ordering": [
-                {
-                  "field": "createdAt",
-                  "direction": "desc"
-                },
-                {
-                  "field": "id",
-                  "direction": "desc"
-                }
-              ]
+              "hasMore": true
             },
             "httpStatus": 200
           }
@@ -6197,12 +6432,7 @@
             "cursor": {
               "$ref": "first.nextCursor"
             },
-            "ordering": [
-              {
-                "field": "createdAt",
-                "direction": "asc"
-              }
-            ]
+            "sort": "createdAt"
           },
           "expect": {
             "error": {
@@ -6231,7 +6461,6 @@
           "expect": {
             "result": {
               "items.length": 51,
-              "pageSize": 100,
               "hasMore": false
             },
             "httpStatus": 200
@@ -6366,7 +6595,7 @@
           "operation": "assets.search",
           "args": {
             "query": "photo",
-            "limit": 20
+            "pageSize": 20
           },
           "expect": {
             "result": {
@@ -6379,7 +6608,7 @@
           "operation": "assets.search",
           "args": {
             "query": "photo",
-            "limit": 21
+            "pageSize": 21
           },
           "expect": {
             "error": {
@@ -6388,7 +6617,7 @@
               "details": {
                 "issues": [
                   {
-                    "path": "limit",
+                    "path": "pageSize",
                     "code": "validation/too-big"
                   }
                 ]
@@ -6400,7 +6629,7 @@
           "operation": "assets.search",
           "args": {
             "query": "photo",
-            "limit": 0
+            "pageSize": 0
           },
           "expect": {
             "error": {
@@ -6409,7 +6638,7 @@
               "details": {
                 "issues": [
                   {
-                    "path": "limit",
+                    "path": "pageSize",
                     "code": "validation/too-small"
                   }
                 ]
@@ -6722,7 +6951,7 @@
               "partNumber": 2,
               "isFinal": true
             },
-            "queue": false
+            "wait": true
           },
           "expect": {
             "result": {
@@ -7282,7 +7511,7 @@
       ]
     },
     {
-      "name": "ensureLenses saves new lenses, returns unchanged ones and needs a greater version for changes",
+      "name": "ensureLenses saves new lenses, returns unchanged ones and changes them in place",
       "mock": {},
       "steps": [
         {
@@ -7294,7 +7523,6 @@
                 "name": "Thumbnail",
                 "type": "image",
                 "active": true,
-                "version": 1,
                 "description": null,
                 "transform": null
               },
@@ -7303,7 +7531,6 @@
                 "name": "Card",
                 "type": "image",
                 "active": true,
-                "version": 1,
                 "description": null,
                 "transform": null
               }
@@ -7317,7 +7544,6 @@
                 "$id": "lens"
               },
               "0.identifier": "thumb",
-              "0.version": 1,
               "1.identifier": "card"
             },
             "httpStatus": 200
@@ -7330,7 +7556,6 @@
             "name": "Thumbnail",
             "type": "image",
             "active": true,
-            "version": 1,
             "description": null,
             "transform": null
           },
@@ -7352,30 +7577,6 @@
             "name": "Small thumbnail",
             "type": "image",
             "active": true,
-            "version": 1,
-            "description": null,
-            "transform": null
-          },
-          "expect": {
-            "error": {
-              "code": "lens/version-conflict",
-              "status": 409,
-              "details": {
-                "currentVersion": 1,
-                "requestedVersion": 1,
-                "minimumVersion": 2
-              }
-            }
-          }
-        },
-        {
-          "operation": "ensureLens",
-          "args": {
-            "identifier": "thumb",
-            "name": "Small thumbnail",
-            "type": "image",
-            "active": true,
-            "version": 2,
             "description": null,
             "transform": null
           },
@@ -7384,84 +7585,134 @@
               "id": {
                 "$ref": "first.0.id"
               },
-              "name": "Small thumbnail",
-              "version": 2
+              "name": "Small thumbnail"
             },
             "httpStatus": 200
           }
         },
         {
-          "operation": "ensureLens",
+          "operation": "lenses.list",
           "args": {
-            "identifier": "thumb",
-            "name": "Thumbnail",
+            "pageSize": 1
+          },
+          "save": "page",
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "hasMore": true
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "lenses.iterate",
+          "args": {
+            "sort": "createdAt"
+          },
+          "expect": {
+            "result": {
+              "length": 2
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "lenses.create",
+          "args": {
+            "identifier": "card",
+            "name": "Again",
             "type": "image",
             "active": true,
-            "version": 1,
             "description": null,
             "transform": null
           },
           "expect": {
             "error": {
-              "code": "lens/version-conflict",
-              "status": 409,
-              "details": {
-                "currentVersion": 2,
-                "requestedVersion": 1,
-                "minimumVersion": 3
-              }
-            }
-          }
-        },
-        {
-          "operation": "ensureLenses",
-          "args": {
-            "lenses": [
-              {
-                "identifier": "hero",
-                "name": "Hero",
-                "type": "image",
-                "active": true,
-                "version": 1,
-                "description": null,
-                "transform": null
-              },
-              {
-                "identifier": "thumb",
-                "name": "Thumbnail",
-                "type": "image",
-                "active": true,
-                "version": 1,
-                "description": null,
-                "transform": null
-              }
-            ]
-          },
-          "expect": {
-            "error": {
-              "code": "lens/version-conflict",
+              "code": "lens/identifier-taken",
               "status": 409
             }
           }
         },
         {
-          "operation": "ensureLens",
+          "operation": "lenses.create",
           "args": {
             "identifier": "hero",
-            "name": "Changed hero",
+            "name": "Hero",
             "type": "image",
             "active": true,
-            "version": 1,
             "description": null,
             "transform": null
           },
+          "save": "hero",
+          "expect": {
+            "result": {
+              "id": {
+                "$id": "lens"
+              },
+              "identifier": "hero",
+              "name": "Hero"
+            },
+            "httpStatus": 201
+          }
+        },
+        {
+          "operation": "lenses.update",
+          "args": {
+            "lensId": {
+              "$ref": "hero.id"
+            },
+            "transform": {
+              "width": 1200
+            }
+          },
+          "expect": {
+            "result": {
+              "id": {
+                "$ref": "hero.id"
+              },
+              "transform.width": 1200,
+              "name": "Hero"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "lenses.retrieve",
+          "args": {
+            "lensId": {
+              "$ref": "hero.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "identifier": "hero",
+              "transform.width": 1200
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "lenses.delete",
+          "args": {
+            "lensId": {
+              "$ref": "hero.id"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "lenses.retrieve",
+          "args": {
+            "lensId": {
+              "$ref": "hero.id"
+            }
+          },
           "expect": {
             "error": {
-              "code": "lens/version-conflict",
-              "status": 409,
-              "details": {
-                "currentVersion": 1
-              }
+              "code": "lens/not-found",
+              "status": 404
             }
           }
         }
@@ -7651,8 +7902,7 @@
             "result": {
               "items.length": 0,
               "ancestors.length": 3,
-              "hasMore": false,
-              "pageSize": 50
+              "hasMore": false
             },
             "httpStatus": 200
           }
@@ -7727,12 +7977,7 @@
         {
           "operation": "folders.list",
           "args": {
-            "ordering": [
-              {
-                "field": "createdAt",
-                "direction": "desc"
-              }
-            ]
+            "sort": "-createdAt"
           },
           "expect": {
             "result": {
@@ -9619,7 +9864,8 @@
                     "likelihood": "very-unlikely",
                     "score": 0
                   }
-                }
+                },
+                "hashMatches": []
               },
               "classification.moderation.automatedStatus": "age-restricted",
               "classification.moderation.flaggedCategories": [
@@ -9795,7 +10041,8 @@
                     "likelihood": "very-unlikely",
                     "score": 0
                   }
-                }
+                },
+                "hashMatches": []
               },
               "classification.moderation.automatedStatus": "allowed",
               "classification.moderation.flaggedCategories": [],

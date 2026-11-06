@@ -291,6 +291,23 @@ class ContractTest {
         assertEquals(c.get("isTest").getAsBoolean(), CalmLensServerClient.isTestWebhookEvent(Json.GSON.fromJson(c.get("event"), Models.WebhookEventPayload.class))));
   }
 
+  /** getEventFact reads one fact's value by key, null when the event lacks it, from a delivery and from a feed event. */
+  @TestFactory Stream<DynamicTest> webhookFactLookups() throws Exception {
+    return cases(array("webhooks.json", "factLookups"), c -> c.get("name").getAsString(), c -> {
+      String key = c.get("key").getAsString();
+      assertEquals(c.get("value"), tree(CalmLensServerClient.getEventFact(Json.GSON.fromJson(c.get("event"), Models.WebhookEventPayload.class), key)));
+      assertEquals(c.get("value"), tree(CalmLensServerClient.getEventFact(Json.GSON.fromJson(c.get("event"), Models.Event.class), key)));
+    });
+  }
+
+  /** getEventFacts gives every fact's value by key, from a delivery and from a feed event. */
+  @TestFactory Stream<DynamicTest> webhookFactObjects() throws Exception {
+    return cases(array("webhooks.json", "factObjects"), c -> c.get("name").getAsString(), c -> {
+      assertEquals(c.get("facts"), tree(CalmLensServerClient.getEventFacts(Json.GSON.fromJson(c.get("event"), Models.WebhookEventPayload.class))));
+      assertEquals(c.get("facts"), tree(CalmLensServerClient.getEventFacts(Json.GSON.fromJson(c.get("event"), Models.Event.class))));
+    });
+  }
+
   @TestFactory Stream<DynamicTest> webhookAssetSequences() throws Exception {
     return cases(array("webhooks.json", "assetSequences"), c -> c.get("name").getAsString(), c -> {
       Long lastSequence = c.get("lastSequence").isJsonNull() ? null : c.get("lastSequence").getAsLong();
@@ -336,12 +353,12 @@ class ContractTest {
 
   /** Options a Java type cannot hold, so the type already refuses them. */
   private static final Map<String, String> TOKEN_OPTIONS_REJECTED_BY_TYPE = Map.of(
-      "fractional lifetime", "SignUploadToken.expiresInSeconds is an Integer");
+      "fractional lifetime", "SignUploadToken.expiresIn is an Integer");
 
   private static Models.SignUploadToken tokenOptions(JsonObject options) {
     Models.SignUploadToken typed = new Models.SignUploadToken(options.get("uploadPresetId").getAsString());
     if (options.has("externalId")) typed.externalId(options.get("externalId").getAsString());
-    if (options.has("expiresInSeconds")) typed.expiresInSeconds(options.get("expiresInSeconds").getAsInt());
+    if (options.has("expiresIn")) typed.expiresIn(options.get("expiresIn").getAsInt());
     return typed;
   }
 
@@ -393,7 +410,7 @@ class ContractTest {
       JsonObject options = c.getAsJsonObject("options");
       if (TOKEN_OPTIONS_REJECTED_BY_TYPE.containsKey(name)) {
         // The typed option cannot hold the fixture's value.
-        assertThrows(NumberFormatException.class, () -> Integer.parseInt(options.get("expiresInSeconds").getAsString()), TOKEN_OPTIONS_REJECTED_BY_TYPE.get(name));
+        assertThrows(NumberFormatException.class, () -> Integer.parseInt(options.get("expiresIn").getAsString()), TOKEN_OPTIONS_REJECTED_BY_TYPE.get(name));
         return;
       }
       String apiKey = c.get("apiKey").getAsString();
@@ -724,10 +741,6 @@ class ContractTest {
       case "assets.waitForDecision":
         return tree(mock.client.assets.waitForDecision(new Models.WaitForDecision(args.get("assetId").getAsString())
             .timeout(Duration.ofMillis(args.get("timeoutMs").getAsLong()))));
-      case "assets.iterate":
-        return collect(mock.client.assets.iterate(Fixtures.decode(args, Models.ListAssets.class)));
-      case "assets.iterateChildren":
-        return collect(mock.client.assets.iterateChildren(Fixtures.decode(args, Models.ListChildren.class)));
       case "events.pages":
         return collect(mock.client.events.pages(Fixtures.decode(args, Models.ListEvents.class)));
       default:
@@ -736,7 +749,9 @@ class ContractTest {
           Models.SubmitAsset submit = Fixtures.decode(args, Models.SubmitAsset.class);
           return tree(operation.equals("assets.create") ? mock.client.assets.create(submit, request) : mock.client.assets.classify(submit, request));
         }
-        return tree(Fixtures.invoke(mock.client, operation, args));
+        Object result = Fixtures.invoke(mock.client, operation, args);
+        // Every list's iterator yields its items in order.
+        return Fixtures.isIterator(operation) ? collect((Iterable<?>) result) : tree(result);
     }
   }
 

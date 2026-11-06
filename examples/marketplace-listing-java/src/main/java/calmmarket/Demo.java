@@ -128,7 +128,6 @@ final class Demo implements Calmmarket.Backend {
     event.put("facts", List.of(
         Map.of("key", "asset-name", "value", photo.name),
         Map.of("key", "asset-type", "value", "image"),
-        Map.of("key", "reviewer-name", "value", "Demo reviewer"),
         Map.of("key", "note", "value", "Simulated portal decision")));
     return mock().enqueueEvents("demo-" + id, false, event).client;
   }

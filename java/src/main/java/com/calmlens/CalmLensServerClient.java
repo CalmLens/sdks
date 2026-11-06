@@ -27,11 +27,13 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
@@ -151,6 +153,8 @@ public final class CalmLensServerClient implements AutoCloseable {
   public final HashLists hashLists = new HashLists();
   /** Moderation policies, shared by the project's organisation. */
   public final Policies policies = new Policies();
+  /** {@code client.lenses}: the project's lenses. */
+  public final Lenses lenses = new Lenses();
   /** Signs upload tokens for upload presets, locally. */
   public final UploadTokens uploadTokens = new UploadTokens();
   /** The events feed. */
@@ -168,7 +172,7 @@ public final class CalmLensServerClient implements AutoCloseable {
   private final Sleeper sleeper;
   private final LongSupplier nanoTime;
   private final AtomicBoolean closed;
-  private final LensCache lenses;
+  private final LensCache lensCache;
   /** Leaves multipart size checks to the API; set by the mock so its API answers them in the API's order. */
   boolean deferUploadChecks;
 
@@ -208,7 +212,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     this.sleeper = base.sleeper;
     this.nanoTime = base.nanoTime;
     this.closed = base.closed;
-    this.lenses = base.lenses;
+    this.lensCache = base.lensCache;
     this.deferUploadChecks = base.deferUploadChecks;
   }
 
@@ -226,7 +230,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     if (options.partSizeBytes < MIN_PART_SIZE_BYTES || options.partSizeBytes > MAX_PART_SIZE_BYTES)
       throw config("partSizeBytes must be from 5 MiB (5242880) to 64 MiB (67108864)");
     this.closed = new AtomicBoolean();
-    this.lenses = new LensCache();
+    this.lensCache = new LensCache();
     this.baseUrl = baseUrl("baseUrl", options.baseUrl);
     this.cdnBaseUrl = baseUrl("cdnBaseUrl", options.cdnBaseUrl);
     this.apiKey = options.apiKey;
@@ -818,17 +822,9 @@ public final class CalmLensServerClient implements AutoCloseable {
       for (var entry : query.entrySet()) {
         JsonElement value = entry.getValue();
         if (value.isJsonNull()) continue;
-        if (entry.getKey().equals("ordering") && value.isJsonArray()) {
-          int index = 0;
-          for (JsonElement order : value.getAsJsonArray()) {
-            for (var field : order.getAsJsonObject().entrySet())
-              params.add(id("ordering[" + index + "][" + field.getKey() + "]") + "=" + id(field.getValue().getAsString()));
-            index++;
-          }
-        } else
-          params.add(id(entry.getKey()) + "=" + URLEncoder.encode(
-              value.isJsonPrimitive() && value.getAsJsonPrimitive().isString() ? value.getAsString() : Json.write(value),
-              StandardCharsets.UTF_8));
+        params.add(id(entry.getKey()) + "=" + URLEncoder.encode(
+            value.isJsonPrimitive() && value.getAsJsonPrimitive().isString() ? value.getAsString() : Json.write(value),
+            StandardCharsets.UTF_8));
       }
     return params.isEmpty() ? "" : "?" + String.join("&", params);
   }
@@ -1191,7 +1187,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     return execute(new Call("POST", baseUrl + path + query(query), headers, body, text ? timeout : uploadTimeout, true));
   }
 
-  private Models.Asset submit(Models.SubmitAsset options, boolean queue, String key) {
+  /** Uploads an asset; {@code wait} says whether the API waits for the decision before answering. */
+  private Models.Asset submit(Models.SubmitAsset options, boolean wait, String key) {
     JsonObject o = Models.encode(options);
     if (List.of("content", "part", "url").stream().noneMatch(k -> o.has(k) && !o.get(k).isJsonNull()))
       throw payloadError("Either file content, URL, or multipart part is required");
@@ -1204,7 +1201,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       o.add("context", Json.GSON.toJsonTree(new Models.ModerationContext(items)));
     }
     JsonObject query = new JsonObject();
-    query.addProperty("queue", queue);
+    query.addProperty("wait", wait);
     if (o.has("url")) {
       Map<String, String> headers = baseHeaders("application/json");
       headers.put("Content-Type", "application/json");
@@ -1304,7 +1301,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     Transport.Body body = payload(options.partValue(), part, true);
     checkPartSize(body.length(), flag(part, "isFinal"), false);
     JsonObject query = new JsonObject();
-    if (o.has("queue")) query.add("queue", o.get("queue"));
+    if (o.has("wait")) query.add("wait", o.get("wait"));
     query.add("partNumber", part.get("partNumber"));
     query.addProperty("isFinal", flag(part, "isFinal"));
     if (body.length() >= 0) query.addProperty("sizeInBytes", body.length());
@@ -1312,15 +1309,24 @@ public final class CalmLensServerClient implements AutoCloseable {
     return decode(upload(path, query, body, null, "part", key, text), Models.Asset.class);
   }
 
-  private AutoPager<Models.Asset> pages(String path, JsonObject options) {
+  /**
+   * Every item of a cursor list from the options' cursor on: {@code list} fetches the page for a
+   * cursor (null for the options' own), and pages follow {@code nextCursor} while {@code hasMore}.
+   */
+  private static <T> AutoPager<T> pages(JsonObject options, java.util.function.Function<String, ? extends Models.CursorPage<T>> list) {
     String first = options.has("cursor") && !options.get("cursor").isJsonNull() ? options.get("cursor").getAsString() : null;
     return new AutoPager<>(token -> {
-      JsonObject query = options.deepCopy();
-      if (token != null) query.addProperty("cursor", token);
-      Models.AssetPage page = decode(json("GET", path, query, null), Models.AssetPage.class);
+      Models.CursorPage<T> page = list.apply(token);
       boolean more = page.hasMore() && page.nextCursor() != null && !page.items().isEmpty();
       return new AutoPager.Chunk<>(page.items(), more ? page.nextCursor() : null, more);
     }, first, false);
+  }
+
+  /** A GET of one cursor page at {@code path} with {@code query}, the cursor set when not null. */
+  private <P> P page(String path, JsonObject query, String cursor, Class<P> type) {
+    JsonObject sent = query.deepCopy();
+    if (cursor != null) sent.addProperty("cursor", cursor);
+    return decode(json("GET", path, sent, null), type);
   }
 
   /** Assets: uploads, moderation, listing and management. */
@@ -1328,9 +1334,9 @@ public final class CalmLensServerClient implements AutoCloseable {
     private Assets() {}
 
     /**
-     * Uploads an asset and queues it for processing; it returns while its {@code classification.status}
-     * is {@code processing} ({@code uploading} for the first part of a multipart upload). The
-     * upload carries an {@code Idempotency-Key}, so it is retried safely.
+     * Uploads an asset and returns without waiting for its decision ({@code wait=false}): its
+     * {@code classification.status} is {@code queued} ({@code uploading} for the first part of a
+     * multipart upload). The upload carries an {@code Idempotency-Key}, so it is retried safely.
      *
      * <p>Content larger than {@link Builder#partSizeBytes(long)} (bytes, base64 or a file) is sent
      * as a multipart upload in parts of that size, each retried on its own; calling again with the
@@ -1340,17 +1346,17 @@ public final class CalmLensServerClient implements AutoCloseable {
      * @param options name and content, part or url
      * @return the new asset
      */
-    public Models.Asset create(Models.SubmitAsset options) { return submit(options, true, null); }
+    public Models.Asset create(Models.SubmitAsset options) { return submit(options, false, null); }
 
     /**
      * @param options name and content, part or url
      * @param requestOptions idempotency key, deadlines and retries for this call
      * @return the new asset
      */
-    public Models.Asset create(Models.SubmitAsset options, RequestOptions requestOptions) { return with(requestOptions).submit(options, true, key(requestOptions)); }
+    public Models.Asset create(Models.SubmitAsset options, RequestOptions requestOptions) { return with(requestOptions).submit(options, false, key(requestOptions)); }
 
     /**
-     * Uploads bytes and queues them for processing.
+     * Uploads bytes and returns without waiting for their decision.
      *
      * @param name asset name
      * @param bytes content
@@ -1360,7 +1366,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     public Models.Asset create(String name, byte[] bytes, String mimeType) { return create(new Models.SubmitAsset(name, Models.Content.bytes(bytes, mimeType))); }
 
     /**
-     * Uploads an asset and waits for classification.
+     * Uploads an asset and waits for its moderation decision ({@code wait=true}).
      *
      * @param options name and content, part or url
      * @return the classified asset
@@ -1378,7 +1384,7 @@ public final class CalmLensServerClient implements AutoCloseable {
         if (o.has("content") && o.getAsJsonObject("content").has("plainText") && str(o.getAsJsonObject("content"), "plainText", "").isBlank())
           throw payloadError("Text to classify must be a non-empty string");
       }
-      return with(requestOptions).submit(options, false, key(requestOptions));
+      return with(requestOptions).submit(options, true, key(requestOptions));
     }
 
     /** @param options search query @return matches, best first */
@@ -1386,20 +1392,27 @@ public final class CalmLensServerClient implements AutoCloseable {
       return decode(json("GET", project("assets/search"), Models.encode(options), null), Models.AssetSearchResponse.class);
     }
 
-    /** @param options page and filter @return one page of assets */
+    /**
+     * Lists one page of the project's assets, newest first unless {@code sort} says otherwise. Pass
+     * {@code filter("folderId==fldr_...")} for one folder's assets.
+     *
+     * @param options page, filter and sort
+     * @return one page of assets
+     */
     public Models.AssetPage list(Models.ListAssets options) {
-      JsonObject query = new JsonObject();
-      Models.encode(options).entrySet().forEach(entry -> query.add(entry.getKey(), entry.getValue()));
-      return decode(json("GET", project("assets"), query, null), Models.AssetPage.class);
+      return decode(json("GET", project("assets"), Models.encode(options), null), Models.AssetPage.class);
     }
 
     /**
      * Iterates over every matching asset, page by page, from the supplied cursor.
      *
-     * @param options page size, filter and ordering
+     * @param options page size, filter and sort
      * @return a lazy iterable
      */
-    public AutoPager<Models.Asset> iterate(Models.ListAssets options) { return pages(project("assets"), Models.encode(options)); }
+    public AutoPager<Models.Asset> iterate(Models.ListAssets options) {
+      JsonObject o = Models.encode(options);
+      return pages(o, cursor -> page(project("assets"), o, cursor, Models.AssetPage.class));
+    }
 
     /** @param options the asset @return the asset */
     public Models.Asset retrieve(Models.AssetId options) {
@@ -1576,15 +1589,30 @@ public final class CalmLensServerClient implements AutoCloseable {
       return decode(json("GET", project("assets/" + id(str(o, "assetId", null)) + "/timeline"), query, null), Models.AssetTimelinePage.class);
     }
 
-    /** @param options the parent asset, page size and filter @return a lazy iterable over every child */
+    /** @param options the parent asset, page size and sort @return a lazy iterable over every child */
     public AutoPager<Models.Asset> iterateChildren(Models.ListChildren options) {
       JsonObject o = Models.encode(options);
-      return pages("/assets/" + id(str(o, "assetId", null)) + "/children", without(o, "assetId"));
+      String path = "/assets/" + id(str(o, "assetId", null)) + "/children";
+      JsonObject query = without(o, "assetId");
+      return pages(query, cursor -> page(path, query, cursor, Models.AssetPage.class));
     }
 
     /**
-     * Sends a later part of a multipart upload. The queue choice saved when the upload started
-     * applies unless {@link Models.UploadPart#queue(Boolean)} overrides it.
+     * Iterates over every segment of an audio or video asset's findings timeline, in time order.
+     *
+     * @param options the asset and page size
+     * @return a lazy iterable over every segment
+     */
+    public AutoPager<Models.MediaClassificationSegment> iterateTimeline(Models.ListTimeline options) {
+      JsonObject o = Models.encode(options);
+      String path = project("assets/" + id(str(o, "assetId", null)) + "/timeline");
+      JsonObject query = without(o, "assetId");
+      return pages(query, cursor -> page(path, query, cursor, Models.AssetTimelinePage.class));
+    }
+
+    /**
+     * Sends a later part of a multipart upload. Whether the final part waits for the decision was
+     * chosen when the upload started; {@link Models.UploadPart#wait(Boolean)} overrides it.
      *
      * @param options the asset and the part
      * @return the asset; its {@code classification.status} is {@code uploading} until the final part
@@ -1635,7 +1663,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     /**
      * Signs a single-use upload token with this client's API key. Makes no request.
      *
-     * @param options the preset, optional external ID and lifetime (1 to 3600 seconds, default 600)
+     * @param options the preset, optional external ID and lifetime ({@code expiresIn}, 1 to 3600 seconds, default 600)
      * @return the token and when it expires
      */
     public Models.SignedUploadToken sign(Models.SignUploadToken options) {
@@ -1651,8 +1679,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     if (options == null) throw argument("Options are required");
     String presetId = options.uploadPresetIdValue();
     id(presetId);
-    int ttl = options.expiresInSecondsValue() == null ? DEFAULT_UPLOAD_TOKEN_EXPIRES_IN_SECONDS : options.expiresInSecondsValue();
-    if (ttl < 1 || ttl > 3600) throw argument("expiresInSeconds must be a whole number from 1 to 3600");
+    int ttl = options.expiresInValue() == null ? DEFAULT_UPLOAD_TOKEN_EXPIRES_IN_SECONDS : options.expiresInValue();
+    if (ttl < 1 || ttl > 3600) throw argument("expiresIn must be a whole number from 1 to 3600");
     String externalId = options.externalIdValue();
     if (externalId != null && externalId.isEmpty()) throw argument("externalId must be a non-empty string");
     long expiresAt = now + ttl * 1000L;
@@ -1708,7 +1736,7 @@ public final class CalmLensServerClient implements AutoCloseable {
      * names, or resolves the paths of {@code ids}. Pass the page's {@code nextCursor} as {@code cursor}
      * for the next page.
      *
-     * @param options parent, cursor, page size, ordering and search
+     * @param options parent, cursor, page size, sort and search
      * @return one folder page
      */
     public Models.FolderPage list(Models.ListFolders options) {
@@ -1717,6 +1745,18 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (!page.has("items") || !page.get("items").isJsonArray() || !page.has("ancestors") || !page.get("ancestors").isJsonArray() || !page.has("hasMore") || !page.get("hasMore").isJsonPrimitive() || !page.get("hasMore").getAsJsonPrimitive().isBoolean())
         throw new ApiException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected a folder page", null, reply.status(), reply.headers(), null);
       return decode(reply, Models.FolderPage.class);
+    }
+
+    /**
+     * Iterates over every child folder of {@code parentId} (or the project root), fetching pages as
+     * needed.
+     *
+     * @param options parent, page size, sort and search
+     * @return a lazy iterable over every folder
+     */
+    public AutoPager<Models.Folder> iterate(Models.ListFolders options) {
+      JsonObject o = Models.encode(options);
+      return pages(o, cursor -> page(project("folders"), o, cursor, Models.FolderPage.class));
     }
 
     /** @param options the folder @return the folder */
@@ -1757,13 +1797,19 @@ public final class CalmLensServerClient implements AutoCloseable {
   public final class HashLists {
     private HashLists() {}
 
-    /** @param options cursor and page size @return one page of the project's hash lists */
+    /** @param options cursor, page size and sort @return one page of the project's hash lists, newest first unless {@code sort} says otherwise */
     public Models.HashListPage list(Models.ListHashLists options) {
       return decode(json("GET", project("hash-lists"), Models.encode(options), null), Models.HashListPage.class);
     }
 
     /** @return the first page of the project's hash lists */
     public Models.HashListPage list() { return list(new Models.ListHashLists()); }
+
+    /** @param options page size and sort @return a lazy iterable over every hash list */
+    public AutoPager<Models.HashList> iterate(Models.ListHashLists options) {
+      JsonObject o = Models.encode(options);
+      return pages(o, cursor -> page(project("hash-lists"), o, cursor, Models.HashListPage.class));
+    }
 
     /** @param options the hash list @return the hash list */
     public Models.HashList retrieve(Models.HashListId options) {
@@ -1786,10 +1832,18 @@ public final class CalmLensServerClient implements AutoCloseable {
       success(json("DELETE", "/hash-lists/" + id(str(Models.encode(options), "hashListId", null)), null, null));
     }
 
-    /** @param options the hash list, cursor and page size @return one page of entries, newest first */
+    /** @param options the hash list, cursor, page size and sort @return one page of entries, newest first unless {@code sort} says otherwise */
     public Models.HashListEntryPage listEntries(Models.ListHashListEntries options) {
       JsonObject o = Models.encode(options);
       return decode(json("GET", "/hash-lists/" + id(str(o, "hashListId", null)) + "/entries", without(o, "hashListId"), null), Models.HashListEntryPage.class);
+    }
+
+    /** @param options the hash list, page size and sort @return a lazy iterable over every entry of the list */
+    public AutoPager<Models.HashListEntry> iterateEntries(Models.ListHashListEntries options) {
+      JsonObject o = Models.encode(options);
+      String path = "/hash-lists/" + id(str(o, "hashListId", null)) + "/entries";
+      JsonObject query = without(o, "hashListId");
+      return pages(query, cursor -> page(path, query, cursor, Models.HashListEntryPage.class));
     }
 
     /**
@@ -1811,19 +1865,34 @@ public final class CalmLensServerClient implements AutoCloseable {
   }
 
   /**
-   * Moderation policies belong to the project's organisation and its projects share them. Every
-   * change sends the policy's {@code revision}, so a policy changed since is refused with {@code
+   * Moderation policies belong to the organisation and its projects share them. Every change sends
+   * the policy's {@code revision}, so a policy changed since is refused with {@code
    * policy/revision-conflict}. Through a project's key you can change only policies no other
-   * project uses or owns.
+   * project uses.
    */
   public final class Policies {
     private Policies() {}
 
-    private String policyPath(JsonObject o) { return project("policies/" + id(str(o, "policyId", null))); }
+    private String policyPath(JsonObject o) { return "/policies/" + id(str(o, "policyId", null)); }
 
-    /** @return the organisation's policies and the ID of the one the project uses */
-    public Models.PolicyList list() {
-      return decode(json("GET", project("policies"), null, null), Models.PolicyList.class);
+    /**
+     * Lists one page of the organisation's policies, oldest first unless {@code sort} says
+     * otherwise. {@link #retrieveAssigned()} says which one the project uses.
+     *
+     * @param options cursor, page size and sort
+     * @return one page of policies
+     */
+    public Models.PolicyPage list(Models.ListPolicies options) {
+      return decode(json("GET", "/policies", Models.encode(options), null), Models.PolicyPage.class);
+    }
+
+    /** @return the first page of the organisation's policies, oldest first */
+    public Models.PolicyPage list() { return list(new Models.ListPolicies()); }
+
+    /** @param options page size and sort @return a lazy iterable over every policy of the organisation */
+    public AutoPager<Models.Policy> iterate(Models.ListPolicies options) {
+      JsonObject o = Models.encode(options);
+      return pages(o, cursor -> page("/policies", o, cursor, Models.PolicyPage.class));
     }
 
     /** @param options the policy @return the policy */
@@ -1839,12 +1908,12 @@ public final class CalmLensServerClient implements AutoCloseable {
      * @return the new policy
      */
     public Models.Policy create(Models.CreatePolicy options) {
-      return decode(json("POST", project("policies"), null, Models.encode(options)), Models.Policy.class);
+      return decode(json("POST", "/policies", null, Models.encode(options)), Models.Policy.class);
     }
 
     /**
-     * Changes the name, description or settings; later moderation uses them. Saving a policy that
-     * follows automatic updates pins it as a copy under the same ID.
+     * Changes the name, description or settings; later moderation uses them. Saving a {@code live}
+     * policy pins it under the same ID.
      *
      * @param options the policy, its revision and the fields to change
      * @return the saved policy
@@ -1855,18 +1924,32 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
 
     /**
-     * Resets a preset copy to its pinned version, or updates an unchanged copy to the latest.
+     * Restores the settings of the preset release a {@code pinned} or {@code copy} policy is at,
+     * discarding its edits.
      *
-     * @param options the policy, operation, revision and preset version
+     * @param options the policy, its revision and the {@code preset.version} you reviewed
      * @return the saved policy
      */
-    public Models.Policy applyPreset(Models.ApplyPolicyPreset options) {
+    public Models.Policy reset(Models.ResetPolicy options) {
       JsonObject o = Models.encode(options);
-      return decode(json("POST", policyPath(o) + "/preset", null, without(o, "policyId")), Models.Policy.class);
+      return decode(json("POST", policyPath(o) + "/reset", null, without(o, "policyId")), Models.Policy.class);
     }
 
     /**
-     * Switches automatic updates on or off for the organisation's own preset policy.
+     * Moves a {@code pinned} or {@code copy} policy whose settings are unchanged from its preset
+     * release to the latest release of the preset.
+     *
+     * @param options the policy, its revision and the {@code preset.latestVersion} you reviewed
+     * @return the saved policy
+     */
+    public Models.Policy upgrade(Models.UpgradePolicy options) {
+      JsonObject o = Models.encode(options);
+      return decode(json("POST", policyPath(o) + "/upgrade", null, without(o, "policyId")), Models.Policy.class);
+    }
+
+    /**
+     * Switches automatic updates on ({@code live}) or off ({@code pinned}) for the organisation's
+     * own preset policy.
      *
      * @param options the policy, whether it follows the preset, its revision and the preset version
      * @return the saved policy
@@ -1879,6 +1962,11 @@ public final class CalmLensServerClient implements AutoCloseable {
     /** Deletes a policy that no project or upload preset uses. @param options the policy */
     public void delete(Models.PolicyId options) {
       success(json("DELETE", policyPath(Models.encode(options)), null, null));
+    }
+
+    /** @return the policy the project moderates with */
+    public Models.Policy retrieveAssigned() {
+      return decode(json("GET", project("policy"), null, null), Models.Policy.class);
     }
 
     /** Chooses the policy the project moderates with. @param options the policy @return the policy */
@@ -2190,7 +2278,77 @@ public final class CalmLensServerClient implements AutoCloseable {
   // ------------------------------------------------------------------ Lenses
 
   /**
-   * Creates or updates one lens, caching the result in this client.
+   * The project's lenses: named image transforms the CDN applies at {@code /@<identifier>}. The CDN
+   * serves files made with each lens's current definition. {@link #ensureLenses} creates or changes
+   * lenses by identifier, for applications that declare theirs in code.
+   */
+  public final class Lenses {
+    private Lenses() {}
+
+    private String lensPath(JsonObject o) { return "/lenses/" + id(str(o, "lensId", null)); }
+
+    /** A lens changed here no longer has the definition {@code ensureLens} cached for it. */
+    private void forget(java.util.function.Predicate<Models.Lens> matches) {
+      lensCache.ensured.values().removeIf(matches);
+    }
+
+    /** @param options cursor, page size and sort @return one page of the project's lenses, newest first unless {@code sort} says otherwise */
+    public Models.LensPage list(Models.ListLenses options) {
+      return decode(json("GET", project("lenses"), Models.encode(options), null), Models.LensPage.class);
+    }
+
+    /** @return the first page of the project's lenses, newest first */
+    public Models.LensPage list() { return list(new Models.ListLenses()); }
+
+    /** @param options page size and sort @return a lazy iterable over every lens of the project */
+    public AutoPager<Models.Lens> iterate(Models.ListLenses options) {
+      JsonObject o = Models.encode(options);
+      return pages(o, cursor -> page(project("lenses"), o, cursor, Models.LensPage.class));
+    }
+
+    /**
+     * Creates a lens; its identifier must be new to the project ({@code lens/identifier-taken}
+     * otherwise).
+     *
+     * @param options the lens definition
+     * @return the new lens
+     */
+    public Models.Lens create(Models.LensDefinition options) {
+      Models.Lens lens = decode(json("POST", project("lenses"), null, Models.encode(options)), Models.Lens.class);
+      forget(cached -> java.util.Objects.equals(cached.identifier(), lens.identifier()));
+      return lens;
+    }
+
+    /** @param options the lens @return the lens */
+    public Models.Lens retrieve(Models.LensId options) {
+      return decode(json("GET", lensPath(Models.encode(options)), null, null), Models.Lens.class);
+    }
+
+    /**
+     * Changes a lens's name, description, type, transform or whether the CDN serves it.
+     *
+     * @param options the lens and the fields to change
+     * @return the saved lens
+     */
+    public Models.Lens update(Models.UpdateLens options) {
+      JsonObject o = Models.encode(options);
+      Models.Lens lens = decode(json("PATCH", lensPath(o), null, without(o, "lensId")), Models.Lens.class);
+      forget(cached -> java.util.Objects.equals(cached.id(), lens.id()));
+      return lens;
+    }
+
+    /** Deletes a lens; URLs that select it stop being served. @param options the lens */
+    public void delete(Models.LensId options) {
+      JsonObject o = Models.encode(options);
+      String lensId = str(o, "lensId", null);
+      success(json("DELETE", lensPath(o), null, null));
+      forget(cached -> java.util.Objects.equals(cached.id(), lensId));
+    }
+  }
+
+  /**
+   * Creates a named lens, or changes it to this definition. Sending the same definition again
+   * returns the lens unchanged, from this client's lens cache once it has seen it.
    *
    * @param options the lens definition
    * @return the lens
@@ -2203,7 +2361,7 @@ public final class CalmLensServerClient implements AutoCloseable {
   public static final int ENSURE_LENSES_MAX_PER_REQUEST = 100;
 
   /**
-   * Creates or updates lenses. Definitions already ensured by this client (or a client derived from
+   * Creates or changes lenses by identifier, as {@link #ensureLens} does. Definitions already ensured by this client (or a client derived from
    * it with {@link #withRequestOptions}) are not sent again, and concurrent calls for the same new
    * definitions share one request. More than {@link #ENSURE_LENSES_MAX_PER_REQUEST} new definitions
    * are sent in consecutive requests, in order.
@@ -2223,12 +2381,12 @@ public final class CalmLensServerClient implements AutoCloseable {
       id(str(value, "identifier", null));
       String key = Json.write(canonical(value));
       keys.add(key);
-      if (!lenses.ensured.containsKey(key)) missing.putIfAbsent(key, value);
+      if (!lensCache.ensured.containsKey(key)) missing.putIfAbsent(key, value);
     }
     if (!missing.isEmpty()) {
       String batch = Json.write(Json.GSON.toJsonTree(new java.util.TreeSet<>(missing.keySet())));
       java.util.concurrent.CompletableFuture<Void> mine = new java.util.concurrent.CompletableFuture<>();
-      java.util.concurrent.CompletableFuture<Void> running = lenses.pending.putIfAbsent(batch, mine);
+      java.util.concurrent.CompletableFuture<Void> running = lensCache.pending.putIfAbsent(batch, mine);
       if (running == null) {
         try {
           submitLenses(new ArrayList<>(missing.values()));
@@ -2237,7 +2395,7 @@ public final class CalmLensServerClient implements AutoCloseable {
           mine.completeExceptionally(failure);
           throw failure;
         } finally {
-          lenses.pending.remove(batch, mine);
+          lensCache.pending.remove(batch, mine);
         }
       } else {
         try {
@@ -2253,8 +2411,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     }
     List<Models.Lens> result = new ArrayList<>();
     for (int i = 0; i < keys.size(); i++) {
-      Models.Lens lens = lenses.ensured.get(keys.get(i));
-      // Another call may have replaced this definition with a newer version meanwhile.
+      Models.Lens lens = lensCache.ensured.get(keys.get(i));
+      // Another call may have replaced this definition with a changed one meanwhile.
       if (lens == null) throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE,
           "CalmLens did not return lens \"" + str(definitions.get(i).getAsJsonObject(), "identifier", "") + "\"");
       result.add(lens);
@@ -2296,8 +2454,8 @@ public final class CalmLensServerClient implements AutoCloseable {
         String identifier = str(chunk.get(index), "identifier", "");
         if (lens == null || !identifier.equals(lens.identifier()))
           throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected lens \"" + identifier + "\" at position " + index);
-        lenses.ensured.entrySet().removeIf(cached -> identifier.equals(cached.getValue().identifier()));
-        lenses.ensured.put(Json.write(canonical(chunk.get(index))), lens);
+        lensCache.ensured.entrySet().removeIf(cached -> identifier.equals(cached.getValue().identifier()));
+        lensCache.ensured.put(Json.write(canonical(chunk.get(index))), lens);
       }
     }
   }
@@ -2385,6 +2543,52 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @return whether it is a test send
    */
   public static boolean isTestWebhookEvent(Models.Event event) { return event != null && isTestFacts(event.facts()); }
+
+  /**
+   * The value of one of an event's facts, by key, such as {@code flagged-categories} on {@code
+   * asset.blocked}, or null when the event doesn't carry it (or carries it with a null value). A
+   * key the event repeats gives its first value. The fact's {@code url}, when it has one, is on the
+   * fact in {@code facts()}.
+   *
+   * @param event a parsed delivery
+   * @param key the fact key
+   * @return the fact's value, or null
+   */
+  public static Object getEventFact(Models.WebhookEventPayload event, String key) { return event == null ? null : factValue(event.facts(), key); }
+
+  /**
+   * @param event an event from {@code events.list}
+   * @param key the fact key
+   * @return the fact's value, or null
+   */
+  public static Object getEventFact(Models.Event event, String key) { return event == null ? null : factValue(event.facts(), key); }
+
+  /**
+   * An event's facts as values by key, in the event's order, such as {@code {"flagged-categories":
+   * ["hate"]}}. A key the event repeats keeps its first value, as {@link
+   * #getEventFact(Models.WebhookEventPayload, String)} reads it; a null value is kept.
+   *
+   * @param event a parsed delivery
+   * @return the values by key, unmodifiable
+   */
+  public static Map<String, Object> getEventFacts(Models.WebhookEventPayload event) { return factValues(event == null ? null : event.facts()); }
+
+  /**
+   * @param event an event from {@code events.list}
+   * @return the values by key, unmodifiable
+   */
+  public static Map<String, Object> getEventFacts(Models.Event event) { return factValues(event == null ? null : event.facts()); }
+
+  private static Object factValue(List<Models.EventFact> facts, String key) {
+    if (facts != null) for (Models.EventFact fact : facts) if (fact != null && Objects.equals(fact.key(), key)) return fact.value();
+    return null;
+  }
+
+  private static Map<String, Object> factValues(List<Models.EventFact> facts) {
+    Map<String, Object> values = new LinkedHashMap<>();
+    if (facts != null) for (Models.EventFact fact : facts) if (fact != null && fact.key() != null && !values.containsKey(fact.key())) values.put(fact.key(), fact.value());
+    return Collections.unmodifiableMap(values);
+  }
 
   /**
    * Whether to apply an event after {@code lastSequence}, the highest {@code assetSequence} you have

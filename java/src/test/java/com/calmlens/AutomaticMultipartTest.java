@@ -87,8 +87,8 @@ class AutomaticMultipartTest {
     assertEquals(List.of("false", "false", "true"), each(sent, r -> r.query().get("isFinal")));
     assertEquals(List.of(String.valueOf(5 * MIB), String.valueOf(5 * MIB), String.valueOf(MIB)), each(sent, r -> r.query().get("sizeInBytes")));
     assertEquals(String.valueOf(11 * MIB), sent.get(0).query().get("totalSizeInBytes"));
-    // The queue choice goes with the first part, which saves it for the upload.
-    assertEquals(java.util.Arrays.asList("false", null, null), each(sent, r -> r.query().get("queue")));
+    // Whether to wait goes with the first part, which saves it for the upload.
+    assertEquals(java.util.Arrays.asList("true", null, null), each(sent, r -> r.query().get("wait")));
     assertArrayEquals(file, joined(sent));
   }
 

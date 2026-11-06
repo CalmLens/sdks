@@ -207,7 +207,7 @@ class CalmmarketTest {
     List<MockCalmLensServerClient.Request> sent = mock.requests();
     assertEquals(5, sent.size());
     assertEquals(listing.id + ":title", sent.get(0).query().get("externalId"));
-    assertEquals("false", sent.get(0).query().get("queue"));
+    assertEquals("true", sent.get(0).query().get("wait"), "text waits for its decision");
     assertEquals(listing.id + ":title", sent.get(0).header("Idempotency-Key"), "the listing's own key makes a retried submission safe");
     assertEquals(listing.id + ":description", sent.get(1).query().get("externalId"));
     for (int i = 0; i < 3; i++) {
@@ -215,7 +215,7 @@ class CalmmarketTest {
       JsonObject options = JsonParser.parseString(upload.query().get("processingOptions")).getAsJsonObject();
       assertTrue(options.getAsJsonObject("features").getAsJsonObject("ocr").get("enabled").getAsBoolean(), "photo " + (i + 1));
       assertTrue(options.get("keepContentAfterProcessing").getAsBoolean());
-      assertEquals("true", upload.query().get("queue"));
+      assertEquals("false", upload.query().get("wait"), "photos are classified in the background");
       assertEquals("private", upload.query().get("visibility"));
       assertEquals(listing.id + ":photo-" + (i + 1), upload.query().get("externalId"));
       assertEquals(listing.id + ":photo-" + (i + 1), upload.header("Idempotency-Key"));
@@ -529,7 +529,7 @@ class CalmmarketTest {
     Calmmarket.Activity review = app.activity().get(0);
     assertEquals("review", review.kind());
     List<String> values = review.facts().stream().map(Calmmarket.FactRow::value).toList();
-    assertTrue(values.contains("Demo reviewer"));
+    assertTrue(values.contains("Simulated portal decision"), "the decision's note is shown");
     assertFalse(values.contains("demo-reviewer"), "the actor's user ID is not shown");
     assertEquals(409, post(app, "/demo/review", "csrf=" + app.csrf + "&listing=" + listing.id).status());
   }
@@ -662,7 +662,7 @@ class CalmmarketTest {
     Calmmarket.Listing listing = app.listings().get(0);
     mock.enqueue(200, photo(listing, 1, "allowed", CLEAN))
         .enqueue(200, Map.of("lenses", List.of(Map.of(
-            "identifier", Calmmarket.CARD_LENS, "name", "Calmmarket listing card", "type", "image", "active", true, "version", 1))))
+            "identifier", Calmmarket.CARD_LENS, "name", "Calmmarket listing card", "type", "image", "active", true))))
         .enqueue(200, Map.of("url", "https://cdn.calmlens.com/v1/assets/project-1/sig_photo1", "expiresAt", 1760000060000L));
     Calmmarket.Response first = get(app, "/listings/" + listing.id + "/photos/1");
     assertEquals(303, first.status());
@@ -761,7 +761,7 @@ class CalmmarketTest {
 
     Map<String, Object> blocking = Map.of("id", "event-1", "type", "asset.blocked", "assetId", "description-1",
         "actor", Map.of("type", "user", "id", "user-9"),
-        "facts", List.of(Map.of("key", "reviewer-name", "value", "Sam"),
+        "facts", List.of(Map.of("key", "asset-name", "value", "Lamp description"),
             Map.of("key", "note", "value", "Counterfeit", "url", "javascript:alert(1)")));
     Map<String, Object> other = Map.of("id", "event-0", "type", "asset.blocked", "assetId", "someone-else", "facts", List.of());
     // First attempt: retrieval fails, so the cursor must not advance.
@@ -782,7 +782,7 @@ class CalmmarketTest {
     assertEquals(Calmmarket.State.REMOVED, listing.state());
     assertEquals(AssetModerationStatus.BLOCKED, listing.textStatus.get("description"), "the later decision replaces the submitted one");
     Calmmarket.Activity review = app.activity().get(0);
-    assertEquals(List.of("Sam", "Counterfeit"), review.facts().stream().map(Calmmarket.FactRow::value).toList());
+    assertEquals(List.of("Lamp description", "Counterfeit"), review.facts().stream().map(Calmmarket.FactRow::value).toList());
     assertNull(review.facts().get(1).url(), "only HTTP(S) fact URLs become links");
   }
 

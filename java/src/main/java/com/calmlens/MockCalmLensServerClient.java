@@ -29,11 +29,11 @@ import java.util.function.LongSupplier;
  * encoding, retries, error mapping) whose transport answers from an in-memory API, and records
  * every request it receives.
  *
- * <p>The in-memory API keeps assets, folders, hash lists, policies, events and content: uploads create assets you can
- * retrieve, list (RSQL filters such as {@code classification.moderation.status==blocked},
- * ordering, folder and cursor paging), search, update, move and delete, and the CDN serves their
- * stored bytes. The project starts on the organisation's own General preset policy; presets have one release and no
- * settings, and policies never decide uploads. It does not classify content: {@link Options#moderate} decides each upload from the
+ * <p>The in-memory API keeps assets, folders, hash lists, policies, lenses, events and content: uploads create assets you can
+ * retrieve, list (RSQL filters such as {@code classification.moderation.status==blocked} or
+ * {@code folderId==...}, {@code sort} and cursor paging), search, update, move and delete, and the CDN serves their
+ * stored bytes. The project starts on the organisation's own General preset policy; presets have one release whose
+ * settings give every category its default action and no rules, and policies never decide uploads. It does not classify content: {@link Options#moderate} decides each upload from the
  * asset, its content and why it is moderated, with a status or a {@link MockDecision}. Without it,
  * queued uploads ({@code assets.create}), retries and reruns stay {@code pending} until {@link
  * #completeProcessing}, and {@code assets.classify} and {@code text.classify} are {@code allowed}.

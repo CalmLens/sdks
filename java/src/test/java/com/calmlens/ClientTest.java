@@ -188,7 +188,7 @@ class ClientTest {
       if (!release.await(5, java.util.concurrent.TimeUnit.SECONDS)) throw new java.io.IOException("not released");
       return lensReply(request);
     });
-    Models.EnsureLenses definition = new Models.EnsureLenses(List.of(new Models.LensDefinition("thumb", "Thumbnail", "image", true, 1)));
+    Models.EnsureLenses definition = new Models.EnsureLenses(List.of(new Models.LensDefinition("thumb", "Thumbnail", "image", true)));
     java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2);
     try {
       var first = executor.submit(() -> client.ensureLenses(definition));
@@ -207,6 +207,28 @@ class ClientTest {
     }
   }
 
+  @Test void aLensChangedThroughTheLensesResourceIsEnsuredAgain() {
+    List<String> methods = new ArrayList<>();
+    CalmLensServerClient client = client(request -> {
+      methods.add(request.method());
+      if (request.method().equals("PUT")) return lensReply(request);
+      return Fixtures.json(200, request.method().equals("DELETE") ? "{}" : "{\"id\":\"id-thumb\",\"identifier\":\"thumb\",\"name\":\"Renamed\",\"type\":\"image\",\"active\":true}");
+    });
+    Models.LensDefinition thumb = new Models.LensDefinition("thumb", "Thumbnail", "image", true);
+    client.ensureLens(thumb);
+    client.ensureLens(thumb);
+    assertEquals(List.of("PUT"), methods);
+    client.lenses.update(new Models.UpdateLens("id-thumb").name("Renamed"));
+    client.ensureLens(thumb);
+    assertEquals(List.of("PUT", "PATCH", "PUT"), methods);
+    client.lenses.delete(new Models.LensId("id-thumb"));
+    client.ensureLens(thumb);
+    assertEquals(List.of("PUT", "PATCH", "PUT", "DELETE", "PUT"), methods);
+    client.lenses.create(thumb);
+    client.ensureLens(thumb);
+    assertEquals(List.of("PUT", "PATCH", "PUT", "DELETE", "PUT", "POST", "PUT"), methods);
+  }
+
   @Test void derivedClientsUseTheirOwnRetriesAndShareTheLensCache() {
     List<String> methods = new ArrayList<>();
     CalmLensServerClient client = CalmLensServerClient.builder("key", "project-1").transport(request -> {
@@ -216,7 +238,7 @@ class ClientTest {
     CalmLensServerClient patient = client.withRequestOptions(new RequestOptions().maxRetries(0).timeout(Duration.ofSeconds(5)));
     assertEquals(503, assertThrows(ApiException.class, () -> patient.assets.retrieve(new Models.AssetId("a"))).getStatus());
     assertEquals(List.of("GET"), methods);
-    Models.EnsureLenses definition = new Models.EnsureLenses(List.of(new Models.LensDefinition("thumb", "Thumbnail", "image", true, 1)));
+    Models.EnsureLenses definition = new Models.EnsureLenses(List.of(new Models.LensDefinition("thumb", "Thumbnail", "image", true)));
     Models.Lens lens = client.ensureLenses(definition).get(0);
     assertEquals(lens, patient.ensureLenses(definition).get(0));
     assertEquals(List.of("GET", "PUT"), methods);

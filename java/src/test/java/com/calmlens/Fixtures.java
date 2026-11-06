@@ -50,15 +50,18 @@ final class Fixtures {
     }
   }
 
+  /** Whether an operation is a list's iterator, which yields every item rather than returning a value. */
+  static boolean isIterator(String operation) { return operation.substring(operation.lastIndexOf('.') + 1).startsWith("iterate"); }
+
   /**
    * Decodes fixture options into a native model. A CDN {@code transform} is set through the builder
-   * overload for its shape: a selector string or {@link Models.ImageTransformOptions}. A lens
-   * definition's {@code transform} is an ordinary field.
+   * overload for its shape: a selector string or {@link Models.ImageTransformOptions}. A lens's
+   * {@code transform} is an ordinary field.
    */
   static <T> T decode(JsonObject options, Class<T> type) throws ReflectiveOperationException {
     T model = JSON.fromJson(options, type);
     JsonElement transform = options.get("transform");
-    if (transform == null || transform.isJsonNull() || type == Models.LensDefinition.class) return model;
+    if (transform == null || transform.isJsonNull() || type == Models.LensDefinition.class || type == Models.UpdateLens.class) return model;
     if (transform.isJsonPrimitive()) type.getMethod("transform", String.class).invoke(model, transform.getAsString());
     else type.getMethod("transform", Models.ImageTransformOptions.class).invoke(model, transformOptions(transform));
     return model;

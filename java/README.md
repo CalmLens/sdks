@@ -67,12 +67,12 @@ Act on `asset.classification().moderation().status()`:
 - [Moderate replies in context](https://calmlens.com/docs/sdk/java/reference#conversation-context) with the earlier posts of a conversation.
 - Turn on [optional analyses](https://calmlens.com/docs/sdk/java/reference#optional-analyses) such as [OCR](https://calmlens.com/docs/guides/ocr).
 - [Manage assets](https://calmlens.com/docs/sdk/java/reference#assets): update, move, retry, explain, record reviewer decisions, remove content, delete and [batch operations](https://calmlens.com/docs/sdk/java/reference#batch-operations).
-- [Search](https://calmlens.com/docs/guides/search), list and [page through](https://calmlens.com/docs/sdk/java/reference#pagination) assets, [folders](https://calmlens.com/docs/sdk/java/reference#folders) and the [events feed](https://calmlens.com/docs/api/events#reading-the-feed).
+- [Search](https://calmlens.com/docs/guides/search), list and [page through](https://calmlens.com/docs/sdk/java/reference#pagination) assets, [folders](https://calmlens.com/docs/sdk/java/reference#folders), hash lists, policies, lenses and the [events feed](https://calmlens.com/docs/api/events#reading-the-feed), sorted with `sort` or item by item with an `iterate` method.
 - Block or flag known images with [hash lists](https://calmlens.com/docs/sdk/java/reference#hash-lists).
-- [Manage moderation policies](https://calmlens.com/docs/sdk/java/reference#policies) and choose the one the project uses.
+- [Manage the organisation's moderation policies](https://calmlens.com/docs/sdk/java/reference#policies) and choose the one the project uses.
 - Sign [upload tokens](https://calmlens.com/docs/sdk/java/reference#upload-tokens) for browser uploads through [upload presets](https://calmlens.com/docs/guides/upload-presets).
 - [Verify and parse webhooks](https://calmlens.com/docs/sdk/java/reference#webhooks) in Spring or servlets.
-- [Deliver content through the CDN](https://calmlens.com/docs/sdk/java/reference#cdn): build URLs, stream content, sign URLs, apply [lenses and transforms](https://calmlens.com/docs/sdk/java/reference#transforms) and pass [viewer claims](https://calmlens.com/docs/sdk/java/reference#viewer-claims).
+- [Deliver content through the CDN](https://calmlens.com/docs/sdk/java/reference#cdn): build URLs, stream content, sign URLs, apply and manage [lenses and transforms](https://calmlens.com/docs/sdk/java/reference#transforms) and pass [viewer claims](https://calmlens.com/docs/sdk/java/reference#viewer-claims).
 - Handle [errors](https://calmlens.com/docs/sdk/java/reference#errors) by stable code, and tune [retries and timeouts](https://calmlens.com/docs/sdk/java/reference#retries-and-timeouts).
 
 ## Testing

@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class ModelsTest {
   @Test void assetNestedObjectsDecodeIntoTypedRecords() {
     Models.Asset asset = Json.GSON.fromJson("""
-        {"id":"asset-1","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"retention","updatedAt":1700000000400,"safetyHold":null,"format":"image/png","extension":"png","sizeInBytes":9007199254740993,"checksums":{"sha256":"abc","md5":null},"width":4,"height":3,"durationSeconds":12.5,"pageCount":2,"perceptualHash":"p","perceptualHashQuality":90,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","containsLocation":true,"location":{"latitude":51.5,"longitude":-0.1}},"extractedText":null,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"hls":{"renditions":[{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]},"preview":{"width":1200,"height":300,"thumbhash":"t","averageColor":"#fff"}},"upload":{"status":"completed","updatedAt":1700000000100,"partsReceived":3},"classification":{"status":"completed","updatedAt":1700000000100,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"fine","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":1700000000200,"applied":true}],"status":"age-restricted","flaggedCategories":[],"regions":[],"timeline":{"segmentCount":7},"raw":{"categories":{"harassment":{"status":"evaluated","score":0.7}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":12,"action":"block"}]}},"linkDetection":{"status":"evaluated","stage":"beta","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","stage":"beta","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"textRegions":[{"box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4},"personalInformation":true}],"completedAt":1700000000300}}
+        {"id":"asset-1","uploadPresetId":"preset-1","content":{"status":"removed","removalReason":"retention","updatedAt":1700000000400,"safetyHold":null,"format":"image/png","extension":"png","sizeInBytes":9007199254740993,"checksums":{"sha256":"abc","md5":null},"width":4,"height":3,"durationSeconds":12.5,"pageCount":2,"perceptualHash":"p","perceptualHashQuality":90,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","containsLocation":true,"location":{"latitude":51.5,"longitude":-0.1}},"extractedText":null,"rendered":{"kind":"audio","format":"audio/mp4","width":null,"height":null,"peaks":[0.25,1]},"hls":{"renditions":[{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]},"preview":{"width":1200,"height":300,"thumbhash":"t","averageColor":"#fff"}},"upload":{"status":"completed","updatedAt":1700000000100,"partsReceived":3},"classification":{"status":"completed","updatedAt":1700000000100,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"fine","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":1700000000200,"applied":true}],"status":"age-restricted","flaggedCategories":[],"regions":[],"timeline":{"segmentCount":7},"raw":{"categories":{"harassment":{"status":"evaluated","score":0.7}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":12,"action":"block"}]}},"linkDetection":{"status":"evaluated","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"aiGeneratedDetection":{"status":"evaluated","provenance":"ai-generated","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"ocr":{"status":"evaluated","textRegions":[{"box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4},"personalInformation":true}]},"completedAt":1700000000300}}
         """, Models.Asset.class);
     assertEquals("preset-1", asset.uploadPresetId());
     assertSame(Models.AssetClassificationStatus.COMPLETED, asset.classification().status());
@@ -47,11 +47,11 @@ class ModelsTest {
     assertEquals(new Models.ModerationTimeline(7), moderation.timeline());
     Models.BoundingBox box = new Models.BoundingBox(0.1, 0.2, 0.3, 0.4);
     assertEquals(List.of(new Models.HashMatch("hash-list", "list-1", "entry-1", 12, Models.HashListAction.BLOCK)), moderation.raw().hashMatches());
-    assertEquals(new Models.LinkDetectionResult("evaluated", "beta", null, List.of(new Models.DetectedQrCode("https://example.com", box)),
+    assertEquals(new Models.LinkDetectionResult("evaluated", null, List.of(new Models.DetectedQrCode("https://example.com", box)),
         List.of(new Models.DetectedLink("https://example.com", "qr-code"))), asset.classification().linkDetection());
-    assertEquals(new Models.AiGeneratedDetectionResult("evaluated", "beta", null, "ai-generated",
+    assertEquals(new Models.AiGeneratedDetectionResult("evaluated", null, "ai-generated",
         List.of(new Models.ProvenanceSignal("c2pa", "trainedAlgorithmicMedia"))), asset.classification().aiGeneratedDetection());
-    assertEquals(List.of(new Models.TextRegion(box, true)), asset.classification().textRegions());
+    assertEquals(new Models.OcrResult("evaluated", null, List.of(new Models.TextRegion(box, true))), asset.classification().ocr());
     assertNull(content.extractedText());
   }
 
@@ -130,16 +130,15 @@ class ModelsTest {
   }
   @Test void reportPolicySnapshotDecodesIntoTypedRecords() {
     Models.AssetModeration policy = Json.GSON.fromJson("""
-        {"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","indexes":[0,1]},"settings":{"categoryAction":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"match":"all","unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedStatus":"purged","regions":[{"region":"GB","status":"blocked","rule":"regional-rule","category":"violence"}]}
+        {"categories":{"violence":{"score":0.9,"action":"block","source":{"kind":"allowance","indexes":[0,1]},"settings":{"action":"block","allowances":[],"restrictions":[{"name":"snapshot-rule","when":["violence-graphic","violence-injury"],"unless":["violence-documentary"],"action":"block"}]}}},"explanationComplete":true,"source":"hash-list","flaggedCategories":["violence"],"automatedStatus":"purged","regions":[{"region":"GB","status":"blocked","rule":"regional-rule","category":"violence"}]}
         """, Models.AssetModeration.class);
     Models.CategoryPolicyScore category = policy.categories().get("violence");
-    assertEquals("block", category.settings().categoryAction());
+    assertEquals("block", category.settings().action());
     assertEquals("snapshot-rule", category.settings().restrictions().get(0).name());
     assertEquals("hash-list", policy.source());
     assertSame(Models.AssetModerationStatus.PURGED, policy.automatedStatus());
     assertEquals(List.of(new Models.RegionalDecision("GB", Models.AssetModerationStatus.BLOCKED, "regional-rule", "violence")), policy.regions());
     assertEquals(List.of("violence"), policy.flaggedCategories());
-    assertEquals("all", category.settings().restrictions().get(0).match());
     assertEquals(List.of("violence-documentary"), category.settings().restrictions().get(0).unless());
     assertEquals(List.of(0, 1), category.source().indexes());
   }

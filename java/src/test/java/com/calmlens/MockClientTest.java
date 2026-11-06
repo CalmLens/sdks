@@ -18,7 +18,7 @@ class MockClientTest {
     assertArrayEquals(data, sent.body());
     assertEquals("256", sent.query().get("sizeInBytes"));
     assertEquals("image/png", sent.query().get("contentType"));
-    assertEquals("true", sent.query().get("queue"));
+    assertEquals("false", sent.query().get("wait"));
   }
 
   @Test void queuedErrorsUseTheApiStatusAndBodyShape() {
@@ -103,13 +103,13 @@ class MockClientTest {
 
   @Test void eventsAndCdnResponsesLookReal() {
     Map<String, Object> event = Map.of("id", "event-1", "type", "asset.blocked", "assetId", "asset-1",
-        "facts", List.of(Map.of("key", "reviewer-name", "value", "Ada")));
+        "facts", List.of(Map.of("key", "asset-name", "value", "Ada.png")));
     MockCalmLensServerClient mock = new MockCalmLensServerClient().enqueueEvents("cursor-2", false, event)
         .enqueueCdn(200, "image/webp", new byte[] {1, 2, 3});
     Models.EventsPage page = mock.client.events.list(new Models.ListEvents().cursor("cursor-1"));
     assertEquals("cursor-2", page.nextCursor());
     assertEquals("asset.blocked", page.items().get(0).type());
-    assertEquals("Ada", page.items().get(0).facts().get(0).value());
+    assertEquals("Ada.png", page.items().get(0).facts().get(0).value());
     try (CdnResponse response = mock.client.cdn.serve(new Models.CdnRequest("asset-1").lens("card"))) {
       assertEquals(200, response.status());
       assertEquals("image/webp", response.header("Content-Type"));
@@ -122,12 +122,12 @@ class MockClientTest {
   @Test void processingFeaturesAreSentAndFeatureResultsAreTyped() {
     Map<String, Object> box = Map.of("left", 0.1, "top", 0.2, "width", 0.3, "height", 0.4);
     Map<String, Object> report = Map.of("features", Map.of(
-        "personDetection", Map.of("status", "evaluated", "stage", "beta", "people", List.of(Map.of("box", box, "confidence", 0.9))),
-        "faceDetection", Map.of("status", "not-evaluated", "stage", "beta", "reason", "unavailable")));
+        "personDetection", Map.of("status", "evaluated", "people", List.of(Map.of("box", box, "confidence", 0.9))),
+        "faceDetection", Map.of("status", "not-evaluated", "reason", "unavailable")));
     MockCalmLensServerClient mock = new MockCalmLensServerClient()
         .enqueue(200, withReport(Fixtures.asset("asset-1", "completed", "allowed"), report))
         .enqueue(200, withReport(Fixtures.asset("asset-2", "completed", "allowed"), Map.of("features", Map.of(
-            "faceDetection", Map.of("status", "evaluated", "stage", "beta", "faces",
+            "faceDetection", Map.of("status", "evaluated", "faces",
                 List.of(Map.of("box", box, "confidence", 0.99, "ageRange", Map.of("low", 21, "high", 30))))))));
     Models.ProcessingOptions options = new Models.ProcessingOptions().keepContentAfterProcessing(false)
         .features(new Models.ProcessingFeatures()
@@ -143,7 +143,6 @@ class MockClientTest {
 
     Models.PersonDetectionResult people = asset.classification().personDetection();
     assertEquals("evaluated", people.status());
-    assertEquals("beta", people.stage());
     assertEquals(new Models.DetectedPerson(new Models.BoundingBox(0.1, 0.2, 0.3, 0.4), 0.9), people.people().get(0));
     assertEquals(1, people.people().size());
     Models.FaceDetectionResult skipped = asset.classification().faceDetection();
@@ -192,7 +191,7 @@ class MockClientTest {
     assertEquals("POST", classify.method());
     assertEquals("/projects/project-9/assets", classify.path());
     assertEquals("content", classify.header("x-calmlens-upload"));
-    assertEquals("false", classify.query().get("queue"));
+    assertEquals("true", classify.query().get("wait"));
     assertEquals("hello", classify.bodyText());
     assertEquals("ignored-key", classify.header("x-api-key"));
     assertFalse(classify.toString().contains("ignored-key"));

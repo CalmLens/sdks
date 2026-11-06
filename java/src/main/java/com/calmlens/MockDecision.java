@@ -170,8 +170,10 @@ public final class MockDecision {
     }
     JsonObject report = new JsonObject();
     report.addProperty("source", "policy");
+    report.add("rule", JsonNull.INSTANCE);
     report.addProperty("automatedStatus", status.value());
     report.add("regions", new JsonArray());
+    report.add("linkSafety", JsonNull.INSTANCE);
     // The mock analyses no audio or video, so a decision has no findings timeline.
     report.add("timeline", JsonNull.INSTANCE);
     report.add("flaggedCategories", flagged);
@@ -179,6 +181,7 @@ public final class MockDecision {
     report.addProperty("explanationComplete", true);
     JsonObject raw = new JsonObject();
     raw.add("categories", categories);
+    raw.add("hashMatches", new JsonArray());
     report.add("raw", raw);
     return report;
   }

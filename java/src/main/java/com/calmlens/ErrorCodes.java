@@ -150,8 +150,10 @@ public final class ErrorCodes {
   public static final String FOLDER_NOT_EMPTY = "folder/not-empty";
   /** {@code folder/parent-cycle} (HTTP 409). */
   public static final String FOLDER_PARENT_CYCLE = "folder/parent-cycle";
-  /** {@code lens/version-conflict} (HTTP 409). */
-  public static final String LENS_VERSION_CONFLICT = "lens/version-conflict";
+  /** {@code lens/not-found} (HTTP 404). */
+  public static final String LENS_NOT_FOUND = "lens/not-found";
+  /** {@code lens/identifier-taken} (HTTP 409). */
+  public static final String LENS_IDENTIFIER_TAKEN = "lens/identifier-taken";
   /** {@code lens/identifier-reserved} (HTTP 409). */
   public static final String LENS_IDENTIFIER_RESERVED = "lens/identifier-reserved";
   /** {@code hash-list/not-found} (HTTP 404). */
@@ -319,7 +321,8 @@ public final class ErrorCodes {
       Map.entry(DUPLICATE_FOLDER_NAME, 409),
       Map.entry(FOLDER_NOT_EMPTY, 409),
       Map.entry(FOLDER_PARENT_CYCLE, 409),
-      Map.entry(LENS_VERSION_CONFLICT, 409),
+      Map.entry(LENS_NOT_FOUND, 404),
+      Map.entry(LENS_IDENTIFIER_TAKEN, 409),
       Map.entry(LENS_IDENTIFIER_RESERVED, 409),
       Map.entry(HASH_LIST_NOT_FOUND, 404),
       Map.entry(HASH_LIST_ENTRY_NOT_FOUND, 404),

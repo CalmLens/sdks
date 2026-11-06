@@ -45,10 +45,10 @@ public final class Calmmarket {
   /** Category evidence below this does not contribute when CalmLens merges reports. */
 
 
-  /** A named, versioned CDN transformation: listing photos are delivered as 4:3 WebP cards. */
+  /** A named CDN transformation: listing photos are delivered as 4:3 WebP cards. */
   static final String CARD_LENS = "calmmarket-card";
   static final LensDefinition CARD_LENS_DEFINITION =
-      new LensDefinition(CARD_LENS, "Calmmarket listing card", "image", true, 1)
+      new LensDefinition(CARD_LENS, "Calmmarket listing card", "image", true)
           .transform(Patch.value(
               new ImageTransformOptions().fit("cover").width(640).height(480).format("webp")));
 
@@ -84,7 +84,7 @@ public final class Calmmarket {
   /** Registered fact keys and labels from packages/shared/src/EventCatalog.ts shown in the activity log. */
   static final Map<String, String> FACT_LABELS = Map.of(
       "asset-name", "Asset", "asset-type", "Asset type", "previous-status", "Previous status", "moderation-status", "Moderation status",
-      "flagged-categories", "Categories", "reviewer-name", "Reviewer", "note", "Note");
+      "flagged-categories", "Categories", "note", "Note");
   /**
    * Events that can change a listing's decision. Each moderation status has its own event
    * ({@code asset.allowed}, {@code asset.limited}, {@code asset.age-restricted}, {@code
