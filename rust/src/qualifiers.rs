@@ -82,6 +82,10 @@ string_enum! {
         SexualIntimateImageAbuse = "sexual-intimate-image-abuse",
         /// Sexual: Extreme pornography.
         SexualExtreme = "sexual-extreme",
+        /// Sexual: Pornographic strangulation or suffocation.
+        SexualStrangulation = "sexual-strangulation",
+        /// Sexual: Pornographic incest.
+        SexualIncest = "sexual-incest",
         /// Sexual: Sexualised minors.
         SexualMinors = "sexual-minors",
         /// Sexual: Sexual solicitation.

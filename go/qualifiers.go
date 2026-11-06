@@ -45,6 +45,8 @@ const (
 	QualifierSexualNonConsensual                  = "sexual-non-consensual"
 	QualifierSexualIntimateImageAbuse             = "sexual-intimate-image-abuse"
 	QualifierSexualExtreme                        = "sexual-extreme"
+	QualifierSexualStrangulation                  = "sexual-strangulation"
+	QualifierSexualIncest                         = "sexual-incest"
 	QualifierSexualMinors                         = "sexual-minors"
 	QualifierSexualSolicitation                   = "sexual-solicitation"
 	QualifierSexualPaid                           = "sexual-paid"

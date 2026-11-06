@@ -42,6 +42,8 @@ module CalmLens
     ?"sexual-non-consensual" => qualifier_result,
     ?"sexual-intimate-image-abuse" => qualifier_result,
     ?"sexual-extreme" => qualifier_result,
+    ?"sexual-strangulation" => qualifier_result,
+    ?"sexual-incest" => qualifier_result,
     ?"sexual-minors" => qualifier_result,
     ?"sexual-solicitation" => qualifier_result,
     ?"sexual-paid" => qualifier_result,

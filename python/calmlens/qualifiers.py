@@ -44,6 +44,8 @@ ModerationQualifier = Union[Literal[
     "sexual-non-consensual",
     "sexual-intimate-image-abuse",
     "sexual-extreme",
+    "sexual-strangulation",
+    "sexual-incest",
     "sexual-minors",
     "sexual-solicitation",
     "sexual-paid",
