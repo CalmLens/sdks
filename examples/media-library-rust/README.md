@@ -32,7 +32,8 @@ moderation:
 - **Delivery.** Only an image whose `classification.moderation.status` is `allowed` or `limited` and whose
   `content.status` is `stored` gets a thumbnail or a download. Each request retrieves the asset's current state, calls `ensure_lens` for a 320px
   square thumbnail lens (`calmlibrary-thumb`) or a 1600px web lens (`calmlibrary-web`), and
-  redirects to a 60-second signed URL from `assets().create_signed_url`. Pending, blocked,
+  redirects to the rendered resource beneath a 60-second signed asset URL from
+  `cdn().sign_asset_url`. Pending, blocked,
   purged and failed images never get either. CalmLens delivers `age-restricted` images only
   through signed URLs or API keys so an app can show them behind its own age check; this team
   library has no age check, so it doesn't deliver them either. CalmLens delivers `limited`

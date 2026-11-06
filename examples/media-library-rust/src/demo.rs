@@ -91,7 +91,7 @@ impl DemoStore {
     /// Pending demo uploads take their selected outcome once the review delay has passed.
     pub fn settle(&mut self) {
         for entry in &mut self.assets {
-            if entry.asset.classification.status == AssetClassificationStatus::Processing
+            if entry.asset.classification.status == AssetClassificationStatus::Queued
                 && entry.submitted_at.elapsed() >= DEMO_REVIEW_DELAY
             {
                 let asset = &mut entry.asset;
@@ -547,7 +547,7 @@ impl DemoStore {
         }
         let mut asset = Asset::new(
             format!("demo-asset-{}", random_hex(6)),
-            AssetClassificationStatus::Processing,
+            AssetClassificationStatus::Queued,
             AssetModerationStatus::Pending,
         );
         asset.name = Some(upload.name);

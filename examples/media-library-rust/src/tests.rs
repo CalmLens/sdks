@@ -219,7 +219,7 @@ fn writes(mock: &MockServerClient) -> Vec<calmlens::testing::Request> {
 fn asset(id: &str, status: &str) -> Value {
     let (processing, moderation) = match status {
         "failed" => ("failed", "pending"),
-        "pending" => ("processing", "pending"),
+        "pending" => ("queued", "pending"),
         decided => ("completed", decided),
     };
     json!({"id": id, "name": format!("{id}.png"), "folderId": "folder-1",
@@ -740,12 +740,15 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
         |identifier: &str| json!({"lenses": [{"identifier": identifier, "version": 1}]});
     mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(200, lens_reply(THUMB_LENS));
-    mock.enqueue(200, json!({"url": "https://cdn.example.com/signed-thumb"}));
+    mock.enqueue(
+        200,
+        json!({"url": "https://cdn.example.com/signed-thumb", "expiresAt": 1}),
+    );
     let thumb = app.get("/assets/asset-1/thumb").await;
     assert_eq!(thumb.status, StatusCode::SEE_OTHER);
     assert_eq!(
         thumb.header("location"),
-        Some("https://cdn.example.com/signed-thumb")
+        Some("https://cdn.example.com/signed-thumb/rendered/@calmlibrary-thumb")
     );
     let requests = mock.requests();
     assert_eq!(requests[0].path, "/assets/asset-1");
@@ -757,15 +760,19 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     assert_eq!(lens["identifier"], THUMB_LENS);
     assert_eq!(lens["transform"]["width"], 320);
     let body = requests[2].json().unwrap();
-    assert_eq!(requests[2].path, "/assets/asset-1/signed-url");
-    assert_eq!(body["lens"], THUMB_LENS);
-    assert_eq!(body["expiresInSeconds"], SIGNED_URL_SECONDS);
-    assert_eq!(body["resource"], "rendered");
+    assert_eq!(requests[2].path, "/projects/project-1/signed-asset-urls");
+    assert_eq!(
+        body,
+        json!({"assetId": "asset-1", "expiresIn": SIGNED_URL_SECONDS, "original": false})
+    );
 
     // Downloads use the 1600px web lens.
     mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(200, lens_reply(WEB_LENS));
-    mock.enqueue(200, json!({"url": "https://cdn.example.com/signed-web"}));
+    mock.enqueue(
+        200,
+        json!({"url": "https://cdn.example.com/signed-web", "expiresAt": 1}),
+    );
     let download = app.get("/assets/asset-1/download").await;
     assert_eq!(download.status, StatusCode::SEE_OTHER);
     let requests = mock.requests();
@@ -773,13 +780,16 @@ async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
         requests[4].json().unwrap()["lenses"][0]["transform"]["width"],
         1600
     );
-    assert_eq!(requests[5].json().unwrap()["lens"], WEB_LENS);
+    assert_eq!(
+        download.header("location"),
+        Some("https://cdn.example.com/signed-web/rendered/@calmlibrary-web")
+    );
 
     // The shared client caches ensured lenses, so a second thumbnail only signs.
     mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(
         200,
-        json!({"url": "https://cdn.example.com/signed-thumb-2"}),
+        json!({"url": "https://cdn.example.com/signed-thumb-2", "expiresAt": 1}),
     );
     assert_eq!(
         app.get("/assets/asset-1/thumb").await.status,

@@ -9,10 +9,10 @@ use crate::demo::DemoStore;
 use crate::messages::Failure;
 use calmlens::models::Content;
 use calmlens::models::{
-    Asset, AssetId, AssetModerationDecision, AssetPage, AssetSearchResponse, CreateFolder, Folder,
-    FolderId, ImageTransformOptions, LensDefinition, ListAssets, ListFolders, MetadataItem,
-    MoveAsset, MoveFolder, Patch, ProcessingOptions, SearchAssets, SignedUrlOptions, SubmitAsset,
-    UpdateAsset, UpdateFolder, Visibility,
+    Asset, AssetId, AssetModerationDecision, AssetPage, AssetSearchResponse, CdnResource,
+    CreateFolder, Folder, FolderId, ImageTransformOptions, LensDefinition, ListAssets, ListFolders,
+    MetadataItem, MoveAsset, MoveFolder, Patch, ProcessingOptions, SearchAssets,
+    SignAssetUrlOptions, SubmitAsset, UpdateAsset, UpdateFolder, Visibility,
 };
 use calmlens::{Bytes, ServerClient};
 use std::sync::{Arc, Mutex};
@@ -328,7 +328,7 @@ impl Library {
 
     /// Delivers an asset the caller has already checked is deliverable. Live mode ensures the
     /// lens (idempotent, cached by the client after the first success) and signs a 60-second
-    /// URL through it.
+    /// asset URL, returning its rendered resource through the lens.
     pub async fn deliver(&self, asset: &Asset, lens: &str) -> Result<Delivery, Failure> {
         match self {
             Library::Live(client) => {
@@ -339,12 +339,12 @@ impl Library {
                     client.ensure_lens(definition).await?;
                 }
                 let signed = client
-                    .assets()
-                    .create_signed_url(SignedUrlOptions {
-                        asset_id: asset.id.clone(),
-                        resource: Some("rendered".into()),
+                    .cdn()
+                    .sign_asset_url(SignAssetUrlOptions {
+                        asset_id: Some(asset.id.clone()),
+                        resource: Some(CdnResource::Rendered),
                         lens: Some(lens.into()),
-                        expires_in_seconds: Some(SIGNED_URL_SECONDS),
+                        expires_in: Some(SIGNED_URL_SECONDS),
                         ..Default::default()
                     })
                     .await?;
