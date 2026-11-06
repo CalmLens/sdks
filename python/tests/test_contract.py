@@ -28,7 +28,7 @@ from urllib.parse import parse_qsl, urlsplit
 import calmlens
 from calmlens import (CalmLensAPIError, CalmLensError, CalmLensServerClient, CalmLensTimeoutError,
                       CalmLensTransportError, CalmLensValidationError, WebhookVerificationError, client as client_module,
-                      is_newer_asset_event, is_test_webhook_event, parse_webhook_event, testing, to_webhook_event_payload,
+                      get_event_fact, get_event_facts, is_newer_asset_event, is_test_webhook_event, parse_webhook_event, testing, to_webhook_event_payload,
                       verify_webhook_signature)
 from calmlens import _mock_classification, _signed_test_inputs
 from calmlens._option_keys import NULLABLE_OPTION_KEYS
@@ -62,9 +62,11 @@ def _json(value: Any) -> Any:
 
 # ---- Translating JavaScript operations and options --------------------------------------------
 
-#: JavaScript iterator names to Python's.
-_ITERATORS = {"assets.iterate": "assets.iter", "assets.iterateChildren": "assets.iter_children",
-              "events.iterate": "events.iter_pages", "events.pages": "events.iter_pages"}
+#: JavaScript iterator names to Python's, as surface.json names them (``events.pages`` is
+#: JavaScript's name for the events iterator).
+_ITERATORS = {capability["id"]: capability["names"]["python"] for capability in SURFACE["capabilities"]
+              if capability["kind"] == "method" and ".iterate" in capability["id"]}
+_ITERATORS["events.pages"] = _ITERATORS["events.iterate"]
 
 
 class _Partial(Exception):
@@ -195,7 +197,7 @@ class RequestTests(unittest.TestCase):
                 def transport(request: Any, timeout: float, response: Any = fixture["response"]) -> _Response:
                     captured.append((request, _body_bytes(request.data)))
                     return _json_response(response)
-                result = _invoke(_client(transport), fixture["operation"], fixture["options"])
+                result = _invoke(_client(transport), fixture["operation"], fixture.get("options"))
                 self.assertEqual(len(captured), 1)
                 request, data = captured[0]
                 url = urlsplit(request.full_url)
@@ -343,7 +345,7 @@ class TypeContractTests(unittest.TestCase):
                 options_type, _ = _declared(operation)
                 nullable = NULLABLE_OPTION_KEYS.get(operation, frozenset())
                 options = {key: _content(value) if key in ("content", "part") else value
-                           for key, value in (fixture["options"] or {}).items()
+                           for key, value in (fixture.get("options") or {}).items()
                            if key != "idempotencyKey" and (value is not None or key in nullable)}
                 self.assertEqual(_type_errors(options, options_type, "options"), [])
 
@@ -685,7 +687,7 @@ class SurfaceTests(unittest.TestCase):
             "retryAfterMaxMs": client_module.MAX_RETRY_AFTER_SECONDS * 1000,
             "maxResponseBytes": c.max_response_bytes, "partSizeBytes": c.part_size_bytes,
             "signedUrlExpiresIn": client_module.DEFAULT_SIGNED_URL_EXPIRES_IN,
-            "uploadTokenExpiresInSeconds": client_module.UPLOAD_TOKEN_DEFAULT_EXPIRES_IN_SECONDS,
+            "uploadTokenExpiresInSeconds": client_module.DEFAULT_UPLOAD_TOKEN_EXPIRES_IN,
             "waitForDecisionTimeoutMs": client_module.DEFAULT_DECISION_TIMEOUT * 1000,
             "waitForDecisionFirstIntervalMs": client_module.DECISION_POLL_FIRST_DELAY * 1000,
             "waitForDecisionIntervalFactor": client_module.DECISION_POLL_DELAY_FACTOR,
@@ -836,6 +838,16 @@ class WebhookContractTests(unittest.TestCase):
         for case in self.fixtures["testFacts"]:
             with self.subTest(case["name"]):
                 self.assertIs(is_test_webhook_event(case["event"]), case["isTest"])
+
+    def test_fact_lookups(self) -> None:
+        for case in self.fixtures["factLookups"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(get_event_fact(case["event"], case["key"]), case["value"])
+
+    def test_fact_objects(self) -> None:
+        for case in self.fixtures["factObjects"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(get_event_facts(case["event"]), case["facts"])
 
     def test_asset_sequences(self) -> None:
         for case in self.fixtures["assetSequences"]:

@@ -36,7 +36,7 @@ Methods take snake_case keyword arguments, or one options dict with the API's ca
 (`client.assets.retrieve({"assetId": "..."})`). Responses are plain dicts with the API's camelCase
 field names, typed as `TypedDict`s in `calmlens.types`.
 
-`assets.create` queues processing; `assets.classify` and `text.classify` wait for the decision.
+`assets.create` returns without waiting for the decision; `assets.classify` and `text.classify` wait for it.
 Act on `classification.moderation.status`:
 
 | Status           | What to do                                                                    |
@@ -60,9 +60,11 @@ Treat a status you don't recognise, and a failed request, as not allowed.
 - [Sign upload tokens](https://calmlens.com/docs/sdk/python/reference#upload-tokens) for
   [upload presets](https://calmlens.com/docs/guides/upload-presets) used from browsers.
 - [Manage assets](https://calmlens.com/docs/sdk/python/reference#assets): list, search, update, move, retry,
-  record reviewer decisions, explain decisions and delete content.
+  page through an audio or video asset's findings timeline, record reviewer decisions, explain decisions and delete content.
 - [Organise assets in folders](https://calmlens.com/docs/sdk/python/reference#folders) and
   [compare uploads with hash lists](https://calmlens.com/docs/sdk/python/reference#hash-lists).
+- [Manage the organisation's moderation policies](https://calmlens.com/docs/sdk/python/reference#policies)
+  and choose the one each project uses.
 - [Deliver content through the CDN](https://calmlens.com/docs/sdk/python/reference#cdn) with
   [lenses and transforms](https://calmlens.com/docs/sdk/python/reference#lenses), signed URLs and
   [viewer claims](https://calmlens.com/docs/sdk/python/reference#viewer-claims).

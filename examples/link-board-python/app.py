@@ -119,7 +119,9 @@ def explain(report: AssetModeration | None) -> dict:
     status this app doesn't know) is unknown, never zero."""
     found: list[tuple[str, float]] = []
     unknown: list[str] = []
-    for category, result in sorted(((report or {}).get("raw", {}).get("categories") or {}).items()):
+    # ``raw`` is None until moderation decides.
+    raw = (report or {}).get("raw") or {}
+    for category, result in sorted((raw.get("categories") or {}).items()):
         if result["status"] in ("evaluated", "partial"):
             if result["score"] >= SHOWN_SCORE:
                 found.append((category, result["score"]))

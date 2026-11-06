@@ -56,7 +56,10 @@ class MockTests(unittest.TestCase):
         asset = c.assets.classify(name="photo.png", content={"data": b"png", "type": "image/png"},
                                   processing_options={"features": {"personDetection": {"enabled": True}}})
         self.assertNotIn("processingOptions", asset)
-        self.assertEqual(asset["classification"]["personDetection"], {"status": "evaluated", "stage": "beta", "people": []})
+        self.assertEqual(asset["classification"]["personDetection"], {"status": "evaluated", "people": []})
+        # Features it didn't turn on report nothing, apart from link detection, which is on by default.
+        self.assertEqual((asset["classification"]["faceDetection"], asset["classification"]["ocr"]), (None, None))
+        self.assertEqual(asset["classification"]["linkDetection"], {"status": "evaluated", "qrCodes": [], "links": []})
 
     def test_hash_list_entries_come_from_assets_once_and_go_with_their_list(self):
         c = MockCalmLensServerClient()
@@ -276,7 +279,7 @@ class MockTests(unittest.TestCase):
         fixture = Path(__file__).resolve().parents[2] / "go" / "testdata" / "upload-mime-types.json"
         for mime_type in json.loads(fixture.read_text())["refused"]:
             with self.subTest(mime_type):
-                query = urlencode({"name": "x", "queue": "true", "contentType": mime_type, "sizeInBytes": 5})
+                query = urlencode({"name": "x", "wait": "false", "contentType": mime_type, "sizeInBytes": 5})
                 request = Request(f"{self.client.base_url}/projects/{self.client.project_id}/assets?{query}",
                                   data=b"hello", method="POST",
                                   headers={"Content-Type": mime_type, "X-CalmLens-Upload": "content"})
@@ -355,7 +358,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         self.assertEqual((upload.method, upload.path, upload.status), ("POST", "/projects/p1/assets", 200))
         self.assertEqual(upload.headers["X-calmlens-upload"], "content")
         self.assertEqual(upload.query["externalId"], "e1")
-        self.assertIs(upload.query["queue"], False)
+        self.assertIs(upload.query["wait"], True)
         self.assertEqual(upload.body, b"hi")
         self.assertEqual(upload.headers["Content-type"], "text/plain")
         self.assertIn("Idempotency-key", upload.headers)

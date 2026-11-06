@@ -84,7 +84,7 @@ class ClientTests(ClientTestCase):
     def test_missing_arguments_use_the_invalid_argument_code(self):
         for call in (lambda: self.client.assets.retrieve(), lambda: self.client.assets.delete({}),
                      lambda: self.client.assets.move(asset_id="a"), lambda: self.client.folders.create(),
-                     lambda: self.client.assets.search(limit=2),
+                     lambda: self.client.assets.search(page_size=2),
                      lambda: self.client.cdn.get_asset_url(asset_id="a", resource="raw")):
             with self.assertRaises(CalmLensValidationError) as raised:
                 call()
@@ -96,7 +96,7 @@ class ClientTests(ClientTestCase):
                         {"data": bytearray(b"abc")}, {"data": memoryview(b"abc")}):
             self.client.assets.create({"name": "x", "content": {"type": "text/plain", **payload}})
             self.assertEqual(self.bodies[-1], b"abc")
-            self.assertEqual(self.query()["queue"], ["true"])
+            self.assertEqual(self.query()["wait"], ["false"])
             self.assertEqual(self.calls[-1].headers["Content-length"], "3")
         self.client.assets.classify({"name": "site", "url": "https://example.com", "metadata": [{"id": "a", "value": 1}],
                                      "tags": ["landing"]})
@@ -172,18 +172,18 @@ class ClientTests(ClientTestCase):
             client.assets.create(name="x", content={"data": Unseekable(b"ab"), "sizeInBytes": 3, "type": "text/plain"})
         self.assertEqual(raised.exception.code, error_codes.INVALID_UPLOAD_PAYLOAD)
 
-    def test_multipart_sends_total_size_and_no_part_queue(self):
+    def test_multipart_sends_total_size_and_no_part_wait(self):
         size = 5 * 1024 * 1024
         self.client.assets.create({"name": "x.png", "totalSizeInBytes": 2 * size,
                                    "part": {"type": "image/png", "data": b"x" * size}})
         self.assertEqual((self.query()["partNumber"], self.query()["isFinal"]), (["1"], ["false"]))
-        self.assertEqual((self.query()["queue"], self.query()["totalSizeInBytes"]), (["true"], [str(2 * size)]))
+        self.assertEqual((self.query()["wait"], self.query()["totalSizeInBytes"]), (["false"], [str(2 * size)]))
         self.client.assets.upload_part({"assetId": "a", "part": {"data": io.BytesIO(b"x" * size), "isFinal": True,
                                                                   "partNumber": 2}})
-        self.assertNotIn("queue", self.query())
+        self.assertNotIn("wait", self.query())
         self.assertEqual(self.query()["sizeInBytes"], [str(size)])
-        self.client.assets.upload_part(asset_id="a", queue=False, part={"data": b"x", "isFinal": True, "partNumber": 3})
-        self.assertEqual(self.query()["queue"], ["false"])
+        self.client.assets.upload_part(asset_id="a", wait=True, part={"data": b"x", "isFinal": True, "partNumber": 3})
+        self.assertEqual(self.query()["wait"], ["true"])
 
     def test_multipart_size_refusals_are_raised_before_sending_without_a_status(self):
         mib = 1024 * 1024
@@ -278,23 +278,46 @@ class ClientTests(ClientTestCase):
         self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_CONFIG)
 
     def test_lens_cache_concurrency_invalidation_and_failure(self):
-        lens = {"identifier": "thumb", "name": "Thumb", "type": "image", "active": True, "version": 1}
+        lens = {"identifier": "thumb", "name": "Thumb", "type": "image", "active": True}
         self.result = {"lenses": [{"id": "l", **lens}]}
         with ThreadPoolExecutor(4) as pool:
             list(pool.map(lambda _: self.client.ensure_lens(lens), range(8)))
         self.assertEqual(len(self.calls), 1)
         self.assertEqual(len(self.client.ensure_lenses({"lenses": [lens, lens]})), 2)
-        changed = {**lens, "version": 2}
-        self.result = {"code": "lens/version-conflict"}
-        self.status = 409
+        changed = {**lens, "name": "Thumbnail"}
+        self.result = {"code": "server/unavailable"}
+        self.status = 503
         with self.assertRaises(CalmLensError):
             self.client.ensure_lens(changed)
         self.status = 200
         self.result = {"lenses": [{"id": "l", **changed}]}
         self.client.ensure_lens(changed)
+        # The changed definition replaced the earlier one in the cache, so it is sent again.
         self.result = {"lenses": [{"id": "l", **lens}]}
         self.client.ensure_lens(lens)
         self.assertEqual(len(self.calls), 4)
+
+    def test_a_lens_changed_through_the_lenses_methods_is_sent_again_by_ensure_lens(self):
+        lens = {"identifier": "thumb", "name": "Thumb", "type": "image", "active": True}
+        for change in ("update", "delete", "create"):
+            with self.subTest(change):
+                self.calls.clear()
+                # A new client, with an empty lens cache.
+                client = CalmLensServerClient(api_key="key", project_id="p", transport=self.client.transport)
+                self.result = {"lenses": [{"id": "l", **lens}]}
+                client.ensure_lens(lens)
+                client.ensure_lens(lens)
+                self.result = {"id": "l", **lens, "name": "Renamed"}
+                if change == "update":
+                    client.lenses.update(lens_id="l", name="Renamed")
+                elif change == "delete":
+                    client.lenses.delete(lens_id="l")
+                else:
+                    client.lenses.create({**lens, "name": "Renamed"})
+                self.result = {"lenses": [{"id": "l", **lens}]}
+                client.ensure_lens(lens)
+                self.assertEqual([call.get_method() for call in self.calls],
+                                 ["PUT", {"update": "PATCH", "delete": "DELETE", "create": "POST"}[change], "PUT"])
 
     def test_structured_transform_formats_numbers_like_javascript(self):
         options = {"blur": 2.0, "brightness": 0.00001, "contrast": 1e-7, "gamma": 1e21, "saturation": -0.0,
@@ -445,7 +468,7 @@ class AutomaticMultipartTests(ClientTestCase):
     def sent(self):
         return [(urlsplit(call.full_url).path, {k: v[0] for k, v in self.query(i).items()
                                                 if k in ("partNumber", "isFinal", "sizeInBytes", "totalSizeInBytes",
-                                                         "queue")},
+                                                         "wait")},
                  call.get_header("Idempotency-key"), call.get_header("X-calmlens-upload"))
                 for i, call in enumerate(self.calls)]
 
@@ -463,7 +486,7 @@ class AutomaticMultipartTests(ClientTestCase):
                 self.assertEqual(asset["id"], "a1")
                 part = str(5 * MIB)
                 self.assertEqual(self.sent(), [
-                    ("/v1/projects/p/assets", {"queue": "false", "partNumber": "1", "isFinal": "false",
+                    ("/v1/projects/p/assets", {"wait": "true", "partNumber": "1", "isFinal": "false",
                                                "sizeInBytes": part, "totalSizeInBytes": str(len(data))}, "K", "part"),
                     ("/v1/assets/a1/part", {"partNumber": "2", "isFinal": "false", "sizeInBytes": part},
                      "K:part-2", "part"),

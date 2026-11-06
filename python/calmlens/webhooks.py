@@ -21,7 +21,7 @@ __all__ = [
     "WEBHOOK_DELIVERY_HEADER", "WEBHOOK_TIMESTAMP_HEADER", "WEBHOOK_SIGNATURE_HEADER",
     "WEBHOOK_SIGNATURE_TOLERANCE_SECONDS", "to_webhook_event_payload", "create_webhook_signature_header",
     "create_webhook_headers", "verify_webhook_signature", "parse_webhook_event", "is_test_webhook_event",
-    "is_newer_asset_event",
+    "is_newer_asset_event", "get_event_fact", "get_event_facts",
 ]
 
 WEBHOOK_DELIVERY_HEADER = "x-calmlens-delivery"
@@ -214,6 +214,29 @@ def _is_webhook_event(value: object) -> bool:
             and isinstance(facts, list)
             and all(isinstance(fact, dict) and isinstance(fact.get("key"), str) and "value" in fact
                     and _optional(fact, "url", False) for fact in facts))
+
+
+def get_event_fact(event: Mapping[str, Any], key: str) -> Any:
+    """The value of one of an event's facts, by key, such as ``get_event_fact(event,
+    "flagged-categories")`` on an ``asset.blocked`` event, or ``None`` when the event doesn't carry
+    it. A key the event repeats gives its first value. The fact's ``url``, when it has one, is on
+    the fact in ``event["facts"]``."""
+    facts = event.get("facts") if isinstance(event, Mapping) else None
+    for fact in facts if isinstance(facts, list) else []:
+        if isinstance(fact, Mapping) and fact.get("key") == key:
+            return fact.get("value")
+    return None
+
+
+def get_event_facts(event: Mapping[str, Any]) -> dict[str, Any]:
+    """An event's facts as a dict of values by key, such as ``{"flagged-categories": ["hate"]}``.
+    A key the event repeats keeps its first value, as :func:`get_event_fact` reads it."""
+    facts = event.get("facts") if isinstance(event, Mapping) else None
+    values: dict[str, Any] = {}
+    for fact in facts if isinstance(facts, list) else []:
+        if isinstance(fact, Mapping) and isinstance(fact.get("key"), str) and fact["key"] not in values:
+            values[fact["key"]] = fact.get("value")
+    return values
 
 
 def is_test_webhook_event(event: Mapping[str, Any]) -> bool:

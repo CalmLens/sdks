@@ -70,7 +70,8 @@ FOLDER_NOT_FOUND = "folder/not-found"
 DUPLICATE_FOLDER_NAME = "folder/duplicate-name"
 FOLDER_NOT_EMPTY = "folder/not-empty"
 FOLDER_PARENT_CYCLE = "folder/parent-cycle"
-LENS_VERSION_CONFLICT = "lens/version-conflict"
+LENS_NOT_FOUND = "lens/not-found"
+LENS_IDENTIFIER_TAKEN = "lens/identifier-taken"
 LENS_IDENTIFIER_RESERVED = "lens/identifier-reserved"
 HASH_LIST_NOT_FOUND = "hash-list/not-found"
 HASH_LIST_ENTRY_NOT_FOUND = "hash-list-entry/not-found"
@@ -191,7 +192,8 @@ STATUS_BY_CODE: dict[str, int] = {
     "folder/duplicate-name": 409,
     "folder/not-empty": 409,
     "folder/parent-cycle": 409,
-    "lens/version-conflict": 409,
+    "lens/not-found": 404,
+    "lens/identifier-taken": 409,
     "lens/identifier-reserved": 409,
     "hash-list/not-found": 404,
     "hash-list-entry/not-found": 404,

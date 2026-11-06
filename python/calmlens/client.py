@@ -22,7 +22,7 @@ import zlib
 from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from types import TracebackType
-from typing import Any, BinaryIO, Callable, List, Literal, Protocol, cast
+from typing import Any, BinaryIO, Callable, List, Literal, Protocol, TypeVar, cast
 from urllib.parse import parse_qs, quote, unquote, urlencode, urlsplit
 from urllib.request import Request, getproxies, proxy_bypass
 
@@ -38,15 +38,16 @@ from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, Ass
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventType, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     ImageTransformOptions, LensDefinition, LensType, ListAssetsOptions, ListChildrenOptions, ListTimelineOptions, ListEventsOptions,
                     BatchAssetsOptions, BatchAssetsResponse,
-                    MetadataItem, ModerationContext, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, Ordering, PartContent,
+                    MetadataItem, ModerationContext, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, PartContent,
                     ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedAssetUrl,
                     SignedUploadToken, SignAssetUrlOptions, GetAssetInfoOptions, SignUploadTokenOptions, SubmitAssetOptions,
                     UpdateAssetOptions, UpdateFolderOptions, UploadPartOptions,
                     AddHashListEntryOptions, CreateHashListOptions, HashList, HashListAction, HashListEntry,
                     HashListEntryIdOptions, HashListEntryPage, HashListIdOptions, HashListPage,
-                    ListHashListEntriesOptions, ListHashListsOptions, DecideAssetOptions, FolderOrdering, UpdateHashListOptions,
-                    ApplyPolicyPresetOptions, AssignPolicyOptions, CreatePolicyOptions, Policy, PolicyIdOptions, PolicyList,
-                    PolicyPresetOperation, PolicySettings, SetPolicyAutomaticUpdatesOptions, UpdatePolicyOptions,
+                    ListHashListEntriesOptions, ListHashListsOptions, DecideAssetOptions, UpdateHashListOptions,
+                    AssignPolicyOptions, CreatePolicyOptions, ListPoliciesOptions, Policy, PolicyIdOptions, PolicyPage,
+                    PolicySettings, ResetPolicyOptions, SetPolicyAutomaticUpdatesOptions, UpdatePolicyOptions,
+                    UpgradePolicyOptions, LensIdOptions, LensPage, ListLensesOptions, UpdateLensOptions, AssetTimelineSegment,
                     ViewerClaims, Visibility, WaitForDecisionOptions)
 from .webhooks import parse_webhook_event, verify_webhook_signature
 
@@ -905,6 +906,26 @@ def _expect_asset(data: Any) -> Asset:
     return cast(Asset, data)
 
 
+_Item = TypeVar("_Item")
+
+
+def _iterate_pages(fetch: Callable[[str | None], Mapping[str, Any]], index: str | None) -> Iterator[Any]:
+    """Yield every item of a cursor list, fetching pages lazily: follow ``nextCursor`` while
+    ``hasMore``, stop at an empty page or a ``None`` cursor, and raise ``sdk/invalid-response``
+    rather than loop when a page repeats a cursor."""
+    sent: set[str] = set()
+    while True:
+        page = fetch(index)
+        cursor = page.get("nextCursor")
+        more = bool(cursor) and bool(page.get("hasMore")) and bool(page["items"])
+        if more:
+            _new_cursor(sent, cast(str, cursor))
+        yield from page["items"]
+        if not more:
+            return
+        index = cursor
+
+
 def _new_cursor(sent: set[str], cursor: str) -> None:
     """Iterators stop rather than loop: a page that says more follow must not hand back a cursor
     the iteration has already sent, which would repeat the same pages forever."""
@@ -990,7 +1011,7 @@ class CalmLensServerClient:
     def _bind(self) -> None:
         self.assets, self.folders, self.hash_lists = Assets(self), Folders(self), HashLists(self)
         self.upload_tokens = UploadTokens(self)
-        self.policies = Policies(self)
+        self.policies, self.lenses = Policies(self), Lenses(self)
         self.text, self.events, self.cdn = Text(self), Events(self), CDN(self)
 
     def __repr__(self) -> str:
@@ -1033,11 +1054,7 @@ class CalmLensServerClient:
         return f"/projects/{_id(self.project_id)}/{path}"
 
     def _url(self, path: str, query: Mapping[str, Any] | None = None) -> str:
-        params = {k: v if isinstance(v, str) else _json(v)
-                  for k, v in (query or {}).items() if v is not None and k != "ordering"}
-        for index, order in enumerate((query or {}).get("ordering") or []):
-            for key, value in order.items():
-                params[f"ordering[{index}][{key}]"] = value
+        params = {k: v if isinstance(v, str) else _json(v) for k, v in (query or {}).items() if v is not None}
         return self.base_url + path + ("?" + urlencode(params) if params else "")
 
     def _headers(self, extra: Mapping[str, str] | None = None, *, api: bool = True) -> dict[str, str]:
@@ -1118,21 +1135,23 @@ class CalmLensServerClient:
         return CalmLensAPIError(error_codes.SDK_HTTP_ERROR, f"HTTP {status}", status=status, headers=headers)
 
     def ensure_lens(self, options: LensDefinition | None = None, /, *, identifier: str = _UNSET, name: str = _UNSET,
-                    type: LensType = _UNSET, version: int = _UNSET, description: str | None = _UNSET,
+                    type: LensType = _UNSET, description: str | None = _UNSET,
                     active: bool = _UNSET, transform: ImageTransformOptions | None = _UNSET) -> Lens:
-        """Create or update one named lens (see :meth:`ensure_lenses`)."""
+        """Create one named lens, or change it to this definition (see :meth:`ensure_lenses`)."""
         # A lens definition is sent as given: ``description=None`` clears the lens's description.
-        lens = _merge_options(options, identifier=identifier, name=name, type=type, version=version,
+        lens = _merge_options(options, identifier=identifier, name=name, type=type,
                               description=description, active=active, transform=transform)
         return self.ensure_lenses({"lenses": [cast(LensDefinition, lens)]})[0]
 
     def ensure_lenses(self, options: EnsureLensesOptions | None = None, /, *,
                       lenses: list[LensDefinition] = _UNSET) -> list[Lens]:
-        """Create or update named lenses, cached per definition and version.
+        """Create each named lens, or change it to the definition sent, by identifier. Sending the
+        same definition again returns the lens unchanged, from the client's lens cache once it has
+        seen it, so applications can send their lenses every time they start.
 
-        Identical concurrent calls share one request; a changed version replaces the cached
-        definition for that identifier. More than ``ENSURE_LENSES_MAX_PER_REQUEST`` new definitions
-        are sent in consecutive requests, in order. Version conflicts raise ``lens/version-conflict``.
+        Identical concurrent calls share one request; a changed definition replaces the cached one
+        for that identifier. More than ``ENSURE_LENSES_MAX_PER_REQUEST`` new definitions are sent in
+        consecutive requests, in order.
         """
         merged = _merge("ensureLenses", options, lenses=lenses)
         definitions = merged.get("lenses")
@@ -1142,7 +1161,7 @@ class CalmLensServerClient:
 
         def cache_key(lens: Mapping[str, Any]) -> str:
             return json.dumps({k: lens.get(k) for k in (
-                "identifier", "name", "description", "type", "active", "transform", "version"
+                "identifier", "name", "description", "type", "active", "transform"
             )}, sort_keys=True, separators=(",", ":"))
         keys = [cache_key(lens) for lens in definitions]
         # Serialize ensure calls so identical concurrent definitions use one request.
@@ -1161,17 +1180,24 @@ class CalmLensServerClient:
                         raise CalmLensError(error_codes.SDK_INVALID_RESPONSE, "Unexpected lens identifier")
                 resolved.update(zip(chunk, returned))
                 for key, lens in zip(chunk, returned):
-                    self._lenses = {k: v for k, v in self._lenses.items() if v["identifier"] != lens["identifier"]}
+                    self._forget_lenses("identifier", lens["identifier"])
                     self._lenses[key] = copy.deepcopy(lens)
             return copy.deepcopy([resolved[key] for key in keys])
+
+    def _forget_lenses(self, field: Literal["id", "identifier"], value: object) -> None:
+        """Drop the cached ensure results of the lens whose ``field`` is ``value``, so a lens changed
+        another way is sent again by ``ensure_lens``."""
+        with self._lens_lock:
+            for key in [key for key, lens in self._lenses.items() if lens.get(field) == value]:
+                del self._lenses[key]
 
 
 #: The most lens definitions :meth:`CalmLensServerClient.ensure_lenses` sends in one request.
 ENSURE_LENSES_MAX_PER_REQUEST = 100
 
 _UPLOAD_TOKEN_CONTEXT = "calmlens-upload-token:v1:"
-#: ``upload_tokens.sign``'s lifetime when ``expires_in_seconds`` is omitted.
-UPLOAD_TOKEN_DEFAULT_EXPIRES_IN_SECONDS = 600
+#: ``upload_tokens.sign``'s lifetime in seconds when ``expires_in`` is omitted: 10 minutes.
+DEFAULT_UPLOAD_TOKEN_EXPIRES_IN = 600
 _UPLOAD_TOKEN_MAX_TTL_SECONDS = 3600
 
 
@@ -1179,9 +1205,9 @@ def _sign_upload_token(api_key: str, options: Mapping[str, Any], now: int, nonce
     """Sign an upload token at ``now`` (milliseconds since the epoch) with ``nonce``."""
     preset_id = options.get("uploadPresetId")
     _id(preset_id, "Upload preset ID")
-    ttl = options.get("expiresInSeconds", UPLOAD_TOKEN_DEFAULT_EXPIRES_IN_SECONDS)
+    ttl = options.get("expiresIn", DEFAULT_UPLOAD_TOKEN_EXPIRES_IN)
     if isinstance(ttl, bool) or not isinstance(ttl, int) or not 1 <= ttl <= _UPLOAD_TOKEN_MAX_TTL_SECONDS:
-        raise _invalid(f"expiresInSeconds must be a whole number from 1 to {_UPLOAD_TOKEN_MAX_TTL_SECONDS}")
+        raise _invalid(f"expires_in must be a whole number of seconds from 1 to {_UPLOAD_TOKEN_MAX_TTL_SECONDS}")
     external = options.get("externalId")
     if "externalId" in options and (not isinstance(external, str) or not external):
         raise _invalid("externalId must be a non-empty string")
@@ -1204,15 +1230,15 @@ class UploadTokens:
         self._c = client
 
     def sign(self, options: SignUploadTokenOptions | None = None, /, *, upload_preset_id: str = _UNSET,
-             external_id: str = _UNSET, expires_in_seconds: int = _UNSET) -> SignedUploadToken:
+             external_id: str = _UNSET, expires_in: int = _UNSET) -> SignedUploadToken:
         """Sign an upload token with the client's API key. Makes no request.
 
         The token lets one browser upload through ``upload_preset_id`` until it expires
-        (``expires_in_seconds``, 1 to 3600, default 600). ``external_id`` becomes the external
+        (``expires_in`` seconds, 1 to 3600, default 600). ``external_id`` becomes the external
         ID of the uploaded asset. Returns ``{"token": ..., "expiresAt": <ms since epoch>}``.
         """
         merged = _merge("uploadTokens.sign", options, upload_preset_id=upload_preset_id, external_id=external_id,
-                        expires_in_seconds=expires_in_seconds)
+                        expires_in=expires_in)
         return _sign_upload_token(self._c.api_key, merged, int(time.time() * 1000), str(uuid.uuid4()))
 
 
@@ -1296,42 +1322,28 @@ class Assets:
         self._c = client
 
     def search(self, options: SearchAssetsOptions | None = None, /, *, query: str = _UNSET,
-               limit: int = _UNSET, mode: SearchMode = _UNSET) -> AssetSearchResponse:
+               page_size: int = _UNSET, mode: SearchMode = _UNSET) -> AssetSearchResponse:
         """Search the project's assets by keyword and/or meaning (``mode``: ``keyword``,
-        ``semantic`` or ``hybrid``)."""
-        merged = _merge("assets.search", options, query=query, limit=limit, mode=mode)
+        ``semantic`` or ``hybrid``), returning the best ``page_size`` matches (1 to 20, default 10)."""
+        merged = _merge("assets.search", options, query=query, page_size=page_size, mode=mode)
         _require(merged, "query")
         return cast(AssetSearchResponse, self._c._request("GET", self._c._project("assets/search"), query=merged))
 
     def list(self, options: ListAssetsOptions | None = None, /, *, cursor: str = _UNSET,
-             page_size: int = _UNSET, ordering: List[Ordering] = _UNSET, filter: str = _UNSET,
-             folder_id: str = _UNSET) -> AssetPage:
-        """One page of the project's assets (``cursor`` resumes a previous page; ``filter`` is RSQL,
-        e.g. ``classification.moderation.status==allowed``). Use :meth:`iter` to walk every page."""
-        merged = _merge("assets.list", options, cursor=cursor, page_size=page_size, ordering=ordering, filter=filter,
-                        folder_id=folder_id)
+             page_size: int = _UNSET, sort: str = _UNSET, filter: str = _UNSET) -> AssetPage:
+        """One page of the project's assets (``cursor`` resumes a previous page). ``filter`` is RSQL,
+        such as ``classification.moderation.status==allowed`` or ``folderId==fldr_…`` (``folderId==null``
+        for the project root). ``sort`` is comma-separated ``createdAt`` and ``id``, each descending
+        when prefixed with ``-``; the default is ``-createdAt``. Use :meth:`iter` to walk every page."""
+        merged = _merge("assets.list", options, cursor=cursor, page_size=page_size, sort=sort, filter=filter)
         return cast(AssetPage, self._c._request("GET", self._c._project("assets"), query=merged))
 
     def iter(self, options: ListAssetsOptions | None = None, /, *, page_size: int = _UNSET,
-             ordering: List[Ordering] = _UNSET, filter: str = _UNSET, folder_id: str = _UNSET) -> Iterator[Asset]:
+             sort: str = _UNSET, filter: str = _UNSET) -> Iterator[Asset]:
         """Yield every matching asset, requesting pages lazily as you iterate."""
-        merged = _merge("assets.each", options, page_size=page_size, ordering=ordering, filter=filter, folder_id=folder_id)
-        return self._iterate(lambda index: self.list(cast(ListAssetsOptions, {**merged, "cursor": index})),
-                             merged.get("cursor"))
-
-    @staticmethod
-    def _iterate(fetch: Callable[[str | None], AssetPage], index: str | None) -> Iterator[Asset]:
-        sent: set[str] = set()
-        while True:
-            page = fetch(index)
-            cursor = page.get("nextCursor")
-            more = bool(cursor) and bool(page.get("hasMore")) and bool(page["items"])
-            if more:
-                _new_cursor(sent, cast(str, cursor))
-            yield from page["items"]
-            if not more:
-                return
-            index = cursor
+        merged = _merge("assets.each", options, page_size=page_size, sort=sort, filter=filter)
+        return cast(Iterator[Asset], _iterate_pages(
+            lambda index: self.list(cast(ListAssetsOptions, {**merged, "cursor": index})), merged.get("cursor")))
 
     def retrieve(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> Asset:
         """Fetch an asset by ID."""
@@ -1388,24 +1400,25 @@ class Assets:
                                             body={k: v for k, v in merged.items() if k != "assetId"}))
 
     def list_children(self, options: ListChildrenOptions | None = None, /, *, asset_id: str = _UNSET,
-                      cursor: str = _UNSET, page_size: int = _UNSET, ordering: List[Ordering] = _UNSET,
+                      cursor: str = _UNSET, page_size: int = _UNSET, sort: str = _UNSET,
                       filter: str = _UNSET) -> AssetPage:
         """One page of the assets extracted from an asset (pages of a document, a website's
-        text and images, ...). Use :meth:`iter_children` to walk every page."""
-        merged = _merge("assets.listChildren", options, asset_id=asset_id, cursor=cursor, page_size=page_size, ordering=ordering,
+        text and images, ...), sorted like :meth:`list`. Use :meth:`iter_children` to walk every page."""
+        merged = _merge("assets.listChildren", options, asset_id=asset_id, cursor=cursor, page_size=page_size, sort=sort,
                         filter=filter)
         return cast(AssetPage, self._c._request(
             "GET", "/assets/" + _id(merged.get("assetId"), "assetId") + "/children",
             query={k: v for k, v in merged.items() if k != "assetId"}))
 
     def iter_children(self, options: ListChildrenOptions | None = None, /, *, asset_id: str = _UNSET,
-                      page_size: int = _UNSET, ordering: List[Ordering] = _UNSET,
+                      page_size: int = _UNSET, sort: str = _UNSET,
                       filter: str = _UNSET) -> Iterator[Asset]:
         """Yield every child of an asset, requesting pages lazily."""
-        merged = _merge("assets.eachChild", options, asset_id=asset_id, page_size=page_size, ordering=ordering, filter=filter)
+        merged = _merge("assets.eachChild", options, asset_id=asset_id, page_size=page_size, sort=sort, filter=filter)
         _id(merged.get("assetId"), "assetId")
-        return self._iterate(lambda index: self.list_children(cast(ListChildrenOptions, {**merged, "cursor": index})),
-                             merged.get("cursor"))
+        return cast(Iterator[Asset], _iterate_pages(
+            lambda index: self.list_children(cast(ListChildrenOptions, {**merged, "cursor": index})),
+            merged.get("cursor")))
 
     def list_timeline(self, options: ListTimelineOptions | None = None, /, *, asset_id: str = _UNSET,
                       cursor: str = _UNSET, page_size: int = _UNSET) -> AssetTimelinePage:
@@ -1417,6 +1430,16 @@ class Assets:
             "GET", self._c._project("assets/" + _id(merged.get("assetId"), "assetId") + "/timeline"),
             query={k: v for k, v in merged.items() if k != "assetId"}))
 
+    def iter_timeline(self, options: ListTimelineOptions | None = None, /, *, asset_id: str = _UNSET,
+                      page_size: int = _UNSET) -> Iterator[AssetTimelineSegment]:
+        """Yield every segment of an audio or video asset's findings timeline, in time order,
+        requesting pages lazily."""
+        merged = _merge("assets.eachTimelineSegment", options, asset_id=asset_id, page_size=page_size)
+        _id(merged.get("assetId"), "assetId")
+        return cast(Iterator[AssetTimelineSegment], _iterate_pages(
+            lambda index: self.list_timeline(cast(ListTimelineOptions, {**merged, "cursor": index})),
+            merged.get("cursor")))
+
     def create(self, options: SubmitAssetOptions | None = None, /, *, name: str = _UNSET, content: Content = _UNSET,
                part: Content = _UNSET, url: str = _UNSET, description: str = _UNSET,
                processing_options: ProcessingOptions = _UNSET, visibility: Visibility = _UNSET,
@@ -1424,8 +1447,8 @@ class Assets:
                context: ModerationContext = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
                folder_id: str | None = _UNSET, upload_preset_id: str = _UNSET,
                total_size_in_bytes: int = _UNSET, idempotency_key: str | None = None) -> Asset:
-        """Upload content (or submit a ``url``) and queue classification; returns at once
-        with an asset that is not yet decided.
+        """Upload content (or submit a ``url``) and return without waiting for its decision
+        (``wait=false``): the asset's ``classification.status`` is ``queued``.
 
         Supply exactly one of ``content``, ``part`` (first part of a multipart upload) or
         ``url``. ``idempotency_key`` makes retries safe; one is generated per call when
@@ -1447,7 +1470,7 @@ class Assets:
                         processing_options=processing_options, visibility=visibility, metadata=metadata, tags=tags,
                         author_id=author_id, context=context, external_id=external_id, external_url=external_url, folder_id=folder_id,
                         upload_preset_id=upload_preset_id, total_size_in_bytes=total_size_in_bytes)
-        return self._submit(merged, True, idempotency_key)
+        return self._submit(merged, False, idempotency_key)
 
     def classify(self, options: SubmitAssetOptions | None = None, /, *, name: str = _UNSET, content: Content = _UNSET,
                  part: Content = _UNSET, url: str = _UNSET, description: str = _UNSET,
@@ -1466,9 +1489,9 @@ class Assets:
         if isinstance(payload, Mapping) and "plainText" in payload and (
                 not isinstance(payload["plainText"], str) or not payload["plainText"].strip()):
             raise _invalid("Text to classify must be a non-empty string", error_codes.INVALID_UPLOAD_PAYLOAD)
-        return self._submit(merged, False, idempotency_key)
+        return self._submit(merged, True, idempotency_key)
 
-    def _submit(self, options: dict[str, Any], queue: bool, idempotency_key: str | None) -> Asset:
+    def _submit(self, options: dict[str, Any], wait: bool, idempotency_key: str | None) -> Asset:
         if not options.get("name"):
             raise _invalid("Asset name is required", error_codes.INVALID_UPLOAD_PAYLOAD)
         if "context" in options:
@@ -1482,7 +1505,7 @@ class Assets:
                            error_codes.INVALID_UPLOAD_PAYLOAD)
         key = idempotency_key if idempotency_key is not None else str(uuid.uuid4())
         if "url" in options:
-            return _expect_asset(self._c._request("POST", self._c._project("assets"), query={"queue": queue},
+            return _expect_asset(self._c._request("POST", self._c._project("assets"), query={"wait": wait},
                                                   body=options, idempotency_key=key))
         multipart = "part" in options
         payload = options["part" if multipart else "content"]
@@ -1510,7 +1533,7 @@ class Assets:
         if checked and multipart and normalized.startswith("image/"):
             _image_size(body.size)
         query = {k: options[k] for k in _SUBMIT_QUERY_KEYS if k in options}
-        query.update(queue=queue, contentType=mime, sizeInBytes=body.size)
+        query.update(wait=wait, contentType=mime, sizeInBytes=body.size)
         # Content the client can read again is split into parts when it is larger than one part.
         split = (not multipart and "plainText" not in payload and body.rewindable and body.size is not None
                  and body.size > self._c.part_size_bytes)
@@ -1573,25 +1596,25 @@ class Assets:
             number += 1
         return asset
 
-    def _send_part(self, asset_id: str, number: int, final: bool, body: _Body, queue: bool | None,
+    def _send_part(self, asset_id: str, number: int, final: bool, body: _Body, wait: bool | None,
                    idempotency_key: str) -> Asset:
         query: dict[str, Any] = {"partNumber": number, "isFinal": final, "sizeInBytes": body.size}
-        if queue is not None:
-            query["queue"] = queue
+        if wait is not None:
+            query["wait"] = wait
         headers = {"X-CalmLens-Upload": "part", "Content-Length": str(body.size)}
         return _expect_asset(self._c._request(
             "POST", "/assets/" + _id(asset_id, "assetId") + "/part", raw=body, headers=headers, query=query,
             idempotency_key=idempotency_key, timeout=self._c.upload_timeout))
 
     def upload_part(self, options: UploadPartOptions | None = None, /, *, asset_id: str = _UNSET,
-                    part: PartContent = _UNSET, queue: bool = _UNSET, idempotency_key: str | None = None) -> Asset:
+                    part: PartContent = _UNSET, wait: bool = _UNSET, idempotency_key: str | None = None) -> Asset:
         """Send the next part of a multipart upload (``partNumber`` 2, 3, ...; parts are
         sequential and all but the final one are at least 5 MiB).
 
-        The final part is classified with the ``create``/``classify`` choice saved when the
-        upload started; pass ``queue`` only to override it.
+        Whether the final part waits for the decision was chosen when the upload started
+        (``classify`` waits, ``create`` doesn't); pass ``wait`` only to override it.
         """
-        merged = _merge("assets.uploadPart", options, asset_id=asset_id, part=part, queue=queue)
+        merged = _merge("assets.uploadPart", options, asset_id=asset_id, part=part, wait=wait)
         asset = merged.get("assetId")
         _id(asset, "assetId")
         payload = merged.get("part")
@@ -1601,7 +1624,7 @@ class Assets:
             raise CalmLensValidationError(error_codes.INVALID_UPLOAD_PART_NUMBER)
         body = _payload(payload, True, not self._c._defer_upload_checks)
         return self._send_part(cast(str, asset), payload["partNumber"], bool(payload.get("isFinal", False)), body,
-                               None if merged.get("queue") is None else bool(merged["queue"]),
+                               None if merged.get("wait") is None else bool(merged["wait"]),
                                idempotency_key if idempotency_key is not None else str(uuid.uuid4()))
 
     def move(self, options: MoveAssetOptions | None = None, /, *, asset_id: str = _UNSET,
@@ -1680,13 +1703,20 @@ class Folders:
         self._c = client
 
     def list(self, options: ListFoldersOptions | None = None, /, *, parent_id: str = _UNSET, cursor: str = _UNSET,
-             page_size: int = _UNSET, ordering: List[FolderOrdering] = _UNSET, search: str = _UNSET) -> FolderPage:
-        """One page of child folders (of ``parent_id``, or the project root), sorted by name unless
-        ``ordering`` says otherwise, with ``ancestors`` for showing their paths. Pass the page's
-        ``nextCursor`` as ``cursor`` for the next page."""
-        merged = _merge("folders.list", options, parent_id=parent_id, cursor=cursor, page_size=page_size, ordering=ordering,
+             page_size: int = _UNSET, sort: str = _UNSET, search: str = _UNSET) -> FolderPage:
+        """One page of child folders (of ``parent_id``, or the project root), with ``ancestors`` for
+        showing their paths. ``sort`` is ``name`` (the default) or ``createdAt``, descending when
+        prefixed with ``-``. Pass the page's ``nextCursor`` as ``cursor`` for the next page."""
+        merged = _merge("folders.list", options, parent_id=parent_id, cursor=cursor, page_size=page_size, sort=sort,
                         search=search)
         return cast(FolderPage, self._c._request("GET", self._c._project("folders"), query=merged))
+
+    def iter(self, options: ListFoldersOptions | None = None, /, *, parent_id: str = _UNSET, page_size: int = _UNSET,
+             sort: str = _UNSET, search: str = _UNSET) -> Iterator[Folder]:
+        """Yield every child folder of ``parent_id`` (or the project root), requesting pages lazily."""
+        merged = _merge("folders.each", options, parent_id=parent_id, page_size=page_size, sort=sort, search=search)
+        return cast(Iterator[Folder], _iterate_pages(
+            lambda index: self.list(cast(ListFoldersOptions, {**merged, "cursor": index})), merged.get("cursor")))
 
     def retrieve(self, options: FolderIdOptions | None = None, /, *, folder_id: str = _UNSET) -> Folder:
         """Fetch a folder by ID."""
@@ -1730,11 +1760,19 @@ class HashLists:
         self._c = client
 
     def list(self, options: ListHashListsOptions | None = None, /, *, cursor: str = _UNSET,
-             page_size: int = _UNSET) -> HashListPage:
-        """One page of the project's hash lists, newest first; pass the previous page's
-        ``nextCursor`` as ``cursor`` for the next."""
-        merged = _merge("hashLists.list", options, cursor=cursor, page_size=page_size)
+             page_size: int = _UNSET, sort: str = _UNSET) -> HashListPage:
+        """One page of the project's hash lists, newest first unless ``sort`` (comma-separated
+        ``createdAt`` and ``id``, descending when prefixed with ``-``) says otherwise; pass the
+        previous page's ``nextCursor`` as ``cursor`` for the next."""
+        merged = _merge("hashLists.list", options, cursor=cursor, page_size=page_size, sort=sort)
         return cast(HashListPage, self._c._request("GET", self._c._project("hash-lists"), query=merged))
+
+    def iter(self, options: ListHashListsOptions | None = None, /, *, page_size: int = _UNSET,
+             sort: str = _UNSET) -> Iterator[HashList]:
+        """Yield every hash list of the project, requesting pages lazily."""
+        merged = _merge("hashLists.each", options, page_size=page_size, sort=sort)
+        return cast(Iterator[HashList], _iterate_pages(
+            lambda index: self.list(cast(ListHashListsOptions, {**merged, "cursor": index})), merged.get("cursor")))
 
     def retrieve(self, options: HashListIdOptions | None = None, /, *, hash_list_id: str = _UNSET) -> HashList:
         """Fetch a hash list by ID."""
@@ -1764,13 +1802,23 @@ class HashLists:
         self._c._request("DELETE", "/hash-lists/" + _id(merged.get("hashListId"), "hashListId"))
 
     def list_entries(self, options: ListHashListEntriesOptions | None = None, /, *, hash_list_id: str = _UNSET,
-                     cursor: str = _UNSET, page_size: int = _UNSET) -> HashListEntryPage:
-        """One page of a list's entries, newest first; pass the previous page's ``nextCursor``
-        as ``cursor`` for the next."""
-        merged = _merge("hashLists.listEntries", options, hash_list_id=hash_list_id, cursor=cursor, page_size=page_size)
+                     cursor: str = _UNSET, page_size: int = _UNSET, sort: str = _UNSET) -> HashListEntryPage:
+        """One page of a list's entries, newest first unless ``sort`` says otherwise, as for
+        :meth:`list`; pass the previous page's ``nextCursor`` as ``cursor`` for the next."""
+        merged = _merge("hashLists.listEntries", options, hash_list_id=hash_list_id, cursor=cursor, page_size=page_size,
+                        sort=sort)
         path = "/hash-lists/" + _id(merged.get("hashListId"), "hashListId") + "/entries"
         return cast(HashListEntryPage, self._c._request(
             "GET", path, query={k: v for k, v in merged.items() if k != "hashListId"}))
+
+    def iter_entries(self, options: ListHashListEntriesOptions | None = None, /, *, hash_list_id: str = _UNSET,
+                     page_size: int = _UNSET, sort: str = _UNSET) -> Iterator[HashListEntry]:
+        """Yield every entry of a list, requesting pages lazily."""
+        merged = _merge("hashLists.eachEntry", options, hash_list_id=hash_list_id, page_size=page_size, sort=sort)
+        _id(merged.get("hashListId"), "hashListId")
+        return cast(Iterator[HashListEntry], _iterate_pages(
+            lambda index: self.list_entries(cast(ListHashListEntriesOptions, {**merged, "cursor": index})),
+            merged.get("cursor")))
 
     def add_entry(self, options: AddHashListEntryOptions | None = None, /, *, hash_list_id: str = _UNSET,
                   hash: str = _UNSET, quality: int | None = _UNSET, asset_id: str = _UNSET,
@@ -1790,22 +1838,32 @@ class HashLists:
 
 
 class Policies:
-    """``client.policies``: moderation policies. Policies belong to the project's organisation and
+    """``client.policies``: moderation policies. Policies belong to the API key's organisation and
     its projects share them. Every change sends the policy's ``revision``, so a policy changed since
     is refused with ``policy/revision-conflict``. Through a project's key you can change only
-    policies no other project uses or owns."""
+    policies no other project uses."""
 
     def __init__(self, client: CalmLensServerClient):
         self._c = client
 
-    def _path(self, policy_id: object) -> str:
-        return self._c._project("policies/" + _id(policy_id, "policyId"))
+    @staticmethod
+    def _path(policy_id: object) -> str:
+        return "/policies/" + _id(policy_id, "policyId")
 
-    def list(self, options: Mapping[str, Any] | None = None, /) -> PolicyList:
-        """The organisation's policies, oldest first, and ``projectPolicyId``, the one the project
-        moderates with. It takes no options."""
-        _merge("policies.list", options)
-        return cast(PolicyList, self._c._request("GET", self._c._project("policies")))
+    def list(self, options: ListPoliciesOptions | None = None, /, *, cursor: str = _UNSET,
+             page_size: int = _UNSET, sort: str = _UNSET) -> PolicyPage:
+        """One page of the organisation's policies, oldest first unless ``sort`` (comma-separated
+        ``createdAt`` and ``id``, descending when prefixed with ``-``) says otherwise. Use
+        :meth:`retrieve_assigned` for the one the project moderates with."""
+        merged = _merge("policies.list", options, cursor=cursor, page_size=page_size, sort=sort)
+        return cast(PolicyPage, self._c._request("GET", "/policies", query=merged))
+
+    def iter(self, options: ListPoliciesOptions | None = None, /, *, page_size: int = _UNSET,
+             sort: str = _UNSET) -> Iterator[Policy]:
+        """Yield every policy of the organisation, requesting pages lazily."""
+        merged = _merge("policies.each", options, page_size=page_size, sort=sort)
+        return cast(Iterator[Policy], _iterate_pages(
+            lambda index: self.list(cast(ListPoliciesOptions, {**merged, "cursor": index})), merged.get("cursor")))
 
     def retrieve(self, options: PolicyIdOptions | None = None, /, *, policy_id: str = _UNSET) -> Policy:
         """Fetch one of the organisation's policies by ID."""
@@ -1818,35 +1876,40 @@ class Policies:
         the latest release of a built-in preset with ``preset_id``. It moderates nothing until it is
         assigned to a project or named on an upload preset."""
         merged = _merge("policies.create", options, name=name, description=description, settings=settings, preset_id=preset_id)
-        return cast(Policy, self._c._request("POST", self._c._project("policies"), body=merged))
+        return cast(Policy, self._c._request("POST", "/policies", body=merged))
 
     def update(self, options: UpdatePolicyOptions | None = None, /, *, policy_id: str = _UNSET,
                revision: int = _UNSET, name: str = _UNSET, description: str = _UNSET,
                settings: PolicySettings = _UNSET) -> Policy:
         """Change the name, description or settings (complete, defining every category); later
-        moderation uses them. Saving a policy that follows automatic updates pins it as a copy."""
+        moderation uses them. Saving a ``live`` policy pins it under the same ID."""
         merged = _merge("policies.update", options, policy_id=policy_id, revision=revision, name=name, description=description,
                         settings=settings)
         return cast(Policy, self._c._request("PATCH", self._path(merged.get("policyId")),
                                              body={k: v for k, v in merged.items() if k != "policyId"}))
 
-    def apply_preset(self, options: ApplyPolicyPresetOptions | None = None, /, *, policy_id: str = _UNSET,
-                     operation: PolicyPresetOperation = _UNSET, revision: int = _UNSET,
-                     preset_version: int = _UNSET) -> Policy:
-        """``operation="reset"`` restores the settings of the pinned preset version (send
-        ``preset.version``); ``"update"`` moves an unchanged copy to the latest release (send
-        ``preset.latestVersion``)."""
-        merged = _merge("policies.applyPreset", options, policy_id=policy_id, operation=operation, revision=revision,
-                        preset_version=preset_version)
-        return cast(Policy, self._c._request("POST", self._path(merged.get("policyId")) + "/preset",
+    def reset(self, options: ResetPolicyOptions | None = None, /, *, policy_id: str = _UNSET,
+              revision: int = _UNSET, preset_version: int = _UNSET) -> Policy:
+        """Restore the settings of the preset release a ``pinned`` or ``copy`` policy is pinned to,
+        discarding its edits. Send the pinned ``preset.version`` you reviewed."""
+        merged = _merge("policies.reset", options, policy_id=policy_id, revision=revision, preset_version=preset_version)
+        return cast(Policy, self._c._request("POST", self._path(merged.get("policyId")) + "/reset",
+                                             body={k: v for k, v in merged.items() if k != "policyId"}))
+
+    def upgrade(self, options: UpgradePolicyOptions | None = None, /, *, policy_id: str = _UNSET,
+                revision: int = _UNSET, preset_version: int = _UNSET) -> Policy:
+        """Move an unchanged ``pinned`` or ``copy`` policy to the latest release of its preset. Send
+        the ``preset.latestVersion`` you reviewed."""
+        merged = _merge("policies.upgrade", options, policy_id=policy_id, revision=revision, preset_version=preset_version)
+        return cast(Policy, self._c._request("POST", self._path(merged.get("policyId")) + "/upgrade",
                                              body={k: v for k, v in merged.items() if k != "policyId"}))
 
     def set_automatic_updates(self, options: SetPolicyAutomaticUpdatesOptions | None = None, /, *,
                               policy_id: str = _UNSET, enabled: bool = _UNSET, revision: int = _UNSET,
                               preset_version: int = _UNSET) -> Policy:
-        """Switch automatic updates on or off for the organisation's own preset policy. Switching
-        on replaces the saved copy with the latest preset settings under the same ID; switching
-        off pins the current preset version as a copy with unchanged settings."""
+        """Switch automatic updates on (``live``) or off (``pinned``) for the organisation's own
+        preset policy. Switching on replaces its settings with the latest preset settings under the
+        same ID; switching off pins the current preset version with unchanged settings."""
         merged = _merge("policies.setAutomaticUpdates", options, policy_id=policy_id, enabled=enabled, revision=revision,
                         preset_version=preset_version)
         return cast(Policy, self._c._request("PUT", self._path(merged.get("policyId")) + "/automatic-updates",
@@ -1857,11 +1920,82 @@ class Policies:
         merged = _merge("policies.delete", options, policy_id=policy_id)
         self._c._request("DELETE", self._path(merged.get("policyId")))
 
+    def retrieve_assigned(self, options: Mapping[str, Any] | None = None, /) -> Policy:
+        """The policy the project moderates with. It takes no options."""
+        _merge("policies.retrieveAssigned", options)
+        return cast(Policy, self._c._request("GET", self._c._project("policy")))
+
     def assign(self, options: AssignPolicyOptions | None = None, /, *, policy_id: str = _UNSET) -> Policy:
         """Choose the policy the project moderates with. Later uploads use it, except those through
         an upload preset that names its own policy."""
         merged = _merge("policies.assign", options, policy_id=policy_id)
         return cast(Policy, self._c._request("PUT", self._c._project("policy"), body=merged))
+
+
+class Lenses:
+    """``client.lenses``: the project's lenses, named image transforms the CDN applies at
+    ``/@<identifier>``. The CDN serves files made with each lens's current definition.
+    :meth:`CalmLensServerClient.ensure_lenses` creates or changes lenses by identifier, for
+    applications that declare theirs in code."""
+
+    def __init__(self, client: CalmLensServerClient):
+        self._c = client
+
+    @staticmethod
+    def _path(lens_id: object) -> str:
+        return "/lenses/" + _id(lens_id, "lensId")
+
+    def list(self, options: ListLensesOptions | None = None, /, *, cursor: str = _UNSET,
+             page_size: int = _UNSET, sort: str = _UNSET) -> LensPage:
+        """One page of the project's lenses, newest first unless ``sort`` (comma-separated
+        ``createdAt`` and ``id``, descending when prefixed with ``-``) says otherwise. The built-in
+        lenses are always available and aren't listed."""
+        merged = _merge("lenses.list", options, cursor=cursor, page_size=page_size, sort=sort)
+        return cast(LensPage, self._c._request("GET", self._c._project("lenses"), query=merged))
+
+    def iter(self, options: ListLensesOptions | None = None, /, *, page_size: int = _UNSET,
+             sort: str = _UNSET) -> Iterator[Lens]:
+        """Yield every lens of the project, requesting pages lazily."""
+        merged = _merge("lenses.each", options, page_size=page_size, sort=sort)
+        return cast(Iterator[Lens], _iterate_pages(
+            lambda index: self.list(cast(ListLensesOptions, {**merged, "cursor": index})), merged.get("cursor")))
+
+    def create(self, options: LensDefinition | None = None, /, *, identifier: str = _UNSET, name: str = _UNSET,
+               type: LensType = _UNSET, description: str | None = _UNSET, active: bool = _UNSET,
+               transform: ImageTransformOptions | None = _UNSET) -> Lens:
+        """Create a lens. Its identifier must be new to the project (``lens/identifier-taken``
+        otherwise); use :meth:`CalmLensServerClient.ensure_lens` to create or change one by
+        identifier."""
+        merged = _merge("lenses.create", options, identifier=identifier, name=name, type=type, description=description,
+                        active=active, transform=transform)
+        lens = cast(Lens, self._c._request("POST", self._c._project("lenses"), body=merged))
+        self._c._forget_lenses("identifier", lens.get("identifier") if isinstance(lens, Mapping) else None)
+        return lens
+
+    def retrieve(self, options: LensIdOptions | None = None, /, *, lens_id: str = _UNSET) -> Lens:
+        """Fetch one of the project's lenses by ID."""
+        merged = _merge("lenses.retrieve", options, lens_id=lens_id)
+        return cast(Lens, self._c._request("GET", self._path(merged.get("lensId"))))
+
+    def update(self, options: UpdateLensOptions | None = None, /, *, lens_id: str = _UNSET, name: str = _UNSET,
+               description: str | None = _UNSET, type: LensType = _UNSET, active: bool = _UNSET,
+               transform: ImageTransformOptions | None = _UNSET) -> Lens:
+        """Change a lens's name, description, type, transform or whether the CDN serves it
+        (``active``). ``description=None`` and ``transform=None`` clear them. The CDN serves the new
+        transform from then on."""
+        merged = _merge("lenses.update", options, lens_id=lens_id, name=name, description=description, type=type,
+                        active=active, transform=transform)
+        lens = cast(Lens, self._c._request("PATCH", self._path(merged.get("lensId")),
+                                           body={k: v for k, v in merged.items() if k != "lensId"}))
+        self._c._forget_lenses("id", lens.get("id") if isinstance(lens, Mapping) else None)
+        return lens
+
+    def delete(self, options: LensIdOptions | None = None, /, *, lens_id: str = _UNSET) -> None:
+        """Delete a lens. URLs that select it stop being served; files the CDN already delivered
+        may stay in caches until they expire."""
+        merged = _merge("lenses.delete", options, lens_id=lens_id)
+        self._c._request("DELETE", self._path(merged.get("lensId")))
+        self._c._forget_lenses("id", merged["lensId"])
 
 
 class Events:

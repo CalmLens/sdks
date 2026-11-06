@@ -167,11 +167,12 @@ class MockDecision:
                 categories[category]["qualifiers"] = {
                     qualifier: {"status": "evaluated", "someScore": some, "likelihood": _score_to_likelihood(some)}
                     for qualifier, some in qualifiers}
-        return {"raw": {"categories": categories},
+        return {"raw": {"categories": categories, "hashMatches": []},
             "categories": {category: {"score": value, "action": action(value)} for category, value in evaluated},
-            "explanationComplete": True, "source": "policy", "automatedStatus": status,
+            "explanationComplete": True, "source": "policy", "rule": None, "automatedStatus": status,
             # The mock analyses no audio or video, so a decision has no findings timeline.
-            "regions": [], "timeline": None, "flaggedCategories": [category for category, value in evaluated if action(value) != "allow"]}
+            "regions": [], "linkSafety": None, "timeline": None,
+            "flaggedCategories": [category for category, value in evaluated if action(value) != "allow"]}
 
 
 
@@ -222,8 +223,8 @@ def _to_decision(value: object) -> MockDecision:
 
 #: Like the API: an upload has at most this many parts.
 _MAX_UPLOAD_PARTS = 10_000
-_INT_QUERY = {"pageSize", "limit", "partNumber", "sizeInBytes", "totalSizeInBytes"}
-_BOOL_QUERY = {"queue", "isFinal"}
+_INT_QUERY = {"pageSize", "partNumber", "sizeInBytes", "totalSizeInBytes"}
+_BOOL_QUERY = {"wait", "isFinal"}
 _JSON_QUERY = {"metadata", "tags", "processingOptions", "context"}
 _MIB = 1024 * 1024
 
@@ -239,13 +240,13 @@ class MockApiKeyGrant(TypedDict):
 
 def sign_upload_token(api_key: str, options: SignUploadTokenOptions | None = None, /, *, now: int, nonce: str,
                       upload_preset_id: str = _UNSET, external_id: str = _UNSET,
-                      expires_in_seconds: int = _UNSET) -> SignedUploadToken:
+                      expires_in: int = _UNSET) -> SignedUploadToken:
     """Sign an upload token like ``client.upload_tokens.sign``, with the same validation, at a
     fixed ``now`` (milliseconds since the epoch) with a fixed ``nonce``, so the token is the
     same every time, for comparing with known tokens in tests. Options are an options dict or
     the same keyword arguments as ``upload_tokens.sign``."""
     merged = _merge("uploadTokens.sign", options, upload_preset_id=upload_preset_id, external_id=external_id,
-                    expires_in_seconds=expires_in_seconds)
+                    expires_in=expires_in)
     return _sign_upload_token(api_key, merged, now, nonce)
 
 
@@ -337,12 +338,8 @@ class _PendingFailure:
 
 def _decode_query(pairs: Iterable[tuple[str, str]]) -> dict[str, Any]:
     query: dict[str, Any] = {}
-    ordering: dict[int, dict[str, str]] = {}
     for key, value in pairs:
-        found = re.fullmatch(r"ordering\[(\d+)\]\[(\w+)\]", key)
-        if found:
-            ordering.setdefault(int(found.group(1)), {})[found.group(2)] = value
-        elif key in _INT_QUERY and re.fullmatch(r"-?[0-9]+", value):
+        if key in _INT_QUERY and re.fullmatch(r"-?[0-9]+", value):
             query[key] = int(value)
         elif key in _BOOL_QUERY and value in ("true", "false"):
             query[key] = value == "true"
@@ -353,9 +350,58 @@ def _decode_query(pairs: Iterable[tuple[str, str]]) -> dict[str, Any]:
                 query[key] = value
         else:
             query[key] = value
-    if ordering:
-        query["ordering"] = [ordering[index] for index in sorted(ordering)]
     return query
+
+
+#: A ``sort`` field, as the API's ``sortQueryField`` reads it: an optional ``-`` and a field name.
+_SORT_FIELD = re.compile(r"-?[A-Za-z][A-Za-z0-9.]*")
+
+
+def _parse_sort(value: Any, fields: tuple[str, ...], most: int) -> list[dict[str, str]] | None:
+    """A ``sort`` query value as the API parses it: comma-separated fields from ``fields``, each
+    descending when prefixed with ``-``, none repeated and at most ``most``. ``None`` when the list
+    sends none, so its default applies; anything else is ``validation/invalid-value`` at ``sort``."""
+    if value is None:
+        return None
+    sort: list[dict[str, str]] = []
+    for part in (item.strip() for item in str(value).split(",")):
+        field = part.removeprefix("-")
+        if not _SORT_FIELD.fullmatch(part) or field not in fields or any(rule["field"] == field for rule in sort):
+            raise _invalid_field(error_codes.INVALID_VALUE, "sort")
+        sort.append({"field": field, "direction": "desc" if part.startswith("-") else "asc"})
+    if len(sort) > most:
+        raise _invalid_field(error_codes.INVALID_VALUE, "sort")
+    return sort
+
+
+def _mock_preset_settings() -> dict[str, Any]:
+    """The settings of the mock's presets: every category with its default action (``allow`` for
+    personal information and profanity, ``block`` otherwise) and no rules. The mock holds no
+    built-in preset settings, and uploads are never decided by a policy."""
+    return {"categorySettings": {
+        category: {"action": "allow" if category in ("personal-information", "profanity") else "block",
+                   "allowances": [], "restrictions": []} for category in CATEGORIES}}
+
+
+def _check_policy_settings(settings: Any) -> None:
+    """Refuse settings the API refuses: every category, each with an ``action`` and its
+    ``allowances`` and ``restrictions`` lists, and no other category. The first problem is the
+    ``validation/invalid-request`` issue."""
+    categories = settings.get("categorySettings") if isinstance(settings, dict) else None
+    if not isinstance(categories, dict):
+        raise _invalid_field("validation/invalid-type", "settings.categorySettings")
+    for category in CATEGORIES:
+        value = categories.get(category)
+        if not isinstance(value, dict):
+            raise _invalid_field("validation/invalid-type", f"settings.categorySettings.{category}")
+        for key in ("allowances", "restrictions"):
+            if not isinstance(value.get(key), list):
+                raise _invalid_field("validation/invalid-type", f"settings.categorySettings.{category}.{key}")
+        if not isinstance(value.get("action"), str):
+            raise _invalid_field("validation/invalid-value", f"settings.categorySettings.{category}.action")
+    for key in categories:
+        if key not in CATEGORIES:
+            raise _invalid_field("validation/unknown-field", f"settings.categorySettings.{key}")
 
 
 def _split_top_level(text: str, separator: str) -> list[str]:
@@ -613,14 +659,17 @@ MockFailure = Union[str, BaseException]
 #: The client methods ``fail_next_request`` can target, as JavaScript-style method paths.
 _OPERATIONS = frozenset({
     "assets.list", "assets.iterate", "assets.search", "assets.retrieve", "assets.waitForDecision", "assets.update",
-    "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.create", "assets.classify", "assets.uploadPart",
+    "assets.listChildren", "assets.iterateChildren", "assets.listTimeline", "assets.iterateTimeline", "assets.create",
+    "assets.classify", "assets.uploadPart",
     "assets.move", "assets.retry", "assets.explain", "assets.decide",
     "assets.removeContent", "assets.delete", "assets.batch", "text.classify", "cdn.serve", "cdn.getAssetInfo", "cdn.signAssetUrl", "events.list",
-    "events.pages", "folders.list", "folders.retrieve", "folders.create", "folders.update", "folders.delete",
-    "folders.move", "hashLists.list", "hashLists.retrieve", "hashLists.create", "hashLists.update",
-    "hashLists.delete", "hashLists.listEntries", "hashLists.addEntry", "hashLists.removeEntry", "policies.list",
-    "policies.retrieve", "policies.create", "policies.update", "policies.applyPreset", "policies.setAutomaticUpdates",
-    "policies.delete", "policies.assign", "ensureLens", "ensureLenses"})
+    "events.pages", "folders.list", "folders.iterate", "folders.retrieve", "folders.create", "folders.update",
+    "folders.delete", "folders.move", "hashLists.list", "hashLists.iterate", "hashLists.retrieve", "hashLists.create",
+    "hashLists.update", "hashLists.delete", "hashLists.listEntries", "hashLists.iterateEntries", "hashLists.addEntry",
+    "hashLists.removeEntry", "policies.list", "policies.iterate", "policies.retrieve", "policies.create",
+    "policies.update", "policies.reset", "policies.upgrade", "policies.setAutomaticUpdates", "policies.delete",
+    "policies.retrieveAssigned", "policies.assign", "lenses.list", "lenses.iterate", "lenses.create",
+    "lenses.retrieve", "lenses.update", "lenses.delete", "ensureLens", "ensureLenses"})
 
 #: The built-in presets the mock knows, by display name.
 _MOCK_PRESET_NAMES = {"general-community": "General", "children-platform": "Kids",
@@ -1149,25 +1198,21 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if not asset or asset["projectId"] != self.project_id:
                 raise CalmLensError(error_codes.ASSET_NOT_FOUND, "Asset not found",
                                     status=error_codes.STATUS_BY_CODE[error_codes.ASSET_NOT_FOUND])
-            self._record_decision(cast(dict[str, Any], asset), decision, None, None)
+            self._record_decision(cast(dict[str, Any], asset), decision, None, False)
             return copy.deepcopy(asset)
 
-    def _record_decision(self, record: dict[str, Any], decision: str, note: str | None,
-                         reviewer_name: str | None) -> None:
+    def _record_decision(self, record: dict[str, Any], decision: str, note: str | None, by_api_key: bool) -> None:
         """Apply a reviewer's decision like ``decideAssetManually`` in the API: the status, the
         review, then (for ``purged``) the content removal and its event, then ``asset.<decision>``.
-        Either way the review is the mock API key's, which has no ID; only the event names the
-        reviewer."""
+        Either way the review is the mock API key's, which has no ID; the event's actor is the API
+        key for a decision through the API and a reviewer for the test hook's."""
         self._apply_outcome(record, decision, "requested")
         now = self.now()
         review: dict[str, Any] = {"id": self.create_id("rev"), "decision": decision, "note": note,
                                   "decidedBy": {"type": "api-key", "id": None}, "reviewedAt": now,
                                   "applied": True}
-        reviewer_facts: list[dict[str, Any]] = []
-        if reviewer_name is not None:
-            reviewer_facts = [{"key": "reviewer-name", "value": reviewer_name}]
         # A decision through the API is the API key's; the test hook's is a reviewer's.
-        actor = _MOCK_API_KEY_ACTOR if reviewer_name is not None else _MOCK_REVIEWER_ACTOR
+        actor = _MOCK_API_KEY_ACTOR if by_api_key else _MOCK_REVIEWER_ACTOR
         record["classification"]["moderation"].setdefault("manualReviews", []).append(review)
         if decision == "purged":
             self._lifecycle_event("asset.content-removed", record, actor=actor)
@@ -1178,12 +1223,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
                                {"key": "asset-type", "value": record["type"]},
                                {"key": "asset-name", "value": record["name"],
                                 "url": f"https://calmlens.com/go/asset/{record['id']}"},
-                               *reviewer_facts,
                                {"key": "note", "value": note}]))
 
     def _decide_request(self, asset: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
-        """``POST /assets/:id/decision`` as the API validates and applies it. The mock's key is
-        unnamed, so its event names the reviewer ``An API key``. An asset still
+        """``POST /assets/:id/decision`` as the API validates and applies it. An asset still
         uploading or processing is refused with ``asset/processing``."""
         decision = body.get("decision")
         if decision not in _REVIEW_DECISIONS:
@@ -1207,7 +1250,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             raise _Failure(error_codes.ASSET_DECISION_UNCHANGED)
         if status == "purged" and decision != "blocked":
             raise _Failure(error_codes.ASSET_CONTENT_PURGED)
-        self._record_decision(asset, decision, note, "An API key")
+        self._record_decision(asset, decision, note, True)
         return asset
 
     def _lifecycle_event(self, type: str, asset: Mapping[str, Any], *, batch_id: str | None = None,
@@ -1265,28 +1308,23 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if route == "events":
                 return ["events.list", "events.pages"]
             if route == "lenses":
-                return ["ensureLenses", "ensureLens"]
-            if route in ("folders", "hash-lists", "policies"):
-                kind = {"folders": "folders", "hash-lists": "hashLists", "policies": "policies"}[route]
-                return [f"{kind}.list" if method == "GET" else f"{kind}.create"]
+                return {"GET": ["lenses.list", "lenses.iterate"], "POST": ["lenses.create"]}.get(
+                    method, ["ensureLenses", "ensureLens"])
+            if route in ("folders", "hash-lists"):
+                kind = {"folders": "folders", "hash-lists": "hashLists"}[route]
+                return [f"{kind}.list", f"{kind}.iterate"] if method == "GET" else [f"{kind}.create"]
             if route == "policy":
-                return ["policies.assign"]
+                return ["policies.retrieveAssigned"] if method == "GET" else ["policies.assign"]
             if route == "signed-asset-urls":
                 return ["cdn.signAssetUrl"]
-            if len(parts) > 3 and parts[2] == "policies":
-                action = parts[4] if len(parts) > 4 else ""
-                if action:
-                    return {"preset": ["policies.applyPreset"],
-                            "automatic-updates": ["policies.setAutomaticUpdates"]}.get(action, [])
-                return ["policies." + {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}.get(method, "")]
             if route in ("assets/search", "assets/batch"):
                 return ["assets." + parts[3]]
             if len(parts) == 5 and parts[2] == "assets" and parts[4] == "timeline":
-                return ["assets.listTimeline"]
+                return ["assets.listTimeline", "assets.iterateTimeline"]
             if route == "assets":
                 if method == "GET":
                     return ["assets.list", "assets.iterate"]
-                if query.get("queue"):
+                if query.get("wait") is False:
                     return ["assets.create"]
                 lower = {key.lower(): value for key, value in headers.items()}
                 text = lower.get("x-calmlens-upload") == "content" and lower.get("content-type") == "text/plain"
@@ -1295,13 +1333,22 @@ class MockCalmLensServerClient(CalmLensServerClient):
         resource = parts[0]
         suffix = parts[2] if len(parts) > 2 else ""
         by_method = {"GET": "retrieve", "PATCH": "update", "DELETE": "delete"}
+        if resource == "policies":
+            if len(parts) == 1:
+                return ["policies.list", "policies.iterate"] if method == "GET" else ["policies.create"]
+            if suffix:
+                return {"reset": ["policies.reset"], "upgrade": ["policies.upgrade"],
+                        "automatic-updates": ["policies.setAutomaticUpdates"]}.get(suffix, [])
+            return ["policies." + by_method.get(method, "")]
         if len(parts) < 2:
             return []
+        if resource == "lenses":
+            return [] if suffix else ["lenses." + by_method.get(method, "")]
         if resource == "folders":
             return ["folders.move"] if suffix == "move" else ["folders." + by_method.get(method, "")]
         if resource == "hash-lists":
             if suffix == "entries":
-                return ["hashLists.listEntries" if method == "GET" else "hashLists.addEntry"]
+                return ["hashLists.listEntries", "hashLists.iterateEntries"] if method == "GET" else ["hashLists.addEntry"]
             return ["hashLists." + by_method.get(method, "")]
         if resource == "hash-list-entries":
             return ["hashLists.removeEntry"]
@@ -1397,7 +1444,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return self._failure_response(failure_response)
             # Like the API: a new folder or hash list is 201 Created, a queued batch 202 Accepted,
             # and deletes answer 200 with an empty object.
-            status = {"folders.create": 201, "hashLists.create": 201, "policies.create": 201,
+            status = {"folders.create": 201, "hashLists.create": 201, "policies.create": 201, "lenses.create": 201,
                       "assets.batch": 202}.get(operation, 200)
             if isinstance(result, _Answer):
                 status, result = result.status, result.body
@@ -1442,12 +1489,16 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if parts[1] != self.project_id:
                 raise _Failure(error_codes.PROJECT_NOT_FOUND)
             return self._dispatch_project(method, parts[2:], query, body, raw, upload)
+        if parts[0] == "policies":
+            return self._dispatch_policy(method, parts, query, body)
         resource, identifier = parts[0], parts[1]
         suffix = parts[2] if len(parts) > 2 else ""
         if resource == "assets":
             return self._dispatch_asset(method, identifier, suffix, query, body, raw)
         if resource == "hash-lists":
             return self._dispatch_hash_list(method, identifier, suffix, query, body)
+        if resource == "lenses" and not suffix:
+            return self._dispatch_lens(method, identifier, body)
         if resource == "hash-list-entries":
             if method != "DELETE" or suffix:
                 raise _Failure(error_codes.ROUTE_NOT_FOUND, f"No route for {method} /{'/'.join(parts)}")
@@ -1465,6 +1516,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if resource == "events":
             return self._events(query)
         if resource == "lenses":
+            if method == "GET":
+                return self._page(list(self._mock_lenses.values()), query, ["lenses", self.project_id])
+            if method == "POST":
+                return self._create_lens(body, now)
             return self._lenses_put(body, now)
         if resource == "folders":
             if method == "GET":
@@ -1476,15 +1531,20 @@ class MockCalmLensServerClient(CalmLensServerClient):
                       "name": body["name"], "createdAt": now, "updatedAt": now}
             self.database_storage.folders[folder["id"]] = cast(Folder, folder)
             return folder
-        if resource in ("policies", "policy"):
-            return self._dispatch_policy(method, parts, body)
+        if resource == "policy":
+            self._ensure_policies()
+            if method == "GET":
+                return self._policy_view(self._find_policy(cast(str, self._project_policy_id)))
+            policy = self._find_policy(str(body.get("policyId")))
+            self._project_policy_id = policy["id"]
+            return self._policy_view(policy)
         if resource == "signed-asset-urls" and method == "POST":
             return self._sign_asset_url(body, now)
         if resource == "hash-lists":
             if method == "GET":
                 lists = [cast(dict[str, Any], h) for h in self.database_storage.hash_lists.values()
                          if h["projectId"] == self.project_id]
-                return self._page(lists, query, [self.project_id])
+                return self._page(lists, query, ["hash-lists", self.project_id])
             return self._create_hash_list(body, now)
         suffix = parts[1] if len(parts) > 1 else ""
         if len(parts) == 3 and parts[2] == "timeline" and method == "GET":
@@ -1494,10 +1554,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if suffix == "search":
             return self._search(query)
         if not suffix and method == "GET":
-            items = self._project_assets()
-            if "folderId" in query:
-                items = [a for a in items if a.get("folderId") == query["folderId"]]
-            return self._page(items, query, [self.project_id, query.get("filter"), query.get("folderId")])
+            return self._page(self._project_assets(), query, [self.project_id, query.get("filter")])
         return self._create_asset(upload, query, body, raw, now)
 
     def _sign_asset_url(self, body: dict[str, Any], now: int) -> dict[str, Any]:
@@ -1537,17 +1594,15 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     def _folders_list(self, query: dict[str, Any]) -> dict[str, Any]:
         """Like the API: one keyset page of a parent's child folders, optionally matching ``search``,
-        by ``name`` ascending unless ``ordering`` (one entry, ``name`` or ``createdAt``) says
-        otherwise, with an ``id`` tie-breaker, and the ancestors of the listed folders."""
+        by ``name`` ascending unless ``sort`` (one field, ``name`` or ``createdAt``) says otherwise,
+        with an ``id`` tie-breaker, and the ancestors of the listed folders."""
         everything = self._project_folders()
         search = query.get("search")
         found = [f for f in everything
                  if f.get("parentId") == query.get("parentId")
                  and (not search or str(search).lower() in f["name"].lower())]
-        if len(query.get("ordering") or []) > 1:
-            raise _invalid_field("validation/too-big", "ordering")
         result = self._page(found, query, [self.project_id, query.get("parentId"), search],
-                            fields=("name", "createdAt"), default=[{"field": "name", "direction": "asc"}])
+                            fields=("name", "createdAt"), most=1, default=[{"field": "name", "direction": "asc"}])
         page = result["items"]
         ids = list(dict.fromkeys([*([query["parentId"]] if query.get("parentId") else []),
                                   *(f["id"] for f in page)]))
@@ -1593,7 +1648,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         external_id = options.get("externalId")
         if external_id and any(a.get("externalId") == external_id for a in self._project_assets()):
             raise _Failure(error_codes.DUPLICATE_EXTERNAL_ID)
-        queue = bool(query.get("queue"))
+        # ``wait=false`` queues the upload; ``wait=true`` waits for its decision.
+        queue = query.get("wait") is False
         processing_options = options.get("processingOptions")
         if not isinstance(processing_options, dict):
             processing_options = {"keepContentAfterProcessing": False}
@@ -1607,11 +1663,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
             "folderId": options.get("folderId"), "uploadPresetId": options.get("uploadPresetId"),
             "createdAt": now, "updatedAt": now, "name": options.get("name"), "description": options.get("description"),
             "externalId": external_id, "externalUrl": options.get("url", options.get("externalUrl")), "type": kind,
-            "metadata": options.get("metadata"), "authorId": options.get("authorId"),
+            "metadata": options.get("metadata") or [], "authorId": options.get("authorId"),
             # Like the API, only the posts CalmLens uses are kept, and only while the content is held.
             "context": {"items": context_items} if context_items else None,
-            "tags": options.get("tags"),
-            "visibility": options.get("visibility", "private"),
+            "tags": options.get("tags") or [],
+            "visibility": options.get("visibility") or "private",
             "content": {"status": "stored" if keep else "temporary", "removalReason": None, "updatedAt": now,
                         "safetyHold": None, "format": mime or None, "extension": None, "sizeInBytes": size,
                         "checksums": None,
@@ -1625,8 +1681,14 @@ class MockCalmLensServerClient(CalmLensServerClient):
             "classification": {"status": "processing" if final else "queued", "failureReason": None, "updatedAt": now,
                                # The mock never reads test inputs.
                                "completedAt": None, "progress": None, "testInput": False,
-                               "moderation": {"status": "pending", "manualReviews": [], "flaggedCategories": [], "regions": [],
-                                              "timeline": None}},
+                               # Like the API, every moderation field is null until moderation decides.
+                               "moderation": {"status": "pending", "manualReviews": [], "automatedStatus": None,
+                                              "source": None, "rule": None, "explanationComplete": None,
+                                              "categories": None, "flaggedCategories": [], "regions": [],
+                                              "linkSafety": None, "raw": None, "timeline": None},
+                               # A feature's result is null until it has run.
+                               "ocr": None, "personDetection": None, "faceDetection": None,
+                               "linkDetection": None, "linkSafety": None},
         }
         self._processing_options[asset["id"]] = processing_options
         if not final:
@@ -1681,17 +1743,22 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return _to_decision(self.moderate(moderation))
 
     def _decided(self, asset: dict[str, Any], decision: MockDecision) -> None:
-        """Decide ``asset`` as ``decision`` says, with its report. Like the API for an image with
-        nobody in it, a decided image reports the person and face detection its upload turned on."""
+        """Decide ``asset`` as ``decision`` says, with its report. Like the API for an image with no
+        text, codes, people or faces in it, a decided image reports the OCR and person and face
+        detection its upload turned on, and link detection unless it was turned off."""
         self._apply_outcome(asset, decision.status, "policy", decision.report())
         classification = asset["classification"]
         if classification["status"] != "completed" or asset["type"] != "image":
             return
         features = self._processing_options.get(asset["id"], {}).get("features") or {}
+        if (features.get("ocr") or {}).get("enabled") is True:
+            classification["ocr"] = {"status": "evaluated", "textRegions": []}
+        if (features.get("linkDetection") or {}).get("enabled") is not False:
+            classification["linkDetection"] = {"status": "evaluated", "qrCodes": [], "links": []}
         if (features.get("personDetection") or {}).get("enabled") is True:
-            classification["personDetection"] = {"status": "evaluated", "stage": "beta", "people": []}
+            classification["personDetection"] = {"status": "evaluated", "people": []}
         if (features.get("faceDetection") or {}).get("enabled") is True:
-            classification["faceDetection"] = {"status": "evaluated", "stage": "beta", "faces": []}
+            classification["faceDetection"] = {"status": "evaluated", "faces": []}
 
     def _moderate_stored(self, asset: dict[str, Any], trigger: MockModerationTrigger,
                          decision: MockDecision | None = None) -> None:
@@ -1791,7 +1858,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         asset["upload"].update(updatedAt=now, partsReceived=None if final else number)
         asset["updatedAt"] = now
         if final:
-            queue = query["queue"] if "queue" in query else upload["queue"]
+            # ``wait=false`` queues the final part; without ``wait``, the upload's saved choice applies.
+            queue = query["wait"] is False if "wait" in query else upload["queue"]
             del self._uploads[asset["id"]]
             self._apply_outcome(asset, "pending")
             uploaded = _event_asset(asset)
@@ -1869,6 +1937,12 @@ class MockCalmLensServerClient(CalmLensServerClient):
                                               for other in self._project_assets()):
                 raise _Failure(error_codes.DUPLICATE_EXTERNAL_ID)
             asset.update(body)
+            # Like the API, null tags and metadata are empty lists, and a null visibility is private.
+            for key in ("tags", "metadata"):
+                if key in body and body[key] is None:
+                    asset[key] = []
+            if "visibility" in body and body["visibility"] is None:
+                asset["visibility"] = "private"
         asset["updatedAt"] = now
         return asset
 
@@ -2032,30 +2106,34 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return _Answer(201, entry)
 
     # Policies: the project starts on the organisation's own General preset policy, following
-    # automatic updates. The mock holds no built-in preset settings: a preset's settings are
-    # ``{"categorySettings": {}}`` at version 1, and uploads are never decided by a policy.
+    # automatic updates (mode ``live``). The mock's presets have one release, version 1, with
+    # ``_mock_preset_settings``, and uploads are never decided by a policy.
 
     def _new_policy(self, name: str, settings: dict[str, Any], *, description: str = "",
-                    automatic_updates: bool = False, preset: dict[str, Any] | None = None) -> dict[str, Any]:
+                    follows_preset: bool = False, preset: dict[str, Any] | None = None) -> dict[str, Any]:
         now = self.now()
-        policy: dict[str, Any] = {"id": self.create_id("pol"), "name": name, "description": description, "settings": settings,
-                  "revision": 1, "automaticUpdates": automatic_updates, "preset": preset,
-                  "baseline": copy.deepcopy(settings), "createdAt": now, "updatedAt": now}
+        # ``followsPreset`` (mode ``live``) and ``baseline`` (the reset settings) are the mock's own.
+        policy: dict[str, Any] = {"id": self.create_id("pol"), "name": name, "description": description,
+                                  "settings": settings, "revision": 1, "preset": preset,
+                                  "followsPreset": follows_preset, "baseline": copy.deepcopy(settings),
+                                  "createdAt": now, "updatedAt": now}
         self._policies[policy["id"]] = policy
         return policy
 
     def _ensure_policies(self) -> None:
         if self._project_policy_id is None:
-            general = self._new_policy(_MOCK_PRESET_NAMES["general-community"], {"categorySettings": {}},
-                                       automatic_updates=True,
+            general = self._new_policy(_MOCK_PRESET_NAMES["general-community"], _mock_preset_settings(),
+                                       follows_preset=True,
                                        preset={"id": "general-community", "version": 1, "own": True})
             self._project_policy_id = general["id"]
 
     def _policy_view(self, policy: dict[str, Any]) -> dict[str, Any]:
         """A stored policy as the API shows it."""
-        shown = {key: value for key, value in policy.items() if key != "baseline"}
-        if policy["preset"] is not None:
-            shown["preset"] = {**policy["preset"], "latestVersion": 1}
+        shown = {key: value for key, value in policy.items() if key not in ("baseline", "followsPreset")}
+        preset = policy["preset"]
+        if preset is not None:
+            mode = ("live" if policy["followsPreset"] else "pinned") if preset["own"] else "copy"
+            shown["preset"] = {"id": preset["id"], "version": preset["version"], "latestVersion": 1, "mode": mode}
         shown["projectIds"] = [self.project_id] if policy["id"] == self._project_policy_id else []
         return shown
 
@@ -2073,43 +2151,44 @@ class MockCalmLensServerClient(CalmLensServerClient):
         policy.update(values, revision=policy["revision"] + 1, updatedAt=self.now())
         return self._policy_view(policy)
 
-    def _dispatch_policy(self, method: str, parts: list[str], body: dict[str, Any]) -> Any:
+    def _dispatch_policy(self, method: str, parts: list[str], query: dict[str, Any], body: dict[str, Any]) -> Any:
+        """``/policies`` and ``/policies/:policyId[/reset|upgrade|automatic-updates]``: the API key's
+        organisation's policies."""
         self._ensure_policies()
-        if parts[0] == "policy":
-            policy = self._find_policy(str(body.get("policyId")))
-            self._project_policy_id = policy["id"]
-            return self._policy_view(policy)
         if len(parts) == 1:
             if method == "GET":
-                return {"policies": [self._policy_view(p) for p in self._policies.values()],
-                        "projectPolicyId": self._project_policy_id}
+                policies = [self._policy_view(p) for p in self._policies.values()]
+                return self._page(policies, query, ["policies", self.project_id],
+                                  default=[{"field": "createdAt", "direction": "asc"}])
             return self._create_policy(body)
         policy = self._find_policy(parts[1])
         action = parts[2] if len(parts) > 2 else ""
-        if action == "preset":
+        if action in ("reset", "upgrade"):
             preset = policy["preset"]
-            if preset is None or policy["automaticUpdates"]:
+            if preset is None or policy["followsPreset"]:
                 raise _Failure(error_codes.POLICY_NO_PRESET)
             if body.get("presetVersion") != preset["version"]:
                 raise _Failure(error_codes.POLICY_PRESET_VERSION_CONFLICT)
-            # The mock's presets have one release, so an update never has a newer one to apply.
-            if body.get("operation") == "update":
+            # The mock's presets have one release, so an upgrade never has a newer one to apply.
+            if action == "upgrade":
                 raise _Failure(error_codes.POLICY_PRESET_UPDATE_UNAVAILABLE)
             return self._save_policy(policy, body.get("revision"), {"settings": copy.deepcopy(policy["baseline"])})
         if action == "automatic-updates":
             enabled = body.get("enabled") is True
             preset = policy["preset"]
-            if preset is None or not preset["own"] or policy["automaticUpdates"] == enabled:
+            if preset is None or not preset["own"] or policy["followsPreset"] == enabled:
                 raise _Failure(error_codes.POLICY_AUTOMATIC_UPDATES_UNAVAILABLE)
             if body.get("revision") != policy["revision"]:
                 raise _Failure(error_codes.POLICY_REVISION_CONFLICT)
             if body.get("presetVersion") != 1:
                 raise _Failure(error_codes.POLICY_PRESET_VERSION_CONFLICT)
-            values: dict[str, Any] = {"automaticUpdates": enabled}
+            values: dict[str, Any] = {"followsPreset": enabled}
             if enabled:
                 values.update(name=_MOCK_PRESET_NAMES[preset["id"]], description="",
                               settings=copy.deepcopy(policy["baseline"]))
             return self._save_policy(policy, body.get("revision"), values)
+        if action:
+            raise _Failure(error_codes.ROUTE_NOT_FOUND, f"No route for {method} /{'/'.join(parts)}")
         if method == "GET":
             return self._policy_view(policy)
         if method == "DELETE":
@@ -2117,12 +2196,14 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 raise _Failure(error_codes.POLICY_IN_USE)
             del self._policies[policy["id"]]
             return None
+        if "settings" in body:
+            _check_policy_settings(body["settings"])
         values = {key: body[key].strip() if key == "name" else body[key]
                   for key in ("name", "description") if isinstance(body.get(key), str)}
         if "settings" in body:
             values["settings"] = body["settings"]
-        # Saving a policy that follows its preset pins it as a copy.
-        values["automaticUpdates"] = False
+        # Saving a ``live`` policy pins it.
+        values["followsPreset"] = False
         return self._save_policy(policy, body.get("revision"), values)
 
     def _create_policy(self, body: dict[str, Any]) -> dict[str, Any]:
@@ -2131,35 +2212,58 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if (settings is None) == (preset_id is None) or (preset_id is not None and preset_id not in _MOCK_PRESET_NAMES) \
                 or (preset_id is None and not named):
             raise _Failure(error_codes.INVALID_VALUE, "Send settings with a name, or presetId")
+        if preset_id is None:
+            _check_policy_settings(settings)
         description = body["description"] if isinstance(body.get("description"), str) else ""
         if preset_id is not None:
             policy = self._new_policy(cast(str, name).strip() if named else _MOCK_PRESET_NAMES[preset_id],
-                                      {"categorySettings": {}}, description=description,
+                                      _mock_preset_settings(), description=description,
                                       preset={"id": preset_id, "version": 1, "own": False})
         else:
             policy = self._new_policy(cast(str, name).strip(), cast(dict[str, Any], settings), description=description)
         return self._policy_view(policy)
 
+    # Lenses: by identifier in ``_mock_lenses``. A changed definition is saved in place.
+
+    def _save_lens(self, definition: Mapping[str, Any], now: int) -> dict[str, Any]:
+        """Save a lens definition like the API: a new lens, the lens unchanged when its definition
+        is, or the lens changed to it."""
+        old = self._mock_lenses.get(definition["identifier"])
+        if old is None:
+            lens = {"id": self.create_id("lens"), "projectId": self.project_id, **definition,
+                    "createdAt": now, "updatedAt": now}
+        elif all(old.get(k) == definition.get(k) for k in ("name", "description", "type", "active", "transform")):
+            lens = old
+        else:
+            lens = {**old, **definition, "updatedAt": now}
+        self._mock_lenses[lens["identifier"]] = lens
+        return lens
+
     def _lenses_put(self, body: dict[str, Any], now: int) -> dict[str, Any]:
-        # Each definition is saved in turn, so earlier ones stay saved when a later one conflicts.
-        result = []
-        for definition in body["lenses"]:
-            old = self._mock_lenses.get(definition["identifier"])
-            if old is None:
-                lens = {"id": self.create_id("lens"), "projectId": self.project_id, **definition,
-                        "createdAt": now, "updatedAt": now}
-            elif all(old.get(k) == definition.get(k) for k in ("name", "description", "type", "active",
-                                                                  "transform", "version")):
-                lens = old
-            elif definition["version"] > old["version"]:
-                lens = {**old, **definition, "updatedAt": now}
-            else:
-                raise _Failure(error_codes.LENS_VERSION_CONFLICT, details={
-                    "currentVersion": old["version"], "minimumVersion": old["version"] + 1,
-                    "requestedVersion": definition["version"]})
-            self._mock_lenses[lens["identifier"]] = lens
-            result.append(copy.deepcopy(lens))
-        return {"lenses": result}
+        if not isinstance(body.get("lenses"), list) or not body["lenses"]:
+            raise _invalid_field("validation/too-small", "lenses")
+        return {"lenses": [copy.deepcopy(self._save_lens(definition, now)) for definition in body["lenses"]]}
+
+    def _create_lens(self, body: dict[str, Any], now: int) -> dict[str, Any]:
+        identifier = body.get("identifier")
+        if not isinstance(identifier, str) or not identifier:
+            raise _invalid_field("validation/invalid-type", "identifier")
+        if identifier in self._mock_lenses:
+            raise _Failure(error_codes.LENS_IDENTIFIER_TAKEN, details={"identifier": identifier})
+        return copy.deepcopy(self._save_lens(body, now))
+
+    def _dispatch_lens(self, method: str, lens_id: str, body: dict[str, Any]) -> Any:
+        """``/lenses/:lensId``: one of the project's lenses by ID."""
+        lens = next((lens for lens in self._mock_lenses.values() if lens["id"] == lens_id), None)
+        if lens is None:
+            raise _Failure(error_codes.LENS_NOT_FOUND)
+        if method == "GET":
+            return copy.deepcopy(lens)
+        if method == "DELETE":
+            del self._mock_lenses[lens["identifier"]]
+            return None
+        changes = {key: value for key, value in body.items() if key != "identifier"}
+        return copy.deepcopy(self._save_lens({**lens, **changes}, self.now()))
 
     def _events(self, query: dict[str, Any]) -> dict[str, Any]:
         # Cursors are positions in the feed (``mock_<n>~<filters>``), so events added later reach
@@ -2207,18 +2311,18 @@ class MockCalmLensServerClient(CalmLensServerClient):
             raise _Failure(error_codes.ASSET_HELD, details={"hold": "safety"})
         if query.get("cursor") is not None:
             raise _Failure(error_codes.INVALID_CURSOR)
-        return {"items": [], "nextCursor": None, "pageSize": size, "hasMore": False, "ordering": []}
+        return {"items": [], "nextCursor": None, "hasMore": False}
 
     def _search(self, query: dict[str, Any]) -> dict[str, Any]:
         # Keyword search like the API's; the mock has no semantic index, so every mode is
         # keyword matching. Like the API's query schema: a trimmed query of 1 to 200 characters
-        # and a limit of 1 to 20.
+        # and a page size of 1 to 20.
         text = str(query.get("query", "")).strip()
         if not text:
             raise _invalid_field("validation/too-small", "query")
         if len(text) > _MAX_SEARCH_QUERY_LENGTH:
             raise _invalid_field("validation/too-big", "query")
-        limit = _bounded_int(query.get("limit", 10), "limit", _MAX_SEARCH_LIMIT)
+        limit = _bounded_int(query.get("pageSize", 10), "pageSize", _MAX_SEARCH_LIMIT)
         normalized = text.lower()
         tokens = list(dict.fromkeys(normalized.split()))[:_MAX_SEARCH_TOKENS]
         items: list[dict[str, Any]] = []
@@ -2241,20 +2345,15 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     @staticmethod
     def _page(items: list[dict[str, Any]], query: dict[str, Any], scope: Any,
-              fields: tuple[str, ...] = ("createdAt", "id"),
+              fields: tuple[str, ...] = ("createdAt", "id"), most: int = 2,
               default: list[dict[str, str]] | None = None) -> dict[str, Any]:
-        """One keyset page like the API's: ordered by ``fields`` (``createdAt`` descending by
-        default; an ``id`` tie-breaker is added), after the cursor's values. The cursor is tied to
-        ``scope`` (the filter, folder or parent) and the ordering, so it only continues the query
-        it came from."""
+        """One keyset page like the API's: ordered by ``sort`` (at most ``most`` of ``fields``;
+        ``default``, or ``createdAt`` descending, without one; an ``id`` tie-breaker is added),
+        after the cursor's values. The cursor is tied to ``scope`` (the list, filter, folder or
+        parent) and the sort, so it only continues the query it came from."""
         size = _bounded_int(query.get("pageSize", _DEFAULT_PAGE_SIZE), "pageSize", _MAX_PAGE_SIZE)
-        ordering = [dict(order) for order in
-                    query.get("ordering") or default or [{"field": "createdAt", "direction": "desc"}]]
-        for index, order in enumerate(ordering):
-            if order.get("field") not in fields:
-                raise _invalid_field(error_codes.INVALID_VALUE, f"ordering.{index}.field")
-            if order.get("direction") not in ("asc", "desc"):
-                raise _invalid_field(error_codes.INVALID_VALUE, f"ordering.{index}.direction")
+        ordering = [dict(order) for order in _parse_sort(query.get("sort"), fields, most)
+                    or default or [{"field": "createdAt", "direction": "desc"}]]
         if query.get("filter"):
             try:
                 matches = _rsql(query["filter"])
@@ -2291,7 +2390,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         more = len(items) > size
         cursor = base64.b64encode(_json({"scope": signature, "values": [selected[-1][o["field"]] for o in ordering]})
                                   .encode("utf-8")).decode() if more else None
-        return {"items": selected, "nextCursor": cursor, "pageSize": size, "ordering": ordering, "hasMore": more}
+        return {"items": selected, "nextCursor": cursor, "hasMore": more}
 
     # CDN ---------------------------------------------------------------------------------
 

@@ -10,8 +10,8 @@ from typing import Dict, FrozenSet
 NULLABLE_OPTION_KEYS: Dict[str, FrozenSet[str]] = {
     "assets.classify": frozenset({"authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "tags", "uploadPresetId", "visibility"}),
     "assets.create": frozenset({"authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "tags", "uploadPresetId", "visibility"}),
-    "assets.each": frozenset({"filter", "folderId"}),
-    "assets.list": frozenset({"filter", "folderId"}),
+    "assets.each": frozenset({"filter"}),
+    "assets.list": frozenset({"filter"}),
     "assets.move": frozenset({"folderId"}),
     "assets.update": frozenset({"description", "externalId", "externalUrl", "metadata", "tags", "visibility"}),
     "folders.create": frozenset({"parentId"}),
@@ -19,5 +19,7 @@ NULLABLE_OPTION_KEYS: Dict[str, FrozenSet[str]] = {
     "hashLists.addEntry": frozenset({"label", "quality"}),
     "hashLists.create": frozenset({"description"}),
     "hashLists.update": frozenset({"description"}),
+    "lenses.create": frozenset({"description", "transform"}),
+    "lenses.update": frozenset({"description", "transform"}),
     "text.classify": frozenset({"authorId", "context", "description", "externalId", "folderId", "metadata", "processingOptions", "tags", "uploadPresetId", "visibility"}),
 }

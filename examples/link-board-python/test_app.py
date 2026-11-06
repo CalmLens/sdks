@@ -160,11 +160,11 @@ class DemoFlowTests(unittest.TestCase):
         self.assertEqual((link["status"], link["asset_id"]), ("note-not-allowed", None))
         self.assertEqual(clickable(board), [])
 
-    def test_page_is_submitted_as_a_queued_url_without_retention(self):
+    def test_page_is_submitted_without_waiting_and_without_retention(self):
         board, _ = demo_board()
         board.submit("https://example.com/page", "Hello")
         request = board.moderator.client.requests[-1]
-        self.assertEqual((request.method, request.path, request.query["queue"]), ("POST", "/projects/project-1/assets", True))
+        self.assertEqual((request.method, request.path, request.query["wait"]), ("POST", "/projects/project-1/assets", False))
         self.assertEqual(request.body["url"], "https://example.com/page")
         self.assertEqual(request.body["processingOptions"], {"keepContentAfterProcessing": False})
         self.assertEqual(board.moderator.client.database_storage.assets[board.links[0]["asset_id"]]["type"], "website")
