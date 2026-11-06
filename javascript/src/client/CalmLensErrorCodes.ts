@@ -72,7 +72,8 @@ export const API_ERROR_CODES = {
   DUPLICATE_FOLDER_NAME: "folder/duplicate-name",
   FOLDER_NOT_EMPTY: "folder/not-empty",
   FOLDER_PARENT_CYCLE: "folder/parent-cycle",
-  LENS_VERSION_CONFLICT: "lens/version-conflict",
+  LENS_NOT_FOUND: "lens/not-found",
+  LENS_IDENTIFIER_TAKEN: "lens/identifier-taken",
   LENS_IDENTIFIER_RESERVED: "lens/identifier-reserved",
   HASH_LIST_NOT_FOUND: "hash-list/not-found",
   HASH_LIST_ENTRY_NOT_FOUND: "hash-list-entry/not-found",
@@ -400,9 +401,13 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
     status: 409,
     message: "A folder cannot be moved inside itself or one of its descendants.",
   },
-  "lens/version-conflict": {
+  "lens/not-found": {
+    status: 404,
+    message: "Lens not found. Check the lens ID or identifier in the portal.",
+  },
+  "lens/identifier-taken": {
     status: 409,
-    message: "Lens updates require a version greater than the current version.",
+    message: "The project already has a lens with this identifier. Update that lens, or give this one another identifier.",
   },
   "lens/identifier-reserved": {
     status: 409,

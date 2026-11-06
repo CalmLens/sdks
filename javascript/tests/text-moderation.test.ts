@@ -22,7 +22,7 @@ describe("assets.classify", () => {
     });
     const asset = await client.text.classify({ text: "hello" });
     expect(asset.classification.moderation.status).toBe("allowed");
-    expect(query?.get("queue")).toBe("false");
+    expect(query?.get("wait")).toBe("true");
     expect(query?.get("name")).toBe("text");
     expect(query?.get("contentType")).toBe("text/plain");
   });
@@ -51,7 +51,7 @@ describe("assets.classify", () => {
     const [{ url, init }] = requests;
     expect(url.pathname).toBe(`/v1/projects/${projectId}/assets`);
     expect(new Headers(init?.headers).get("X-CalmLens-Upload")).toBe("content");
-    expect(url.searchParams.get("queue")).toBe("false");
+    expect(url.searchParams.get("wait")).toBe("true");
     expect(url.searchParams.get("name")).toBe("text");
     expect(url.searchParams.get("contentType")).toBe("text/plain");
     expect(url.searchParams.get("externalId")).toBe("comment-42");

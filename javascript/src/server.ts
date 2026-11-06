@@ -2,6 +2,8 @@
 
 export { default as CalmLensServerClient } from "./client/CalmLensServerClient";
 export {
+  getEventFact,
+  getEventFacts,
   isNewerAssetEvent,
   isTestWebhookEvent,
   parseWebhookEvent,

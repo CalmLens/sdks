@@ -147,7 +147,7 @@ const LOCAL_OPTION_KEYS: Readonly<Record<string, readonly string[]>> = {
   "assets.waitForDecision": ["assetId", "signal", "timeoutMs"],
   "cdn.getAssetUrl": CDN_LOCATION_KEYS,
   "cdn.serve": [...CDN_LOCATION_KEYS, "init"],
-  "uploadTokens.sign": ["expiresInSeconds", "externalId", "uploadPresetId"],
+  "uploadTokens.sign": ["expiresIn", "externalId", "uploadPresetId"],
 };
 /** Uploads also take an `idempotencyKey`, which the SDK sends as a header. */
 const IDEMPOTENT_OPERATIONS = [
@@ -469,31 +469,25 @@ export const validateBatchAssetsOptions = ({ assetIds, operation }: BatchAssetsO
   }
 };
 
-const appendQueryValue = (parts: string[], key: string, value: unknown): void => {
-  if (value === undefined || value === null) return;
-  if (Array.isArray(value)) {
-    for (const [index, item] of value.entries()) appendQueryValue(parts, `${key}[${index}]`, item);
-    return;
-  }
-  if (typeof value === "object") {
-    for (const [field, item] of Object.entries(value)) {
-      appendQueryValue(parts, `${key}[${field}]`, item);
-    }
-    return;
-  }
-  parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
-};
-
 /**
- * Serialises a query object the way the API parses it (qs bracket notation), for example
- * `ordering[0][field]=createdAt&ordering[0][direction]=desc`. Every key and value is
- * percent-encoded and missing values are omitted.
+ * Serialises a query object the way the API reads it: plain values as text, lists of IDs and enum
+ * values comma-separated, and structured values as JSON. Every key and value is percent-encoded
+ * and missing values are omitted.
  */
-export const stringifyQuery = (query: Record<string, unknown>): string => {
-  const parts: string[] = [];
-  for (const [key, value] of Object.entries(query)) appendQueryValue(parts, key, value);
-  return parts.join("&");
-};
+export const stringifyQuery = (query: Record<string, unknown>): string =>
+  Object.entries(query)
+    .flatMap(([key, value]) => {
+      if (value === undefined || value === null) return [];
+      const text = Array.isArray(value)
+        ? value.every((item) => typeof item === "string" || typeof item === "number")
+          ? value.join(",")
+          : JSON.stringify(value)
+        : typeof value === "object"
+          ? JSON.stringify(value)
+          : String(value);
+      return [`${encodeURIComponent(key)}=${encodeURIComponent(text)}`];
+    })
+    .join("&");
 
 /**
  * Whether an asset is settled: its `classification.status` is `completed` (moderation decided it)

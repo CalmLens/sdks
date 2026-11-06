@@ -41,10 +41,6 @@ const invoke = async (client: CalmLensServerClient, operation: string, args: unk
   };
   const anyArgs = args as never;
   switch (operation) {
-    case "assets.iterate":
-      return collect(client.assets.iterate(anyArgs));
-    case "assets.iterateChildren":
-      return collect(client.assets.iterateChildren(anyArgs));
     case "events.iterate":
       return collect(client.events.pages(anyArgs));
     case "ensureLens":
@@ -53,6 +49,8 @@ const invoke = async (client: CalmLensServerClient, operation: string, args: unk
       return client.ensureLenses(anyArgs);
   }
   const [resource, method] = operation.split(".") as [string, string];
+  // Every list's iterator yields its items in order.
+  if (method.startsWith("iterate")) return collect((client as any)[resource][method](anyArgs));
   return (client as any)[resource][method](args);
 };
 

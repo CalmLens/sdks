@@ -212,7 +212,7 @@ like any other text that isn't `allowed` or `limited`.
   short-lived signed asset URLs from your backend with `cdn.signAssetUrl` instead (see
   [Age-restricted assets](https://calmlens.com/docs/guides/delivering-assets#age-restricted-assets)).
 - **`not-evaluated` is not zero.** Only `evaluated` and `partial` category results have scores.
-- **Lenses** are named, versioned image presets. Calmgram defines `calmgram-feed` (1080px WebP)
+- **Lenses** are named image presets. Calmgram defines `calmgram-feed` (1080px WebP)
   and `calmgram-thumb` (400px square) once with `ensureLenses`, so it needs no image-resizing code.
 - **Deleting a post deletes the image from CalmLens** with `assets.delete`, because CalmLens holds
   the only copy.

@@ -1,27 +1,21 @@
 import { n as HashListEntry, t as HashList } from "./HashList-B-tYWgXP.js";
-import "./Asset-DoGZCP6Y.js";
+import "./Asset-9P59rDu0.js";
 import "./AssetPayload-BpPkhqVM.js";
-import { r as TypedEvent } from "./Event-C1qyvBIW.js";
+import { r as TypedEvent } from "./Event-DiW9B0kO.js";
 import { t as Folder } from "./Folder-D1CVstEY.js";
 import { o as EventType } from "./EventCatalog-CodUobTN.js";
-import { t as CursorPage } from "./Page-DNdKkX2B.js";
-import "./Lens-BBGzDl4v.js";
-import "./PublicErrorCodes-CKfwYGi2.js";
+import { t as CursorPage } from "./Page-Bwn9Pb4k.js";
+import "./Lens-CLZcyVve.js";
+import "./PublicErrorCodes-CDSiRwGp.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   parentId: zod.ZodOptional<zod.ZodString>;
   cursor: zod.ZodOptional<zod.ZodString>;
   pageSize: zod.ZodDefault<zod.ZodNumber>;
-  ordering: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
-    direction: zod.ZodEnum<{
-      asc: "asc";
-      desc: "desc";
-    }>;
-    field: zod.ZodEnum<{
-      createdAt: "createdAt";
-      name: "name";
-    }>;
-  }, zod.core.$strip>>>;
+  sort: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<{
+    field: string;
+    direction: "asc" | "desc";
+  }[], string>>>;
   search: zod.ZodOptional<zod.ZodString>;
 }, zod.core.$strip>;
 type GetFoldersQuery = Partial<zod.input<typeof GET_FOLDERS_QUERY_SCHEMA>>;
@@ -40,35 +34,22 @@ type PatchFolderBody = zod.infer<typeof PATCH_FOLDER_BODY_SCHEMA>;
 declare const GET_ASSETS_PAGE_QUERY_SCHEMA: zod.ZodObject<{
   cursor: zod.ZodOptional<zod.ZodString>;
   pageSize: zod.ZodOptional<zod.ZodNumber>;
-  ordering: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
-    direction: zod.ZodEnum<{
-      asc: "asc";
-      desc: "desc";
-    }>;
-    field: zod.ZodEnum<{
-      createdAt: "createdAt";
-      id: "id";
-    }>;
-  }, zod.core.$strip>>>;
+  sort: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<{
+    field: string;
+    direction: "asc" | "desc";
+  }[], string>>>;
   filter: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
-  folderId: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
 }, zod.core.$strict>;
-type GetAssetsPageQuery = zod.infer<typeof GET_ASSETS_PAGE_QUERY_SCHEMA>;
+type GetAssetsPageQuery = zod.input<typeof GET_ASSETS_PAGE_QUERY_SCHEMA>;
 declare const GET_ASSET_CHILDREN_QUERY_SCHEMA: zod.ZodObject<{
   cursor: zod.ZodOptional<zod.ZodString>;
   pageSize: zod.ZodOptional<zod.ZodNumber>;
-  ordering: zod.ZodOptional<zod.ZodArray<zod.ZodObject<{
-    direction: zod.ZodEnum<{
-      asc: "asc";
-      desc: "desc";
-    }>;
-    field: zod.ZodEnum<{
-      createdAt: "createdAt";
-      id: "id";
-    }>;
-  }, zod.core.$strip>>>;
+  sort: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<{
+    field: string;
+    direction: "asc" | "desc";
+  }[], string>>>;
 }, zod.core.$strict>;
-type GetAssetChildrenQuery = zod.infer<typeof GET_ASSET_CHILDREN_QUERY_SCHEMA>;
+type GetAssetChildrenQuery = zod.input<typeof GET_ASSET_CHILDREN_QUERY_SCHEMA>;
 declare const GET_ASSET_TIMELINE_QUERY_SCHEMA: zod.ZodObject<{
   cursor: zod.ZodOptional<zod.ZodString>;
   pageSize: zod.ZodOptional<zod.ZodNumber>;
@@ -4046,12 +4027,35 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>;
 }, zod.core.$strict>;
 type AssetTimelineSegment = zod.infer<typeof ASSET_TIMELINE_SEGMENT_SCHEMA>;
-type GetAssetTimelineQuery = zod.infer<typeof GET_ASSET_TIMELINE_QUERY_SCHEMA>;
+type GetAssetTimelineQuery = zod.input<typeof GET_ASSET_TIMELINE_QUERY_SCHEMA>;
 declare const SIGN_ASSET_URL_RESPONSE_SCHEMA: zod.ZodObject<{
   url: zod.ZodString;
   expiresAt: zod.ZodNumber;
 }, zod.core.$strip>;
 type SignAssetUrlResponse = zod.infer<typeof SIGN_ASSET_URL_RESPONSE_SCHEMA>;
+declare const GET_LENSES_QUERY_SCHEMA: zod.ZodObject<{
+  cursor: zod.ZodOptional<zod.ZodString>;
+  pageSize: zod.ZodOptional<zod.ZodNumber>;
+  sort: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<{
+    field: string;
+    direction: "asc" | "desc";
+  }[], string>>>;
+}, zod.core.$strict>;
+type GetLensesQuery = zod.input<typeof GET_LENSES_QUERY_SCHEMA>;
+declare const PATCH_LENS_BODY_SCHEMA: zod.ZodObject<{
+  name: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
+  description: zod.ZodOptional<zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>>;
+  type: zod.ZodOptional<zod.ZodEnum<{
+    audio: "audio";
+    document: "document";
+    image: "image";
+    video: "video";
+    website: "website";
+  }>>;
+  active: zod.ZodOptional<zod.ZodBoolean>;
+  transform: zod.ZodOptional<zod.ZodOptional<zod.ZodNullable<zod.ZodRecord<zod.ZodString, zod.ZodUnknown>>>>;
+}, zod.core.$strict>;
+type PatchLensBody = zod.infer<typeof PATCH_LENS_BODY_SCHEMA>;
 declare const PATCH_ASSET_BODY_SCHEMA: zod.ZodObject<{
   name: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>;
   description: zod.ZodOptional<zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>>;
@@ -4136,6 +4140,15 @@ type GetEventsResponse = {
   hasMore: boolean;
   excludedTypes: EventType[];
 };
+declare const GET_HASH_LISTS_QUERY_SCHEMA: zod.ZodObject<{
+  cursor: zod.ZodOptional<zod.ZodString>;
+  pageSize: zod.ZodOptional<zod.ZodNumber>;
+  sort: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<{
+    field: string;
+    direction: "asc" | "desc";
+  }[], string>>>;
+}, zod.core.$strict>;
+type GetHashListsQuery = zod.input<typeof GET_HASH_LISTS_QUERY_SCHEMA>;
 type GetHashListsResponse = CursorPage<HashList>;
 declare const POST_HASH_LIST_BODY_SCHEMA: zod.ZodObject<{
   name: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
@@ -4155,6 +4168,15 @@ declare const PATCH_HASH_LIST_BODY_SCHEMA: zod.ZodObject<{
   }>>;
 }, zod.core.$strip>;
 type PatchHashListBody = zod.infer<typeof PATCH_HASH_LIST_BODY_SCHEMA>;
+declare const GET_HASH_LIST_ENTRIES_QUERY_SCHEMA: zod.ZodObject<{
+  cursor: zod.ZodOptional<zod.ZodString>;
+  pageSize: zod.ZodOptional<zod.ZodNumber>;
+  sort: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<{
+    field: string;
+    direction: "asc" | "desc";
+  }[], string>>>;
+}, zod.core.$strict>;
+type GetHashListEntriesQuery = zod.input<typeof GET_HASH_LIST_ENTRIES_QUERY_SCHEMA>;
 type GetHashListEntriesResponse = CursorPage<HashListEntry>;
 declare const POST_HASH_LIST_ENTRY_BODY_SCHEMA: zod.ZodObject<{
   hash: zod.ZodOptional<zod.ZodString>;
@@ -4163,4 +4185,4 @@ declare const POST_HASH_LIST_ENTRY_BODY_SCHEMA: zod.ZodObject<{
   label: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
 }, zod.core.$strip>;
 type PostHashListEntryBody = zod.infer<typeof POST_HASH_LIST_ENTRY_BODY_SCHEMA>;
-export type { AssetBatchOperation, AssetTimelineSegment, GetAssetChildrenQuery, GetAssetTimelineQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, GetHashListEntriesResponse, GetHashListsResponse, PatchAssetBody, PatchFolderBody, PatchHashListBody, PostAssetBatchOperationResponse, PostAssetDecisionBody, PostFolderBody, PostHashListBody, PostHashListEntryBody, SignAssetUrlResponse };
+export type { AssetBatchOperation, AssetTimelineSegment, GetAssetChildrenQuery, GetAssetTimelineQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, GetHashListEntriesQuery, GetHashListEntriesResponse, GetHashListsQuery, GetHashListsResponse, GetLensesQuery, PatchAssetBody, PatchFolderBody, PatchHashListBody, PatchLensBody, PostAssetBatchOperationResponse, PostAssetDecisionBody, PostFolderBody, PostHashListBody, PostHashListEntryBody, SignAssetUrlResponse };

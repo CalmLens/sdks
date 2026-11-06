@@ -635,9 +635,14 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "A folder cannot be moved inside itself or one of its descendants.",
 		status: 409
 	}),
-	LENS_VERSION_CONFLICT: new ErrorCode({
-		id: "lens/version-conflict",
-		defaultMessage: "Lens updates require a version greater than the current version.",
+	LENS_NOT_FOUND: new ErrorCode({
+		id: "lens/not-found",
+		defaultMessage: "Lens not found. Check the lens ID or identifier in the portal.",
+		status: 404
+	}),
+	LENS_IDENTIFIER_TAKEN: new ErrorCode({
+		id: "lens/identifier-taken",
+		defaultMessage: "The project already has a lens with this identifier. Update that lens, or give this one another identifier.",
 		status: 409
 	}),
 	LENS_IDENTIFIER_RESERVED: new ErrorCode({

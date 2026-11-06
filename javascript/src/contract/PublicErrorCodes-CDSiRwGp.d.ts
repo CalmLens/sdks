@@ -77,7 +77,8 @@ declare const PUBLIC_ERROR_CODES: {
   readonly DUPLICATE_FOLDER_NAME: RequestErrorCode;
   readonly FOLDER_NOT_EMPTY: RequestErrorCode;
   readonly FOLDER_PARENT_CYCLE: RequestErrorCode;
-  readonly LENS_VERSION_CONFLICT: RequestErrorCode;
+  readonly LENS_NOT_FOUND: RequestErrorCode;
+  readonly LENS_IDENTIFIER_TAKEN: RequestErrorCode;
   readonly LENS_IDENTIFIER_RESERVED: RequestErrorCode;
   readonly HASH_LIST_NOT_FOUND: RequestErrorCode;
   readonly HASH_LIST_ENTRY_NOT_FOUND: RequestErrorCode;

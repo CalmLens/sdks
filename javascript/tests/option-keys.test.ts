@@ -72,9 +72,7 @@ describe("unknown option keys", () => {
         "identifer",
         () =>
           client.ensureLenses({
-            lenses: [
-              { identifier: "thumb", name: "Thumb", type: "image", version: 1, identifer: "x" },
-            ],
+            lenses: [{ identifier: "thumb", name: "Thumb", type: "image", identifer: "x" }],
           } as never),
       ],
     };

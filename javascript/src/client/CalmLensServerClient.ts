@@ -24,7 +24,6 @@ import { NULLABLE_OPTION_KEYS, SERVER_OPTION_KEYS } from "./CalmLensOptionKeys";
 import type { TransportRequest } from "./CalmLensTransport";
 import type {
   AddHashListEntryOptions,
-  ApplyPolicyPresetOptions,
   Asset,
   AssetChildrenPage,
   AssetPage,
@@ -40,6 +39,7 @@ import type {
   ClassifyTextOptions,
   CreateFolderOptions,
   CreateHashListOptions,
+  CreateLensOptions,
   CreatePolicyOptions,
   DecideAssetOptions,
   DeleteAssetOptions,
@@ -57,7 +57,15 @@ import type {
   HashListPage,
   IterateAssetChildrenOptions,
   IterateAssetsOptions,
+  IterateAssetTimelineOptions,
+  IterateFoldersOptions,
+  IterateHashListEntriesOptions,
+  IterateHashListsOptions,
+  IterateLensesOptions,
+  IteratePoliciesOptions,
   Lens,
+  LensIdOptions,
+  LensPage,
   ListAssetChildrenOptions,
   ListAssetsOptions,
   ListAssetTimelineOptions,
@@ -65,13 +73,16 @@ import type {
   ListFoldersOptions,
   ListHashListEntriesOptions,
   ListHashListsOptions,
+  ListLensesOptions,
+  ListPoliciesOptions,
   MoveAssetOptions,
   MoveFolderOptions,
   Policy,
   PolicyIdOptions,
-  PolicyList,
+  PolicyPage,
   RemoveAssetContentOptions,
   RequestOptions,
+  ResetPolicyOptions,
   RetrieveAssetOptions,
   RetryAssetOptions,
   SetPolicyAutomaticUpdatesOptions,
@@ -83,7 +94,9 @@ import type {
   UpdateAssetOptions,
   UpdateFolderOptions,
   UpdateHashListOptions,
+  UpdateLensOptions,
   UpdatePolicyOptions,
+  UpgradePolicyOptions,
   UploadAssetPartOptions,
   VerifyWebhookSignatureOptions,
   WaitForAssetDecisionOptions,
@@ -113,7 +126,6 @@ const getEnsureLensCacheKey = (options: EnsureLensOptions): string =>
     type: options.type,
     active: options.active,
     transform: options.transform ?? null,
-    version: options.version,
   });
 
 const requireId = (value: unknown, name: string): string => encodePathSegment(value, name);
@@ -244,7 +256,7 @@ export default class CalmLensServerClient {
     return this.#connection.json<T>(method, path, options);
   }
 
-  private async submitAsset(options: SubmitAssetOptions, queue: boolean): Promise<Asset> {
+  private async submitAsset(options: SubmitAssetOptions, wait: boolean): Promise<Asset> {
     const body = prepareSubmitAssetOptions(options, {
       deferUploadChecks: this.#connection.deferUploadChecks,
       partSizeBytes: this.#connection.partSizeBytes,
@@ -252,18 +264,18 @@ export default class CalmLensServerClient {
     const uploadsPath = `${this.projectPath}/assets`;
     if ("content" in body && splitsIntoParts(body.content, this.#connection.partSizeBytes)) {
       return expectAsset(
-        await this.#connection.submitInParts(uploadsPath, body, queue, {
+        await this.#connection.submitInParts(uploadsPath, body, wait, {
           partPath: (assetId) => `/assets/${encodeURIComponent(assetId)}/part`,
           retrieve: (assetId) => this.buildAssets().retrieve({ assetId }),
         }),
       );
     }
     if ("content" in body || "part" in body) {
-      return expectAsset(await this.#connection.submitRawUpload(uploadsPath, body, queue));
+      return expectAsset(await this.#connection.submitRawUpload(uploadsPath, body, wait));
     }
     const { idempotencyKey, ...fields } = body;
     const data = await this.#connection.json<unknown>("POST", uploadsPath, {
-      query: { queue },
+      query: { wait },
       body: fields,
       idempotencyKey: idempotencyKey ?? newIdempotencyKey(),
     });
@@ -404,7 +416,7 @@ export default class CalmLensServerClient {
           query: checked("assets.search", options),
         }),
 
-      /** Lists one page of the project's assets, with optional filter and ordering. */
+      /** Lists one page of the project's assets, with an optional filter and sort. */
       list: async (options: ListAssetsOptions = {}): Promise<AssetPage> =>
         this.request("GET", `${this.projectPath}/assets`, {
           query: checked("assets.list", options),
@@ -453,6 +465,17 @@ export default class CalmLensServerClient {
         });
       },
 
+      /** Yields every segment of an audio or video asset's findings timeline, in time order. */
+      iterateTimeline: (
+        options: IterateAssetTimelineOptions,
+      ): AsyncGenerator<AssetTimelinePage["items"][number], void, undefined> => {
+        checked("assets.iterateTimeline", options);
+        requireId(options?.assetId, "Asset ID");
+        return this.iteratePages((cursor) =>
+          this.buildAssets().listTimeline({ ...options, cursor }),
+        );
+      },
+
       /** Yields every child of an asset, fetching pages as needed. */
       iterateChildren: (
         options: IterateAssetChildrenOptions,
@@ -465,12 +488,11 @@ export default class CalmLensServerClient {
       },
 
       /**
-       * Uploads an asset and queues it for moderation, returning immediately with processing
-       * status `processing` (or `uploading` for the first multipart part). Retried safely with an
-       * `Idempotency-Key`.
+       * Uploads an asset and returns without waiting for its decision (`wait=false`), with
+       * `classification.status` `queued`. Retried safely with an `Idempotency-Key`.
        */
       create: async (options: SubmitAssetOptions): Promise<Asset> =>
-        this.submitAsset(checked("assets.create", options), true),
+        this.submitAsset(checked("assets.create", options), false),
 
       /**
        * Uploads an asset and waits for its moderation decision. Audio and video still finish
@@ -486,12 +508,12 @@ export default class CalmLensServerClient {
         ) {
           throw invalidPayload("Text to classify must be a non-empty string");
         }
-        return this.submitAsset(options, false);
+        return this.submitAsset(options, true);
       },
 
       /**
-       * Uploads the next part of a multipart upload. The upload's queue mode, chosen when it
-       * started, applies when the final part arrives; pass `queue` to override it.
+       * Uploads the next part of a multipart upload. Whether the final part waits for the
+       * decision was chosen when the upload started; pass `wait` to override it.
        */
       uploadPart: async (partOptions: UploadAssetPartOptions): Promise<Asset> => {
         const { assetId, ...options } = checked("assets.uploadPart", partOptions);
@@ -531,8 +553,8 @@ export default class CalmLensServerClient {
       },
 
       /**
-       * Completes the policy evidence behind a decided asset's moderation decision: the report's
-       * `classification.moderation.evidence` becomes `full` and every action stays as
+       * Completes the policy evidence behind a decided asset's moderation decision: its
+       * `classification.moderation.explanationComplete` becomes `true` and every action stays as
        * decided. With `rerun: true` the asset is moderated again with the project's current policy
        * and returns in `processing`; use it when the policy has changed since the decision
        * (`asset/policy-changed`).
@@ -641,11 +663,11 @@ export default class CalmLensServerClient {
     }
   }
 
-  private async *iteratePages(
+  private async *iteratePages<T>(
     listPage: (
       cursor?: string,
-    ) => Promise<{ items: Asset[]; nextCursor: string | null; hasMore: boolean }>,
-  ): AsyncGenerator<Asset, void, undefined> {
+    ) => Promise<{ items: T[]; nextCursor: string | null; hasMore: boolean }>,
+  ): AsyncGenerator<T, void, undefined> {
     let cursor: string | undefined;
     const sent = new Set<string>();
     for (;;) {
@@ -661,13 +683,19 @@ export default class CalmLensServerClient {
   get folders() {
     return {
       /**
-       * Lists one page of child folders, sorted by name unless `ordering` says otherwise. Pass
+       * Lists one page of child folders, sorted by name unless `sort` says otherwise. Pass
        * `nextCursor` as `cursor` for the next page; fetch a branch when it is opened.
        */
       list: async (options: ListFoldersOptions = {}): Promise<FolderPage> =>
         this.request("GET", `${this.projectPath}/folders`, {
           query: checked("folders.list", options),
         }),
+
+      /** Yields every child folder of `parentId` (or the project root), fetching pages as needed. */
+      iterate: (options: IterateFoldersOptions = {}): AsyncGenerator<Folder, void, undefined> => {
+        checked("folders.iterate", options);
+        return this.iteratePages((cursor) => this.folders.list({ ...options, cursor }));
+      },
 
       retrieve: async (options: FolderIdOptions): Promise<Folder> => {
         const { folderId } = checked("folders.retrieve", options);
@@ -707,11 +735,19 @@ export default class CalmLensServerClient {
    */
   get hashLists() {
     return {
-      /** Lists one page of the project's hash lists, newest first. */
+      /** Lists one page of the project's hash lists, newest first unless `sort` says otherwise. */
       list: async (options: ListHashListsOptions = {}): Promise<HashListPage> =>
         this.request("GET", `${this.projectPath}/hash-lists`, {
           query: checked("hashLists.list", options),
         }),
+
+      /** Yields every hash list, fetching pages as needed. */
+      iterate: (
+        options: IterateHashListsOptions = {},
+      ): AsyncGenerator<HashList, void, undefined> => {
+        checked("hashLists.iterate", options);
+        return this.iteratePages((cursor) => this.hashLists.list({ ...options, cursor }));
+      },
 
       retrieve: async (options: HashListIdOptions): Promise<HashList> => {
         const { hashListId } = checked("hashLists.retrieve", options);
@@ -737,7 +773,16 @@ export default class CalmLensServerClient {
         await this.request("DELETE", `/hash-lists/${requireId(hashListId, "Hash list ID")}`);
       },
 
-      /** Lists one page of a list's entries, newest first. */
+      /** Yields every entry of a list, fetching pages as needed. */
+      iterateEntries: (
+        options: IterateHashListEntriesOptions,
+      ): AsyncGenerator<HashListEntry, void, undefined> => {
+        checked("hashLists.iterateEntries", options);
+        requireId(options?.hashListId, "Hash list ID");
+        return this.iteratePages((cursor) => this.hashLists.listEntries({ ...options, cursor }));
+      },
+
+      /** Lists one page of a list's entries, newest first unless `sort` says otherwise. */
       listEntries: async (options: ListHashListEntriesOptions): Promise<HashListEntryPage> => {
         const { hashListId, ...query } = checked("hashLists.listEntries", options);
         return this.request("GET", `/hash-lists/${requireId(hashListId, "Hash list ID")}/entries`, {
@@ -766,25 +811,29 @@ export default class CalmLensServerClient {
   }
 
   /**
-   * Moderation policies belong to the project's organisation and its projects share them. Every
-   * change sends the policy's `revision`, so a policy changed since is refused. Through a
-   * project's key you can change only policies no other project uses or owns.
+   * Moderation policies belong to the organisation and its projects share them. Every change sends
+   * the policy's `revision`, so a policy changed since is refused. Through a project's key you can
+   * change only policies no other project uses.
    */
   get policies() {
-    const policyPath = (policyId: string) =>
-      `${this.projectPath}/policies/${requireId(policyId, "Policy ID")}`;
+    const policyPath = (policyId: string) => `/policies/${requireId(policyId, "Policy ID")}`;
     return {
-      /** Lists the organisation's policies and the ID of the one the project uses. */
-      list: async (): Promise<PolicyList> => this.request("GET", `${this.projectPath}/policies`),
+      /** Lists one page of the organisation's policies, oldest first unless `sort` says otherwise. */
+      list: async (options: ListPoliciesOptions = {}): Promise<PolicyPage> =>
+        this.request("GET", "/policies", { query: checked("policies.list", options) }),
+
+      /** Yields every policy of the organisation, fetching pages as needed. */
+      iterate: (options: IteratePoliciesOptions = {}): AsyncGenerator<Policy, void, undefined> => {
+        checked("policies.iterate", options);
+        return this.iteratePages((cursor) => this.policies.list({ ...options, cursor }));
+      },
 
       retrieve: async (options: PolicyIdOptions): Promise<Policy> =>
         this.request("GET", policyPath(checked("policies.retrieve", options).policyId)),
 
       /** Creates a policy from `settings`, or a copy of a built-in preset with `presetId`. */
       create: async (options: CreatePolicyOptions): Promise<Policy> =>
-        this.request("POST", `${this.projectPath}/policies`, {
-          body: checked("policies.create", options),
-        }),
+        this.request("POST", "/policies", { body: checked("policies.create", options) }),
 
       /** Changes the name, description or settings; later moderation uses them. */
       update: async (options: UpdatePolicyOptions): Promise<Policy> => {
@@ -792,13 +841,19 @@ export default class CalmLensServerClient {
         return this.request("PATCH", policyPath(policyId), { body });
       },
 
-      /** Resets a preset copy to its pinned version, or updates an unchanged copy to the latest. */
-      applyPreset: async (options: ApplyPolicyPresetOptions): Promise<Policy> => {
-        const { policyId, ...body } = checked("policies.applyPreset", options);
-        return this.request("POST", `${policyPath(policyId)}/preset`, { body });
+      /** Restores the settings of the preset release a `pinned` or `copy` policy is pinned to. */
+      reset: async (options: ResetPolicyOptions): Promise<Policy> => {
+        const { policyId, ...body } = checked("policies.reset", options);
+        return this.request("POST", `${policyPath(policyId)}/reset`, { body });
       },
 
-      /** Switches automatic updates on or off for the organisation's own preset policy. */
+      /** Moves an unchanged `pinned` or `copy` policy to the latest release of its preset. */
+      upgrade: async (options: UpgradePolicyOptions): Promise<Policy> => {
+        const { policyId, ...body } = checked("policies.upgrade", options);
+        return this.request("POST", `${policyPath(policyId)}/upgrade`, { body });
+      },
+
+      /** Switches automatic updates on (`live`) or off (`pinned`) for the organisation's own preset policy. */
       setAutomaticUpdates: async (options: SetPolicyAutomaticUpdatesOptions): Promise<Policy> => {
         const { policyId, ...body } = checked("policies.setAutomaticUpdates", options);
         return this.request("PUT", `${policyPath(policyId)}/automatic-updates`, { body });
@@ -809,6 +864,10 @@ export default class CalmLensServerClient {
         await this.request("DELETE", policyPath(checked("policies.delete", options).policyId));
       },
 
+      /** The policy the project moderates with. */
+      retrieveAssigned: async (): Promise<Policy> =>
+        this.request("GET", `${this.projectPath}/policy`),
+
       /** Chooses the policy the project moderates with. */
       assign: async (options: AssignPolicyOptions): Promise<Policy> =>
         this.request("PUT", `${this.projectPath}/policy`, {
@@ -818,8 +877,62 @@ export default class CalmLensServerClient {
   }
 
   /**
-   * Create a named lens at any positive version, or update it with a greater version.
-   * Supplying the same definition and version is idempotent.
+   * The project's lenses: named image transforms the CDN applies at `/@<identifier>`. The CDN
+   * serves files made with each lens's current definition. `ensureLenses` creates or changes
+   * lenses by identifier, for applications that declare theirs in code.
+   */
+  get lenses() {
+    const lensPath = (lensId: string) => `/lenses/${requireId(lensId, "Lens ID")}`;
+    // A lens changed here no longer has the definition ensureLens cached for it.
+    const forget = (matches: (lens: Lens) => boolean) => {
+      for (const [cacheKey, lens] of this.#lenses.ensuredLenses)
+        if (matches(lens)) this.#lenses.ensuredLenses.delete(cacheKey);
+    };
+    return {
+      /** Lists one page of the project's lenses, newest first unless `sort` says otherwise. */
+      list: async (options: ListLensesOptions = {}): Promise<LensPage> =>
+        this.request("GET", `${this.projectPath}/lenses`, {
+          query: checked("lenses.list", options),
+        }),
+
+      /** Yields every lens of the project, fetching pages as needed. */
+      iterate: (options: IterateLensesOptions = {}): AsyncGenerator<Lens, void, undefined> => {
+        checked("lenses.iterate", options);
+        return this.iteratePages((cursor) => this.lenses.list({ ...options, cursor }));
+      },
+
+      /** Creates a lens; its identifier must be new to the project. */
+      create: async (options: CreateLensOptions): Promise<Lens> => {
+        const lens = await this.request<Lens>("POST", `${this.projectPath}/lenses`, {
+          body: checked("lenses.create", options),
+        });
+        forget((cached) => cached.identifier === lens.identifier);
+        return lens;
+      },
+
+      retrieve: async (options: LensIdOptions): Promise<Lens> =>
+        this.request("GET", lensPath(checked("lenses.retrieve", options).lensId)),
+
+      /** Changes a lens's name, description, type, transform or whether the CDN serves it. */
+      update: async (options: UpdateLensOptions): Promise<Lens> => {
+        const { lensId, ...body } = checked("lenses.update", options);
+        const lens = await this.request<Lens>("PATCH", lensPath(lensId), { body });
+        forget((cached) => cached.id === lens.id);
+        return lens;
+      },
+
+      /** Deletes a lens; URLs that select it stop being served. */
+      delete: async (options: LensIdOptions): Promise<void> => {
+        const { lensId } = checked("lenses.delete", options);
+        await this.request("DELETE", lensPath(lensId));
+        forget((cached) => cached.id === lensId);
+      },
+    };
+  }
+
+  /**
+   * Creates a named lens, or changes it to this definition. Sending the same definition again
+   * returns the lens unchanged, from the client's lens cache once it has seen it.
    */
   async ensureLens(options: EnsureLensOptions): Promise<Lens> {
     checked("ensureLens", options);
@@ -831,7 +944,7 @@ export default class CalmLensServerClient {
   /**
    * Create or update several named lenses. New definitions are sent in one API request, or in
    * consecutive requests of at most {@link ENSURE_LENSES_MAX_PER_REQUEST} definitions, in order.
-   * Each lens follows the same versioning and idempotency rules as ensureLens().
+   * Each lens is created or changed as ensureLens() does.
    */
   async ensureLenses(options: EnsureLensesOptions): Promise<Lens[]> {
     const { lenses } = checked("ensureLenses", options);

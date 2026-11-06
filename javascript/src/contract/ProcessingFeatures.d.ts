@@ -70,12 +70,26 @@ declare const DETECTED_FACE_SCHEMA: zod.ZodObject<{
 }, zod.core.$strict>;
 type DetectedFace = zod.infer<typeof DETECTED_FACE_SCHEMA>;
 declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
+  ocr: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+    status: zod.ZodLiteral<"evaluated">;
+    textRegions: zod.ZodArray<zod.ZodObject<{
+      box: zod.ZodObject<{
+        left: zod.ZodNumber;
+        top: zod.ZodNumber;
+        width: zod.ZodNumber;
+        height: zod.ZodNumber;
+      }, zod.core.$strict>;
+      personalInformation: zod.ZodBoolean;
+    }, zod.core.$strict>>;
+  }, zod.core.$strict>, zod.ZodObject<{
+    status: zod.ZodLiteral<"not-evaluated">;
+    reason: zod.ZodEnum<{
+      "not-supported": "not-supported";
+      unavailable: "unavailable";
+    }>;
+  }, zod.core.$strict>], "status">>;
   personDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
-    stage: zod.ZodEnum<{
-      beta: "beta";
-      ga: "ga";
-    }>;
     people: zod.ZodArray<zod.ZodObject<{
       box: zod.ZodObject<{
         left: zod.ZodNumber;
@@ -87,10 +101,6 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>>;
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
-    stage: zod.ZodEnum<{
-      beta: "beta";
-      ga: "ga";
-    }>;
     reason: zod.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
@@ -98,10 +108,6 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>], "status">>;
   faceDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
-    stage: zod.ZodEnum<{
-      beta: "beta";
-      ga: "ga";
-    }>;
     faces: zod.ZodArray<zod.ZodObject<{
       box: zod.ZodObject<{
         left: zod.ZodNumber;
@@ -117,10 +123,6 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>>;
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
-    stage: zod.ZodEnum<{
-      beta: "beta";
-      ga: "ga";
-    }>;
     reason: zod.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
@@ -128,10 +130,6 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>], "status">>;
   linkDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
-    stage: zod.ZodEnum<{
-      beta: "beta";
-      ga: "ga";
-    }>;
     qrCodes: zod.ZodArray<zod.ZodObject<{
       value: zod.ZodString;
       box: zod.ZodObject<{
@@ -150,10 +148,6 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>>;
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
-    stage: zod.ZodEnum<{
-      beta: "beta";
-      ga: "ga";
-    }>;
     reason: zod.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
@@ -161,10 +155,6 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>], "status">>;
   linkSafety: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
-    stage: zod.ZodEnum<{
-      beta: "beta";
-      ga: "ga";
-    }>;
     links: zod.ZodArray<zod.ZodObject<{
       url: zod.ZodString;
       finalUrl: zod.ZodNullable<zod.ZodString>;
@@ -195,10 +185,6 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>>;
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
-    stage: zod.ZodEnum<{
-      beta: "beta";
-      ga: "ga";
-    }>;
     reason: zod.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";
@@ -206,10 +192,6 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>], "status">>;
   aiGeneratedDetection: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
     status: zod.ZodLiteral<"evaluated">;
-    stage: zod.ZodEnum<{
-      beta: "beta";
-      ga: "ga";
-    }>;
     provenance: zod.ZodEnum<{
       "ai-edited": "ai-edited";
       "ai-generated": "ai-generated";
@@ -225,10 +207,6 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>>;
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
-    stage: zod.ZodEnum<{
-      beta: "beta";
-      ga: "ga";
-    }>;
     reason: zod.ZodEnum<{
       "not-supported": "not-supported";
       unavailable: "unavailable";

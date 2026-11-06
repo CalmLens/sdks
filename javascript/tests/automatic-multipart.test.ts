@@ -86,8 +86,8 @@ describe("automatic multipart uploads", () => {
       String(MiB),
     ]);
     expect(sent[0]!.query.get("totalSizeInBytes")).toBe(String(11 * MiB));
-    // The queue choice goes with the first part, which saves it for the upload.
-    expect(sent.map(({ query }) => query.get("queue"))).toEqual(["false", null, null]);
+    // Whether to wait goes with the first part, which saves it for the upload.
+    expect(sent.map(({ query }) => query.get("wait"))).toEqual(["true", null, null]);
     expect(joined(sent).equals(Buffer.from(file))).toBe(true);
   });
 

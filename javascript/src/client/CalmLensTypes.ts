@@ -26,13 +26,15 @@ import type { PUBLIC_LENS_SCHEMA } from "../contract/Lens.js";
 import type { ModerationContext } from "../contract/ModerationContext.js";
 import type { CursorPage } from "../contract/Page.js";
 import type {
+  GetPoliciesQuery,
   GetPoliciesResponse,
   PatchPolicyBody,
   Policy,
   PostPolicyBody,
-  PostPolicyPresetBody,
   PutPolicyAutomaticUpdatesBody,
   PutProjectPolicyBody,
+  ResetPolicyBody,
+  UpgradePolicyBody,
 } from "../contract/Policy.js";
 import type { ProcessingFeatures } from "../contract/ProcessingFeatures.js";
 import type {
@@ -44,11 +46,15 @@ import type {
   GetEventsQuery,
   GetFoldersQuery,
   GetFoldersResponse,
+  GetHashListEntriesQuery,
   GetHashListEntriesResponse,
+  GetHashListsQuery,
   GetHashListsResponse,
+  GetLensesQuery,
   PatchAssetBody,
   PatchFolderBody,
   PatchHashListBody,
+  PatchLensBody,
   PostAssetBatchOperationResponse,
   PostAssetDecisionBody,
   PostFolderBody,
@@ -276,7 +282,7 @@ export interface ImageTransformOptions {
  */
 export type CdnTransform = string | ImageTransformOptions;
 
-/** A named, versioned CDN transformation. */
+/** A named CDN transformation; the CDN serves files made with its current definition. */
 export type Lens = Omit<zod.infer<typeof PUBLIC_LENS_SCHEMA>, "transform"> & {
   transform?: ImageTransformOptions | null;
 };
@@ -367,7 +373,7 @@ export interface SignUploadTokenOptions {
   /** Your ID for the upload, such as the draft post it belongs to. The asset gets it. */
   externalId?: string;
   /** How long the token can start an upload, from 1 second to 1 hour. Defaults to 10 minutes. */
-  expiresInSeconds?: number;
+  expiresIn?: number;
 }
 
 export interface SignedUploadToken {
@@ -509,13 +515,30 @@ export interface GetAssetInfoOptions {
 
 export type EnsureLensOptions = Pick<
   Lens,
-  "identifier" | "name" | "description" | "type" | "active" | "transform" | "version"
+  "identifier" | "name" | "description" | "type" | "active" | "transform"
 >;
 
 export interface EnsureLensesOptions {
   lenses: EnsureLensOptions[];
 }
 
+/** `lenses.list` options: a page of the project's lenses, newest first unless `sort` says otherwise. */
+export type ListLensesOptions = Partial<GetLensesQuery>;
+/** `lenses.iterate` options: the sort and page size; pages are fetched as needed. */
+export type IterateLensesOptions = Omit<ListLensesOptions, "cursor">;
+export type LensPage = CursorPage<Lens>;
+/** A new lens: its identifier must be new to the project. */
+export type CreateLensOptions = EnsureLensOptions;
+export interface LensIdOptions {
+  lensId: string;
+}
+export type UpdateLensOptions = PatchLensBody & LensIdOptions;
+
+/**
+ * `assets.list` options. `sort` is a comma-separated list of `createdAt` and `id`, descending when
+ * prefixed with `-` (the default is `-createdAt`); `filter` is an RSQL filter, such as
+ * `folderId==fldr_…`.
+ */
 export type ListAssetsOptions = Partial<GetAssetsPageQuery>;
 /** `assets.iterate` options: list filters and page size; pages are fetched as needed. */
 export type IterateAssetsOptions = Omit<ListAssetsOptions, "cursor">;
@@ -585,24 +608,19 @@ export interface MoveFolderOptions extends FolderIdOptions {
   parentId: string | null;
 }
 export type { HashList, HashListEntry };
-/** `hashLists.list` options: a page of the project's hash lists, newest first. */
-export type ListHashListsOptions = {
-  /** The previous page's `nextCursor`; omit for the first page. */
-  cursor?: string;
-  /** 1 to 100; 10 by default. */
-  pageSize?: number;
-};
+/** `hashLists.list` options: a page of the project's hash lists, newest first unless `sort` says otherwise. */
+export type ListHashListsOptions = Partial<GetHashListsQuery>;
+/** `hashLists.iterate` options. */
+export type IterateHashListsOptions = Omit<ListHashListsOptions, "cursor">;
 export type HashListPage = GetHashListsResponse;
 export type CreateHashListOptions = PostHashListBody;
 export type UpdateHashListOptions = PatchHashListBody & { hashListId: string };
 export interface HashListIdOptions {
   hashListId: string;
 }
-export interface ListHashListEntriesOptions extends HashListIdOptions {
-  /** The previous page's `nextCursor`; omit for the first page. */
-  cursor?: string;
-  pageSize?: number;
-}
+export type ListHashListEntriesOptions = Partial<GetHashListEntriesQuery> & HashListIdOptions;
+/** `hashLists.iterateEntries` options. */
+export type IterateHashListEntriesOptions = Omit<ListHashListEntriesOptions, "cursor">;
 export type HashListEntryPage = GetHashListEntriesResponse;
 /** Send `hash` (and `quality` when you know it) or `assetId`, an image asset in the project. */
 export type AddHashListEntryOptions = PostHashListEntryBody & HashListIdOptions;
@@ -610,8 +628,11 @@ export interface HashListEntryIdOptions {
   entryId: string;
 }
 export type { Policy };
-/** `policies.list`: every policy of the project's organisation, and the one the project uses. */
-export type PolicyList = GetPoliciesResponse;
+/** `policies.list` options: a page of the organisation's policies, oldest first unless `sort` says otherwise. */
+export type ListPoliciesOptions = Partial<GetPoliciesQuery>;
+/** `policies.iterate` options. */
+export type IteratePoliciesOptions = Omit<ListPoliciesOptions, "cursor">;
+export type PolicyPage = GetPoliciesResponse;
 /** Send `settings` and a `name`, or `presetId` to copy the latest release of a built-in preset. */
 export type CreatePolicyOptions = PostPolicyBody;
 export interface PolicyIdOptions {
@@ -619,7 +640,10 @@ export interface PolicyIdOptions {
 }
 /** Send the policy's current `revision`; a policy changed since is refused. */
 export type UpdatePolicyOptions = PatchPolicyBody & PolicyIdOptions;
-export type ApplyPolicyPresetOptions = PostPolicyPresetBody & PolicyIdOptions;
+/** Send the policy's `revision` and the pinned `preset.version` you reviewed. */
+export type ResetPolicyOptions = ResetPolicyBody & PolicyIdOptions;
+/** Send the policy's `revision` and the `preset.latestVersion` you reviewed. */
+export type UpgradePolicyOptions = UpgradePolicyBody & PolicyIdOptions;
 export type SetPolicyAutomaticUpdatesOptions = PutPolicyAutomaticUpdatesBody & PolicyIdOptions;
 export type AssignPolicyOptions = PutProjectPolicyBody;
 
@@ -638,6 +662,8 @@ export type IterateAssetChildrenOptions = Omit<ListAssetChildrenOptions, "cursor
 export type ListAssetTimelineOptions = Partial<GetAssetTimelineQuery> & {
   assetId: string;
 };
+/** `assets.iterateTimeline` options. */
+export type IterateAssetTimelineOptions = Omit<ListAssetTimelineOptions, "cursor">;
 
 export type AssetContentOptions = AssetBinaryPayloadInput & {
   type: string;
@@ -654,10 +680,11 @@ export interface UploadAssetPartOptions extends IdempotencyOptions {
   assetId: string;
   part: MultipartUploadPartOptions;
   /**
-   * Overrides the queue mode saved when the upload started, for this upload's final part.
-   * Leave it unset to use the saved choice (`create` queues, `classify` waits).
+   * Whether this upload's final part waits for the decision (`true`) or returns with the asset
+   * `queued` (`false`), overriding the choice saved when the upload started. Leave it unset to
+   * use the saved choice (`classify` waits, `create` doesn't).
    */
-  queue?: boolean;
+  wait?: boolean;
 }
 
 export type CreateMultipartUploadPartOptions = AssetContentOptions & {
@@ -753,5 +780,8 @@ export interface ClassifyTextOptions
   name?: string;
 }
 
+/** `folders.list` options. `sort` is `name` (the default) or `createdAt`, descending when prefixed with `-`. */
 export type ListFoldersOptions = GetFoldersQuery;
+/** `folders.iterate` options. */
+export type IterateFoldersOptions = Omit<ListFoldersOptions, "cursor">;
 export type FolderPage = GetFoldersResponse;

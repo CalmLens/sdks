@@ -87,7 +87,7 @@ export default class CalmLensAppClient {
   /** Uploads with a new token, kept for the upload's parts and status checks. */
   private async submit(
     options: UploadPresetSubmitAssetOptions,
-    queue: boolean,
+    wait: boolean,
   ): Promise<UploadedAsset> {
     if (!options || typeof options !== "object") {
       throw invalidArgument("Upload options are required");
@@ -102,7 +102,7 @@ export default class CalmLensAppClient {
     const token = await this.newUploadToken();
     if ("content" in options && splitsIntoParts(options.content, this.#connection.partSizeBytes)) {
       // The token that started the upload authorizes its later parts.
-      const data = await this.#connection.submitInParts(this.uploadsPath, options, queue, {
+      const data = await this.#connection.submitInParts(this.uploadsPath, options, wait, {
         authHeaders: token ? { Authorization: `Bearer ${token}` } : {},
         partPath: (assetId) => `${this.uploadsPath}/${encodeURIComponent(assetId)}/part`,
         onStarted: (assetId) => {
@@ -115,7 +115,7 @@ export default class CalmLensAppClient {
     const data = await this.#connection.submitRawUpload(
       this.uploadsPath,
       options,
-      queue,
+      wait,
       token ? { Authorization: `Bearer ${token}` } : {},
     );
     const uploaded = expectUploadedAsset(data);
@@ -146,16 +146,16 @@ export default class CalmLensAppClient {
   /** Uploads through the client's upload preset and checks those uploads. */
   get assets() {
     return {
-      /** Uploads a file and queues it for moderation. */
+      /** Uploads a file and returns without waiting for its decision. */
       create: async (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
-        this.submit(checked("assets.create", options), true),
+        this.submit(checked("assets.create", options), false),
 
       /** Uploads a file and waits for its moderation decision. */
       classify: async (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
-        this.submit(checked("assets.classify", options), false),
+        this.submit(checked("assets.classify", options), true),
 
       /**
-       * Uploads the next part of a multipart upload this client started. The upload's queue
+       * Uploads the next part of a multipart upload this client started. The upload's wait
        * mode, chosen when it started, applies when the final part arrives.
        */
       uploadPart: async (partOptions: UploadAssetPartOptions): Promise<UploadedAsset> => {

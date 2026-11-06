@@ -89,7 +89,7 @@ describe("multipart binary field names", () => {
     expect(bodies).toEqual([directStream, multipartStream]);
   });
 
-  test("serializes externalId, metadata, tags, processingOptions and queue=true on direct uploads", async () => {
+  test("serializes externalId, metadata, tags, processingOptions and wait=false on direct uploads", async () => {
     const requests: Request[] = [];
     const fetchImpl: typeof fetch = async (input, init) => {
       requests.push(input instanceof Request ? input : new Request(input, init));
@@ -123,7 +123,7 @@ describe("multipart binary field names", () => {
     expect(url.pathname).toBe(`/v1/projects/${projectId}/assets`);
     expect(requests[0]!.headers.get("X-CalmLens-Upload")).toBe("content");
     expect(url.searchParams.get("externalId")).toBe("external-image");
-    expect(url.searchParams.get("queue")).toBe("true");
+    expect(url.searchParams.get("wait")).toBe("false");
     expect(JSON.parse(url.searchParams.get("metadata")!)).toEqual([
       { id: "source", value: "sdk-test" },
     ]);
@@ -287,8 +287,8 @@ describe("multipart binary field names", () => {
       expect(url.pathname).toBe(`/v1/assets/${assetId}/part`);
       expect(url.searchParams.get("partNumber")).toBe(String(index + 1));
       expect(url.searchParams.get("isFinal")).toBe("true");
-      // The queue mode chosen at the start of the upload is saved by the API.
-      expect(url.searchParams.has("queue")).toBe(false);
+      // Whether to wait, chosen at the start of the upload, is saved by the API.
+      expect(url.searchParams.has("wait")).toBe(false);
       expect(url.searchParams.get("sizeInBytes")).toBe(
         String(payloadCase.expectedBytes.byteLength),
       );
@@ -349,15 +349,15 @@ describe("multipart binary field names", () => {
     expect(urls[1]!.searchParams.get("totalSizeInBytes")).toBe(
       String(2 * MIN_MULTIPART_UPLOAD_PART_BYTES - 1),
     );
-    expect(urls[1]!.searchParams.get("queue")).toBe("true");
+    expect(urls[1]!.searchParams.get("wait")).toBe("false");
 
     // The API knows the declared and accumulated size, so a small final part is sent to it.
     await client.assets.uploadPart({
       assetId,
-      queue: false,
+      wait: true,
       part: { data: oneByteStream(), partNumber: 2, isFinal: true, sizeInBytes: 1 },
     });
     expect(urls[2]!.pathname).toBe(`/v1/assets/${assetId}/part`);
-    expect(urls[2]!.searchParams.get("queue")).toBe("false");
+    expect(urls[2]!.searchParams.get("wait")).toBe("true");
   });
 });

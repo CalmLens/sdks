@@ -54,7 +54,7 @@ describe("MockCalmLensServerClient errors", () => {
 });
 
 describe("MockCalmLensServerClient listing", () => {
-  it("applies ordering and RSQL filters", async () => {
+  it("applies the sort and RSQL filters", async () => {
     const client = createClient();
     await client.assets.classify(text("b-allowed"));
     await client.assets.create(text("a-pending"));
@@ -69,7 +69,7 @@ describe("MockCalmLensServerClient listing", () => {
 
     const allowedByName = await client.assets.list({
       filter: "classification.moderation.status==allowed",
-      ordering: [{ field: "createdAt", direction: "asc" }],
+      sort: "createdAt",
     });
     expect(allowedByName.items.map((asset) => asset.name)).toEqual(["b-allowed", "c-allowed"]);
     expect(allowedByName.hasMore).toBe(false);
@@ -88,7 +88,7 @@ describe("MockCalmLensServerClient listing", () => {
     const names: string[] = [];
     for await (const asset of client.assets.iterate({
       pageSize: 2,
-      ordering: [{ field: "createdAt", direction: "asc" }],
+      sort: "createdAt",
     })) {
       names.push(asset.name);
     }

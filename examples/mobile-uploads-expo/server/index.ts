@@ -26,7 +26,7 @@ const server = Bun.serve({
     const { token, expiresAt } = await client.uploadTokens.sign({
       uploadPresetId,
       externalId: `mobile-${crypto.randomUUID()}`,
-      expiresInSeconds: 300,
+      expiresIn: 300,
     });
     return Response.json({ token, expiresAt });
   },

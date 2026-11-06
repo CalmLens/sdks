@@ -11,8 +11,9 @@ import type {
   HashListEntry,
   HashListEntryPage,
   Lens,
+  LensPage,
   Policy,
-  PolicyList,
+  PolicyPage,
   UploadedAsset,
 } from "../client/CalmLensTypes";
 import {
@@ -26,6 +27,7 @@ import type { TypedEvent } from "../contract/Event.js";
 import type { Folder } from "../contract/Folder.js";
 import { type IdPrefix, isId } from "../contract/Ids.js";
 import { stringifyJsonCanonical } from "../contract/JsonUtils.js";
+import { CLASSIFICATION_CATEGORIES } from "../contract/ModerationCategories.js";
 import {
   type ModerationContextItem,
   selectModerationContextItems,
@@ -51,6 +53,7 @@ import {
   DEFAULT_PAGE_SIZE,
   filterAssets,
   MockInvalidFilter,
+  parseSort,
   searchAssets,
 } from "./MockUtils";
 
@@ -86,6 +89,7 @@ const MOCK_OPERATIONS = [
   "assets.listChildren",
   "assets.iterateChildren",
   "assets.listTimeline",
+  "assets.iterateTimeline",
   "assets.create",
   "assets.classify",
   "assets.uploadPart",
@@ -103,27 +107,39 @@ const MOCK_OPERATIONS = [
   "events.list",
   "events.pages",
   "folders.list",
+  "folders.iterate",
   "folders.retrieve",
   "folders.create",
   "folders.update",
   "folders.delete",
   "folders.move",
   "hashLists.list",
+  "hashLists.iterate",
   "hashLists.retrieve",
   "hashLists.create",
   "hashLists.update",
   "hashLists.delete",
   "hashLists.listEntries",
+  "hashLists.iterateEntries",
   "hashLists.addEntry",
   "hashLists.removeEntry",
   "policies.list",
+  "policies.iterate",
   "policies.retrieve",
   "policies.create",
   "policies.update",
-  "policies.applyPreset",
+  "policies.reset",
+  "policies.upgrade",
   "policies.setAutomaticUpdates",
   "policies.delete",
+  "policies.retrieveAssigned",
   "policies.assign",
+  "lenses.list",
+  "lenses.iterate",
+  "lenses.create",
+  "lenses.retrieve",
+  "lenses.update",
+  "lenses.delete",
   "ensureLens",
   "ensureLenses",
 ] as const;
@@ -236,7 +252,7 @@ const MOCK_REVIEWER_ACTOR = { type: "user", id: null } as const;
 const AUTOMATED_ACTOR = { type: "automated", id: null } as const;
 /** An event type's shape (`resource.action`), as the mock checks `types` without the catalog. */
 const EVENT_TYPE_PATTERN = /^[a-z][a-z-]*\.[a-z][a-z-]*$/;
-const MAX_SEARCH_LIMIT = 20;
+const MAX_SEARCH_PAGE_SIZE = 20;
 const MAX_SEARCH_QUERY_LENGTH = 200;
 
 /**
@@ -536,8 +552,59 @@ type MockPresetId = keyof typeof MOCK_PRESET_NAMES;
 /** A stored policy: the API's shape without its derived fields, plus its reset baseline. */
 interface MockPolicy extends Omit<Policy, "preset" | "projectIds"> {
   preset: { id: MockPresetId; version: number; own: boolean } | null;
+  /** Whether the organisation's own preset policy follows its preset (mode `live`). */
+  followsPreset: boolean;
   baseline: Policy["settings"];
 }
+
+/**
+ * The settings of the mock's presets: every category with its default action (`allow` for
+ * personal information and profanity, `block` otherwise) and no rules. The mock holds no built-in
+ * preset settings, and uploads are never decided by a policy.
+ */
+const mockPresetSettings = (): Policy["settings"] =>
+  ({
+    categorySettings: Object.fromEntries(
+      CLASSIFICATION_CATEGORIES.map((category) => [
+        category,
+        {
+          action:
+            category === "personal-information" || category === "profanity" ? "allow" : "block",
+          allowances: [],
+          restrictions: [],
+        },
+      ]),
+    ),
+  }) as unknown as Policy["settings"];
+
+/**
+ * Refuses settings the API refuses (MODERATION_POLICY_SETTINGS_SCHEMA): every category, each with
+ * an `action` and its `allowances` and `restrictions` lists.
+ */
+const checkPolicySettings = (settings: unknown) => {
+  const categories = (settings as { categorySettings?: Record<string, unknown> })?.categorySettings;
+  if (!categories || typeof categories !== "object")
+    throw invalidField("validation/invalid-type", "settings.categorySettings");
+  for (const category of CLASSIFICATION_CATEGORIES) {
+    const value = categories[category] as Record<string, unknown> | undefined;
+    if (!value || typeof value !== "object")
+      throw invalidField("validation/invalid-type", `settings.categorySettings.${category}`);
+    for (const key of ["allowances", "restrictions"])
+      if (!Array.isArray(value[key]))
+        throw invalidField(
+          "validation/invalid-type",
+          `settings.categorySettings.${category}.${key}`,
+        );
+    if (typeof value.action !== "string")
+      throw invalidField(
+        "validation/invalid-value",
+        `settings.categorySettings.${category}.action`,
+      );
+  }
+  for (const key of Object.keys(categories))
+    if (!(CLASSIFICATION_CATEGORIES as readonly string[]).includes(key))
+      throw invalidField("validation/unknown-field", `settings.categorySettings.${key}`);
+};
 
 /** The client methods that send a request, the one it is recorded under first. */
 const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
@@ -550,15 +617,17 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
       case "events":
         return ["events.list", "events.pages"];
       case "lenses":
-        return ["ensureLenses", "ensureLens"];
+        return method === "GET"
+          ? ["lenses.list", "lenses.iterate"]
+          : method === "POST"
+            ? ["lenses.create"]
+            : ["ensureLenses", "ensureLens"];
       case "folders":
-        return method === "GET" ? ["folders.list"] : ["folders.create"];
+        return method === "GET" ? ["folders.list", "folders.iterate"] : ["folders.create"];
       case "hash-lists":
-        return method === "GET" ? ["hashLists.list"] : ["hashLists.create"];
-      case "policies":
-        return method === "GET" ? ["policies.list"] : ["policies.create"];
+        return method === "GET" ? ["hashLists.list", "hashLists.iterate"] : ["hashLists.create"];
       case "policy":
-        return ["policies.assign"];
+        return method === "GET" ? ["policies.retrieveAssigned"] : ["policies.assign"];
       case "assets/search":
         return ["assets.search"];
       case "assets/batch":
@@ -567,27 +636,38 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
         return ["cdn.signAssetUrl"];
       case "assets":
         if (method === "GET") return ["assets.list", "assets.iterate"];
-        if (query.get("queue") === "true") return ["assets.create"];
+        if (query.get("wait") === "false") return ["assets.create"];
         return isTextUpload(request) ? ["assets.classify", "text.classify"] : ["assets.classify"];
     }
     if (segments[2] === "assets" && segments[4] === "timeline" && segments.length === 5) {
-      return ["assets.listTimeline"];
-    }
-    if (segments[2] === "policies" && segments[3] !== undefined) {
-      if (segments[4] === "preset") return ["policies.applyPreset"];
-      if (segments[4] === "automatic-updates") return ["policies.setAutomaticUpdates"];
-      return method === "GET"
-        ? ["policies.retrieve"]
-        : method === "PATCH"
-          ? ["policies.update"]
-          : ["policies.delete"];
+      return ["assets.listTimeline", "assets.iterateTimeline"];
     }
     return [];
+  }
+  if (root === "policies") {
+    const [, policyId, policyAction] = segments;
+    if (policyId === undefined)
+      return method === "GET" ? ["policies.list", "policies.iterate"] : ["policies.create"];
+    if (policyAction === "reset") return ["policies.reset"];
+    if (policyAction === "upgrade") return ["policies.upgrade"];
+    if (policyAction === "automatic-updates") return ["policies.setAutomaticUpdates"];
+    return method === "GET"
+      ? ["policies.retrieve"]
+      : method === "PATCH"
+        ? ["policies.update"]
+        : ["policies.delete"];
+  }
+  if (root === "lenses" && segments[1] !== undefined) {
+    return method === "GET"
+      ? ["lenses.retrieve"]
+      : method === "PATCH"
+        ? ["lenses.update"]
+        : ["lenses.delete"];
   }
   if (root === "upload-presets") {
     // App clients: `/upload-presets/:id/assets[/:assetId[/part]]`.
     if (segments[3] === undefined) {
-      return [query.get("queue") === "true" ? "assets.create" : "assets.classify"];
+      return [query.get("wait") === "false" ? "assets.create" : "assets.classify"];
     }
     return segments[4] === "part" ? ["assets.uploadPart"] : ["assets.retrieve"];
   }
@@ -603,7 +683,9 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
   }
   if (root === "hash-lists" && id !== undefined) {
     if (action === "entries") {
-      return method === "GET" ? ["hashLists.listEntries"] : ["hashLists.addEntry"];
+      return method === "GET"
+        ? ["hashLists.listEntries", "hashLists.iterateEntries"]
+        : ["hashLists.addEntry"];
     }
     return method === "GET"
       ? ["hashLists.retrieve"]
@@ -1171,10 +1253,12 @@ export class MockCalmLensApi {
           return [201, this.createHashList(this.json(request))];
         case "PUT lenses":
           return [200, this.ensureLenses(this.json(request))];
-        case "GET policies":
-          return [200, this.listPolicies()];
-        case "POST policies":
-          return [201, this.createPolicy(this.json(request))];
+        case "GET lenses":
+          return [200, this.listLenses(request.query)];
+        case "POST lenses":
+          return [201, this.createLens(this.json(request))];
+        case "GET policy":
+          return [200, this.toPolicy(this.findPolicy(this.ensurePolicies()))];
         case "PUT policy":
           return [200, this.assignPolicy(this.json(request))];
       }
@@ -1188,19 +1272,36 @@ export class MockCalmLensApi {
       ) {
         return [200, await this.listTimeline(itemId, request.query)];
       }
-      if (collection === "policies" && itemId !== undefined && more.length === 0) {
-        switch (`${method} ${itemAction ?? ""}`) {
+    }
+    if (root === "policies" && rest.length === 0) {
+      if (id === undefined) {
+        if (method === "GET") return [200, this.listPolicies(request.query)];
+        if (method === "POST") return [201, this.createPolicy(this.json(request))];
+      } else {
+        switch (`${method} ${action ?? ""}`) {
           case "GET ":
-            return [200, this.toPolicy(this.findPolicy(itemId))];
+            return [200, this.toPolicy(this.findPolicy(id))];
           case "PATCH ":
-            return [200, this.updatePolicy(itemId, this.json(request))];
+            return [200, this.updatePolicy(id, this.json(request))];
           case "DELETE ":
-            return [200, this.deletePolicy(itemId)];
-          case "POST preset":
-            return [200, this.applyPolicyPreset(itemId, this.json(request))];
+            return [200, this.deletePolicy(id)];
+          case "POST reset":
+            return [200, this.restorePolicy(id, "reset", this.json(request))];
+          case "POST upgrade":
+            return [200, this.restorePolicy(id, "upgrade", this.json(request))];
           case "PUT automatic-updates":
-            return [200, this.setPolicyAutomaticUpdates(itemId, this.json(request))];
+            return [200, this.setPolicyAutomaticUpdates(id, this.json(request))];
         }
+      }
+    }
+    if (root === "lenses" && id !== undefined && action === undefined) {
+      switch (method) {
+        case "GET":
+          return [200, this.findLens(id)];
+        case "PATCH":
+          return [200, this.updateLens(id, this.json(request))];
+        case "DELETE":
+          return [200, this.deleteLens(id)];
       }
     }
     if (root === "upload-presets" && id !== undefined && action === "assets") {
@@ -1267,30 +1368,31 @@ export class MockCalmLensApi {
 
   // ---- Policies ----------------------------------------------------------------------------
   // The project starts on the organisation's own General preset policy, following automatic
-  // updates. The mock holds no built-in preset settings: a preset's settings are
-  // `{ categorySettings: {} }` at version 1, and uploads are never decided by a policy.
+  // updates. The mock's presets have one release, version 1, with `mockPresetSettings`.
 
   private readonly policies = new Map<string, MockPolicy>();
   private projectPolicyId: string | undefined;
 
-  private ensurePolicies() {
-    if (this.projectPolicyId) return;
+  /** The project's policy, after creating the organisation's own General policy on first use. */
+  private ensurePolicies(): string {
+    if (this.projectPolicyId) return this.projectPolicyId;
     const now = this.now();
     const general = this.newPolicy({
       name: MOCK_PRESET_NAMES["general-community"],
-      settings: { categorySettings: {} },
-      automaticUpdates: true,
+      settings: mockPresetSettings(),
+      followsPreset: true,
       preset: { id: "general-community", version: 1, own: true },
       createdAt: now,
     });
     this.projectPolicyId = general.id;
+    return general.id;
   }
 
   private newPolicy(values: {
     name: string;
     description?: string;
     settings: Policy["settings"];
-    automaticUpdates?: boolean;
+    followsPreset?: boolean;
     preset?: { id: MockPresetId; version: number; own: boolean };
     createdAt: number;
   }): MockPolicy {
@@ -1300,7 +1402,7 @@ export class MockCalmLensApi {
       description: values.description ?? "",
       settings: values.settings,
       revision: 1,
-      automaticUpdates: values.automaticUpdates ?? false,
+      followsPreset: values.followsPreset ?? false,
       preset: values.preset ?? null,
       baseline: structuredClone(values.settings),
       createdAt: values.createdAt,
@@ -1311,10 +1413,15 @@ export class MockCalmLensApi {
   }
 
   private toPolicy(policy: MockPolicy): Policy {
-    const { baseline: _baseline, preset, ...rest } = policy;
+    const { baseline: _baseline, preset, followsPreset, ...rest } = policy;
     return {
       ...structuredClone(rest),
-      preset: preset && { ...preset, latestVersion: 1 },
+      preset: preset && {
+        id: preset.id,
+        version: preset.version,
+        latestVersion: 1,
+        mode: preset.own ? (followsPreset ? "live" : "pinned") : "copy",
+      },
       projectIds: policy.id === this.projectPolicyId ? [this.projectId] : [],
     };
   }
@@ -1326,12 +1433,18 @@ export class MockCalmLensApi {
     return policy;
   }
 
-  private listPolicies(): PolicyList {
+  /** A page of the organisation's policies, oldest first unless `sort` says otherwise. */
+  private listPolicies(query: URLSearchParams): PolicyPage {
     this.ensurePolicies();
-    return {
-      policies: [...this.policies.values()].map((policy) => this.toPolicy(policy)),
-      projectPolicyId: this.projectPolicyId!,
-    };
+    return createPage(
+      [...this.policies.values()].map((policy) => this.toPolicy(policy)),
+      this.pageQuery(query),
+      {
+        scope: `policies:${this.projectId}`,
+        fail: this.pageFailure,
+        defaultSort: [{ field: "createdAt", direction: "asc" }],
+      },
+    );
   }
 
   private createPolicy(body: Record<string, unknown>): Policy {
@@ -1347,10 +1460,11 @@ export class MockCalmLensApi {
         message: "Send settings with a name, or presetId",
       });
     }
+    if (!preset) checkPolicySettings(settings);
     const policy = this.newPolicy({
       name: typeof name === "string" && name.trim() ? name.trim() : MOCK_PRESET_NAMES[preset!],
       ...(typeof description === "string" ? { description } : {}),
-      settings: preset ? { categorySettings: {} } : (settings as Policy["settings"]),
+      settings: preset ? mockPresetSettings() : (settings as Policy["settings"]),
       ...(preset ? { preset: { id: preset, version: 1, own: false } } : {}),
       createdAt: this.now(),
     });
@@ -1372,36 +1486,42 @@ export class MockCalmLensApi {
 
   private updatePolicy(policyId: string, body: Record<string, unknown>): Policy {
     const policy = this.findPolicy(policyId);
+    if (body.settings !== undefined) checkPolicySettings(body.settings);
     return this.savePolicy(policy, body.revision, {
       ...(typeof body.name === "string" ? { name: body.name.trim() } : {}),
       ...(typeof body.description === "string" ? { description: body.description } : {}),
       ...(body.settings !== undefined ? { settings: body.settings as Policy["settings"] } : {}),
-      // Saving a policy that follows its preset pins it as a copy.
-      automaticUpdates: false,
+      // Saving a `live` policy pins it.
+      followsPreset: false,
     });
   }
 
-  private applyPolicyPreset(policyId: string, body: Record<string, unknown>): Policy {
+  /** Resets a `pinned` or `copy` policy to its preset release, or upgrades it to the latest. */
+  private restorePolicy(
+    policyId: string,
+    operation: "reset" | "upgrade",
+    body: Record<string, unknown>,
+  ): Policy {
     const policy = this.findPolicy(policyId);
-    if (!policy.preset || policy.automaticUpdates) throw fail(API_ERROR_CODES.POLICY_NO_PRESET);
+    if (!policy.preset || policy.followsPreset) throw fail(API_ERROR_CODES.POLICY_NO_PRESET);
     if (body.presetVersion !== policy.preset.version) {
       throw fail(API_ERROR_CODES.POLICY_PRESET_VERSION_CONFLICT);
     }
-    // The mock's presets have one release, so an update never has a newer one to apply.
-    if (body.operation === "update") throw fail(API_ERROR_CODES.POLICY_PRESET_UPDATE_UNAVAILABLE);
+    // The mock's presets have one release, so an upgrade never has a newer one to apply.
+    if (operation === "upgrade") throw fail(API_ERROR_CODES.POLICY_PRESET_UPDATE_UNAVAILABLE);
     return this.savePolicy(policy, body.revision, { settings: structuredClone(policy.baseline) });
   }
 
   private setPolicyAutomaticUpdates(policyId: string, body: Record<string, unknown>): Policy {
     const policy = this.findPolicy(policyId);
     const enabled = body.enabled === true;
-    if (!policy.preset?.own || policy.automaticUpdates === enabled) {
+    if (!policy.preset?.own || policy.followsPreset === enabled) {
       throw fail(API_ERROR_CODES.POLICY_AUTOMATIC_UPDATES_UNAVAILABLE);
     }
     if (body.revision !== policy.revision) throw fail(API_ERROR_CODES.POLICY_REVISION_CONFLICT);
     if (body.presetVersion !== 1) throw fail(API_ERROR_CODES.POLICY_PRESET_VERSION_CONFLICT);
     return this.savePolicy(policy, body.revision, {
-      automaticUpdates: enabled,
+      followsPreset: enabled,
       ...(enabled
         ? {
             name: MOCK_PRESET_NAMES[policy.preset.id],
@@ -1491,25 +1611,11 @@ export class MockCalmLensApi {
 
   private listHashListEntries(hashListId: string, query: URLSearchParams): HashListEntryPage {
     this.findHashList(hashListId);
-    const pageSize = this.integer(query, "pageSize", DEFAULT_PAGE_SIZE);
-    const entries = [...this.hashListEntries.values()]
-      .filter((entry) => entry.hashListId === hashListId)
-      .reverse();
-    const cursor = query.get("cursor");
-    const start = cursor ? Number(atob(cursor)) : 0;
-    if (!Number.isInteger(start) || start < 0) throw fail(API_ERROR_CODES.INVALID_CURSOR);
-    const items = entries.slice(start, start + pageSize);
-    const hasMore = start + pageSize < entries.length;
-    return {
-      items,
-      hasMore,
-      nextCursor: hasMore ? btoa(String(start + pageSize)) : null,
-      pageSize,
-      ordering: [
-        { field: "createdAt", direction: "desc" },
-        { field: "id", direction: "desc" },
-      ],
-    };
+    return createPage(
+      [...this.hashListEntries.values()].filter((entry) => entry.hashListId === hashListId),
+      this.pageQuery(query),
+      { scope: `hash-list-entries:${hashListId}`, fail: this.pageFailure },
+    );
   }
 
   private async addHashListEntry(
@@ -1578,16 +1684,14 @@ export class MockCalmLensApi {
     return value;
   }
 
-  /** `ordering[i][field]` and `ordering[i][direction]` pairs, as qs parses them. */
-  private ordering(query: URLSearchParams) {
-    const ordering: Array<{ field: "createdAt" | "id"; direction: "asc" | "desc" }> = [];
-    for (const [key, value] of query) {
-      const match = /^ordering\[(\d+)\]\[(field|direction)\]$/.exec(key);
-      if (!match) continue;
-      const index = Number(match[1]);
-      ordering[index] = { ...ordering[index], [match[2]!]: value } as (typeof ordering)[number];
-    }
-    return ordering.filter(Boolean);
+  /** The list's `sort`, from `fields`, as the API's `sortQueryField` reads it. */
+  private sort(query: URLSearchParams, fields: readonly string[], max: number) {
+    return parseSort(
+      query.get("sort"),
+      fields,
+      max,
+      () => invalidField("validation/invalid-value", "sort") as unknown as Error,
+    );
   }
 
   private pageFailure = (
@@ -1600,24 +1704,16 @@ export class MockCalmLensApi {
 
   /**
    * A cursor list's query, checked like CURSOR_PAGE_QUERY_SCHEMA before anything else: `pageSize`
-   * from 1 to 100, and at most two `ordering` rules, each by `createdAt` or `id`.
+   * from 1 to 100, and a `sort` of at most two fields from `createdAt` and `id`.
    */
   private pageQuery(query: URLSearchParams) {
     const pageSize = this.integer(query, "pageSize", DEFAULT_PAGE_SIZE);
     if (pageSize < 1) throw invalidField("validation/too-small", "pageSize");
     if (pageSize > 100) throw invalidField("validation/too-big", "pageSize");
-    const ordering = this.ordering(query);
-    for (const [index, rule] of ordering.entries()) {
-      if (rule.field !== "createdAt" && rule.field !== "id")
-        throw invalidField("validation/invalid-value", `ordering.${index}.field`);
-      if (rule.direction !== "asc" && rule.direction !== "desc")
-        throw invalidField("validation/invalid-value", `ordering.${index}.direction`);
-    }
-    if (ordering.length > 2) throw invalidField("validation/too-big", "ordering");
     return {
       pageSize,
       cursor: query.get("cursor") ?? undefined,
-      ordering: ordering.length ? ordering : undefined,
+      sort: this.sort(query, ["createdAt", "id"], 2),
     };
   }
 
@@ -1633,10 +1729,6 @@ export class MockCalmLensApi {
 
   private async listAssets(query: URLSearchParams) {
     let assets = await this.databaseStorage.listAssets(this.projectId);
-    const folderId = query.get("folderId");
-    if (folderId !== null) {
-      assets = assets.filter((asset) => (asset.folderId ?? null) === folderId);
-    }
     const page = this.pageQuery(query);
     const filter = query.get("filter") ?? undefined;
     try {
@@ -1646,7 +1738,7 @@ export class MockCalmLensApi {
       throw error;
     }
     return createPage(assets, page, {
-      scope: JSON.stringify([this.projectId, filter ?? null, folderId]),
+      scope: JSON.stringify([this.projectId, filter ?? null]),
       fail: this.pageFailure,
     });
   }
@@ -1657,14 +1749,18 @@ export class MockCalmLensApi {
    * format or extension, or moderation status. There is no semantic search.
    */
   private async searchAssets(params: URLSearchParams) {
-    // Like the API's query schema: a trimmed query of 1 to 200 characters, a limit of 1 to 20.
+    // Like the API's query schema: a trimmed query of 1 to 200 characters, 1 to 20 results.
     const query = (params.get("query") ?? "").trim();
     if (!query) throw invalidField("validation/too-small", "query");
     if (query.length > MAX_SEARCH_QUERY_LENGTH) throw invalidField("validation/too-big", "query");
-    const limit = this.integer(params, "limit", 10);
-    if (limit < 1) throw invalidField("validation/too-small", "limit");
-    if (limit > MAX_SEARCH_LIMIT) throw invalidField("validation/too-big", "limit");
-    const items = searchAssets(await this.databaseStorage.listAssets(this.projectId), query, limit);
+    const pageSize = this.integer(params, "pageSize", 10);
+    if (pageSize < 1) throw invalidField("validation/too-small", "pageSize");
+    if (pageSize > MAX_SEARCH_PAGE_SIZE) throw invalidField("validation/too-big", "pageSize");
+    const items = searchAssets(
+      await this.databaseStorage.listAssets(this.projectId),
+      query,
+      pageSize,
+    );
     return { query, items, semanticStatus: "disabled" };
   }
 
@@ -1692,7 +1788,7 @@ export class MockCalmLensApi {
       throw fail(API_ERROR_CODES.ASSET_HELD, { details: { hold: "safety" } });
     }
     if (query.get("cursor") !== null) throw fail(API_ERROR_CODES.INVALID_CURSOR);
-    return { items: [], nextCursor: null, pageSize, hasMore: false, ordering: [] };
+    return { items: [], nextCursor: null, hasMore: false };
   }
 
   private async updateAsset(assetId: string, body: Record<string, unknown>): Promise<Asset> {
@@ -1969,7 +2065,7 @@ export class MockCalmLensApi {
   }
 
   private async createAsset(request: MockRequest): Promise<Asset> {
-    return this.storeAsset(this.uploadFields(request), request.query.get("queue") === "true");
+    return this.storeAsset(this.uploadFields(request), request.query.get("wait") === "false");
   }
 
   private async storeAsset(fields: UploadFields, queue: boolean): Promise<Asset> {
@@ -2040,11 +2136,11 @@ export class MockCalmLensApi {
       externalId: fields.externalId ?? null,
       externalUrl: fields.url ?? fields.externalUrl ?? null,
       type,
-      metadata: fields.metadata ?? null,
+      metadata: fields.metadata ?? [],
       authorId: fields.authorId ?? null,
       // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
       context: contextItems.length ? { items: contextItems } : null,
-      tags: fields.tags ?? null,
+      tags: fields.tags ?? [],
       visibility: fields.visibility ?? "private",
       content: {
         status: keepContent ? "stored" : "temporary",
@@ -2084,12 +2180,21 @@ export class MockCalmLensApi {
         moderation: {
           status: "pending",
           manualReviews: [],
+          automatedStatus: null,
+          source: null,
+          rule: null,
+          explanationComplete: null,
+          categories: null,
           flaggedCategories: [],
           regions: [],
+          raw: null,
           timeline: null,
         },
+        // Like the API, a feature's result is `null` until it has run.
+        ocr: null,
+        linkDetection: null,
       },
-    } as Asset;
+    } as unknown as Asset;
 
     if (part) {
       await this.imageStorage.putPart(id, {
@@ -2144,8 +2249,9 @@ export class MockCalmLensApi {
     }
 
     await this.imageStorage.putPart(assetId, { uint8Array: bytes, partNumber, isFinal });
-    const queueOverride = query.get("queue");
-    const queue = queueOverride === null ? (upload?.queue ?? false) : queueOverride === "true";
+    // `wait=false` queues the final part; without `wait`, the upload's saved choice applies.
+    const waitOverride = query.get("wait");
+    const queue = waitOverride === null ? (upload?.queue ?? false) : waitOverride === "false";
     if (isFinal) this.openUploads.delete(assetId);
     const now = this.now();
     const next: Asset = {
@@ -2238,11 +2344,18 @@ export class MockCalmLensApi {
       ...next,
       classification: {
         ...next.classification,
+        // The mock reads no text, QR codes, people or faces in an image: features find nothing.
+        ...(features?.ocr?.enabled === true && {
+          ocr: { status: "evaluated", textRegions: [] },
+        }),
+        ...(features?.linkDetection?.enabled !== false && {
+          linkDetection: { status: "evaluated", qrCodes: [], links: [] },
+        }),
         ...(features?.personDetection?.enabled === true && {
-          personDetection: { status: "evaluated", stage: "beta", people: [] },
+          personDetection: { status: "evaluated", people: [] },
         }),
         ...(features?.faceDetection?.enabled === true && {
-          faceDetection: { status: "evaluated", stage: "beta", faces: [] },
+          faceDetection: { status: "evaluated", faces: [] },
         }),
       },
     };
@@ -2511,7 +2624,7 @@ export class MockCalmLensApi {
           keepContentAfterProcessing: preset.keepContentAfterProcessing ?? true,
         },
       },
-      request.query.get("queue") === "true",
+      request.query.get("wait") === "false",
     );
     session.uploads.add(asset.id);
     return toUploaded(asset);
@@ -2583,7 +2696,8 @@ export class MockCalmLensApi {
     const all = (await this.databaseStorage.listFolders?.(this.projectId)) ?? [];
     const parentId = query.get("parentId");
     const search = query.get("search")?.trim() || null;
-    const ordering = this.folderOrdering(query);
+    // The folder list sorts by one field, `name` or `createdAt`.
+    const sort = this.sort(query, ["name", "createdAt"], 1);
     const matching = all.filter(
       (folder) =>
         (folder.parentId ?? null) === parentId &&
@@ -2594,12 +2708,12 @@ export class MockCalmLensApi {
       {
         cursor: query.get("cursor") ?? undefined,
         pageSize: this.integer(query, "pageSize", DEFAULT_PAGE_SIZE),
-        ordering,
+        sort,
       },
       {
         scope: JSON.stringify([this.projectId, parentId, search]),
         fail: this.pageFailure,
-        defaultOrdering: [{ field: "name", direction: "asc" }],
+        defaultSort: [{ field: "name", direction: "asc" }],
       },
     );
     const folders = page.items;
@@ -2615,23 +2729,8 @@ export class MockCalmLensApi {
         (folder) => ids.has(folder.id) && !folders.some((item) => item.id === folder.id),
       ),
       nextCursor: page.nextCursor,
-      pageSize: page.pageSize,
       hasMore: page.hasMore,
-      ordering: page.ordering,
     };
-  }
-
-  /** The folder list's `ordering`: at most one rule, by `name` or `createdAt`. */
-  private folderOrdering(query: URLSearchParams) {
-    const ordering = this.ordering(query) as Array<{ field: string; direction: string }>;
-    if (ordering.length > 1) throw invalidField("validation/too-big", "ordering");
-    for (const [index, rule] of ordering.entries()) {
-      if (rule.field !== "name" && rule.field !== "createdAt")
-        throw invalidField("validation/invalid-value", `ordering.${index}.field`);
-      if (rule.direction !== "asc" && rule.direction !== "desc")
-        throw invalidField("validation/invalid-value", `ordering.${index}.direction`);
-    }
-    return ordering as Array<{ field: "name" | "createdAt"; direction: "asc" | "desc" }>;
   }
 
   private async createFolder(body: Record<string, unknown>): Promise<Folder> {
@@ -2740,7 +2839,7 @@ export class MockCalmLensApi {
 
   // ---- Lenses ------------------------------------------------------------------------------
 
-  /** Saves each lens in order, like the API: new ones, or changes with a greater version. */
+  /** Saves each lens in order, like the API: new ones, or a changed definition. */
   private ensureLenses(body: Record<string, unknown>) {
     const lenses = Array.isArray(body.lenses) ? (body.lenses as LensDefinition[]) : [];
     if (lenses.length === 0) throw invalidField("validation/too-small", "lenses");
@@ -2749,18 +2848,7 @@ export class MockCalmLensApi {
 
   private ensureLens(options: LensDefinition): Lens {
     const existing = this.lenses.get(options.identifier);
-    if (!existing) {
-      const now = this.now();
-      const lens: Lens = {
-        id: this.createId("lens"),
-        projectId: this.projectId,
-        ...options,
-        createdAt: now,
-        updatedAt: now,
-      };
-      this.lenses.set(lens.identifier, lens);
-      return lens;
-    }
+    if (!existing) return this.saveNewLens(options);
     const hasMatchingDefinition =
       existing.name === options.name &&
       (existing.description ?? null) === (options.description ?? null) &&
@@ -2768,19 +2856,59 @@ export class MockCalmLensApi {
       existing.active === options.active &&
       stringifyJsonCanonical(existing.transform ?? null) ===
         stringifyJsonCanonical(options.transform ?? null);
-    if (hasMatchingDefinition && existing.version === options.version) return existing;
-    if (options.version > existing.version) {
-      const lens = { ...existing, ...options, updatedAt: this.now() };
-      this.lenses.set(lens.identifier, lens);
-      return lens;
-    }
-    throw fail(API_ERROR_CODES.LENS_VERSION_CONFLICT, {
-      details: {
-        currentVersion: existing.version,
-        minimumVersion: existing.version + 1,
-        requestedVersion: options.version,
-      },
+    if (hasMatchingDefinition) return existing;
+    const lens = { ...existing, ...options, updatedAt: this.now() };
+    this.lenses.set(lens.identifier, lens);
+    return lens;
+  }
+
+  private saveNewLens(options: LensDefinition): Lens {
+    const now = this.now();
+    const lens: Lens = {
+      id: this.createId("lens"),
+      projectId: this.projectId,
+      ...options,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.lenses.set(lens.identifier, lens);
+    return lens;
+  }
+
+  /** A page of the project's lenses, newest first unless `sort` says otherwise. */
+  private listLenses(query: URLSearchParams): LensPage {
+    return createPage([...this.lenses.values()], this.pageQuery(query), {
+      scope: `lenses:${this.projectId}`,
+      fail: this.pageFailure,
     });
+  }
+
+  private createLens(body: Record<string, unknown>): Lens {
+    const definition = body as LensDefinition;
+    if (typeof definition.identifier !== "string" || !definition.identifier)
+      throw invalidField("validation/invalid-type", "identifier");
+    if (this.lenses.has(definition.identifier))
+      throw fail(API_ERROR_CODES.LENS_IDENTIFIER_TAKEN, {
+        details: { identifier: definition.identifier },
+      });
+    return this.saveNewLens(definition);
+  }
+
+  private findLens(lensId: string): Lens {
+    const lens = [...this.lenses.values()].find((candidate) => candidate.id === lensId);
+    if (!lens) throw fail(API_ERROR_CODES.LENS_NOT_FOUND);
+    return lens;
+  }
+
+  private updateLens(lensId: string, body: Record<string, unknown>): Lens {
+    const lens = this.findLens(lensId);
+    const { identifier: _identifier, ...changes } = body as Partial<LensDefinition>;
+    return this.ensureLens({ ...lens, ...changes });
+  }
+
+  private deleteLens(lensId: string): Record<string, never> {
+    this.lenses.delete(this.findLens(lensId).identifier);
+    return {};
   }
 
   // ---- CDN ---------------------------------------------------------------------------------

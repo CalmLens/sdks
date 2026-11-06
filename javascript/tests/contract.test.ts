@@ -263,12 +263,6 @@ const runScenarioStep = async (
       return { status: response.status, code, bytes, headers: response.headers };
     }
     // Iterators yield every item (or, for events, every page) in order.
-    case "assets.iterate":
-      return JSON.parse(JSON.stringify(await collect(client.assets.iterate(args))));
-    case "assets.iterateChildren":
-      return JSON.parse(
-        JSON.stringify(await collect(client.assets.iterateChildren(args as never))),
-      );
     case "events.pages":
       return JSON.parse(JSON.stringify(await collect(client.events.pages(args))));
   }
@@ -278,6 +272,11 @@ const runScenarioStep = async (
     .slice(0, -1)
     .reduce<any>((target, key) => target[key], client as unknown as Record<string, unknown>);
   const method = owner[path.at(-1)!] as (options: unknown) => unknown;
+  // Every list's iterator yields its items in order.
+  if (path.at(-1)!.startsWith("iterate"))
+    return JSON.parse(
+      JSON.stringify(await collect(method.call(owner, args) as AsyncIterable<unknown>)),
+    );
   return JSON.parse(JSON.stringify((await method.call(owner, args)) ?? null));
 };
 
@@ -607,7 +606,7 @@ const { sha256Hex } = await import("../src/contract/CryptoUtils.js");
 interface TokenOptions {
   uploadPresetId: string;
   externalId?: string;
-  expiresInSeconds?: number;
+  expiresIn?: number;
 }
 const uploadTokens: {
   signing: {
@@ -725,6 +724,12 @@ const receiver: {
     lastSequence: number | null;
     newer: boolean;
   }[];
+  factLookups: { name: string; event: server.WebhookEventPayload; key: string; value: unknown }[];
+  factObjects: {
+    name: string;
+    event: server.WebhookEventPayload;
+    facts: Record<string, unknown>;
+  }[];
 } = testdata("webhooks.json");
 
 /** The header containers a JavaScript receiver gets: Node's plain object and a fetch `Headers`. */
@@ -798,6 +803,17 @@ describe("webhook receivers", () => {
   for (const { name, event, isTest } of receiver.testFacts) {
     test(`${isTest ? "recognises" : "does not take"} ${name} ${isTest ? "as" : "for"} a test send`, () => {
       expect(server.isTestWebhookEvent(event)).toBe(isTest);
+    });
+  }
+
+  for (const { name, event, key, value } of receiver.factLookups) {
+    test(`reads ${name} with getEventFact`, () => {
+      expect(server.getEventFact(event as never, key as never) ?? null).toEqual(value);
+    });
+  }
+  for (const { name, event, facts } of receiver.factObjects) {
+    test(`reads ${name} with getEventFacts`, () => {
+      expect(server.getEventFacts(event as never)).toEqual(facts);
     });
   }
 

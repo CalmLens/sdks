@@ -491,21 +491,19 @@ describe("MockCalmLensServerClient", () => {
     expect(init.redirect).toBe("manual");
   });
 
-  it("ensures versioned custom lenses", async () => {
+  it("ensures custom lenses, changing them in place", async () => {
     const client = createClient();
     const initialDefinition = {
       identifier: "picmagic-normal",
       name: "PicMagic normal",
       type: "image" as const,
       active: true,
-      version: 7,
       transform: { fit: "scale-down", width: 1024, format: "png" },
     };
     const uhdDefinition = {
       ...initialDefinition,
       identifier: "picmagic-uhd",
       name: "PicMagic UHD",
-      version: 20,
       transform: { fit: "scale-down", width: 2048, format: "png" },
     };
 
@@ -524,27 +522,13 @@ describe("MockCalmLensServerClient", () => {
     expect(repeated).toEqual(created);
     expect(uhd.identifier).toBe("picmagic-uhd");
 
-    await expect(
-      client.ensureLens({
-        ...initialDefinition,
-        name: "PicMagic updated without a version bump",
-      }),
-    ).rejects.toMatchObject({ code: "lens/version-conflict" });
-
-    const updated = await client.ensureLens({
-      ...initialDefinition,
-      name: "PicMagic updated",
-      version: 42,
-    });
-    expect(updated.version).toBe(42);
-    expect(updated.name).toBe("PicMagic updated");
-
-    const versionOnlyUpdate = await client.ensureLens({
-      ...initialDefinition,
-      name: "PicMagic updated",
-      version: 100,
-    });
-    expect(versionOnlyUpdate.version).toBe(100);
+    const updated = await client.ensureLens({ ...initialDefinition, name: "PicMagic updated" });
+    expect(updated).toMatchObject({ id: created.id, name: "PicMagic updated" });
+    const { items } = await client.lenses.list();
+    expect(items.map(({ identifier, name }) => [identifier, name]).sort()).toEqual([
+      ["picmagic-normal", "PicMagic updated"],
+      ["picmagic-uhd", "PicMagic UHD"],
+    ]);
   });
 
   it("serves in-memory asset content from the mock CDN", async () => {
@@ -1065,7 +1049,6 @@ describe("MockCalmLensServerClient", () => {
       name: "Thumb",
       type: "imageTransform",
       active: true,
-      version: 1,
     } as const;
     await client.ensureLenses({ lenses: [lens] });
     // The lens cache answers this one without a request.
@@ -1088,7 +1071,7 @@ describe("MockCalmLensServerClient", () => {
     ]);
     const [classify] = client.callsTo("text.classify");
     expect(classify).toMatchObject({
-      query: { name: "text", externalId: "comment-1", queue: "false", contentType: "text/plain" },
+      query: { name: "text", externalId: "comment-1", wait: "true", contentType: "text/plain" },
       body: "hello",
     });
     expect(client.callsTo("assets.waitForDecision").map(({ path }) => path)).toEqual([

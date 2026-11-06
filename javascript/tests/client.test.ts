@@ -156,7 +156,6 @@ describe("responses", () => {
         name: "Thumb",
         type: "image",
         active: true,
-        version: 1,
       }),
     ).rejects.toMatchObject({ code: "sdk/invalid-response" });
   });

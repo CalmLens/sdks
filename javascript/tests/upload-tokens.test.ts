@@ -33,7 +33,7 @@ describe("uploadTokens.sign", () => {
     const { token, expiresAt } = await client.uploadTokens.sign({
       uploadPresetId: PRESET_ID,
       externalId: "post-42",
-      expiresInSeconds: 120,
+      expiresIn: 120,
     });
 
     const decoded = decodeUploadToken(token);
@@ -65,7 +65,7 @@ describe("uploadTokens.sign", () => {
     const client = new CalmLensServerClient({ apiKey: API_KEY, projectId: "project-1" });
     expect(
       await errorCode(() =>
-        client.uploadTokens.sign({ uploadPresetId: PRESET_ID, expiresInSeconds: 3601 }),
+        client.uploadTokens.sign({ uploadPresetId: PRESET_ID, expiresIn: 3601 }),
       ),
     ).toBe("sdk/invalid-argument");
   });
@@ -78,7 +78,7 @@ describe("uploadTokens.sign", () => {
     });
     const { token, expiresAt } = await mock.uploadTokens.sign({
       uploadPresetId: PRESET_ID,
-      expiresInSeconds: 60,
+      expiresIn: 60,
     });
     const decoded = decodeUploadToken(token)!;
     expect(

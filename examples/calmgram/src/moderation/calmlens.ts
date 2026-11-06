@@ -2,8 +2,8 @@ import type { Asset, EnsureLensOptions } from "calmlens";
 import { CalmLensError, CalmLensServerClient, verifyWebhookSignature } from "calmlens/server";
 import type { ModerationOutcome, ModerationProvider, ModerationStatus } from "./types";
 
-// Lenses are named, versioned CDN transformations (think "image presets"). Bump `version`
-// whenever you change a lens definition so the CDN cache is invalidated.
+// Lenses are named CDN transformations (think "image presets"). Change a definition here and
+// ensureLenses updates it; the CDN then serves files made with the new definition.
 const LENSES: EnsureLensOptions[] = [
   {
     identifier: "calmgram-feed",
@@ -11,7 +11,6 @@ const LENSES: EnsureLensOptions[] = [
     description: null,
     type: "image",
     active: true,
-    version: 1,
     transform: { fit: "scale-down", width: 1080, format: "webp" },
   },
   {
@@ -20,7 +19,6 @@ const LENSES: EnsureLensOptions[] = [
     description: null,
     type: "image",
     active: true,
-    version: 1,
     transform: { fit: "cover", width: 400, height: 400, format: "webp" },
   },
 ];
@@ -123,7 +121,7 @@ export const createCalmLensProvider = (options: {
       return client.uploadTokens.sign({
         uploadPresetId: options.uploadPresetId,
         externalId,
-        expiresInSeconds: 10 * 60,
+        expiresIn: 10 * 60,
       });
     },
 

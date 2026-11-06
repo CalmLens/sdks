@@ -1,9 +1,33 @@
 import { invalidArgument } from "../client/CalmLensError";
 import type { Asset, AssetSearchResponse } from "../client/CalmLensTypes";
-import type { CursorPage, Page } from "../contract/Page.js";
+import type { CursorPage } from "../contract/Page.js";
 import { MOCK_ASSET_FILTER_FIELDS } from "./MockAssetFilters";
 
-type Ordering = NonNullable<Page<unknown>["ordering"]>;
+/** A list's sort, as the API reads its `sort` query value: fields in order, each with a direction. */
+export type MockSort = Array<{ field: string; direction: "asc" | "desc" }>;
+
+/**
+ * A `sort` query value as the API parses it (`sortQueryField` in shared/Page.ts): comma-separated
+ * fields from `fields`, descending when prefixed with `-`, none repeated and at most `max`.
+ * Undefined for a list that sends none; `undefined`'s default applies.
+ */
+export const parseSort = (
+  value: string | null,
+  fields: readonly string[],
+  max: number,
+  fail: () => Error,
+): MockSort | undefined => {
+  if (value === null) return undefined;
+  const sort: MockSort = [];
+  for (const part of value.split(",").map((item) => item.trim())) {
+    const field = part.startsWith("-") ? part.slice(1) : part;
+    if (!/^-?[A-Za-z][A-Za-z0-9.]*$/.test(part) || !fields.includes(field)) throw fail();
+    if (sort.some((rule) => rule.field === field)) throw fail();
+    sort.push({ field, direction: part.startsWith("-") ? "desc" : "asc" });
+  }
+  if (sort.length > max) throw fail();
+  return sort;
+};
 
 const toBase64Utf8 = (value: string) =>
   btoa(Array.from(new TextEncoder().encode(value), (byte) => String.fromCharCode(byte)).join(""));
@@ -25,33 +49,32 @@ export type PageRequestFailure = (
 /** Every API cursor list returns this many items unless `pageSize` says otherwise. */
 export const DEFAULT_PAGE_SIZE = 50;
 
-/** A cursor page request: the API's `cursor`, `pageSize` and `ordering` query values. */
-export interface PageRequest<Field extends string = "createdAt" | "id"> {
+/** A cursor page request: the API's `cursor` and `pageSize` query values, and its parsed `sort`. */
+export interface PageRequest {
   cursor?: string;
   pageSize?: number;
-  ordering?: Array<{ field: Field; direction: "asc" | "desc" }>;
+  sort?: MockSort;
 }
 
 /**
  * One keyset page like the API's (packages/shared-backend/src/CursorPagination.ts): ordered by
- * `ordering` (newest first by default) with an `id` tie-breaker added, starting after the
- * cursor's values. The cursor is tied to `scope` (the filter, folder or parent) and the
- * ordering, so it only continues the query it came from. `name` and `id` are compared by code
- * point, like the database.
+ * `sort` (newest first by default) with an `id` tie-breaker added, starting after the cursor's
+ * values. The cursor is tied to `scope` (the filter, folder or parent) and the sort, so it only
+ * continues the query it came from. `name` and `id` are compared by code point, like the database.
  */
-export const createPage = <T extends { id: string }, Field extends string = "createdAt" | "id">(
+export const createPage = <T extends { id: string }>(
   items: T[],
-  query: PageRequest<Field>,
+  query: PageRequest,
   {
     scope,
     fail,
     defaultPageSize = DEFAULT_PAGE_SIZE,
-    defaultOrdering = [{ field: "createdAt", direction: "desc" }],
+    defaultSort = [{ field: "createdAt", direction: "desc" }],
   }: {
     scope: string;
     fail: PageRequestFailure;
     defaultPageSize?: number;
-    defaultOrdering?: Ordering;
+    defaultSort?: MockSort;
   },
 ): CursorPage<T> => {
   const pageSize = query.pageSize ?? defaultPageSize;
@@ -59,7 +82,7 @@ export const createPage = <T extends { id: string }, Field extends string = "cre
     throw fail("validation/too-small", "pageSize");
   if (pageSize > 100) throw fail("validation/too-big", "pageSize");
   if (!Number.isInteger(pageSize)) throw invalidArgument("Invalid page size");
-  const ordering: Ordering = query.ordering?.length ? [...query.ordering] : [...defaultOrdering];
+  const ordering: MockSort = query.sort?.length ? [...query.sort] : [...defaultSort];
   if (!ordering.some(({ field }) => field === "id"))
     ordering.push({ field: "id", direction: ordering[0]!.direction });
   const signature = JSON.stringify([scope, ordering]);
@@ -96,9 +119,7 @@ export const createPage = <T extends { id: string }, Field extends string = "cre
   const last = pageItems.at(-1);
   return {
     items: pageItems,
-    pageSize,
     hasMore,
-    ordering,
     nextCursor:
       hasMore && last
         ? toBase64Utf8(
@@ -123,11 +144,9 @@ const compareValues = (left: unknown, right: unknown): number => {
   return a < b ? -1 : a > b ? 1 : 0;
 };
 
-/** Sorts like the API's `ordering`; without one, newest first. */
-export const orderItems = <T>(items: T[], ordering: Ordering | null | undefined): T[] => {
-  const rules: Ordering = ordering?.length
-    ? ordering
-    : ([{ field: "createdAt", direction: "desc" }] as Ordering);
+/** Sorts like the API's `sort`; without one, newest first. */
+export const orderItems = <T>(items: T[], ordering: MockSort | null | undefined): T[] => {
+  const rules: MockSort = ordering?.length ? ordering : [{ field: "createdAt", direction: "desc" }];
   return [...items].sort((a, b) => {
     for (const rule of rules) {
       const result = compareValues(

@@ -443,12 +443,12 @@ export class CalmLensConnection {
   submitRawUpload(
     uploadsPath: string,
     options: Exclude<SubmitAssetOptions, { url: string }>,
-    queue: boolean,
+    wait: boolean,
     authHeaders: Record<string, string> = {},
   ): Promise<unknown> {
     const query = new URLSearchParams();
     query.set("name", options.name);
-    query.set("queue", String(queue));
+    query.set("wait", String(wait));
     setOptionalQueryValue(query, "description", options.description);
     setOptionalQueryValue(query, "processingOptions", options.processingOptions);
     setOptionalQueryValue(query, "visibility", options.visibility);
@@ -508,7 +508,7 @@ export class CalmLensConnection {
   async submitInParts(
     uploadsPath: string,
     options: Extract<SubmitAssetOptions, { content: unknown }>,
-    queue: boolean,
+    wait: boolean,
     {
       authHeaders = {},
       partPath,
@@ -536,7 +536,7 @@ export class CalmLensConnection {
         totalSizeInBytes: source.size,
         idempotencyKey: key,
       } as SubmitAssetOptions as Exclude<SubmitAssetOptions, { url: string }>,
-      queue,
+      wait,
       authHeaders,
     )) as { id?: unknown };
     const assetId = expectUploadedAsset(first).id;
@@ -578,7 +578,7 @@ export class CalmLensConnection {
   /** Uploads the next part of a multipart upload to `partPath` (`.../assets/{id}/part`). */
   uploadPart(
     partPath: string,
-    { part, queue, idempotencyKey }: Omit<UploadAssetPartOptions, "assetId">,
+    { part, wait, idempotencyKey }: Omit<UploadAssetPartOptions, "assetId">,
     authHeaders: Record<string, string> = {},
   ): Promise<unknown> {
     if (!part) throw invalidArgument("Part options are required");
@@ -592,7 +592,7 @@ export class CalmLensConnection {
       partNumber: String(part.partNumber),
       isFinal: String(part.isFinal ?? false),
     });
-    if (queue !== undefined) query.set("queue", String(queue));
+    if (wait !== undefined) query.set("wait", String(wait));
     setOptionalQueryValue(
       query,
       "sizeInBytes",

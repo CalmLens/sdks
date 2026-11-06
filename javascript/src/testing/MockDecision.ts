@@ -163,14 +163,19 @@ export class MockDecision {
       ),
       explanationComplete: true,
       source: "policy",
+      rule: null,
       automatedStatus: status,
       regions: [],
+      linkSafety: null,
       // The mock analyses no audio or video, so a decision has no findings timeline.
       timeline: null,
       flaggedCategories: evaluated
         .filter(([, score]) => action(score) !== "allow")
         .map(([category]) => category),
-      raw: { categories: categories as NonNullable<AssetModeration["raw"]>["categories"] },
+      raw: {
+        categories: categories as NonNullable<AssetModeration["raw"]>["categories"],
+        hashMatches: [],
+      },
     };
   }
 }

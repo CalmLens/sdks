@@ -156,6 +156,46 @@ const isWebhookEvent = (value: unknown): value is ReceivedWebhookEventPayload =>
   );
 };
 
+type FactsOf<TEvent> = TEvent extends { facts: ReadonlyArray<infer TFact> } ? TFact : never;
+type FactValue<TEvent, TKey> =
+  Extract<FactsOf<TEvent>, { key: TKey }> extends { value: infer V } ? V : unknown;
+
+/**
+ * The value of one of an event's facts, by key, or `undefined` when the event doesn't carry it.
+ * Typed by the event's `type`, so `getEventFact(event, "flagged-categories")` on an
+ * `asset.blocked` event is a list of categories. The fact's `url`, when it has one, is on the fact
+ * in `event.facts`.
+ */
+export const getEventFact = <
+  TEvent extends { facts?: ReadonlyArray<{ key: string; value: unknown }> },
+  TKey extends FactsOf<TEvent> extends { key: infer K } ? K : string,
+>(
+  event: TEvent,
+  key: TKey,
+): FactValue<TEvent, TKey> | undefined =>
+  event?.facts?.find((fact) => fact?.key === key)?.value as FactValue<TEvent, TKey> | undefined;
+
+/**
+ * An event's facts as an object of values by key, such as `{ "flagged-categories": ["hate"] }`.
+ * A key the event repeats keeps its first value, as `getEventFact` reads it.
+ */
+export const getEventFacts = <
+  TEvent extends { facts?: ReadonlyArray<{ key: string; value: unknown }> },
+>(
+  event: TEvent,
+): {
+  [TKey in FactsOf<TEvent> extends { key: infer K extends string } ? K : string]?: FactValue<
+    TEvent,
+    TKey
+  >;
+} => {
+  const values: Record<string, unknown> = {};
+  for (const fact of event?.facts ?? [])
+    if (fact && typeof fact.key === "string" && !Object.hasOwn(values, fact.key))
+      values[fact.key] = fact.value;
+  return values as never;
+};
+
 /**
  * Whether a webhook event is a test send from the portal or the CLI rather than a real event: it
  * carries the registered `{ key: "test", value: true }` fact.

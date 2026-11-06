@@ -87,7 +87,10 @@ zod.object({
 	action: HASH_LIST_ACTION_SCHEMA.describe(`What a match does: \`flag\` reports it without changing the decision, \`block\` blocks matches 16 bits apart or fewer and flags looser ones`),
 	createdAt: createdAtField().describe("When the list was created, in milliseconds since the Unix epoch"),
 	updatedAt: updatedAtField().describe("When the list was last updated, in milliseconds since the Unix epoch")
-}).extend({
+}).meta(metaStore([docPropertyInfo({
+	description: "A list of image hashes the project flags or blocks",
+	namedType: "HashList"
+})])).extend({
 	createdByUserId: idField("user").nullish(),
 	revision: zod.string().max(64).nullish()
 });
@@ -103,7 +106,10 @@ zod.object({
 	label: saneStringField({ type: "medium" }).nullish().describe("Your own note or reference for the entry"),
 	assetId: idField("asset").nullish().describe("ID of the asset the hash was taken from, when it was added from an asset (`assetId` when adding the entry)"),
 	createdAt: createdAtField().describe("When the entry was added, in milliseconds since the Unix epoch")
-}).extend({ createdByUserId: idField("user").nullish() });
+}).meta(metaStore([docPropertyInfo({
+	description: "An image hash in a hash list",
+	namedType: "HashListEntry"
+})])).extend({ createdByUserId: idField("user").nullish() });
 /**
 * Where a match came from. Project hash lists are the only source today; shared industry lists
 * join this enum as they are connected.
@@ -243,7 +249,6 @@ const POLICY_ACTION_SCHEMA = zod.enum([
 const policyRuleSchema = (whenDescription, actionDescription) => zod.object({
 	name: zod.string().trim().min(1).max(80).optional(),
 	when: zod.array(zod.enum(MODERATION_QUALIFIERS)).min(1).max(MODERATION_QUALIFIERS.length).refine((v) => new Set(v).size === v.length, msg("Qualifiers must be unique")).meta({ description: whenDescription }),
-	match: zod.literal("all").optional().meta({ description: "All selected qualifiers must describe the same qualifying instance. If supplied, must be all." }),
 	unless: zod.array(zod.enum(MODERATION_QUALIFIERS)).min(1).max(MODERATION_QUALIFIERS.length).refine((v) => new Set(v).size === v.length, msg("Qualifiers must be unique")).optional().meta({ description: "Exclude instances covered by any of these qualifiers from this rule. Does not exempt other content or other categories." }),
 	action: POLICY_ACTION_SCHEMA.meta({ description: actionDescription })
 }).strict().refine((rule) => !rule.unless || !rule.when.some((qualifier) => rule.unless.includes(qualifier)), {
@@ -257,14 +262,6 @@ const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the cont
 /** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
 const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action.");
 // packages/shared/src/ProcessingFeatures.ts
-/**
-* Optional analyses a request can turn on or off with `processingOptions.features.<id>`. The
-* catalog is the single source for the request and result schemas, cache keys and metering. Each
-* feature's `activation` sets what a request that doesn't mention it gets. Streaming alone also
-* follows a project setting (`streamingEnabled`) when the request doesn't mention it.
-*/
-/** How mature a feature is. Beta results may change shape. */
-const PROCESSING_FEATURE_STAGES = ["beta", "ga"];
 const createFeatureOptionsSchemas = (booleanSchema) => {
 	const enabled = booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to run the feature. It runs only when this is true." })]));
 	const enabledUnlessFalse = booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to run the feature. It runs unless this is false, including when the feature is left out." })]));
@@ -356,18 +353,23 @@ const DETECTED_FACE_SCHEMA = zod.object({
 	description: "A detected face",
 	namedType: "DetectedFace"
 })]));
-const NOT_EVALUATED_FEATURE_RESULT_SCHEMA = zod.object({
-	status: zod.literal("not-evaluated"),
-	stage: zod.enum(PROCESSING_FEATURE_STAGES),
-	reason: zod.enum(["not-supported", "unavailable"])
-}).strict();
-const createFeatureResultSchema = (shape) => zod.discriminatedUnion("status", [zod.object({
+/**
+* A feature's result: `evaluated` with its findings, or `not-evaluated` when it could not run on
+* this asset (`not-supported`) or its analysis failed (`unavailable`).
+*/
+const createFeatureResultSchema = (name, description, shape) => zod.discriminatedUnion("status", [zod.object({
 	status: zod.literal("evaluated"),
-	stage: zod.enum(PROCESSING_FEATURE_STAGES),
 	...shape
-}).strict(), NOT_EVALUATED_FEATURE_RESULT_SCHEMA]);
-const PERSON_DETECTION_RESULT_SCHEMA = createFeatureResultSchema({ people: zod.array(DETECTED_PERSON_SCHEMA) });
-const FACE_DETECTION_RESULT_SCHEMA = createFeatureResultSchema({ faces: zod.array(DETECTED_FACE_SCHEMA) });
+}).strict(), zod.object({
+	status: zod.literal("not-evaluated"),
+	reason: zod.enum(["not-supported", "unavailable"]).describe("Why the feature has no findings: `not-supported` for content it can't analyse, `unavailable` when its analysis failed")
+}).strict()]).meta(metaStore([docPropertyInfo({
+	description,
+	namedType: name
+})]));
+const OCR_RESULT_SCHEMA = createFeatureResultSchema("OcrResult", "What OCR found in the image. Its text is `content.extractedText`.", { textRegions: zod.array(TEXT_REGION_SCHEMA).max(200).describe("Where OCR found text, and personal information within it. Redaction transforms blur these regions. Empty when the image has no text.") });
+const PERSON_DETECTION_RESULT_SCHEMA = createFeatureResultSchema("PersonDetectionResult", "Preview. The people person detection found", { people: zod.array(DETECTED_PERSON_SCHEMA) });
+const FACE_DETECTION_RESULT_SCHEMA = createFeatureResultSchema("FaceDetectionResult", "Preview. The faces face detection found", { faces: zod.array(DETECTED_FACE_SCHEMA) });
 const DETECTED_QR_CODE_SCHEMA = zod.object({
 	value: zod.string().describe("The text the QR code holds, such as a URL"),
 	box: BOUNDING_BOX_SCHEMA
@@ -382,7 +384,7 @@ const DETECTED_LINK_SCHEMA = zod.object({
 	description: "A web link found in the image",
 	namedType: "DetectedLink"
 })]));
-const LINK_DETECTION_RESULT_SCHEMA = createFeatureResultSchema({
+const LINK_DETECTION_RESULT_SCHEMA = createFeatureResultSchema("LinkDetectionResult", "The QR codes and web links link detection found", {
 	qrCodes: zod.array(DETECTED_QR_CODE_SCHEMA),
 	links: zod.array(DETECTED_LINK_SCHEMA)
 });
@@ -390,7 +392,7 @@ const LINK_DETECTION_RESULT_SCHEMA = createFeatureResultSchema({
 * Link safety's result: every link found in the asset, where it leads and its verdict. It runs when
 * the project's policy acts on links, not through `processingOptions.features`.
 */
-const LINK_SAFETY_RESULT_SCHEMA = createFeatureResultSchema({ links: zod.array(CHECKED_LINK_SCHEMA) });
+const LINK_SAFETY_RESULT_SCHEMA = createFeatureResultSchema("LinkSafetyResult", "Preview. Where each link in the asset leads and its verdict", { links: zod.array(CHECKED_LINK_SCHEMA) });
 const PROVENANCE_SIGNAL_SCHEMA = zod.object({
 	kind: zod.enum([
 		"c2pa",
@@ -412,8 +414,9 @@ const AI_PROVENANCE_SHAPE = {
 };
 /** The AI provenance an uploaded image declares, read before its metadata is removed. */
 const AI_PROVENANCE_SCHEMA = zod.object(AI_PROVENANCE_SHAPE).strict();
-const AI_GENERATED_DETECTION_RESULT_SCHEMA = createFeatureResultSchema(AI_PROVENANCE_SHAPE);
+const AI_GENERATED_DETECTION_RESULT_SCHEMA = createFeatureResultSchema("AiGeneratedDetectionResult", "Preview. The AI provenance the image's metadata declares", AI_PROVENANCE_SHAPE);
 const PROCESSING_FEATURE_RESULTS_SCHEMA = zod.object({
+	ocr: OCR_RESULT_SCHEMA.optional(),
 	personDetection: PERSON_DETECTION_RESULT_SCHEMA.optional(),
 	faceDetection: FACE_DETECTION_RESULT_SCHEMA.optional(),
 	linkDetection: LINK_DETECTION_RESULT_SCHEMA.optional(),
@@ -453,7 +456,10 @@ const STRICT_QUALIFIER_RESULTS_SCHEMA = zod.partialRecord(zod.enum(MODERATION_QU
 }), zod.object({
 	status: zod.literal("not-evaluated"),
 	reason: CLASSIFICATION_NOT_EVALUATED_REASON_SCHEMA
-}).strict()]));
+}).strict()]).meta(metaStore([docPropertyInfo({
+	description: "What the evidence says about one qualifier",
+	namedType: "QualifierResult"
+})])));
 const KNOWN_QUALIFIERS = new Set(MODERATION_QUALIFIERS);
 /**
 * Qualifier results keyed by qualifier. Keys from removed or renamed qualifiers are dropped rather
@@ -498,7 +504,10 @@ const PUBLIC_CATEGORY_REPORT_SCHEMA = zod.discriminatedUnion("status", [
 	CLASSIFICATION_CATEGORY_REPORT_SCHEMA.options[0].omit({ policyConditions: true }),
 	CLASSIFICATION_CATEGORY_REPORT_SCHEMA.options[1].omit({ policyConditions: true }),
 	CLASSIFICATION_CATEGORY_REPORT_SCHEMA.options[2].omit({ policyConditions: true })
-]);
+]).meta(metaStore([docPropertyInfo({
+	description: "A category's detection findings, before the policy is applied",
+	namedType: "CategoryReport"
+})]));
 const CATEGORIES_SCHEMA = zod.object({
 	sexual: CLASSIFICATION_CATEGORY_REPORT_SCHEMA,
 	violence: CLASSIFICATION_CATEGORY_REPORT_SCHEMA,
@@ -530,7 +539,7 @@ const DECISION_SOURCES = [
 	"link-safety"
 ];
 const CATEGORY_SETTINGS_SNAPSHOT_SCHEMA = zod.object({
-	categoryAction: POLICY_ACTION_SCHEMA,
+	action: POLICY_ACTION_SCHEMA,
 	allowances: zod.array(POLICY_ALLOWANCE_SCHEMA).max(50),
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50)
 }).strict().optional().describe("The category's default action and rules in force at decision time.");
@@ -550,9 +559,15 @@ const CATEGORY_ASSESSMENT_SCHEMA = zod.object({
 			kind: zod.literal("restriction"),
 			indexes: RULE_INDEXES_SCHEMA
 		}).strict()
-	]).optional().describe("What decided the category's action: its `default` action, a policy score `below-threshold`, or the `allowance` or `restriction` rules listed by `indexes`."),
+	]).meta(metaStore([docPropertyInfo({
+		description: "What decided the category's action: its `default` action, a policy score `below-threshold`, or the `allowance` or `restriction` rules listed by `indexes`.",
+		namedType: "CategoryAssessmentSource"
+	})])).optional(),
 	settings: CATEGORY_SETTINGS_SNAPSHOT_SCHEMA
-}).strict();
+}).strict().meta(metaStore([docPropertyInfo({
+	description: "What the policy made of one category",
+	namedType: "CategoryAssessment"
+})]));
 /** What the project's policy made of the report when the asset was decided. */
 const MODERATION_ASSESSMENT_FIELDS_SCHEMA = zod.object({
 	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, CATEGORY_ASSESSMENT_SCHEMA).describe("Each assessed category's policy score and action. Unassessed categories are left out."),
@@ -612,8 +627,7 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 		}).strict().optional(),
 		hashMatches: zod.array(HASH_MATCH_SCHEMA).optional().describe("Entries in the project's hash lists that the image matched, blocking matches first and then the closest. Absent when nothing matched.")
 	}).strict().describe("Detection findings before policy evaluation."),
-	features: PROCESSING_FEATURE_RESULTS_SCHEMA.optional(),
-	textRegions: zod.array(TEXT_REGION_SCHEMA).max(200).optional().describe("Where OCR found text, and personal information within it, in an image. Redaction transforms blur these regions.")
+	features: PROCESSING_FEATURE_RESULTS_SCHEMA.optional()
 }).strict().refine(hasValidModerationRule, {
 	message: "moderation/rule-required",
 	path: ["rule"]
@@ -774,7 +788,10 @@ const EXTRACTED_TEXT_SCHEMA = zod.discriminatedUnion("type", [zod.object({
 }), zod.object({
 	type: zod.literal("document"),
 	id: saneStringField()
-})]);
+})]).meta(metaStore([docPropertyInfo({
+	description: "Extracted text: inline as `content` (`type: string`), or stored as a document with its `id` (`type: document`)",
+	namedType: "ExtractedText"
+})]));
 const CHECKSUMS_SCHEMA = zod.object({
 	md5: zod.string().nullish().describe("MD5 digest of the stored content"),
 	sha1: zod.string().nullish().describe("SHA-1 digest of the stored content"),
@@ -1023,24 +1040,24 @@ const ASSESSMENT_FIELDS = MODERATION_ASSESSMENT_FIELDS_SCHEMA.shape;
 const ASSET_MODERATION_SCHEMA = zod.object({
 	status: ASSET_MODERATION_STATUS_SCHEMA.describe("The decision in force, which also decides delivery: `pending`, `allowed`, `limited` (delivered normally, marked for reduced reach), `age-restricted` (served only with `viewerClaims.ageConfirmed: true` and any required private-asset access), `blocked` or `purged`. A reviewer's decision takes precedence."),
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
-	automatedStatus: ASSET_MODERATION_DECISION_SCHEMA.optional().describe("The status automated moderation decided. Manual reviews can change `status` without changing this, so the two differ when a reviewer overrode the automated decision."),
-	source: ASSESSMENT_FIELDS.source.optional(),
-	rule: ASSESSMENT_FIELDS.rule,
-	explanationComplete: ASSESSMENT_FIELDS.explanationComplete.optional(),
-	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, CATEGORY_ASSESSMENT_SCHEMA).optional().describe("Each assessed category's policy score and action. Unassessed categories are left out."),
+	automatedStatus: ASSET_MODERATION_DECISION_SCHEMA.nullable().describe("The status automated moderation decided, `null` until it decides. Manual reviews can change `status` without changing this, so the two differ when a reviewer overrode the automated decision."),
+	source: ASSESSMENT_FIELDS.source.nullable().describe("What decided the automated status: the `policy`'s categories, the asset's `children`, a `hash-list` match, a `mandatory-rule` or `link-safety`. `null` until moderation decides."),
+	rule: ASSESSMENT_FIELDS.rule.unwrap().nullable().describe("The mandatory rule that decided, when `source` is `mandatory-rule`; otherwise `null`"),
+	explanationComplete: ASSESSMENT_FIELDS.explanationComplete.nullable().describe("Whether all questions needed for a complete explanation of the decision were answered, `null` until moderation decides. False means questions that could not change any action were skipped; the actions are still final."),
+	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, CATEGORY_ASSESSMENT_SCHEMA).nullable().describe("Each assessed category's policy score and action, `null` until moderation decides. Unassessed categories are left out."),
 	flaggedCategories: ASSESSMENT_FIELDS.flaggedCategories,
 	regions: zod.array(ASSET_REGIONAL_DECISION_SCHEMA).describe("Stricter decisions in jurisdictions the project serves, which apply to viewers there. Empty when there are none."),
 	linkSafety: zod.object({
 		action: LINK_SAFETY_ACTION_SCHEMA.describe("The strongest action the asset's links take under the policy's link-safety settings."),
 		links: zod.array(CHECKED_LINK_SCHEMA).describe("The links that take that action, with where each leads and its verdict."),
 		settings: LINK_SAFETY_SETTINGS_SCHEMA
-	}).strict().optional().describe("Preview. What the policy's link-safety section made of the asset's links. Absent when the policy doesn't act on links."),
+	}).strict().nullable().describe("Preview. What the policy's link-safety section made of the asset's links. `null` when the policy doesn't act on links and until moderation decides."),
 	raw: zod.object({
 		categories: PUBLIC_CATEGORIES_SCHEMA,
-		hashMatches: CLASSIFICATION_REPORT_SCHEMA.shape.raw.shape.hashMatches
-	}).strict().optional().describe("Detection findings before policy evaluation."),
+		hashMatches: CLASSIFICATION_REPORT_SCHEMA.shape.raw.shape.hashMatches.unwrap().describe("Entries in the project's hash lists that the image matched, blocking matches first and then the closest. Empty when nothing matched.")
+	}).strict().nullable().describe("Detection findings before policy evaluation, `null` until the asset is analysed."),
 	timeline: ASSET_MODERATION_TIMELINE_SCHEMA.nullable().describe("For audio and video: a summary of the findings timeline, which lists findings for each stretch of the media. Page through it with `GET /v1/projects/:projectId/assets/:assetId/timeline`. `null` for other assets, before there are findings and while a safety or copyright hold withholds the asset's content.")
-}).omit({}).refine(hasValidModerationRule, {
+}).omit({}).refine((moderation) => moderation.source === "mandatory-rule" ? Boolean(moderation.rule) : moderation.rule === null, {
 	message: "moderation/rule-required",
 	path: ["rule"]
 }).meta(metaStore([docPropertyInfo({
@@ -1055,12 +1072,12 @@ const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 	progress: CLASSIFICATION_PROGRESS_SCHEMA.nullable().describe("While long audio or video is analysed in sections and `status` is `processing`: how many of its sections are done. `null` otherwise. See [Long audio and video](/docs/guides/audio-and-video#long-audio-and-video)."),
 	testInput: zod.boolean().describe("Whether the results came from one of the project's test inputs (a signed text code, test image or media test phrase) rather than from analysing the content. Test results, including person and face detection and age ranges, are declared by the input: never use them for real decisions such as age checks. See [Testing](/docs/guides/testing)."),
 	moderation: ASSET_MODERATION_SCHEMA,
-	personDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.personDetection,
-	faceDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.faceDetection,
-	linkDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.linkDetection,
-	linkSafety: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.linkSafety.describe("Preview. Where each link in the asset leads and its verdict, when the project's policy acts on links."),
-	aiGeneratedDetection: CLASSIFICATION_REPORT_SCHEMA.shape.features.unwrap().shape.aiGeneratedDetection,
-	textRegions: CLASSIFICATION_REPORT_SCHEMA.shape.textRegions
+	ocr: OCR_RESULT_SCHEMA.nullable().describe("OCR's result for an image processed with `processingOptions.features.ocr`: where it found text. `null` when OCR didn't run."),
+	personDetection: PERSON_DETECTION_RESULT_SCHEMA.nullable().describe("Preview. Person detection's result, `null` when it didn't run"),
+	faceDetection: FACE_DETECTION_RESULT_SCHEMA.nullable().describe("Preview. Face detection's result, `null` when it didn't run"),
+	linkDetection: LINK_DETECTION_RESULT_SCHEMA.nullable().describe("Link detection's result for an image, `null` when it didn't run"),
+	linkSafety: LINK_SAFETY_RESULT_SCHEMA.nullable().describe("Preview. Where each link in the asset leads and its verdict, when the project's policy acts on links; otherwise `null`."),
+	aiGeneratedDetection: AI_GENERATED_DETECTION_RESULT_SCHEMA.nullable().describe("Preview. AI-generated detection's result, `null` when it didn't run")
 }).omit({ aiGeneratedDetection: true }).meta(metaStore([docPropertyInfo({
 	description: "Classification results",
 	namedType: "AssetClassification"
@@ -1103,11 +1120,11 @@ STORED_ASSET_SCHEMA.pick({
 	externalId: true,
 	externalUrl: true,
 	authorId: true,
-	context: true,
-	metadata: true,
-	tags: true,
-	visibility: true
+	context: true
 }).extend({
+	metadata: zod.array(METADATA_ITEM_SCHEMA).describe("Custom metadata items, by metadata field. Empty when the asset has none."),
+	tags: zod.array(saneStringField()).describe("Tags for the asset. Empty when it has none."),
+	visibility: ASSET_VISIBILITY_SCHEMA.describe("`public` assets are delivered from their plain URL; `private` ones, the default, need a signed asset URL"),
 	upload: ASSET_UPLOAD_SCHEMA,
 	classification: ASSET_CLASSIFICATION_SCHEMA,
 	content: ASSET_CONTENT_SCHEMA
@@ -1121,7 +1138,17 @@ STORED_ASSET_SCHEMA.pick({
 		type: "image",
 		createdAt: 17672256e5,
 		description: "Front view of a blue backpack",
+		parentId: null,
+		folderId: null,
+		uploadPresetId: null,
+		updatedAt: 1767225601e3,
+		externalId: null,
+		externalUrl: null,
+		authorId: null,
+		context: null,
+		metadata: [],
 		tags: ["catalogue", "backpacks"],
+		visibility: "private",
 		upload: {
 			status: "completed",
 			updatedAt: 17672256e5,
@@ -1137,10 +1164,37 @@ STORED_ASSET_SCHEMA.pick({
 			moderation: {
 				status: "allowed",
 				manualReviews: [],
+				automatedStatus: "allowed",
+				source: "policy",
+				rule: null,
+				explanationComplete: true,
+				categories: { violence: {
+					score: .01,
+					action: "allow",
+					source: { kind: "below-threshold" }
+				} },
 				flaggedCategories: [],
 				regions: [],
+				linkSafety: null,
+				raw: {
+					categories: Object.fromEntries(CLASSIFICATION_CATEGORIES.map((category) => [category, {
+						status: "evaluated",
+						likelihood: "very-unlikely",
+						score: .01
+					}])),
+					hashMatches: []
+				},
 				timeline: null
-			}
+			},
+			ocr: null,
+			linkDetection: {
+				status: "evaluated",
+				qrCodes: [],
+				links: []
+			},
+			personDetection: null,
+			faceDetection: null,
+			linkSafety: null
 		},
 		content: {
 			status: "stored",
