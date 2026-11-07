@@ -61,10 +61,36 @@ final class TestInputsTest extends TestCase
     }
 
     /**
-     * Rejections a PHP array can't express. `detections: []` (a list) decodes to the same empty
-     * array as `detections: {}`, which is a valid scenario; a non-empty list is still refused.
+     * Rejections PHP can't express. `detections: []` (a list) decodes to the same empty array as
+     * `detections: {}`, which is a valid scenario; a non-empty list is still refused. `$expiresAt`
+     * is an `int`, so a fractional expiry is a `TypeError`.
      */
-    private const INEXPRESSIBLE_REJECTIONS = ['detections list'];
+    private const INEXPRESSIBLE_REJECTIONS = ['detections list', 'expiry 1.5'];
+
+    public function testFractionalExpiryIsATypeError(): void
+    {
+        $this->expectException(TypeError::class);
+        TestInputs::generateTestTextCode('harassment', str_repeat('a', 32), expiresAt: 1.5);
+    }
+
+    public function testExpiryLifetimesMatchTheFixture(): void
+    {
+        $expiry = self::fixture()['expiry'];
+        self::assertSame([$expiry['defaultLifetimeSeconds'], $expiry['maxLifetimeSeconds']],
+            [TestInputs::DEFAULT_LIFETIME_SECONDS, TestInputs::MAX_LIFETIME_SECONDS]);
+    }
+
+    /** Without `$expiresAt`, the signed payload's first four bytes are a day from now. */
+    public function testCodeExpiresAfterTheDefaultLifetime(): void
+    {
+        $code = TestInputs::generateTestTextCode('harassment', str_repeat('a', 32));
+        $now = time();
+        $payload = explode(' ', substr($code, 0, -1))[2];
+        $expiresAt = unpack('N', (string) base64_decode(strtr($payload, '-_', '+/'), true))[1];
+        $lifetime = self::fixture()['expiry']['defaultLifetimeSeconds'];
+        self::assertGreaterThanOrEqual($now + $lifetime - 5, $expiresAt);
+        self::assertLessThanOrEqual($now + $lifetime + 5, $expiresAt);
+    }
 
     public static function rejections(): array
     {
@@ -85,7 +111,7 @@ final class TestInputsTest extends TestCase
     #[DataProvider('images')]
     public function testImageMatchesTheFixture(array $case): void
     {
-        $image = TestInputs::paintTestImage($case['input'] ?? $case['signal'], $case['key']);
+        $image = TestInputs::paintTestImage($case['input'] ?? $case['signal'], $case['key'], $case['expiresAt']);
         self::assertSame([$case['width'], $case['height']], [$image->width, $image->height]);
         self::assertSame($case['rgbaSha256'], hash('sha256', $image->rgba));
         self::assertSame($case['levels'], self::fixtureLevels($image->rgba, $image->width, $case['cells']));
@@ -96,7 +122,7 @@ final class TestInputsTest extends TestCase
     public function testOversizedImageScenarioRaisesInvalidArgument(array $case): void
     {
         try {
-            TestInputs::paintTestImage($case['input'] ?? $case['signal'], $case['key']);
+            TestInputs::paintTestImage($case['input'] ?? $case['signal'], $case['key'], $case['expiresAt']);
             self::fail("{$case['name']} was painted");
         } catch (InvalidArgumentException $error) {
             self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, $error->errorCode);
@@ -155,7 +181,7 @@ final class TestInputsTest extends TestCase
     #[DataProvider('texts')]
     public function testTextCodeMatchesTheFixture(array $case): void
     {
-        self::assertSame($case['code'], TestInputs::generateTestTextCode($case['input'] ?? $case['signal'], $case['key']));
+        self::assertSame($case['code'], TestInputs::generateTestTextCode($case['input'] ?? $case['signal'], $case['key'], $case['expiresAt']));
     }
 
     #[DataProvider('media')]
@@ -209,7 +235,7 @@ final class TestInputsTest extends TestCase
         $scenario = $case['input'] ?? $case['signal'];
         try {
             match ($case['kind']) {
-                'text' => TestInputs::generateTestTextCode($scenario, $case['key']),
+                'text' => TestInputs::generateTestTextCode($scenario, $case['key'], $case['expiresAt'] ?? null),
                 'media' => TestInputs::generateMediaTestCode($scenario, $case['key']),
             };
             self::fail("{$case['name']} was accepted");
