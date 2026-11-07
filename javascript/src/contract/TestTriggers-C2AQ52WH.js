@@ -1,6 +1,6 @@
 import { t as CLASSIFICATION_CATEGORIES } from "./ModerationCategories-CHFRoeWV.js";
 import { r as timingSafeEqual, t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { i as msg, n as MODERATION_QUALIFIERS, r as getModerationQualifierInfo, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-RQomMunm.js";
+import { i as msg, n as MODERATION_QUALIFIERS, r as getModerationQualifierInfo, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-DPNhFf9c.js";
 import * as z from "zod";
 // packages/shared/src/TestImageGrid.ts
 /**
@@ -249,7 +249,8 @@ function paintTestImageGrid(data, palette = [TEST_IMAGE_GRID_NEUTRAL]) {
 /**
 * Reads the bytes a grid carries, or undefined when the image holds no readable grid. The grid
 * may be scaled (also unevenly) and surrounded by a uniform border, such as video letterboxing.
-* Cost is bounded by sampling, not by the image size, so every video frame can be checked.
+* Cost is bounded by sampling, not by the image size, so every video frame can be checked. Reading
+* only samples cells: `matchesTestImageGrid` checks that nothing else is in the image.
 */
 function readTestImageGrid({ width, height, rgba }) {
 	if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 30 || height < 30 || rgba.length !== width * height * 4) return;
@@ -305,8 +306,93 @@ function readTestImageGrid({ width, height, rgba }) {
 		let position = 0;
 		for (let i = 0; i < Math.max(...lengths); i++) for (const codeword of codewords) if (i < codeword.length) codeword[i] = stream[position++];
 		if (!codewords.every(rsDecode)) continue;
-		return new Uint8Array(codewords.flatMap((codeword) => [...codeword.subarray(0, codeword.length - 32)]));
+		return {
+			data: new Uint8Array(codewords.flatMap((codeword) => [...codeword.subarray(0, codeword.length - 32)])),
+			cells,
+			left,
+			top,
+			gridWidth,
+			gridHeight
+		};
 	}
+}
+/**
+* Whether the whole image is the grid `expected` (painted from the bytes `found` read) on a
+* uniform border: every pixel is opaque and, in each channel, within the tolerance of the colours
+* of the repainted cells (or the border) near its place. "Near" is a few pixels, which absorbs
+* the blur scaling and compression put on cell edges. Damage the reader's error correction
+* repaired, an overlay and anything drawn in chroma alone all fail.
+*/
+function matchesTestImageGrid({ width, height, rgba }, found, expected) {
+	const { cells, left, top, gridWidth, gridHeight } = found;
+	if (rgba.length !== width * height * 4 || expected.width % cells) return false;
+	const cellSize = expected.width / cells;
+	if (cellSize < 1 || expected.height !== expected.width) return false;
+	const colours = new Uint8Array(cells * cells * 3);
+	for (let row = 0; row < cells; row++) for (let column = 0; column < cells; column++) {
+		const offset = ((row * cellSize + (cellSize >> 1)) * expected.width + column * cellSize + (cellSize >> 1)) * 4;
+		colours.set(expected.rgba.subarray(offset, offset + 3), (row * cells + column) * 3);
+	}
+	const border = [
+		rgba[0],
+		rgba[1],
+		rgba[2]
+	];
+	const radius = 2 + Math.ceil(Math.max(gridWidth, gridHeight) / expected.width);
+	const right = left + gridWidth - 1;
+	const bottom = top + gridHeight - 1;
+	const span = (from, to, start, end, size) => {
+		const outside = from < start || to > end;
+		if (to < start || from > end) return {
+			outside,
+			first: 0,
+			last: -1
+		};
+		return {
+			outside,
+			first: Math.max(0, Math.floor((Math.max(from, start) - start) * cells / size)),
+			last: Math.min(cells - 1, Math.floor((Math.min(to, end) - start) * cells / size))
+		};
+	};
+	const columns = Array.from({ length: width }, (_, x) => span(x - radius, x + radius, left, right, gridWidth));
+	const low = [
+		0,
+		0,
+		0
+	];
+	const high = [
+		0,
+		0,
+		0
+	];
+	for (let y = 0; y < height; y++) {
+		const rows = span(y - radius, y + radius, top, bottom, gridHeight);
+		for (let x = 0; x < width; x++) {
+			const offset = (y * width + x) * 4;
+			if (rgba[offset + 3] < 250) return false;
+			const near = columns[x];
+			low.fill(255);
+			high.fill(0);
+			const include = (r, g, b) => {
+				low[0] = Math.min(low[0], r);
+				low[1] = Math.min(low[1], g);
+				low[2] = Math.min(low[2], b);
+				high[0] = Math.max(high[0], r);
+				high[1] = Math.max(high[1], g);
+				high[2] = Math.max(high[2], b);
+			};
+			if (rows.outside || near.outside) include(border[0], border[1], border[2]);
+			for (let row = rows.first; row <= rows.last; row++) for (let column = near.first; column <= near.last; column++) {
+				const colour = (row * cells + column) * 3;
+				include(colours[colour], colours[colour + 1], colours[colour + 2]);
+			}
+			for (let channel = 0; channel < 3; channel++) {
+				const value = rgba[offset + channel];
+				if (value < low[channel] - 40 || value > high[channel] + 40) return false;
+			}
+		}
+	}
+	return true;
 }
 const ringMatches = (samples) => {
 	let black = 0;
@@ -584,30 +670,70 @@ const TEST_INPUT_PRESETS = {
 		}
 	}
 };
+/** A code is valid for a day unless its maker chooses another expiry. */
+const TEST_INPUT_DEFAULT_LIFETIME_SECONDS = 86400;
 /**
-* A text code as it appears in the text being moderated. Text extracted from a document (a PDF, or
-* a Word file converted to one) breaks a code that its layout wrapped: a line break between its
-* parts, after a hyphen or anywhere in a long payload. Whitespace inside a code is layout, not
-* content, so it is removed before the signature is checked.
+* The longest a code may still have to run when CalmLens reads it: a code that expires later is
+* never recognised, so a leaked one stops working within a week whatever its maker chose.
 */
-const pattern = /<!calmlens-\s*test\s+([A-Za-z0-9_\s-]{33,16384})>/g;
-const tag = async (payload, key) => (await hmacSha256Hex(key, `calmlens-test:v1:${payload}`)).slice(0, 32);
-async function generateTestTextCode(scenario, key) {
+const TEST_INPUT_MAX_LIFETIME_SECONDS = 604800;
+/** Clock difference tolerated between the code's maker and CalmLens. */
+const CLOCK_SKEW_SECONDS = 300;
+const expiryOf = (options) => {
+	const expiresAt = options?.expiresAt ?? Math.floor(Date.now() / 1e3) + 86400;
+	if (!Number.isInteger(expiresAt) || expiresAt < 0 || expiresAt > 4294967295) throw new TypeError("Invalid test input expiry");
+	return expiresAt;
+};
+/** Whether a code expiring at `expiresAt` (Unix seconds) is current at `now` (milliseconds). */
+const isTestInputExpiryCurrent = (expiresAt, now) => {
+	const seconds = Math.floor(now / 1e3);
+	return expiresAt + CLOCK_SKEW_SECONDS >= seconds && expiresAt <= seconds + 604800 + CLOCK_SKEW_SECONDS;
+};
+/**
+* A text code: the tag, then the signed payload, base64url of the expiry (four bytes, big-endian
+* Unix seconds) followed by the scenario JSON. Text extracted from a document (a PDF, or a Word file
+* converted to one) breaks a code that its layout wrapped: a line break between its parts, after a
+* hyphen or anywhere in a long payload. Whitespace inside a code is layout, not content, so it is
+* removed before the signature is checked.
+*/
+const WHOLE_CODE = /^<!calmlens-\s*test\s+([A-Za-z0-9_\s-]{33,16384})>$/;
+const tag = async (payload, key) => (await hmacSha256Hex(key, `calmlens-test:v2:${payload}`)).slice(0, 32);
+const toBase64Url = (bytes) => btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+const fromBase64Url = (text) => Uint8Array.from(atob(text.replaceAll("-", "+").replaceAll("_", "/")), (char) => char.charCodeAt(0));
+/** The signed bytes: the expiry, then the scenario's canonical JSON (ASCII). */
+const envelope = (scenario, expiresAt) => {
+	const json = new TextEncoder().encode(JSON.stringify(TEST_INPUT_SCHEMA.parse(scenario)));
+	const bytes = new Uint8Array(4 + json.length);
+	new DataView(bytes.buffer).setUint32(0, expiresAt);
+	bytes.set(json, 4);
+	return bytes;
+};
+async function generateTestTextCode(scenario, key, options) {
 	if (!/^[a-f0-9]{32}$/.test(key)) throw new TypeError("Invalid test input key");
-	const payload = btoa(JSON.stringify(TEST_INPUT_SCHEMA.parse(typeof scenario === "string" ? testInputForSignal(scenario) : scenario))).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+	const payload = toBase64Url(envelope(typeof scenario === "string" ? testInputForSignal(scenario) : scenario, expiryOf(options)));
 	if (payload.length > 8e3) throw new RangeError("Test scenario is too large");
 	return `<!calmlens-test ${await tag(payload, key)} ${payload}>`;
 }
-async function detectTestTrigger(text, key) {
+/**
+* The scenario a text declares when the whole text is one current code signed with `key`;
+* surrounding text, a second code, an altered, expired or over-long-lived code all return
+* undefined, so the text is moderated as ordinary content.
+*/
+async function detectTestTrigger(text, key, now = Date.now()) {
 	if (!/^[a-f0-9]{32}$/.test(key)) return;
-	const matches = [...text.matchAll(pattern)];
-	if (matches.length !== 1) return;
-	const code = matches[0][1].replace(/\s+/g, "");
+	const match = WHOLE_CODE.exec(text.trim());
+	if (!match) return;
+	const code = match[1].replace(/\s+/g, "");
 	const signature = code.slice(0, 32);
 	const payload = code.slice(32);
 	if (!/^[a-f0-9]{32}$/.test(signature) || !payload || payload.length > 8e3 || !timingSafeEqual(signature, await tag(payload, key))) return;
 	try {
-		const parsed = TEST_INPUT_SCHEMA.safeParse(JSON.parse(atob(payload.replaceAll("-", "+").replaceAll("_", "/"))));
+		const bytes = fromBase64Url(payload);
+		if (bytes.length < 5) return;
+		if (!isTestInputExpiryCurrent(new DataView(bytes.buffer).getUint32(0), now)) return;
+		const json = bytes.subarray(4);
+		if (json.some((byte) => byte > 127)) return;
+		const parsed = TEST_INPUT_SCHEMA.safeParse(JSON.parse(new TextDecoder().decode(json)));
 		return parsed.success ? parsed.data : void 0;
 	} catch {
 		return;
@@ -657,31 +783,40 @@ const TEST_INPUT_CATEGORY_COLORS = {
 	]
 };
 /**
-* The text code's signed bytes as a grid (TestImageGrid.ts): the scenario JSON's length (two
-* bytes, big-endian), the 16-byte tag, then the JSON. The reader rebuilds the text code, so images
-* and text share one verification.
+* The text code's signed bytes as a grid (TestImageGrid.ts): the signed payload's length (two
+* bytes, big-endian), the 16-byte tag, then the payload (the expiry and the scenario JSON). The
+* reader rebuilds the text code, so images and text share one verification.
 */
-async function paintTestImage(scenario, key) {
+async function paintTestImage(scenario, key, options) {
 	const input = TEST_INPUT_SCHEMA.parse(typeof scenario === "string" ? testInputForSignal(scenario, "image") : scenario);
-	const [, signature, payload] = (await generateTestTextCode(input, key)).slice(0, -1).split(" ");
-	const json = Uint8Array.from(atob(payload.replaceAll("-", "+").replaceAll("_", "/")), (char) => char.charCodeAt(0));
-	const data = new Uint8Array(18 + json.length);
-	data.set([json.length >> 8, json.length & 255]);
+	const [, signature, payload] = (await generateTestTextCode(input, key, options)).slice(0, -1).split(" ");
+	const signed = fromBase64Url(payload);
+	const data = new Uint8Array(18 + signed.length);
+	data.set([signed.length >> 8, signed.length & 255]);
 	data.set(signature.match(/../g).map((hex) => Number.parseInt(hex, 16)), 2);
-	data.set(json, 18);
+	data.set(signed, 18);
+	return paintTestImageGrid(data, testImagePalette(input));
+}
+const testImagePalette = (input) => {
 	const categories = [...new Set(input.instances.map((instance) => instance.category))];
-	return paintTestImageGrid(data, categories.length ? categories.map((category) => TEST_INPUT_CATEGORY_COLORS[category]) : void 0);
-}
-const base64Url = (bytes) => btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-/** The test input a project's test image carries, also after video encoding and resizing. */
-async function detectTestImage(image, key) {
+	return categories.length ? categories.map((category) => TEST_INPUT_CATEGORY_COLORS[category]) : void 0;
+};
+/**
+* The test input an image declares when the whole image is one of the project's current test
+* images, also after video encoding and resizing: the grid, optionally on a uniform border. Every
+* pixel must match the grid repainted from the bytes it carries (TestImageGrid.ts,
+* `matchesTestImageGrid`), so nothing else can be drawn on or around it.
+*/
+async function detectTestImage(image, key, now = Date.now()) {
 	if (!TEST_INPUT_KEY_PATTERN.test(key)) return;
-	const data = readTestImageGrid(image);
-	if (!data) return;
+	const grid = readTestImageGrid(image);
+	if (!grid) return;
+	const { data } = grid;
 	const length = data[0] << 8 | data[1];
-	if (18 + length > data.length) return;
-	const json = data.subarray(18, 18 + length);
-	if (json.some((byte) => byte > 127)) return;
-	return detectTestTrigger(`<!calmlens-test ${[...data.subarray(2, 18)].map((byte) => byte.toString(16).padStart(2, "0")).join("")} ${base64Url(json)}>`, key);
+	if (length < 5 || 18 + length > data.length) return;
+	const signed = data.subarray(18, 18 + length);
+	const scenario = await detectTestTrigger(`<!calmlens-test ${[...data.subarray(2, 18)].map((byte) => byte.toString(16).padStart(2, "0")).join("")} ${toBase64Url(signed)}>`, key, now);
+	if (!scenario) return;
+	return matchesTestImageGrid(image, grid, paintTestImageGrid(data.subarray(0, 18 + length), testImagePalette(scenario))) ? scenario : void 0;
 }
-export { TEST_INPUT_KEY_PATTERN as a, detectTestTrigger as c, getTestInputTag as d, paintTestImage as f, TEST_FACE_AGE_PRESETS as i, generateTestTextCode as l, TEST_DETECTION_BOX_MAX as n, TEST_INPUT_PRESETS as o, testInputForSignal as p, TEST_FACE_AGE_MAX as r, detectTestImage as s, TEST_DETECTIONS_MAX as t, getImageTestCategories as u };
+export { TEST_INPUT_DEFAULT_LIFETIME_SECONDS as a, TEST_INPUT_PRESETS as c, generateTestTextCode as d, getImageTestCategories as f, testInputForSignal as h, TEST_FACE_AGE_PRESETS as i, detectTestImage as l, paintTestImage as m, TEST_DETECTION_BOX_MAX as n, TEST_INPUT_KEY_PATTERN as o, getTestInputTag as p, TEST_FACE_AGE_MAX as r, TEST_INPUT_MAX_LIFETIME_SECONDS as s, TEST_DETECTIONS_MAX as t, detectTestTrigger as u };

@@ -355,20 +355,41 @@ declare const TEST_INPUT_PRESETS: {
     };
   };
 };
-declare function generateTestTextCode(scenario: TestInput | ClassificationTestSignal, key: string): Promise<string>;
-declare function detectTestTrigger(text: string, key: string): Promise<TestInput | undefined>;
+/** A code is valid for a day unless its maker chooses another expiry. */
+declare const TEST_INPUT_DEFAULT_LIFETIME_SECONDS: number;
 /**
- * The text code's signed bytes as a grid (TestImageGrid.ts): the scenario JSON's length (two
- * bytes, big-endian), the 16-byte tag, then the JSON. The reader rebuilds the text code, so images
- * and text share one verification.
+ * The longest a code may still have to run when CalmLens reads it: a code that expires later is
+ * never recognised, so a leaked one stops working within a week whatever its maker chose.
  */
-declare function paintTestImage(scenario: TestInput | ClassificationTestSignal, key: string): Promise<{
+declare const TEST_INPUT_MAX_LIFETIME_SECONDS: number;
+/** Generation options: `expiresAt` is the code's expiry in Unix seconds. */
+interface TestInputCodeOptions {
+  expiresAt?: number;
+}
+declare function generateTestTextCode(scenario: TestInput | ClassificationTestSignal, key: string, options?: TestInputCodeOptions): Promise<string>;
+/**
+ * The scenario a text declares when the whole text is one current code signed with `key`;
+ * surrounding text, a second code, an altered, expired or over-long-lived code all return
+ * undefined, so the text is moderated as ordinary content.
+ */
+declare function detectTestTrigger(text: string, key: string, now?: number): Promise<TestInput | undefined>;
+/**
+ * The text code's signed bytes as a grid (TestImageGrid.ts): the signed payload's length (two
+ * bytes, big-endian), the 16-byte tag, then the payload (the expiry and the scenario JSON). The
+ * reader rebuilds the text code, so images and text share one verification.
+ */
+declare function paintTestImage(scenario: TestInput | ClassificationTestSignal, key: string, options?: TestInputCodeOptions): Promise<{
   width: number;
   height: number;
   rgba: Uint8Array<ArrayBuffer>;
 }>;
-/** The test input a project's test image carries, also after video encoding and resizing. */
-declare function detectTestImage(image: RgbaImage, key: string): Promise<{
+/**
+ * The test input an image declares when the whole image is one of the project's current test
+ * images, also after video encoding and resizing: the grid, optionally on a uniform border. Every
+ * pixel must match the grid repainted from the bytes it carries (TestImageGrid.ts,
+ * `matchesTestImageGrid`), so nothing else can be drawn on or around it.
+ */
+declare function detectTestImage(image: RgbaImage, key: string, now?: number): Promise<{
   regionalActions?: {
     region: "AT" | "AU" | "BR" | "DE" | "EU" | "FR" | "GB";
     action: "age-restrict" | "block" | "limit";
@@ -395,4 +416,4 @@ declare function detectTestImage(image: RgbaImage, key: string): Promise<{
     }[] | undefined;
   } | undefined;
 } | undefined>;
-export { TEST_FACE_AGE_PRESETS as a, TestDetections as c, detectTestTrigger as d, generateTestTextCode as f, testInputForSignal as h, TEST_FACE_AGE_MAX as i, TestInput as l, paintTestImage as m, TEST_DETECTIONS_MAX as n, TEST_INPUT_KEY_PATTERN as o, getImageTestCategories as p, TEST_DETECTION_BOX_MAX as r, TEST_INPUT_PRESETS as s, ClassificationTestSignal as t, detectTestImage as u };
+export { paintTestImage as _, TEST_FACE_AGE_PRESETS as a, TEST_INPUT_MAX_LIFETIME_SECONDS as c, TestInput as d, TestInputCodeOptions as f, getImageTestCategories as g, generateTestTextCode as h, TEST_FACE_AGE_MAX as i, TEST_INPUT_PRESETS as l, detectTestTrigger as m, TEST_DETECTIONS_MAX as n, TEST_INPUT_DEFAULT_LIFETIME_SECONDS as o, detectTestImage as p, TEST_DETECTION_BOX_MAX as r, TEST_INPUT_KEY_PATTERN as s, ClassificationTestSignal as t, TestDetections as u, testInputForSignal as v };
