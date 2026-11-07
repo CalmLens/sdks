@@ -7,8 +7,10 @@ JSON error bodies and headers (``X-Request-Id``, ``Retry-After``, ``Idempotent-R
 Keep this module out of production code paths.
 
 It also generates signed test inputs (``generate_test_text_code``, ``paint_test_image`` and
-``generate_media_test_code``): content that CalmLens, given the project's test input key, answers
-with the scenario it describes instead of classifying it.
+``generate_media_test_code``): content that CalmLens, in a project with "Recognise test inputs"
+turned on, answers with the scenario it describes instead of classifying it when the content is
+signed with the project's test input key. Text codes and test images expire, by default one day
+after they are made, so generate them when tests run.
 """
 from __future__ import annotations
 
@@ -42,7 +44,9 @@ from .client import (DEFAULT_CONNECT_TIMEOUT, DEFAULT_MAX_RESPONSE_BYTES, DEFAUL
                      _HEX_COLOUR, _UNSET, _check_transform_options, _invalid, _invalid_upload_mime_type,
                      _is_accepted_upload_mime_type, _json, _merge, _normalize_upload_mime_type,
                      _sign_upload_token)
-from ._signed_test_inputs import (MEDIA_TEST_SIGNALS, TEST_INPUT_PRESETS, TEXT_TEST_SIGNALS, ClassificationTestSignal,
+from ._signed_test_inputs import (MEDIA_TEST_SIGNALS, TEST_INPUT_DEFAULT_LIFETIME_SECONDS,
+                                  TEST_INPUT_MAX_LIFETIME_SECONDS, TEST_INPUT_PRESETS, TEXT_TEST_SIGNALS,
+                                  ClassificationTestSignal,
                                   PaintedTestImage, SignedTestAction, SignedTestDetectedFace,
                                   SignedTestDetectedPerson, SignedTestDetections, SignedTestFaceAge,
                                   SignedTestFaceAgePreset, SignedTestFaceAgeRange, SignedTestInput, SignedTestInstance,
@@ -62,7 +66,8 @@ __all__ = ["MockCalmLensServerClient", "MOCK_PROJECT_ID", "MockRequest", "MockOp
            "ClassificationTestSignal", "SignedTestInput", "SignedTestInstance", "SignedTestAction",
            "SignedTestRegionalAction", "SignedTestRegion", "SignedTestRegionalActionName",
            "SignedTestDetections", "SignedTestDetectedPerson", "SignedTestDetectedFace", "SignedTestFaceAge",
-           "SignedTestFaceAgePreset", "SignedTestFaceAgeRange", "TEST_INPUT_PRESETS", "TEXT_TEST_SIGNALS", "MEDIA_TEST_SIGNALS", "generate_test_text_code",
+           "SignedTestFaceAgePreset", "SignedTestFaceAgeRange", "TEST_INPUT_PRESETS", "TEST_INPUT_DEFAULT_LIFETIME_SECONDS",
+           "TEST_INPUT_MAX_LIFETIME_SECONDS", "TEXT_TEST_SIGNALS", "MEDIA_TEST_SIGNALS", "generate_test_text_code",
            "generate_media_test_code", "signal_test_input", "paint_test_image", "PaintedTestImage"]
 
 _MOCK_OPTIONS = {"database_storage", "image_storage", "create_id", "now", "moderate"}

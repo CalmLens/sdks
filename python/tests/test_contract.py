@@ -17,6 +17,7 @@ import io
 import json
 import re
 import struct
+import time
 import typing
 import unittest
 import zlib
@@ -1138,8 +1139,22 @@ class SignedTestInputTests(unittest.TestCase):
     def test_text_codes(self) -> None:
         for case in self.FIXTURE["text"]:
             with self.subTest(case["name"]):
-                self.assertEqual(testing.generate_test_text_code(case.get("input", case.get("signal")), case["key"]),
+                self.assertEqual(testing.generate_test_text_code(case.get("input", case.get("signal")), case["key"],
+                                                                 expires_at=case["expiresAt"]),
                                  case["code"])
+
+    def test_expiry(self) -> None:
+        """The fixture's lifetimes, and a code made without an expiry signs one a day from now."""
+        expiry = self.FIXTURE["expiry"]
+        self.assertEqual(testing.TEST_INPUT_DEFAULT_LIFETIME_SECONDS, expiry["defaultLifetimeSeconds"])
+        self.assertEqual(testing.TEST_INPUT_MAX_LIFETIME_SECONDS, expiry["maxLifetimeSeconds"])
+        key = self.FIXTURE["text"][0]["key"]
+        code = testing.generate_test_text_code("harassment", key)
+        now = time.time()
+        payload = code[:-1].split(" ")[2]
+        (expires_at,) = struct.unpack(">I", base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))[:4])
+        self.assertGreaterEqual(expires_at, now + expiry["defaultLifetimeSeconds"] - 5)
+        self.assertLessEqual(expires_at, now + expiry["defaultLifetimeSeconds"] + 5)
 
     def test_media_phrases(self) -> None:
         for case in self.FIXTURE["media"]:
@@ -1149,7 +1164,8 @@ class SignedTestInputTests(unittest.TestCase):
     def test_images(self) -> None:
         for case in self.FIXTURE["images"]:
             with self.subTest(case["name"]):
-                image = testing.paint_test_image(case.get("input", case.get("signal")), case["key"])
+                image = testing.paint_test_image(case.get("input", case.get("signal")), case["key"],
+                                                 expires_at=case["expiresAt"])
                 self.assertEqual((image.width, image.height), (case["width"], case["height"]))
                 self.assertEqual(hashlib.sha256(image.rgba).hexdigest(), case["rgbaSha256"])
                 self.assertEqual(_fixture_levels(image, case["cells"]), case["levels"])
@@ -1157,15 +1173,19 @@ class SignedTestInputTests(unittest.TestCase):
         for case in self.FIXTURE["imageRejections"]:
             with self.subTest(case["name"]):
                 with self.assertRaises(CalmLensValidationError) as raised:
-                    testing.paint_test_image(case.get("input", case.get("signal")), case["key"])
+                    testing.paint_test_image(case.get("input", case.get("signal")), case["key"],
+                                             expires_at=case["expiresAt"])
                 self.assertEqual(raised.exception.code, "sdk/invalid-argument")
 
     def test_rejections(self) -> None:
-        generators = {"text": testing.generate_test_text_code, "media": testing.generate_media_test_code}
         for case in self.FIXTURE["rejections"]:
             with self.subTest(case["name"], kind=case["kind"]):
                 with self.assertRaises(CalmLensValidationError) as raised:
-                    generators[case["kind"]](case.get("input", case.get("signal")), case["key"])
+                    if case["kind"] == "media":
+                        testing.generate_media_test_code(case["signal"], case["key"])
+                    else:
+                        testing.generate_test_text_code(case.get("input", case.get("signal")), case["key"],
+                                                        **({"expires_at": case["expiresAt"]} if "expiresAt" in case else {}))
                 self.assertEqual(raised.exception.code, "sdk/invalid-argument")
 
 
