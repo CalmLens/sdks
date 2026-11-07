@@ -1,5 +1,6 @@
 //! Signed test inputs: text codes, test images and media phrases that CalmLens decides as the
-//! scenario they carry, for testing a moderation integration end to end without real content.
+//! scenario they carry, for testing a moderation integration end to end without real content, in
+//! projects with "Recognise test inputs" turned on.
 use super::classification::{
     CATEGORIES, INPUT_QUALIFIERS, QUALIFIERS, TEST_DETECTIONS_MAX, TEST_DETECTION_BOX_MAX,
     TEST_FACE_AGE_MAX, TEST_FACE_AGE_PRESETS,
@@ -14,6 +15,23 @@ use serde::Deserialize;
 use sha2::Sha256;
 use std::fmt;
 use std::marker::PhantomData;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// How long a text code or test image stays valid when [`TestInputCodeOptions::expires_at`] is
+/// `None`: one day, in seconds.
+pub const TEST_INPUT_DEFAULT_LIFETIME_SECONDS: i64 = 24 * 60 * 60;
+
+/// The longest a code may still have to run when CalmLens reads it, in seconds: CalmLens ignores
+/// a code or test image that expires more than seven days after it arrives.
+pub const TEST_INPUT_MAX_LIFETIME_SECONDS: i64 = 7 * 24 * 60 * 60;
+
+/// Options for [`generate_test_text_code`] and [`paint_test_image`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TestInputCodeOptions {
+    /// When the code or image stops being recognised, in Unix seconds from 0 to 4294967295;
+    /// defaults to [`TEST_INPUT_DEFAULT_LIFETIME_SECONDS`] from now.
+    pub expires_at: Option<i64>,
+}
 
 /// A test scenario: the qualifying instances CalmLens reports for the input, optionally with
 /// regional delivery actions, categories it reports as not assessed and person and face
@@ -501,27 +519,31 @@ pub fn test_input_for_signal(signal: &str, kind: TestInputKind) -> Result<TestIn
     Ok(preset.input())
 }
 
-/// A signed text code for a scenario or signal. Put it anywhere in a text input and CalmLens
-/// decides the input as that scenario.
+/// A signed text code for a scenario or signal. CalmLens decides a text input as that scenario
+/// only when the code is the whole text (surrounding whitespace aside); text with anything else
+/// around it is moderated as ordinary content.
 ///
-/// `test_input_key` is the project's secret test input key from the portal (32 lowercase hex
-/// characters). An invalid key or scenario, or one too large to encode, is
-/// `sdk/invalid-argument`.
+/// The code expires at `options.expires_at`, or a day from now, so generate it when the test runs
+/// rather than storing it. `test_input_key` is the project's secret test input key from the portal
+/// (32 lowercase hex characters). An invalid key, scenario or expiry, or a scenario too large to
+/// encode, is `sdk/invalid-argument`.
 ///
 /// ```
-/// use calmlens::testing::{generate_test_text_code, TestInputPreset};
+/// use calmlens::testing::{generate_test_text_code, TestInputCodeOptions, TestInputPreset};
 /// # let test_input_key = "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d";
-/// let code = generate_test_text_code(&TestInputPreset::Limited.input(), test_input_key)?;
-/// let violent = generate_test_text_code("violence", test_input_key)?;
+/// let code = generate_test_text_code(&TestInputPreset::Limited.input(), test_input_key, Default::default())?;
+/// let until_2030 = TestInputCodeOptions { expires_at: Some(1_893_456_000) };
+/// let violent = generate_test_text_code("violence", test_input_key, until_2030)?;
 /// assert!(code.starts_with("<!calmlens-test ") && violent != code);
 /// # Ok::<(), calmlens::Error>(())
 /// ```
 pub fn generate_test_text_code<'a>(
     scenario: impl Into<TestScenario<'a>>,
     test_input_key: &str,
+    options: TestInputCodeOptions,
 ) -> Result<String> {
     let input = resolve(scenario.into(), TestInputKind::Text)?;
-    text_code(&input, test_input_key)
+    text_code(&input, test_input_key, options)
 }
 
 /// A painted test image: RGBA bytes, row by row, and the same image as PNG.
@@ -550,34 +572,40 @@ const CATEGORY_COLORS: [(&str, [u8; 3]); 8] = [
     ("profanity", [136, 192, 48]),
 ];
 
-/// Paints a scenario or signal as a test image that CalmLens decides as that scenario. The image
-/// survives lossy formats and resizing: upload its `png` bytes, or encode its `rgba` in any format.
+/// Paints a scenario or signal as a test image that CalmLens decides as that scenario when it is
+/// the whole upload (a plain single-colour border aside). The image survives lossy formats and
+/// resizing: upload its `png` bytes, or encode its `rgba` in any format.
 ///
-/// `test_input_key` is the project's secret test input key from the portal. An invalid key or
-/// scenario, or one too large for a test image, is `sdk/invalid-argument`.
+/// Like a text code, it expires at `options.expires_at`, or a day from now. `test_input_key` is the
+/// project's secret test input key from the portal. An invalid key, scenario or expiry, or a
+/// scenario too large for a test image, is `sdk/invalid-argument`.
 ///
 /// ```
 /// use calmlens::testing::paint_test_image;
 /// # let test_input_key = "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d";
-/// let image = paint_test_image("violence", test_input_key)?;
+/// let image = paint_test_image("violence", test_input_key, Default::default())?;
 /// assert!(image.png.starts_with(b"\x89PNG"));
 /// # Ok::<(), calmlens::Error>(())
 /// ```
 pub fn paint_test_image<'a>(
     scenario: impl Into<TestScenario<'a>>,
     test_input_key: &str,
+    options: TestInputCodeOptions,
 ) -> Result<TestImage> {
     let input = resolve(scenario.into(), TestInputKind::Image)?;
-    let code = text_code(&input, test_input_key)?;
-    let tag = &code.split(' ').nth(1).expect("a text code has a tag");
-    let content = canonical_json(&input);
-    let mut data = vec![(content.len() >> 8) as u8, content.len() as u8];
+    let code = text_code(&input, test_input_key, options)?;
+    let mut parts = code[..code.len() - 1].split(' ').skip(1);
+    let tag = parts.next().expect("a text code has a tag");
+    let signed = URL_SAFE_NO_PAD
+        .decode(parts.next().expect("a text code has a payload"))
+        .expect("the payload is base64url");
+    let mut data = vec![(signed.len() >> 8) as u8, signed.len() as u8];
     data.extend(
         (0..tag.len())
             .step_by(2)
             .map(|i| u8::from_str_radix(&tag[i..i + 2], 16).expect("the tag is hexadecimal")),
     );
-    data.extend_from_slice(content.as_bytes());
+    data.extend_from_slice(&signed);
     let mut palette: Vec<[u8; 3]> = Vec::new();
     for instance in &input.instances {
         let color = CATEGORY_COLORS
@@ -634,13 +662,28 @@ fn resolve(scenario: TestScenario<'_>, kind: TestInputKind) -> Result<TestInput>
     Ok(input)
 }
 
-fn text_code(input: &TestInput, key: &str) -> Result<String> {
+/// The signed bytes are the expiry (four bytes, big-endian Unix seconds), then the scenario's
+/// canonical JSON.
+fn text_code(input: &TestInput, key: &str, options: TestInputCodeOptions) -> Result<String> {
     check_key(key)?;
-    let payload = URL_SAFE_NO_PAD.encode(canonical_json(input));
+    let expires_at = match options.expires_at {
+        Some(expires_at) => u32::try_from(expires_at).map_err(|_| {
+            invalid_argument("Test input expiry must be Unix seconds from 0 to 4294967295")
+        })?,
+        None => {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_or(0, |elapsed| elapsed.as_secs());
+            (now + TEST_INPUT_DEFAULT_LIFETIME_SECONDS as u64) as u32
+        }
+    };
+    let mut signed = expires_at.to_be_bytes().to_vec();
+    signed.extend_from_slice(canonical_json(input).as_bytes());
+    let payload = URL_SAFE_NO_PAD.encode(signed);
     if payload.len() > 8000 {
         return Err(invalid_argument("Test scenario is too large"));
     }
-    let tag = tag(key, &format!("calmlens-test:v1:{payload}"));
+    let tag = tag(key, &format!("calmlens-test:v2:{payload}"));
     Ok(format!("<!calmlens-test {tag} {payload}>"))
 }
 
