@@ -8,8 +8,6 @@ package calmlenstest
 import (
 	"bytes"
 	"crypto/sha256"
-	"encoding/base64"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -20,7 +18,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	calmlens "github.com/CalmLens/sdks/go"
 	"github.com/CalmLens/sdks/go/internal/fixtures"
@@ -33,18 +30,6 @@ type testInputCase struct {
 	Typed                   bool
 	Width, Height, Cells    int
 	Levels, RgbaSha256      string
-	// ExpiresAt is the case's expiry: an integer for generated cases, possibly fractional or out
-	// of range in rejections.
-	ExpiresAt *float64
-}
-
-// options is the case's expiry as TestInputCodeOptions; generated cases always have one.
-func (c testInputCase) options(t *testing.T) *TestInputCodeOptions {
-	t.Helper()
-	if c.ExpiresAt == nil {
-		t.Fatalf("case %q has no expiresAt", c.Name)
-	}
-	return &TestInputCodeOptions{ExpiresAt: int64(*c.ExpiresAt)}
 }
 
 type testInputFixture struct {
@@ -61,7 +46,6 @@ type testInputFixture struct {
 		MaxEntries, BoxMax, AgeMax int
 		AgePresets                 map[string]TestAgeRange
 	}
-	Expiry struct{ DefaultLifetimeSeconds, MaxLifetimeSeconds int }
 }
 
 // decodeStrict decodes raw into a T, failing on fields T does not have.
@@ -122,11 +106,6 @@ func TestTestInputsContract(t *testing.T) {
 			t.Errorf("age presets = %q, fixture %q", testFaceAgePresets, names)
 		}
 	})
-	t.Run("expiry lifetimes", func(t *testing.T) {
-		if TestInputDefaultLifetimeSeconds != fixture.Expiry.DefaultLifetimeSeconds || TestInputMaxLifetimeSeconds != fixture.Expiry.MaxLifetimeSeconds {
-			t.Errorf("lifetimes = %d, %d; fixture %+v", TestInputDefaultLifetimeSeconds, TestInputMaxLifetimeSeconds, fixture.Expiry)
-		}
-	})
 	for _, c := range fixture.SignalInputs {
 		t.Run("signal input "+c.Signal+" "+string(c.Kind), func(t *testing.T) {
 			got, err := TestInputForSignal(c.Signal, c.Kind)
@@ -144,7 +123,7 @@ func TestTestInputsContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			code, err := GenerateTestTextCode(input, c.Key, c.options(t))
+			code, err := GenerateTestTextCode(input, c.Key)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -170,7 +149,7 @@ func TestTestInputsContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			painted, err := PaintTestImage(input, c.Key, c.options(t))
+			painted, err := PaintTestImage(input, c.Key)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -199,7 +178,7 @@ func TestTestInputsContract(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = PaintTestImage(input, c.Key, c.options(t))
+			_, err = PaintTestImage(input, c.Key)
 			var sdkError *calmlens.Error
 			if !errors.As(err, &sdkError) || sdkError.Code != calmlens.CodeSDKInvalidArgument {
 				t.Errorf("error = %v, want %s", err, calmlens.CodeSDKInvalidArgument)
@@ -209,21 +188,6 @@ func TestTestInputsContract(t *testing.T) {
 	for _, c := range fixture.Rejections {
 		t.Run("rejects "+c.Name+" "+string(c.Kind), func(t *testing.T) {
 			var err error
-			if c.ExpiresAt != nil {
-				expiresAt := *c.ExpiresAt
-				if expiresAt != float64(int64(expiresAt)) {
-					t.Skip("fractional expiry: not expressible as an int64")
-				}
-				var input TestInput
-				if input, err = c.scenario(t, TestInputText); err == nil {
-					_, err = GenerateTestTextCode(input, c.Key, &TestInputCodeOptions{ExpiresAt: int64(expiresAt)})
-				}
-				var sdkError *calmlens.Error
-				if !errors.As(err, &sdkError) || sdkError.Code != calmlens.CodeSDKInvalidArgument {
-					t.Errorf("error = %v, want %s", err, calmlens.CodeSDKInvalidArgument)
-				}
-				return
-			}
 			if !c.Typed {
 				var fields map[string]json.RawMessage
 				if json.Unmarshal(c.Input, &fields) != nil || fields["detections"] == nil {
@@ -231,7 +195,7 @@ func TestTestInputsContract(t *testing.T) {
 				}
 				var input TestInput
 				if err = json.Unmarshal(c.Input, &input); err == nil {
-					_, err = GenerateTestTextCode(input, c.Key, nil)
+					_, err = GenerateTestTextCode(input, c.Key)
 				}
 				var sdkError *calmlens.Error
 				if !errors.As(err, &sdkError) || sdkError.Code != calmlens.CodeSDKInvalidArgument {
@@ -245,7 +209,7 @@ func TestTestInputsContract(t *testing.T) {
 			case TestInputText:
 				var input TestInput
 				if input, err = c.scenario(t, TestInputText); err == nil {
-					_, err = GenerateTestTextCode(input, c.Key, nil)
+					_, err = GenerateTestTextCode(input, c.Key)
 				}
 			default:
 				t.Fatalf("unknown rejection kind %q", c.Kind)
@@ -320,7 +284,7 @@ func TestTestDetectionsRejectUnsupportedValues(t *testing.T) {
 		"person list pointer": {People: &TestPersonList{}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := GenerateTestTextCode(TestInput{Instances: []TestInstance{}, Detections: &detections}, "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d", nil)
+			_, err := GenerateTestTextCode(TestInput{Instances: []TestInstance{}, Detections: &detections}, "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d")
 			var sdkError *calmlens.Error
 			if !errors.As(err, &sdkError) || sdkError.Code != calmlens.CodeSDKInvalidArgument {
 				t.Errorf("error = %v, want %s", err, calmlens.CodeSDKInvalidArgument)
@@ -331,34 +295,15 @@ func TestTestDetectionsRejectUnsupportedValues(t *testing.T) {
 
 func TestTestDetectionsNilListsAreSentEmpty(t *testing.T) {
 	const key = "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d"
-	options := &TestInputCodeOptions{ExpiresAt: 1893456000}
-	empty, err := GenerateTestTextCode(TestInputPresets().NoFace, key, options)
+	empty, err := GenerateTestTextCode(TestInputPresets().NoFace, key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	nilLists, err := GenerateTestTextCode(TestInput{Instances: []TestInstance{}, Detections: &TestDetections{People: TestPersonList(nil), Faces: TestFaceList(nil)}}, key, options)
+	nilLists, err := GenerateTestTextCode(TestInput{Instances: []TestInstance{}, Detections: &TestDetections{People: TestPersonList(nil), Faces: TestFaceList(nil)}}, key)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if nilLists != empty {
 		t.Errorf("nil lists sign %s, want the empty lists' %s", nilLists, empty)
-	}
-}
-
-// A code generated without an expiry carries one a day from now in its signed payload.
-func TestTestTextCodeExpiresInADayByDefault(t *testing.T) {
-	before := time.Now().Unix()
-	code, err := GenerateTestTextCode(TestInputPresets().Clean, "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	after := time.Now().Unix()
-	signed, err := base64.RawURLEncoding.DecodeString(strings.Fields(strings.TrimSuffix(code, ">"))[2])
-	if err != nil {
-		t.Fatal(err)
-	}
-	expiresAt := int64(binary.BigEndian.Uint32(signed))
-	if expiresAt < before+86400 || expiresAt > after+86400 {
-		t.Errorf("expiresAt = %d, want between %d and %d", expiresAt, before+86400, after+86400)
 	}
 }

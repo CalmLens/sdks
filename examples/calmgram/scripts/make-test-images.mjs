@@ -6,8 +6,7 @@
 //   bun run test-images                                  # demo mode's key
 //   CALMLENS_TEST_INPUT_KEY=<key> bun run test-images    # your project's key
 //
-// Each image carries the signed test input in a compact square grid, and expires a day after it
-// is made. Upload one unchanged as the whole image, and post a code as the whole text. The images
+// Each image carries the signed test input in a compact square grid. Upload one unchanged as the whole image, and post a code as the whole text. The images
 // go to test-images/, which git ignores and the app never serves: keep a real project's test inputs
 // out of the public site.
 
@@ -40,9 +39,7 @@ for (const signal of getImageTestCategories()) {
   process.stdout.write(`wrote ${path.relative(process.cwd(), file)}\n`);
 }
 
-process.stdout.write(
-  "\nText test codes (post one as the whole comment, caption or bio; they expire in a day):\n",
-);
+process.stdout.write("\nText test codes (post one as the whole comment, caption or bio):\n");
 for (const category of TEST_TEXT_CATEGORIES) {
   process.stdout.write(`  ${await testTextCode(category, testInputKey)}\n`);
 }

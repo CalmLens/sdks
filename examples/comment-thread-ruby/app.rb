@@ -482,7 +482,7 @@ module Calmthread
     end
 
     # CalmLens text test inputs (`<!calmlens-test <tag> <payload>>`) are shown as a short marker,
-    # never as the code: anyone who copied a code could reuse it in the project until it expires.
+    # never as the code: anyone who copied a code could reuse it in the project.
     # Matched on the escaped text, so the output stays escaped.
     TEST_INPUT = /&lt;!calmlens-\s*test\s+[A-Za-z0-9_\s-]+&gt;/
     AVATAR_TONES = 6

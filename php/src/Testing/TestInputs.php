@@ -10,9 +10,8 @@ use CalmLens\SdkErrorCodes;
 /**
  * Signed test inputs: text codes, test images and media phrases that a project's test input key
  * authenticates, so CalmLens returns the scenario they describe instead of classifying them in a
- * project with "Recognise test inputs" turned on. Text codes and test images expire, by default
- * `DEFAULT_LIFETIME_SECONDS` after they are made, so generate them when tests run rather than
- * storing them. The formats match the JavaScript SDK's `calmlens/test-inputs` byte for byte.
+ * project with "Recognise test inputs" turned on. The formats match the JavaScript SDK's
+ * `calmlens/test-inputs` byte for byte.
  *
  * A scenario is an array with the API's keys: up to 128 `instances` (each a `category`, the
  * category's content `qualifiers` that apply, and optionally a `score` from 0 to 1 and an
@@ -86,10 +85,6 @@ final class TestInputs
     /** The signals `generateMediaTestCode` accepts. */
     public const MEDIA_SIGNALS = [...Classification::CATEGORIES, 'violence.graphic'];
 
-    /** A text code or test image expires this many seconds (one day) after it is made unless `$expiresAt` says otherwise. */
-    public const DEFAULT_LIFETIME_SECONDS = 24 * 60 * 60;
-    /** CalmLens ignores a text code or test image more than this many seconds (seven days) from expiring when it arrives. */
-    public const MAX_LIFETIME_SECONDS = 7 * 24 * 60 * 60;
     private const ACTIONS = ['allow', 'limit', 'age-restrict', 'block'];
     private const REGIONS = ['DE', 'AT', 'FR', 'GB', 'EU', 'AU', 'BR'];
     private const REGIONAL_ACTIONS = ['limit', 'age-restrict', 'block'];
@@ -128,16 +123,14 @@ final class TestInputs
     /**
      * A text code for a scenario or a signal (one of `TEXT_SIGNALS`), signed with
      * `$testInputKey`: the project's secret test input key from the portal. Submit it as the whole
-     * text: CalmLens moderates text with anything else around the code as ordinary content. The
-     * code expires at `$expiresAt`, in Unix seconds from 0 to 4294967295, by default
-     * `DEFAULT_LIFETIME_SECONDS` from now.
+     * text: CalmLens moderates text with anything else around the code as ordinary content.
      *
      * @param TestInput|string $scenario
      */
-    public static function generateTestTextCode(array|string $scenario, string $testInputKey, ?int $expiresAt = null): string
+    public static function generateTestTextCode(array|string $scenario, string $testInputKey): string
     {
         self::checkKey($testInputKey);
-        return self::textCode(self::validate(is_string($scenario) ? self::testInputForSignal($scenario) : $scenario), $testInputKey, self::expiry($expiresAt));
+        return self::textCode(self::validate(is_string($scenario) ? self::testInputForSignal($scenario) : $scenario), $testInputKey);
     }
 
     /**
@@ -145,19 +138,17 @@ final class TestInputs
      * `$testInputKey`: the project's secret test input key from the portal. The image survives
      * lossy formats and resizing: upload its `png`, or encode its `rgba` in any format, as the
      * whole image, optionally on a plain single-colour border; CalmLens moderates an image with
-     * anything else in it as ordinary content. It expires like a text code, at `$expiresAt`.
-     * Throws `InvalidArgumentException` for a scenario too large for a test image.
+     * anything else in it as ordinary content. Throws `InvalidArgumentException` for a scenario
+     * too large for a test image.
      *
      * @param TestInput|string $scenario
      */
-    public static function paintTestImage(array|string $scenario, string $testInputKey, ?int $expiresAt = null): PaintedTestImage
+    public static function paintTestImage(array|string $scenario, string $testInputKey): PaintedTestImage
     {
         self::checkKey($testInputKey);
         $checked = self::validate(is_string($scenario) ? self::testInputForSignal($scenario, 'image') : $scenario);
-        $expiry = self::expiry($expiresAt);
-        $tag = explode(' ', self::textCode($checked, $testInputKey, $expiry))[1];
-        // The signed payload: the expiry, then the canonical JSON.
-        $content = pack('N', $expiry) . self::canonical($checked);
+        $tag = explode(' ', self::textCode($checked, $testInputKey))[1];
+        $content = self::canonical($checked);
         $palette = [];
         foreach ($checked['instances'] as $instance) {
             $palette[$instance['category']] = self::COLOURS[$instance['category']];
@@ -197,27 +188,14 @@ final class TestInputs
         return substr(hash_hmac('sha256', $message, $key), 0, 32);
     }
 
-    /** The expiry to sign: `$expiresAt`, or `DEFAULT_LIFETIME_SECONDS` from now. */
-    private static function expiry(?int $expiresAt): int
-    {
-        if ($expiresAt === null) {
-            return time() + self::DEFAULT_LIFETIME_SECONDS;
-        }
-        if ($expiresAt < 0 || $expiresAt > 0xFFFFFFFF) {
-            throw self::invalid('expiresAt must be Unix seconds from 0 to 4294967295');
-        }
-        return $expiresAt;
-    }
-
     /**
-     * The signed payload is the expiry (four bytes, big-endian Unix seconds), then the scenario's
-     * canonical JSON.
+     * The signed payload is the scenario's canonical JSON.
      *
      * @param TestInput $scenario
      */
-    private static function textCode(array $scenario, string $key, int $expiresAt): string
+    private static function textCode(array $scenario, string $key): string
     {
-        $payload = rtrim(strtr(base64_encode(pack('N', $expiresAt) . self::canonical($scenario)), '+/', '-_'), '=');
+        $payload = rtrim(strtr(base64_encode(self::canonical($scenario)), '+/', '-_'), '=');
         if (strlen($payload) > 8000) {
             throw self::invalid('The test scenario is too large');
         }

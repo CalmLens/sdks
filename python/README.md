@@ -80,8 +80,7 @@ Treat a status you don't recognise, and a failed request, as not allowed.
 `MockCalmLensServerClient` from `calmlens.testing` is the real client with an in-memory API behind it,
 for offline tests. Its `generate_test_text_code`, `paint_test_image` and `generate_media_test_code` make signed test inputs that the real API answers with the scenario you choose, using your project's test
 input key, once "Recognise test inputs" is turned on in the project's settings. Submit a text code as
-the whole text and a test image as the whole upload. Codes and images expire, by default one day after
-they are made (set `expires_at` to choose), so generate them when tests run. See
+the whole text and a test image as the whole upload. See
 [Python testing](https://calmlens.com/docs/sdk/python/testing).
 
 ## Command-line tool

@@ -83,7 +83,7 @@ Every public SDK operation accepts one options object, so call sites stay stable
 
 `calmlens/testing` runs the real clients against an in-memory CalmLens API and CDN, with moderation outcomes, recorded requests, injected failures and signed webhook deliveries. See [JavaScript testing](https://calmlens.com/docs/sdk/javascript/testing).
 
-`calmlens/test-inputs` makes signed test codes and images that a real project with test inputs turned on moderates as the scenario you choose. A code counts only as the whole text and an image only as the whole upload, and both expire after a day by default, so generate them when your tests run. See [Generate test inputs](https://calmlens.com/docs/sdk/javascript/testing#generate-test-inputs).
+`calmlens/test-inputs` makes signed test codes and images that a real project with test inputs turned on moderates as the scenario you choose. A code counts only as the whole text and an image only as the whole upload. See [Generate test inputs](https://calmlens.com/docs/sdk/javascript/testing#generate-test-inputs).
 
 ## Links
 

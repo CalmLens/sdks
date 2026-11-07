@@ -9,10 +9,8 @@ module CalmLens
   # Signed test inputs: text codes, test images and media phrases that a project's moderation
   # recognises as a declared scenario when they are signed with its secret test input key (shown in
   # the portal's project settings to those who can read them) and the project has "Recognise test
-  # inputs" turned on, so CalmLens returns that scenario instead of classifying them. Text codes and
-  # test images expire, by default {DEFAULT_LIFETIME_SECONDS} after they are made, so generate them
-  # when tests run rather than storing them. The formats match the JavaScript SDK's
-  # `calmlens/test-inputs` byte for byte.
+  # inputs" turned on, so CalmLens returns that scenario instead of classifying them. The formats
+  # match the JavaScript SDK's `calmlens/test-inputs` byte for byte.
   #
   # A scenario is a Hash with the API's keys, as Strings or Symbols (snake_case keys are converted
   # to camelCase like other options):
@@ -82,13 +80,6 @@ module CalmLens
       } }
     )
 
-    # A text code or test image expires this many seconds (one day) after it is made unless
-    # `expires_at` says otherwise.
-    DEFAULT_LIFETIME_SECONDS = 24 * 60 * 60
-    # CalmLens ignores a text code or test image more than this many seconds (seven days) from
-    # expiring when it arrives.
-    MAX_LIFETIME_SECONDS = 7 * 24 * 60 * 60
-
     HEX_WORDS = %w[zero one two three four five six seven eight nine alpha bravo charlie delta echo foxtrot].freeze
     private_constant :HEX_WORDS
 
@@ -121,13 +112,10 @@ module CalmLens
     # text: CalmLens moderates text with anything else around the code as ordinary content.
     # @param input [Hash, String] a scenario or a signal
     # @param test_input_key [String] the project's secret test input key from the portal
-    # @param expires_at [Integer, nil] when the code expires, in Unix seconds from 0 to 4294967295;
-    #   by default {DEFAULT_LIFETIME_SECONDS} from now
     # @return [String]
-    # @raise [InvalidArgumentError] `sdk/invalid-argument` for an invalid key, scenario, signal or
-    #   expiry
-    def generate_text_code(input, test_input_key, expires_at: nil)
-      text_code(scenario(input, 'text', test_input_key), test_input_key, expiry(expires_at))
+    # @raise [InvalidArgumentError] `sdk/invalid-argument` for an invalid key, scenario or signal
+    def generate_text_code(input, test_input_key)
+      text_code(scenario(input, 'text', test_input_key), test_input_key)
     end
 
     # Paints the signed test image for a scenario or a signal (one of {SIGNALS}): a grid that
@@ -136,16 +124,14 @@ module CalmLens
     # anything else in it as ordinary content.
     # @param input [Hash, String] a scenario or a signal
     # @param test_input_key [String] the project's secret test input key from the portal
-    # @param expires_at [Integer, nil] when the image expires, in Unix seconds from 0 to 4294967295;
-    #   by default {DEFAULT_LIFETIME_SECONDS} from now
     # @return [Image]
-    # @raise [InvalidArgumentError] `sdk/invalid-argument` for an invalid key, scenario, signal or
-    #   expiry, or a scenario too large for a test image
-    def paint_image(input, test_input_key, expires_at: nil)
+    # @raise [InvalidArgumentError] `sdk/invalid-argument` for an invalid key, scenario or signal, or
+    #   a scenario too large for a test image
+    def paint_image(input, test_input_key)
       checked = scenario(input, 'image', test_input_key)
-      _, signature, payload = text_code(checked, test_input_key, expiry(expires_at)).chomp('>').split
-      signed = payload.tr('-_', '+/').unpack1('m')
-      data = [signed.bytesize].pack('n') + [signature].pack('H*') + signed
+      signature = text_code(checked, test_input_key).split[1]
+      content = Scenario.canonical_json(checked).b
+      data = [content.bytesize].pack('n') + [signature].pack('H*') + content
       width, rgba = Grid.paint(data, checked['instances'].map { |instance| instance['category'] })
       Image.new(width: width, height: width, rgba: rgba, png: Png.png(width, width, rgba))
     end
@@ -170,19 +156,9 @@ module CalmLens
       Scenario.validate(input.is_a?(String) ? for_signal(input, kind) : input)
     end
 
-    # The expiry to sign: `expires_at`, or {DEFAULT_LIFETIME_SECONDS} from now.
-    def expiry(expires_at)
-      return Time.now.to_i + DEFAULT_LIFETIME_SECONDS if expires_at.nil?
-      return expires_at if expires_at.is_a?(Integer) && expires_at.between?(0, 0xFFFF_FFFF)
-
-      raise Internal.invalid("expires_at must be an Integer of Unix seconds from 0 to 4294967295 (got #{expires_at.inspect})")
-    end
-
-    # The signed payload is the expiry (four bytes, big-endian Unix seconds), then the scenario's
-    # canonical JSON.
-    def text_code(checked, test_input_key, expires_at)
-      signed = [expires_at].pack('N') + Scenario.canonical_json(checked).b
-      payload = [signed].pack('m0').tr('+/', '-_').delete('=')
+    # The signed payload is the scenario's canonical JSON.
+    def text_code(checked, test_input_key)
+      payload = [Scenario.canonical_json(checked)].pack('m0').tr('+/', '-_').delete('=')
       raise Internal.invalid('Test scenario is too large') if payload.bytesize > 8000
 
       "<!calmlens-test #{tag(test_input_key, "calmlens-test:v2:#{payload}")} #{payload}>"
@@ -197,6 +173,6 @@ module CalmLens
     # The first 32 hex characters of HMAC-SHA256 with the key's ASCII bytes.
     def tag(key, message) = OpenSSL::HMAC.hexdigest('SHA256', key, message)[0, 32]
 
-    private_class_method :scenario, :expiry, :text_code, :check_key, :tag
+    private_class_method :scenario, :text_code, :check_key, :tag
   end
 end

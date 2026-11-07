@@ -23,16 +23,6 @@ test("text codes count only as the whole text, with the project's key", async ()
   ).toBeUndefined();
 });
 
-test("an expired text code is ordinary text", async () => {
-  const expiresAt = Math.floor(Date.now() / 1000) - 3600;
-  expect(
-    await detectTestText(
-      await testTextCode("hate", DEMO_TEST_INPUT_KEY, { expiresAt }),
-      DEMO_TEST_INPUT_KEY,
-    ),
-  ).toBeUndefined();
-});
-
 test("a test image counts only with the project's key", async () => {
   const image = await paintTestImage("violence", DEMO_TEST_INPUT_KEY);
   expect(await detectTestImage(image, DEMO_TEST_INPUT_KEY)).toEqual(

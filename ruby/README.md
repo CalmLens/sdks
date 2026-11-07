@@ -79,7 +79,7 @@ Every method is listed in the [Ruby SDK documentation](https://calmlens.com/docs
 
 `CalmLens::MockServerClient` from `calmlens/testing` runs the real client against an in-memory stand-in for the API and CDN, so you can test your integration offline. See [Ruby testing](https://calmlens.com/docs/sdk/ruby/testing).
 
-`CalmLens::TestInputs` signs test inputs with your project's test input key from the portal: `generate_text_code` turns a scenario, preset or signal into a text code, `paint_image` paints it as a test image, and `generate_media_code` gives a phrase for audio and video, so the real API returns the scenario you declared in projects with "Recognise test inputs" turned on. Submit a text code as the whole text and a test image as the whole upload. Codes and images expire, by default one day after they are made (pass `expires_at:` to choose), so generate them when tests run.
+`CalmLens::TestInputs` signs test inputs with your project's test input key from the portal: `generate_text_code` turns a scenario, preset or signal into a text code, `paint_image` paints it as a test image, and `generate_media_code` gives a phrase for audio and video, so the real API returns the scenario you declared in projects with "Recognise test inputs" turned on. Submit a text code as the whole text and a test image as the whole upload.
 
 ## Links
 

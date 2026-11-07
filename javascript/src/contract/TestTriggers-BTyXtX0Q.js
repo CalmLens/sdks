@@ -670,29 +670,9 @@ const TEST_INPUT_PRESETS = {
 		}
 	}
 };
-/** A code is valid for a day unless its maker chooses another expiry. */
-const TEST_INPUT_DEFAULT_LIFETIME_SECONDS = 86400;
 /**
-* The longest a code may still have to run when CalmLens reads it: a code that expires later is
-* never recognised, so a leaked one stops working within a week whatever its maker chose.
-*/
-const TEST_INPUT_MAX_LIFETIME_SECONDS = 604800;
-/** Clock difference tolerated between the code's maker and CalmLens. */
-const CLOCK_SKEW_SECONDS = 300;
-const expiryOf = (options) => {
-	const expiresAt = options?.expiresAt ?? Math.floor(Date.now() / 1e3) + 86400;
-	if (!Number.isInteger(expiresAt) || expiresAt < 0 || expiresAt > 4294967295) throw new TypeError("Invalid test input expiry");
-	return expiresAt;
-};
-/** Whether a code expiring at `expiresAt` (Unix seconds) is current at `now` (milliseconds). */
-const isTestInputExpiryCurrent = (expiresAt, now) => {
-	const seconds = Math.floor(now / 1e3);
-	return expiresAt + CLOCK_SKEW_SECONDS >= seconds && expiresAt <= seconds + 604800 + CLOCK_SKEW_SECONDS;
-};
-/**
-* A text code: the tag, then the signed payload, base64url of the expiry (four bytes, big-endian
-* Unix seconds) followed by the scenario JSON. Text extracted from a document (a PDF, or a Word file
-* converted to one) breaks a code that its layout wrapped: a line break between its parts, after a
+* A text code: the tag, then the signed payload, base64url of the scenario's canonical JSON. Text
+* extracted from a document (a PDF, or a Word file converted to one) breaks a code that its layout wrapped: a line break between its parts, after a
 * hyphen or anywhere in a long payload. Whitespace inside a code is layout, not content, so it is
 * removed before the signature is checked.
 */
@@ -700,26 +680,20 @@ const WHOLE_CODE = /^<!calmlens-\s*test\s+([A-Za-z0-9_\s-]{33,16384})>$/;
 const tag = async (payload, key) => (await hmacSha256Hex(key, `calmlens-test:v2:${payload}`)).slice(0, 32);
 const toBase64Url = (bytes) => btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 const fromBase64Url = (text) => Uint8Array.from(atob(text.replaceAll("-", "+").replaceAll("_", "/")), (char) => char.charCodeAt(0));
-/** The signed bytes: the expiry, then the scenario's canonical JSON (ASCII). */
-const envelope = (scenario, expiresAt) => {
-	const json = new TextEncoder().encode(JSON.stringify(TEST_INPUT_SCHEMA.parse(scenario)));
-	const bytes = new Uint8Array(4 + json.length);
-	new DataView(bytes.buffer).setUint32(0, expiresAt);
-	bytes.set(json, 4);
-	return bytes;
-};
-async function generateTestTextCode(scenario, key, options) {
+/** The signed bytes: the scenario's canonical JSON (ASCII). */
+const envelope = (scenario) => new TextEncoder().encode(JSON.stringify(TEST_INPUT_SCHEMA.parse(scenario)));
+async function generateTestTextCode(scenario, key) {
 	if (!/^[a-f0-9]{32}$/.test(key)) throw new TypeError("Invalid test input key");
-	const payload = toBase64Url(envelope(typeof scenario === "string" ? testInputForSignal(scenario) : scenario, expiryOf(options)));
+	const payload = toBase64Url(envelope(typeof scenario === "string" ? testInputForSignal(scenario) : scenario));
 	if (payload.length > 8e3) throw new RangeError("Test scenario is too large");
 	return `<!calmlens-test ${await tag(payload, key)} ${payload}>`;
 }
 /**
-* The scenario a text declares when the whole text is one current code signed with `key`;
-* surrounding text, a second code, an altered, expired or over-long-lived code all return
-* undefined, so the text is moderated as ordinary content.
+* The scenario a text declares when the whole text is one code signed with `key`; surrounding
+* text, a second code or an altered code all return undefined, so the text is moderated as
+* ordinary content.
 */
-async function detectTestTrigger(text, key, now = Date.now()) {
+async function detectTestTrigger(text, key) {
 	if (!/^[a-f0-9]{32}$/.test(key)) return;
 	const match = WHOLE_CODE.exec(text.trim());
 	if (!match) return;
@@ -728,10 +702,7 @@ async function detectTestTrigger(text, key, now = Date.now()) {
 	const payload = code.slice(32);
 	if (!/^[a-f0-9]{32}$/.test(signature) || !payload || payload.length > 8e3 || !timingSafeEqual(signature, await tag(payload, key))) return;
 	try {
-		const bytes = fromBase64Url(payload);
-		if (bytes.length < 5) return;
-		if (!isTestInputExpiryCurrent(new DataView(bytes.buffer).getUint32(0), now)) return;
-		const json = bytes.subarray(4);
+		const json = fromBase64Url(payload);
 		if (json.some((byte) => byte > 127)) return;
 		const parsed = TEST_INPUT_SCHEMA.safeParse(JSON.parse(new TextDecoder().decode(json)));
 		return parsed.success ? parsed.data : void 0;
@@ -784,12 +755,12 @@ const TEST_INPUT_CATEGORY_COLORS = {
 };
 /**
 * The text code's signed bytes as a grid (TestImageGrid.ts): the signed payload's length (two
-* bytes, big-endian), the 16-byte tag, then the payload (the expiry and the scenario JSON). The
-* reader rebuilds the text code, so images and text share one verification.
+* bytes, big-endian), the 16-byte tag, then the payload (the scenario JSON). The reader rebuilds
+* the text code, so images and text share one verification.
 */
-async function paintTestImage(scenario, key, options) {
+async function paintTestImage(scenario, key) {
 	const input = TEST_INPUT_SCHEMA.parse(typeof scenario === "string" ? testInputForSignal(scenario, "image") : scenario);
-	const [, signature, payload] = (await generateTestTextCode(input, key, options)).slice(0, -1).split(" ");
+	const [, signature, payload] = (await generateTestTextCode(input, key)).slice(0, -1).split(" ");
 	const signed = fromBase64Url(payload);
 	const data = new Uint8Array(18 + signed.length);
 	data.set([signed.length >> 8, signed.length & 255]);
@@ -802,21 +773,21 @@ const testImagePalette = (input) => {
 	return categories.length ? categories.map((category) => TEST_INPUT_CATEGORY_COLORS[category]) : void 0;
 };
 /**
-* The test input an image declares when the whole image is one of the project's current test
-* images, also after lossy formats and resizing: the grid, optionally on a uniform border. Every
-* pixel must match the grid repainted from the bytes it carries (TestImageGrid.ts,
+* The test input an image declares when the whole image is one of the project's test images,
+* also after lossy formats and resizing: the grid, optionally on a uniform border. Every pixel
+* must match the grid repainted from the bytes it carries (TestImageGrid.ts,
 * `matchesTestImageGrid`), so nothing else can be drawn on or around it.
 */
-async function detectTestImage(image, key, now = Date.now(), { whole = true } = {}) {
+async function detectTestImage(image, key, { whole = true } = {}) {
 	if (!TEST_INPUT_KEY_PATTERN.test(key)) return;
 	const grid = readTestImageGrid(image);
 	if (!grid) return;
 	const { data } = grid;
 	const length = data[0] << 8 | data[1];
-	if (length < 5 || 18 + length > data.length) return;
+	if (!length || 18 + length > data.length) return;
 	const signed = data.subarray(18, 18 + length);
-	const scenario = await detectTestTrigger(`<!calmlens-test ${[...data.subarray(2, 18)].map((byte) => byte.toString(16).padStart(2, "0")).join("")} ${toBase64Url(signed)}>`, key, now);
+	const scenario = await detectTestTrigger(`<!calmlens-test ${[...data.subarray(2, 18)].map((byte) => byte.toString(16).padStart(2, "0")).join("")} ${toBase64Url(signed)}>`, key);
 	if (!scenario || !whole) return scenario;
 	return matchesTestImageGrid(image, grid, paintTestImageGrid(data.subarray(0, 18 + length), testImagePalette(scenario))) ? scenario : void 0;
 }
-export { TEST_INPUT_DEFAULT_LIFETIME_SECONDS as a, TEST_INPUT_PRESETS as c, generateTestTextCode as d, getImageTestCategories as f, testInputForSignal as h, TEST_FACE_AGE_PRESETS as i, detectTestImage as l, paintTestImage as m, TEST_DETECTION_BOX_MAX as n, TEST_INPUT_KEY_PATTERN as o, getTestInputTag as p, TEST_FACE_AGE_MAX as r, TEST_INPUT_MAX_LIFETIME_SECONDS as s, TEST_DETECTIONS_MAX as t, detectTestTrigger as u };
+export { TEST_INPUT_KEY_PATTERN as a, detectTestTrigger as c, getTestInputTag as d, paintTestImage as f, TEST_FACE_AGE_PRESETS as i, generateTestTextCode as l, TEST_DETECTION_BOX_MAX as n, TEST_INPUT_PRESETS as o, testInputForSignal as p, TEST_FACE_AGE_MAX as r, detectTestImage as s, TEST_DETECTIONS_MAX as t, getImageTestCategories as u };

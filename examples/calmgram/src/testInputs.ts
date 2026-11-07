@@ -25,7 +25,7 @@ export const TEST_TEXT_CATEGORIES = [
 ] as const;
 
 /**
- * The category a text declares when the whole text is one current test code signed with
+ * The category a text declares when the whole text is one test code signed with
  * `testInputKey`, as CalmLens recognises it; anything else is ordinary text.
  */
 export const detectTestText = async (text: string, testInputKey: string) =>
@@ -37,8 +37,7 @@ const TEST_CODE = /^<!calmlens-test [0-9a-f]{32} ([A-Za-z0-9_-]+)>$/;
 
 /**
  * The categories a text that is one test code names, for a readable label only: it doesn't check
- * the code's tag or expiry, so it never decides moderation. The signed payload is the four-byte
- * expiry followed by the scenario's JSON.
+ * the code's tag, so it never decides moderation. The signed payload is the scenario's JSON.
  */
 export const testCodeCategories = (text: string): string[] | undefined => {
   const payload = TEST_CODE.exec(text.trim())?.[1];
@@ -48,7 +47,7 @@ export const testCodeCategories = (text: string): string[] | undefined => {
       char.charCodeAt(0),
     );
     const scenario: { instances?: { category?: unknown }[] } = JSON.parse(
-      new TextDecoder().decode(bytes.subarray(4)),
+      new TextDecoder().decode(bytes),
     );
     return [
       ...new Set(

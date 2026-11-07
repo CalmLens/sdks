@@ -9,14 +9,11 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"math"
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	calmlens "github.com/CalmLens/sdks/go"
 )
@@ -163,57 +160,18 @@ func TestInputForSignal(signal string, kind TestInputKind) (TestInput, error) {
 	return TestInput{Instances: []TestInstance{{Category: signal, Qualifiers: []string{}}}}, nil
 }
 
-// TestInputDefaultLifetimeSeconds is how long a text code or test image stays valid when
-// TestInputCodeOptions doesn't set its expiry: one day.
-const TestInputDefaultLifetimeSeconds = 24 * 60 * 60
-
-// TestInputMaxLifetimeSeconds is the longest a code may still have to run when CalmLens reads it:
-// CalmLens ignores a code or test image that expires more than seven days after it arrives.
-const TestInputMaxLifetimeSeconds = 7 * 24 * 60 * 60
-
-// TestInputCodeOptions are the options for GenerateTestTextCode and PaintTestImage. A nil
-// *TestInputCodeOptions uses the defaults.
-type TestInputCodeOptions struct {
-	// ExpiresAt is when the code or image stops being recognised, in Unix seconds from 0 to
-	// 4294967295.
-	ExpiresAt int64
-}
-
-// testInputExpiry is the options' expiry, or one day from now.
-func testInputExpiry(options *TestInputCodeOptions) (uint32, error) {
-	if options == nil {
-		return uint32(time.Now().Unix() + TestInputDefaultLifetimeSeconds), nil
-	}
-	if options.ExpiresAt < 0 || options.ExpiresAt > math.MaxUint32 {
-		return 0, invalidTestInput("Test input expiry must be Unix seconds from 0 to 4294967295")
-	}
-	return uint32(options.ExpiresAt), nil
-}
-
-// testInputEnvelope is the signed bytes: the expiry (four bytes, big-endian Unix seconds), then
-// the scenario's canonical JSON.
-func testInputEnvelope(input TestInput, expiresAt uint32) []byte {
-	return append(binary.BigEndian.AppendUint32(nil, expiresAt), canonicalTestInput(input)...)
-}
-
 // GenerateTestTextCode returns the signed text code for a scenario. CalmLens recognises it only as
 // the whole of a text input (surrounding whitespace aside) in a project with test inputs turned on;
-// any other text around it is moderated as ordinary content. The code expires, a day from now
-// unless options set ExpiresAt, so generate it when the test runs rather than storing it.
-// testInputKey is the project's secret test input key from the portal. An invalid key, scenario
-// or expiry is an sdk/invalid-argument error.
-func GenerateTestTextCode(input TestInput, testInputKey string, options *TestInputCodeOptions) (string, error) {
+// any other text around it is moderated as ordinary content. testInputKey is the project's secret
+// test input key from the portal. An invalid key or scenario is an sdk/invalid-argument error.
+func GenerateTestTextCode(input TestInput, testInputKey string) (string, error) {
 	if err := checkTestInputKey(testInputKey); err != nil {
 		return "", err
 	}
 	if err := validateTestInput(input); err != nil {
 		return "", err
 	}
-	expiresAt, err := testInputExpiry(options)
-	if err != nil {
-		return "", err
-	}
-	payload := base64.RawURLEncoding.EncodeToString(testInputEnvelope(input, expiresAt))
+	payload := base64.RawURLEncoding.EncodeToString(canonicalTestInput(input))
 	if len(payload) > 8000 {
 		return "", invalidTestInput("Test scenario is too large")
 	}

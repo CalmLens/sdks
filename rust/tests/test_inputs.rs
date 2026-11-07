@@ -1,11 +1,9 @@
 //! Signed test inputs match the shared contract in `testdata/test-inputs.json`.
 mod common;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use calmlens::testing::{
     generate_media_test_code, generate_test_text_code, paint_test_image, test_input_for_signal,
-    TestImage, TestInput, TestInputCodeOptions, TestInputKind, TestInputPreset, TestPerson,
-    TestScenario, MEDIA_TEST_SIGNALS, TEST_INPUT_DEFAULT_LIFETIME_SECONDS,
-    TEST_INPUT_MAX_LIFETIME_SECONDS, TEST_INPUT_SIGNALS,
+    TestImage, TestInput, TestInputKind, TestInputPreset, TestPerson, TestScenario,
+    MEDIA_TEST_SIGNALS, TEST_INPUT_SIGNALS,
 };
 use calmlens::ErrorCode;
 use common::{fixture, typed};
@@ -28,12 +26,6 @@ fn with_scenario<T>(case: &Value, run: impl FnOnce(TestScenario<'_>) -> T) -> T 
 }
 fn key(case: &Value) -> &str {
     case["key"].as_str().unwrap()
-}
-/// The case's recorded expiry; every generated case has one.
-fn options(case: &Value) -> TestInputCodeOptions {
-    TestInputCodeOptions {
-        expires_at: Some(case["expiresAt"].as_i64().unwrap()),
-    }
 }
 
 #[test]
@@ -89,10 +81,7 @@ fn presets_and_signal_shortcuts_match_the_contract() {
 #[test]
 fn text_codes_match_the_contract() {
     for case in fixture("test-inputs")["text"].as_array().unwrap() {
-        let code = with_scenario(case, |s| {
-            generate_test_text_code(s, key(case), options(case))
-        })
-        .unwrap();
+        let code = with_scenario(case, |s| generate_test_text_code(s, key(case))).unwrap();
         assert_eq!(code, case["code"].as_str().unwrap(), "{}", case["name"]);
     }
 }
@@ -171,7 +160,7 @@ fn test_images_match_the_contract() {
     let fixtures = fixture("test-inputs");
     for case in fixtures["images"].as_array().unwrap() {
         let name = &case["name"];
-        let image = with_scenario(case, |s| paint_test_image(s, key(case), options(case))).unwrap();
+        let image = with_scenario(case, |s| paint_test_image(s, key(case))).unwrap();
         assert_eq!(
             (u64::from(image.width), u64::from(image.height)),
             (
@@ -197,8 +186,7 @@ fn test_images_match_the_contract() {
         );
     }
     for case in fixtures["imageRejections"].as_array().unwrap() {
-        let error =
-            with_scenario(case, |s| paint_test_image(s, key(case), options(case))).unwrap_err();
+        let error = with_scenario(case, |s| paint_test_image(s, key(case))).unwrap_err();
         assert_eq!(
             error.code(),
             &ErrorCode::InvalidArgument,
@@ -219,72 +207,6 @@ fn has_negative(value: &Value) -> bool {
     }
 }
 
-#[test]
-fn expiry_lifetimes_match_the_contract() {
-    let expiry = &fixture("test-inputs")["expiry"];
-    assert_eq!(
-        (
-            TEST_INPUT_DEFAULT_LIFETIME_SECONDS,
-            TEST_INPUT_MAX_LIFETIME_SECONDS
-        ),
-        (
-            expiry["defaultLifetimeSeconds"].as_i64().unwrap(),
-            expiry["maxLifetimeSeconds"].as_i64().unwrap()
-        )
-    );
-}
-
-/// A code generated without an expiry carries one a day from now in its signed payload.
-#[test]
-fn text_codes_expire_in_a_day_by_default() {
-    let now = || {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64
-    };
-    let before = now();
-    let code = generate_test_text_code(
-        "violence",
-        "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
-        Default::default(),
-    )
-    .unwrap();
-    let after = now();
-    let payload = code.trim_end_matches('>').rsplit(' ').next().unwrap();
-    let signed = URL_SAFE_NO_PAD.decode(payload).unwrap();
-    let expires_at = i64::from(u32::from_be_bytes(signed[..4].try_into().unwrap()));
-    assert!(
-        (before + 86400..=after + 86400).contains(&expires_at),
-        "expires at {expires_at}, generated between {before} and {after}"
-    );
-}
-
-/// Expiries outside 0 to 4294967295 are refused; a fractional one cannot be expressed in `i64`.
-#[test]
-fn out_of_range_expiries_are_invalid_arguments() {
-    let fixtures = fixture("test-inputs");
-    let cases: Vec<&Value> = fixtures["rejections"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|case| case.get("expiresAt").is_some_and(Value::is_i64))
-        .collect();
-    assert_eq!(cases.len(), 2, "integral expiry rejections");
-    for case in cases {
-        let error = with_scenario(case, |s| {
-            generate_test_text_code(s, key(case), options(case))
-        })
-        .unwrap_err();
-        assert_eq!(
-            error.code(),
-            &ErrorCode::InvalidArgument,
-            "{}",
-            case["name"]
-        );
-    }
-}
-
 /// Untyped cases (unknown fields, wrong value types) cannot be expressed in the typed scenario;
 /// neither can negative detection values, which its unsigned fields refuse when decoding.
 #[test]
@@ -302,9 +224,7 @@ fn invalid_test_inputs_are_invalid_arguments() {
             continue;
         }
         let error = match case["kind"].as_str().unwrap() {
-            "text" => with_scenario(case, |s| {
-                generate_test_text_code(s, key(case), Default::default())
-            }),
+            "text" => with_scenario(case, |s| generate_test_text_code(s, key(case))),
             "media" => generate_media_test_code(case["signal"].as_str().unwrap(), key(case)),
             other => panic!("unknown kind {other}"),
         }

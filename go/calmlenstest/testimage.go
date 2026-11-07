@@ -33,12 +33,11 @@ var testInputColors = map[string][3]int{
 // PaintTestImage paints a scenario's signed test image: a grid that survives lossy formats and
 // resizing. Upload its PNG bytes, or encode its RGBA in any format. CalmLens recognises it only as
 // the whole upload (a plain single-colour border aside) in a project with test inputs turned on.
-// Like a text code it expires, a day from now unless options set ExpiresAt, so paint it when the
-// test runs. Use TestInputForSignal with TestInputImage for a signal's scenario. testInputKey is
-// the project's secret test input key from the portal. An invalid key, scenario or expiry, or a
-// scenario too large for a test image, is an sdk/invalid-argument error.
-func PaintTestImage(input TestInput, testInputKey string, options *TestInputCodeOptions) (*TestImage, error) {
-	code, err := GenerateTestTextCode(input, testInputKey, options)
+// Use TestInputForSignal with TestInputImage for a signal's scenario. testInputKey is the
+// project's secret test input key from the portal. An invalid key or scenario, or a scenario too
+// large for a test image, is an sdk/invalid-argument error.
+func PaintTestImage(input TestInput, testInputKey string) (*TestImage, error) {
+	code, err := GenerateTestTextCode(input, testInputKey)
 	if err != nil {
 		return nil, err
 	}

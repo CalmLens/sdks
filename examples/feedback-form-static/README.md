@@ -87,8 +87,7 @@ allowed sites can upload.
 
 To see a refusal, attach a [test image](https://calmlens.com/docs/guides/testing): turn on
 **Recognise test inputs** in your project's settings, then download one for your project from
-**Try your policy** in the portal. Test images expire after a day, so download a fresh one when
-you test, and attach it unchanged.
+**Try your policy** in the portal, and attach it unchanged.
 
 ### Demo mode
 

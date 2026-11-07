@@ -32,9 +32,8 @@ pub use decision::{
 pub use inputs::{
     generate_media_test_code, generate_test_text_code, paint_test_image, test_input_for_signal,
     TestAgeRange, TestDetectionList, TestDetections, TestFace, TestFaceAge, TestImage, TestInput,
-    TestInputCodeOptions, TestInputInstance, TestInputKind, TestInputPreset, TestPerson,
-    TestRegionalAction, TestScenario, MEDIA_TEST_SIGNALS, TEST_INPUT_DEFAULT_LIFETIME_SECONDS,
-    TEST_INPUT_MAX_LIFETIME_SECONDS, TEST_INPUT_SIGNALS,
+    TestInputInstance, TestInputKind, TestInputPreset, TestPerson, TestRegionalAction,
+    TestScenario, MEDIA_TEST_SIGNALS, TEST_INPUT_SIGNALS,
 };
 pub use memory::{
     create_mock_api_key, MockApiKeyGrant, MockFailure, MockFailureOptions, MockOptions,

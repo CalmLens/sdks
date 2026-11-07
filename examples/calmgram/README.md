@@ -230,10 +230,9 @@ real harmful content.
 
 Every test input is signed with your project's secret **test input key**, available under
 **Project settings → Test inputs** in the portal, and CalmLens recognises them only in projects
-with **Recognise test inputs** turned on (it is off by default). Codes and images expire a day
-after they are made, so make them when you test rather than storing them. A text code counts only
-as the whole caption, comment or bio, and a test image only as the whole upload, unchanged;
-anything else is moderated as ordinary content.
+with **Recognise test inputs** turned on (it is off by default). A text code counts only as the
+whole caption, comment or bio, and a test image only as the whole upload, unchanged; anything else
+is moderated as ordinary content.
 
 - **Demo mode:** **New post** shows test images and a text code made with the simulator's public
   key `1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d`, painted on request. They mean nothing to a real project.

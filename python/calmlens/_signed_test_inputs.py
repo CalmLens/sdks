@@ -9,7 +9,6 @@ import hmac
 import json
 import re
 import struct
-import time
 import zlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -152,14 +151,6 @@ TEXT_TEST_SIGNALS: tuple[str, ...] = (*CATEGORIES, "sexual.involving-minors", "h
 MEDIA_TEST_SIGNALS: tuple[str, ...] = (*CATEGORIES, "violence.graphic")
 
 
-#: A code or test image expires this many seconds after it is made unless ``expires_at`` says
-#: otherwise: one day.
-TEST_INPUT_DEFAULT_LIFETIME_SECONDS = 24 * 60 * 60
-#: CalmLens ignores a code or test image that is more than this many seconds from expiring when it
-#: arrives: seven days.
-TEST_INPUT_MAX_LIFETIME_SECONDS = 7 * 24 * 60 * 60
-
-
 def signal_test_input(signal: ClassificationTestSignal, kind: Literal["text", "image"] = "text") -> SignedTestInput:
     """The scenario a signal stands for in text (``kind="text"``) or in an image
     (``kind="image"``). Raises ``sdk/invalid-argument`` for an unknown signal."""
@@ -181,18 +172,14 @@ def signal_test_input(signal: ClassificationTestSignal, kind: Literal["text", "i
     return cast(SignedTestInput, _validate(preset))
 
 
-def generate_test_text_code(scenario: SignedTestInput | ClassificationTestSignal, test_input_key: str, *,
-                            expires_at: int | None = None) -> str:
+def generate_test_text_code(scenario: SignedTestInput | ClassificationTestSignal, test_input_key: str) -> str:
     """A text code for a scenario or signal, signed with ``test_input_key``: the project's secret
     test input key from the portal settings. Submit the code as the whole text: CalmLens moderates
-    text with anything else around it as ordinary content. The code expires at ``expires_at``
-    (Unix seconds, an integer from 0 to 4294967295), by default one day from now; CalmLens ignores
-    an expired code, and one more than seven days from expiring, so generate codes when tests run
-    rather than storing them. Raises ``sdk/invalid-argument`` for an invalid key, scenario or
-    expiry."""
+    text with anything else around it as ordinary content. Raises ``sdk/invalid-argument`` for an
+    invalid key or scenario."""
     _check_key(test_input_key)
     return _text_code(_validate(signal_test_input(scenario) if isinstance(scenario, str) else scenario),
-                      test_input_key, _expiry(expires_at))
+                      test_input_key)
 
 
 def generate_media_test_code(signal: ClassificationTestSignal, test_input_key: str) -> str:
@@ -207,18 +194,16 @@ def generate_media_test_code(signal: ClassificationTestSignal, test_input_key: s
     return f"Calm Lens test {words} {re.sub(r'[.-]', ' ', signal)} end test"
 
 
-def paint_test_image(scenario: SignedTestInput | ClassificationTestSignal, test_input_key: str, *,
-                     expires_at: int | None = None) -> PaintedTestImage:
+def paint_test_image(scenario: SignedTestInput | ClassificationTestSignal, test_input_key: str) -> PaintedTestImage:
     """The test image for a scenario or signal, signed with ``test_input_key``: the project's
     secret test input key from the portal settings. Upload its ``png`` bytes (or encode ``rgba``
     in any format: the image survives lossy formats and resizing) as the whole image, optionally
     on a plain single-colour border; CalmLens moderates an image with anything else in it as
-    ordinary content. The image expires like a text code: at ``expires_at`` (Unix seconds), by
-    default one day from now. Raises ``sdk/invalid-argument`` for an invalid key, scenario or
-    expiry, or a scenario too large for a test image."""
+    ordinary content. Raises ``sdk/invalid-argument`` for an invalid key or scenario, or a
+    scenario too large for a test image."""
     _check_key(test_input_key)
     checked = _validate(signal_test_input(scenario, "image") if isinstance(scenario, str) else scenario)
-    _, tag, payload = _text_code(checked, test_input_key, _expiry(expires_at))[:-1].split(" ")
+    _, tag, payload = _text_code(checked, test_input_key)[:-1].split(" ")
     signed = base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))
     data = bytes([len(signed) >> 8, len(signed) & 255]) + bytes.fromhex(tag) + signed
     categories = dict.fromkeys(instance["category"] for instance in checked["instances"])
@@ -373,19 +358,9 @@ def _hmac(key: str, message: str) -> str:
     return hmac.new(key.encode(), message.encode(), hashlib.sha256).hexdigest()[:32]
 
 
-def _expiry(expires_at: object) -> int:
-    if expires_at is None:
-        return int(time.time()) + TEST_INPUT_DEFAULT_LIFETIME_SECONDS
-    if not _whole(expires_at, 0, 0xFFFFFFFF):
-        raise _invalid("expires_at must be an integer number of Unix seconds from 0 to 4294967295")
-    return cast(int, expires_at)
-
-
-def _text_code(scenario: dict[str, Any], key: str, expires_at: int) -> str:
-    """The signed payload is the expiry (four bytes, big-endian Unix seconds) followed by the
-    scenario's canonical JSON."""
-    signed = struct.pack(">I", expires_at) + _canonical(scenario).encode()
-    payload = base64.urlsafe_b64encode(signed).decode().rstrip("=")
+def _text_code(scenario: dict[str, Any], key: str) -> str:
+    """The signed payload is the scenario's canonical JSON."""
+    payload = base64.urlsafe_b64encode(_canonical(scenario).encode()).decode().rstrip("=")
     if len(payload) > 8000:
         raise _invalid("The test scenario is too large")
     return f"<!calmlens-test {_hmac(key, f'calmlens-test:v2:{payload}')} {payload}>"
