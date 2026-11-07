@@ -107,6 +107,8 @@ const (
 	CodeNoRenderedVersion = "asset/no-rendered-version"
 	// CodeAssetNotFound is returned with HTTP 404.
 	CodeAssetNotFound = "asset/not-found"
+	// CodeAssetChildNotDeletable is returned with HTTP 409.
+	CodeAssetChildNotDeletable = "asset/child-not-deletable"
 	// CodeProjectNotFound is returned with HTTP 404.
 	CodeProjectNotFound = "project/not-found"
 	// CodeAssetReviewChanged is returned with HTTP 409.
@@ -277,6 +279,7 @@ var publicErrorStatuses = map[string]int{
 	CodeIdempotentRequestInProgress:       409,
 	CodeNoRenderedVersion:                 404,
 	CodeAssetNotFound:                     404,
+	CodeAssetChildNotDeletable:            409,
 	CodeProjectNotFound:                   404,
 	CodeAssetReviewChanged:                409,
 	CodeAssetReviewNoteRequired:           400,

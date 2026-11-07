@@ -1665,6 +1665,38 @@
     }
   },
   {
+    "code": "asset/child-not-deletable",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-asset-child-not-deletable"
+      },
+      "body": {
+        "code": "asset/child-not-deletable",
+        "message": "This asset was extracted from another asset (its `parentId`), so it can't be deleted on its own. Delete the asset it was extracted from instead, which deletes it too.",
+        "requestId": "req-asset-child-not-deletable",
+        "details": {
+          "reason": "asset_child_not_deletable"
+        }
+      }
+    },
+    "expected": {
+      "code": "asset/child-not-deletable",
+      "status": 409,
+      "requestId": "req-asset-child-not-deletable",
+      "retryAfter": null,
+      "details": {
+        "reason": "asset_child_not_deletable"
+      }
+    }
+  },
+  {
     "code": "asset/review-changed",
     "status": 409,
     "operation": "assets.retrieve",

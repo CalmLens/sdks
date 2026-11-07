@@ -194,8 +194,12 @@ module CalmLens
 
     # Completes the policy evidence behind a decided asset's moderation decision: the report's
     # `classification.moderation.explanationComplete` becomes `true` and every action stays as decided.
-    # With `rerun: true` the asset is moderated again with the project's current policy and returns
-    # in `processing`; use it when the policy changed since the decision (`asset/policy-changed`).
+    # With `rerun: true` the asset is moderated again with the project's current policy and an
+    # `asset.rerun-requested` event is recorded; use it when the policy changed since the decision
+    # (`asset/policy-changed`). The asset returns unchanged: it keeps its decision until the re-run's
+    # is stored, reported by `asset.classified` and `asset.<status>` events, and a failed re-run keeps
+    # it. A reviewed asset raises `asset/reviewed`, and one whose content is gone
+    # `asset/content-unavailable`.
     # @option options [String] :asset_id
     # @option options [Boolean] :rerun
     # @return [Hash] the asset
@@ -216,7 +220,8 @@ module CalmLens
       end
     end
 
-    # Deletes the asset record and its stored content.
+    # Deletes the asset record and its stored content. An asset extracted from another (one with a
+    # `parentId`) raises `asset/child-not-deletable`: delete its parent instead.
     # @option options [String] :asset_id
     # @return [nil]
     def delete(options)
@@ -228,7 +233,8 @@ module CalmLens
 
     # Deletes up to 500 assets (`operation: 'delete'`) or removes their stored content
     # (`'remove-content'`) in one request. Every asset must exist in the project and the key needs
-    # `assets:delete` for its folder, or nothing is queued. Returns once the operation is queued; the
+    # `assets:delete` for its folder, and a deletion can't name an asset extracted from another
+    # (`asset/child-not-deletable`), or nothing is queued. Returns once the operation is queued; the
     # work runs in the background and records `asset.deleted` or `asset.content-removed` for each
     # asset, with a `batch-id` fact naming `batchId`. Assets under a safety hold are skipped. Not
     # retried: it carries no `Idempotency-Key`.

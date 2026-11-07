@@ -83,9 +83,11 @@ func (s *AssetsService) Decide(ctx context.Context, options DecideAssetOptions) 
 
 // Explain completes the policy evidence behind a decided asset's moderation decision: the report's
 // ExplanationComplete becomes true and every action stays as decided. With Rerun the
-// asset is moderated again with the project's current policy and returns in
-// ClassificationStatusProcessing; use it when the policy changed since the decision
-// (CodeAssetPolicyChanged).
+// asset is moderated again with the project's current policy, and an EventAssetRerunRequested
+// event is recorded; use it when the policy changed since the decision (CodeAssetPolicyChanged).
+// The asset returns unchanged: it keeps its decision until the re-run's is stored, reported by
+// EventAssetClassified and asset.<status> events, and a failed re-run keeps it. A reviewed asset
+// fails with CodeAssetReviewed, and one whose content is gone with CodeAssetContentUnavailable.
 func (s *AssetsService) Explain(ctx context.Context, options ExplainAssetOptions) (*Asset, error) {
 	body := JSON{}
 	if options.Rerun {
@@ -158,7 +160,8 @@ func (s *AssetsService) RemoveContent(ctx context.Context, options AssetIDOption
 	return s.assetRequest(ctx, "DELETE", options.AssetID, "/content", nil)
 }
 
-// Delete removes the asset record together with its stored content.
+// Delete removes the asset record together with its stored content. An asset extracted from
+// another (one with a ParentID) fails with CodeAssetChildNotDeletable: delete its parent instead.
 func (s *AssetsService) Delete(ctx context.Context, options AssetIDOptions) error {
 	path, err := resourcePath("assets", options.AssetID, "")
 	if err != nil {
@@ -169,7 +172,8 @@ func (s *AssetsService) Delete(ctx context.Context, options AssetIDOptions) erro
 
 // Batch deletes up to 500 assets (AssetBatchOperationDelete) or removes their stored content
 // (AssetBatchOperationRemoveContent) in one request. Every asset must exist in the project and
-// the key needs assets:delete for its folder, or nothing is queued. It returns once the
+// the key needs assets:delete for its folder, and a deletion can't name an asset extracted from
+// another (CodeAssetChildNotDeletable), or nothing is queued. It returns once the
 // operation is queued, with the batch's BatchID; the work runs in the background and records
 // asset.deleted or asset.content-removed for each asset, with a FactBatchID fact naming BatchID.
 // Assets under a safety hold are skipped. It is not retried: it carries no Idempotency-Key.

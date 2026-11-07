@@ -112,6 +112,8 @@ public final class ErrorCodes {
   public static final String NO_RENDERED_VERSION = "asset/no-rendered-version";
   /** {@code asset/not-found} (HTTP 404). */
   public static final String ASSET_NOT_FOUND = "asset/not-found";
+  /** {@code asset/child-not-deletable} (HTTP 409). */
+  public static final String ASSET_CHILD_NOT_DELETABLE = "asset/child-not-deletable";
   /** {@code project/not-found} (HTTP 404). */
   public static final String PROJECT_NOT_FOUND = "project/not-found";
   /** {@code asset/review-changed} (HTTP 409). */
@@ -304,6 +306,7 @@ public final class ErrorCodes {
       Map.entry(IDEMPOTENT_REQUEST_IN_PROGRESS, 409),
       Map.entry(NO_RENDERED_VERSION, 404),
       Map.entry(ASSET_NOT_FOUND, 404),
+      Map.entry(ASSET_CHILD_NOT_DELETABLE, 409),
       Map.entry(PROJECT_NOT_FOUND, 404),
       Map.entry(ASSET_REVIEW_CHANGED, 409),
       Map.entry(ASSET_REVIEW_NOTE_REQUIRED, 400),

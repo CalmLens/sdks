@@ -476,8 +476,10 @@ impl MockServerClient {
     /// `decision`, or else what [`MockOptions::moderate`] returns for the
     /// [`Complete`](MockModerationTrigger::Complete) trigger (by default `allowed`). It records
     /// the processing events and no manual review; a `pending` decision leaves the asset
-    /// processing. Fails with `asset/not-found` (status 404) for an unknown asset and with
-    /// `sdk/invalid-argument` for one that isn't processing.
+    /// processing. A decided asset whose re-run is still queued counts as processing: the decision
+    /// replaces its old one unless it is `pending` or `failed`. Fails with `asset/not-found`
+    /// (status 404) for an unknown asset and with `sdk/invalid-argument` for one that isn't
+    /// processing.
     ///
     /// # Panics
     ///

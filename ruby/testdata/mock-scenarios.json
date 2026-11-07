@@ -5169,14 +5169,7 @@
             "rerun": true
           },
           "expect": {
-            "result": {
-              "id": {
-                "$ref": "kept.id"
-              },
-              "classification.status": "processing",
-              "classification.completedAt": null,
-              "classification.moderation.status": "pending"
-            },
+            "sameAs": "kept",
             "httpStatus": 200
           }
         },
@@ -9949,7 +9942,22 @@
           },
           "expect": {
             "result": {
-              "classification.status": "processing"
+              "classification.status": "completed",
+              "classification.moderation.status": "age-restricted"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "queued.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.status": "age-restricted"
             },
             "httpStatus": 200
           }
@@ -10050,6 +10058,34 @@
               "classification.moderation.source": "policy",
               "classification.moderation.explanationComplete": true
             }
+          }
+        },
+        {
+          "operation": "events.list",
+          "args": {
+            "cursor": {
+              "$ref": "feed.nextCursor"
+            }
+          },
+          "expect": {
+            "result": {
+              "items.length": 5,
+              "items.2.type": "asset.rerun-requested",
+              "items.2.actor.type": "api-key",
+              "items.2.facts": {
+                "$contains": {
+                  "key": "moderation-status",
+                  "value": "age-restricted"
+                }
+              },
+              "items.3.type": "asset.classified",
+              "items.4.type": "asset.allowed",
+              "items.4.actor": {
+                "type": "automated",
+                "id": null
+              }
+            },
+            "httpStatus": 200
           }
         },
         {

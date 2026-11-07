@@ -556,8 +556,11 @@ export default class CalmLensServerClient {
        * Completes the policy evidence behind a decided asset's moderation decision: its
        * `classification.moderation.explanationComplete` becomes `true` and every action stays as
        * decided. With `rerun: true` the asset is moderated again with the project's current policy
-       * and returns in `processing`; use it when the policy has changed since the decision
-       * (`asset/policy-changed`).
+       * and an `asset.rerun-requested` event is recorded; use it when the policy has changed since
+       * the decision (`asset/policy-changed`). The asset returns unchanged: it keeps its decision
+       * until the re-run's is stored, reported by `asset.classified` and `asset.<status>` events,
+       * and a failed re-run keeps it. A reviewed asset fails with `asset/reviewed`, and one whose
+       * content is gone with `asset/content-unavailable`.
        */
       explain: async (options: ExplainAssetOptions): Promise<Asset> => {
         const { assetId, rerun } = checked("assets.explain", options);
@@ -595,7 +598,10 @@ export default class CalmLensServerClient {
         return this.request("DELETE", `/assets/${requireId(assetId, "Asset ID")}/content`);
       },
 
-      /** Deletes an asset record together with its stored content. */
+      /**
+       * Deletes an asset record together with its stored content. An asset extracted from another
+       * (one with a `parentId`) fails with `asset/child-not-deletable`: delete its parent instead.
+       */
       delete: async (options: DeleteAssetOptions): Promise<void> => {
         const { assetId } = checked("assets.delete", options);
         await this.request("DELETE", `/assets/${requireId(assetId, "Asset ID")}`);
@@ -604,7 +610,8 @@ export default class CalmLensServerClient {
       /**
        * Deletes up to 500 assets (`operation: "delete"`) or removes their stored content
        * (`"remove-content"`) in one request. Every asset must exist in the project and the key
-       * needs `assets:delete` for its folder, or nothing is queued. Resolves with
+       * needs `assets:delete` for its folder, and a deletion can't name an asset extracted from
+       * another (`asset/child-not-deletable`), or nothing is queued. Resolves with
        * `{ batchId, status: "queued", assetCount }` once queued; the work runs in the background
        * and records `asset.deleted` or `asset.content-removed` for each asset, with a `batch-id`
        * fact naming `batchId`. Assets under a safety hold are skipped. Not retried: it carries no

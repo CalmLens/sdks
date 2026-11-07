@@ -222,7 +222,7 @@
     {
       "id": "assets.delete",
       "kind": "method",
-      "description": "Delete an asset, its child assets and their stored content from a project",
+      "description": "Delete an uploaded asset, its child assets and their stored content from a project. Child assets (those with a `parentId`) are deleted only with the asset they were extracted from.",
       "names": {
         "javascript": "assets.delete",
         "python": "assets.delete",
@@ -292,7 +292,7 @@
     {
       "id": "assets.batch",
       "kind": "method",
-      "description": "Delete up to 500 assets, or remove their stored content, in one request. Every asset must exist in the project and the API key needs `assets:delete` for its folder; otherwise nothing is queued. The response gives the operation's `batchId` and confirms that it is queued. It then runs in the background: `delete` deletes each asset with its child assets and stored content and records `asset.deleted`, and `remove-content` removes the content as a removal would (reason `requested`) and records `asset.content-removed`; each of those events carries the `batch-id` fact. Assets under a safety hold, or in a folder the key can no longer delete from when the operation runs, are skipped and record no event. To follow the operation, read the events feed filtered by those types or by asset.",
+      "description": "Delete up to 500 assets, or remove their stored content, in one request. Every asset must exist in the project, the API key needs `assets:delete` for its folder, and `delete` takes only uploaded assets, not child assets (those with a `parentId`); otherwise nothing is queued. The response gives the operation's `batchId` and confirms that it is queued. It then runs in the background: `delete` deletes each asset with its child assets and stored content and records `asset.deleted`, and `remove-content` removes the content as a removal would (reason `requested`) and records `asset.content-removed`; each of those events carries the `batch-id` fact. Assets under a safety hold, or in a folder the key can no longer delete from when the operation runs, are skipped and record no event. To follow the operation, read the events feed filtered by those types or by asset.",
       "names": {
         "javascript": "assets.batch",
         "python": "assets.batch",
@@ -1990,6 +1990,11 @@
     {
       "code": "project/not-found",
       "status": 404,
+      "retryable": false
+    },
+    {
+      "code": "asset/child-not-deletable",
+      "status": 409,
       "retryable": false
     },
     {

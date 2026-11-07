@@ -119,6 +119,11 @@ final class MockApi {
   private final Map<String, JsonObject> uploads = new HashMap<>();
   /** The processing options each asset was uploaded with, which the API keeps but doesn't return. */
   private final Map<String, JsonObject> processingOptions = new HashMap<>();
+  /**
+   * The decided assets whose re-run ({@code assets.explain} with {@code rerun}) is still queued;
+   * they keep their decision until {@link MockCalmLensServerClient#completeProcessing} decides them.
+   */
+  final Set<String> reruns = new HashSet<>();
   private final Map<String, JsonObject> lenses = new LinkedHashMap<>();
   /** Whether the request being answered created a hash list, hash list entry or policy. */
   private boolean created;
@@ -742,6 +747,23 @@ final class MockApi {
   }
 
   /**
+   * Asks {@code moderate} (unless {@code decision} is given) for a re-run's decision on a decided
+   * asset and applies it like the pipeline: a {@code pending} decision stays queued for {@link
+   * MockCalmLensServerClient#completeProcessing}, a {@code failed} one keeps the asset's decision,
+   * and any other replaces it with the pipeline's events.
+   */
+  void settleRerun(JsonObject asset, MockCalmLensServerClient.Trigger trigger, MockDecision decision) {
+    MockDecision settled = decision != null ? decision : decisionFor(asset, trigger, true);
+    String id = str(asset, "id");
+    reruns.remove(id);
+    switch (settled.status()) {
+      case PENDING -> reruns.add(id);
+      case FAILED -> { }
+      default -> moderateStored(asset, trigger, settled);
+    }
+  }
+
+  /**
    * The events the pipeline records when it settles an asset (AssetClassification.ts and
    * AssetErrorAlert.ts): {@code asset.classified} and the automated {@code asset.<status>}, or
    * {@code asset.failed}.
@@ -1129,6 +1151,8 @@ final class MockApi {
     review.addProperty("applied", true);
     if (!(moderation.get("manualReviews") instanceof JsonArray)) moderation.add("manualReviews", new JsonArray());
     moderation.getAsJsonArray("manualReviews").add(review);
+    // Like the API: a queued re-run no longer replaces a reviewed decision.
+    reruns.remove(str(asset, "id"));
     asset.addProperty("updatedAt", now);
     if (decision.equals("purged")) removeContent(asset, now, API_KEY_ACTOR, null);
     String name = str(asset, "name"), type = str(asset, "type");
@@ -1263,10 +1287,13 @@ final class MockApi {
         JsonElement reviews = moderation.get("manualReviews");
         if (reviews != null && reviews.isJsonArray() && !reviews.getAsJsonArray().isEmpty()) throw new Failure(ErrorCodes.ASSET_REVIEWED);
         if ("removed".equals(str(asset.getAsJsonObject("content"), "status"))) throw new Failure(ErrorCodes.ASSET_CONTENT_UNAVAILABLE);
-        // Like the API: back to processing, to be moderated again under the current policy.
-        applyOutcome(asset, MockCalmLensServerClient.Outcome.PENDING, "policy", now, null);
-        moderateStored(asset, MockCalmLensServerClient.Trigger.RERUN, null);
-        return asset;
+        // Like the API: the request is recorded, and the asset returns as it was. It keeps its
+        // decision while it's moderated again under the current policy.
+        recordEvent("asset.rerun-requested", "low", API_KEY_ACTOR, asset, List.of(assetNameFact(asset),
+            new Models.EventFact("asset-type", str(asset, "type"), null), new Models.EventFact("moderation-status", str(moderation, "status"), null)));
+        JsonObject response = asset.deepCopy();
+        settleRerun(asset, MockCalmLensServerClient.Trigger.RERUN, null);
+        return response;
       }
       case "POST move": {
         String folderId = str(body, "folderId");

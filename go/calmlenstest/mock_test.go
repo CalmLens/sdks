@@ -666,11 +666,50 @@ func TestMockExplainCompletesEvidenceOrReruns(t *testing.T) {
 	}
 	moderation["manualReviews"] = []any{}
 	rerun, err := c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID, Rerun: true})
-	if err != nil || rerun.Classification.Status != calmlens.ClassificationStatusProcessing || rerun.Classification.Moderation.Status != calmlens.ModerationStatusPending {
+	if err != nil || rerun.Classification.Status != calmlens.ClassificationStatusCompleted || rerun.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
 		t.Fatal(rerun, err)
 	}
-	if _, err = c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID}); calmlens.ErrorCode(err) != calmlens.CodeAssetNotDecided {
-		t.Fatal("explained an undecided asset", err)
+}
+
+func TestMockRerunReplacesTheDecisionOnlyWithANewOne(t *testing.T) {
+	outcome := OutcomeBlocked
+	c, err := NewServerClient(Options{Moderate: func(input ModerationInput) *Decision {
+		if input.Trigger == TriggerRerun {
+			return NewDecision(outcome)
+		}
+		return NewDecision(OutcomeAllowed)
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The response is the asset as the re-run found it; the new decision follows.
+	rerun, err := c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID, Rerun: true})
+	if err != nil || rerun.Classification.Moderation.Status != calmlens.ModerationStatusAllowed {
+		t.Fatal(rerun, err)
+	}
+	if stored, err := c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID}); err != nil || stored.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
+		t.Fatal(stored, err)
+	}
+	// A failed re-run keeps the decision and records no processing events.
+	outcome = OutcomeFailed
+	if _, err = c.Assets.Explain(ctx, calmlens.ExplainAssetOptions{AssetID: a.ID, Rerun: true}); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := c.Assets.Retrieve(ctx, calmlens.AssetIDOptions{AssetID: a.ID})
+	if err != nil || stored.Classification.Status != calmlens.ClassificationStatusCompleted || stored.Classification.Moderation.Status != calmlens.ModerationStatusBlocked {
+		t.Fatal(stored, err)
+	}
+	if last := c.events[len(c.events)-1]; last["type"] != calmlens.EventAssetRerunRequested {
+		t.Fatal(last["type"])
+	}
+	if _, err = c.CompleteProcessing(a.ID, nil); calmlens.ErrorCode(err) != calmlens.CodeSDKInvalidArgument {
+		t.Fatal("completed a decided asset with no queued re-run", err)
 	}
 }
 

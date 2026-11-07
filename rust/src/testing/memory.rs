@@ -302,12 +302,13 @@ impl MockOptions {
     }
     /// Decides each asset the mock moderates: when an upload completes (`assets().create`,
     /// `assets().classify`, `text().classify` or a final part), when `assets().retry` or
-    /// `assets().explain` with `rerun` queues an asset again, and when
+    /// `assets().explain` with `rerun` moderates an asset again, and when
     /// [`complete_processing`](super::MockServerClient::complete_processing) is called without a
     /// decision. It receives the stored asset, its content, the trigger and whether the API
     /// would queue the work, and returns a [`MockOutcome`] or a [`MockDecision`] (or a
     /// `calmlens::Result` of either; an error fails the request that triggered it). `pending`
-    /// leaves the asset processing. Without it, queued work other than `complete` stays
+    /// leaves the asset processing; for a re-run it keeps the asset's decision until
+    /// `complete_processing`, and a `failed` re-run keeps it. Without it, queued work other than `complete` stays
     /// `pending` and everything else is `allowed`.
     ///
     /// The callback runs while the mock handles the request, so it must not call the mock.
@@ -604,6 +605,9 @@ pub(super) struct Backend {
     /// The processing options each asset was uploaded with, which the API keeps but doesn't
     /// return.
     processing_options: HashMap<String, Value>,
+    /// The decided assets whose re-run (`assets().explain` with `rerun`) is still queued; they
+    /// keep their decision until `complete_processing` decides them.
+    reruns: HashSet<String>,
 }
 
 fn text(value: &Value) -> &str {
@@ -903,6 +907,7 @@ impl Backend {
             policies: policies::Policies::default(),
             asset_sequences: HashMap::new(),
             processing_options: HashMap::new(),
+            reruns: HashSet::new(),
         }
     }
     /// The `assetSequence` of the next event about `asset_id`, like the API: 1 for its first
@@ -936,6 +941,8 @@ impl Backend {
     /// [`decide`](Self::decide). A decision through the API (with its note) is the API key's; the
     /// test hook's is a reviewer's, whose events name a `user`.
     fn record_review(&mut self, asset_id: &str, decision: &str, note: Value) -> Value {
+        // Like the API: a queued re-run no longer replaces a reviewed decision.
+        self.reruns.remove(asset_id);
         let now = self.now();
         let review_id = self.create_id("rev");
         let storage = &mut self.storage;
@@ -1497,6 +1504,22 @@ impl Backend {
         asset
     }
 
+    /// Applies a re-run's `decision` to a stored decided asset like the pipeline and returns it: a
+    /// `pending` decision stays queued for `complete_processing`, a `failed` one keeps the
+    /// asset's decision, and any other replaces it with the pipeline's events.
+    fn settle_rerun(&mut self, asset: Value, decision: &MockDecision, now: u64) -> Value {
+        let id = text(&asset["id"]).to_owned();
+        self.reruns.remove(&id);
+        match decision.status() {
+            MockOutcome::Pending => {
+                self.reruns.insert(id);
+                asset
+            }
+            MockOutcome::Failed => asset,
+            _ => self.settle(asset, decision, now),
+        }
+    }
+
     /// Asks `moderate` (unless `decision` is given) and settles a stored processing asset.
     fn moderate_stored(
         &mut self,
@@ -1528,7 +1551,8 @@ impl Backend {
     }
 
     /// Finishes processing a stored asset as the pipeline would: with `decision`, or else what
-    /// `moderate` returns for the `complete` trigger.
+    /// `moderate` returns for the `complete` trigger. A decided asset whose re-run is still queued
+    /// counts as processing: the decision replaces its old one unless it is pending or failed.
     pub(super) fn complete_processing(
         &mut self,
         asset_id: &str,
@@ -1540,15 +1564,26 @@ impl Backend {
                 crate::Error::new(ErrorCode::AssetNotFound, "Asset not found").with_status(404)
             })?
             .clone();
-        if asset["classification"]["status"] != "processing" {
+        let rerun = self.reruns.contains(asset_id);
+        if !rerun && asset["classification"]["status"] != "processing" {
             return Err(crate::Error::new(
                 ErrorCode::InvalidArgument,
                 format!("asset {asset_id} isn't processing"),
             ));
         }
         let now = self.now();
-        self.moderate_stored(asset, MockModerationTrigger::Complete, decision, now)
-            .map_err(Failure::into_error)
+        if !rerun {
+            return self
+                .moderate_stored(asset, MockModerationTrigger::Complete, decision, now)
+                .map_err(Failure::into_error);
+        }
+        let decision = match decision {
+            Some(decision) => decision,
+            None => self
+                .decision_for(&asset, MockModerationTrigger::Complete, true)
+                .map_err(Failure::into_error)?,
+        };
+        Ok(self.settle_rerun(asset, &decision, now))
     }
 
     /// `asset.uploaded`, as the API records it when an upload completes.
@@ -2355,10 +2390,23 @@ impl Backend {
                             "The content is no longer stored",
                         ));
                     }
-                    // Back to processing, to be moderated again under the current policy.
-                    apply_outcome(&mut asset, &mut storage.content, "pending", "policy", now);
-                    storage.assets.insert(id.to_owned(), asset.clone());
-                    return self.moderate_stored(asset, MockModerationTrigger::Rerun, None, now);
+                    // The request is recorded, and the asset returns as it was: it keeps its
+                    // decision while it's moderated again under the current policy.
+                    let facts = json!([
+                        asset_name_fact(&asset),
+                        {"key": "asset-type", "value": asset["type"]},
+                        {"key": "moderation-status", "value": asset["classification"]["moderation"]["status"]},
+                    ]);
+                    self.push_event(
+                        "asset.rerun-requested",
+                        "low",
+                        &asset,
+                        api_key_actor(),
+                        facts,
+                    );
+                    let decision = self.decision_for(&asset, MockModerationTrigger::Rerun, true)?;
+                    self.settle_rerun(asset.clone(), &decision, now);
+                    return Ok(asset);
                 }
             }
             ("POST", "move") => {

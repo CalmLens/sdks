@@ -54,6 +54,7 @@ export const API_ERROR_CODES = {
   NO_RENDERED_VERSION: "asset/no-rendered-version",
   ASSET_NOT_FOUND: "asset/not-found",
   PROJECT_NOT_FOUND: "project/not-found",
+  ASSET_CHILD_NOT_DELETABLE: "asset/child-not-deletable",
   ASSET_REVIEW_CHANGED: "asset/review-changed",
   ASSET_REVIEW_NOTE_REQUIRED: "asset/review-note-required",
   ASSET_UPDATE_FAILED: "asset/update-failed",
@@ -329,6 +330,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "project/not-found": {
     status: 404,
     message: "Project not found",
+  },
+  "asset/child-not-deletable": {
+    status: 409,
+    message: "This asset was extracted from another asset (its `parentId`), so it can't be deleted on its own. Delete the asset it was extracted from instead, which deletes it too.",
   },
   "asset/review-changed": {
     status: 409,

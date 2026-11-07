@@ -1286,8 +1286,12 @@ impl AssetsClient<'_> {
     }
     /// Completes the policy evidence behind a decided asset's moderation decision: the report's
     /// `moderation.explanationComplete` becomes `true` and every action stays as decided. With `rerun` the asset
-    /// is moderated again with the project's current policy and returns in `processing`; use it
-    /// when the policy changed since the decision (`asset/policy-changed`).
+    /// is moderated again with the project's current policy, and an `asset.rerun-requested` event
+    /// is recorded; use it when the policy changed since the decision (`asset/policy-changed`).
+    /// The asset returns unchanged: it keeps its decision until the re-run's is stored, reported
+    /// by `asset.classified` and `asset.<status>` events, and a failed re-run keeps it. A reviewed
+    /// asset fails with `asset/reviewed`, and one whose content is gone with
+    /// `asset/content-unavailable`.
     pub async fn explain(&self, options: ExplainAsset) -> Result<Asset> {
         let path = format!("/assets/{}/explain", id(&options.asset_id)?);
         let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
@@ -1303,7 +1307,9 @@ impl AssetsClient<'_> {
             .call(self.0.prepare(Method::DELETE, &path, &[])?)
             .await
     }
-    /// Deletes the asset record and its stored content (`DELETE /assets/:assetId`).
+    /// Deletes the asset record and its stored content (`DELETE /assets/:assetId`). An asset
+    /// extracted from another (one with a `parent_id`) fails with `asset/child-not-deletable`:
+    /// delete its parent instead.
     pub async fn delete(&self, options: AssetId) -> Result<()> {
         let path = format!("/assets/{}", id(&options.asset_id)?);
         self.0
@@ -1313,7 +1319,8 @@ impl AssetsClient<'_> {
     /// Deletes up to 500 assets ([`AssetBatchOperation::Delete`]) or removes their stored content
     /// ([`AssetBatchOperation::RemoveContent`]) in one request
     /// (`POST /projects/:projectId/assets/batch`). Every asset must exist in the project and the
-    /// key needs `assets:delete` for its folder, or nothing is queued. Returns the operation's
+    /// key needs `assets:delete` for its folder, and a deletion can't name an asset extracted from
+    /// another (`asset/child-not-deletable`), or nothing is queued. Returns the operation's
     /// `batch_id` once queued; the work runs in the background and records `asset.deleted` or
     /// `asset.content-removed` for each asset, with a `batch-id` fact naming `batch_id`. Assets
     /// under a safety hold are skipped. Not retried: it carries no `Idempotency-Key`.

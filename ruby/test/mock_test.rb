@@ -18,6 +18,24 @@ class MockTest < Minitest::Test
     assert mock.state.content.key?(asset['id'])
   end
 
+  def test_a_rerun_replaces_the_decision_only_with_a_new_one
+    outcome = 'blocked'
+    mock = CalmLens::MockServerClient.new(moderate: ->(input) { input.trigger == 'rerun' ? outcome : 'allowed' })
+    asset = mock.assets.classify(name: 'note.txt', content: { data: 'hello', type: 'text/plain' }, processing_options: KEEP)
+    # The response is the asset as the re-run found it; the new decision follows.
+    rerun = mock.assets.explain(asset_id: asset['id'], rerun: true)
+    assert_equal 'allowed', rerun.dig('classification', 'moderation', 'status')
+    assert_equal 'blocked', mock.assets.retrieve(asset_id: asset['id']).dig('classification', 'moderation', 'status')
+    # A failed re-run keeps the decision and records no processing events.
+    outcome = 'failed'
+    mock.assets.explain(asset_id: asset['id'], rerun: true)
+    stored = mock.assets.retrieve(asset_id: asset['id'])
+    assert_equal %w[completed blocked], [stored.dig('classification', 'status'), stored.dig('classification', 'moderation', 'status')]
+    assert_equal 'asset.rerun-requested', mock.state.events.last['type']
+    error = assert_raises(CalmLens::InvalidArgumentError) { mock.complete_processing(asset['id']) }
+    assert_equal 'sdk/invalid-argument', error.code
+  end
+
   def test_cdn_serves_transformed_urls_and_signed_urls_carry_the_serialized_selector_beneath_the_grant
     mock = CalmLens::MockServerClient.new(api_key: DOWNLOAD)
     asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)

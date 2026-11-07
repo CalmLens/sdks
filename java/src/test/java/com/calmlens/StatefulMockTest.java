@@ -52,15 +52,34 @@ class StatefulMockTest {
     assertEquals(true, explained.classification().moderation().explanationComplete());
     assertEquals(Models.AssetModerationStatus.BLOCKED, explained.classification().moderation().status());
 
+    // A queued re-run keeps the decision until it is decided.
     Models.Asset rerun = mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true));
-    assertSame(Models.AssetClassificationStatus.PROCESSING, rerun.classification().status());
-    assertEquals(Models.AssetModerationStatus.PENDING, rerun.classification().moderation().status());
-    assertEquals(ErrorCodes.ASSET_NOT_DECIDED, assertThrows(ApiException.class,
-        () -> mock.client.assets.explain(new Models.ExplainAsset(asset.id()))).getCode());
+    assertSame(Models.AssetClassificationStatus.COMPLETED, rerun.classification().status());
+    assertEquals(Models.AssetModerationStatus.BLOCKED, rerun.classification().moderation().status());
 
+    // A reviewer's decision stands: the queued re-run no longer replaces it.
     mock.decide(asset.id(), Outcome.ALLOWED);
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.completeProcessing(asset.id())).getCode());
+    assertEquals(Models.AssetModerationStatus.ALLOWED, mock.client.assets.retrieve(new Models.AssetId(asset.id())).classification().moderation().status());
     assertEquals(ErrorCodes.ASSET_REVIEWED, assertThrows(ApiException.class,
         () -> mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true))).getCode());
+  }
+
+  @Test void rerunReplacesTheDecisionOnlyWithANewOne() {
+    AtomicInteger reruns = new AtomicInteger();
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic().moderate(input ->
+        MockDecision.of(input.trigger() != MockCalmLensServerClient.Trigger.RERUN ? "allowed" : reruns.incrementAndGet() == 1 ? "blocked" : "failed")));
+    Models.Asset asset = mock.client.assets.classify(kept("photo.png"));
+    // The response is the asset as the re-run found it; the new decision follows.
+    Models.Asset rerun = mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true));
+    assertEquals(Models.AssetModerationStatus.ALLOWED, rerun.classification().moderation().status());
+    assertEquals(Models.AssetModerationStatus.BLOCKED, mock.client.assets.retrieve(new Models.AssetId(asset.id())).classification().moderation().status());
+    // A failed re-run keeps the decision.
+    mock.client.assets.explain(new Models.ExplainAsset(asset.id()).rerun(true));
+    Models.Asset stored = mock.client.assets.retrieve(new Models.AssetId(asset.id()));
+    assertSame(Models.AssetClassificationStatus.COMPLETED, stored.classification().status());
+    assertEquals(Models.AssetModerationStatus.BLOCKED, stored.classification().moderation().status());
+    assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class, () -> mock.completeProcessing(asset.id())).getCode());
   }
 
   @Test void moderateGetsAMultipartUploadOnceItsFinalPartArrives() {

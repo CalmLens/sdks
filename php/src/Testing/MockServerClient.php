@@ -44,7 +44,10 @@ use Psr\Http\Message\ResponseInterface;
  * while a safety hold is on. Like the API, a completed upload adds
  * `asset.uploaded`, then `asset.classified` and the automated `asset.<status>` once decided, or
  * `asset.failed`; deleting an asset, removing its content and retrying it add `asset.deleted`,
- * `asset.content-removed` and `asset.retried`. Every event names its `actor`: the mock API key
+ * `asset.content-removed` and `asset.retried`. Explaining with `'rerun' => true` adds
+ * `asset.rerun-requested` and returns the asset unchanged: it keeps its decision until the one
+ * `moderate` returns replaces it, and keeps it when that is `failed`; a `pending` re-run waits for
+ * `completeProcessing`. Every event names its `actor`: the mock API key
  * (`['type' => 'api-key', 'id' => null]`, as mock keys have no ID) for what the client does,
  * `automated` moderation for the pipeline's decisions, and a `user` for `decide`. The project starts on the organisation's own
  * General preset policy, `live`; the mock's presets have one release (version 1), every category at its default action with no rules, and policies never decide uploads.
@@ -147,6 +150,8 @@ final class MockServerClient
     private array $uploads = [];
     /** The processing options each asset was uploaded with, which the API keeps but doesn't return. */
     private array $processingOptions = [];
+    /** @var array<string, true> Decided assets whose re-run is still queued; they keep their decision until `completeProcessing`. */
+    private array $pendingReruns = [];
     private array $grants;
     /** The client's API key: a CDN request without it, as `fetchCdn` sends, has no grants. */
     private string $apiKey;
@@ -362,6 +367,8 @@ final class MockServerClient
             throw self::invalidArgument('decide takes ' . implode(', ', self::DECISIONS) . " (got $outcome)");
         }
         $asset = $this->applyOutcome($this->ownAsset($assetId), $outcome, 'requested');
+        // Like the API: a queued re-run no longer replaces a reviewed decision.
+        unset($this->pendingReruns[$assetId]);
         $asset['classification']['moderation']['manualReviews'][] = self::review(($this->createId)('rev'), $outcome, null, ($this->now)());
         $this->assets[$assetId] = $asset;
         if ($outcome === 'purged') {
@@ -379,16 +386,23 @@ final class MockServerClient
      * `MockDecision::STATUSES` or a `MockDecision`), or else what `moderate` returns for the
      * `complete` trigger. A decision adds `asset.classified` and the automated `asset.<status>`
      * event, `failed` adds `asset.failed`, and `pending` leaves the asset processing; no manual
-     * review is recorded. Throws `NotFoundException` (`asset/not-found`) for an unknown asset and
-     * `InvalidArgumentException` (`sdk/invalid-argument`) for one that isn't processing.
+     * review is recorded. A decided asset whose re-run is still pending gets the decision in place
+     * of its old one, unless it is `pending` or `failed`. Throws `NotFoundException`
+     * (`asset/not-found`) for an unknown asset and `InvalidArgumentException`
+     * (`sdk/invalid-argument`) for one that isn't processing or awaiting a pending re-run.
      */
     public function completeProcessing(string $assetId, string|MockDecision|null $decision = null): array
     {
         $asset = $this->ownAsset($assetId);
-        if ($asset['classification']['status'] !== 'processing') {
+        $rerun = isset($this->pendingReruns[$assetId]);
+        if (!$rerun && $asset['classification']['status'] !== 'processing') {
             throw self::invalidArgument("asset $assetId isn't processing");
         }
-        return $this->moderateStored($asset, MockModerationInput::COMPLETE, $decision === null ? null : MockDecision::from($decision));
+        $decision = $decision === null ? null : MockDecision::from($decision);
+        if ($rerun) {
+            return $this->settleRerun($asset, $decision ?? $this->decisionFor($asset, MockModerationInput::COMPLETE, true));
+        }
+        return $this->moderateStored($asset, MockModerationInput::COMPLETE, $decision);
     }
 
     /**
@@ -796,8 +810,13 @@ final class MockServerClient
                 if ($asset['content']['status'] === 'removed') {
                     self::fail(ErrorCodes::ASSET_CONTENT_UNAVAILABLE);
                 }
-                // Like the API: back to processing, to be moderated again under the current policy.
-                return $this->moderateStored($this->applyOutcome($asset, 'pending'), MockModerationInput::RERUN);
+                // Like the API: the request is recorded, and the asset returns as it was. It keeps
+                // its decision while it's moderated again under the current policy.
+                $this->enqueueEvent(['type' => 'asset.rerun-requested', 'severity' => 'low', 'assetId' => $id, 'asset' => $this->snapshot($asset),
+                    'actor' => self::API_KEY_ACTOR, 'facts' => [self::nameFact($asset), ['key' => 'asset-type', 'value' => $asset['type']],
+                        ['key' => 'moderation-status', 'value' => $asset['classification']['moderation']['status']]]]);
+                $this->settleRerun($asset, $this->decisionFor($asset, MockModerationInput::RERUN, true));
+                return $asset;
             case 'POST move':
                 $folderId = $json['folderId'] ?? null;
                 if ($folderId !== null) {
@@ -1021,6 +1040,24 @@ final class MockServerClient
         return $this->assets[$next['id']] = $next;
     }
 
+    /**
+     * Applies a re-run's decision to a decided asset like the pipeline: `pending` stays queued for
+     * `completeProcessing`, `failed` keeps the asset's decision, and any other replaces it with the
+     * pipeline's events.
+     */
+    private function settleRerun(array $asset, MockDecision $decision): array
+    {
+        unset($this->pendingReruns[$asset['id']]);
+        if ($decision->status === 'pending') {
+            $this->pendingReruns[$asset['id']] = true;
+            return $asset;
+        }
+        if ($decision->status === 'failed') {
+            return $asset;
+        }
+        return $this->moderateStored($asset, MockModerationInput::RERUN, $decision);
+    }
+
     /** Asks `moderate` (unless `$decision` is given) and settles a processing asset; `pending` leaves it processing. */
     private function moderateStored(array $asset, string $trigger, ?MockDecision $decision = null): array
     {
@@ -1185,6 +1222,7 @@ final class MockServerClient
             self::fail(ErrorCodes::ASSET_CONTENT_PURGED);
         }
         $asset['classification']['moderation']['status'] = $decision;
+        unset($this->pendingReruns[$asset['id']]);
         $asset['classification']['moderation']['manualReviews'][] = self::review(($this->createId)('rev'), $decision, $note, ($this->now)());
         $asset = $this->assets[$asset['id']] = $this->touch($asset);
         if ($decision === 'purged') {

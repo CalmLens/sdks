@@ -869,11 +869,31 @@ describe("MockCalmLensServerClient", () => {
     await databaseStorage.updateAsset(explained);
 
     const rerun = await client.assets.explain({ assetId: asset.id, rerun: true });
-    expect(rerun.classification.status).toBe("processing");
-    expect(rerun.classification.moderation.status).toBe("pending");
-    await expect(client.assets.explain({ assetId: asset.id })).rejects.toMatchObject({
-      code: PUBLIC_ERROR_CODES.ASSET_NOT_DECIDED.getId(),
+    expect(rerun.classification.status).toBe("completed");
+    expect(rerun.classification.moderation.status).toBe("blocked");
+    // A failed re-run keeps the decision and leaves nothing to complete.
+    const kept = await client.completeProcessing(asset.id, "failed");
+    expect(kept.classification.status).toBe("completed");
+    expect(kept.classification.moderation.status).toBe("blocked");
+    await expect(client.completeProcessing(asset.id)).rejects.toMatchObject({
+      code: "sdk/invalid-argument",
     });
+  });
+
+  it("replaces a decision with a re-run's only after answering with the asset as it was", async () => {
+    const client = createClient({
+      moderate: ({ trigger }) => (trigger === "upload" ? "blocked" : "allowed"),
+    });
+    const asset = await client.assets.classify({
+      name: "image.png",
+      content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
+      processingOptions: { keepContentAfterProcessing: true },
+    });
+
+    const rerun = await client.assets.explain({ assetId: asset.id, rerun: true });
+    expect(rerun.classification.moderation.status).toBe("blocked");
+    const stored = await client.assets.retrieve({ assetId: asset.id });
+    expect(stored.classification.moderation.status).toBe("allowed");
   });
 
   it("removes content but keeps the record, and deletes assets", async () => {

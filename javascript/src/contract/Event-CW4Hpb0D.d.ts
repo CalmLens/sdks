@@ -1,5 +1,5 @@
 import "./Asset-_U-3SHpb.js";
-import { i as EventFacts, o as EventType } from "./EventCatalog-CuR4E_kx.js";
+import { i as EventFacts, o as EventType } from "./EventCatalog-DH0ekgif.js";
 import "./Page-Bwn9Pb4k.js";
 import * as zod from "zod";
 declare const ACTOR_SCHEMA: zod.ZodObject<{
@@ -83,6 +83,7 @@ declare const EVENT_SCHEMA: zod.ZodObject<{
     "asset.progress-updated": "asset.progress-updated";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";
+    "asset.rerun-requested": "asset.rerun-requested";
     "asset.retried": "asset.retried";
     "asset.review-requested": "asset.review-requested";
     "asset.uploaded": "asset.uploaded";
@@ -185,6 +186,7 @@ declare const PUBLIC_EVENT_SCHEMA: zod.ZodObject<{
     "asset.progress-updated": "asset.progress-updated";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";
+    "asset.rerun-requested": "asset.rerun-requested";
     "asset.retried": "asset.retried";
     "asset.review-requested": "asset.review-requested";
     "asset.uploaded": "asset.uploaded";

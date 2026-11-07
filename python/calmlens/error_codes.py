@@ -52,6 +52,7 @@ IDEMPOTENT_REQUEST_IN_PROGRESS = "idempotency/request-in-progress"
 NO_RENDERED_VERSION = "asset/no-rendered-version"
 ASSET_NOT_FOUND = "asset/not-found"
 PROJECT_NOT_FOUND = "project/not-found"
+ASSET_CHILD_NOT_DELETABLE = "asset/child-not-deletable"
 ASSET_REVIEW_CHANGED = "asset/review-changed"
 ASSET_REVIEW_NOTE_REQUIRED = "asset/review-note-required"
 ASSET_UPDATE_FAILED = "asset/update-failed"
@@ -175,6 +176,7 @@ STATUS_BY_CODE: dict[str, int] = {
     "asset/no-rendered-version": 404,
     "asset/not-found": 404,
     "project/not-found": 404,
+    "asset/child-not-deletable": 409,
     "asset/review-changed": 409,
     "asset/review-note-required": 400,
     "asset/update-failed": 500,

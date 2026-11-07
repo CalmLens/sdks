@@ -570,6 +570,10 @@ fn newer_event_types_decode_to_their_own_variants() {
     );
     assert_eq!(decode("asset.retried"), EventType::AssetRetried);
     assert_eq!(
+        decode("asset.rerun-requested"),
+        EventType::AssetRerunRequested
+    );
+    assert_eq!(
         decode("usage.uploads-paused"),
         EventType::UsageUploadsPaused
     );

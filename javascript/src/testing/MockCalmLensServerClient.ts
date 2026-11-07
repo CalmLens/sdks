@@ -241,8 +241,11 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
    * else what `mockOptions.moderate` returns for the `complete` trigger (`allowed` by default).
    * The asset gets the decision's report, and `asset.classified` and the automated
    * `asset.<status>` (or `asset.failed`) join the events feed. No review is recorded, so the
-   * asset can still be moderated again. Rejects with `asset/not-found` for an unknown asset and
-   * `sdk/invalid-argument` for one that isn't processing. It sends no request.
+   * asset can still be moderated again. A decided asset whose re-run (`assets.explain` with
+   * `rerun: true`) is still pending gets the decision in place of its old one, unless it is
+   * `pending` or `failed`. Rejects with `asset/not-found` for an unknown asset and
+   * `sdk/invalid-argument` for one that isn't processing or awaiting a pending re-run. It sends
+   * no request.
    */
   completeProcessing(assetId: string, decision?: MockAssetOutcome | MockDecision): Promise<Asset> {
     return this.#api.completeProcessing(assetId, decision);

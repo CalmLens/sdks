@@ -1508,9 +1508,12 @@ public final class CalmLensServerClient implements AutoCloseable {
     /**
      * Completes the policy evidence behind a decided asset's moderation decision: the report's
      * {@code classification.moderation.explanationComplete} becomes {@code true} and every action stays as
-     * decided. With {@code rerun} the asset is moderated again with the project's current policy and
-     * returns in {@code processing}; use it when the policy changed since the decision
-     * ({@code asset/policy-changed}).
+     * decided. With {@code rerun} the asset is moderated again with the project's current policy,
+     * and an {@code asset.rerun-requested} event is recorded; use it when the policy changed since
+     * the decision ({@code asset/policy-changed}). The asset returns unchanged: it keeps its
+     * decision until the re-run's is stored, reported by {@code asset.classified} and {@code
+     * asset.<status>} events, and a failed re-run keeps it. A reviewed asset fails with {@code
+     * asset/reviewed}, and one whose content is gone with {@code asset/content-unavailable}.
      *
      * @param options the asset, and whether to moderate it again
      * @return the asset
@@ -1532,7 +1535,13 @@ public final class CalmLensServerClient implements AutoCloseable {
       return decode(json("DELETE", "/assets/" + id(str(Models.encode(options), "assetId", null)) + "/content", null, null), Models.Asset.class);
     }
 
-    /** Permanently deletes the asset record, its report and its stored content. @param options the asset */
+    /**
+     * Permanently deletes the asset record, its report and its stored content. An asset extracted
+     * from another (one with a {@code parentId}) fails with {@code asset/child-not-deletable}:
+     * delete its parent instead.
+     *
+     * @param options the asset
+     */
     public void delete(Models.AssetId options) {
       success(json("DELETE", "/assets/" + id(str(Models.encode(options), "assetId", null)), null, null));
     }
@@ -1540,7 +1549,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     /**
      * Deletes up to 500 assets ({@link Models.AssetBatchOperation#DELETE}) or removes their stored
      * content ({@link Models.AssetBatchOperation#REMOVE_CONTENT}) in one request. Every asset must
-     * exist in the project and the key needs {@code assets:delete} for its folder, or nothing is
+     * exist in the project and the key needs {@code assets:delete} for its folder, and a deletion
+     * can't name an asset extracted from another ({@code asset/child-not-deletable}), or nothing is
      * queued. The work runs in the background and records {@code asset.deleted} or
      * {@code asset.content-removed} for each asset, with a {@code batch-id} fact naming the
      * response's {@code batchId}; assets under a safety hold are skipped. Not retried: it carries

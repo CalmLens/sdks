@@ -132,6 +132,9 @@ module CalmLens
         @asset_event_sequences = Hash.new(0)
         # The processing options each asset was uploaded with, which the API keeps but doesn't return.
         @processing_options = {}
+        # Decided assets whose re-run (`assets.explain` with `rerun: true`) is still queued: they keep
+        # their decision until `complete_processing` decides them.
+        @reruns = {}
       end
 
       # Adds an event to the feed, filling the fields the API always sets. Its `actor` is the mock's
@@ -178,13 +181,17 @@ module CalmLens
       end
 
       # Finishes processing an asset as the pipeline would, with `decision` or else what `moderate`
-      # answers for the `complete` trigger, and returns it; nil when there is no such asset.
+      # answers for the `complete` trigger, and returns it; nil when there is no such asset. A decided
+      # asset whose re-run is still queued counts as processing.
       def complete_processing(asset_id, decision)
         item = own_asset(asset_id)
         return unless item
-        raise Internal.invalid("Asset #{asset_id} isn't processing") unless item['classification']['status'] == 'processing'
 
-        moderate_stored(item, 'complete', decision.nil? ? nil : MockDecision.from(decision))
+        rerun = @reruns.key?(asset_id)
+        raise Internal.invalid("Asset #{asset_id} isn't processing") unless rerun || item['classification']['status'] == 'processing'
+
+        settled = decision.nil? ? nil : MockDecision.from(decision)
+        rerun ? settle_rerun(item, 'complete', settled) : moderate_stored(item, 'complete', settled)
         deep_copy(item)
       end
 
@@ -228,6 +235,8 @@ module CalmLens
       # review is the mock API key's, which has no ID. A decision through the API (`by_api_key`) has
       # the API key as its events' actor; the test hook's is a reviewer's (a `user`).
       def record_decision(item, decision, note, by_api_key)
+        # Like the API: a queued re-run no longer replaces a reviewed decision.
+        @reruns.delete(item['id'])
         apply_outcome(item, decision, 'requested')
         review = { 'id' => @create_id.call('rev'), 'decision' => decision, 'note' => note,
                    'decidedBy' => { 'type' => 'api-key', 'id' => nil }, 'reviewedAt' => @now.call, 'applied' => true }
@@ -1001,9 +1010,28 @@ module CalmLens
         fail!(ErrorCodes::ASSET_REVIEWED) unless moderation.fetch('manualReviews', []).empty?
         fail!(ErrorCodes::ASSET_CONTENT_UNAVAILABLE) if item['content']['status'] == 'removed'
 
-        # Like the API: back to processing, to be moderated again under the current policy.
-        apply_outcome(item, 'pending')
-        moderate_stored(item, 'rerun')
+        # Like the API: the request is recorded, and the asset returns as it was. It keeps its decision
+        # while it's moderated again under the current policy.
+        add_event('type' => 'asset.rerun-requested', 'severity' => 'low', 'assetId' => item['id'],
+                  'asset' => snapshot(item), 'actor' => deep_copy(API_KEY_ACTOR),
+                  'facts' => [asset_name_fact(item), { 'key' => 'asset-type', 'value' => item['type'] },
+                              { 'key' => 'moderation-status', 'value' => moderation['status'] }])
+        response = deep_copy(item)
+        settle_rerun(item, 'rerun')
+        response
+      end
+
+      # Applies a re-run's decision to a decided asset like the pipeline: `pending` stays queued for
+      # `complete_processing`, `failed` keeps the asset's decision, and any other replaces it with the
+      # pipeline's events.
+      def settle_rerun(item, trigger, decision = nil)
+        decision ||= decision_for(item, trigger, true)
+        @reruns.delete(item['id'])
+        if decision.status == 'pending'
+          @reruns[item['id']] = true
+        elsif decision.status != 'failed'
+          moderate_stored(item, trigger, decision)
+        end
       end
 
       # Signs an asset URL like the API (`POST /projects/:projectId/signed-asset-urls`): a grant to one

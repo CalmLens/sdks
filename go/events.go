@@ -17,6 +17,7 @@ const (
 	EventAssetDeleted                  = "asset.deleted"
 	EventAssetContentRemoved           = "asset.content-removed"
 	EventAssetRetried                  = "asset.retried"
+	EventAssetRerunRequested           = "asset.rerun-requested"
 	EventUsageFreeUploadsExhausted     = "usage.free-uploads-exhausted"
 	EventUsageUploadsPaused            = "usage.uploads-paused"
 	EventUploadPresetDailyLimitReached = "upload-preset.daily-limit-reached"
@@ -272,6 +273,17 @@ type AssetDecisionFacts struct {
 	AssetType         *string  `json:"asset-type"`
 	FlaggedCategories []string `json:"flagged-categories"`
 	Note              *string  `json:"note"`
+}
+
+// AssetRerunRequestedFacts are the facts of EventAssetRerunRequested, recorded when the event's
+// Actor asks for a decided asset to be moderated again (AssetsService.Explain with Rerun).
+// ModerationStatus is the asset's status when the re-run was requested (a ModerationStatus
+// constant other than pending), which stands until the re-run's EventAssetClassified and
+// asset.<status> events report the new one; a failed re-run keeps it.
+type AssetRerunRequestedFacts struct {
+	AssetName        *string `json:"asset-name"`
+	AssetType        *string `json:"asset-type"`
+	ModerationStatus string  `json:"moderation-status"`
 }
 
 // AssetFailedFacts are the facts of EventAssetFailed.

@@ -106,7 +106,8 @@ type Options struct {
 	// Assets.Classify, Text.Classify and final parts), Assets.Retry, Assets.Explain with Rerun,
 	// and CompleteProcessing without a decision. Return NewDecision(status), with any Flag and
 	// NotEvaluated calls; nil, or no Moderate, means DefaultModerate: queued work stays pending
-	// and the rest is allowed. A pending decision leaves the asset processing. Finished
+	// and the rest is allowed. A pending decision leaves the asset processing; for a re-run it
+	// keeps the asset's decision until CompleteProcessing, and a failed re-run keeps it. Finished
 	// processing removes content unless the upload set
 	// ProcessingOptions.KeepContentAfterProcessing. Moderate runs while the mock answers a
 	// request, so it must not call the mock.
@@ -178,6 +179,9 @@ type MockServerClient struct {
 	// processingOptions are the processing options each asset was uploaded with, which the API
 	// keeps but doesn't return.
 	processingOptions map[string]calmlens.JSON
+	// reruns are the decided assets whose re-run (Assets.Explain with Rerun) is still queued; they
+	// keep their decision until CompleteProcessing decides them.
+	reruns map[string]bool
 }
 
 // Failures for RequestFailure.Code besides API error codes.
@@ -374,7 +378,8 @@ func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, er
 // decision, or with Options.Moderate's decision for TriggerComplete when decision is nil, and
 // records the pipeline's events. It records no manual review. It returns a *calmlens.Error with
 // code asset/not-found for an unknown asset, and sdk/invalid-argument for an asset that isn't
-// processing or an invalid decision.
+// processing or an invalid decision. A decided asset whose re-run is still queued is processing
+// for this: the decision replaces its old one, unless it is pending or failed.
 func (m *MockServerClient) CompleteProcessing(assetID string, decision *Decision) (*calmlens.Asset, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -382,7 +387,8 @@ func (m *MockServerClient) CompleteProcessing(assetID string, decision *Decision
 	if err != nil {
 		return nil, &calmlens.Error{Code: calmlens.CodeAssetNotFound, Message: "Asset not found", Status: http.StatusNotFound}
 	}
-	if section(a, "classification")["status"] != calmlens.ClassificationStatusProcessing {
+	rerun := m.reruns[assetID]
+	if !rerun && section(a, "classification")["status"] != calmlens.ClassificationStatusProcessing {
 		return nil, &calmlens.Error{Code: calmlens.CodeSDKInvalidArgument, Message: "Asset " + assetID + " isn't processing"}
 	}
 	if decision == nil {
@@ -392,7 +398,11 @@ func (m *MockServerClient) CompleteProcessing(assetID string, decision *Decision
 	} else if err = decision.Err(); err != nil {
 		return nil, err
 	}
-	m.settle(a, decision)
+	if rerun {
+		m.settleRerun(a, decision)
+	} else {
+		m.settle(a, decision)
+	}
 	return toAsset(a)
 }
 
@@ -413,6 +423,8 @@ func toAsset(a calmlens.JSON) (*calmlens.Asset, error) {
 // Decide test hook. A decision through the API (with its note) is the mock API key's; the
 // Decide test hook's is a reviewer's, whose user ID the mock doesn't know.
 func (m *MockServerClient) recordReview(a calmlens.JSON, decision string, note any) {
+	// Like the API: a queued re-run no longer replaces a reviewed decision.
+	delete(m.reruns, text(a["id"]))
 	m.applyOutcome(a, decision, calmlens.ContentRemovalReasonRequested, nil)
 	now := m.options.Now()
 	moderation := section(section(a, "classification"), "moderation")
@@ -626,7 +638,7 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 	if images.Content == nil {
 		images.Content = map[string]*StoredContent{}
 	}
-	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}, assetSequences: map[string]int64{}, processingOptions: map[string]calmlens.JSON{}}
+	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}, assetSequences: map[string]int64{}, processingOptions: map[string]calmlens.JSON{}, reruns: map[string]bool{}}
 	client, err := calmlens.NewServerClient(calmlens.Options{APIKey: options.APIKey, ProjectID: options.ProjectID, BaseURL: options.BaseURL, CDNBaseURL: options.CDNBaseURL, Timeout: options.Timeout, UploadTimeout: options.UploadTimeout, MaxRetries: options.MaxRetries, MaxResponseBytes: options.MaxResponseBytes, PartSizeBytes: options.PartSizeBytes, HTTPClient: &http.Client{Transport: transport{mock}}})
 	if err != nil {
 		return nil, err
@@ -1752,6 +1764,21 @@ func (m *MockServerClient) settle(a calmlens.JSON, decision *Decision) {
 	m.recordProcessingEvents(a, decision)
 }
 
+// settleRerun applies a re-run's decision to a decided asset like the pipeline: a pending decision
+// stays queued for CompleteProcessing, a failed one keeps the asset's decision, and any other
+// replaces it with the pipeline's events.
+func (m *MockServerClient) settleRerun(a calmlens.JSON, decision *Decision) {
+	id := text(a["id"])
+	delete(m.reruns, id)
+	switch decision.status {
+	case OutcomePending:
+		m.reruns[id] = true
+	case OutcomeFailed:
+	default:
+		m.settle(a, decision)
+	}
+}
+
 // moderateStored asks Options.Moderate how to decide a queued, processing asset and settles it.
 func (m *MockServerClient) moderateStored(a calmlens.JSON, trigger string) error {
 	decision, err := m.decisionFor(a, trigger, true, nil)
@@ -2182,11 +2209,20 @@ func (m *MockServerClient) assetRoute(method, id, suffix string, body calmlens.J
 		if section(a, "content")["status"] == calmlens.ContentStatusRemoved {
 			return nil, fail(calmlens.CodeAssetContentUnavailable)
 		}
-		// Like the API: back to processing, to be moderated again under the current policy.
-		m.applyOutcome(a, OutcomePending, calmlens.ContentRemovalReasonPolicy, nil)
-		if err := m.moderateStored(a, TriggerRerun); err != nil {
+		// Like the API: the request is recorded, and the asset returns as it was. It keeps its
+		// decision while it's moderated again under the current policy.
+		m.addEvent(calmlens.EventAssetRerunRequested, calmlens.SeverityLow, a, mockAPIKeyActor, []any{
+			assetNameFact(a),
+			calmlens.JSON{"key": calmlens.FactAssetType, "value": a["type"]},
+			calmlens.JSON{"key": calmlens.FactModerationStatus, "value": moderation["status"]},
+		})
+		response := cloneJSON(a).(calmlens.JSON)
+		decision, err := m.decisionFor(a, TriggerRerun, true, nil)
+		if err != nil {
 			return nil, err
 		}
+		m.settleRerun(a, decision)
+		return response, nil
 	case method == "POST" && suffix == "move":
 		if folder := text(body["folderId"]); folder != "" {
 			if _, err = m.folder(folder); err != nil {

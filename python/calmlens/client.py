@@ -1661,9 +1661,12 @@ class Assets:
                 rerun: bool = _UNSET) -> Asset:
         """Complete the policy evidence behind a decided asset's moderation decision: the report's
         ``classification.moderation.explanationComplete`` becomes ``True`` and every action stays as
-        decided. With ``rerun=True`` the asset is moderated again with the project's current policy
-        and returns in ``processing``; use it when the policy changed since the decision
-        (``asset/policy-changed``)."""
+        decided. With ``rerun=True`` the asset is moderated again with the project's current policy and
+        an ``asset.rerun-requested`` event is recorded; use it when the policy changed since the
+        decision (``asset/policy-changed``). The asset returns unchanged: it keeps its decision until
+        the re-run's is stored, reported by ``asset.classified`` and ``asset.<status>`` events, and a
+        failed re-run keeps it. A reviewed asset raises ``asset/reviewed``, and one whose content is
+        gone ``asset/content-unavailable``."""
         merged = _merge("assets.explain", options, asset_id=asset_id, rerun=rerun)
         body = {"rerun": True} if merged.get("rerun") else {}
         return cast(Asset, self._c._request(
@@ -1677,7 +1680,8 @@ class Assets:
         return cast(Asset, self._c._request("DELETE", "/assets/" + _id(merged.get("assetId"), "assetId") + "/content"))
 
     def delete(self, options: AssetIdOptions | None = None, /, *, asset_id: str = _UNSET) -> None:
-        """Delete the asset record together with its stored content."""
+        """Delete the asset record together with its stored content. An asset extracted from another
+        (one with a ``parentId``) raises ``asset/child-not-deletable``: delete its parent instead."""
         merged = _merge("assets.delete", options, asset_id=asset_id)
         self._c._request("DELETE", "/assets/" + _id(merged.get("assetId"), "assetId"))
 
@@ -1685,7 +1689,8 @@ class Assets:
               operation: AssetBatchOperation = _UNSET) -> BatchAssetsResponse:
         """Delete up to 500 assets (``operation="delete"``) or remove their stored content
         (``"remove-content"``) in one request. Every asset must exist in the project and the key needs
-        ``assets:delete`` for its folder, or nothing is queued. Returns ``{"batchId", "status": "queued",
+        ``assets:delete`` for its folder, and a deletion can't name an asset extracted from another
+        (``asset/child-not-deletable``), or nothing is queued. Returns ``{"batchId", "status": "queued",
         "assetCount"}`` once queued; the work runs in the background and records ``asset.deleted`` or
         ``asset.content-removed`` for each asset, with a ``batch-id`` fact naming ``batchId``. Assets
         under a safety hold are skipped. Not retried: it carries no ``Idempotency-Key``."""

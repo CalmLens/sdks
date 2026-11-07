@@ -449,6 +449,8 @@ string_enum! {
         AssetContentRemoved = "asset.content-removed",
         /// `asset.retried`.
         AssetRetried = "asset.retried",
+        /// `asset.rerun-requested`.
+        AssetRerunRequested = "asset.rerun-requested",
         /// `asset.review-requested`.
         AssetReviewRequested = "asset.review-requested",
         /// `asset.hash-matched`.

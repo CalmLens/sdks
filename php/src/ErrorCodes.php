@@ -64,6 +64,7 @@ final class ErrorCodes
     public const NO_RENDERED_VERSION = 'asset/no-rendered-version';
     public const ASSET_NOT_FOUND = 'asset/not-found';
     public const PROJECT_NOT_FOUND = 'project/not-found';
+    public const ASSET_CHILD_NOT_DELETABLE = 'asset/child-not-deletable';
     public const ASSET_REVIEW_CHANGED = 'asset/review-changed';
     public const ASSET_REVIEW_NOTE_REQUIRED = 'asset/review-note-required';
     public const ASSET_UPDATE_FAILED = 'asset/update-failed';
@@ -176,6 +177,7 @@ final class ErrorCodes
         'asset/no-rendered-version' => 404,
         'asset/not-found' => 404,
         'project/not-found' => 404,
+        'asset/child-not-deletable' => 409,
         'asset/review-changed' => 409,
         'asset/review-note-required' => 400,
         'asset/update-failed' => 500,

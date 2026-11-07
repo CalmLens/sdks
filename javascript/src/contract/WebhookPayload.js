@@ -1600,6 +1600,17 @@ const defineModerationOutcome = (outcome) => defineEventType({
 			label: msg("Note"),
 			description: "The reviewer's note, or `null`.",
 			display: "text"
+		}),
+		childAsset: field(zod.string().optional(), {
+			label: msg("Child asset"),
+			description: "Present when a reviewer's decision on one of this asset's child assets changed this asset's status: the ID of that child. The event's `actor` is that reviewer.",
+			display: "code"
+		}),
+		childStatus: field(ASSET_MODERATION_DECISION_SCHEMA.optional(), {
+			label: msg("Child status"),
+			description: "Present with `child-asset`: the status the reviewer gave that child, such as `blocked`.",
+			display: "enum",
+			valueLabels: MODERATION_STATUS_LABELS
 		})
 	},
 	example: {
@@ -1889,6 +1900,30 @@ const ASSET_RETRIED = defineEventType({
 	example: {
 		assetName: "beach.jpg",
 		assetType: "image"
+	}
+});
+const ASSET_RERUN_REQUESTED = defineEventType({
+	id: "asset.rerun-requested",
+	name: msg("Moderation re-run requested"),
+	description: msg("Moderation of a decided asset was requested again under the project's current policy. The event's `actor` made the request. The asset keeps its decision until the re-run's `asset.classified` event and status event report the new one; if the re-run fails, it keeps it."),
+	category: "moderation",
+	severity: "low",
+	notify: false,
+	permission: "assets:read",
+	fields: {
+		assetName: assetNameField,
+		assetType: assetTypeField,
+		moderationStatus: field(ASSET_MODERATION_DECISION_SCHEMA, {
+			label: msg("Status"),
+			description: "The asset's status when the re-run was requested, which stands until the re-run decides it again: `allowed`, `limited`, `age-restricted` or `blocked`.",
+			display: "enum",
+			valueLabels: MODERATION_STATUS_LABELS
+		})
+	},
+	example: {
+		assetName: "beach.jpg",
+		assetType: "image",
+		moderationStatus: "limited"
 	}
 });
 const ASSET_REVIEW_REQUESTED = defineEventType({
@@ -2413,6 +2448,7 @@ const EVENT_TYPE_INFO = {
 	"asset.deleted": ASSET_DELETED,
 	"asset.content-removed": ASSET_CONTENT_REMOVED,
 	"asset.retried": ASSET_RETRIED,
+	"asset.rerun-requested": ASSET_RERUN_REQUESTED,
 	"asset.review-requested": ASSET_REVIEW_REQUESTED,
 	"asset.hash-matched": ASSET_HASH_MATCHED,
 	"asset.link-flagged": ASSET_LINK_FLAGGED,

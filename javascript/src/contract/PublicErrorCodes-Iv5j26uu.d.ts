@@ -59,6 +59,7 @@ declare const PUBLIC_ERROR_CODES: {
   readonly NO_RENDERED_VERSION: RequestErrorCode;
   readonly ASSET_NOT_FOUND: RequestErrorCode;
   readonly PROJECT_NOT_FOUND: RequestErrorCode;
+  readonly ASSET_CHILD_NOT_DELETABLE: RequestErrorCode;
   readonly ASSET_REVIEW_CHANGED: RequestErrorCode;
   readonly ASSET_REVIEW_NOTE_REQUIRED: RequestErrorCode;
   readonly ASSET_UPDATE_FAILED: RequestErrorCode;

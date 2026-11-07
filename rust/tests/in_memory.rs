@@ -362,10 +362,64 @@ async fn explain_completes_evidence_and_rerun_moderates_again() {
     let rerun = mock.assets().explain(explain(true)).await.unwrap();
     assert_eq!(
         rerun.classification.status,
-        AssetClassificationStatus::Processing
+        AssetClassificationStatus::Completed
     );
-    let error = mock.assets().explain(explain(false)).await.unwrap_err();
-    assert_eq!(error.code(), &ErrorCode::AssetNotDecided);
+    assert_eq!(
+        rerun.classification.moderation.status,
+        AssetModerationStatus::Allowed
+    );
+}
+
+#[tokio::test]
+async fn rerun_replaces_the_decision_only_with_a_new_one() {
+    let outcome = std::sync::Arc::new(std::sync::Mutex::new(MockOutcome::Blocked));
+    let rerun_outcome = outcome.clone();
+    let mock =
+        MockServerClient::in_memory(options().moderate(move |input: &MockModerationInput| {
+            match input.trigger {
+                MockModerationTrigger::Rerun => *rerun_outcome.lock().unwrap(),
+                _ => MockOutcome::Allowed,
+            }
+        }))
+        .unwrap();
+    let asset = mock.assets().classify(kept("r.png", b"png")).await.unwrap();
+    let explain = || ExplainAsset {
+        asset_id: asset.id.clone(),
+        rerun: true,
+    };
+    // The response is the asset as the re-run found it; the new decision follows.
+    let rerun = mock.assets().explain(explain()).await.unwrap();
+    assert_eq!(
+        rerun.classification.moderation.status,
+        AssetModerationStatus::Allowed
+    );
+    let stored = mock
+        .assets()
+        .retrieve(AssetId::new(&asset.id))
+        .await
+        .unwrap();
+    assert_eq!(
+        stored.classification.moderation.status,
+        AssetModerationStatus::Blocked
+    );
+    // A failed re-run keeps the decision, and leaves nothing for complete_processing.
+    *outcome.lock().unwrap() = MockOutcome::Failed;
+    mock.assets().explain(explain()).await.unwrap();
+    let stored = mock
+        .assets()
+        .retrieve(AssetId::new(&asset.id))
+        .await
+        .unwrap();
+    assert_eq!(
+        stored.classification.status,
+        AssetClassificationStatus::Completed
+    );
+    assert_eq!(
+        stored.classification.moderation.status,
+        AssetModerationStatus::Blocked
+    );
+    let error = mock.complete_processing(&asset.id, None).unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::InvalidArgument);
 }
 
 #[tokio::test]

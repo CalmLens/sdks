@@ -545,6 +545,11 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "Project not found",
 		status: 404
 	}),
+	ASSET_CHILD_NOT_DELETABLE: new ErrorCode({
+		id: "asset/child-not-deletable",
+		defaultMessage: "This asset was extracted from another asset (its `parentId`), so it can't be deleted on its own. Delete the asset it was extracted from instead, which deletes it too.",
+		status: 409
+	}),
 	ASSET_REVIEW_CHANGED: new ErrorCode({
 		id: "asset/review-changed",
 		defaultMessage: "The asset changed during review. Refresh and review the current decision.",

@@ -1,12 +1,12 @@
 import { n as HashListEntry, t as HashList } from "./HashList-B-tYWgXP.js";
 import "./Asset-_U-3SHpb.js";
 import "./AssetPayload-BpPkhqVM.js";
-import { r as TypedEvent } from "./Event-BiNGUk0n.js";
+import { r as TypedEvent } from "./Event-CW4Hpb0D.js";
 import { t as Folder } from "./Folder-D1CVstEY.js";
-import { o as EventType } from "./EventCatalog-CuR4E_kx.js";
+import { o as EventType } from "./EventCatalog-DH0ekgif.js";
 import { t as CursorPage } from "./Page-Bwn9Pb4k.js";
 import "./Lens-CLZcyVve.js";
-import "./PublicErrorCodes-o8Q4Gxso.js";
+import "./PublicErrorCodes-Iv5j26uu.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   parentId: zod.ZodOptional<zod.ZodString>;
@@ -4117,6 +4117,7 @@ declare const GET_EVENTS_QUERY_SCHEMA: zod.ZodObject<{
     "asset.progress-updated": "asset.progress-updated";
     "asset.purged": "asset.purged";
     "asset.region-restricted": "asset.region-restricted";
+    "asset.rerun-requested": "asset.rerun-requested";
     "asset.retried": "asset.retried";
     "asset.review-requested": "asset.review-requested";
     "asset.uploaded": "asset.uploaded";

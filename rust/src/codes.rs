@@ -104,6 +104,8 @@ error_codes! {
     AssetNotFound = "asset/not-found", 404;
     /// `project/not-found` (HTTP 404): Project not found
     ProjectNotFound = "project/not-found", 404;
+    /// `asset/child-not-deletable` (HTTP 409): This asset was extracted from another asset (its `parentId`), so it can't be deleted on its own. Delete the asset it was extracted from instead, which deletes it too.
+    AssetChildNotDeletable = "asset/child-not-deletable", 409;
     /// `asset/review-changed` (HTTP 409): The asset changed during review. Refresh and review the current decision.
     AssetReviewChanged = "asset/review-changed", 409;
     /// `asset/review-note-required` (HTTP 400): A note is required when changing the decision.
