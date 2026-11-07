@@ -481,7 +481,7 @@ module CalmLens
   end
 
   # Signed test inputs: text codes, test images and media phrases signed with a project's secret
-  # test input key from the portal.
+  # test input key from the portal. Text codes and test images expire.
   module TestInputs
     type action = "allow" | "limit" | "age-restrict" | "block"
     type region = "DE" | "AT" | "FR" | "GB" | "EU" | "AU" | "BR"
@@ -523,10 +523,14 @@ module CalmLens
     # clean, limited, adult_image, adult_text, regional_delivery, germany, mixed, one_face, no_face,
     # adult_face, minor_face and group (deeply frozen).
     PRESETS: Hash[Symbol, scenario]
+    # A text code or test image's default lifetime: one day.
+    DEFAULT_LIFETIME_SECONDS: Integer
+    # The longest a text code or test image may have left to run when CalmLens reads it: seven days.
+    MAX_LIFETIME_SECONDS: Integer
 
     def self.for_signal: (signal signal, ?("text" | "image") kind) -> scenario
-    def self.generate_text_code: (input input, String test_input_key) -> String
-    def self.paint_image: (input input, String test_input_key) -> Image
+    def self.generate_text_code: (input input, String test_input_key, ?expires_at: Integer?) -> String
+    def self.paint_image: (input input, String test_input_key, ?expires_at: Integer?) -> Image
     def self.generate_media_code: (media_signal signal, String test_input_key) -> String
   end
 end

@@ -183,8 +183,9 @@ signed = CalmLens::TestInputs.generate_text_code(mixed, test_input_key)
 scored = CalmLens::TestInputs.generate_text_code({ instances: [{ category: 'violence', score: 0.9, qualifiers: ['violence-threat'] }] },
                                                  test_input_key)
 phrase = CalmLens::TestInputs.generate_media_code('violence', test_input_key)
+hourly = CalmLens::TestInputs.paint_image('violence', test_input_key, expires_at: Time.now.to_i + 3600).png
 
 [status, processing, failure, reviews, removal, format, camera, score, ages, names, more, children, matched, expires, available,
  lens_width, url,
  renditions, embed, hls, bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered, fetched, signed, scored,
- phrase, automated, regional, flagged_links, batched, webhook_actor, segments, lens_names, mode, token, flagged, webhook_facts]
+ phrase, hourly, automated, regional, flagged_links, batched, webhook_actor, segments, lens_names, mode, token, flagged, webhook_facts]

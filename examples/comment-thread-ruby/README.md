@@ -180,7 +180,9 @@ shown. Only absolute HTTP(S) fact URLs become links. A test send (fact
 - [index.html.erb](index.html.erb): server-rendered UI with no JavaScript or external
   assets. Every dynamic value goes through `h`. CalmLens
   [text test inputs](https://calmlens.com/docs/guides/testing) in a reply are shown as a short
-  marker rather than their full code.
+  marker rather than their code, so visitors can't copy a code and reuse it. CalmLens
+  recognises a code only when it is the whole reply, in a project with "Recognise test inputs"
+  turned on.
 - [app_test.rb](app_test.rb): the processing options on every request, holding and blocking flagged
   replies, release and removal rules, content deletion, retries, replays, webhook
   tampering, test sends, fail-closed states, form tokens, request limits and the server.

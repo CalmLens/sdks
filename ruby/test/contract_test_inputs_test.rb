@@ -77,7 +77,21 @@ class ContractTestInputsTest < Minitest::Test
     expected = FIXTURE['text'].find { |item| item['name'] == 'keyOrder' }
     symbolized = JSON.parse(JSON.generate(expected['input']), symbolize_names: true)
     symbolized[:regional_actions] = symbolized.delete(:regionalActions)
-    assert_equal expected['code'], TestInputs.generate_text_code(symbolized, expected['key'])
+    assert_equal expected['code'], TestInputs.generate_text_code(symbolized, expected['key'], expires_at: expected['expiresAt'])
+  end
+
+  def test_expiry_lifetimes_match_the_fixture
+    assert_equal FIXTURE['expiry']['defaultLifetimeSeconds'], TestInputs::DEFAULT_LIFETIME_SECONDS
+    assert_equal FIXTURE['expiry']['maxLifetimeSeconds'], TestInputs::MAX_LIFETIME_SECONDS
+  end
+
+  # Without `expires_at`, the signed payload's first four bytes are a day from now.
+  def test_a_code_expires_after_the_default_lifetime
+    code = TestInputs.generate_text_code('harassment', KEY)
+    now = Time.now.to_i
+    expires_at = code.chomp('>').split[2].tr('-_', '+/').unpack1('m').unpack1('N')
+    lifetime = FIXTURE['expiry']['defaultLifetimeSeconds']
+    assert_includes (now + lifetime - 5)..(now + lifetime + 5), expires_at
   end
 
   def test_a_key_given_in_two_forms_is_refused
@@ -90,7 +104,7 @@ class ContractTestInputsTest < Minitest::Test
   def test_detection_keys_accept_symbols
     expected = FIXTURE['text'].find { |item| item['name'] == 'detectionsKeyOrder' }
     symbolized = JSON.parse(JSON.generate(expected['input']), symbolize_names: true)
-    assert_equal expected['code'], TestInputs.generate_text_code(symbolized, expected['key'])
+    assert_equal expected['code'], TestInputs.generate_text_code(symbolized, expected['key'], expires_at: expected['expiresAt'])
   end
 
   # Each detection key given as both a String and a Symbol is refused rather than one winning.
@@ -140,7 +154,7 @@ class ContractTestInputsTest < Minitest::Test
   end
 
   def replay_text(item)
-    assert_equal item['code'], TestInputs.generate_text_code(input(item), item['key'])
+    assert_equal item['code'], TestInputs.generate_text_code(input(item), item['key'], expires_at: item['expiresAt'])
   end
 
   def replay_media(item)
@@ -148,7 +162,7 @@ class ContractTestInputsTest < Minitest::Test
   end
 
   def replay_image(item)
-    image = TestInputs.paint_image(input(item), item['key'])
+    image = TestInputs.paint_image(input(item), item['key'], expires_at: item['expiresAt'])
     assert_equal [item['width'], item['height']], [image.width, image.height]
     assert_equal item['rgbaSha256'], Digest::SHA256.hexdigest(image.rgba)
     assert_equal item['levels'], fixture_levels(image, item['cells'])
@@ -156,7 +170,7 @@ class ContractTestInputsTest < Minitest::Test
   end
 
   def replay_image_rejection(item)
-    error = assert_raises(CalmLens::InvalidArgumentError, item['name']) { TestInputs.paint_image(input(item), item['key']) }
+    error = assert_raises(CalmLens::InvalidArgumentError, item['name']) { TestInputs.paint_image(input(item), item['key'], expires_at: item['expiresAt']) }
     assert_equal CalmLens::SdkErrorCodes::INVALID_ARGUMENT, error.code
   end
 
@@ -203,7 +217,7 @@ class ContractTestInputsTest < Minitest::Test
       if item['kind'] == 'media'
         TestInputs.generate_media_code(item['signal'], item['key'])
       else
-        TestInputs.generate_text_code(input(item), item['key'])
+        TestInputs.generate_text_code(input(item), item['key'], expires_at: item['expiresAt'])
       end
     end
     assert_equal CalmLens::SdkErrorCodes::INVALID_ARGUMENT, error.code

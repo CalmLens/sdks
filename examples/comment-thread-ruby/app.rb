@@ -481,9 +481,10 @@ module Calmthread
       locals.each { |key, value| instance_variable_set("@#{key}", value) }
     end
 
-    # CalmLens text test inputs (`<!calmlens-test <tag> <category>>`) are shown as a short marker
-    # instead of their 32-character tag. Matched on the escaped text, so the output stays escaped.
-    TEST_INPUT = /&lt;!calmlens-test\s+[a-f0-9]{32}\s+([a-z.-]+)\s*&gt;/i
+    # CalmLens text test inputs (`<!calmlens-test <tag> <payload>>`) are shown as a short marker,
+    # never as the code: anyone who copied a code could reuse it in the project until it expires.
+    # Matched on the escaped text, so the output stays escaped.
+    TEST_INPUT = /&lt;!calmlens-\s*test\s+[A-Za-z0-9_\s-]+&gt;/
     AVATAR_TONES = 6
 
     def render = TEMPLATE.result(binding)
@@ -501,7 +502,7 @@ module Calmthread
     end
 
     def body_html(text)
-      h(text).gsub(TEST_INPUT) { %(<span class="test-input">test input: #{Regexp.last_match(1).downcase}</span>) }
+      h(text).gsub(TEST_INPUT) { '<span class="test-input">test input</span>' }
     end
 
     def ago(time)

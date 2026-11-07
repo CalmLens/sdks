@@ -527,12 +527,14 @@ class RequestTest < Minitest::Test
   end
 
   def test_test_input_codes_are_shown_as_a_marker_and_stay_escaped
-    tag = 'a' * 32
-    html = Calmthread::View.new.body_html("Hi <b> <!calmlens-test #{tag} harassment>")
-    refute_includes html, tag
-    refute_includes html, '<b>'
-    assert_includes html, '&lt;b&gt;'
-    assert_includes html, 'harassment'
+    code = CalmLens::TestInputs.generate_text_code('harassment', 'a' * 32)
+    html = Calmthread::View.new.body_html(code)
+    refute_includes html, code.split[1]
+    refute_includes html, code.split[2].delete('>')
+    mixed = Calmthread::View.new.body_html("Hi <b> #{code}")
+    refute_includes mixed, code.split[1]
+    refute_includes mixed, '<b>'
+    assert_includes mixed, '&lt;b&gt;'
   end
 
   def test_fact_links_allow_only_http_urls_and_registered_keys
