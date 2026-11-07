@@ -70,23 +70,24 @@ test("rejects the contract's invalid inputs", async () => {
   }
 });
 
-test("paints the contract's test images byte for byte and rejects ones too large", async () => {
-  for (const testCase of fixture.images) {
+// One test per image: painting and reading a whole image is slow enough that the contract's set
+// doesn't fit one test's time limit on a CI runner.
+for (const testCase of fixture.images)
+  test(`paints the contract's ${testCase.name} test image byte for byte`, async () => {
     const image = await paintTestImage(scenarioOf(testCase), testCase.key);
-    expect({ name: testCase.name, width: image.width, height: image.height }).toEqual({
-      name: testCase.name,
+    expect({ width: image.width, height: image.height }).toEqual({
       width: testCase.width,
       height: testCase.height,
     });
-    const digest = new Bun.CryptoHasher("sha256").update(image.rgba).digest("hex");
-    expect({ name: testCase.name, digest }).toEqual({
-      name: testCase.name,
-      digest: testCase.rgbaSha256,
-    });
+    expect(new Bun.CryptoHasher("sha256").update(image.rgba).digest("hex")).toBe(
+      testCase.rgbaSha256,
+    );
     expect(await detectTestImage(image, testCase.key)).toEqual(
       testCase.signal ? testInputForSignal(testCase.signal, "image") : testCase.input,
     );
-  }
+  });
+
+test("refuses to paint the contract's test images that are too large", async () => {
   for (const rejection of fixture.imageRejections)
     expect(
       await paintTestImage(scenarioOf(rejection), rejection.key).then(
