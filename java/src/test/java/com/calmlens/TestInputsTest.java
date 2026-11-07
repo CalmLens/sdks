@@ -13,8 +13,11 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,9 +76,15 @@ class TestInputsTest {
     return values;
   }
 
+  /** The case's expiry; generated cases always record one, and rejections may. */
+  private static long expiresAt(JsonObject c) { return c.get("expiresAt").getAsBigDecimal().longValueExact(); }
+
   private static String text(JsonObject c) {
     String key = c.get("key").getAsString();
-    return c.has("signal") ? TestInputs.generateTestTextCode(c.get("signal").getAsString(), key) : TestInputs.generateTestTextCode(input(c.get("input")), key);
+    if (!c.has("expiresAt"))
+      return c.has("signal") ? TestInputs.generateTestTextCode(c.get("signal").getAsString(), key) : TestInputs.generateTestTextCode(input(c.get("input")), key);
+    return c.has("signal") ? TestInputs.generateTestTextCode(c.get("signal").getAsString(), key, expiresAt(c))
+        : TestInputs.generateTestTextCode(input(c.get("input")), key, expiresAt(c));
   }
 
   @Test
@@ -152,7 +161,8 @@ class TestInputsTest {
 
   private static TestInputs.TestImage image(JsonObject c) {
     String key = c.get("key").getAsString();
-    return c.has("signal") ? TestInputs.paintTestImage(c.get("signal").getAsString(), key) : TestInputs.paintTestImage(input(c.get("input")), key);
+    return c.has("signal") ? TestInputs.paintTestImage(c.get("signal").getAsString(), key, expiresAt(c))
+        : TestInputs.paintTestImage(input(c.get("input")), key, expiresAt(c));
   }
 
   /** Each cell's level as packages/sdk-contract/testInputs.ts records it: "r" for the outer ring, else the data level (0-3) nearest the luma of the cell's top-left pixel. */
@@ -200,11 +210,15 @@ class TestInputsTest {
     });
   }
 
-  /** Untyped rejections (unknown fields, wrong value types) cannot be expressed with {@link TestInput}. */
+  /**
+   * Untyped rejections (unknown fields, wrong value types) cannot be expressed with {@link TestInput},
+   * nor a fractional expiry with a {@code long}; out-of-range expiries can and are refused.
+   */
   @TestFactory
   Stream<DynamicTest> rejections() throws Exception {
     return cases("rejections", "name", c -> {
-      Assumptions.assumeTrue(c.get("typed").getAsBoolean(), "an untyped scenario TestInput cannot express");
+      boolean integralExpiry = c.has("expiresAt") && c.get("expiresAt").getAsBigDecimal().stripTrailingZeros().scale() <= 0;
+      Assumptions.assumeTrue(c.get("typed").getAsBoolean() || integralExpiry, "an untyped scenario or expiry Java cannot express");
       String key = c.get("key").getAsString();
       CalmLensException error = assertThrows(CalmLensException.class, () -> {
         switch (c.get("kind").getAsString()) {
@@ -215,6 +229,24 @@ class TestInputsTest {
       }, c.toString());
       assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, error.getCode());
     });
+  }
+
+  @Test
+  void expiryLifetimesMatchTheFixture() throws Exception {
+    JsonObject expiry = fixture().getAsJsonObject("expiry");
+    assertEquals(List.of(expiry.get("defaultLifetimeSeconds").getAsLong(), expiry.get("maxLifetimeSeconds").getAsLong()),
+        List.of(TestInputs.DEFAULT_LIFETIME_SECONDS, TestInputs.MAX_LIFETIME_SECONDS));
+  }
+
+  /** A code generated without an expiry carries one a day from now in its signed payload. */
+  @Test
+  void textCodesExpireInADayByDefault() {
+    long before = Instant.now().getEpochSecond();
+    String code = TestInputs.generateTestTextCode("violence", "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d");
+    long after = Instant.now().getEpochSecond();
+    String payload = code.substring(0, code.length() - 1).split(" ")[2];
+    long expiresAt = Integer.toUnsignedLong(ByteBuffer.wrap(Base64.getUrlDecoder().decode(payload)).getInt());
+    assertTrue(expiresAt >= before + 86400 && expiresAt <= after + 86400, expiresAt + " not a day after " + before + ".." + after);
   }
 
   @Test

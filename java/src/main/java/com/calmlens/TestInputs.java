@@ -3,8 +3,10 @@ package com.calmlens;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashSet;
@@ -20,11 +22,17 @@ import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Signed test inputs: text codes, test images and media phrases that a project's moderation
- * recognises as a declared scenario when they are signed with its secret test input key (shown in
- * the portal's project settings). The formats match the backend byte for byte.
+ * recognises as a declared scenario when they are signed with its secret test input key and the
+ * project has "Recognise test inputs" turned on. The key is in the portal's project settings, for
+ * members and API keys that can read them. The formats match the backend byte for byte.
+ *
+ * <p>Text codes and test images expire, {@link #DEFAULT_LIFETIME_SECONDS} after they are made
+ * unless an {@code expiresAt} overload chooses another time, so generate them when tests run
+ * rather than storing them.
  *
  * <pre>{@code
  * String text = TestInputs.generateTestTextCode(TestInputs.LIMITED, testInputKey);
+ * String hourly = TestInputs.generateTestTextCode("violence", testInputKey, Instant.now().getEpochSecond() + 3600);
  * byte[] faces = TestInputs.paintTestImage(TestInputs.ADULT_FACE, testInputKey).png();
  * byte[] png = TestInputs.paintTestImage("violence", testInputKey).png();
  * String phrase = TestInputs.generateMediaTestCode("violence", testInputKey);
@@ -35,6 +43,15 @@ import javax.crypto.spec.SecretKeySpec;
  */
 public final class TestInputs {
   private TestInputs() {}
+
+  /** How long a text code or test image stays valid when no expiry is given: one day, in seconds. */
+  public static final long DEFAULT_LIFETIME_SECONDS = 24 * 60 * 60;
+
+  /**
+   * The longest a code may still have to run when CalmLens reads it, in seconds: CalmLens ignores a
+   * code or test image that expires more than seven days after it arrives.
+   */
+  public static final long MAX_LIFETIME_SECONDS = 7 * 24 * 60 * 60;
 
   /** The kind of input a signal shortcut stands for. */
   public enum Kind {
@@ -162,7 +179,9 @@ public final class TestInputs {
   public static TestInput testInputForSignal(String signal) { return testInputForSignal(signal, Kind.TEXT); }
 
   /**
-   * Returns the signed text code for a scenario. Put it anywhere in a text input.
+   * Returns the signed text code for a scenario, expiring {@link #DEFAULT_LIFETIME_SECONDS} from now.
+   * CalmLens recognises it only as the whole of a text input (surrounding whitespace aside); text
+   * with anything else around the code is moderated as ordinary content.
    *
    * @param input the scenario
    * @param testInputKey the project's secret test input key from the portal
@@ -170,15 +189,33 @@ public final class TestInputs {
    * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for an invalid key or scenario
    */
   public static String generateTestTextCode(TestInput input, String testInputKey) {
-    checkKey(testInputKey);
-    validate(input);
-    String payload = Base64.getUrlEncoder().withoutPadding().encodeToString(canonical(input).getBytes(StandardCharsets.UTF_8));
-    if (payload.length() > 8000) throw invalid("Test scenario is too large");
-    return "<!calmlens-test " + tag(testInputKey, "calmlens-test:v1:" + payload) + " " + payload + ">";
+    return generateTestTextCode(input, testInputKey, defaultExpiry());
   }
 
   /**
-   * Returns the signed text code for a signal's text scenario ({@link #testInputForSignal(String)}).
+   * Returns the signed text code for a scenario, expiring at {@code expiresAt}. CalmLens recognises
+   * it only as the whole of a text input (surrounding whitespace aside).
+   *
+   * @param input the scenario
+   * @param testInputKey the project's secret test input key from the portal
+   * @param expiresAt when the code stops being recognised, in Unix seconds from 0 to 4294967295
+   * @return the code, {@code <!calmlens-test ...>}
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for an invalid key, scenario or expiry
+   */
+  public static String generateTestTextCode(TestInput input, String testInputKey, long expiresAt) {
+    checkKey(testInputKey);
+    validate(input);
+    if (expiresAt < 0 || expiresAt > 0xFFFF_FFFFL) throw invalid("Test input expiry must be Unix seconds from 0 to 4294967295");
+    byte[] content = canonical(input).getBytes(StandardCharsets.UTF_8);
+    byte[] signed = ByteBuffer.allocate(4 + content.length).putInt((int) expiresAt).put(content).array();
+    String payload = Base64.getUrlEncoder().withoutPadding().encodeToString(signed);
+    if (payload.length() > 8000) throw invalid("Test scenario is too large");
+    return "<!calmlens-test " + tag(testInputKey, "calmlens-test:v2:" + payload) + " " + payload + ">";
+  }
+
+  /**
+   * Returns the signed text code for a signal's text scenario ({@link #testInputForSignal(String)}),
+   * expiring {@link #DEFAULT_LIFETIME_SECONDS} from now.
    *
    * @param signal one of {@link #SIGNALS}
    * @param testInputKey the project's secret test input key from the portal
@@ -187,6 +224,20 @@ public final class TestInputs {
    */
   public static String generateTestTextCode(String signal, String testInputKey) {
     return generateTestTextCode(testInputForSignal(signal, Kind.TEXT), testInputKey);
+  }
+
+  /**
+   * Returns the signed text code for a signal's text scenario ({@link #testInputForSignal(String)}),
+   * expiring at {@code expiresAt}.
+   *
+   * @param signal one of {@link #SIGNALS}
+   * @param testInputKey the project's secret test input key from the portal
+   * @param expiresAt when the code stops being recognised, in Unix seconds from 0 to 4294967295
+   * @return the code
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for an invalid key, signal or expiry
+   */
+  public static String generateTestTextCode(String signal, String testInputKey, long expiresAt) {
+    return generateTestTextCode(testInputForSignal(signal, Kind.TEXT), testInputKey, expiresAt);
   }
 
   /**
@@ -208,8 +259,10 @@ public final class TestInputs {
   }
 
   /**
-   * Paints a scenario's signed test image: a grid that survives lossy formats and resizing. Upload
-   * its {@link TestImage#png()}, or encode its {@link TestImage#rgba()} in any format.
+   * Paints a scenario's signed test image, expiring {@link #DEFAULT_LIFETIME_SECONDS} from now: a
+   * grid that survives lossy formats and resizing. Upload its {@link TestImage#png()}, or encode
+   * its {@link TestImage#rgba()} in any format. CalmLens recognises it only as the whole upload (a
+   * plain single-colour border aside).
    *
    * @param input the scenario
    * @param testInputKey the project's secret test input key from the portal
@@ -218,13 +271,28 @@ public final class TestInputs {
    *     one too large for a test image
    */
   public static TestImage paintTestImage(TestInput input, String testInputKey) {
-    String tag = generateTestTextCode(input, testInputKey).split(" ")[1];
-    byte[] content = canonical(input).getBytes(StandardCharsets.UTF_8);
-    byte[] data = new byte[18 + content.length];
-    data[0] = (byte) (content.length >> 8);
-    data[1] = (byte) content.length;
+    return paintTestImage(input, testInputKey, defaultExpiry());
+  }
+
+  /**
+   * Paints a scenario's signed test image, expiring at {@code expiresAt}.
+   *
+   * @param input the scenario
+   * @param testInputKey the project's secret test input key from the portal
+   * @param expiresAt when the image stops being recognised, in Unix seconds from 0 to 4294967295
+   * @return the image
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for an invalid key, scenario or
+   *     expiry, or a scenario too large for a test image
+   */
+  public static TestImage paintTestImage(TestInput input, String testInputKey, long expiresAt) {
+    String[] code = generateTestTextCode(input, testInputKey, expiresAt).split(" ");
+    String tag = code[1];
+    byte[] signed = Base64.getUrlDecoder().decode(code[2].substring(0, code[2].length() - 1));
+    byte[] data = new byte[18 + signed.length];
+    data[0] = (byte) (signed.length >> 8);
+    data[1] = (byte) signed.length;
     for (int i = 0; i < 16; i++) data[2 + i] = (byte) Integer.parseInt(tag.substring(2 * i, 2 * i + 2), 16);
-    System.arraycopy(content, 0, data, 18, content.length);
+    System.arraycopy(signed, 0, data, 18, signed.length);
     List<int[]> palette = new ArrayList<>();
     Set<String> seen = new HashSet<>();
     for (TestInput.Instance instance : input.instances())
@@ -236,7 +304,8 @@ public final class TestInputs {
   }
 
   /**
-   * Paints a signal's image scenario ({@link #testInputForSignal(String, Kind)} with {@link Kind#IMAGE}).
+   * Paints a signal's image scenario ({@link #testInputForSignal(String, Kind)} with {@link Kind#IMAGE}),
+   * expiring {@link #DEFAULT_LIFETIME_SECONDS} from now.
    *
    * @param signal one of {@link #SIGNALS}
    * @param testInputKey the project's secret test input key from the portal
@@ -245,6 +314,24 @@ public final class TestInputs {
    */
   public static TestImage paintTestImage(String signal, String testInputKey) {
     return paintTestImage(testInputForSignal(signal, Kind.IMAGE), testInputKey);
+  }
+
+  /**
+   * Paints a signal's image scenario ({@link #testInputForSignal(String, Kind)} with {@link Kind#IMAGE}),
+   * expiring at {@code expiresAt}.
+   *
+   * @param signal one of {@link #SIGNALS}
+   * @param testInputKey the project's secret test input key from the portal
+   * @param expiresAt when the image stops being recognised, in Unix seconds from 0 to 4294967295
+   * @return the image
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} for an invalid key, signal or expiry
+   */
+  public static TestImage paintTestImage(String signal, String testInputKey, long expiresAt) {
+    return paintTestImage(testInputForSignal(signal, Kind.IMAGE), testInputKey, expiresAt);
+  }
+
+  private static long defaultExpiry() {
+    return Instant.now().getEpochSecond() + DEFAULT_LIFETIME_SECONDS;
   }
 
   private static void checkKey(String key) {
