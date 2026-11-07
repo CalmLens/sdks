@@ -458,21 +458,43 @@ final class Page {
     return "<input type=\"hidden\" name=\"csrf\" value=\"" + h(app.csrf) + "\">";
   }
 
-  /** CalmLens text test inputs, after escaping: {@code <!calmlens-test <tag> <category>>}. */
+  /**
+   * CalmLens text test inputs, after escaping: {@code <!calmlens-test <tag> <payload>>}, where the
+   * payload is base64url of a four-byte expiry and the scenario's JSON.
+   */
   private static final java.util.regex.Pattern TEST_INPUT =
-      java.util.regex.Pattern.compile("&lt;!calmlens-test\\s+[a-f0-9]{32}\\s+([a-z.-]+)\\s*&gt;", java.util.regex.Pattern.CASE_INSENSITIVE);
+      java.util.regex.Pattern.compile("&lt;!calmlens-test\\s+[a-f0-9]{32}\\s+([A-Za-z0-9_-]+)&gt;");
+  private static final java.util.regex.Pattern TEST_CATEGORY = java.util.regex.Pattern.compile("\"category\":\"([a-z-]+)\"");
+
+  /**
+   * A test input's marker: "test input" and the categories its scenario names, for a readable
+   * label only. It doesn't check the tag or expiry, so it never decides moderation.
+   */
+  private static String testInputLabel(String payload) {
+    byte[] signed;
+    try {
+      signed = java.util.Base64.getUrlDecoder().decode(payload);
+    } catch (IllegalArgumentException invalid) {
+      return "test input";
+    }
+    if (signed.length < 5) return "test input";
+    String json = new String(signed, 4, signed.length - 4, java.nio.charset.StandardCharsets.US_ASCII);
+    List<String> categories = TEST_CATEGORY.matcher(json).results().map(match -> match.group(1)).distinct().toList();
+    return categories.isEmpty() ? "test input" : "test input: " + String.join(", ", categories);
+  }
 
   /**
    * User text for display: escaped, with each CalmLens test input shown as a short marker
-   * ("test input: criminal-activity") instead of its tag.
+   * ("test input: criminal-activity") instead of its signed code, so a page never republishes a
+   * project's codes.
    */
   static String t(String value) {
-    return TEST_INPUT.matcher(h(value)).replaceAll(match -> "<span class=\"test-input\">test input: " + match.group(1).toLowerCase(Locale.ROOT) + "</span>");
+    return TEST_INPUT.matcher(h(value)).replaceAll(match -> "<span class=\"test-input\">" + testInputLabel(match.group(1)) + "</span>");
   }
 
   /** User text for an attribute or the document title: escaped, with test inputs as plain markers. */
   static String attribute(String value) {
-    return TEST_INPUT.matcher(h(value)).replaceAll(match -> "test input: " + match.group(1).toLowerCase(Locale.ROOT));
+    return TEST_INPUT.matcher(h(value)).replaceAll(match -> testInputLabel(match.group(1)));
   }
 
   static String h(String value) {

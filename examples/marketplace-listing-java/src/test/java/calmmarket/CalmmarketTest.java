@@ -6,6 +6,7 @@ import com.calmlens.CalmLensServerClient;
 import com.calmlens.ErrorCodes;
 import com.calmlens.MockCalmLensServerClient;
 import com.calmlens.Models.*;
+import com.calmlens.TestInputs;
 import com.calmlens.Transport;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -293,22 +294,25 @@ class CalmmarketTest {
   }
 
   @Test
-  void testInputsInListingTextAndPhotoTextAreShownAsAMarkerWithoutTheirTag() {
-    String tag = "255cc104ee407e16ec3c6c8c7ce087c0";
+  void testInputsInListingTextAndPhotoTextAreShownAsAMarkerWithoutTheirCode() {
+    String key = "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d";
+    // A code is recognised only as the whole text, and is longer than a title may be.
+    String violence = TestInputs.generateTestTextCode("violence", key);
+    String photoText = "PUPPIES FOR SALE " + TestInputs.generateTestTextCode("criminal-activity", key);
     MockCalmLensServerClient mock = liveSubmission(1);
     Calmmarket app = live(mock, "");
-    submit(app, app.csrf, "Lamp <!calmlens-test " + tag + " violence>", "Works <!calmlens-test " + tag + " hate>", "25", List.of(PNG), null, null);
+    submit(app, app.csrf, "Lamp", violence, "25", List.of(PNG), null, null);
     Calmmarket.Listing listing = app.listings().get(0);
     Map<String, Object> image = photo(listing, 1, "blocked", report(Map.of("criminal-activity", evaluated(0.95))));
-    image.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string",
-        "content", "PUPPIES FOR SALE <!calmlens-test " + tag + " criminal-activity>")));
+    image.put("content", Map.of("status", "stored", "extractedText", Map.of("type", "string", "content", photoText)));
     mock.enqueue(200, image);
     String page = html(get(app, "/listings/" + listing.id));
-    assertEquals("PUPPIES FOR SALE <!calmlens-test " + tag + " criminal-activity>", listing.photos.get(0).extractedText.content(), "the stored text is unchanged");
-    assertFalse(page.contains(tag), "the test tag is never displayed");
-    for (String category : List.of("violence", "hate", "criminal-activity"))
+    assertEquals(photoText, listing.photos.get(0).extractedText.content(), "the stored text is unchanged");
+    for (String code : List.of(violence, photoText.substring("PUPPIES FOR SALE ".length())))
+      assertFalse(page.contains(code.split(" ")[2].replace(">", "")), "a test input's signed payload is never displayed");
+    for (String category : List.of("violence", "criminal-activity"))
       assertTrue(page.contains("class=\"test-input\">test input: " + category + "<"), category);
-    assertFalse(html(get(app, "/")).contains(tag));
+    assertFalse(html(get(app, "/")).contains(violence.split(" ")[1]), "the test tag is never displayed");
   }
 
   @Test
