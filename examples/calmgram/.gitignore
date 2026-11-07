@@ -13,3 +13,6 @@ public/confirm.js
 
 # Shared illustrative media copied during build.
 public/post-examples/
+
+# Test images from `bun run test-images`: they expire, and a real project's must never be served.
+test-images/

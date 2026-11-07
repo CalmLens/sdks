@@ -98,6 +98,10 @@ test("demo mode age-restricts sexual test text, blocks other matches and allows 
       .status;
   expect(await moderate(await testTextCode("sexual", DEMO_TEST_INPUT_KEY))).toBe("age-restricted");
   expect(await moderate(await testTextCode("harassment", DEMO_TEST_INPUT_KEY))).toBe("blocked");
+  // As in CalmLens, a code inside other text is ordinary text.
+  expect(await moderate(`so true ${await testTextCode("hate", DEMO_TEST_INPUT_KEY)}`)).toBe(
+    "allowed",
+  );
   expect(await moderate("I'll hurt you")).toBe("blocked");
   expect(await moderate("The tomatoes are ripening.")).toBe("allowed");
 });

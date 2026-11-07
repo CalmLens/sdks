@@ -55,7 +55,7 @@ import {
 import {
   DEMO_TEST_INPUT_KEY,
   paintTestImage,
-  TEST_INPUT_KEY_PATTERN,
+  testCodeCategories,
   testTextCode,
 } from "./testInputs";
 import { requireHuman } from "./turnstile";
@@ -329,12 +329,9 @@ app.get("/test-inputs/:file", async (c) => {
   const file = c.req.param("file");
   const image = TEST_IMAGES.find(([name]) => file === `calmlens-test-${name}.png`);
   if (!image) return c.notFound();
-  const key =
-    getModeration(c.env).mode === "demo" ? DEMO_TEST_INPUT_KEY : c.env.CALMLENS_TEST_INPUT_KEY;
-  if (!key || !TEST_INPUT_KEY_PATTERN.test(key))
-    return c.text("Test inputs are not configured for this project.", 503);
-  const signal = image[0];
-  const pixels = await paintTestImage(signal, key);
+  // Only the local simulator's public key: a real project's test images stay in your own tests.
+  if (getModeration(c.env).mode !== "demo") return c.notFound();
+  const pixels = await paintTestImage(image[0], DEMO_TEST_INPUT_KEY);
   return c.body(new Uint8Array(encodePng(pixels.width, pixels.height, pixels.rgba)).buffer, 200, {
     "Content-Type": "image/png",
     "Cache-Control": "private, no-store",
@@ -348,8 +345,6 @@ app.get("/new", async (c) => {
   const message = await takeFlash(c.env, sandbox);
   const moderation = getModeration(c.env);
   const demo = moderation.mode === "demo";
-  // Test inputs use category-specific authentication tags; the simulator has its own.
-  const testInputKey = demo ? DEMO_TEST_INPUT_KEY : (c.env.CALMLENS_TEST_INPUT_KEY ?? "");
   return page(
     c,
     sandbox,
@@ -416,47 +411,46 @@ app.get("/new", async (c) => {
         <summary class="cursor-pointer font-semibold">
           Want to see a post or comment get blocked?
         </summary>
-        <p>
-          These harmless images are CalmLens <em>test triggers</em>: CalmLens classifies each one as
-          the named category, so you can see what happens to content that isn't allowed without
-          uploading real harmful content.
-        </p>
-        {TEST_INPUT_KEY_PATTERN.test(testInputKey) ? (
-          <ul class="grid grid-cols-4 gap-2">
-            {TEST_IMAGES.map(([file, label]) => (
-              <li>
-                <a
-                  href={`/test-inputs/calmlens-test-${file}.png`}
-                  class="grid gap-1 text-center text-xs"
-                  download
-                >
-                  <img
-                    src={`/test-inputs/calmlens-test-${file}.png`}
-                    alt=""
-                    class="aspect-square w-full rounded-lg"
-                  />
-                  {label}
-                </a>
-              </li>
-            ))}
-          </ul>
+        {demo ? (
+          <>
+            <p>
+              These harmless images are CalmLens <em>test inputs</em>: the demo's simulator
+              classifies each one as the named category, so you can see what happens to content that
+              isn't allowed without uploading real harmful content. Upload one unchanged.
+            </p>
+            <ul class="grid grid-cols-4 gap-2">
+              {TEST_IMAGES.map(([file, label]) => (
+                <li>
+                  <a
+                    href={`/test-inputs/calmlens-test-${file}.png`}
+                    class="grid gap-1 text-center text-xs"
+                    download
+                  >
+                    <img
+                      src={`/test-inputs/calmlens-test-${file}.png`}
+                      alt=""
+                      class="aspect-square w-full rounded-lg"
+                    />
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <p>
+              For text, post this test code as a whole caption, comment or bio:
+              <br />
+              <code>{await testTextCode("harassment", DEMO_TEST_INPUT_KEY)}</code>
+            </p>
+            <p class="text-muted">
+              Threats like “I'll hurt you” are blocked too, and the sexual test image is
+              age-restricted: it's published behind a blurred placeholder unless you turn on{" "}
+              <a href={sensitiveMediaSettingHref(sandbox.username)}>Show sensitive media</a>.
+            </p>
+          </>
         ) : (
-          <p class="text-muted">
-            Set CALMLENS_TEST_INPUT_KEY to enable test inputs for this project.
-          </p>
-        )}
-        {TEST_INPUT_KEY_PATTERN.test(testInputKey) && (
           <p>
-            For text, paste a test code into a caption, comment or bio:
-            <br />
-            <code>{await testTextCode("harassment", testInputKey)}</code>
-          </p>
-        )}
-        {demo && (
-          <p class="text-muted">
-            In demo mode, threats like “I'll hurt you” are blocked, and the sexual test image is
-            age-restricted: it's published behind a blurred placeholder unless you turn on{" "}
-            <a href={sensitiveMediaSettingHref(sandbox.username)}>Show sensitive media</a>.
+            Make CalmLens test inputs in your own tests with the CalmLens SDK and your project's
+            test input key. Calmgram never shows them to visitors.
           </p>
         )}
       </details>
@@ -789,14 +783,13 @@ const QUEUE_SECTIONS = [
 
 export type QueueEntry = { kind: "post"; item: Post } | { kind: "comment"; item: Comment };
 
-/** A CalmLens test input names its category in plain text, after its authentication tag. */
-const TEST_TEXT_CODE = /^<!calmlens-test [0-9a-f]+ ([a-z-]+)>$/;
-
 /** What a queue entry is called: its caption or text, or an example's label when it's hidden. */
 export const queueName = (entry: QueueEntry) => {
   if (entry.kind === "comment") {
-    const testCategory = TEST_TEXT_CODE.exec(entry.item.text.trim())?.[1];
-    return testCategory ? `Test input: ${testCategory}` : entry.item.text;
+    const testCategories = testCodeCategories(entry.item.text);
+    if (testCategories)
+      return testCategories.length ? `Test input: ${testCategories.join(", ")}` : "Test input";
+    return entry.item.text;
   }
   const example = entry.item.exampleId ? EXAMPLE_POSTS_BY_ID.get(entry.item.exampleId) : null;
   if (example && !isShownToEveryone(entry.item.status)) return example.label;

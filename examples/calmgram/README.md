@@ -55,7 +55,8 @@ bun run dev:demo --port 6400
 
 Open http://localhost:6400 (you're given a random username straight away; change it from your profile) and try:
 
-- commenting `i will hurt you` (blocked) or a [test code](#testing-moderation-safely);
+- commenting `i will hurt you` (blocked) or the [test code](#testing-moderation-safely) from
+  **New post** as the whole comment;
 - uploading one of the test images from the **New post** page (the sexual one is age-restricted,
   the others blocked) or any normal photo (allowed after ~2 seconds);
 - turning on **Show sensitive media** on your profile to see the age-restricted photo instead of
@@ -101,8 +102,9 @@ forwarded to CalmLens, as in demo mode.
 
 ### Trying sensitive media
 
-With the *General community* policy, adult sexual content is age-restricted. Download the sexual
-test image from **New post** (with `CALMLENS_TEST_INPUT_KEY` set) and share it: once CalmLens
+With the *General community* policy, adult sexual content is age-restricted. Make the sexual
+test image for your project with `CALMLENS_TEST_INPUT_KEY=<key> bun run test-images` (see
+[Testing moderation safely](#testing-moderation-safely)) and share it: once CalmLens
 age-restricts it, the post appears in the feed behind its blurred placeholder. Turn on **Show
 sensitive media** on your profile to see the photo itself. Subscribe the webhook to
 `asset.age-restricted` (below) so the post updates as soon as CalmLens decides.
@@ -226,10 +228,21 @@ like any other text that isn't `allowed` or `limited`.
 CalmLens recognises special test inputs, so you can test your "post removed" flow without uploading
 real harmful content.
 
-Every test input contains an authentication tag generated with your project's secret **test input key**, available under **Project settings → Test inputs** in the portal. Tags are specific to the category and content type and do not disclose the key. A valid sample can still be reused in the same project while test inputs are enabled. Demo mode uses the public key `1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d`.
+Every test input is signed with your project's secret **test input key**, available under
+**Project settings → Test inputs** in the portal, and CalmLens recognises them only in projects
+with **Recognise test inputs** turned on (it is off by default). Codes and images expire a day
+after they are made, so make them when you test rather than storing them. A text code counts only
+as the whole caption, comment or bio, and a test image only as the whole upload, unchanged;
+anything else is moderated as ordinary content.
 
-- **Images:** download them from **New post**. A compact square grid encodes the complete authenticated test input. Upload it unchanged. Download new files after changing projects. `bun run test-images` regenerates simulator fixtures; set `CALMLENS_TEST_INPUT_KEY` to generate them for a real project.
-- **Text:** copy an authenticated category code from the portal into a comment. All eight moderation categories are supported. `bun run test-images` prints the exact codes, and **New post** shows one when `CALMLENS_TEST_INPUT_KEY` is set.
+- **Demo mode:** **New post** shows test images and a text code made with the simulator's public
+  key `1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d`, painted on request. They mean nothing to a real project.
+- **Your project:** Calmgram never shows a real project's test inputs to visitors. Make them in
+  your own tests with `calmlens/test-inputs` (see
+  [JavaScript testing](https://calmlens.com/docs/sdk/javascript/testing#generate-test-inputs)), or
+  locally with `CALMLENS_TEST_INPUT_KEY=<key> bun run test-images`, which writes the images to the
+  ignored `test-images/` directory and prints a text code for each category. Without the variable
+  it uses the demo key.
 
 ## The public demo
 

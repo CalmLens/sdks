@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import type { Post } from "../src/data";
 import { exampleFeedFor, isExamplePhoto } from "../src/examples";
 import { queueName } from "../src/index";
+import { DEMO_TEST_INPUT_KEY, testTextCode } from "../src/testInputs";
 import { PostCard } from "../src/views";
 
 const post = (status: Post["status"]): Post => ({
@@ -52,12 +53,12 @@ test("the author can delete a post that wasn't published, and retry one that fai
   expect(await card("allowed", "maya.hills")).toEqual(["/p/p1/like"]);
 });
 
-test("the queue names a test input by its category instead of its authentication tag", () => {
-  const text = "<!calmlens-test a775108e09ac7aa36bfc8f59b56b494a harassment>";
+test("the queue names a test input by its category instead of its signed code", async () => {
+  const text = await testTextCode("harassment", DEMO_TEST_INPUT_KEY);
   const name = queueName({
     kind: "comment",
     item: { ...post("blocked"), postId: "p1", text },
   });
-  expect(name).not.toContain("a775108e09ac7aa36bfc8f59b56b494a");
+  expect(name).not.toContain(text.split(" ")[1]);
   expect(name).toContain("harassment");
 });

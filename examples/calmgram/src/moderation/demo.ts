@@ -5,9 +5,10 @@ import type { CategoryFinding, ModerationOutcome, ModerationProvider } from "./t
 
 // Demo mode: a local stand-in for CalmLens so you can click around without an account.
 // It is NOT a moderation model. It only recognises:
-//   • CalmLens test-trigger images carrying DEMO_TEST_INPUT_KEY (public/test-images, made by
-//     `npm run test-images`)
-//   • CalmLens test-trigger text with that key, e.g. "<!calmlens-test 1a2b3c4d harassment>"
+//   • a current CalmLens test image carrying DEMO_TEST_INPUT_KEY, as the whole upload (the New
+//     post page paints them on request)
+//   • a current CalmLens test code with that key, as the whole text; a code inside other text is
+//     ordinary text, as in CalmLens
 //   • a handful of obvious phrases, so typing an insult shows the flow
 // Set CALMLENS_API_KEY and CALMLENS_PROJECT_ID to use real moderation.
 

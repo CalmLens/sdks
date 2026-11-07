@@ -1,13 +1,15 @@
 #!/usr/bin/env bun
-// Generates CalmLens test-trigger images: harmless PNGs that CalmLens classifies as a
-// specific category (score 0.95). Use them to test your "post removed" UX without
-// uploading real harmful content. Also prints the matching text test codes.
+// Generates CalmLens test images: harmless PNGs that CalmLens classifies as a specific category
+// (score 0.95), to test your "post removed" UX without uploading real harmful content. Also prints
+// the matching text test codes.
 //
 //   bun run test-images                                  # demo mode's key
 //   CALMLENS_TEST_INPUT_KEY=<key> bun run test-images    # your project's key
 //
-// Each image carries the authenticated test input in a compact square grid.
-// Images carrying another key are moderated normally. Committed images use demo mode's key.
+// Each image carries the signed test input in a compact square grid, and expires a day after it
+// is made. Upload one unchanged as the whole image, and post a code as the whole text. The images
+// go to test-images/, which git ignores and the app never serves: keep a real project's test inputs
+// out of the public site.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -29,7 +31,7 @@ if (!TEST_INPUT_KEY_PATTERN.test(testInputKey)) {
   process.exit(1);
 }
 
-const outDir = path.join(process.cwd(), "public", "test-images");
+const outDir = path.join(import.meta.dirname, "..", "test-images");
 fs.mkdirSync(outDir, { recursive: true });
 for (const signal of getImageTestCategories()) {
   const file = path.join(outDir, `calmlens-test-${signal.replace(".", "-")}.png`);
@@ -39,7 +41,7 @@ for (const signal of getImageTestCategories()) {
 }
 
 process.stdout.write(
-  `\nText test codes for key ${testInputKey} (paste into a comment, caption or bio):\n`,
+  "\nText test codes (post one as the whole comment, caption or bio; they expire in a day):\n",
 );
 for (const category of TEST_TEXT_CATEGORIES) {
   process.stdout.write(`  ${await testTextCode(category, testInputKey)}\n`);

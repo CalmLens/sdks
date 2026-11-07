@@ -16,9 +16,8 @@
   "ratelimits": [
     { "name": "WRITE_LIMITER", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } }
   ]
-  // Secrets, set with `wrangler secret put`: CALMLENS_API_KEY, CALMLENS_PROJECT_ID,
-  // CALMLENS_WEBHOOK_SECRET, and the project's CALMLENS_TEST_INPUT_KEY for the New post page's
-  // test code. Without the first two the app refuses to serve, unless
+  // Secrets, set with `wrangler secret put`: CALMLENS_API_KEY, CALMLENS_PROJECT_ID and
+  // CALMLENS_WEBHOOK_SECRET. Without the first two the app refuses to serve, unless
   // CALMLENS_DEMO=1 asks for the local simulator (`bun run dev:demo`). The optional
   // CALMLENS_UPLOAD_PRESET_ID lets browsers upload photos straight to CalmLens. The optional
   // TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY put a Turnstile check in front of every page.

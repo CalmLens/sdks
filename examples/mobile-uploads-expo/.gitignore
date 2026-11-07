@@ -33,9 +33,6 @@ yarn-error.*
 # local env files
 .env*.local
 
-# test images for the local backend's project, written by `bun run local-backend`
-*.local.png
-
 # typescript
 *.tsbuildinfo
 

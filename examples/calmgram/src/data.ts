@@ -17,11 +17,6 @@ export interface Env {
   CALMGRAM_DAILY_MODERATION_LIMIT?: string;
   CALMLENS_API_KEY?: string;
   CALMLENS_PROJECT_ID?: string;
-  /**
-   * The project's secret test input key (Assets → Try test inputs in the CalmLens portal), shown in
-   * the New post page's test code. Test images in public/test-images must be made with it too.
-   */
-  CALMLENS_TEST_INPUT_KEY?: string;
   CALMLENS_WEBHOOK_SECRET?: string;
   /** Upload preset (requiring tokens) that browsers upload photos through. */
   CALMLENS_UPLOAD_PRESET_ID?: string;
