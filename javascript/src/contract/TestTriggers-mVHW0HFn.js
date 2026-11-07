@@ -316,28 +316,30 @@ function readTestImageGrid({ width, height, rgba }) {
 		};
 	}
 }
+/** BT.601 full-range Y, Cb and Cr, as JPEG and WebP store colour. */
+const ycbcr = (r, g, b) => [
+	.299 * r + .587 * g + .114 * b,
+	128 - .168736 * r - .331264 * g + .5 * b,
+	128 + .5 * r - .418688 * g - .081312 * b
+];
 /**
 * Whether the whole image is the grid `expected` (painted from the bytes `found` read) on a
-* uniform border: every pixel is opaque and, in each channel, within the tolerance of the colours
-* of the repainted cells (or the border) near its place. "Near" is a few pixels, which absorbs
-* the blur scaling and compression put on cell edges. Damage the reader's error correction
-* repaired, an overlay and anything drawn in chroma alone all fail.
+* uniform border: every pixel is opaque and its luma and chroma lie within the tolerances of those
+* of the repainted cells (or the border) near its place. "Near" is a few pixels, which absorbs the
+* blur scaling and compression put on cell edges. Damage the reader's error correction repaired,
+* an overlay and anything drawn in chroma alone all fail.
 */
 function matchesTestImageGrid({ width, height, rgba }, found, expected) {
 	const { cells, left, top, gridWidth, gridHeight } = found;
 	if (rgba.length !== width * height * 4 || expected.width % cells) return false;
 	const cellSize = expected.width / cells;
 	if (cellSize < 1 || expected.height !== expected.width) return false;
-	const colours = new Uint8Array(cells * cells * 3);
+	const colours = [];
 	for (let row = 0; row < cells; row++) for (let column = 0; column < cells; column++) {
 		const offset = ((row * cellSize + (cellSize >> 1)) * expected.width + column * cellSize + (cellSize >> 1)) * 4;
-		colours.set(expected.rgba.subarray(offset, offset + 3), (row * cells + column) * 3);
+		colours.push(ycbcr(expected.rgba[offset], expected.rgba[offset + 1], expected.rgba[offset + 2]));
 	}
-	const border = [
-		rgba[0],
-		rgba[1],
-		rgba[2]
-	];
+	const border = ycbcr(rgba[0], rgba[1], rgba[2]);
 	const radius = 2 + Math.ceil(Math.max(gridWidth, gridHeight) / expected.width);
 	const right = left + gridWidth - 1;
 	const bottom = top + gridHeight - 1;
@@ -355,6 +357,11 @@ function matchesTestImageGrid({ width, height, rgba }, found, expected) {
 		};
 	};
 	const columns = Array.from({ length: width }, (_, x) => span(x - radius, x + radius, left, right, gridWidth));
+	const tolerance = [
+		48,
+		40,
+		40
+	];
 	const low = [
 		0,
 		0,
@@ -365,31 +372,24 @@ function matchesTestImageGrid({ width, height, rgba }, found, expected) {
 		0,
 		0
 	];
+	const include = (colour) => {
+		for (let channel = 0; channel < 3; channel++) {
+			low[channel] = Math.min(low[channel], colour[channel]);
+			high[channel] = Math.max(high[channel], colour[channel]);
+		}
+	};
 	for (let y = 0; y < height; y++) {
 		const rows = span(y - radius, y + radius, top, bottom, gridHeight);
 		for (let x = 0; x < width; x++) {
 			const offset = (y * width + x) * 4;
 			if (rgba[offset + 3] < 250) return false;
 			const near = columns[x];
-			low.fill(255);
-			high.fill(0);
-			const include = (r, g, b) => {
-				low[0] = Math.min(low[0], r);
-				low[1] = Math.min(low[1], g);
-				low[2] = Math.min(low[2], b);
-				high[0] = Math.max(high[0], r);
-				high[1] = Math.max(high[1], g);
-				high[2] = Math.max(high[2], b);
-			};
-			if (rows.outside || near.outside) include(border[0], border[1], border[2]);
-			for (let row = rows.first; row <= rows.last; row++) for (let column = near.first; column <= near.last; column++) {
-				const colour = (row * cells + column) * 3;
-				include(colours[colour], colours[colour + 1], colours[colour + 2]);
-			}
-			for (let channel = 0; channel < 3; channel++) {
-				const value = rgba[offset + channel];
-				if (value < low[channel] - 40 || value > high[channel] + 40) return false;
-			}
+			low.fill(Number.POSITIVE_INFINITY);
+			high.fill(Number.NEGATIVE_INFINITY);
+			if (rows.outside || near.outside) include(border);
+			for (let row = rows.first; row <= rows.last; row++) for (let column = near.first; column <= near.last; column++) include(colours[row * cells + column]);
+			const pixel = ycbcr(rgba[offset], rgba[offset + 1], rgba[offset + 2]);
+			for (let channel = 0; channel < 3; channel++) if (pixel[channel] < low[channel] - tolerance[channel] || pixel[channel] > high[channel] + tolerance[channel]) return false;
 		}
 	}
 	return true;
@@ -803,11 +803,11 @@ const testImagePalette = (input) => {
 };
 /**
 * The test input an image declares when the whole image is one of the project's current test
-* images, also after video encoding and resizing: the grid, optionally on a uniform border. Every
+* images, also after lossy formats and resizing: the grid, optionally on a uniform border. Every
 * pixel must match the grid repainted from the bytes it carries (TestImageGrid.ts,
 * `matchesTestImageGrid`), so nothing else can be drawn on or around it.
 */
-async function detectTestImage(image, key, now = Date.now()) {
+async function detectTestImage(image, key, now = Date.now(), { whole = true } = {}) {
 	if (!TEST_INPUT_KEY_PATTERN.test(key)) return;
 	const grid = readTestImageGrid(image);
 	if (!grid) return;
@@ -816,7 +816,7 @@ async function detectTestImage(image, key, now = Date.now()) {
 	if (length < 5 || 18 + length > data.length) return;
 	const signed = data.subarray(18, 18 + length);
 	const scenario = await detectTestTrigger(`<!calmlens-test ${[...data.subarray(2, 18)].map((byte) => byte.toString(16).padStart(2, "0")).join("")} ${toBase64Url(signed)}>`, key, now);
-	if (!scenario) return;
+	if (!scenario || !whole) return scenario;
 	return matchesTestImageGrid(image, grid, paintTestImageGrid(data.subarray(0, 18 + length), testImagePalette(scenario))) ? scenario : void 0;
 }
 export { TEST_INPUT_DEFAULT_LIFETIME_SECONDS as a, TEST_INPUT_PRESETS as c, generateTestTextCode as d, getImageTestCategories as f, testInputForSignal as h, TEST_FACE_AGE_PRESETS as i, detectTestImage as l, paintTestImage as m, TEST_DETECTION_BOX_MAX as n, TEST_INPUT_KEY_PATTERN as o, getTestInputTag as p, TEST_FACE_AGE_MAX as r, TEST_INPUT_MAX_LIFETIME_SECONDS as s, TEST_DETECTIONS_MAX as t, detectTestTrigger as u };

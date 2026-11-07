@@ -385,11 +385,18 @@ declare function paintTestImage(scenario: TestInput | ClassificationTestSignal, 
 }>;
 /**
  * The test input an image declares when the whole image is one of the project's current test
- * images, also after video encoding and resizing: the grid, optionally on a uniform border. Every
+ * images, also after lossy formats and resizing: the grid, optionally on a uniform border. Every
  * pixel must match the grid repainted from the bytes it carries (TestImageGrid.ts,
  * `matchesTestImageGrid`), so nothing else can be drawn on or around it.
  */
-declare function detectTestImage(image: RgbaImage, key: string, now?: number): Promise<{
+declare function detectTestImage(image: RgbaImage, key: string, now?: number,
+/**
+ * `whole: false` only reads the grid, for a video frame: media moderation sees the frame anyway,
+ * so its findings can only add to that moderation.
+ */
+{ whole }?: {
+  whole?: boolean;
+}): Promise<{
   regionalActions?: {
     region: "AT" | "AU" | "BR" | "DE" | "EU" | "FR" | "GB";
     action: "age-restrict" | "block" | "limit";
