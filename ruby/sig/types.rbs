@@ -249,6 +249,8 @@ module CalmLens
     "id" => String,
     "projectId" => String,
     ?"parentId" => String?,
+    # The pages of the parent document a child shows, from 1; empty when unknown or not a child.
+    ?"parentPages" => Array[Integer],
     ?"folderId" => String?,
     ?"uploadPresetId" => String?,
     "createdAt" => Integer,
@@ -276,6 +278,9 @@ module CalmLens
   type likelihood = "very-unlikely" | "unlikely" | "possible" | "likely" | "very-likely"
   # not-supported: this processing path cannot assess the signal; unavailable: assessment failed.
   type not_evaluated_reason = "not-supported" | "unavailable"
+  # A processing feature's reason, which adds in-children: a document's or website's images are each
+  # a child asset with its own result (`assets.list_children`).
+  type feature_not_evaluated_reason = not_evaluated_reason | "in-children"
   type classification_category = "sexual" | "violence" | "self-harm" | "harassment" | "hate" | "criminal-activity"
 
   # `status: "evaluated"` carries `someScore`, `likelihood` and optionally `allScore`;
@@ -324,13 +329,13 @@ module CalmLens
   type person_detection_result = {
     "status" => "evaluated" | "not-evaluated",
     ?"people" => Array[detected_person],
-    ?"reason" => not_evaluated_reason
+    ?"reason" => feature_not_evaluated_reason
   }
   # `status: "evaluated"` carries `faces`; `"not-evaluated"` carries `reason`.
   type face_detection_result = {
     "status" => "evaluated" | "not-evaluated",
     ?"faces" => Array[detected_face],
-    ?"reason" => not_evaluated_reason
+    ?"reason" => feature_not_evaluated_reason
   }
   type detected_qr_code = { "value" => String, "box" => bounding_box }
   # A web link found in a QR code or in the text OCR extracted.
@@ -340,7 +345,7 @@ module CalmLens
     "status" => "evaluated" | "not-evaluated",
     ?"qrCodes" => Array[detected_qr_code],
     ?"links" => Array[detected_link],
-    ?"reason" => not_evaluated_reason
+    ?"reason" => feature_not_evaluated_reason
   }
   # Link safety (preview, LinkSafety.ts).
   # What a link's destination is: `safe` when every reputation check passed, `adult` or `gambling`
@@ -404,7 +409,7 @@ module CalmLens
     "status" => "evaluated" | "not-evaluated",
     ?"provenance" => "ai-generated" | "ai-edited" | "unknown",
     ?"signals" => Array[provenance_signal],
-    ?"reason" => not_evaluated_reason
+    ?"reason" => feature_not_evaluated_reason
   }
   # Where OCR found text in an image, and whether it is personal information.
   type text_region = { "box" => bounding_box, "personalInformation" => bool }
@@ -413,7 +418,7 @@ module CalmLens
   type ocr_result = {
     "status" => "evaluated" | "not-evaluated",
     ?"textRegions" => Array[text_region],
-    ?"reason" => not_evaluated_reason
+    ?"reason" => feature_not_evaluated_reason
   }
 
   # How strongly each assessed category meets the policy and what the policy does with it.

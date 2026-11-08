@@ -2152,6 +2152,7 @@ export class MockCalmLensApi {
       id,
       projectId: this.projectId,
       parentId: null,
+      parentPages: [],
       folderId: fields.folderId ?? null,
       uploadPresetId: fields.uploadPresetId ?? null,
       createdAt: now,

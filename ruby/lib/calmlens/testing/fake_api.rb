@@ -663,7 +663,7 @@ module CalmLens
         keep = processing.is_a?(Hash) && processing['keepContentAfterProcessing'] == true
         context = options['context'].is_a?(Hash) ? ModerationContext.select_items(options['context'].fetch('items', [])) : []
         # Fields the API returns as null when they are not set.
-        asset = { 'id' => @create_id.call('asset'), 'projectId' => @project_id, 'parentId' => nil,
+        asset = { 'id' => @create_id.call('asset'), 'projectId' => @project_id, 'parentId' => nil, 'parentPages' => [],
                   'folderId' => options['folderId'], 'uploadPresetId' => options['uploadPresetId'],
                   'createdAt' => now, 'updatedAt' => now, 'name' => options['name'], 'description' => options['description'],
                   'externalId' => options['externalId'], 'externalUrl' => url || options['externalUrl'],

@@ -1581,7 +1581,7 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 	id := m.options.CreateID("asset")
 	// Fields the API returns as null when they are not set.
 	a := calmlens.JSON{
-		"id": id, "projectId": m.options.ProjectID, "parentId": nil,
+		"id": id, "projectId": m.options.ProjectID, "parentId": nil, "parentPages": []any{},
 		"folderId": orNull("folderId"), "uploadPresetId": orNull("uploadPresetId"),
 		"createdAt": now, "updatedAt": now, "name": options["name"],
 		"description": orNull("description"), "externalId": orNull("externalId"), "externalUrl": externalURL,

@@ -150,7 +150,10 @@ type Asset struct {
 	// Type is one of the AssetType constants.
 	Type     string  `json:"type"`
 	ParentID *string `json:"parentId"`
-	FolderID *string `json:"folderId"`
+	// ParentPages are the pages of the parent document a child shows, numbered from 1; empty when
+	// its page isn't known or it has no parent document.
+	ParentPages []int   `json:"parentPages"`
+	FolderID    *string `json:"folderId"`
 	// UploadPresetID is the upload preset the asset was uploaded through, if any.
 	UploadPresetID *string        `json:"uploadPresetId"`
 	CreatedAt      int64          `json:"createdAt"`
@@ -218,7 +221,8 @@ type AssetClassification struct {
 type OCRResult struct {
 	// Status is ResultEvaluated or ResultNotEvaluated; other values may be added.
 	Status string `json:"status"`
-	// Reason explains a ResultNotEvaluated result: ReasonNotSupported or ReasonUnavailable.
+	// Reason explains a ResultNotEvaluated result: ReasonNotSupported, ReasonUnavailable or
+	// ReasonInChildren.
 	Reason string `json:"reason,omitempty"`
 	// TextRegions are where OCR found text in the image; empty when it found none.
 	TextRegions []TextRegion `json:"textRegions,omitempty"`
@@ -691,7 +695,7 @@ type ProcessingFeatureResults struct {
 type LinkDetectionResult struct {
 	// Status is ResultEvaluated or ResultNotEvaluated; other values may be added.
 	Status string `json:"status"`
-	// Reason explains a ResultNotEvaluated result: ReasonNotSupported or ReasonUnavailable.
+	// Reason explains a ResultNotEvaluated result: ReasonNotSupported, ReasonUnavailable or ReasonInChildren.
 	Reason  string           `json:"reason,omitempty"`
 	QRCodes []DetectedQRCode `json:"qrCodes,omitempty"`
 	Links   []DetectedLink   `json:"links,omitempty"`
@@ -786,7 +790,7 @@ type LinkSafetyEvidence struct {
 type AIGeneratedDetectionResult struct {
 	// Status is ResultEvaluated or ResultNotEvaluated; other values may be added.
 	Status string `json:"status"`
-	// Reason explains a ResultNotEvaluated result: ReasonNotSupported or ReasonUnavailable.
+	// Reason explains a ResultNotEvaluated result: ReasonNotSupported, ReasonUnavailable or ReasonInChildren.
 	Reason string `json:"reason,omitempty"`
 	// Provenance is "ai-generated", "ai-edited" or "unknown" (no AI provenance in the file,
 	// which does not mean a person made it).
@@ -814,7 +818,7 @@ type TextRegion struct {
 type PersonDetectionResult struct {
 	// Status is ResultEvaluated or ResultNotEvaluated; other values may be added.
 	Status string `json:"status"`
-	// Reason explains a ResultNotEvaluated result: ReasonNotSupported or ReasonUnavailable.
+	// Reason explains a ResultNotEvaluated result: ReasonNotSupported, ReasonUnavailable or ReasonInChildren.
 	Reason string           `json:"reason,omitempty"`
 	People []DetectedPerson `json:"people,omitempty"`
 }
@@ -823,7 +827,7 @@ type PersonDetectionResult struct {
 type FaceDetectionResult struct {
 	// Status is ResultEvaluated or ResultNotEvaluated; other values may be added.
 	Status string `json:"status"`
-	// Reason explains a ResultNotEvaluated result: ReasonNotSupported or ReasonUnavailable.
+	// Reason explains a ResultNotEvaluated result: ReasonNotSupported, ReasonUnavailable or ReasonInChildren.
 	Reason string         `json:"reason,omitempty"`
 	Faces  []DetectedFace `json:"faces,omitempty"`
 }
@@ -902,6 +906,9 @@ const (
 	ReasonNotSupported = "not-supported"
 	// ReasonUnavailable means assessment was attempted but produced no usable result.
 	ReasonUnavailable = "unavailable"
+	// ReasonInChildren means a processing feature ran on a document's or website's images, each a
+	// child asset with its own result: list them with Assets.ListChildren.
+	ReasonInChildren = "in-children"
 )
 
 // Likelihood values, from least to most likely.

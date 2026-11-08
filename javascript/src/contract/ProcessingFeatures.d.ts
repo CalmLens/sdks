@@ -84,6 +84,7 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -102,6 +103,7 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -124,6 +126,7 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -149,6 +152,7 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -186,6 +190,7 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -208,6 +213,7 @@ declare const PROCESSING_FEATURE_RESULTS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;

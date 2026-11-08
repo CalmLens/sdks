@@ -580,6 +580,7 @@ final class MockApi {
     asset.addProperty("id", id);
     asset.addProperty("projectId", projectId);
     asset.add("parentId", JsonNull.INSTANCE);
+    asset.add("parentPages", new JsonArray());
     asset.add("folderId", nullable(str(o, "folderId")));
     asset.add("uploadPresetId", nullable(str(o, "uploadPresetId")));
     asset.addProperty("createdAt", now);

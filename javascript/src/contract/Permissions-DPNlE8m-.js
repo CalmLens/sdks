@@ -62,6 +62,8 @@ const ACCESS_ROLE_SCHEMA = zod.enum([
 	"viewer",
 	"custom"
 ]);
+[...ACTION_SCHEMA.options.filter((a) => !isProjectAction(a))];
+[...ACTION_SCHEMA.options.filter((a) => !isProjectAction(a))];
 const permits = (grants, action, folderId, folders) => grants.some((grant) => {
 	if (![action, ...actionsImplying(action)].some((held) => grant.actions.includes(held))) return false;
 	if (grant.folderId === null) return true;

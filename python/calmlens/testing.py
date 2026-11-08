@@ -1675,7 +1675,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             context["items"] if isinstance(context, dict) and isinstance(context.get("items"), list) else [])
         # Fields the API returns as null when they are not set.
         asset: dict[str, Any] = {
-            "id": self.create_id("asset"), "projectId": self.project_id, "parentId": None,
+            "id": self.create_id("asset"), "projectId": self.project_id, "parentId": None, "parentPages": [],
             "folderId": options.get("folderId"), "uploadPresetId": options.get("uploadPresetId"),
             "createdAt": now, "updatedAt": now, "name": options.get("name"), "description": options.get("description"),
             "externalId": external_id, "externalUrl": options.get("url", options.get("externalUrl")), "type": kind,

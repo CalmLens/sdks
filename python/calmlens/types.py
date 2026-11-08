@@ -44,7 +44,7 @@ __all__ = [
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions",
     "MediaClassificationSegment", "MediaSegmentSource", "MetadataItem", "ClassifyTextOptions", "ModerationAction",
     "ModerationQualifier", "MoveAssetOptions", "MoveFolderOptions", "NotEvaluatedCategoryResult",
-    "NotEvaluatedFeatureResult", "NotEvaluatedQualifierResult", "NotEvaluatedReason", "OcrFeatureOptions",
+    "FeatureNotEvaluatedReason", "NotEvaluatedFeatureResult", "NotEvaluatedQualifierResult", "NotEvaluatedReason", "OcrFeatureOptions",
     "PartContent", "PartialCategoryResult", "PersonDetectionFeatureOptions", "PersonDetectionResult",
     "ProcessingFeatures", "ProcessingOptions",
     "QualifierResult", "QualifierResults", "SafetyHold", "SafetyHoldReason", "SearchAssetsOptions", "SearchMode",
@@ -108,6 +108,10 @@ Likelihood = Union[Literal["very-unlikely", "unlikely", "possible", "likely", "v
 #: Why a category, qualifier or feature was not evaluated: ``not-supported`` (this processing
 #: path cannot assess it) or ``unavailable`` (assessment produced no usable result).
 NotEvaluatedReason = Union[Literal["not-supported", "unavailable"], str]
+#: Why a processing feature has no findings of its own: ``not-supported``, ``unavailable``, or
+#: ``in-children`` for a document or website, whose images are each a child asset with its own
+#: result (list them with ``assets.list_children``).
+FeatureNotEvaluatedReason = Union[Literal["not-supported", "unavailable", "in-children"], str]
 #: Where a media segment's scores came from. New sources may be added.
 MediaSegmentSource = Union[Literal["frame", "speech", "frame-text", "clip"], str]
 #: Asset type a lens applies to (request values).
@@ -383,7 +387,7 @@ class DetectedFace(_DetectedRequired, total=False):
 
 class NotEvaluatedFeatureResult(TypedDict):
     status: Literal["not-evaluated"]
-    reason: NotEvaluatedReason
+    reason: FeatureNotEvaluatedReason
 
 
 class EvaluatedPersonDetectionResult(TypedDict):
@@ -910,6 +914,9 @@ class _AssetRequired(TypedDict):
 
 class Asset(_AssetRequired, total=False):
     parentId: Optional[str]
+    #: For a child extracted from a document, the pages of the parent it shows, numbered from 1;
+    #: empty when its page isn't known or it has no parent document.
+    parentPages: list[int]
     folderId: Optional[str]
     uploadPresetId: Optional[str]
     updatedAt: int

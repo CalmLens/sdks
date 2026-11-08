@@ -1862,6 +1862,8 @@ public final class Models {
    * @param folderId containing folder, or null at the project root
    * @param metadata metadata entries
    * @param parentId parent asset for derived assets such as images extracted from documents
+   * @param parentPages the pages of the parent document a child shows, numbered from 1; empty
+   *     when its page isn't known or it has no parent document
    * @param uploadPresetId upload preset the asset was uploaded through, if any
    * @param createdAt creation time
    * @param updatedAt last update time
@@ -1879,7 +1881,7 @@ public final class Models {
    */
   public record Asset(
       String id, String name, String projectId, String type, String folderId,
-      List<MetadataItem> metadata, String parentId, String uploadPresetId,
+      List<MetadataItem> metadata, String parentId, List<Integer> parentPages, String uploadPresetId,
       @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
       @JsonAdapter(Json.EpochMillis.class) Instant updatedAt,
       String description, String externalId, String externalUrl, String authorId, ModerationContext context, List<String> tags,
@@ -1888,6 +1890,7 @@ public final class Models {
     /** Copies collections so the record stays immutable. */
     public Asset {
       metadata = list(metadata);
+      parentPages = list(parentPages);
       tags = list(tags);
     }
   }
@@ -1911,7 +1914,9 @@ public final class Models {
    * @param testInput whether the results came from one of the project's test inputs rather than
    *     analysing the content; never use test results, such as age ranges, for real decisions
    * @param moderation safety findings and decisions
-   * @param ocr text found in the image; null until OCR has run, and when it wasn't requested
+   * @param ocr text found in the image; null until OCR has run, and when it wasn't requested. For
+   *     a document or website, {@code not-evaluated} with reason {@code in-children}: each of its
+   *     images is a child asset with its own result ({@code assets().listChildren})
    * @param personDetection person detection result; null until it has run
    * @param faceDetection face detection result; null until it has run
    * @param linkDetection link detection result; null until it has run
@@ -1932,7 +1937,7 @@ public final class Models {
    * {@code not-evaluated}.
    *
    * @param status {@code evaluated} or {@code not-evaluated}
-   * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
+   * @param reason why the feature was not evaluated: {@code not-supported}, {@code unavailable} or {@code in-children}
    * @param textRegions the text regions found in the image; {@code redact} transform options blur them
    */
   public record OcrResult(String status, String reason, List<TextRegion> textRegions) {
@@ -1945,7 +1950,7 @@ public final class Models {
    * evaluated}; {@code reason} only for {@code not-evaluated}.
    *
    * @param status {@code evaluated} or {@code not-evaluated}
-   * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
+   * @param reason why the feature was not evaluated: {@code not-supported}, {@code unavailable} or {@code in-children}
    * @param qrCodes QR codes found in the image
    * @param links links found in QR codes and text
    */
@@ -2022,7 +2027,7 @@ public final class Models {
    * {@code signals} are set only for {@code evaluated}; {@code reason} only for {@code not-evaluated}.
    *
    * @param status {@code evaluated} or {@code not-evaluated}
-   * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
+   * @param reason why the feature was not evaluated: {@code not-supported}, {@code unavailable} or {@code in-children}
    * @param provenance {@code ai-generated}, {@code ai-edited} or {@code unknown}
    * @param signals the metadata that indicated it
    */
@@ -2336,7 +2341,7 @@ public final class Models {
    * only for {@code not-evaluated}.
    *
    * @param status {@code evaluated} or {@code not-evaluated}
-   * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
+   * @param reason why the feature was not evaluated: {@code not-supported}, {@code unavailable} or {@code in-children}
    * @param people detected people
    */
   public record PersonDetectionResult(String status, String reason, List<DetectedPerson> people) {
@@ -2349,7 +2354,7 @@ public final class Models {
    * for {@code not-evaluated}.
    *
    * @param status {@code evaluated} or {@code not-evaluated}
-   * @param reason why the feature was not evaluated: {@code not-supported} or {@code unavailable}
+   * @param reason why the feature was not evaluated: {@code not-supported}, {@code unavailable} or {@code in-children}
    * @param faces detected faces
    */
   public record FaceDetectionResult(String status, String reason, List<DetectedFace> faces) {

@@ -951,7 +951,7 @@ final class MockServerClient
         $context = ModerationContext::select($decode('context')['items'] ?? []);
         // Fields the API returns as null when they are not set.
         $asset = [
-            'id' => ($this->createId)('asset'), 'projectId' => $this->projectId, 'parentId' => null,
+            'id' => ($this->createId)('asset'), 'projectId' => $this->projectId, 'parentId' => null, 'parentPages' => [],
             'folderId' => $options['folderId'] ?? null, 'uploadPresetId' => $options['uploadPresetId'] ?? null,
             'createdAt' => $now, 'updatedAt' => $now, 'name' => $options['name'] ?? null,
             'description' => $options['description'] ?? null, 'externalId' => $options['externalId'] ?? null,

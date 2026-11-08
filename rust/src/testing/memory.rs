@@ -2202,7 +2202,7 @@ impl Backend {
         let id = self.create_id("asset");
         // Fields the API returns as `null` when they are not set.
         let mut asset = json!({
-            "id": id, "projectId": self.options.project_id, "parentId": null,
+            "id": id, "projectId": self.options.project_id, "parentId": null, "parentPages": [],
             "folderId": null, "uploadPresetId": null, "createdAt": now, "updatedAt": now,
             "name": null, "description": null, "externalId": null, "externalUrl": null,
             "type": kind, "metadata": [], "authorId": null, "context": null, "tags": [],

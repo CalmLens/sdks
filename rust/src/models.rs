@@ -1705,6 +1705,10 @@ pub struct Asset {
     /// The parent asset, for child assets CalmLens extracts during processing.
     #[serde(default)]
     pub parent_id: Option<String>,
+    /// The pages of the parent document a child shows, numbered from 1; empty when its page isn't
+    /// known or it has no parent document.
+    #[serde(default)]
+    pub parent_pages: Vec<u32>,
     /// The folder, or `None` at the project root.
     #[serde(default)]
     pub folder_id: Option<String>,
@@ -2246,6 +2250,9 @@ string_enum! {
         NotSupported = "not-supported",
         /// The feature could not run this time.
         Unavailable = "unavailable",
+        /// The asset is a document or website whose images are each a child asset with its own
+        /// result: list them with `assets().list_children`.
+        InChildren = "in-children",
     }
 }
 

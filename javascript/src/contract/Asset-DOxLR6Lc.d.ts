@@ -9705,6 +9705,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -9723,6 +9724,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -9745,6 +9747,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -9770,6 +9773,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -9807,6 +9811,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -9829,6 +9834,7 @@ declare const ASSET_CLASSIFICATION_SCHEMA: zod.ZodObject<{
   }, zod.core.$strict>, zod.ZodObject<{
     status: zod.ZodLiteral<"not-evaluated">;
     reason: zod.ZodEnum<{
+      "in-children": "in-children";
       "not-supported": "not-supported";
       unavailable: "unavailable";
     }>;
@@ -9954,6 +9960,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
     video: "video";
     website: "website";
   }>;
+  parentPages: zod.ZodArray<zod.ZodNumber>;
   metadata: zod.ZodArray<zod.ZodObject<{
     id: zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>;
     value: zod.ZodJSONSchema;
@@ -14749,6 +14756,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
+        "in-children": "in-children";
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
@@ -14767,6 +14775,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
+        "in-children": "in-children";
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
@@ -14789,6 +14798,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
+        "in-children": "in-children";
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
@@ -14814,6 +14824,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
+        "in-children": "in-children";
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
@@ -14851,6 +14862,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
+        "in-children": "in-children";
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;
@@ -14873,6 +14885,7 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
     }, zod.core.$strict>, zod.ZodObject<{
       status: zod.ZodLiteral<"not-evaluated">;
       reason: zod.ZodEnum<{
+        "in-children": "in-children";
         "not-supported": "not-supported";
         unavailable: "unavailable";
       }>;

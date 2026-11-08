@@ -6,7 +6,7 @@ import "./SharedConstants-DxUCZwLZ.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { i as msg, n as MODERATION_QUALIFIERS, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-DPNhFf9c.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-DnnDdNKC.js";
-import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-BqpmE0Qa.js";
+import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-DPNlE8m-.js";
 import * as zod from "zod";
 // packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
@@ -261,6 +261,134 @@ const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the cont
 });
 /** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
 const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action.");
+// packages/shared/src/Subscriptions.ts
+/**
+* Product IDs are chosen by the repo (Stripe accepts an `id` on product creation) so the admin Stripe
+* setup provisions the same catalogue in test and live mode without per-environment overrides.
+*/
+const PRODUCTS = {
+	assetSearch: {
+		id: "assetSearch",
+		productId: {
+			local: "prod_calmlens_asset_search",
+			dev: "prod_calmlens_asset_search",
+			main: "prod_calmlens_asset_search"
+		},
+		type: "subscription",
+		name: "AI Asset Search"
+	},
+	assetMediaSearchIndexing: {
+		id: "assetMediaSearchIndexing",
+		productId: {
+			local: "prod_calmlens_asset_media_search_indexing",
+			dev: "prod_calmlens_asset_media_search_indexing",
+			main: "prod_calmlens_asset_media_search_indexing"
+		},
+		type: "subscription",
+		name: "AI Video & Audio Indexing"
+	},
+	imageTransformed: {
+		id: "imageTransformed",
+		productId: {
+			local: "prod_calmlens_image_transformed",
+			dev: "prod_calmlens_image_transformed",
+			main: "prod_calmlens_image_transformed"
+		},
+		type: "subscription",
+		name: "Image Transformed"
+	},
+	websiteIngestion: {
+		id: "websiteIngestion",
+		productId: {
+			local: "prod_calmlens_website_ingestion",
+			dev: "prod_calmlens_website_ingestion",
+			main: "prod_calmlens_website_ingestion"
+		},
+		type: "subscription",
+		name: "Website Ingestion"
+	},
+	textClassificationTokens: {
+		id: "textClassificationTokens",
+		productId: {
+			local: "prod_calmlens_text_classification_tokens",
+			dev: "prod_calmlens_text_classification_tokens",
+			main: "prod_calmlens_text_classification_tokens"
+		},
+		type: "subscription",
+		name: "Text Classification"
+	},
+	imageClassification: {
+		id: "imageClassification",
+		productId: {
+			local: "prod_calmlens_image_classification",
+			dev: "prod_calmlens_image_classification",
+			main: "prod_calmlens_image_classification"
+		},
+		type: "subscription",
+		name: "Image Classification"
+	},
+	assetStorageGb: {
+		id: "assetStorageGb",
+		productId: {
+			local: "prod_calmlens_asset_storage_gb",
+			dev: "prod_calmlens_asset_storage_gb",
+			main: "prod_calmlens_asset_storage_gb"
+		},
+		type: "subscription",
+		name: "Asset Storage"
+	},
+	assetRead: {
+		id: "assetRead",
+		productId: {
+			local: "prod_calmlens_asset_read",
+			dev: "prod_calmlens_asset_read",
+			main: "prod_calmlens_asset_read"
+		},
+		type: "subscription",
+		name: "Asset Read"
+	},
+	ocrClassification: {
+		id: "ocrClassification",
+		productId: {
+			local: "prod_calmlens_ocr_classification",
+			dev: "prod_calmlens_ocr_classification",
+			main: "prod_calmlens_ocr_classification"
+		},
+		type: "subscription",
+		name: "OCR Classification"
+	},
+	personDetection: {
+		id: "personDetection",
+		productId: {
+			local: "prod_calmlens_person_detection",
+			dev: "prod_calmlens_person_detection",
+			main: "prod_calmlens_person_detection"
+		},
+		type: "subscription",
+		name: "Person Detection"
+	},
+	faceDetection: {
+		id: "faceDetection",
+		productId: {
+			local: "prod_calmlens_face_detection",
+			dev: "prod_calmlens_face_detection",
+			main: "prod_calmlens_face_detection"
+		},
+		type: "subscription",
+		name: "Face Detection"
+	},
+	streamEncoding: {
+		id: "streamEncoding",
+		productId: {
+			local: "prod_calmlens_stream_encoding",
+			dev: "prod_calmlens_stream_encoding",
+			main: "prod_calmlens_stream_encoding"
+		},
+		type: "subscription",
+		name: "Stream Encoding"
+	}
+};
+PRODUCTS.imageTransformed, PRODUCTS.websiteIngestion, PRODUCTS.textClassificationTokens, PRODUCTS.imageClassification, PRODUCTS.assetStorageGb, PRODUCTS.assetSearch, PRODUCTS.assetMediaSearchIndexing, PRODUCTS.assetRead, PRODUCTS.ocrClassification, PRODUCTS.personDetection, PRODUCTS.faceDetection, PRODUCTS.streamEncoding;
 // packages/shared/src/ProcessingFeatures.ts
 const createFeatureOptionsSchemas = (booleanSchema) => {
 	const enabled = booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to run the feature. It runs only when this is true." })]));
@@ -293,7 +421,7 @@ const createFeatureOptionsSchemas = (booleanSchema) => {
 			namedType: "AiGeneratedDetectionFeatureOptions"
 		})])),
 		streaming: zod.object({ enabled: booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to prepare the stream. Left out, the project's streaming setting decides." })])) }).strict().meta(metaStore([docPropertyInfo({
-			description: "Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made browser-safe, served at `/hls/index.m3u8` and played by the embed page at `/embed`. Needs `keepContentAfterProcessing`. Billed per started minute of media; `false` turns it off for an upload in a project that streams by default.",
+			description: "Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made browser-safe, served at `/hls/index.m3u8` and played by the embed page at `/embed`. Needs `keepContentAfterProcessing`. Billed per started minute of video; without billing, video uses the organisation's free allowance of 60 started minutes a month, and isn't streamed once it is used. `false` turns it off for an upload in a project that streams by default.",
 			namedType: "StreamingFeatureOptions"
 		})]))
 	};
@@ -354,15 +482,25 @@ const DETECTED_FACE_SCHEMA = zod.object({
 	namedType: "DetectedFace"
 })]));
 /**
-* A feature's result: `evaluated` with its findings, or `not-evaluated` when it could not run on
-* this asset (`not-supported`) or its analysis failed (`unavailable`).
+* Why a feature has no findings of its own: it can't analyse this content (`not-supported`), its
+* analysis failed (`unavailable`), or the asset is a document or website whose images are each
+* analysed as their own child asset (`in-children`).
+*/
+const FEATURE_NOT_EVALUATED_REASON_SCHEMA = zod.enum([
+	"not-supported",
+	"unavailable",
+	"in-children"
+]);
+/**
+* A feature's result: `evaluated` with its findings, or `not-evaluated` with why it has none
+* (`FEATURE_NOT_EVALUATED_REASON_SCHEMA`).
 */
 const createFeatureResultSchema = (name, description, shape) => zod.discriminatedUnion("status", [zod.object({
 	status: zod.literal("evaluated"),
 	...shape
 }).strict(), zod.object({
 	status: zod.literal("not-evaluated"),
-	reason: zod.enum(["not-supported", "unavailable"]).describe("Why the feature has no findings: `not-supported` for content it can't analyse, `unavailable` when its analysis failed")
+	reason: FEATURE_NOT_EVALUATED_REASON_SCHEMA.describe("Why the feature has no findings: `not-supported` for content it can't analyse, `unavailable` when its analysis failed, `in-children` for a document or website, whose images are each analysed as a child asset with its own result (list them with `GET /v1/assets/{assetId}/children`)")
 }).strict()]).meta(metaStore([docPropertyInfo({
 	description,
 	namedType: name
@@ -941,6 +1079,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	sizeInBytes: zod.number().int().nullish().describe("Size of the uploaded content in bytes"),
 	userId: idField("user").nullish().describe("ID of the user whose account created the asset"),
 	parentId: idField("asset").nullish().describe("ID of the parent asset for child assets CalmLens extracts during processing, such as images in a document. `null` for uploaded assets."),
+	parentPages: zod.array(zod.number().int().positive()).nullish().describe("The pages of the parent document a child asset shows, numbered from 1: each page an extracted image is drawn on, or the page or slide a render shows"),
 	folderId: idField("fldr").nullish().meta(metaStore([docPropertyInfo({ description: "Folder containing the asset" })])),
 	uploadPresetId: idField("preset").nullish().describe("ID of the upload preset the asset was uploaded through, if any"),
 	createdAt: createdAtField().describe("When the asset was created, in milliseconds since the Unix epoch"),
@@ -1072,7 +1211,7 @@ const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 	progress: CLASSIFICATION_PROGRESS_SCHEMA.nullable().describe("While long audio or video is analysed in sections and `status` is `processing`: how many of its sections are done. `null` otherwise. See [Long audio and video](/docs/guides/audio-and-video#long-audio-and-video)."),
 	testInput: zod.boolean().describe("Whether the results came from one of the project's test inputs (a signed text code, test image or media test phrase) rather than from analysing the content. Test results, including person and face detection and age ranges, are declared by the input: never use them for real decisions such as age checks. See [Testing](/docs/guides/testing)."),
 	moderation: ASSET_MODERATION_SCHEMA,
-	ocr: OCR_RESULT_SCHEMA.nullable().describe("OCR's result for an image processed with `processingOptions.features.ocr`: where it found text. `null` when OCR didn't run."),
+	ocr: OCR_RESULT_SCHEMA.nullable().describe("OCR's result for an image processed with `processingOptions.features.ocr`: where it found text. For a document or website with OCR on, `not-evaluated` with reason `in-children`: each of its images is a child asset with its own `ocr`, and a document's children give their pages in `parentPages` (list them with `GET /v1/assets/{assetId}/children`). `null` when OCR wasn't requested."),
 	personDetection: PERSON_DETECTION_RESULT_SCHEMA.nullable().describe("Preview. Person detection's result, `null` when it didn't run"),
 	faceDetection: FACE_DETECTION_RESULT_SCHEMA.nullable().describe("Preview. Face detection's result, `null` when it didn't run"),
 	linkDetection: LINK_DETECTION_RESULT_SCHEMA.nullable().describe("Link detection's result for an image, `null` when it didn't run"),
@@ -1122,6 +1261,7 @@ STORED_ASSET_SCHEMA.pick({
 	authorId: true,
 	context: true
 }).extend({
+	parentPages: zod.array(zod.number().int().positive()).describe("For a child asset extracted from a document: the pages of the parent document it shows, numbered from 1. An image drawn on several pages lists each; a render of a page or slide lists that one. Empty for other assets, and for children whose page isn't known: a document's text, an image read from a Word, OpenDocument or spreadsheet file without laying out its pages, a presentation's embedded images, and website children."),
 	metadata: zod.array(METADATA_ITEM_SCHEMA).describe("Custom metadata items, by metadata field. Empty when the asset has none."),
 	tags: zod.array(saneStringField()).describe("Tags for the asset. Empty when it has none."),
 	visibility: ASSET_VISIBILITY_SCHEMA.describe("`public` assets are delivered from their plain URL; `private` ones, the default, need a signed asset URL"),
@@ -1139,6 +1279,7 @@ STORED_ASSET_SCHEMA.pick({
 		createdAt: 17672256e5,
 		description: "Front view of a blue backpack",
 		parentId: null,
+		parentPages: [],
 		folderId: null,
 		uploadPresetId: null,
 		updatedAt: 1767225601e3,
