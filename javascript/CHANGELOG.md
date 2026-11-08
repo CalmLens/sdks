@@ -1,3 +1,23 @@
+## 0.22.0
+
+### Minor Changes
+
+- d4f47e9: Events can report the new `configurator` role, and `auth/permission-denied` errors carry `details.role`, the least role that includes the permission in `details.permission`.
+- 1c0eef1: An asset's `classification.moderation` names the policy that made the automated decision (`policy`: its `id`, its `revision` then and the `preset` release it used) and says when a human review is waiting (`pendingReview`: `requestedAt`, `reason` and `uncertainCategories`, `null` when none is waiting). A category's allowance or restriction `source` carries the `conditionScore` that triggered its rules, since a rule assessed as a whole can leave its qualifiers out of `raw`. A document or website decided by its parts lists the categories that decided it in `flaggedCategories`. The mocks keep no policies or review queue, so both new fields stay `null` in them.
+- 11a2ca4: `calmlens listen` retries a failed delivery the way CalmLens retries webhook deliveries: network errors, timeouts, `408`, `425`, `429` and `5xx` responses get up to 7 attempts with the same `x-calmlens-delivery` ID, each signed again, after 1, 2, 4, 8, 15 and 30 seconds, or longer when a `Retry-After` header asks, up to 60 seconds. Later events wait until the delivery succeeds or gives up. The CLI's help lists every key of the forwarded body and the ways to install it without Node.js: the install script at `https://calmlens.com/install.sh` (`install.ps1` on Windows), Homebrew and the release downloads.
+- 008473f: Manage a project's configuration in code. `uploadPresets.list`, `iterate`, `ensure` and `delete` read upload presets and create or replace them by key; `projectSettings.get` and `update` read and replace the project's settings; `metadataFields.list`, `ensure` and `delete` manage its metadata fields. Each change can send the `revision` you read, so a change made since is refused instead of overwritten, and the mock client serves all of them. The `calmlens` CLI adds `calmlens plan` and `calmlens apply`, which compare a `calmlens.config.json` file listing the project's policies, upload presets, lenses, metadata fields and settings with the project and make the differences; `--prune` also deletes presets, lenses and metadata fields the file doesn't list.
+- 11fd85b: `content.hlsStatus` says whether a requested adaptive stream is `preparing` or `ready`, or `unavailable` with a reason (`allowance-used`, `billing-required`, `spend-limit`, `processing-failed` or `content-not-kept`). The offline mock prepares no stream, so it reports `null`. Adds the `media/duration-limit` error code: audio or video whose file states it is over the duration limit is refused at upload, with `details.durationSeconds` and `details.limitSeconds`.
+- 52cfb90: Errors raised by the SDK itself, with no HTTP response, report `error.isLocal()` as `true`. That covers invalid arguments and options, content checked before it is sent (such as `upload/unsupported-type` for an unsupported type), timeouts, cancellations and connection failures. They carry the code the API would use, with no `status` or `requestId`, so branch on `code`.
+
+  `MockCalmLensServerClient`'s `assets.waitForDecision` accepts `signal`, as the real client does, and stops with `sdk/cancelled` when it aborts. `withRequestOptions` on a mock client keeps answering from the in-memory API.
+
+  `json-schema-to-ts` is no longer installed with the package; it was only used to build it.
+- 1d9a0d0: Uploads no longer put asset fields in the URL. Text is sent as a JSON body, and files and first multipart parts as a `multipart/form-data` upload form: the name, description, metadata, tags, author, conversation context, external IDs, folder, upload preset and processing options go in its `options` part and the bytes in its `file` part, so none of them appear in proxy, CDN or server logs. The query string holds only `wait`, `contentType`, sizes and part numbers. The offline mock reads uploads the same way and refuses asset fields in a query string with `upload/options-in-query`, as the API does.
+
+### Patch Changes
+
+- Every project recognises its test inputs: the project setting that turned them on is gone, so test codes and test images made with the current signed format are always recognised. Nothing changes in how you generate or detect them.
+
 ## 0.21.0
 
 ### Minor Changes

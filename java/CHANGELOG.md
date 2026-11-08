@@ -1,5 +1,20 @@
 # @calmlens/sdk-java
 
+## 0.22.0
+
+### Minor Changes
+
+- d4f47e9: Events can report the new `configurator` role, and `auth/permission-denied` errors carry `details.role`, the least role that includes the permission in `details.permission`.
+- 1c0eef1: An asset's `classification.moderation` names the policy that made the automated decision (`policy`: its `id`, its `revision` then and the `preset` release it used) and says when a human review is waiting (`pendingReview`: `requestedAt`, `reason` and `uncertainCategories`, `null` when none is waiting). A category's allowance or restriction `source` carries the `conditionScore` that triggered its rules, since a rule assessed as a whole can leave its qualifiers out of `raw`. A document or website decided by its parts lists the categories that decided it in `flaggedCategories`. The mocks keep no policies or review queue, so both new fields stay `null` in them.
+- 008473f: Keep a project's configuration in code: `client.uploadPresets` lists, iterates, ensures by key and deletes upload presets, which have a `key` and `revision`; `client.projectSettings` reads and replaces the project's settings; and `client.metadataFields` lists, ensures by ID and deletes its metadata fields. Send the `revision` you read to refuse a change made since. `ErrorCodes` adds the codes these calls return, and `MockCalmLensServerClient` serves all of them.
+- 11fd85b: `AssetContent.hlsStatus()` says whether a requested adaptive stream is `preparing` or `ready`, or `unavailable` with a reason (`allowance-used`, `billing-required`, `spend-limit`, `processing-failed` or `content-not-kept`). The offline mock prepares no stream, so it reports `null`. Adds the `ErrorCodes.MEDIA_DURATION_LIMIT` error code: audio or video whose file states it is over the duration limit is refused at upload, with `details.durationSeconds` and `details.limitSeconds`.
+- 52cfb90: Exceptions raised by the SDK itself, with no HTTP response, report `isLocal()` as `true`. That covers invalid arguments and options, content checked before it is sent (such as `ErrorCodes.UNSUPPORTED_UPLOAD_TYPE` for an unsupported type), timeouts, interruptions and connection failures. They carry the code the API would use, with `getStatus()` 0 and `getRequestId()` null, so branch on `getCode()`.
+- 1d9a0d0: Uploads no longer put asset fields in the URL. Text is sent as a JSON body, and files and first multipart parts as a `multipart/form-data` upload form: the name, description, metadata, tags, author, conversation context, external IDs, folder, upload preset and processing options go in its `options` part and the bytes in its `file` part, so none of them appear in proxy, CDN or server logs. The query string holds only `wait`, `contentType`, sizes and part numbers. The offline mock reads uploads the same way and refuses asset fields in a query string with `upload/options-in-query`, as the API does.
+
+### Patch Changes
+
+- Every project recognises its test inputs: the project setting that turned them on is gone, so test codes and test images made with the current signed format are always recognised. Nothing changes in how you generate or detect them.
+
 ## 0.21.0
 
 ### Minor Changes
