@@ -1,26 +1,26 @@
 class Calmlens < Formula
   desc "CalmLens CLI for local webhook development"
   homepage "https://calmlens.com"
-  version "0.21.0"
+  version "0.22.0"
 
   on_macos do
     on_arm do
-      url "https://github.com/CalmLens/sdks/releases/download/cli-v0.21.0/calmlens-0.21.0-darwin-arm64.tar.gz"
-      sha256 "fa6c04042c29528d5e5d4bc280fde8bae4a2007648a579c23b20ee0423773fdc"
+      url "https://github.com/CalmLens/sdks/releases/download/cli-v0.22.0/calmlens-0.22.0-darwin-arm64.tar.gz"
+      sha256 "320f3301640fea44b7bb3fc248332676f4daec53a9b75e04842c0a73f121a580"
     end
     on_intel do
-      url "https://github.com/CalmLens/sdks/releases/download/cli-v0.21.0/calmlens-0.21.0-darwin-x64.tar.gz"
-      sha256 "b4922f457b69376974d0525eab1acb41fa0a6300a2037b2e2cd6817e30ca3096"
+      url "https://github.com/CalmLens/sdks/releases/download/cli-v0.22.0/calmlens-0.22.0-darwin-x64.tar.gz"
+      sha256 "d896aebd739cf28a9f4587fa4eafdcbc2e8c8453565b46411c460392cb698405"
     end
   end
   on_linux do
     on_arm do
-      url "https://github.com/CalmLens/sdks/releases/download/cli-v0.21.0/calmlens-0.21.0-linux-arm64.tar.gz"
-      sha256 "ab4ed4b9cdb040b9455bf4f0627e40e1124074af9e2d9a8ee8734dd3fb061d73"
+      url "https://github.com/CalmLens/sdks/releases/download/cli-v0.22.0/calmlens-0.22.0-linux-arm64.tar.gz"
+      sha256 "ec8f2374a55f6edc3e2da952738cfe292e80131000f7c8f5681feb756f753471"
     end
     on_intel do
-      url "https://github.com/CalmLens/sdks/releases/download/cli-v0.21.0/calmlens-0.21.0-linux-x64.tar.gz"
-      sha256 "378973fac0da83d66f87f7a2be22abfbd2afafe14340e0f11a0a50bd9ec454ce"
+      url "https://github.com/CalmLens/sdks/releases/download/cli-v0.22.0/calmlens-0.22.0-linux-x64.tar.gz"
+      sha256 "ff590c80c273671f8b012743d577c45f99199e37824a58e52b3aaf06db5e6eed"
     end
   end
 
