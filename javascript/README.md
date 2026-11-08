@@ -17,7 +17,7 @@ The package has two clients, each with its own import:
 | `calmlens/server` | `CalmLensServerClient` | On your server: Node.js 22 or later, Bun, Deno, Cloudflare Workers | A project API key                                                |
 | `calmlens/app`    | `CalmLensAppClient`    | In browsers and React Native apps                                  | An upload preset, with an optional upload token from your server |
 
-API keys are secret, so `CalmLensServerClient` refuses to start in a web page or app. Upload from browsers and apps with `CalmLensAppClient`, and serve private content to them with signed URLs. The package ships ES modules and CommonJS with type declarations and loads no other packages at runtime.
+API keys are secret, so `CalmLensServerClient` refuses to start in a web page or app. Upload from browsers and apps with `CalmLensAppClient`, and serve private content to them with signed URLs. The package ships ES modules and CommonJS with type declarations. The main, `/server` and `/app` entry points load no other packages at runtime. The package depends on `zod`, which its type declarations and testing helpers use, and on `pdfjs-dist` and `hls.js`, which the UI viewers load only when they show a document or a stream.
 
 Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
 
@@ -83,7 +83,7 @@ Every public SDK operation accepts one options object, so call sites stay stable
 
 `calmlens/testing` runs the real clients against an in-memory CalmLens API and CDN, with moderation outcomes, recorded requests, injected failures and signed webhook deliveries. See [JavaScript testing](https://calmlens.com/docs/sdk/javascript/testing).
 
-`calmlens/test-inputs` makes signed test codes and images that a real project with test inputs turned on moderates as the scenario you choose. A code counts only as the whole text and an image only as the whole upload. See [Generate test inputs](https://calmlens.com/docs/sdk/javascript/testing#generate-test-inputs).
+`calmlens/test-inputs` makes signed test codes and images that the project they are signed for moderates as the scenario you choose. A code counts only as the whole text and an image only as the whole upload. See [Generate test inputs](https://calmlens.com/docs/sdk/javascript/testing#generate-test-inputs).
 
 ## Links
 

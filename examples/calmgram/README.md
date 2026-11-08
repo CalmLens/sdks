@@ -229,8 +229,8 @@ CalmLens recognises special test inputs, so you can test your "post removed" flo
 real harmful content.
 
 Every test input is signed with your project's secret **test input key**, available under
-**Project settings → Test inputs** in the portal, and CalmLens recognises them only in projects
-with **Recognise test inputs** turned on (it is off by default). A text code counts only as the
+**Project settings → Test inputs** in the portal, and every project recognises the ones signed
+with its own key. A text code counts only as the
 whole caption, comment or bio, and a test image only as the whole upload, unchanged; anything else
 is moderated as ordinary content.
 

@@ -32,7 +32,7 @@ var testInputColors = map[string][3]int{
 
 // PaintTestImage paints a scenario's signed test image: a grid that survives lossy formats and
 // resizing. Upload its PNG bytes, or encode its RGBA in any format. CalmLens recognises it only as
-// the whole upload (a plain single-colour border aside) in a project with test inputs turned on.
+// the whole upload (a plain single-colour border aside).
 // Use TestInputForSignal with TestInputImage for a signal's scenario. testInputKey is the
 // project's secret test input key from the portal. An invalid key or scenario, or a scenario too
 // large for a test image, is an sdk/invalid-argument error.

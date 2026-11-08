@@ -32,8 +32,7 @@ Commands:
             after 1, 2, 4, 8, 15 and 30 seconds (longer if Retry-After asks, up to 60).
   trigger   Moderate a harmless test comment so CalmLens creates real events. Each trigger
             counts as one upload. Test comments other than clean are signed with the
-            project's test input key (Project settings → Test inputs in the portal, with
-            Recognise test inputs turned on).
+            project's test input key (Project settings → Test inputs in the portal).
 
 Options:
   --forward-to <url>     Local webhook URL, e.g. http://localhost:3000/api/webhooks/calmlens

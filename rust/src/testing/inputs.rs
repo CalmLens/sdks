@@ -1,6 +1,5 @@
 //! Signed test inputs: text codes, test images and media phrases that CalmLens decides as the
-//! scenario they carry, for testing a moderation integration end to end without real content, in
-//! projects with "Recognise test inputs" turned on.
+//! scenario they carry, for testing a moderation integration end to end without real content.
 use super::classification::{
     CATEGORIES, INPUT_QUALIFIERS, QUALIFIERS, TEST_DETECTIONS_MAX, TEST_DETECTION_BOX_MAX,
     TEST_FACE_AGE_MAX, TEST_FACE_AGE_PRESETS,

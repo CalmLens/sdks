@@ -8,8 +8,7 @@ require_relative 'test_image_grid'
 module CalmLens
   # Signed test inputs: text codes, test images and media phrases that a project's moderation
   # recognises as a declared scenario when they are signed with its secret test input key (shown in
-  # the portal's project settings to those who can read them) and the project has "Recognise test
-  # inputs" turned on, so CalmLens returns that scenario instead of classifying them. The formats
+  # the portal's project settings to those who can read them), so CalmLens returns that scenario instead of classifying them. The formats
   # match the JavaScript SDK's `calmlens/test-inputs` byte for byte.
   #
   # A scenario is a Hash with the API's keys, as Strings or Symbols (snake_case keys are converted

@@ -9,8 +9,8 @@ use CalmLens\SdkErrorCodes;
 
 /**
  * Signed test inputs: text codes, test images and media phrases that a project's test input key
- * authenticates, so CalmLens returns the scenario they describe instead of classifying them in a
- * project with "Recognise test inputs" turned on. The formats match the JavaScript SDK's
+ * authenticates, so CalmLens returns the scenario they describe instead of classifying them. The
+ * formats match the JavaScript SDK's
  * `calmlens/test-inputs` byte for byte.
  *
  * A scenario is an array with the API's keys: up to 128 `instances` (each a `category`, the

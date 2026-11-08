@@ -1,8 +1,8 @@
 package calmlenstest
 
 // Signed test inputs: text codes, test images and media phrases that a project's moderation
-// recognises as a declared scenario when they are signed with its secret test input key and the
-// project has "Recognise test inputs" turned on. The key is in the portal's project settings, for
+// recognises as a declared scenario when they are signed with its secret test input key. The key
+// is in the portal's project settings, for
 // members and API keys that can read them. The formats match the backend byte for byte.
 
 import (
@@ -161,7 +161,7 @@ func TestInputForSignal(signal string, kind TestInputKind) (TestInput, error) {
 }
 
 // GenerateTestTextCode returns the signed text code for a scenario. CalmLens recognises it only as
-// the whole of a text input (surrounding whitespace aside) in a project with test inputs turned on;
+// the whole of a text input (surrounding whitespace aside);
 // any other text around it is moderated as ordinary content. testInputKey is the project's secret
 // test input key from the portal. An invalid key or scenario is an sdk/invalid-argument error.
 func GenerateTestTextCode(input TestInput, testInputKey string) (string, error) {

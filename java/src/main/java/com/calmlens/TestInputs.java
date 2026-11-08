@@ -20,8 +20,8 @@ import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Signed test inputs: text codes, test images and media phrases that a project's moderation
- * recognises as a declared scenario when they are signed with its secret test input key and the
- * project has "Recognise test inputs" turned on. The key is in the portal's project settings, for
+ * recognises as a declared scenario when they are signed with its secret test input key. The key
+ * is in the portal's project settings, for
  * members and API keys that can read them. The formats match the backend byte for byte.
  *
  * <pre>{@code

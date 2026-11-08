@@ -152,9 +152,8 @@ bun run start
 ```
 
 Choose a photo. Normal photos come back `allowed`; to see one that isn't, upload a
-[test image](https://calmlens.com/docs/guides/testing). Turn on **Recognise test inputs** in your
-project's settings, then download the violence test image for your project from **Try your
-policy** on its page in the portal. Test images are signed with your project's secret test input
+[test image](https://calmlens.com/docs/guides/testing). Download the violence test image for your
+project from **Try your policy** on its page in the portal. Test images are signed with your project's secret test input
 key; upload it unchanged. Add it to the simulator's photo library with:
 
 ```bash

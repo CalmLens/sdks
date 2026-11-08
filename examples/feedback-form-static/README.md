@@ -85,9 +85,8 @@ the folder. Open http://localhost:6406, write a message, attach a screenshot and
 `localhost` rather than `127.0.0.1`: they're different origins, and only the one in the preset's
 allowed sites can upload.
 
-To see a refusal, attach a [test image](https://calmlens.com/docs/guides/testing): turn on
-**Recognise test inputs** in your project's settings, then download one for your project from
-**Try your policy** in the portal, and attach it unchanged.
+To see a refusal, attach a [test image](https://calmlens.com/docs/guides/testing): download one for your
+project from **Try your policy** in the portal, and attach it unchanged.
 
 ### Demo mode
 

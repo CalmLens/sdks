@@ -80,8 +80,7 @@ An asset is settled once `classification.status` is `completed` or `failed`; whi
 
 `CalmLens\Testing\MockServerClient` runs the real client against an in-memory CalmLens, and
 `MockTransport` replays queued responses. `CalmLens\Testing\TestInputs` signs text codes, test images and media
-phrases with your project's test input key, so the real API returns a chosen scenario in projects with
-"Recognise test inputs" turned on. Submit a text code as the whole text and a test image as the whole
+phrases with your project's test input key, so the real API returns a chosen scenario. Submit a text code as the whole text and a test image as the whole
 upload. See [PHP testing](https://calmlens.com/docs/sdk/php/testing).
 
 ## Links

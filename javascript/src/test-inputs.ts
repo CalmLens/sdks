@@ -1,7 +1,7 @@
 /**
  * Portable test inputs: presets and custom instances share one authenticated format. CalmLens
  * recognises a code only as the whole text and a test image only as the whole
- * upload, in projects with test inputs turned on.
+ * upload, signed with the project's own key.
  */
 export {
   type ClassificationTestSignal,
