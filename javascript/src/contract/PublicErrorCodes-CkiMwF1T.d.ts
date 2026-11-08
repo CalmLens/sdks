@@ -42,6 +42,7 @@ declare const PUBLIC_ERROR_CODES: {
   readonly PERMISSION_DENIED: RequestErrorCode;
   readonly UPLOAD_TOO_LARGE: RequestErrorCode;
   readonly DOCUMENT_TOO_MANY_ITEMS: RequestErrorCode;
+  readonly MEDIA_DURATION_LIMIT: RequestErrorCode;
   readonly INVALID_IMAGE: RequestErrorCode;
   readonly IMAGE_TOO_LARGE: RequestErrorCode;
   readonly FREE_UPLOADS_EXHAUSTED: RequestErrorCode;

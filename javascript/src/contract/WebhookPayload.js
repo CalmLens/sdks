@@ -1,4 +1,4 @@
-import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, o as backfill, s as updatedAt, t as EXAMPLE_IDS } from "./Ids-BESMSxGb.js";
+import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, o as backfill, s as updatedAt, t as EXAMPLE_IDS } from "./Ids-BZszWHCN.js";
 import { t as CLASSIFICATION_CATEGORIES } from "./ModerationCategories-CHFRoeWV.js";
 import "./Media-B2PMcUf7.js";
 import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
@@ -6,7 +6,7 @@ import "./SharedConstants-DxUCZwLZ.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { i as msg, n as MODERATION_QUALIFIERS, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-C2mw3ntb.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-LWQvqyxL.js";
-import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-DPNlE8m-.js";
+import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-BlHEKHKk.js";
 import * as zod from "zod";
 // packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
@@ -952,6 +952,14 @@ const PREVIEW_IMAGE_SCHEMA = zod.object({
 	height: zod.number().int().positive().nullable().describe("Preview height in pixels")
 });
 const pixels = (description) => zod.number().int().positive().nullable().describe(description);
+/** Why a stream that was asked for isn't prepared. */
+const ASSET_HLS_UNAVAILABLE_REASON_SCHEMA = zod.enum([
+	"allowance-used",
+	"billing-required",
+	"spend-limit",
+	"processing-failed",
+	"content-not-kept"
+]);
 /** A rendition ID: `audio`, or `v` and the picture's height (`v720`). It names its CDN path. */
 const STREAM_RENDITION_ID_SCHEMA = zod.string().regex(/^(audio|v[1-9][0-9]{1,3})$/);
 /**
@@ -998,7 +1006,12 @@ const RENDERED_MEDIA_SCHEMA = zod.object({
 	height: zod.number().int().positive().nullish(),
 	peaks: zod.array(zod.number().min(0).max(1)).max(512).nullish(),
 	/** Its adaptive stream, once one is prepared from it. */
-	stream: STORED_MEDIA_STREAM_SCHEMA.nullish()
+	stream: STORED_MEDIA_STREAM_SCHEMA.nullish(),
+	/** What became of the stream asked for, until it is saved in `stream`. */
+	streamStatus: zod.discriminatedUnion("status", [zod.object({ status: zod.literal("preparing") }), zod.object({
+		status: zod.literal("unavailable"),
+		reason: ASSET_HLS_UNAVAILABLE_REASON_SCHEMA
+	})]).nullish()
 });
 /** One rendition of an adaptive stream, as the HLS master playlist lists it. */
 const ASSET_HLS_RENDITION_SCHEMA = zod.object({
@@ -1015,6 +1028,18 @@ const ASSET_HLS_RENDITION_SCHEMA = zod.object({
 const ASSET_HLS_SCHEMA = zod.object({ renditions: zod.array(ASSET_HLS_RENDITION_SCHEMA).describe("Every rendition, video from the largest down, then audio") }).meta(metaStore([docPropertyInfo({
 	description: "The adaptive stream of audio or video: HLS with fragmented MP4 (CMAF) segments, served at `/hls/index.m3u8`",
 	namedType: "AssetHls"
+})]));
+/** Whether the stream asked for is ready, or why it isn't. */
+const ASSET_HLS_STATUS_SCHEMA = zod.object({
+	status: zod.enum([
+		"preparing",
+		"ready",
+		"unavailable"
+	]).describe("`preparing` until the stream is saved, `ready` once `content.hls` lists it, `unavailable` when it won't be prepared: see `reason`"),
+	reason: ASSET_HLS_UNAVAILABLE_REASON_SCHEMA.nullable().describe("Why an `unavailable` stream isn't prepared: `allowance-used` (this month's free streaming minutes don't have room for it), `billing-required` (it is longer than the free minutes allow, so it needs billing), `spend-limit` (its expected cost would pass a spend limit), `processing-failed` (preparing it failed) or `content-not-kept` (the upload keeps no content to stream). `null` otherwise.")
+}).meta(metaStore([docPropertyInfo({
+	description: "Whether the adaptive stream asked for is ready, or why it isn't",
+	namedType: "AssetHlsStatus"
 })]));
 const ASSET_RENDERED_KIND_SCHEMA = zod.enum([
 	"image",
@@ -1240,6 +1265,7 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document. `null` while the asset is held."),
 	rendered: ASSET_RENDERED_SCHEMA.nullable().describe("The displayable file, served at `/rendered`: an image, a PDF, or browser-safe video or audio. `null` when the asset has none (text, spreadsheets and other files, or media not yet made browser-safe), once the content is removed and while the asset is held."),
 	hls: ASSET_HLS_SCHEMA.nullable().describe("Preview. The adaptive (HLS) stream of video or audio, once streaming has prepared it from the rendered file, served at `/hls/index.m3u8` and played by the embed page at `/embed`. `null` for other assets, until a stream is prepared, once the content is removed and while the asset is held."),
+	hlsStatus: ASSET_HLS_STATUS_SCHEMA.nullable().describe("Preview. Whether the adaptive stream asked for is ready, or why it isn't. `null` when no stream was asked for, once the content is removed and while the asset is held; with only the project's streaming setting asking, also until the asset's rendered file exists."),
 	preview: ASSET_PREVIEW_SCHEMA.nullable().describe("A still image for the asset, served at `/preview` (and its blurred placeholder at `/placeholder`). `null` when the asset has none (text, spreadsheets and other files, or a document, video or audio whose still isn't made yet), once the content is removed and while the asset is held.")
 }).meta(metaStore([docPropertyInfo({
 	description: "Content state",
@@ -1377,6 +1403,7 @@ STORED_ASSET_SCHEMA.pick({
 				averageColor: null
 			},
 			hls: null,
+			hlsStatus: null,
 			extractedText: null
 		}
 	}

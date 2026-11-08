@@ -1,11 +1,11 @@
-// node_modules/sendable-error/esm/Consts.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Consts.js
 const SENDABLE_ERROR_INSTANCE_SYMBOL = "__isSendableError";
-// node_modules/sendable-error/esm/Utils.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Utils.js
 const isSendableError = (error) => {
 	if (!error || typeof error !== "object") return false;
 	return Boolean(error[SENDABLE_ERROR_INSTANCE_SYMBOL]);
 };
-// node_modules/sendable-error/esm/ErrorCode.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/ErrorCode.js
 var ErrorCode = class ErrorCode {
 	properties;
 	static DEFAULT_CODE = new ErrorCode({
@@ -52,7 +52,7 @@ var ErrorCode = class ErrorCode {
 		return this.getId();
 	}
 };
-// node_modules/sendable-error/esm/Logging.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/Logging.js
 const defaultErrorLogger = (options) => {
 	const { message, error, info } = options;
 	const stackLines = error.stack?.split("\n").slice(1).join("\n");
@@ -69,7 +69,7 @@ let currentLogger = defaultErrorLogger;
 const getErrorLogger = () => {
 	return currentLogger;
 };
-// node_modules/sendable-error/esm/SendableError.js
+// ../../../../../../../Users/09jwater/Documents/safemind/node_modules/sendable-error/esm/SendableError.js
 const DEFAULT_STATUS = 500;
 function hashString(str) {
 	let h = 2166136261;
@@ -458,6 +458,11 @@ const PUBLIC_ERROR_CODES = {
 	DOCUMENT_TOO_MANY_ITEMS: new ErrorCode({
 		id: "document/too-many-items",
 		defaultMessage: "The document holds more embedded images or audio and video files than can be moderated: details.limit is `images` or `media` and details.maximum the most allowed. Split it into smaller documents.",
+		status: 422
+	}),
+	MEDIA_DURATION_LIMIT: new ErrorCode({
+		id: "media/duration-limit",
+		defaultMessage: "The audio or video is longer than allowed: details.durationSeconds is what its file states and details.limitSeconds the limit. Trim it or split it into separate uploads; before billing is set up, setting it up raises the limit.",
 		status: 422
 	}),
 	INVALID_IMAGE: new ErrorCode({

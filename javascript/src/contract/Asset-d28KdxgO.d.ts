@@ -120,6 +120,22 @@ declare const ASSET_HLS_SCHEMA: zod.ZodObject<{
   }, zod.core.$strip>>;
 }, zod.core.$strip>;
 type AssetHls = zod.infer<typeof ASSET_HLS_SCHEMA>;
+/** Whether the stream asked for is ready, or why it isn't. */
+declare const ASSET_HLS_STATUS_SCHEMA: zod.ZodObject<{
+  status: zod.ZodEnum<{
+    preparing: "preparing";
+    ready: "ready";
+    unavailable: "unavailable";
+  }>;
+  reason: zod.ZodNullable<zod.ZodEnum<{
+    "allowance-used": "allowance-used";
+    "billing-required": "billing-required";
+    "content-not-kept": "content-not-kept";
+    "processing-failed": "processing-failed";
+    "spend-limit": "spend-limit";
+  }>>;
+}, zod.core.$strip>;
+type AssetHlsStatus = zod.infer<typeof ASSET_HLS_STATUS_SCHEMA>;
 declare const ASSET_RENDERED_KIND_SCHEMA: zod.ZodEnum<{
   audio: "audio";
   image: "image";
@@ -9924,6 +9940,20 @@ declare const ASSET_CONTENT_SCHEMA: zod.ZodObject<{
       codecs: zod.ZodString;
     }, zod.core.$strip>>;
   }, zod.core.$strip>>;
+  hlsStatus: zod.ZodNullable<zod.ZodObject<{
+    status: zod.ZodEnum<{
+      preparing: "preparing";
+      ready: "ready";
+      unavailable: "unavailable";
+    }>;
+    reason: zod.ZodNullable<zod.ZodEnum<{
+      "allowance-used": "allowance-used";
+      "billing-required": "billing-required";
+      "content-not-kept": "content-not-kept";
+      "processing-failed": "processing-failed";
+      "spend-limit": "spend-limit";
+    }>>;
+  }, zod.core.$strip>>;
   preview: zod.ZodNullable<zod.ZodObject<{
     width: zod.ZodNullable<zod.ZodNumber>;
     height: zod.ZodNullable<zod.ZodNumber>;
@@ -14974,6 +15004,20 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
         codecs: zod.ZodString;
       }, zod.core.$strip>>;
     }, zod.core.$strip>>;
+    hlsStatus: zod.ZodNullable<zod.ZodObject<{
+      status: zod.ZodEnum<{
+        preparing: "preparing";
+        ready: "ready";
+        unavailable: "unavailable";
+      }>;
+      reason: zod.ZodNullable<zod.ZodEnum<{
+        "allowance-used": "allowance-used";
+        "billing-required": "billing-required";
+        "content-not-kept": "content-not-kept";
+        "processing-failed": "processing-failed";
+        "spend-limit": "spend-limit";
+      }>>;
+    }, zod.core.$strip>>;
     preview: zod.ZodNullable<zod.ZodObject<{
       width: zod.ZodNullable<zod.ZodNumber>;
       height: zod.ZodNullable<zod.ZodNumber>;
@@ -14983,4 +15027,4 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
   }, zod.core.$strip>;
 }, zod.core.$strip>;
 type Asset = zod.infer<typeof ASSET_SCHEMA>;
-export { ProcessingOptions as S, AssetUpload as _, AssetContentRemovalReason as a, FileMetadata as b, AssetHlsRendition as c, AssetPreview as d, AssetRendered as f, AssetType as g, AssetSafetyHoldReason as h, AssetContent as i, AssetModeration as l, AssetSafetyHold as m, AssetClassification as n, AssetContentStatus as o, AssetRenderedKind as p, AssetClassificationStatus as r, AssetHls as s, Asset as t, AssetModerationStatus as u, AssetVisibility as v, MetadataItem as x, ExtractedText as y };
+export { ProcessingOptions as C, MetadataItem as S, AssetType as _, AssetContentRemovalReason as a, ExtractedText as b, AssetHlsRendition as c, AssetModerationStatus as d, AssetPreview as f, AssetSafetyHoldReason as g, AssetSafetyHold as h, AssetContent as i, AssetHlsStatus as l, AssetRenderedKind as m, AssetClassification as n, AssetContentStatus as o, AssetRendered as p, AssetClassificationStatus as r, AssetHls as s, Asset as t, AssetModeration as u, AssetUpload as v, FileMetadata as x, AssetVisibility as y };

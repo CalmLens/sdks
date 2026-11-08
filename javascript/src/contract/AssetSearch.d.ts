@@ -5064,6 +5064,20 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
           codecs: zod.ZodString;
         }, zod.core.$strip>>;
       }, zod.core.$strip>>;
+      hlsStatus: zod.ZodNullable<zod.ZodObject<{
+        status: zod.ZodEnum<{
+          preparing: "preparing";
+          ready: "ready";
+          unavailable: "unavailable";
+        }>;
+        reason: zod.ZodNullable<zod.ZodEnum<{
+          "allowance-used": "allowance-used";
+          "billing-required": "billing-required";
+          "content-not-kept": "content-not-kept";
+          "processing-failed": "processing-failed";
+          "spend-limit": "spend-limit";
+        }>>;
+      }, zod.core.$strip>>;
       preview: zod.ZodNullable<zod.ZodObject<{
         width: zod.ZodNullable<zod.ZodNumber>;
         height: zod.ZodNullable<zod.ZodNumber>;
