@@ -11172,7 +11172,7 @@
           },
           "expect": {
             "error": {
-              "code": "asset/not-available",
+              "code": "asset/not-found",
               "status": 404
             }
           }

@@ -1060,8 +1060,9 @@ type SubmitAssetOptions struct {
 	ExternalID  *string            `json:"externalId,omitempty"`
 	ExternalURL *string            `json:"externalUrl,omitempty"`
 	FolderID    *string            `json:"folderId,omitempty"`
-	// UploadPresetID applies an upload preset: its folder, visibility, file types and size
-	// limit apply to the upload.
+	// UploadPresetID applies an upload preset: its folder, visibility, file types, size limit,
+	// moderation policy and processing options apply to the upload. ProcessingOptions, when
+	// set, replace the preset's.
 	UploadPresetID *string `json:"uploadPresetId,omitempty"`
 	// TotalSizeInBytes declares the size of the whole file when starting a multipart upload
 	// (Part), so CalmLens can reject an upload that could never complete before storing it.

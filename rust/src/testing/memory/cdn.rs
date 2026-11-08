@@ -166,7 +166,7 @@ pub(super) fn serve_info(
 ) -> super::MockResponse {
     let private = asset["visibility"] != "public";
     if private && !authorised {
-        return custom("asset/not-available", 404, "Asset is not available").response();
+        return custom("asset/not-found", 404, "Asset not found").response();
     }
     let claims = match q.get("viewerClaims") {
         None => Value::Null,

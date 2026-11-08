@@ -985,7 +985,8 @@ pub struct SubmitAsset {
     /// The folder to put the asset in.
     #[serde(default)]
     pub folder_id: Patch<String>,
-    /// The upload preset to apply: its folder, visibility, file types and size limit.
+    /// The upload preset to apply: its folder, visibility, file types, size limit, moderation
+    /// policy and processing options. `processing_options`, when set, replace the preset's.
     #[serde(default)]
     pub upload_preset_id: Option<String>,
     /// For a multipart upload, the size of the whole file; CalmLens then refuses an upload

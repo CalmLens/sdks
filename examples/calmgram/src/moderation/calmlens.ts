@@ -136,8 +136,8 @@ export const createCalmLensProvider = (options: {
         // Public so allowed images can be served straight from the CDN. NOTE: the CDN
         // serves public assets while they're still pending, so we never hand the URL to
         // browsers until the asset is allowed or age-restricted (see README → "Things worth
-        // copying"). With a preset,
-        // its folder, visibility, file types and size limit apply to this upload too.
+        // copying"). With a preset, its folder, visibility, file types, size limit, moderation
+        // policy and processing options apply to this upload too.
         ...(options.uploadPresetId
           ? { uploadPresetId: options.uploadPresetId }
           : { visibility: "public" as const }),

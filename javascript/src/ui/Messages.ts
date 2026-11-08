@@ -18,7 +18,7 @@ export interface CalmLensMessages {
   chooseFiles: string;
   /** Replaces the picked file when the uploader takes one file. */
   chooseAnother: string;
-  /** `{size}` is replaced with the largest accepted size, such as `20 MB`. */
+  /** `{size}` is replaced with the largest accepted size, such as `20 MiB`. */
   maxFileSizeHint: string;
   /** Under a file waiting for `start()`. Empty by default, so the row shows only its size. */
   selected: string;
@@ -121,10 +121,13 @@ export const getUploadItemOutcome = (
   return item.status === "age-restricted" ? "restricted" : "accepted";
 };
 
-/** A byte count for people, such as `1.2 MB`. */
+/**
+ * A byte count for people, such as `1.2 MiB`: binary units, labelled as such, the unit of every
+ * CalmLens size limit.
+ */
 export const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
-  const units = ["KB", "MB", "GB"];
+  const units = ["KiB", "MiB", "GiB"];
   let value = bytes / 1024;
   let unit = 0;
   while (value >= 1024 && unit < units.length - 1) {

@@ -2577,7 +2577,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         decide it. A private asset's info needs a grant or an API key with ``assets:download``."""
         private = asset["visibility"] != "public"
         if private and not authorised:
-            return self._failure_response(_Failure("asset/not-available", "Asset is not available", 404))
+            return self._failure_response(_Failure("asset/not-found", "Asset not found", 404))
         try:
             claims = json.loads(query.get("viewerClaims", "{}"))
         except ValueError:

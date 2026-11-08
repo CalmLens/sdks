@@ -716,7 +716,10 @@ export interface SubmitAssetCommonOptions extends IdempotencyOptions {
   externalId?: string;
   externalUrl?: string;
   folderId?: string | null;
-  /** An upload preset whose folder, visibility, file types and size limit apply. */
+  /**
+   * An upload preset whose folder, visibility, file types, size limit, moderation policy and
+   * processing options apply. `processingOptions`, when set, replace the preset's.
+   */
   uploadPresetId?: string;
   isFinal?: never;
 }

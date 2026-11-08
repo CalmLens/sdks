@@ -2423,7 +2423,7 @@ final class MockApi {
    */
   private Transport.Response info(MockCalmLensServerClient.Request request, JsonObject asset, boolean authorised) {
     if (!"public".equals(str(asset, "visibility")) && !authorised)
-      return error(new Failure("asset/not-available", 404, "Asset is not available"));
+      return error(new Failure("asset/not-found", 404, "Asset not found"));
     JsonObject claims;
     try {
       claims = JsonParser.parseString(request.query().getOrDefault("viewerClaims", "{}")).getAsJsonObject();

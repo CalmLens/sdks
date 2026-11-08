@@ -2957,7 +2957,7 @@ func (m *MockServerClient) serveInfo(req *http.Request, asset calmlens.JSON, aut
 	}
 	private := asset["visibility"] != calmlens.VisibilityPublic
 	if private && !authorised {
-		return errorBody(http.StatusNotFound, "asset/not-available", "Asset is not available")
+		return errorBody(http.StatusNotFound, "asset/not-found", "Asset not found")
 	}
 	claims := map[string]any{}
 	if raw := req.URL.Query().Get("viewerClaims"); raw != "" && json.Unmarshal([]byte(raw), &claims) != nil {

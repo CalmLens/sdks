@@ -1178,7 +1178,7 @@ public final class Models {
     public SubmitAsset externalId(String value) { externalId = value; return this; }
     public SubmitAsset externalUrl(String value) { externalUrl = value; return this; }
     public SubmitAsset folderId(Patch<String> value) { folderId = value; return this; }
-    /** @param value the upload preset to apply: its folder, visibility, file types and size limit @return these options */
+    /** @param value the upload preset to apply: its folder, visibility, file types, size limit, moderation policy and processing options (processing options set here replace the preset's) @return these options */
     public SubmitAsset uploadPresetId(String value) { uploadPresetId = value; return this; }
     public SubmitAsset sizeInBytes(Long value) { sizeInBytes = value; return this; }
     /** @param value the whole file's size, checked when a multipart upload starts @return these options */

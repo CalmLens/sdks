@@ -2536,7 +2536,7 @@ final class MockServerClient
     {
         $private = $asset['visibility'] !== 'public';
         if ($private && !$authorised) {
-            return $this->json(404, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
+            return $this->json(404, ['code' => 'asset/not-found', 'message' => 'Asset not found']);
         }
         $claims = json_decode($query['viewerClaims'] ?? '{}', true);
         if (!is_array($claims)) {

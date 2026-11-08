@@ -3207,11 +3207,7 @@ export class MockCalmLensApi {
     const { url, query } = request;
     const isPrivate = asset.visibility !== "public";
     if (isPrivate && !authorised) {
-      return this.jsonResponse(
-        404,
-        { code: "asset/not-available", message: "Asset is not available" },
-        url,
-      );
+      return this.jsonResponse(404, { code: "asset/not-found", message: "Asset not found" }, url);
     }
     let claims: { ageConfirmed?: boolean } = {};
     try {

@@ -1559,7 +1559,7 @@ module CalmLens
       # A private asset's info needs a grant or an API key with `assets:download`.
       def info(method, item, authorised, params)
         restricted = item['visibility'] != 'public'
-        return error('asset/not-available', 'Asset is not available', status: 404) if restricted && !authorised
+        return asset_not_found if restricted && !authorised
 
         claims = JSON.parse(params.fetch('viewerClaims', '{}'))
         body = { 'id' => item['id'], 'projectId' => item['projectId'], 'type' => item['type'], 'externalUrl' => item['externalUrl'],
