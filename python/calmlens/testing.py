@@ -7,9 +7,8 @@ JSON error bodies and headers (``X-Request-Id``, ``Retry-After``, ``Idempotent-R
 Keep this module out of production code paths.
 
 It also generates signed test inputs (``generate_test_text_code``, ``paint_test_image`` and
-``generate_media_test_code``): content that CalmLens, in a project with "Recognise test inputs"
-turned on, answers with the scenario it describes instead of classifying it when the content is
-signed with the project's test input key. Submit a text code as the whole text and a test image
+``generate_media_test_code``): content that CalmLens answers with the scenario it describes
+instead of classifying it when the content is signed with the project's test input key. Submit a text code as the whole text and a test image
 as the whole image.
 """
 from __future__ import annotations
