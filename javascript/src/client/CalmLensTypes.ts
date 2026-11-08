@@ -25,6 +25,7 @@ import type { HashList, HashListEntry } from "../contract/HashList.js";
 import type { PUBLIC_LENS_SCHEMA } from "../contract/Lens.js";
 import type { ModerationContext } from "../contract/ModerationContext.js";
 import type { CursorPage } from "../contract/Page.js";
+import type { UploadPreset } from "../contract/UploadPreset.js";
 import type {
   GetPoliciesQuery,
   GetPoliciesResponse,
@@ -37,6 +38,14 @@ import type {
   UpgradePolicyBody,
 } from "../contract/Policy.js";
 import type { ProcessingFeatures } from "../contract/ProcessingFeatures.js";
+import type {
+  EnsureMetadataFieldsBody,
+  EnsureUploadPresetInput,
+  MetadataFieldsResource,
+  ProjectSettingsResource,
+  PublicProjectSettings,
+  PutProjectSettingsBody,
+} from "../contract/ProjectConfiguration.js";
 import type {
   AssetBatchOperation,
   AssetTimelineSegment,
@@ -51,6 +60,8 @@ import type {
   GetHashListsQuery,
   GetHashListsResponse,
   GetLensesQuery,
+  GetUploadPresetsQuery,
+  GetUploadPresetsResponse,
   PatchAssetBody,
   PatchFolderBody,
   PatchHashListBody,
@@ -646,6 +657,38 @@ export type ResetPolicyOptions = ResetPolicyBody & PolicyIdOptions;
 export type UpgradePolicyOptions = UpgradePolicyBody & PolicyIdOptions;
 export type SetPolicyAutomaticUpdatesOptions = PutPolicyAutomaticUpdatesBody & PolicyIdOptions;
 export type AssignPolicyOptions = PutProjectPolicyBody;
+
+export type { UploadPreset };
+/** `uploadPresets.list` options: a page of the project's upload presets, oldest first unless `sort` says otherwise. */
+export type ListUploadPresetsOptions = Partial<GetUploadPresetsQuery>;
+/** `uploadPresets.iterate` options. */
+export type IterateUploadPresetsOptions = Omit<ListUploadPresetsOptions, "cursor">;
+export type UploadPresetPage = GetUploadPresetsResponse;
+/**
+ * One preset's whole definition, by `key`; fields left out take their defaults. Send the
+ * `revision` you read (0 for a preset that must not exist yet) to refuse a change made since.
+ */
+export type UploadPresetDefinition = EnsureUploadPresetInput;
+export interface EnsureUploadPresetsOptions {
+  uploadPresets: UploadPresetDefinition[];
+}
+/** The stored presets, in the order they were sent. */
+export interface EnsureUploadPresetsResponse {
+  uploadPresets: UploadPreset[];
+}
+export interface UploadPresetIdOptions {
+  uploadPresetId: string;
+}
+export type { MetadataFieldsResource, ProjectSettingsResource, PublicProjectSettings };
+/** Send the `revision` you read to refuse settings changed since. Settings left out return to their defaults. */
+export type UpdateProjectSettingsOptions = PutProjectSettingsBody;
+/** Fields to create or replace by ID; other fields are kept. */
+export type EnsureMetadataFieldsOptions = EnsureMetadataFieldsBody;
+export interface DeleteMetadataFieldOptions {
+  fieldId: string;
+  /** The `revision` you read; fields changed since are refused. */
+  revision?: number;
+}
 
 export interface MoveAssetOptions {
   assetId: string;

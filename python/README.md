@@ -65,6 +65,10 @@ Treat a status you don't recognise, and a failed request, as not allowed.
   [compare uploads with hash lists](https://calmlens.com/docs/sdk/python/reference#hash-lists).
 - [Manage the organisation's moderation policies](https://calmlens.com/docs/sdk/python/reference#policies)
   and choose the one each project uses.
+- Keep project configuration in code: `client.upload_presets` (`list`, `iter`, `ensure`, `delete`),
+  `client.project_settings` (`get`, `update`) and `client.metadata_fields` (`list`, `ensure`, `delete`). `ensure`
+  creates or replaces [upload presets](https://calmlens.com/docs/guides/upload-presets) by key and metadata fields
+  by ID; send the `revision` you read to refuse a change made since.
 - [Deliver content through the CDN](https://calmlens.com/docs/sdk/python/reference#cdn) with
   [lenses and transforms](https://calmlens.com/docs/sdk/python/reference#lenses), signed URLs and
   [viewer claims](https://calmlens.com/docs/sdk/python/reference#viewer-claims).

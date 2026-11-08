@@ -69,6 +69,7 @@ New statuses and fields may appear in later API versions. The SDK returns them u
 - [Serve content from the CDN](https://calmlens.com/docs/sdk/ruby#cdn-methods), with [lenses, transforms and signed URLs](https://calmlens.com/docs/sdk/ruby/reference#cdn-urls) and [age-restricted delivery](https://calmlens.com/docs/guides/delivering-assets#age-restricted-assets).
 - [Organise assets in folders](https://calmlens.com/docs/sdk/ruby/reference#folders), [search them](https://calmlens.com/docs/guides/search) and [page through lists](https://calmlens.com/docs/sdk/ruby#pagination).
 - [Match images against hash lists](https://calmlens.com/docs/sdk/ruby/reference#hash-lists).
+- Keep [upload presets](https://calmlens.com/docs/guides/upload-presets), project settings and metadata fields in your code: `upload_presets` (`list`, `each`, `ensure`, `delete`), `project_settings` (`get`, `update`) and `metadata_fields` (`list`, `ensure`, `delete`). `ensure` and `update` create or replace by key or ID, and the `revision` you read refuses a change made since.
 - [Read the events feed](https://calmlens.com/docs/sdk/ruby#pagination) and [verify webhooks in Rails or Rack](https://calmlens.com/docs/sdk/ruby#webhooks).
 - [Handle errors](https://calmlens.com/docs/sdk/ruby/reference#errors) with automatic [retries, timeouts and idempotency keys](https://calmlens.com/docs/sdk/ruby/reference#retries-and-timeouts).
 - [Type-check your code with RBS signatures](https://calmlens.com/docs/sdk/ruby/reference#types).

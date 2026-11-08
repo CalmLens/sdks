@@ -23,6 +23,7 @@ use std::{
 };
 
 mod cdn;
+mod configuration;
 mod policies;
 
 use cdn::{serve_info, MockGrant, EXTERNAL_ID_PREFIX};
@@ -121,7 +122,7 @@ pub(super) struct QueuedFailure {
 
 /// The operation names [`MockServerClient::fail_next_request`](super::MockServerClient::fail_next_request)
 /// takes: the JavaScript SDK's method paths.
-pub(super) const OPERATIONS: [&str; 62] = [
+pub(super) const OPERATIONS: [&str; 71] = [
     "assets.create",
     "assets.classify",
     "text.classify",
@@ -177,6 +178,15 @@ pub(super) const OPERATIONS: [&str; 62] = [
     "lenses.retrieve",
     "lenses.update",
     "lenses.delete",
+    "uploadPresets.list",
+    "uploadPresets.iterate",
+    "uploadPresets.ensure",
+    "uploadPresets.delete",
+    "projectSettings.get",
+    "projectSettings.update",
+    "metadataFields.list",
+    "metadataFields.ensure",
+    "metadataFields.delete",
     "events.list",
     "events.pages",
     "ensureLens",
@@ -600,6 +610,7 @@ pub(super) struct Backend {
     lenses: HashMap<String, Value>,
     replays: HashMap<String, (String, MockResponse)>,
     policies: policies::Policies,
+    configuration: configuration::Configuration,
     /// Each asset's latest event `assetSequence`, which the API keeps on the asset.
     asset_sequences: HashMap<String, u64>,
     /// The processing options each asset was uploaded with, which the API keeps but doesn't
@@ -1019,6 +1030,7 @@ impl Backend {
             lenses: HashMap::new(),
             replays: HashMap::new(),
             policies: policies::Policies::default(),
+            configuration: configuration::Configuration::default(),
             asset_sequences: HashMap::new(),
             processing_options: HashMap::new(),
             reruns: HashSet::new(),
@@ -1479,6 +1491,15 @@ impl Backend {
                     ("POST", "assets/batch") => self.batch(body, now),
                     ("POST", "signed-asset-urls") => self.sign_asset_url(body, now),
                     (_, "policy") => self.project_policy_route(method, body),
+                    ("GET", "upload-presets") => self.list_upload_presets(q),
+                    ("PUT", "upload-presets") => self.ensure_upload_presets(&body, now),
+                    ("GET", "settings") => Ok(self.project_settings_json()),
+                    ("PUT", "settings") => self.update_project_settings(&body),
+                    ("GET", "metadata-fields") => Ok(self.metadata_fields_json()),
+                    ("PUT", "metadata-fields") => self.ensure_metadata_fields(&body),
+                    ("DELETE", _) if matches!(route, [fields, _] if fields == "metadata-fields") => {
+                        self.delete_metadata_field(&route[1], q)
+                    }
                     ("POST", "assets") => self.create_asset(
                         (
                             header(headers, "x-calmlens-upload"),
@@ -1505,6 +1526,9 @@ impl Backend {
             }
             [scope, route @ ..] if scope == "policies" => self.policy_route(method, route, q, body),
             [scope, id] if scope == "lenses" => self.lens_route(method, id, body, now),
+            [scope, id] if scope == "upload-presets" && method == "DELETE" => {
+                self.delete_upload_preset(id)
+            }
             [scope, id, suffix @ ..] if scope == "hash-lists" => {
                 self.hash_list_route(method, id, &suffix.join("/"), body, q, now)
             }
@@ -3215,6 +3239,14 @@ impl Backend {
             ("PUT", ["policies", _, "automatic-updates"]) => "policies.setAutomaticUpdates",
             ("GET", ["projects", _, "policy"]) => "policies.retrieveAssigned",
             ("PUT", ["projects", _, "policy"]) => "policies.assign",
+            ("GET", ["projects", _, "upload-presets"]) => "uploadPresets.list",
+            ("PUT", ["projects", _, "upload-presets"]) => "uploadPresets.ensure",
+            ("DELETE", ["upload-presets", _]) => "uploadPresets.delete",
+            ("GET", ["projects", _, "settings"]) => "projectSettings.get",
+            ("PUT", ["projects", _, "settings"]) => "projectSettings.update",
+            ("GET", ["projects", _, "metadata-fields"]) => "metadataFields.list",
+            ("PUT", ["projects", _, "metadata-fields"]) => "metadataFields.ensure",
+            ("DELETE", ["projects", _, "metadata-fields", _]) => "metadataFields.delete",
             _ => return None,
         })
     }
@@ -3236,6 +3268,7 @@ fn covers(target: &str, operation: &str) -> bool {
                 | ("hashLists.iterateEntries", "hashLists.listEntries")
                 | ("policies.iterate", "policies.list")
                 | ("lenses.iterate", "lenses.list")
+                | ("uploadPresets.iterate", "uploadPresets.list")
                 | ("events.pages", "events.list")
                 | ("ensureLens", "ensureLenses")
         )

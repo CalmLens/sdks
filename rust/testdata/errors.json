@@ -3171,6 +3171,262 @@
     }
   },
   {
+    "code": "upload-preset/revision-conflict",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-revision-conflict"
+      },
+      "body": {
+        "code": "upload-preset/revision-conflict",
+        "message": "The upload preset changed, or was created or deleted, since you read it. Retrieve it again and retry with its current revision.",
+        "requestId": "req-upload-preset-revision-conflict",
+        "details": {
+          "reason": "upload_preset_revision_conflict"
+        }
+      }
+    },
+    "expected": {
+      "code": "upload-preset/revision-conflict",
+      "status": 409,
+      "requestId": "req-upload-preset-revision-conflict",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_revision_conflict"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/key-taken",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-key-taken"
+      },
+      "body": {
+        "code": "upload-preset/key-taken",
+        "message": "Another upload preset in this project has this key. Choose a different key.",
+        "requestId": "req-upload-preset-key-taken",
+        "details": {
+          "reason": "upload_preset_key_taken"
+        }
+      }
+    },
+    "expected": {
+      "code": "upload-preset/key-taken",
+      "status": 409,
+      "requestId": "req-upload-preset-key-taken",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_key_taken"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/daily-limit-required",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-daily-limit-required"
+      },
+      "body": {
+        "code": "upload-preset/daily-limit-required",
+        "message": "A preset that anyone can upload to needs a daily upload limit.",
+        "requestId": "req-upload-preset-daily-limit-required",
+        "details": {
+          "reason": "upload_preset_daily_limit_required"
+        }
+      }
+    },
+    "expected": {
+      "code": "upload-preset/daily-limit-required",
+      "status": 400,
+      "requestId": "req-upload-preset-daily-limit-required",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_daily_limit_required"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/invalid-folder",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-invalid-folder"
+      },
+      "body": {
+        "code": "upload-preset/invalid-folder",
+        "message": "The folder isn't in this project. Choose a folder from this project and try again.",
+        "requestId": "req-upload-preset-invalid-folder",
+        "details": {
+          "reason": "upload_preset_invalid_folder"
+        }
+      }
+    },
+    "expected": {
+      "code": "upload-preset/invalid-folder",
+      "status": 400,
+      "requestId": "req-upload-preset-invalid-folder",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_invalid_folder"
+      }
+    }
+  },
+  {
+    "code": "upload-preset/invalid-policy",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-preset-invalid-policy"
+      },
+      "body": {
+        "code": "upload-preset/invalid-policy",
+        "message": "The policy isn't one of this organisation's. Choose one of its policies and try again.",
+        "requestId": "req-upload-preset-invalid-policy",
+        "details": {
+          "reason": "upload_preset_invalid_policy"
+        }
+      }
+    },
+    "expected": {
+      "code": "upload-preset/invalid-policy",
+      "status": 400,
+      "requestId": "req-upload-preset-invalid-policy",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_preset_invalid_policy"
+      }
+    }
+  },
+  {
+    "code": "project-settings/revision-conflict",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-project-settings-revision-conflict"
+      },
+      "body": {
+        "code": "project-settings/revision-conflict",
+        "message": "The project's settings or metadata fields changed since you read them. Retrieve them again and retry with the current revision.",
+        "requestId": "req-project-settings-revision-conflict",
+        "details": {
+          "reason": "project_settings_revision_conflict"
+        }
+      }
+    },
+    "expected": {
+      "code": "project-settings/revision-conflict",
+      "status": 409,
+      "requestId": "req-project-settings-revision-conflict",
+      "retryAfter": null,
+      "details": {
+        "reason": "project_settings_revision_conflict"
+      }
+    }
+  },
+  {
+    "code": "search/estimate-changed",
+    "status": 409,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-search-estimate-changed"
+      },
+      "body": {
+        "code": "search/estimate-changed",
+        "message": "Turning on AI media search needs a searchIndexingBudgetUnits of at least the current indexing estimate, which details.indexingUnits gives.",
+        "requestId": "req-search-estimate-changed",
+        "details": {
+          "reason": "search_estimate_changed"
+        }
+      }
+    },
+    "expected": {
+      "code": "search/estimate-changed",
+      "status": 409,
+      "requestId": "req-search-estimate-changed",
+      "retryAfter": null,
+      "details": {
+        "reason": "search_estimate_changed"
+      }
+    }
+  },
+  {
+    "code": "metadata-field/not-found",
+    "status": 404,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-metadata-field-not-found"
+      },
+      "body": {
+        "code": "metadata-field/not-found",
+        "message": "The project has no metadata field with this ID.",
+        "requestId": "req-metadata-field-not-found",
+        "details": {
+          "reason": "metadata_field_not_found"
+        }
+      }
+    },
+    "expected": {
+      "code": "metadata-field/not-found",
+      "status": 404,
+      "requestId": "req-metadata-field-not-found",
+      "retryAfter": null,
+      "details": {
+        "reason": "metadata_field_not_found"
+      }
+    }
+  },
+  {
     "code": "upload-token/invalid",
     "status": 401,
     "operation": "assets.retrieve",

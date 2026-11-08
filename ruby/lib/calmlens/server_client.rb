@@ -51,6 +51,12 @@ module CalmLens
     attr_reader :cdn
     # @return [Lenses]
     attr_reader :lenses
+    # @return [UploadPresets]
+    attr_reader :upload_presets
+    # @return [ProjectSettings]
+    attr_reader :project_settings
+    # @return [MetadataFields]
+    attr_reader :metadata_fields
 
     # @param api_key [String] a project API key. Keep it on your server.
     # @param project_id [String]
@@ -100,6 +106,9 @@ module CalmLens
       @events = Events.new(@session)
       @cdn = CDN.new(@session)
       @lenses = Lenses.new(@session)
+      @upload_presets = UploadPresets.new(@session)
+      @project_settings = ProjectSettings.new(@session)
+      @metadata_fields = MetadataFields.new(@session)
     end
 
     # @return [String]

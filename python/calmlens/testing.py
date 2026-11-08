@@ -229,7 +229,7 @@ def _to_decision(value: object) -> MockDecision:
 
 #: Like the API: an upload has at most this many parts.
 _MAX_UPLOAD_PARTS = 10_000
-_INT_QUERY = {"pageSize", "partNumber", "sizeInBytes", "totalSizeInBytes"}
+_INT_QUERY = {"pageSize", "partNumber", "sizeInBytes", "totalSizeInBytes", "revision"}
 _BOOL_QUERY = {"wait", "isFinal"}
 #: The asset fields an upload carries in its body: the API refuses them in the query string.
 _UPLOAD_OPTION_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "tags", "authorId",
@@ -675,7 +675,9 @@ _OPERATIONS = frozenset({
     "hashLists.removeEntry", "policies.list", "policies.iterate", "policies.retrieve", "policies.create",
     "policies.update", "policies.reset", "policies.upgrade", "policies.setAutomaticUpdates", "policies.delete",
     "policies.retrieveAssigned", "policies.assign", "lenses.list", "lenses.iterate", "lenses.create",
-    "lenses.retrieve", "lenses.update", "lenses.delete", "ensureLens", "ensureLenses"})
+    "lenses.retrieve", "lenses.update", "lenses.delete", "ensureLens", "ensureLenses", "uploadPresets.list",
+    "uploadPresets.iterate", "uploadPresets.ensure", "uploadPresets.delete", "projectSettings.get",
+    "projectSettings.update", "metadataFields.list", "metadataFields.ensure", "metadataFields.delete"})
 
 #: The built-in presets the mock knows, by display name.
 _MOCK_PRESET_NAMES = {"general-community": "General", "children-platform": "Kids",
@@ -1086,6 +1088,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
         # their reset ``baseline``) and the one the project moderates with.
         self._policies: dict[str, dict[str, Any]] = {}
         self._project_policy_id: str | None = None
+        self._upload_presets: dict[str, dict[str, Any]] = {}
+        self._settings_revision = 1
+        self._project_settings_values: dict[str, Any] = {}
+        self._metadata_field_list: list[dict[str, Any]] = []
         self.database_storage = options.get("database_storage") or InMemoryMockDatabaseStorage()
         if not hasattr(self.database_storage, "events"):
             self.database_storage.events = []
@@ -1366,6 +1372,14 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 return [f"{kind}.list", f"{kind}.iterate"] if method == "GET" else [f"{kind}.create"]
             if route == "policy":
                 return ["policies.retrieveAssigned"] if method == "GET" else ["policies.assign"]
+            if route == "upload-presets":
+                return ["uploadPresets.list", "uploadPresets.iterate"] if method == "GET" else ["uploadPresets.ensure"]
+            if route == "settings":
+                return ["projectSettings.get"] if method == "GET" else ["projectSettings.update"]
+            if route == "metadata-fields":
+                return ["metadataFields.list"] if method == "GET" else ["metadataFields.ensure"]
+            if len(parts) == 4 and parts[2] == "metadata-fields":
+                return ["metadataFields.delete"]
             if route == "signed-asset-urls":
                 return ["cdn.signAssetUrl"]
             if route in ("assets/search", "assets/batch"):
@@ -1395,6 +1409,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return []
         if resource == "lenses":
             return [] if suffix else ["lenses." + by_method.get(method, "")]
+        if resource == "upload-presets":
+            return [] if suffix else ["uploadPresets.delete"]
         if resource == "folders":
             return ["folders.move"] if suffix == "move" else ["folders." + by_method.get(method, "")]
         if resource == "hash-lists":
@@ -1567,6 +1583,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return self._dispatch_hash_list(method, identifier, suffix, query, body)
         if resource == "lenses" and not suffix:
             return self._dispatch_lens(method, identifier, body)
+        if resource == "upload-presets":
+            if method != "DELETE" or suffix:
+                raise _Failure(error_codes.ROUTE_NOT_FOUND, f"No route for {method} /{'/'.join(parts)}")
+            return self._delete_upload_preset(identifier)
         if resource == "hash-list-entries":
             if method != "DELETE" or suffix:
                 raise _Failure(error_codes.ROUTE_NOT_FOUND, f"No route for {method} /{'/'.join(parts)}")
@@ -1589,6 +1609,19 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if method == "POST":
                 return self._create_lens(body, now)
             return self._lenses_put(body, now)
+        if resource == "upload-presets":
+            if method == "GET":
+                return self._page(list(self._upload_presets.values()), query, ["upload-presets", self.project_id],
+                                  default=[{"field": "createdAt", "direction": "asc"}])
+            return self._ensure_upload_presets(body)
+        if resource == "settings":
+            return self._project_settings_view() if method == "GET" else self._update_project_settings(body)
+        if resource == "metadata-fields":
+            if len(parts) > 1:
+                if method != "DELETE" or len(parts) > 2:
+                    raise _Failure(error_codes.ROUTE_NOT_FOUND, f"No route for {method} /{'/'.join(parts)}")
+                return self._delete_metadata_field(parts[1], query)
+            return self._metadata_fields_view() if method == "GET" else self._ensure_metadata_fields(body)
         if resource == "folders":
             if method == "GET":
                 return self._folders_list(query)
@@ -2341,6 +2374,113 @@ class MockCalmLensServerClient(CalmLensServerClient):
         else:
             policy = self._new_policy(cast(str, name).strip(), cast(dict[str, Any], settings), description=description)
         return self._policy_view(policy)
+
+    # Configuration: presets by key in ``_upload_presets``. Project settings and metadata fields share
+    # one revision, which only a real change moves.
+
+    def _ensure_upload_presets(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Like the API: every preset's revision and settings are checked before any is saved."""
+        definitions = body.get("uploadPresets")
+        if not isinstance(definitions, list) or not definitions:
+            raise _invalid_field("validation/too-small", "uploadPresets")
+
+        def unique(value: Any) -> list[str] | None:
+            return list(dict.fromkeys(value)) if isinstance(value, list) and value else None
+
+        plans: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []
+        for index, definition in enumerate(definitions):
+            for field_name in ("key", "name"):
+                if not isinstance(definition.get(field_name), str) or not definition[field_name]:
+                    raise _invalid_field("validation/invalid-type", f"uploadPresets.{index}.{field_name}")
+            existing = self._upload_presets.get(definition["key"])
+            current = existing["revision"] if existing else 0
+            if "revision" in definition and definition["revision"] != current:
+                raise _Failure(error_codes.UPLOAD_PRESET_REVISION_CONFLICT,
+                               details={"key": definition["key"], "revision": current})
+            values = {
+                "key": definition["key"], "name": definition["name"], "access": definition.get("access", "token"),
+                "enabled": definition.get("enabled", True),
+                "allowedContentTypes": unique(definition.get("allowedContentTypes")),
+                "maxSizeInBytes": definition.get("maxSizeInBytes"), "folderId": definition.get("folderId"),
+                "policyId": definition.get("policyId"), "visibility": definition.get("visibility", "private"),
+                "processingOptions": definition.get("processingOptions"),
+                "revealDecision": definition.get("revealDecision", False),
+                "dailyUploadLimit": definition.get("dailyUploadLimit"),
+                "allowedOrigins": unique(definition.get("allowedOrigins")),
+            }
+            if values["access"] == "anyone" and not values["dailyUploadLimit"]:
+                raise _Failure(error_codes.UPLOAD_PRESET_DAILY_LIMIT_REQUIRED)
+            plans.append((existing, values))
+
+        def save(existing: dict[str, Any] | None, values: dict[str, Any]) -> dict[str, Any]:
+            if existing and all(existing[key] == value for key, value in values.items()):
+                return existing
+            now = self.now()
+            preset = {"id": existing["id"] if existing else self.create_id("preset"), "projectId": self.project_id,
+                      "createdByUserId": None, **values, "revision": (existing["revision"] if existing else 0) + 1,
+                      "createdAt": existing["createdAt"] if existing else now, "updatedAt": now}
+            self._upload_presets[preset["key"]] = preset
+            return preset
+        return {"uploadPresets": [save(existing, values) for existing, values in plans]}
+
+    def _delete_upload_preset(self, preset_id: str) -> None:
+        preset = next((preset for preset in self._upload_presets.values() if preset["id"] == preset_id), None)
+        if preset is None:
+            raise _Failure(error_codes.UPLOAD_PRESET_NOT_FOUND)
+        del self._upload_presets[preset["key"]]
+
+    def _project_settings_view(self) -> dict[str, Any]:
+        stored = self._project_settings_values
+        return {"projectId": self.project_id, "revision": self._settings_revision, "settings": {
+            "optOutJurisdictions": [], "blockUnmoderatedAssets": True, "storeSensitiveMetadata": False,
+            "streamingEnabled": False, "aiMediaSearchEnabled": False, "remoteUrlRule": None,
+            "websiteSubmissionsPerMinute": None, **stored,
+            "humanReview": {"allowedSamplePercent": 0, "restrictedSamplePercent": 0, "uncertaintyMarginPercent": 0,
+                            "reviewMissingEvidence": False, **(stored.get("humanReview") or {})}}}
+
+    def _check_settings_revision(self, revision: Any) -> None:
+        if revision is not None and revision != self._settings_revision:
+            raise _Failure(error_codes.PROJECT_SETTINGS_REVISION_CONFLICT)
+
+    def _update_project_settings(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Replace the settings: those left out return to their defaults."""
+        self._check_settings_revision(body.get("revision"))
+        settings = body.get("settings")
+        if not isinstance(settings, dict):
+            raise _invalid_field("validation/invalid-type", "settings")
+        before, previous = self._project_settings_view()["settings"], self._project_settings_values
+        self._project_settings_values = settings
+        if self._project_settings_view()["settings"] == before:
+            self._project_settings_values = previous
+        else:
+            self._settings_revision += 1
+        return self._project_settings_view()
+
+    def _metadata_fields_view(self) -> dict[str, Any]:
+        return {"projectId": self.project_id, "revision": self._settings_revision, "fields": self._metadata_field_list}
+
+    def _ensure_metadata_fields(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Create or replace fields by ID, keeping the others in order."""
+        self._check_settings_revision(body.get("revision"))
+        fields = body.get("fields")
+        if not isinstance(fields, list) or not fields:
+            raise _invalid_field("validation/too-small", "fields")
+        by_id = {field.get("id"): field for field in fields}
+        known = {field["id"] for field in self._metadata_field_list}
+        merged = [by_id.get(field["id"], field) for field in self._metadata_field_list]
+        merged += [field for field in fields if field.get("id") not in known]
+        if merged != self._metadata_field_list:
+            self._metadata_field_list = merged
+            self._settings_revision += 1
+        return self._metadata_fields_view()
+
+    def _delete_metadata_field(self, field_id: str, query: Mapping[str, Any]) -> dict[str, Any]:
+        if not any(field["id"] == field_id for field in self._metadata_field_list):
+            raise _Failure(error_codes.METADATA_FIELD_NOT_FOUND, details={"fieldId": field_id})
+        self._check_settings_revision(query.get("revision"))
+        self._metadata_field_list = [field for field in self._metadata_field_list if field["id"] != field_id]
+        self._settings_revision += 1
+        return self._metadata_fields_view()
 
     # Lenses: by identifier in ``_mock_lenses``. A changed definition is saved in place.
 

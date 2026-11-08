@@ -96,6 +96,18 @@ import type {
   UpdateHashListOptions,
   UpdateLensOptions,
   UpdatePolicyOptions,
+  UpdateProjectSettingsOptions,
+  UploadPreset,
+  UploadPresetIdOptions,
+  UploadPresetPage,
+  EnsureUploadPresetsOptions,
+  EnsureUploadPresetsResponse,
+  EnsureMetadataFieldsOptions,
+  DeleteMetadataFieldOptions,
+  IterateUploadPresetsOptions,
+  ListUploadPresetsOptions,
+  MetadataFieldsResource,
+  ProjectSettingsResource,
   UpgradePolicyOptions,
   UploadAssetPartOptions,
   VerifyWebhookSignatureOptions,
@@ -883,6 +895,89 @@ export default class CalmLensServerClient {
         this.request("PUT", `${this.projectPath}/policy`, {
           body: checked("policies.assign", options),
         }),
+    };
+  }
+
+  /**
+   * The project's upload presets: the rules for uploads from browsers and apps. `ensure` creates or
+   * replaces presets by key, for deploys that declare them in code; send each preset's `revision`
+   * to refuse a change made since you read it.
+   */
+  get uploadPresets() {
+    return {
+      /** Lists one page of the project's upload presets, oldest first unless `sort` says otherwise. */
+      list: async (options: ListUploadPresetsOptions = {}): Promise<UploadPresetPage> =>
+        this.request("GET", `${this.projectPath}/upload-presets`, {
+          query: checked("uploadPresets.list", options),
+        }),
+
+      /** Yields every upload preset of the project, fetching pages as needed. */
+      iterate: (
+        options: IterateUploadPresetsOptions = {},
+      ): AsyncGenerator<UploadPreset, void, undefined> => {
+        checked("uploadPresets.iterate", options);
+        return this.iteratePages((cursor) => this.uploadPresets.list({ ...options, cursor }));
+      },
+
+      /**
+       * Creates each preset, or replaces it with the definition sent, by key. Every preset is
+       * checked before any is saved. Returns the stored presets in the order sent.
+       */
+      ensure: async (options: EnsureUploadPresetsOptions): Promise<EnsureUploadPresetsResponse> =>
+        this.request("PUT", `${this.projectPath}/upload-presets`, {
+          body: checked("uploadPresets.ensure", options),
+        }),
+
+      /** Deletes an upload preset; assets already uploaded through it stay. */
+      delete: async (options: UploadPresetIdOptions): Promise<void> => {
+        const { uploadPresetId } = checked("uploadPresets.delete", options);
+        await this.request(
+          "DELETE",
+          `/upload-presets/${requireId(uploadPresetId, "Upload preset ID")}`,
+        );
+      },
+    };
+  }
+
+  /**
+   * The project's settings, with defaults filled in. `update` replaces them: settings left out
+   * return to their defaults. Send the `revision` you read to refuse a change made since.
+   */
+  get projectSettings() {
+    return {
+      get: async (): Promise<ProjectSettingsResource> =>
+        this.request("GET", `${this.projectPath}/settings`),
+
+      update: async (options: UpdateProjectSettingsOptions): Promise<ProjectSettingsResource> =>
+        this.request("PUT", `${this.projectPath}/settings`, {
+          body: checked("projectSettings.update", options),
+        }),
+    };
+  }
+
+  /**
+   * The project's metadata fields. They share the project settings' `revision`; `ensure` creates
+   * or replaces fields by ID and keeps the others.
+   */
+  get metadataFields() {
+    return {
+      list: async (): Promise<MetadataFieldsResource> =>
+        this.request("GET", `${this.projectPath}/metadata-fields`),
+
+      ensure: async (options: EnsureMetadataFieldsOptions): Promise<MetadataFieldsResource> =>
+        this.request("PUT", `${this.projectPath}/metadata-fields`, {
+          body: checked("metadataFields.ensure", options),
+        }),
+
+      /** Deletes a field definition; assets keep their values. */
+      delete: async (options: DeleteMetadataFieldOptions): Promise<void> => {
+        const { fieldId, ...query } = checked("metadataFields.delete", options);
+        await this.request(
+          "DELETE",
+          `${this.projectPath}/metadata-fields/${requireId(fieldId, "Metadata field ID")}`,
+          { query },
+        );
+      },
     };
   }
 

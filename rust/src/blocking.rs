@@ -176,6 +176,18 @@ impl ServerClient {
     pub fn policies(&self) -> PoliciesClient<'_> {
         PoliciesClient(self)
     }
+    /// The project's upload presets: the rules for uploads from browsers and apps.
+    pub fn upload_presets(&self) -> UploadPresetsClient<'_> {
+        UploadPresetsClient(self)
+    }
+    /// The project's settings.
+    pub fn project_settings(&self) -> ProjectSettingsClient<'_> {
+        ProjectSettingsClient(self)
+    }
+    /// The project's metadata fields.
+    pub fn metadata_fields(&self) -> MetadataFieldsClient<'_> {
+        MetadataFieldsClient(self)
+    }
     /// Lens operations: the project's named CDN transforms.
     pub fn lenses(&self) -> LensesClient<'_> {
         LensesClient(self)
@@ -384,6 +396,46 @@ impl PoliciesClient<'_> {
         self.0.iter(self.0.client.policies().iterate(options))
     }
 }
+
+/// Upload preset operations. See [`crate::UploadPresetsClient`].
+#[derive(Debug, Clone, Copy)]
+pub struct UploadPresetsClient<'a>(&'a ServerClient);
+blocking_methods!(UploadPresetsClient => upload_presets {
+    /// See [`crate::UploadPresetsClient::list`].
+    fn list(options: ListUploadPresets) -> Result<UploadPresetPage>;
+    /// See [`crate::UploadPresetsClient::ensure`].
+    fn ensure(options: EnsureUploadPresets) -> Result<EnsureUploadPresetsResponse>;
+    /// See [`crate::UploadPresetsClient::delete`].
+    fn delete(options: UploadPresetId) -> Result<()>;
+});
+impl UploadPresetsClient<'_> {
+    /// Every upload preset of the project from `options.cursor` on.
+    pub fn iterate(&self, options: ListUploadPresets) -> Iter<Result<UploadPreset>> {
+        self.0.iter(self.0.client.upload_presets().iterate(options))
+    }
+}
+
+/// Project settings operations. See [`crate::ProjectSettingsClient`].
+#[derive(Debug, Clone, Copy)]
+pub struct ProjectSettingsClient<'a>(&'a ServerClient);
+blocking_methods!(ProjectSettingsClient => project_settings {
+    /// See [`crate::ProjectSettingsClient::get`].
+    fn get() -> Result<ProjectSettingsResource>;
+    /// See [`crate::ProjectSettingsClient::update`].
+    fn update(options: UpdateProjectSettings) -> Result<ProjectSettingsResource>;
+});
+
+/// Metadata field operations. See [`crate::MetadataFieldsClient`].
+#[derive(Debug, Clone, Copy)]
+pub struct MetadataFieldsClient<'a>(&'a ServerClient);
+blocking_methods!(MetadataFieldsClient => metadata_fields {
+    /// See [`crate::MetadataFieldsClient::list`].
+    fn list() -> Result<MetadataFieldsResource>;
+    /// See [`crate::MetadataFieldsClient::ensure`].
+    fn ensure(options: EnsureMetadataFields) -> Result<MetadataFieldsResource>;
+    /// See [`crate::MetadataFieldsClient::delete`].
+    fn delete(options: DeleteMetadataField) -> Result<()>;
+});
 
 /// Lens operations. See [`crate::LensesClient`].
 #[derive(Debug, Clone, Copy)]

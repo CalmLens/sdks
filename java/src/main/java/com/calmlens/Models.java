@@ -78,6 +78,9 @@ public final class Models {
     return value == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(value));
   }
 
+  /** A field of a whole definition: null is sent as null, the same as its default. */
+  private static <T> Patch<T> patch(T value) { return value == null ? Patch.clear() : Patch.value(value); }
+
   private static <K, V> Map<K, V> map(Map<K, V> value) {
     return value == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(value));
   }
@@ -3017,6 +3020,313 @@ public final class Models {
     public SetPolicyAutomaticUpdates enabled(Boolean value) { enabled = value; return this; }
     public SetPolicyAutomaticUpdates revision(Integer value) { revision = value; return this; }
     public SetPolicyAutomaticUpdates presetVersion(Integer value) { presetVersion = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  // ------------------------------------------------------------------ Configuration
+
+  /**
+   * An upload preset: the rules for uploads from browsers and apps.
+   *
+   * @param id upload preset ID
+   * @param projectId project it belongs to
+   * @param createdByUserId who created it, or null
+   * @param key stable identifier, unique in the project
+   * @param revision changes with every saved change; send it to {@code uploadPresets.ensure} to refuse a change made since
+   * @param name display name
+   * @param access {@code token} or {@code anyone}
+   * @param enabled whether it accepts uploads
+   * @param allowedContentTypes MIME types it accepts, or null for any supported type
+   * @param maxSizeInBytes largest upload it accepts, or null for the standard limits
+   * @param folderId folder uploads go into, or null for the project's root
+   * @param policyId moderation policy for its uploads, or null for the project's policy
+   * @param visibility visibility of uploaded assets
+   * @param processingOptions processing options for every upload through it, or null
+   * @param revealDecision whether browser uploads see the moderation decision for their own upload
+   * @param dailyUploadLimit most uploads it accepts from each client per UTC day, or null
+   * @param allowedOrigins sites allowed to upload from the browser, or null for any site
+   * @param createdAt creation time
+   * @param updatedAt last change
+   */
+  public record UploadPreset(String id, String projectId, String createdByUserId, String key, Integer revision, String name,
+      String access, Boolean enabled, List<String> allowedContentTypes, Long maxSizeInBytes, String folderId, String policyId,
+      Visibility visibility, ProcessingOptions processingOptions, Boolean revealDecision, Integer dailyUploadLimit,
+      List<String> allowedOrigins,
+      @JsonAdapter(Json.EpochMillis.class) Instant createdAt,
+      @JsonAdapter(Json.EpochMillis.class) Instant updatedAt) {
+    /** Copies collections so the record stays immutable. */
+    public UploadPreset { allowedContentTypes = list(allowedContentTypes); allowedOrigins = list(allowedOrigins); }
+  }
+
+  /**
+   * One page of the project's upload presets, oldest first unless {@code sort} says otherwise.
+   *
+   * @param items upload presets on this page
+   * @param nextCursor pass as {@code cursor} to get the next page; null on the last page
+   * @param hasMore whether another page follows
+   */
+  public record UploadPresetPage(List<UploadPreset> items, String nextCursor, boolean hasMore) implements CursorPage<UploadPreset> {
+    /** Copies collections; a missing item list becomes empty. */
+    public UploadPresetPage { items = listOrEmpty(items); }
+  }
+
+  /**
+   * What {@code uploadPresets.ensure} stored.
+   *
+   * @param uploadPresets the stored presets, in the order they were sent
+   */
+  public record EnsureUploadPresetsResponse(List<UploadPreset> uploadPresets) {
+    /** Copies collections; a missing list becomes empty. */
+    public EnsureUploadPresetsResponse { uploadPresets = listOrEmpty(uploadPresets); }
+  }
+
+  /** Options for {@code uploadPresets.list} and {@code uploadPresets.iterate}. */
+  public static final class ListUploadPresets {
+    private String cursor;
+    private Integer pageSize;
+    private String sort;
+    public ListUploadPresets() {}
+    /** @param value the previous page's {@code nextCursor} @return these options */
+    public ListUploadPresets cursor(String value) { cursor = value; return this; }
+    /** @param value upload presets per page, 1 to 100 (default 50) @return these options */
+    public ListUploadPresets pageSize(Integer value) { pageSize = value; return this; }
+    /** @param value comma-separated {@code createdAt} and {@code id}, descending when prefixed with {@code -}; oldest first when unset @return these options */
+    public ListUploadPresets sort(String value) { sort = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Identifies one upload preset, for {@code uploadPresets.delete}. */
+  public static final class UploadPresetId {
+    private String uploadPresetId;
+    public UploadPresetId() {}
+    /** @param uploadPresetId the upload preset ID */
+    public UploadPresetId(String uploadPresetId) { this.uploadPresetId = uploadPresetId; }
+    public UploadPresetId uploadPresetId(String value) { uploadPresetId = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /**
+   * One upload preset's whole definition for {@code uploadPresets.ensure}, by key. Fields left unset
+   * take their defaults, so the stored preset matches what was sent.
+   */
+  public static final class UploadPresetDefinition {
+    private String key;
+    private Integer revision;
+    private String name;
+    private String access;
+    private Boolean enabled;
+    private Patch<List<String>> allowedContentTypes;
+    private Patch<Long> maxSizeInBytes;
+    private Patch<String> folderId;
+    private Patch<String> policyId;
+    private Visibility visibility;
+    private Patch<ProcessingOptions> processingOptions;
+    private Boolean revealDecision;
+    private Patch<Integer> dailyUploadLimit;
+    private Patch<List<String>> allowedOrigins;
+    public UploadPresetDefinition() {}
+    /** @param key stable identifier, unique in the project @param name display name */
+    public UploadPresetDefinition(String key, String name) { this.key = key; this.name = name; }
+    public UploadPresetDefinition key(String value) { key = value; return this; }
+    /** @param value the revision you read, or 0 for a preset that must not exist yet; a preset changed since is refused @return this definition */
+    public UploadPresetDefinition revision(Integer value) { revision = value; return this; }
+    public UploadPresetDefinition name(String value) { name = value; return this; }
+    /** @param value {@code token} (the default) or {@code anyone}, which needs a {@code dailyUploadLimit} @return this definition */
+    public UploadPresetDefinition access(String value) { access = value; return this; }
+    /** @param value whether the preset accepts uploads (default true) @return this definition */
+    public UploadPresetDefinition enabled(Boolean value) { enabled = value; return this; }
+    /** @param value MIME types it accepts, such as {@code image/*}; null or empty accepts any supported type @return this definition */
+    public UploadPresetDefinition allowedContentTypes(List<String> value) { allowedContentTypes = patch(value == null ? null : List.copyOf(value)); return this; }
+    /** @param value largest upload it accepts, in bytes; null uses the standard limits @return this definition */
+    public UploadPresetDefinition maxSizeInBytes(Long value) { maxSizeInBytes = patch(value); return this; }
+    /** @param value folder uploads go into; null uses the project's root @return this definition */
+    public UploadPresetDefinition folderId(String value) { folderId = patch(value); return this; }
+    /** @param value moderation policy for its uploads; null uses the project's policy @return this definition */
+    public UploadPresetDefinition policyId(String value) { policyId = patch(value); return this; }
+    /** @param value visibility of uploaded assets (default private) @return this definition */
+    public UploadPresetDefinition visibility(Visibility value) { visibility = value; return this; }
+    /** @param value processing options for every upload through the preset, or null @return this definition */
+    public UploadPresetDefinition processingOptions(ProcessingOptions value) { processingOptions = patch(value); return this; }
+    /** @param value whether browser uploads see the decision for their own upload (default false) @return this definition */
+    public UploadPresetDefinition revealDecision(Boolean value) { revealDecision = value; return this; }
+    /** @param value most uploads it accepts from each client per UTC day; required when access is {@code anyone} @return this definition */
+    public UploadPresetDefinition dailyUploadLimit(Integer value) { dailyUploadLimit = patch(value); return this; }
+    /** @param value sites allowed to upload from the browser; null or empty allows any site @return this definition */
+    public UploadPresetDefinition allowedOrigins(List<String> value) { allowedOrigins = patch(value == null ? null : List.copyOf(value)); return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Options for {@code uploadPresets.ensure}. */
+  public static final class EnsureUploadPresets {
+    private List<UploadPresetDefinition> uploadPresets;
+    public EnsureUploadPresets() {}
+    /** @param uploadPresets the presets to create or replace */
+    public EnsureUploadPresets(List<UploadPresetDefinition> uploadPresets) { this.uploadPresets = uploadPresets; }
+    public EnsureUploadPresets uploadPresets(List<UploadPresetDefinition> value) { uploadPresets = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /**
+   * Restricts the domains a project accepts when content is submitted by URL, including websites.
+   *
+   * @param mode {@code allow} accepts only the listed domains; {@code deny} accepts every domain except them
+   * @param domains the domains
+   */
+  public record RemoteUrlRule(String mode, List<String> domains) {
+    /** Copies collections so the record stays immutable. */
+    public RemoteUrlRule { domains = list(domains); }
+  }
+
+  /**
+   * Which automated decisions are sampled into the human review queue.
+   *
+   * @param allowedSamplePercent percentage of allowed assets to sample
+   * @param restrictedSamplePercent percentage of restricted assets to sample
+   * @param uncertaintyMarginPercent how close to a threshold a score queues the asset
+   * @param reviewMissingEvidence whether assets with missing evidence are queued
+   */
+  public record HumanReviewSettings(Double allowedSamplePercent, Double restrictedSamplePercent,
+      Double uncertaintyMarginPercent, Boolean reviewMissingEvidence) {
+    /** No settings set. */
+    public HumanReviewSettings() { this(null, null, null, null); }
+
+    /** @param value percentage of allowed assets to sample @return a copy with this setting */
+    public HumanReviewSettings allowedSamplePercent(Double value) { return new HumanReviewSettings(value, restrictedSamplePercent, uncertaintyMarginPercent, reviewMissingEvidence); }
+
+    /** @param value percentage of restricted assets to sample @return a copy with this setting */
+    public HumanReviewSettings restrictedSamplePercent(Double value) { return new HumanReviewSettings(allowedSamplePercent, value, uncertaintyMarginPercent, reviewMissingEvidence); }
+
+    /** @param value how close to a threshold a score queues the asset @return a copy with this setting */
+    public HumanReviewSettings uncertaintyMarginPercent(Double value) { return new HumanReviewSettings(allowedSamplePercent, restrictedSamplePercent, value, reviewMissingEvidence); }
+
+    /** @param value whether assets with missing evidence are queued @return a copy with this setting */
+    public HumanReviewSettings reviewMissingEvidence(Boolean value) { return new HumanReviewSettings(allowedSamplePercent, restrictedSamplePercent, uncertaintyMarginPercent, value); }
+  }
+
+  /**
+   * A project's settings, with defaults filled in.
+   *
+   * @param optOutJurisdictions optional standards the project doesn't serve, such as {@code EU}
+   * @param blockUnmoderatedAssets whether the CDN refuses to serve assets whose moderation is pending
+   * @param storeSensitiveMetadata whether uploaded images keep their embedded metadata
+   * @param streamingEnabled whether audio and video uploads that keep their content get an adaptive stream
+   * @param aiMediaSearchEnabled whether audio and video are indexed for AI search
+   * @param remoteUrlRule the domains accepted when content is submitted by URL, or null for every public domain
+   * @param websiteSubmissionsPerMinute how many websites the project can submit per minute, or null for the platform limit
+   * @param humanReview which automated decisions are sampled into the human review queue
+   */
+  public record ProjectSettings(List<String> optOutJurisdictions, Boolean blockUnmoderatedAssets, Boolean storeSensitiveMetadata,
+      Boolean streamingEnabled, Boolean aiMediaSearchEnabled, RemoteUrlRule remoteUrlRule, Integer websiteSubmissionsPerMinute,
+      HumanReviewSettings humanReview) {
+    /** Copies collections so the record stays immutable. */
+    public ProjectSettings { optOutJurisdictions = list(optOutJurisdictions); }
+  }
+
+  /**
+   * A project's settings and their revision.
+   *
+   * @param projectId the project
+   * @param revision changes with every real change; metadata fields share it
+   * @param settings the settings
+   */
+  public record ProjectSettingsResource(String projectId, Integer revision, ProjectSettings settings) {}
+
+  /** The settings to save with {@code projectSettings.update}. Settings left unset return to their defaults. */
+  public static final class ProjectSettingsInput {
+    private List<String> optOutJurisdictions;
+    private Boolean blockUnmoderatedAssets;
+    private Boolean storeSensitiveMetadata;
+    private Boolean streamingEnabled;
+    private Boolean aiMediaSearchEnabled;
+    private Patch<RemoteUrlRule> remoteUrlRule;
+    private Patch<Integer> websiteSubmissionsPerMinute;
+    private HumanReviewSettings humanReview;
+    public ProjectSettingsInput() {}
+    /** @param value optional standards the project doesn't serve, such as {@code EU} (default none) @return these settings */
+    public ProjectSettingsInput optOutJurisdictions(List<String> value) { optOutJurisdictions = value == null ? null : List.copyOf(value); return this; }
+    /** @param value whether the CDN refuses to serve assets whose moderation is pending (default true) @return these settings */
+    public ProjectSettingsInput blockUnmoderatedAssets(Boolean value) { blockUnmoderatedAssets = value; return this; }
+    /** @param value whether uploaded images keep their embedded metadata (default false) @return these settings */
+    public ProjectSettingsInput storeSensitiveMetadata(Boolean value) { storeSensitiveMetadata = value; return this; }
+    /** @param value whether audio and video uploads that keep their content get an adaptive stream (default false) @return these settings */
+    public ProjectSettingsInput streamingEnabled(Boolean value) { streamingEnabled = value; return this; }
+    /** @param value whether audio and video are indexed for AI search (default false) @return these settings */
+    public ProjectSettingsInput aiMediaSearchEnabled(Boolean value) { aiMediaSearchEnabled = value; return this; }
+    /** @param value the domains accepted when content is submitted by URL; null accepts every public domain @return these settings */
+    public ProjectSettingsInput remoteUrlRule(RemoteUrlRule value) { remoteUrlRule = patch(value); return this; }
+    /** @param value how many websites the project can submit per minute; null uses the platform limit @return these settings */
+    public ProjectSettingsInput websiteSubmissionsPerMinute(Integer value) { websiteSubmissionsPerMinute = patch(value); return this; }
+    /** @param value which automated decisions are sampled into the human review queue @return these settings */
+    public ProjectSettingsInput humanReview(HumanReviewSettings value) { humanReview = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Options for {@code projectSettings.update}, which replaces the settings. */
+  public static final class UpdateProjectSettings {
+    private Integer revision;
+    private ProjectSettingsInput settings;
+    private Double searchIndexingBudgetUnits;
+    public UpdateProjectSettings() {}
+    /** @param settings the complete settings */
+    public UpdateProjectSettings(ProjectSettingsInput settings) { this.settings = settings; }
+    /** @param value the revision you read; settings changed since are refused @return these options */
+    public UpdateProjectSettings revision(Integer value) { revision = value; return this; }
+    public UpdateProjectSettings settings(ProjectSettingsInput value) { settings = value; return this; }
+    /** @param value needed when turning on {@code aiMediaSearchEnabled}: the most indexing units you accept for existing media @return these options */
+    public UpdateProjectSettings searchIndexingBudgetUnits(Double value) { searchIndexingBudgetUnits = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /**
+   * A metadata field definition.
+   *
+   * @param id field identifier
+   * @param title display title
+   * @param description what the field holds, or null
+   * @param type {@code string}, {@code number}, {@code boolean}, {@code date} or {@code url}
+   * @param icon {@code folder}, {@code hash}, {@code layers}, {@code link}, {@code photo}, {@code tag} or {@code user}
+   * @param color display color, such as {@code #2563eb}
+   */
+  public record MetadataField(String id, String title, String description, String type, String icon, String color) {
+    /** A field without a description. @param id field identifier @param title display title @param type value type @param icon icon @param color display color */
+    public MetadataField(String id, String title, String type, String icon, String color) { this(id, title, null, type, icon, color); }
+  }
+
+  /**
+   * A project's metadata fields and their revision.
+   *
+   * @param projectId the project
+   * @param revision shared with the project's settings
+   * @param fields the field definitions
+   */
+  public record MetadataFieldsResource(String projectId, Integer revision, List<MetadataField> fields) {
+    /** Copies collections; a missing list becomes empty. */
+    public MetadataFieldsResource { fields = listOrEmpty(fields); }
+  }
+
+  /** Options for {@code metadataFields.ensure}: fields to create or replace by ID; other fields are kept. */
+  public static final class EnsureMetadataFields {
+    private Integer revision;
+    private List<MetadataField> fields;
+    public EnsureMetadataFields() {}
+    /** @param fields the fields to create or replace */
+    public EnsureMetadataFields(List<MetadataField> fields) { this.fields = fields; }
+    /** @param value the revision you read; fields changed since are refused @return these options */
+    public EnsureMetadataFields revision(Integer value) { revision = value; return this; }
+    public EnsureMetadataFields fields(List<MetadataField> value) { fields = value; return this; }
+    @Override public String toString() { return describe(this); }
+  }
+
+  /** Options for {@code metadataFields.delete}. */
+  public static final class DeleteMetadataField {
+    private String fieldId;
+    private Integer revision;
+    public DeleteMetadataField() {}
+    /** @param fieldId the field ID */
+    public DeleteMetadataField(String fieldId) { this.fieldId = fieldId; }
+    public DeleteMetadataField fieldId(String value) { fieldId = value; return this; }
+    /** @param value the revision you read; fields changed since are refused @return these options */
+    public DeleteMetadataField revision(Integer value) { revision = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 

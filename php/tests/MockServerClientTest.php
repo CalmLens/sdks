@@ -565,4 +565,81 @@ final class MockServerClientTest extends TestCase
         self::assertSame([['asset.deleted', 'asset.deleted'], ['asset.deleted']],
             array_map(fn (array $page) => array_column($page['items'], 'type'), $pages));
     }
+
+    public static function configurationOperations(): iterable
+    {
+        yield ['uploadPresets.list', fn ($client) => $client->uploadPresets->list()];
+        yield ['uploadPresets.each', fn ($client) => iterator_to_array($client->uploadPresets->each())];
+        yield ['uploadPresets.ensure', fn ($client) => $client->uploadPresets->ensure(['uploadPresets' => [['key' => 'a', 'name' => 'A']]])];
+        yield ['uploadPresets.delete', fn ($client) => $client->uploadPresets->delete(['uploadPresetId' => 'preset-1'])];
+        yield ['projectSettings.get', fn ($client) => $client->projectSettings->get()];
+        yield ['projectSettings.update', fn ($client) => $client->projectSettings->update(['settings' => []])];
+        yield ['metadataFields.list', fn ($client) => $client->metadataFields->list()];
+        yield ['metadataFields.ensure', fn ($client) => $client->metadataFields->ensure(['fields' => [['id' => 'a']]])];
+        yield ['metadataFields.delete', fn ($client) => $client->metadataFields->delete(['fieldId' => 'a'])];
+    }
+
+    /** `failNextRequest` targets each configuration operation by name, and leaves other requests alone. */
+    #[DataProvider('configurationOperations')]
+    public function testFailNextRequestTargetsConfigurationOperations(string $operation, callable $call): void
+    {
+        self::assertContains($operation, MockServerClient::OPERATIONS);
+        $mock = new MockServerClient();
+        $mock->failNextRequest(ErrorCodes::INTERNAL_ERROR, $operation);
+        $mock->client()->lenses->list();
+        self::assertSame(1, $mock->pending());
+        self::assertSame(ErrorCodes::INTERNAL_ERROR, self::code(fn () => $call($mock->client())));
+        self::assertSame(0, $mock->pending());
+    }
+
+    /** PHP's empty array is sent as the empty object the API's schema takes for settings. */
+    public function testEmptyProjectSettingsAreSentAsAnObject(): void
+    {
+        $mock = new MockServerClient();
+        $mock->client()->projectSettings->update(['settings' => []]);
+        $requests = $mock->requests();
+        self::assertSame('{"settings":{}}', (string) end($requests)->request->getBody());
+    }
+
+    public function testEnsuringAnUploadPresetReplacesItsDefinitionAndListsOldestFirst(): void
+    {
+        $mock = new MockServerClient();
+        $presets = $mock->client()->uploadPresets;
+        $first = $presets->ensure(['uploadPresets' => [['key' => 'first', 'name' => 'First', 'allowedContentTypes' => ['image/*', 'image/*'], 'revealDecision' => true]]])['uploadPresets'][0];
+        self::assertSame(['image/*'], $first['allowedContentTypes']);
+        $presets->ensure(['uploadPresets' => [['key' => 'second', 'name' => 'Second'], ['key' => 'third', 'name' => 'Third']]]);
+        // Fields left out return to their defaults, which is a change.
+        $replaced = $presets->ensure(['uploadPresets' => [['key' => 'first', 'name' => 'First']]])['uploadPresets'][0];
+        self::assertSame([$first['id'], 2, null, false], [$replaced['id'], $replaced['revision'], $replaced['allowedContentTypes'], $replaced['revealDecision']]);
+        self::assertSame(['first', 'second', 'third'], array_column(iterator_to_array($presets->each(['pageSize' => 2]), false), 'key'));
+        self::assertSame(['third', 'second'], array_column($presets->list(['sort' => '-createdAt', 'pageSize' => 2])['items'], 'key'));
+        $conflict = self::error(fn () => $presets->ensure(['uploadPresets' => [['key' => 'first', 'revision' => 1, 'name' => 'Stale']]]));
+        self::assertSame([ErrorCodes::UPLOAD_PRESET_REVISION_CONFLICT, 'first', 2], [$conflict->errorCode, $conflict->details['key'], $conflict->details['revision']]);
+    }
+
+    public function testSettingsAndMetadataFieldsShareARevisionThatOnlyARealChangeBumps(): void
+    {
+        $mock = new MockServerClient();
+        $client = $mock->client();
+        // Sending the defaults changes nothing.
+        self::assertSame(1, $client->projectSettings->update(['settings' => ['blockUnmoderatedAssets' => true, 'humanReview' => ['allowedSamplePercent' => 0]]])['revision']);
+        $review = $client->projectSettings->update(['settings' => ['humanReview' => ['allowedSamplePercent' => 5]]]);
+        self::assertSame([2, ['allowedSamplePercent' => 5, 'restrictedSamplePercent' => 0, 'uncertaintyMarginPercent' => 0, 'reviewMissingEvidence' => false]],
+            [$review['revision'], $review['settings']['humanReview']]);
+        // Settings left out return to their defaults.
+        self::assertSame([3, 0], [($reset = $client->projectSettings->update(['settings' => []]))['revision'], $reset['settings']['humanReview']['allowedSamplePercent']]);
+
+        $user = ['id' => 'userId', 'title' => 'User', 'type' => 'string'];
+        $order = ['id' => 'orderId', 'title' => 'Order', 'type' => 'string'];
+        self::assertSame(4, $client->metadataFields->ensure(['fields' => [$user, $order]])['revision']);
+        self::assertSame(4, $client->metadataFields->ensure(['fields' => [$order]])['revision']);
+        // A field is replaced in place and the fields left out stay.
+        $renamed = ['title' => 'Customer'] + $user;
+        $fields = $client->metadataFields->ensure(['fields' => [$renamed]]);
+        self::assertSame([5, ['userId', 'orderId'], 'Customer'], [$fields['revision'], array_column($fields['fields'], 'id'), $fields['fields'][0]['title']]);
+        self::assertSame(ErrorCodes::PROJECT_SETTINGS_REVISION_CONFLICT, self::code(fn () => $client->metadataFields->delete(['fieldId' => 'userId', 'revision' => 4])));
+        self::assertSame(['userId', 'orderId'], array_column($client->metadataFields->list()['fields'], 'id'));
+        $client->metadataFields->delete(['fieldId' => 'userId', 'revision' => 5]);
+        self::assertSame([6, 6], [$client->metadataFields->list()['revision'], $client->projectSettings->get()['revision']]);
+    }
 }

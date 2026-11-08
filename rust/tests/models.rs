@@ -662,3 +662,28 @@ fn an_over_long_newest_post_is_kept_alone_for_the_api_to_reject() {
     assert_eq!(select_moderation_context_items(&items), vec![newest]);
     assert_eq!(select_moderation_context_items(&[]), Vec::new());
 }
+
+/// Updating settings replaces them, so sending back those read must keep every one, including
+/// clearing what is unset and a setting this SDK version doesn't know.
+#[test]
+fn settings_read_convert_to_a_definition_holding_every_setting() {
+    let read = json!({
+        "optOutJurisdictions": ["EU"],
+        "blockUnmoderatedAssets": false,
+        "storeSensitiveMetadata": true,
+        "streamingEnabled": true,
+        "aiMediaSearchEnabled": true,
+        "remoteUrlRule": null,
+        "websiteSubmissionsPerMinute": 5,
+        "humanReview": {
+            "allowedSamplePercent": 1.5,
+            "restrictedSamplePercent": 2.5,
+            "uncertaintyMarginPercent": 3.5,
+            "reviewMissingEvidence": true,
+        },
+        "futureSetting": "kept",
+    });
+    let settings: ProjectSettings = serde_json::from_value(read.clone()).unwrap();
+    let definition = ProjectSettingsDefinition::from(settings);
+    assert_eq!(serde_json::to_value(definition).unwrap(), read);
+}

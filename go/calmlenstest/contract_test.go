@@ -800,6 +800,24 @@ func runStep(t *testing.T, ctx context.Context, m *MockServerClient, operation s
 		result, err = m.Lenses.Update(ctx, decode[calmlens.UpdateLensOptions](t, args))
 	case "lenses.delete":
 		err = m.Lenses.Delete(ctx, decode[calmlens.LensIDOptions](t, args))
+	case "uploadPresets.list":
+		result, err = m.UploadPresets.List(ctx, decode[calmlens.ListUploadPresetsOptions](t, args))
+	case "uploadPresets.iterate":
+		result, err = collect(ctx, m.UploadPresets.ListAll(decode[calmlens.ListUploadPresetsOptions](t, args)))
+	case "uploadPresets.ensure":
+		result, err = m.UploadPresets.Ensure(ctx, decode[calmlens.EnsureUploadPresetsOptions](t, args))
+	case "uploadPresets.delete":
+		err = m.UploadPresets.Delete(ctx, decode[calmlens.UploadPresetIDOptions](t, args))
+	case "projectSettings.get":
+		result, err = m.ProjectSettings.Get(ctx)
+	case "projectSettings.update":
+		result, err = m.ProjectSettings.Update(ctx, decode[calmlens.UpdateProjectSettingsOptions](t, args))
+	case "metadataFields.list":
+		result, err = m.MetadataFields.List(ctx)
+	case "metadataFields.ensure":
+		result, err = m.MetadataFields.Ensure(ctx, decode[calmlens.EnsureMetadataFieldsOptions](t, args))
+	case "metadataFields.delete":
+		err = m.MetadataFields.Delete(ctx, decode[calmlens.DeleteMetadataFieldOptions](t, args))
 	case "ensureLens":
 		result, err = m.EnsureLens(ctx, decode[calmlens.EnsureLensOptions](t, args))
 	case "ensureLenses":

@@ -198,6 +198,22 @@ error_codes! {
     UploadPresetOriginNotAllowed = "upload-preset/origin-not-allowed", 403;
     /// `upload-preset/field-not-allowed` (HTTP 400): This field is set by the upload preset or the upload token and can't be changed by the upload.
     UploadPresetFieldNotAllowed = "upload-preset/field-not-allowed", 400;
+    /// `upload-preset/revision-conflict` (HTTP 409): The upload preset changed, or was created or deleted, since you read it. Retrieve it again and retry with its current revision.
+    UploadPresetRevisionConflict = "upload-preset/revision-conflict", 409;
+    /// `upload-preset/key-taken` (HTTP 409): Another upload preset in this project has this key. Choose a different key.
+    UploadPresetKeyTaken = "upload-preset/key-taken", 409;
+    /// `upload-preset/daily-limit-required` (HTTP 400): A preset that anyone can upload to needs a daily upload limit.
+    UploadPresetDailyLimitRequired = "upload-preset/daily-limit-required", 400;
+    /// `upload-preset/invalid-folder` (HTTP 400): The folder isn't in this project. Choose a folder from this project and try again.
+    UploadPresetInvalidFolder = "upload-preset/invalid-folder", 400;
+    /// `upload-preset/invalid-policy` (HTTP 400): The policy isn't one of this organisation's. Choose one of its policies and try again.
+    UploadPresetInvalidPolicy = "upload-preset/invalid-policy", 400;
+    /// `project-settings/revision-conflict` (HTTP 409): The project's settings or metadata fields changed since you read them. Retrieve them again and retry with the current revision.
+    ProjectSettingsRevisionConflict = "project-settings/revision-conflict", 409;
+    /// `search/estimate-changed` (HTTP 409): Turning on AI media search needs a searchIndexingBudgetUnits of at least the current indexing estimate, which details.indexingUnits gives.
+    SearchEstimateChanged = "search/estimate-changed", 409;
+    /// `metadata-field/not-found` (HTTP 404): The project has no metadata field with this ID.
+    MetadataFieldNotFound = "metadata-field/not-found", 404;
     /// `upload-token/invalid` (HTTP 401): The upload token is invalid. Sign a new one on your server with an active API key for this project.
     UploadTokenInvalid = "upload-token/invalid", 401;
     /// `upload-token/expired` (HTTP 401): The upload token has expired. Sign a new one on your server.

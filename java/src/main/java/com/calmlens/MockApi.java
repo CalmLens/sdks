@@ -177,7 +177,10 @@ final class MockApi {
       "policies.list", "policies.iterate", "policies.retrieve", "policies.create", "policies.update", "policies.reset",
       "policies.upgrade", "policies.setAutomaticUpdates", "policies.delete", "policies.retrieveAssigned", "policies.assign",
       "lenses.list", "lenses.iterate", "lenses.create", "lenses.retrieve", "lenses.update", "lenses.delete",
-      "ensureLens", "ensureLenses");
+      "ensureLens", "ensureLenses",
+      "uploadPresets.list", "uploadPresets.iterate", "uploadPresets.ensure", "uploadPresets.delete",
+      "projectSettings.get", "projectSettings.update",
+      "metadataFields.list", "metadataFields.ensure", "metadataFields.delete");
 
   /** A request URL's path after the API or CDN base URL, with its segments decoded. */
   String relativePath(String url) {
@@ -205,11 +208,19 @@ final class MockApi {
       String route = method + " " + String.join("/", parts.subList(2, parts.size()));
       if (parts.size() == 5 && parts.get(2).equals("assets") && parts.get(4).equals("timeline") && method.equals("GET"))
         return Set.of("assets.listTimeline", "assets.iterateTimeline");
+      if (parts.size() == 4 && parts.get(2).equals("metadata-fields") && method.equals("DELETE"))
+        return Set.of("metadataFields.delete");
       return switch (route) {
         case "GET events" -> Set.of("events.list", "events.pages");
         case "PUT lenses" -> Set.of("ensureLens", "ensureLenses");
         case "GET lenses" -> Set.of("lenses.list", "lenses.iterate");
         case "POST lenses" -> Set.of("lenses.create");
+        case "GET upload-presets" -> Set.of("uploadPresets.list", "uploadPresets.iterate");
+        case "PUT upload-presets" -> Set.of("uploadPresets.ensure");
+        case "GET settings" -> Set.of("projectSettings.get");
+        case "PUT settings" -> Set.of("projectSettings.update");
+        case "GET metadata-fields" -> Set.of("metadataFields.list");
+        case "PUT metadata-fields" -> Set.of("metadataFields.ensure");
         case "GET folders" -> Set.of("folders.list", "folders.iterate");
         case "POST folders" -> Set.of("folders.create");
         case "GET hash-lists" -> Set.of("hashLists.list", "hashLists.iterate");
@@ -260,6 +271,7 @@ final class MockApi {
       case "lenses GET " -> Set.of("lenses.retrieve");
       case "lenses PATCH " -> Set.of("lenses.update");
       case "lenses DELETE " -> Set.of("lenses.delete");
+      case "upload-presets DELETE " -> Set.of("uploadPresets.delete");
       case "hash-lists POST entries" -> Set.of("hashLists.addEntry");
       case "hash-list-entries DELETE " -> Set.of("hashLists.removeEntry");
       default -> Set.of();
@@ -476,6 +488,12 @@ final class MockApi {
         case "PUT lenses": return putLenses(body);
         case "GET lenses": return page(new ArrayList<>(lenses.values()), q, Json.write(new JsonPrimitive(projectId + "/lenses")), null);
         case "POST lenses": return createLens(body);
+        case "GET upload-presets": return page(new ArrayList<>(configuredPresets.values()), q, Json.write(new JsonPrimitive(projectId + "/upload-presets")), clause("createdAt", "asc"));
+        case "PUT upload-presets": return ensureUploadPresets(body, now);
+        case "GET settings": return toProjectSettings();
+        case "PUT settings": return updateProjectSettings(body);
+        case "GET metadata-fields": return toMetadataFields();
+        case "PUT metadata-fields": return ensureMetadataFields(body);
         case "GET folders": return listFolders(q);
         case "POST folders": return createFolder(body, now);
         case "GET hash-lists": return page(projectHashLists(), q, Json.write(new JsonPrimitive(projectId + "/hash-lists")), null);
@@ -502,6 +520,8 @@ final class MockApi {
       }
       if (parts.size() == 5 && parts.get(2).equals("assets") && parts.get(4).equals("timeline") && method.equals("GET"))
         return timeline(asset(parts.get(3)), q);
+      if (parts.size() == 4 && parts.get(2).equals("metadata-fields") && method.equals("DELETE"))
+        return deleteMetadataField(parts.get(3), q);
     } else if (parts.get(0).equals("policies") && parts.size() == 1) {
       if (method.equals("GET")) return listPolicies(q);
       if (method.equals("POST")) return createPolicy(body, now);
@@ -512,6 +532,7 @@ final class MockApi {
       if (parts.get(0).equals("hash-lists")) return hashListRoute(method, parts.get(1), suffix, q, body, now);
       if (parts.get(0).equals("policies")) return policyRoute(method, parts.get(1), suffix, body, now);
       if (parts.get(0).equals("lenses") && parts.size() == 2) return lensRoute(method, parts.get(1), body);
+      if (parts.get(0).equals("upload-presets") && parts.size() == 2 && method.equals("DELETE")) return deleteUploadPreset(parts.get(1));
       if (parts.get(0).equals("hash-list-entries") && parts.size() == 2 && method.equals("DELETE")) {
         JsonObject entry = storage.hashListEntries.get(parts.get(1));
         if (entry == null || !projectId.equals(str(entry, "projectId"))) throw new Failure(ErrorCodes.HASH_LIST_ENTRY_NOT_FOUND, "Hash list entry not found");
@@ -1963,6 +1984,204 @@ final class MockApi {
       return "[" + String.join(",", items) + "]";
     }
     return Json.write(value);
+  }
+
+  // ------------------------------------------------------------------ Configuration
+  // Upload presets, project settings and metadata fields. Settings and fields share one revision.
+
+  private final Map<String, JsonObject> configuredPresets = new LinkedHashMap<>();
+  private long settingsRevision = 1;
+  private JsonObject projectSettingsValues = new JsonObject();
+  private List<JsonObject> metadataFieldList = new ArrayList<>();
+
+  /** The objects in {@code body[key]}, refused like the API's schema when there are none. */
+  private static List<JsonObject> definitions(JsonObject body, String key) throws Failure {
+    List<JsonObject> items = new ArrayList<>();
+    JsonElement value = body.get(key);
+    if (value != null && value.isJsonArray())
+      for (JsonElement item : value.getAsJsonArray()) {
+        if (!item.isJsonObject()) throw Failure.validation("validation/invalid-type", key + "." + items.size());
+        items.add(item.getAsJsonObject());
+      }
+    if (items.isEmpty()) throw Failure.validation("validation/too-small", key);
+    return items;
+  }
+
+  private static JsonElement orNull(JsonObject object, String key) {
+    JsonElement value = object.get(key);
+    return value == null ? JsonNull.INSTANCE : value.deepCopy();
+  }
+
+  private static JsonElement orDefault(JsonObject object, String key, JsonElement fallback) {
+    JsonElement value = object.get(key);
+    return value == null || value.isJsonNull() ? fallback : value.deepCopy();
+  }
+
+  /** A preset's list without repeats, with null for an empty or missing one. */
+  private static JsonElement distinctList(JsonElement value) {
+    if (value == null || !value.isJsonArray() || value.getAsJsonArray().isEmpty()) return JsonNull.INSTANCE;
+    JsonArray distinct = new JsonArray();
+    new java.util.LinkedHashSet<>(value.getAsJsonArray().asList()).forEach(distinct::add);
+    return distinct;
+  }
+
+  /** Whether a revision the caller sent, in a body or a query, is the given one. */
+  private static boolean sameRevision(JsonElement sent, long current) {
+    return sent.isJsonPrimitive() && sent.getAsString().equals(String.valueOf(current));
+  }
+
+  /** Like the API: every preset's revision and settings are checked before any is saved. */
+  private JsonObject ensureUploadPresets(JsonObject body, long now) throws Failure {
+    List<JsonObject> plans = new ArrayList<>();
+    List<JsonObject> definitions = definitions(body, "uploadPresets");
+    for (int index = 0; index < definitions.size(); index++) {
+      JsonObject definition = definitions.get(index);
+      String key = str(definition, "key");
+      if (key == null || key.isEmpty()) throw Failure.validation("validation/invalid-type", "uploadPresets." + index + ".key");
+      String name = str(definition, "name");
+      if (name == null || name.isEmpty()) throw Failure.validation("validation/invalid-type", "uploadPresets." + index + ".name");
+      JsonObject existing = configuredPresets.get(key);
+      long current = existing == null ? 0 : existing.get("revision").getAsLong();
+      JsonElement revision = definition.get("revision");
+      if (revision != null && !sameRevision(revision, current)) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("key", key);
+        details.put("revision", current);
+        throw Failure.of(ErrorCodes.UPLOAD_PRESET_REVISION_CONFLICT, details);
+      }
+      JsonObject values = new JsonObject();
+      values.addProperty("key", key);
+      values.addProperty("name", name);
+      values.add("access", orDefault(definition, "access", new JsonPrimitive("token")));
+      values.add("enabled", orDefault(definition, "enabled", new JsonPrimitive(true)));
+      values.add("allowedContentTypes", distinctList(definition.get("allowedContentTypes")));
+      values.add("maxSizeInBytes", orNull(definition, "maxSizeInBytes"));
+      values.add("folderId", orNull(definition, "folderId"));
+      values.add("policyId", orNull(definition, "policyId"));
+      values.add("visibility", orDefault(definition, "visibility", new JsonPrimitive("private")));
+      values.add("processingOptions", orNull(definition, "processingOptions"));
+      values.add("revealDecision", orDefault(definition, "revealDecision", new JsonPrimitive(false)));
+      values.add("dailyUploadLimit", orNull(definition, "dailyUploadLimit"));
+      values.add("allowedOrigins", distinctList(definition.get("allowedOrigins")));
+      JsonElement limit = values.get("dailyUploadLimit");
+      if ("anyone".equals(str(values, "access")) && (limit.isJsonNull() || limit.getAsDouble() == 0))
+        throw new Failure(ErrorCodes.UPLOAD_PRESET_DAILY_LIMIT_REQUIRED);
+      plans.add(values);
+    }
+    JsonArray saved = new JsonArray();
+    for (JsonObject values : plans) {
+      JsonObject existing = configuredPresets.get(str(values, "key"));
+      if (existing != null && values.keySet().stream().allMatch(field -> canonical(values.get(field)).equals(canonical(existing.get(field))))) {
+        saved.add(existing);
+        continue;
+      }
+      JsonObject preset = new JsonObject();
+      preset.addProperty("id", existing == null ? createId("preset") : str(existing, "id"));
+      preset.addProperty("projectId", projectId);
+      preset.add("createdByUserId", JsonNull.INSTANCE);
+      values.entrySet().forEach(entry -> preset.add(entry.getKey(), entry.getValue()));
+      preset.addProperty("revision", existing == null ? 1 : existing.get("revision").getAsLong() + 1);
+      preset.addProperty("createdAt", existing == null ? now : existing.get("createdAt").getAsLong());
+      preset.addProperty("updatedAt", now);
+      configuredPresets.put(str(values, "key"), preset);
+      saved.add(preset);
+    }
+    JsonObject response = new JsonObject();
+    response.add("uploadPresets", saved);
+    return response;
+  }
+
+  private JsonElement deleteUploadPreset(String id) throws Failure {
+    if (!configuredPresets.values().removeIf(preset -> id.equals(str(preset, "id"))))
+      throw new Failure(ErrorCodes.UPLOAD_PRESET_NOT_FOUND, "Upload preset not found");
+    return null;
+  }
+
+  private JsonObject toProjectSettings() {
+    JsonObject settings = new JsonObject();
+    settings.add("optOutJurisdictions", new JsonArray());
+    settings.addProperty("blockUnmoderatedAssets", true);
+    settings.addProperty("storeSensitiveMetadata", false);
+    settings.addProperty("streamingEnabled", false);
+    settings.addProperty("aiMediaSearchEnabled", false);
+    settings.add("remoteUrlRule", JsonNull.INSTANCE);
+    settings.add("websiteSubmissionsPerMinute", JsonNull.INSTANCE);
+    projectSettingsValues.deepCopy().entrySet().forEach(entry -> settings.add(entry.getKey(), entry.getValue()));
+    JsonObject humanReview = new JsonObject();
+    humanReview.addProperty("allowedSamplePercent", 0);
+    humanReview.addProperty("restrictedSamplePercent", 0);
+    humanReview.addProperty("uncertaintyMarginPercent", 0);
+    humanReview.addProperty("reviewMissingEvidence", false);
+    if (projectSettingsValues.get("humanReview") instanceof JsonObject chosen)
+      chosen.deepCopy().entrySet().forEach(entry -> humanReview.add(entry.getKey(), entry.getValue()));
+    settings.add("humanReview", humanReview);
+    JsonObject resource = new JsonObject();
+    resource.addProperty("projectId", projectId);
+    resource.addProperty("revision", settingsRevision);
+    resource.add("settings", settings);
+    return resource;
+  }
+
+  private void checkSettingsRevision(JsonElement revision) throws Failure {
+    if (revision != null && !revision.isJsonNull() && !sameRevision(revision, settingsRevision))
+      throw new Failure(ErrorCodes.PROJECT_SETTINGS_REVISION_CONFLICT);
+  }
+
+  /** Replaces the settings: those left out return to their defaults. Only a real change takes a new revision. */
+  private JsonObject updateProjectSettings(JsonObject body) throws Failure {
+    checkSettingsRevision(body.get("revision"));
+    if (!(body.get("settings") instanceof JsonObject settings)) throw Failure.validation("validation/invalid-type", "settings");
+    String before = canonical(toProjectSettings().get("settings"));
+    JsonObject previous = projectSettingsValues;
+    projectSettingsValues = settings.deepCopy();
+    if (canonical(toProjectSettings().get("settings")).equals(before)) projectSettingsValues = previous;
+    else settingsRevision += 1;
+    return toProjectSettings();
+  }
+
+  private JsonObject toMetadataFields() {
+    JsonArray fields = new JsonArray();
+    metadataFieldList.forEach(field -> fields.add(field.deepCopy()));
+    JsonObject resource = new JsonObject();
+    resource.addProperty("projectId", projectId);
+    resource.addProperty("revision", settingsRevision);
+    resource.add("fields", fields);
+    return resource;
+  }
+
+  /** Creates or replaces fields by ID, keeping the others in order. */
+  private JsonObject ensureMetadataFields(JsonObject body) throws Failure {
+    checkSettingsRevision(body.get("revision"));
+    List<JsonObject> fields = definitions(body, "fields");
+    Map<String, JsonObject> byId = new HashMap<>();
+    fields.forEach(field -> byId.put(str(field, "id"), field));
+    Set<String> known = new HashSet<>();
+    List<JsonObject> merged = new ArrayList<>();
+    for (JsonObject field : metadataFieldList) {
+      known.add(str(field, "id"));
+      merged.add(byId.getOrDefault(str(field, "id"), field));
+    }
+    for (JsonObject field : fields) if (!known.contains(str(field, "id"))) merged.add(field);
+    JsonArray before = new JsonArray(), after = new JsonArray();
+    metadataFieldList.forEach(before::add);
+    merged.forEach(after::add);
+    if (!canonical(after).equals(canonical(before))) {
+      metadataFieldList = merged;
+      settingsRevision += 1;
+    }
+    return toMetadataFields();
+  }
+
+  private JsonObject deleteMetadataField(String fieldId, JsonObject q) throws Failure {
+    if (metadataFieldList.stream().noneMatch(field -> fieldId.equals(str(field, "id")))) {
+      Map<String, Object> details = new LinkedHashMap<>();
+      details.put("fieldId", fieldId);
+      throw Failure.of(ErrorCodes.METADATA_FIELD_NOT_FOUND, details);
+    }
+    checkSettingsRevision(q.get("revision"));
+    metadataFieldList.removeIf(field -> fieldId.equals(str(field, "id")));
+    settingsRevision += 1;
+    return toMetadataFields();
   }
 
   // ------------------------------------------------------------------ Policies

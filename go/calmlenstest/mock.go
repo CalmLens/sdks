@@ -161,6 +161,7 @@ type MockServerClient struct {
 	cdnPath         string
 	lenses          map[string]calmlens.JSON
 	policies        policyStore
+	config          configurationStore
 	uploads         map[string]*upload
 	events          []calmlens.JSON
 	// assetSequences is each asset's latest event assetSequence, which the API keeps on the asset.
@@ -641,7 +642,7 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 	if images.Content == nil {
 		images.Content = map[string]*StoredContent{}
 	}
-	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}, assetSequences: map[string]int64{}, processingOptions: map[string]calmlens.JSON{}, reruns: map[string]bool{}}
+	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}, assetSequences: map[string]int64{}, processingOptions: map[string]calmlens.JSON{}, reruns: map[string]bool{}, config: newConfigurationStore()}
 	client, err := calmlens.NewServerClient(calmlens.Options{APIKey: options.APIKey, ProjectID: options.ProjectID, BaseURL: options.BaseURL, CDNBaseURL: options.CDNBaseURL, Timeout: options.Timeout, UploadTimeout: options.UploadTimeout, MaxRetries: options.MaxRetries, MaxResponseBytes: options.MaxResponseBytes, PartSizeBytes: options.PartSizeBytes, HTTPClient: &http.Client{Transport: transport{mock}}})
 	if err != nil {
 		return nil, err
@@ -891,6 +892,20 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 			return []string{"hashLists.list", "hashLists.iterate"}
 		case route == "hash-lists":
 			return []string{"hashLists.create"}
+		case route == "upload-presets" && method == "GET":
+			return []string{"uploadPresets.list", "uploadPresets.iterate"}
+		case route == "upload-presets":
+			return []string{"uploadPresets.ensure"}
+		case route == "settings" && method == "GET":
+			return []string{"projectSettings.get"}
+		case route == "settings":
+			return []string{"projectSettings.update"}
+		case route == "metadata-fields" && method == "GET":
+			return []string{"metadataFields.list"}
+		case route == "metadata-fields":
+			return []string{"metadataFields.ensure"}
+		case len(parts) == 4 && parts[2] == "metadata-fields":
+			return []string{"metadataFields.delete"}
 		case route == "policy" && method == "GET":
 			return []string{"policies.retrieveAssigned"}
 		case route == "policy":
@@ -942,6 +957,8 @@ func operationsOf(method string, parts []string, q url.Values, cdn bool) []strin
 		return []string{"lenses.update"}
 	case parts[0] == "lenses":
 		return []string{"lenses.delete"}
+	case parts[0] == "upload-presets" && len(parts) == 2:
+		return []string{"uploadPresets.delete"}
 	case parts[0] == "hash-list-entries":
 		return []string{"hashLists.removeEntry"}
 	case parts[0] == "hash-lists" && suffix == "entries" && method == "GET":
@@ -1004,7 +1021,9 @@ var mockOperations = []string{
 	"policies.create", "policies.update", "policies.reset", "policies.upgrade",
 	"policies.setAutomaticUpdates", "policies.delete", "policies.retrieveAssigned",
 	"policies.assign", "lenses.list", "lenses.iterate", "lenses.create", "lenses.retrieve",
-	"lenses.update", "lenses.delete", "ensureLens", "ensureLenses",
+	"lenses.update", "lenses.delete", "ensureLens", "ensureLenses", "uploadPresets.list",
+	"uploadPresets.iterate", "uploadPresets.ensure", "uploadPresets.delete", "projectSettings.get",
+	"projectSettings.update", "metadataFields.list", "metadataFields.ensure", "metadataFields.delete",
 }
 
 // jsonResponse encodes result, or err as the API's error body and status.
@@ -1207,6 +1226,20 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 			return m.createLens(body, now)
 		case route == "policy":
 			return m.projectPolicyRoute(method, body)
+		case route == "upload-presets" && method == "GET":
+			return m.listUploadPresets(q)
+		case route == "upload-presets" && method == "PUT":
+			return m.ensureUploadPresets(body, now)
+		case route == "settings" && method == "GET":
+			return m.projectSettings(), nil
+		case route == "settings" && method == "PUT":
+			return m.updateProjectSettings(body)
+		case route == "metadata-fields" && method == "GET":
+			return m.metadataFields(), nil
+		case route == "metadata-fields" && method == "PUT":
+			return m.ensureMetadataFields(body)
+		case len(parts) == 4 && parts[2] == "metadata-fields" && method == "DELETE":
+			return m.deleteMetadataField(parts[3], q)
 		case route == "folders" && method == "GET":
 			return m.listFolders(q)
 		case route == "folders" && method == "POST":
@@ -1244,6 +1277,8 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 		return m.hashListRoute(method, id, suffix, body, q, now)
 	case "lenses":
 		return m.lensRoute(method, id, suffix, body, now)
+	case "upload-presets":
+		return m.uploadPresetRoute(method, id, suffix)
 	case "hash-list-entries":
 		entry := m.DatabaseStorage.HashListEntries[id]
 		if method != "DELETE" || suffix != "" {

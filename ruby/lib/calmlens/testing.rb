@@ -84,6 +84,9 @@ module CalmLens
                    policies: %i[list retrieve retrieve_assigned create update reset upgrade set_automatic_updates delete
                                 assign],
                    lenses: %i[list create retrieve update delete],
+                   upload_presets: %i[list ensure delete],
+                   project_settings: %i[get update],
+                   metadata_fields: %i[list ensure delete],
                    text: %i[classify], events: %i[list],
                    cdn: %i[serve sign_asset_url get_asset_info] }.freeze
     private_constant :OPERATIONS

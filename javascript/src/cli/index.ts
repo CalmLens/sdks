@@ -1,8 +1,17 @@
+import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { version } from "../../package.json";
 import { CLASSIFICATION_CATEGORIES } from "../contract/ModerationCategories.js";
 import { CalmLensError, CalmLensServerClient } from "../server";
 import { generateTestTextCode, TEST_INPUT_KEY_PATTERN } from "../test-inputs";
+import {
+  applyConfiguration,
+  ConfigurationError,
+  formatPlan,
+  parseConfiguration,
+  planConfiguration,
+  readConfigurationState,
+} from "./configuration";
 import { createLocalSigningSecret, describeEventTypes, listen, unavailableWarning } from "./listen";
 import { credentialsPath, DEFAULT_API_URL, login, logout, readCredentials } from "./login";
 
@@ -13,6 +22,8 @@ Usage:
   calmlens logout
   calmlens listen --forward-to <url> [options]
   calmlens trigger [sexual|violence|self-harm|harassment|hate|criminal-activity|clean] [options]
+  calmlens plan [--config <path>] [--prune]
+  calmlens apply [--config <path>] [--prune]
 
 Install it with \`brew install calmlens/sdks/calmlens\` (after
 \`brew tap calmlens/sdks https://github.com/CalmLens/sdks\`), the install script at
@@ -33,6 +44,12 @@ Commands:
   trigger   Moderate a harmless test comment so CalmLens creates real events. Each trigger
             counts as one upload. Test comments other than clean are signed with the
             project's test input key (Project settings → Test inputs in the portal).
+  plan      Compare calmlens.config.json with the project: its policies (by name, with the
+            project's policy), upload presets (by key), lenses (by identifier), metadata
+            fields (by ID) and settings. Prints what apply would change and changes nothing.
+  apply     Make the changes plan prints. Each is sent with the revision just read, so a
+            change made meanwhile in the portal or by another deploy is refused, not lost.
+            See https://calmlens.com/docs/guides/configuration-as-code.
 
 Options:
   --forward-to <url>     Local webhook URL, e.g. http://localhost:3000/api/webhooks/calmlens
@@ -45,6 +62,9 @@ Options:
   --test-key <key>       Project's test input key, for trigger (default: $CALMLENS_TEST_INPUT_KEY)
   --env-file <path>      Load environment variables from a file, e.g. .env.local
   --interval <seconds>   Seconds between checks for new events (default: 2)
+  --config <path>        For plan and apply: the configuration file (default: calmlens.config.json)
+  --prune                For plan and apply: also delete upload presets, lenses and metadata
+                         fields the file doesn't list (never policies)
   --api-url <url>        API base URL (default: $CALMLENS_API_URL or https://api.calmlens.com/v1)
   -v, --version          Show the CLI version
   -h, --help             Show this help
@@ -78,6 +98,8 @@ const main = async () => {
       interval: { type: "string" },
       "api-url": { type: "string" },
       "read-only": { type: "boolean" },
+      config: { type: "string" },
+      prune: { type: "boolean" },
       "no-browser": { type: "boolean" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
@@ -230,6 +252,39 @@ const main = async () => {
       );
     } catch (error) {
       fail(`Trigger failed: ${describeError(error)}`);
+    }
+    return;
+  }
+
+  if (command === "plan" || command === "apply") {
+    const path = values.config ?? "calmlens.config.json";
+    let text: string;
+    try {
+      text = await readFile(path, "utf8");
+    } catch {
+      return fail(`Couldn't read ${path}. Pass --config <path> to use another file.`);
+    }
+    try {
+      const config = parseConfiguration(text, path);
+      const state = await readConfigurationState(client, config);
+      const plan = planConfiguration(config, state, { prune: Boolean(values.prune) });
+      process.stdout.write(formatPlan(plan));
+      if (command === "apply" && plan.changes.length) {
+        await applyConfiguration(client, config, state, plan, (line) =>
+          process.stdout.write(`${line}\n`),
+        );
+        process.stdout.write("Applied.\n");
+      }
+    } catch (error) {
+      if (error instanceof CalmLensError && error.code.endsWith("/revision-conflict"))
+        fail(
+          `${describeError(error)}\nSomething changed since it was read. Run \`calmlens ${command}\` again to see the latest differences.`,
+        );
+      fail(
+        error instanceof ConfigurationError
+          ? error.message
+          : `${command === "apply" ? "Apply" : "Plan"} failed: ${describeError(error)}`,
+      );
     }
     return;
   }

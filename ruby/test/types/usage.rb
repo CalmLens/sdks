@@ -121,6 +121,20 @@ client.policies.set_automatic_updates(policy_id: policy['id'], enabled: false, r
                                       preset_version: policy['preset']&.fetch('latestVersion') || 1)
 client.policies.assign(policy_id: kids['id'])
 client.policies.delete(policy_id: custom['id'])
+upload_presets = client.upload_presets.ensure(
+  upload_presets: [{ key: 'avatars', name: 'Avatars', revision: 0, allowed_content_types: ['image/*'], folder_id: nil }]
+)
+avatars = upload_presets['uploadPresets'].first
+client.upload_presets.list(page_size: 10, sort: '-createdAt')['items'].map { |item| item['key'] }
+client.upload_presets.each { |item| item['revision'] }
+client.upload_presets.delete(upload_preset_id: avatars&.fetch('id') || 'preset-1')
+project_settings = client.project_settings.get
+client.project_settings.update(revision: project_settings['revision'], settings: { block_unmoderated_assets: false, remote_url_rule: nil })
+client.project_settings.update(settings: { ai_media_search_enabled: true }, search_indexing_budget_units: 120)
+sampled_percent = project_settings['settings']['humanReview']['allowedSamplePercent']
+fields = client.metadata_fields.ensure(fields: [{ id: 'userId', title: 'User', type: 'string', icon: 'user', color: '#2563eb' }])
+client.metadata_fields.list['fields'].map { |field| field['id'] }
+client.metadata_fields.delete(field_id: 'userId', revision: fields['revision'])
 token = client.upload_tokens.sign(upload_preset_id: 'preset-1', external_id: 'post-42', expires_in: 120)['token']
 
 url = client.cdn.get_asset_url(asset_id: 'post-1', resource: 'preview', lens: lens['identifier'], viewer_claims: { age_confirmed: true })

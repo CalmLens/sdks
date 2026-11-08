@@ -62,6 +62,9 @@ final class OptionKeys
         'lenses.list' => ['cursor', 'pageSize', 'sort'],
         'lenses.retrieve' => ['lensId'],
         'lenses.update' => ['active', 'description', 'lensId', 'name', 'transform', 'type'],
+        'metadataFields.delete' => ['fieldId', 'revision'],
+        'metadataFields.ensure' => ['fields', 'revision'],
+        'metadataFields.list' => [],
         'policies.assign' => ['policyId'],
         'policies.create' => ['description', 'name', 'presetId', 'settings'],
         'policies.delete' => ['policyId'],
@@ -73,7 +76,13 @@ final class OptionKeys
         'policies.setAutomaticUpdates' => ['enabled', 'policyId', 'presetVersion', 'revision'],
         'policies.update' => ['description', 'name', 'policyId', 'revision', 'settings'],
         'policies.upgrade' => ['policyId', 'presetVersion', 'revision'],
+        'projectSettings.get' => [],
+        'projectSettings.update' => ['revision', 'searchIndexingBudgetUnits', 'settings'],
         'text.classify' => ['authorId', 'context', 'description', 'externalId', 'externalUrl', 'folderId', 'metadata', 'name', 'processingOptions', 'tags', 'text', 'uploadPresetId', 'visibility'],
+        'uploadPresets.delete' => ['uploadPresetId'],
+        'uploadPresets.each' => ['cursor', 'pageSize', 'sort'],
+        'uploadPresets.ensure' => ['uploadPresets'],
+        'uploadPresets.list' => ['cursor', 'pageSize', 'sort'],
     ];
 
     /**

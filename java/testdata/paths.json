@@ -167,6 +167,20 @@
         "lensId": "."
       },
       "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "uploadPresets.delete",
+      "options": {
+        "uploadPresetId": ".."
+      },
+      "error": "sdk/invalid-argument"
+    },
+    {
+      "operation": "metadataFields.delete",
+      "options": {
+        "fieldId": "."
+      },
+      "error": "sdk/invalid-argument"
     }
   ],
   "cdnUrls": [

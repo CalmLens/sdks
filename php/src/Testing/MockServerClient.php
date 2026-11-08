@@ -119,7 +119,9 @@ final class MockServerClient
         'hashLists.addEntry', 'hashLists.removeEntry', 'policies.list', 'policies.each', 'policies.retrieve', 'policies.create',
         'policies.update', 'policies.reset', 'policies.upgrade', 'policies.setAutomaticUpdates', 'policies.delete',
         'policies.retrieveAssigned', 'policies.assign', 'lenses.list', 'lenses.each', 'lenses.create', 'lenses.retrieve',
-        'lenses.update', 'lenses.delete', 'ensureLens', 'ensureLenses'];
+        'lenses.update', 'lenses.delete', 'ensureLens', 'ensureLenses', 'uploadPresets.list', 'uploadPresets.each',
+        'uploadPresets.ensure', 'uploadPresets.delete', 'projectSettings.get', 'projectSettings.update', 'metadataFields.list',
+        'metadataFields.ensure', 'metadataFields.delete'];
     private const ACTIVE_CONTENT_TYPES = ['image/svg+xml', 'application/xhtml+xml', 'text/html', 'application/xml', 'text/xml'];
 
     /** @var array<string, array> Assets by ID, with the API's field names. Change them to arrange a test. */
@@ -138,6 +140,14 @@ final class MockServerClient
     private array $assetEventSequences = [];
     /** @var array<string, array> Lenses by identifier. */
     public array $lenses = [];
+    /** @var array<string, array> Upload presets by key, oldest first. */
+    public array $uploadPresets = [];
+    /** The revision the project settings and metadata fields share. */
+    private int $settingsRevision = 1;
+    /** The settings last saved, without the defaults `toProjectSettings` fills in. */
+    private array $projectSettingsValues = [];
+    /** @var list<array> The project's metadata field definitions, in order. */
+    private array $metadataFieldList = [];
 
     private ServerClient $client;
     private array $queue = [];
@@ -473,6 +483,9 @@ final class MockServerClient
             if (self::isTimelineRoute($method, $parts)) {
                 return ['assets.listTimeline', 'assets.eachTimelineSegment'];
             }
+            if ($method === 'DELETE' && ($parts[2] ?? null) === 'metadata-fields' && count($parts) === 4) {
+                return ['metadataFields.delete'];
+            }
             $route = $method . ' ' . implode('/', array_slice($parts, 2));
             return match ($route) {
                 'GET events' => ['events.list'],
@@ -485,6 +498,12 @@ final class MockServerClient
                 'POST hash-lists' => ['hashLists.create'],
                 'GET policy' => ['policies.retrieveAssigned'],
                 'PUT policy' => ['policies.assign'],
+                'GET upload-presets' => ['uploadPresets.list', 'uploadPresets.each'],
+                'PUT upload-presets' => ['uploadPresets.ensure'],
+                'GET settings' => ['projectSettings.get'],
+                'PUT settings' => ['projectSettings.update'],
+                'GET metadata-fields' => ['metadataFields.list'],
+                'PUT metadata-fields' => ['metadataFields.ensure'],
                 'GET assets' => ['assets.list', 'assets.each'],
                 'GET assets/search' => ['assets.search'],
                 'POST assets/batch' => ['assets.batch'],
@@ -501,6 +520,9 @@ final class MockServerClient
                     'PUT automatic-updates' => 'setAutomaticUpdates'][$method . ' ' . $suffix] ?? null
                 : ['GET' => 'list', 'POST' => 'create'][$method] ?? null;
             return $name === null ? [] : ($name === 'list' ? ['policies.list', 'policies.each'] : ["policies.$name"]);
+        }
+        if ($resource === 'upload-presets' && isset($parts[1]) && !isset($parts[2])) {
+            return $method === 'DELETE' ? ['uploadPresets.delete'] : [];
         }
         if ($resource === 'lenses' && isset($parts[1]) && !isset($parts[2])) {
             $name = ['GET' => 'retrieve', 'PATCH' => 'update', 'DELETE' => 'delete'][$method] ?? null;
@@ -708,9 +730,19 @@ final class MockServerClient
             if (self::isTimelineRoute($method, $parts)) {
                 return $this->timeline($parts[3], $query);
             }
+            if ($method === 'DELETE' && ($parts[2] ?? null) === 'metadata-fields' && count($parts) === 4) {
+                return $this->deleteMetadataField($parts[3], $query);
+            }
             $route = $method . ' ' . implode('/', array_slice($parts, 2));
             return match (true) {
                 $route === 'GET events' => $this->listEvents($query),
+                $route === 'GET upload-presets' => $this->page($this->uploadPresets, $query, Values::json(['upload-presets', $this->projectId]),
+                    [['field' => 'createdAt', 'direction' => 'asc']]),
+                $route === 'PUT upload-presets' => $this->ensureUploadPresets($json),
+                $route === 'GET settings' => $this->toProjectSettings(),
+                $route === 'PUT settings' => $this->updateProjectSettings($json),
+                $route === 'GET metadata-fields' => $this->toMetadataFields(),
+                $route === 'PUT metadata-fields' => $this->ensureMetadataFields($json),
                 $route === 'PUT lenses' => $this->saveLenses($json['lenses'] ?? []),
                 $route === 'GET lenses' => $this->page($this->lenses, $query, Values::json(['lenses', $this->projectId])),
                 $route === 'POST lenses' => $this->createLens($json),
@@ -740,6 +772,9 @@ final class MockServerClient
         }
         if (($parts[0] ?? null) === 'lenses' && isset($parts[1]) && !isset($parts[2])) {
             return $this->lensRoute($method, $parts[1], $json);
+        }
+        if (($parts[0] ?? null) === 'upload-presets' && isset($parts[1]) && !isset($parts[2]) && $method === 'DELETE') {
+            return $this->deleteUploadPreset($parts[1]);
         }
         if (($parts[0] ?? null) === 'folders' && isset($parts[1])) {
             return $this->folderRoute($method, $parts[1], $parts[2] ?? '', $json);
@@ -2416,6 +2451,169 @@ final class MockServerClient
                 return null;
         }
         throw new \LogicException("MockServerClient does not emulate $method /lenses/$id; enqueue a response for it");
+    }
+
+    // Configuration: upload presets, project settings and metadata fields, like the API's.
+
+    /** The API's defaults for the project settings. */
+    private const DEFAULT_PROJECT_SETTINGS = ['optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true, 'storeSensitiveMetadata' => false,
+        'streamingEnabled' => false, 'aiMediaSearchEnabled' => false, 'remoteUrlRule' => null, 'websiteSubmissionsPerMinute' => null];
+    private const DEFAULT_HUMAN_REVIEW = ['allowedSamplePercent' => 0, 'restrictedSamplePercent' => 0, 'uncertaintyMarginPercent' => 0,
+        'reviewMissingEvidence' => false];
+
+    private static function sameJson(mixed $a, mixed $b): bool
+    {
+        return Values::json(Values::canonical($a)) === Values::json(Values::canonical($b));
+    }
+
+    /**
+     * Creates or replaces each preset by key, like the API: every preset's revision (0 for one that
+     * must not exist) and settings are checked before any is saved, fields left out return to their
+     * defaults, and an unchanged preset keeps its revision.
+     */
+    private function ensureUploadPresets(array $json): array
+    {
+        $definitions = $json['uploadPresets'] ?? null;
+        if (!is_array($definitions) || !array_is_list($definitions) || $definitions === []) {
+            self::invalid('validation/too-small', 'uploadPresets');
+        }
+        $list = fn (mixed $value): ?array => is_array($value) && $value !== [] ? array_values(array_unique($value)) : null;
+        $plans = [];
+        foreach ($definitions as $index => $definition) {
+            if (!is_array($definition) || !is_string($definition['key'] ?? null) || $definition['key'] === '') {
+                self::invalid('validation/invalid-type', "uploadPresets.$index.key");
+            }
+            if (!is_string($definition['name'] ?? null) || $definition['name'] === '') {
+                self::invalid('validation/invalid-type', "uploadPresets.$index.name");
+            }
+            $existing = $this->uploadPresets[$definition['key']] ?? null;
+            if (array_key_exists('revision', $definition) && $definition['revision'] !== ($existing['revision'] ?? 0)) {
+                self::fail(ErrorCodes::UPLOAD_PRESET_REVISION_CONFLICT, null, 'The upload preset changed since you read it.',
+                    ['key' => $definition['key'], 'revision' => $existing['revision'] ?? 0]);
+            }
+            $values = [
+                'key' => $definition['key'],
+                'name' => $definition['name'],
+                'access' => $definition['access'] ?? 'token',
+                'enabled' => $definition['enabled'] ?? true,
+                'allowedContentTypes' => $list($definition['allowedContentTypes'] ?? null),
+                'maxSizeInBytes' => $definition['maxSizeInBytes'] ?? null,
+                'folderId' => $definition['folderId'] ?? null,
+                'policyId' => $definition['policyId'] ?? null,
+                'visibility' => $definition['visibility'] ?? 'private',
+                'processingOptions' => $definition['processingOptions'] ?? null,
+                'revealDecision' => $definition['revealDecision'] ?? false,
+                'dailyUploadLimit' => $definition['dailyUploadLimit'] ?? null,
+                'allowedOrigins' => $list($definition['allowedOrigins'] ?? null),
+            ];
+            if ($values['access'] === 'anyone' && !$values['dailyUploadLimit']) {
+                self::fail(ErrorCodes::UPLOAD_PRESET_DAILY_LIMIT_REQUIRED, null, 'A preset anyone can upload through needs a daily upload limit.');
+            }
+            $plans[] = [$existing, $values];
+        }
+        $saved = [];
+        foreach ($plans as [$existing, $values]) {
+            if ($existing !== null && self::sameJson($values, array_intersect_key($existing, $values))) {
+                $saved[] = $existing;
+                continue;
+            }
+            $now = ($this->now)();
+            $saved[] = $this->uploadPresets[$values['key']] = ['id' => $existing['id'] ?? ($this->createId)('preset'), 'projectId' => $this->projectId,
+                'createdByUserId' => null] + $values + ['revision' => ($existing['revision'] ?? 0) + 1, 'createdAt' => $existing['createdAt'] ?? $now,
+                'updatedAt' => $now];
+        }
+        return ['uploadPresets' => $saved];
+    }
+
+    private function deleteUploadPreset(string $id): ?array
+    {
+        foreach ($this->uploadPresets as $key => $preset) {
+            if ($preset['id'] === $id) {
+                unset($this->uploadPresets[$key]);
+                return null;
+            }
+        }
+        self::fail(ErrorCodes::UPLOAD_PRESET_NOT_FOUND, null, 'Upload preset not found.');
+    }
+
+    /** The project settings with the API's defaults filled in. */
+    private function toProjectSettings(): array
+    {
+        $values = $this->projectSettingsValues;
+        $humanReview = is_array($values['humanReview'] ?? null) ? $values['humanReview'] : [];
+        return ['projectId' => $this->projectId, 'revision' => $this->settingsRevision,
+            'settings' => array_replace(self::DEFAULT_PROJECT_SETTINGS, $values, ['humanReview' => array_replace(self::DEFAULT_HUMAN_REVIEW, $humanReview)])];
+    }
+
+    /** Refuses a stale `revision` with `project-settings/revision-conflict`; none skips the check. */
+    private function checkSettingsRevision(mixed $revision): void
+    {
+        if ($revision !== null && (!is_numeric($revision) || (float) $revision !== (float) $this->settingsRevision)) {
+            self::fail(ErrorCodes::PROJECT_SETTINGS_REVISION_CONFLICT, null, 'The project settings changed since you read them.');
+        }
+    }
+
+    /** Replaces the settings: those left out return to their defaults. Only a real change bumps the revision. */
+    private function updateProjectSettings(array $json): array
+    {
+        $this->checkSettingsRevision($json['revision'] ?? null);
+        $settings = $json['settings'] ?? null;
+        if (!is_array($settings) || ($settings !== [] && array_is_list($settings))) {
+            self::invalid('validation/invalid-type', 'settings');
+        }
+        $before = $this->toProjectSettings()['settings'];
+        $previous = $this->projectSettingsValues;
+        $this->projectSettingsValues = $settings;
+        if (self::sameJson($this->toProjectSettings()['settings'], $before)) {
+            $this->projectSettingsValues = $previous;
+        } else {
+            $this->settingsRevision++;
+        }
+        return $this->toProjectSettings();
+    }
+
+    private function toMetadataFields(): array
+    {
+        return ['projectId' => $this->projectId, 'revision' => $this->settingsRevision, 'fields' => $this->metadataFieldList];
+    }
+
+    /** Creates or replaces fields by ID, keeping the others in order. */
+    private function ensureMetadataFields(array $json): array
+    {
+        $this->checkSettingsRevision($json['revision'] ?? null);
+        $fields = $json['fields'] ?? null;
+        if (!is_array($fields) || !array_is_list($fields) || $fields === []) {
+            self::invalid('validation/too-small', 'fields');
+        }
+        $byId = [];
+        foreach ($fields as $index => $field) {
+            if (!is_array($field) || !is_string($field['id'] ?? null)) {
+                self::invalid('validation/invalid-type', "fields.$index.id");
+            }
+            $byId[$field['id']] = $field;
+        }
+        $merged = [];
+        foreach ($this->metadataFieldList as $field) {
+            $merged[] = $byId[$field['id']] ?? $field;
+            unset($byId[$field['id']]);
+        }
+        $merged = [...$merged, ...array_values($byId)];
+        if (!self::sameJson($merged, $this->metadataFieldList)) {
+            $this->metadataFieldList = $merged;
+            $this->settingsRevision++;
+        }
+        return $this->toMetadataFields();
+    }
+
+    private function deleteMetadataField(string $fieldId, array $query): array
+    {
+        if (!in_array($fieldId, array_column($this->metadataFieldList, 'id'), true)) {
+            self::fail(ErrorCodes::METADATA_FIELD_NOT_FOUND, null, 'Metadata field not found.', ['fieldId' => $fieldId]);
+        }
+        $this->checkSettingsRevision($query['revision'] ?? null);
+        $this->metadataFieldList = array_values(array_filter($this->metadataFieldList, fn (array $field) => $field['id'] !== $fieldId));
+        $this->settingsRevision++;
+        return $this->toMetadataFields();
     }
 
     private function canDownload(?string $folderId): bool

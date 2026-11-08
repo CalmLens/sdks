@@ -106,6 +106,14 @@ declare const PUBLIC_ERROR_CODES: {
   readonly UPLOAD_PRESET_DAILY_LIMIT_REACHED: RequestErrorCode;
   readonly UPLOAD_PRESET_ORIGIN_NOT_ALLOWED: RequestErrorCode;
   readonly UPLOAD_PRESET_FIELD_NOT_ALLOWED: RequestErrorCode;
+  readonly UPLOAD_PRESET_REVISION_CONFLICT: RequestErrorCode;
+  readonly UPLOAD_PRESET_KEY_TAKEN: RequestErrorCode;
+  readonly UPLOAD_PRESET_DAILY_LIMIT_REQUIRED: RequestErrorCode;
+  readonly UPLOAD_PRESET_INVALID_FOLDER: RequestErrorCode;
+  readonly UPLOAD_PRESET_INVALID_POLICY: RequestErrorCode;
+  readonly PROJECT_SETTINGS_REVISION_CONFLICT: RequestErrorCode;
+  readonly SEARCH_ESTIMATE_CHANGED: RequestErrorCode;
+  readonly METADATA_FIELD_NOT_FOUND: RequestErrorCode;
   readonly UPLOAD_TOKEN_INVALID: RequestErrorCode;
   readonly UPLOAD_TOKEN_EXPIRED: RequestErrorCode;
   readonly UPLOAD_TOKEN_USED: RequestErrorCode;

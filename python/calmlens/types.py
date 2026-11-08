@@ -63,6 +63,7 @@ __all__ = [
     "Policy", "PolicyPage", "ListPoliciesOptions", "PolicyIdOptions", "CreatePolicyOptions", "UpdatePolicyOptions",
     "ResetPolicyOptions", "UpgradePolicyOptions", "SetPolicyAutomaticUpdatesOptions", "AssignPolicyOptions",
     "LensPage", "ListLensesOptions", "LensIdOptions", "UpdateLensOptions", "EvaluatedOcrResult", "OcrResult",
+    "UploadPreset", "UploadPresetAccess", "UploadPresetPage", "UploadPresetDefinition", "UploadPresetIdOptions", "ListUploadPresetsOptions", "EnsureUploadPresetsOptions", "EnsureUploadPresetsResponse", "OptOutJurisdiction", "RemoteUrlRule", "HumanReviewSettings", "HumanReviewSettingsInput", "PublicProjectSettings", "PublicProjectSettingsInput", "ProjectSettingsResource", "UpdateProjectSettingsOptions", "MetadataFieldType", "MetadataFieldIcon", "MetadataField", "MetadataFieldDefinition", "MetadataFieldsResource", "EnsureMetadataFieldsOptions", "DeleteMetadataFieldOptions",
 ]
 
 # ---- Enum-like values -----------------------------------------------------------------------
@@ -1781,6 +1782,256 @@ class UpdateLensOptions(LensIdOptions, total=False):
 
 class EnsureLensesOptions(TypedDict):
     lenses: list[LensDefinition]
+
+
+# ---- Configuration: upload presets, project settings, metadata fields -----------------------
+
+#: Who can upload through a preset from a browser: ``token`` needs an upload token signed by your
+#: server, ``anyone`` accepts the preset ID alone.
+UploadPresetAccess = Literal["token", "anyone"]
+
+
+class _UploadPresetRequired(TypedDict):
+    id: str
+    projectId: str
+    #: Identifies the preset within its project, for ``upload_presets.ensure``.
+    key: str
+    #: Counts changes to the preset, starting at 1. Send it back with a change, so a change made
+    #: since you read it isn't overwritten.
+    revision: int
+    name: str
+    access: Union[UploadPresetAccess, str]
+    enabled: bool
+    visibility: Union[Visibility, str]
+    #: Whether browser uploads see the moderation decision for their own upload.
+    revealDecision: bool
+    createdAt: int
+    updatedAt: int
+
+
+class UploadPreset(_UploadPresetRequired, total=False):
+    """An upload preset: the rules for uploads made from browsers and apps."""
+    createdByUserId: Optional[str]
+    #: MIME types the preset accepts, such as ``image/*``; ``None`` accepts any supported type.
+    allowedContentTypes: Optional[List[str]]
+    #: Largest upload the preset accepts, in bytes; ``None`` uses the standard upload limits.
+    maxSizeInBytes: Optional[int]
+    folderId: Optional[str]
+    #: Moderation policy for uploads through the preset; ``None`` uses the project's policy.
+    policyId: Optional[str]
+    processingOptions: Optional[ProcessingOptions]
+    #: Most uploads the preset accepts from each client (IP address) per UTC day.
+    dailyUploadLimit: Optional[int]
+    #: Sites allowed to upload from the browser; ``None`` allows any site.
+    allowedOrigins: Optional[List[str]]
+
+
+class UploadPresetPage(TypedDict):
+    """One page of the project's upload presets, oldest first unless ``sort`` says otherwise."""
+    items: List[UploadPreset]
+    hasMore: bool
+    nextCursor: Optional[str]
+
+
+class ListUploadPresetsOptions(TypedDict, total=False):
+    #: The previous page's ``nextCursor``; omit for the first page.
+    cursor: str
+    #: 1 to 100, default 50.
+    pageSize: int
+    #: Comma-separated ``createdAt`` and ``id``, each descending when prefixed with ``-``, such as
+    #: ``"-createdAt,id"``; oldest first by default.
+    sort: str
+
+
+class _UploadPresetDefinitionRequired(TypedDict):
+    key: str
+    name: str
+
+
+class UploadPresetDefinition(_UploadPresetDefinitionRequired, total=False):
+    """One preset's whole definition, by ``key``. Fields left out take their defaults."""
+    #: The ``revision`` you read, or 0 for a preset that must not exist yet. A preset changed since
+    #: is refused with ``upload-preset/revision-conflict``. Omit it to create or replace the preset
+    #: whatever its revision.
+    revision: int
+    #: Defaults to ``token``.
+    access: UploadPresetAccess
+    #: Defaults to True.
+    enabled: bool
+    allowedContentTypes: Optional[List[str]]
+    maxSizeInBytes: Optional[int]
+    folderId: Optional[str]
+    policyId: Optional[str]
+    #: Defaults to ``private``.
+    visibility: Visibility
+    processingOptions: Optional[ProcessingOptions]
+    #: Defaults to False.
+    revealDecision: bool
+    #: Required when ``access`` is ``anyone``.
+    dailyUploadLimit: Optional[int]
+    allowedOrigins: Optional[List[str]]
+
+
+class EnsureUploadPresetsOptions(TypedDict):
+    #: At most 50 presets, each key once.
+    uploadPresets: List[UploadPresetDefinition]
+
+
+class EnsureUploadPresetsResponse(TypedDict):
+    """The stored presets, in the order they were sent."""
+    uploadPresets: List[UploadPreset]
+
+
+class UploadPresetIdOptions(TypedDict):
+    uploadPresetId: str
+
+
+#: Optional standards a project can choose not to serve.
+OptOutJurisdiction = Literal["EU"]
+
+
+class RemoteUrlRule(TypedDict):
+    """Which domains a project accepts when content is submitted by URL. A domain also covers its
+    subdomains."""
+    #: ``allow`` accepts only the listed domains; ``deny`` accepts every domain except them.
+    mode: Literal["allow", "deny"]
+    domains: List[str]
+
+
+class HumanReviewSettings(TypedDict):
+    """Which automated decisions are sampled into the human review queue."""
+    allowedSamplePercent: float
+    restrictedSamplePercent: float
+    #: Queues decisions whose policy score lies less than this many percentage points from the
+    #: policy threshold. 0 turns it off.
+    uncertaintyMarginPercent: float
+    #: Queues decisions whose report has evidence that couldn't be assessed.
+    reviewMissingEvidence: bool
+
+
+class HumanReviewSettingsInput(TypedDict, total=False):
+    """Human review settings to save. Those left out default to 0 and False."""
+    allowedSamplePercent: float
+    restrictedSamplePercent: float
+    uncertaintyMarginPercent: float
+    reviewMissingEvidence: bool
+
+
+class PublicProjectSettings(TypedDict):
+    """A project's settings, with defaults filled in. Its policy and metadata fields have their own
+    methods."""
+    optOutJurisdictions: List[Union[OptOutJurisdiction, str]]
+    #: When True, the CDN refuses to serve assets whose moderation is still pending.
+    blockUnmoderatedAssets: bool
+    #: When True, uploaded images keep their embedded metadata (EXIF, XMP and IPTC).
+    storeSensitiveMetadata: bool
+    #: Preview. Prepare an adaptive stream (HLS) of every audio and video upload that keeps its
+    #: content. Billed per started minute of media.
+    streamingEnabled: bool
+    #: Index audio speech and video frames and transcripts for AI search. Billed per indexed media
+    #: unit.
+    aiMediaSearchEnabled: bool
+    #: ``None`` accepts every public domain.
+    remoteUrlRule: Optional[RemoteUrlRule]
+    #: Lowers how many websites the project can submit per minute; ``None`` uses the platform limit.
+    websiteSubmissionsPerMinute: Optional[int]
+    humanReview: HumanReviewSettings
+
+
+class PublicProjectSettingsInput(TypedDict, total=False):
+    """The complete settings to save. Settings left out return to their defaults: no opted-out
+    jurisdictions, ``blockUnmoderatedAssets`` True, the other switches False, and the rest ``None``
+    or no human review."""
+    optOutJurisdictions: List[OptOutJurisdiction]
+    blockUnmoderatedAssets: bool
+    storeSensitiveMetadata: bool
+    streamingEnabled: bool
+    aiMediaSearchEnabled: bool
+    remoteUrlRule: Optional[RemoteUrlRule]
+    websiteSubmissionsPerMinute: Optional[int]
+    humanReview: HumanReviewSettingsInput
+
+
+class ProjectSettingsResource(TypedDict):
+    """A project's settings and the revision to send back with a change."""
+    projectId: str
+    #: Counts changes to the project's settings and metadata fields, starting at 1.
+    revision: int
+    settings: PublicProjectSettings
+
+
+class _UpdateProjectSettingsRequired(TypedDict):
+    settings: PublicProjectSettingsInput
+
+
+class UpdateProjectSettingsOptions(_UpdateProjectSettingsRequired, total=False):
+    #: The ``revision`` you read. Settings or metadata fields changed since are refused with
+    #: ``project-settings/revision-conflict``. Omit it to replace them whatever their revision.
+    revision: int
+    #: Needed when turning on ``aiMediaSearchEnabled``: the most indexing units you accept for the
+    #: project's existing media. Less than the estimate is refused with
+    #: ``search/estimate-changed``, whose details give the estimate.
+    searchIndexingBudgetUnits: float
+
+
+MetadataFieldType = Literal["string", "number", "boolean", "date", "url"]
+MetadataFieldIcon = Literal["tag", "hash", "user", "folder", "layers", "photo", "link"]
+
+
+class _MetadataFieldRequired(TypedDict):
+    id: str
+    title: str
+    type: Union[MetadataFieldType, str]
+    icon: Union[MetadataFieldIcon, str]
+    color: str
+
+
+class MetadataField(_MetadataFieldRequired, total=False):
+    """A metadata field the portal shows and filters by."""
+    description: str
+
+
+class _MetadataFieldDefinitionRequired(TypedDict):
+    id: str
+    title: str
+    type: MetadataFieldType
+    icon: MetadataFieldIcon
+    #: A hex colour such as ``#2563eb``.
+    color: str
+
+
+class MetadataFieldDefinition(_MetadataFieldDefinitionRequired, total=False):
+    """A metadata field to create or replace, by ``id``."""
+    description: str
+
+
+class MetadataFieldsResource(TypedDict):
+    """A project's metadata fields in display order, and the revision to send back with a change."""
+    projectId: str
+    #: The revision the fields share with the project's settings.
+    revision: int
+    fields: List[MetadataField]
+
+
+class _EnsureMetadataFieldsRequired(TypedDict):
+    #: At most 50, each ID once. Other fields are kept; new ones are added at the end.
+    fields: List[MetadataFieldDefinition]
+
+
+class EnsureMetadataFieldsOptions(_EnsureMetadataFieldsRequired, total=False):
+    #: The ``revision`` you read; a change made since is refused with
+    #: ``project-settings/revision-conflict``.
+    revision: int
+
+
+class _DeleteMetadataFieldRequired(TypedDict):
+    fieldId: str
+
+
+class DeleteMetadataFieldOptions(_DeleteMetadataFieldRequired, total=False):
+    #: The ``revision`` you read; a change made since is refused with
+    #: ``project-settings/revision-conflict``.
+    revision: int
 
 
 class AssetUrlOptions(TypedDict, total=False):

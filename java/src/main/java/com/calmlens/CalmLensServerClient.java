@@ -155,6 +155,12 @@ public final class CalmLensServerClient implements AutoCloseable {
   public final Policies policies = new Policies();
   /** {@code client.lenses}: the project's lenses. */
   public final Lenses lenses = new Lenses();
+  /** The project's upload presets. */
+  public final UploadPresets uploadPresets = new UploadPresets();
+  /** The project's settings. */
+  public final ProjectSettings projectSettings = new ProjectSettings();
+  /** The project's metadata fields. */
+  public final MetadataFields metadataFields = new MetadataFields();
   /** Signs upload tokens for upload presets, locally. */
   public final UploadTokens uploadTokens = new UploadTokens();
   /** The events feed. */
@@ -2003,6 +2009,87 @@ public final class CalmLensServerClient implements AutoCloseable {
     /** Chooses the policy the project moderates with. @param options the policy @return the policy */
     public Models.Policy assign(Models.PolicyId options) {
       return decode(json("PUT", project("policy"), null, Models.encode(options)), Models.Policy.class);
+    }
+  }
+
+  /**
+   * The project's upload presets: the rules for uploads from browsers and apps. {@link #ensure}
+   * creates or replaces presets by key, for deploys that declare them in code; send each preset's
+   * {@code revision} to refuse a change made since you read it.
+   */
+  public final class UploadPresets {
+    private UploadPresets() {}
+
+    /** @param options cursor, page size and sort @return one page of the project's upload presets, oldest first unless {@code sort} says otherwise */
+    public Models.UploadPresetPage list(Models.ListUploadPresets options) {
+      return decode(json("GET", project("upload-presets"), Models.encode(options), null), Models.UploadPresetPage.class);
+    }
+
+    /** @return the first page of the project's upload presets, oldest first */
+    public Models.UploadPresetPage list() { return list(new Models.ListUploadPresets()); }
+
+    /** @param options page size and sort @return a lazy iterable over every upload preset of the project */
+    public AutoPager<Models.UploadPreset> iterate(Models.ListUploadPresets options) {
+      JsonObject o = Models.encode(options);
+      return pages(o, cursor -> page(project("upload-presets"), o, cursor, Models.UploadPresetPage.class));
+    }
+
+    /**
+     * Creates each preset, or replaces it with the definition sent, by key. Every preset is checked
+     * before any is saved; an unchanged preset keeps its revision.
+     *
+     * @param options the preset definitions
+     * @return the stored presets, in the order sent
+     */
+    public Models.EnsureUploadPresetsResponse ensure(Models.EnsureUploadPresets options) {
+      return decode(json("PUT", project("upload-presets"), null, Models.encode(options)), Models.EnsureUploadPresetsResponse.class);
+    }
+
+    /** Deletes an upload preset; assets already uploaded through it stay. @param options the upload preset */
+    public void delete(Models.UploadPresetId options) {
+      success(json("DELETE", "/upload-presets/" + id(str(Models.encode(options), "uploadPresetId", null)), null, null));
+    }
+  }
+
+  /**
+   * The project's settings, with defaults filled in. {@link #update} replaces them: settings left
+   * out return to their defaults. Send the {@code revision} you read to refuse a change made since.
+   */
+  public final class ProjectSettings {
+    private ProjectSettings() {}
+
+    /** @return the project's settings and their revision */
+    public Models.ProjectSettingsResource get() {
+      return decode(json("GET", project("settings"), null, null), Models.ProjectSettingsResource.class);
+    }
+
+    /** @param options the complete settings and, optionally, the revision you read @return the saved settings */
+    public Models.ProjectSettingsResource update(Models.UpdateProjectSettings options) {
+      return decode(json("PUT", project("settings"), null, Models.encode(options)), Models.ProjectSettingsResource.class);
+    }
+  }
+
+  /**
+   * The project's metadata fields. They share the project settings' {@code revision}; {@link
+   * #ensure} creates or replaces fields by ID and keeps the others.
+   */
+  public final class MetadataFields {
+    private MetadataFields() {}
+
+    /** @return the project's metadata fields and their revision */
+    public Models.MetadataFieldsResource list() {
+      return decode(json("GET", project("metadata-fields"), null, null), Models.MetadataFieldsResource.class);
+    }
+
+    /** @param options the fields to create or replace and, optionally, the revision you read @return every field after the change */
+    public Models.MetadataFieldsResource ensure(Models.EnsureMetadataFields options) {
+      return decode(json("PUT", project("metadata-fields"), null, Models.encode(options)), Models.MetadataFieldsResource.class);
+    }
+
+    /** Deletes a field definition; assets keep their values. @param options the field and, optionally, the revision you read */
+    public void delete(Models.DeleteMetadataField options) {
+      JsonObject o = Models.encode(options);
+      success(json("DELETE", project("metadata-fields/" + id(str(o, "fieldId", null))), without(o, "fieldId"), null));
     }
   }
 

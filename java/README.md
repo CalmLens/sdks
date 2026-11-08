@@ -70,6 +70,7 @@ Act on `asset.classification().moderation().status()`:
 - [Search](https://calmlens.com/docs/guides/search), list and [page through](https://calmlens.com/docs/sdk/java/reference#pagination) assets, [folders](https://calmlens.com/docs/sdk/java/reference#folders), hash lists, policies, lenses and the [events feed](https://calmlens.com/docs/api/events#reading-the-feed), sorted with `sort` or item by item with an `iterate` method.
 - Block or flag known images with [hash lists](https://calmlens.com/docs/sdk/java/reference#hash-lists).
 - [Manage the organisation's moderation policies](https://calmlens.com/docs/sdk/java/reference#policies) and choose the one the project uses.
+- Keep a project's configuration in code: `uploadPresets` (`list`, `iterate`, `ensure` by key and `delete`), `projectSettings` (`get` and `update`) and `metadataFields` (`list`, `ensure` by ID and `delete`). Send the `revision` you read to refuse a change made since.
 - Sign [upload tokens](https://calmlens.com/docs/sdk/java/reference#upload-tokens) for browser uploads through [upload presets](https://calmlens.com/docs/guides/upload-presets).
 - [Verify and parse webhooks](https://calmlens.com/docs/sdk/java/reference#webhooks) in Spring or servlets.
 - [Deliver content through the CDN](https://calmlens.com/docs/sdk/java/reference#cdn): build URLs, stream content, sign URLs, apply and manage [lenses and transforms](https://calmlens.com/docs/sdk/java/reference#transforms) and pass [viewer claims](https://calmlens.com/docs/sdk/java/reference#viewer-claims).

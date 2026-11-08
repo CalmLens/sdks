@@ -63,6 +63,9 @@ An asset is settled once `classification.status` is `completed` or `failed`; whi
 - [Manage assets, folders and hash lists](https://calmlens.com/docs/sdk/php#methods), with
   [hash list details](https://calmlens.com/docs/sdk/php/reference#hash-lists).
 - [Manage moderation policies](https://calmlens.com/docs/sdk/php/reference#policies) and choose the one the project uses.
+- [Manage configuration in code](https://calmlens.com/docs/guides/configuration-as-code), each change guarded by a revision:
+  `uploadPresets->list`, `each`, `ensure` and `delete`; `projectSettings->get` and `update`; and
+  `metadataFields->list`, `ensure` and `delete`.
 - [Page through lists and the events feed](https://calmlens.com/docs/sdk/php/reference#pagination-and-filters),
   with [filters](https://calmlens.com/docs/guides/pagination-and-filtering).
 - [Build CDN URLs, sign URLs and stream content](https://calmlens.com/docs/sdk/php/reference#cdn-urls-and-transforms),

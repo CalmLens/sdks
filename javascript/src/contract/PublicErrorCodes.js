@@ -780,6 +780,46 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "This field is set by the upload preset or the upload token and can't be changed by the upload.",
 		status: 400
 	}),
+	UPLOAD_PRESET_REVISION_CONFLICT: new ErrorCode({
+		id: "upload-preset/revision-conflict",
+		defaultMessage: "The upload preset changed, or was created or deleted, since you read it. Retrieve it again and retry with its current revision.",
+		status: 409
+	}),
+	UPLOAD_PRESET_KEY_TAKEN: new ErrorCode({
+		id: "upload-preset/key-taken",
+		defaultMessage: "Another upload preset in this project has this key. Choose a different key.",
+		status: 409
+	}),
+	UPLOAD_PRESET_DAILY_LIMIT_REQUIRED: new ErrorCode({
+		id: "upload-preset/daily-limit-required",
+		defaultMessage: "A preset that anyone can upload to needs a daily upload limit.",
+		status: 400
+	}),
+	UPLOAD_PRESET_INVALID_FOLDER: new ErrorCode({
+		id: "upload-preset/invalid-folder",
+		defaultMessage: "The folder isn't in this project. Choose a folder from this project and try again.",
+		status: 400
+	}),
+	UPLOAD_PRESET_INVALID_POLICY: new ErrorCode({
+		id: "upload-preset/invalid-policy",
+		defaultMessage: "The policy isn't one of this organisation's. Choose one of its policies and try again.",
+		status: 400
+	}),
+	PROJECT_SETTINGS_REVISION_CONFLICT: new ErrorCode({
+		id: "project-settings/revision-conflict",
+		defaultMessage: "The project's settings or metadata fields changed since you read them. Retrieve them again and retry with the current revision.",
+		status: 409
+	}),
+	SEARCH_ESTIMATE_CHANGED: new ErrorCode({
+		id: "search/estimate-changed",
+		defaultMessage: "Turning on AI media search needs a searchIndexingBudgetUnits of at least the current indexing estimate, which details.indexingUnits gives.",
+		status: 409
+	}),
+	METADATA_FIELD_NOT_FOUND: new ErrorCode({
+		id: "metadata-field/not-found",
+		defaultMessage: "The project has no metadata field with this ID.",
+		status: 404
+	}),
 	UPLOAD_TOKEN_INVALID: new ErrorCode({
 		id: "upload-token/invalid",
 		defaultMessage: "The upload token is invalid. Sign a new one on your server with an active API key for this project.",

@@ -203,6 +203,22 @@ const (
 	CodeUploadPresetOriginNotAllowed = "upload-preset/origin-not-allowed"
 	// CodeUploadPresetFieldNotAllowed is returned with HTTP 400.
 	CodeUploadPresetFieldNotAllowed = "upload-preset/field-not-allowed"
+	// CodeUploadPresetRevisionConflict is returned with HTTP 409.
+	CodeUploadPresetRevisionConflict = "upload-preset/revision-conflict"
+	// CodeUploadPresetKeyTaken is returned with HTTP 409.
+	CodeUploadPresetKeyTaken = "upload-preset/key-taken"
+	// CodeUploadPresetDailyLimitRequired is returned with HTTP 400.
+	CodeUploadPresetDailyLimitRequired = "upload-preset/daily-limit-required"
+	// CodeUploadPresetInvalidFolder is returned with HTTP 400.
+	CodeUploadPresetInvalidFolder = "upload-preset/invalid-folder"
+	// CodeUploadPresetInvalidPolicy is returned with HTTP 400.
+	CodeUploadPresetInvalidPolicy = "upload-preset/invalid-policy"
+	// CodeProjectSettingsRevisionConflict is returned with HTTP 409.
+	CodeProjectSettingsRevisionConflict = "project-settings/revision-conflict"
+	// CodeSearchEstimateChanged is returned with HTTP 409.
+	CodeSearchEstimateChanged = "search/estimate-changed"
+	// CodeMetadataFieldNotFound is returned with HTTP 404.
+	CodeMetadataFieldNotFound = "metadata-field/not-found"
 	// CodeUploadTokenInvalid is returned with HTTP 401.
 	CodeUploadTokenInvalid = "upload-token/invalid"
 	// CodeUploadTokenExpired is returned with HTTP 401.
@@ -331,6 +347,14 @@ var publicErrorStatuses = map[string]int{
 	CodeUploadPresetDailyLimitReached:     429,
 	CodeUploadPresetOriginNotAllowed:      403,
 	CodeUploadPresetFieldNotAllowed:       400,
+	CodeUploadPresetRevisionConflict:      409,
+	CodeUploadPresetKeyTaken:              409,
+	CodeUploadPresetDailyLimitRequired:    400,
+	CodeUploadPresetInvalidFolder:         400,
+	CodeUploadPresetInvalidPolicy:         400,
+	CodeProjectSettingsRevisionConflict:   409,
+	CodeSearchEstimateChanged:             409,
+	CodeMetadataFieldNotFound:             404,
 	CodeUploadTokenInvalid:                401,
 	CodeUploadTokenExpired:                401,
 	CodeUploadTokenUsed:                   409,

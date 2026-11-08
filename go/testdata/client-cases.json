@@ -11910,6 +11910,124 @@
       ]
     },
     {
+      "name": "uploadPresets.iterate follows nextCursor across pages, keeping the options",
+      "area": "pagination",
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "id": "preset-1"
+              },
+              {
+                "id": "preset-2"
+              }
+            ],
+            "nextCursor": "cursor-2",
+            "hasMore": true
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "items": [
+              {
+                "id": "preset-3"
+              }
+            ],
+            "nextCursor": null,
+            "hasMore": false
+          },
+          "headers": {
+            "x-request-id": "req-2",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "uploadPresets.iterate",
+          "args": {
+            "pageSize": 2
+          },
+          "expect": {
+            "result": [
+              {
+                "id": "preset-1"
+              },
+              {
+                "id": "preset-2"
+              },
+              {
+                "id": "preset-3"
+              }
+            ]
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/upload-presets",
+          "rawQuery": "pageSize=2",
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        },
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/upload-presets",
+          "rawQuery": "pageSize=2&cursor=cursor-2",
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ]
+    },
+    {
       "name": "assets.iterateTimeline follows nextCursor across pages, keeping the options",
       "area": "pagination",
       "responses": [

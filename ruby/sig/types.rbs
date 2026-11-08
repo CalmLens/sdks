@@ -662,6 +662,81 @@ module CalmLens
     "nextCursor" => String?
   }
 
+  # ---- Configuration as data (UploadPreset.ts, ProjectConfiguration.ts) --------------------------
+
+  type upload_preset_access = "token" | "anyone"
+  # An upload preset's processing options, as the API returns them.
+  type upload_preset_processing_options = {
+    ?"keepContentAfterProcessing" => bool?,
+    ?"storeSensitiveMetadata" => bool?,
+    ?"features" => {
+      ?"ocr" => { "enabled" => bool }?,
+      ?"personDetection" => { "enabled" => bool }?,
+      ?"faceDetection" => { "enabled" => bool, ?"ageEstimation" => bool? }?,
+      ?"linkDetection" => { "enabled" => bool }?,
+      ?"streaming" => { "enabled" => bool }?
+    }?
+  }
+  # The rules for uploads made from browsers and apps. `key` is unique in its project; `revision`
+  # counts changes, starting at 1. Send it back with a change.
+  type upload_preset = {
+    "id" => String,
+    "projectId" => String,
+    ?"createdByUserId" => String?,
+    "key" => String,
+    "revision" => Integer,
+    "name" => String,
+    "access" => upload_preset_access,
+    "enabled" => bool,
+    ?"allowedContentTypes" => Array[String]?,
+    ?"maxSizeInBytes" => Integer?,
+    ?"folderId" => String?,
+    ?"policyId" => String?,
+    "visibility" => asset_visibility,
+    ?"processingOptions" => upload_preset_processing_options?,
+    "revealDecision" => bool,
+    ?"dailyUploadLimit" => Integer?,
+    ?"allowedOrigins" => Array[String]?,
+    "createdAt" => Integer,
+    "updatedAt" => Integer
+  }
+  type upload_preset_page = { "items" => Array[upload_preset], "hasMore" => bool, "nextCursor" => String? }
+  type ensure_upload_presets_response = { "uploadPresets" => Array[upload_preset] }
+
+  type remote_url_rule = { "mode" => "allow" | "deny", "domains" => Array[String] }
+  type human_review_settings = {
+    "allowedSamplePercent" => number,
+    "restrictedSamplePercent" => number,
+    "uncertaintyMarginPercent" => number,
+    "reviewMissingEvidence" => bool
+  }
+  type public_project_settings = {
+    "optOutJurisdictions" => Array[String],
+    "blockUnmoderatedAssets" => bool,
+    "storeSensitiveMetadata" => bool,
+    "streamingEnabled" => bool,
+    "aiMediaSearchEnabled" => bool,
+    "remoteUrlRule" => remote_url_rule?,
+    "websiteSubmissionsPerMinute" => Integer?,
+    "humanReview" => human_review_settings
+  }
+  # The project's settings, with defaults filled in. `revision` counts changes to the settings and
+  # metadata fields, starting at 1. Send it back with a change.
+  type project_settings_resource = { "projectId" => String, "revision" => Integer, "settings" => public_project_settings }
+
+  type metadata_field_type = "string" | "number" | "boolean" | "date" | "url"
+  type metadata_field_icon = "tag" | "hash" | "user" | "folder" | "layers" | "photo" | "link"
+  # A metadata field the portal shows and filters by. `color` is `#rrggbb`.
+  type metadata_field = {
+    "id" => String,
+    "title" => String,
+    ?"description" => String,
+    "type" => metadata_field_type,
+    "icon" => metadata_field_icon,
+    "color" => String
+  }
+  type metadata_fields_resource = { "projectId" => String, "revision" => Integer, "fields" => Array[metadata_field] }
+
   # ---- Folders (Folder.ts) --------------------------------------------------------------------
 
   type folder = {
@@ -1112,6 +1187,64 @@ module CalmLens
     ?transform: image_transform_options_input?,
     ?request_options: request_options
   }
+
+  # `sort` is `createdAt` and `id`, `createdAt` (oldest first) by default.
+  type list_upload_presets_options = { ?cursor: String, ?page_size: Integer, ?sort: sort, ?request_options: request_options }
+  # One preset's whole definition, by `key`; fields left out take their defaults. Send the `revision`
+  # you read (0 for a preset that must not exist yet) to refuse a change made since.
+  type upload_preset_definition = {
+    key: String,
+    name: String,
+    ?revision: Integer,
+    ?access: upload_preset_access,
+    ?enabled: bool,
+    ?allowed_content_types: Array[String]?,
+    ?max_size_in_bytes: Integer?,
+    ?folder_id: String?,
+    ?policy_id: String?,
+    ?visibility: asset_visibility,
+    ?processing_options: processing_options_input?,
+    ?reveal_decision: bool,
+    ?daily_upload_limit: Integer?,
+    ?allowed_origins: Array[String]?
+  }
+  type ensure_upload_presets_options = { upload_presets: Array[upload_preset_definition], ?request_options: request_options }
+  type upload_preset_id_options = { upload_preset_id: String, ?request_options: request_options }
+  # The complete settings: those left out return to their defaults.
+  type project_settings_input = {
+    ?opt_out_jurisdictions: Array[String],
+    ?block_unmoderated_assets: bool,
+    ?store_sensitive_metadata: bool,
+    ?streaming_enabled: bool,
+    ?ai_media_search_enabled: bool,
+    ?remote_url_rule: { mode: "allow" | "deny", domains: Array[String] }?,
+    ?website_submissions_per_minute: Integer?,
+    ?human_review: {
+      ?allowed_sample_percent: number,
+      ?restricted_sample_percent: number,
+      ?uncertainty_margin_percent: number,
+      ?review_missing_evidence: bool
+    }
+  }
+  # Send the `revision` you read to refuse settings changed since. `search_indexing_budget_units` is
+  # needed when turning on `ai_media_search_enabled`.
+  type update_project_settings_options = {
+    ?revision: Integer,
+    settings: project_settings_input,
+    ?search_indexing_budget_units: number,
+    ?request_options: request_options
+  }
+  type metadata_field_input = {
+    id: String,
+    title: String,
+    ?description: String,
+    type: metadata_field_type,
+    icon: metadata_field_icon,
+    color: String
+  }
+  # Fields to create or replace by ID; other fields are kept.
+  type ensure_metadata_fields_options = { ?revision: Integer, fields: Array[metadata_field_input], ?request_options: request_options }
+  type delete_metadata_field_options = { field_id: String, ?revision: Integer, ?request_options: request_options }
 
   type asset_url_options = {
     # Exactly one of `asset_id` and `external_id`.

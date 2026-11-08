@@ -119,6 +119,12 @@ type ServerClient struct {
 	Policies *PoliciesService
 	// Lenses manages the project's lenses.
 	Lenses *LensesService
+	// UploadPresets manages the project's upload presets.
+	UploadPresets *UploadPresetsService
+	// ProjectSettings reads and replaces the project's settings.
+	ProjectSettings *ProjectSettingsService
+	// MetadataFields manages the project's metadata fields.
+	MetadataFields *MetadataFieldsService
 	// Events reads the project event feed.
 	Events *EventsService
 	// CDN builds CDN URLs and fetches content.
@@ -214,6 +220,7 @@ func (c *ServerClient) services() {
 	c.Folders, c.Events, c.CDN = &FoldersService{c}, &EventsService{c}, &CDNService{c}
 	c.UploadTokens, c.HashLists, c.Policies = &UploadTokensService{c}, &HashListsService{c}, &PoliciesService{c}
 	c.Lenses = &LensesService{c}
+	c.UploadPresets, c.ProjectSettings, c.MetadataFields = &UploadPresetsService{c}, &ProjectSettingsService{c}, &MetadataFieldsService{c}
 }
 
 // RequestOptions changes the deadlines and retries of the calls made through the client

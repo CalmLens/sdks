@@ -2516,6 +2516,275 @@
       ]
     },
     {
+      "name": "upload presets, settings and metadata fields are ensured by key with revisions",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "uploadPresets.ensure",
+          "args": {
+            "uploadPresets": [
+              {
+                "key": "avatars",
+                "revision": 0,
+                "name": "Avatars"
+              }
+            ]
+          },
+          "save": "created",
+          "expect": {
+            "result": {
+              "uploadPresets.length": 1,
+              "uploadPresets.0.id": {
+                "$id": "preset"
+              },
+              "uploadPresets.0.key": "avatars",
+              "uploadPresets.0.revision": 1,
+              "uploadPresets.0.access": "token",
+              "uploadPresets.0.enabled": true,
+              "uploadPresets.0.visibility": "private",
+              "uploadPresets.0.revealDecision": false,
+              "uploadPresets.0.allowedContentTypes": null
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "uploadPresets.ensure",
+          "args": {
+            "uploadPresets": [
+              {
+                "key": "avatars",
+                "name": "Avatars"
+              }
+            ]
+          },
+          "expect": {
+            "result": {
+              "uploadPresets.0.id": {
+                "$ref": "created.uploadPresets.0.id"
+              },
+              "uploadPresets.0.revision": 1
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "uploadPresets.ensure",
+          "args": {
+            "uploadPresets": [
+              {
+                "key": "avatars",
+                "revision": 0,
+                "name": "Avatars"
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "upload-preset/revision-conflict",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "uploadPresets.ensure",
+          "args": {
+            "uploadPresets": [
+              {
+                "key": "banners",
+                "name": "Banners"
+              },
+              {
+                "key": "open",
+                "name": "Open",
+                "access": "anyone"
+              }
+            ]
+          },
+          "expect": {
+            "error": {
+              "code": "upload-preset/daily-limit-required",
+              "status": 400
+            }
+          }
+        },
+        {
+          "operation": "uploadPresets.ensure",
+          "args": {
+            "uploadPresets": [
+              {
+                "key": "avatars",
+                "revision": 1,
+                "name": "Profile pictures",
+                "enabled": false
+              }
+            ]
+          },
+          "expect": {
+            "result": {
+              "uploadPresets.0.id": {
+                "$ref": "created.uploadPresets.0.id"
+              },
+              "uploadPresets.0.revision": 2,
+              "uploadPresets.0.name": "Profile pictures"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "uploadPresets.list",
+          "expect": {
+            "result": {
+              "items.length": 1,
+              "items.0.key": "avatars",
+              "items.0.enabled": false
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "uploadPresets.delete",
+          "args": {
+            "uploadPresetId": {
+              "$ref": "created.uploadPresets.0.id"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "uploadPresets.delete",
+          "args": {
+            "uploadPresetId": {
+              "$ref": "created.uploadPresets.0.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload-preset/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "projectSettings.get",
+          "save": "settings",
+          "expect": {
+            "result": {
+              "revision": 1,
+              "settings.optOutJurisdictions": [],
+              "settings.blockUnmoderatedAssets": true,
+              "settings.remoteUrlRule": null
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "projectSettings.update",
+          "args": {
+            "revision": 1,
+            "settings": {
+              "blockUnmoderatedAssets": false
+            }
+          },
+          "expect": {
+            "result": {
+              "revision": 2,
+              "settings.blockUnmoderatedAssets": false,
+              "settings.storeSensitiveMetadata": false
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "projectSettings.update",
+          "args": {
+            "revision": 1,
+            "settings": {}
+          },
+          "expect": {
+            "error": {
+              "code": "project-settings/revision-conflict",
+              "status": 409
+            }
+          }
+        },
+        {
+          "operation": "metadataFields.ensure",
+          "args": {
+            "revision": 2,
+            "fields": [
+              {
+                "id": "userId",
+                "title": "User",
+                "type": "string",
+                "icon": "user",
+                "color": "#2563eb"
+              },
+              {
+                "id": "orderId",
+                "title": "Order",
+                "type": "string",
+                "icon": "tag",
+                "color": "#16a34a"
+              }
+            ]
+          },
+          "expect": {
+            "result": {
+              "revision": 3,
+              "fields.length": 2
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "metadataFields.delete",
+          "args": {
+            "fieldId": "userId",
+            "revision": 3
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "metadataFields.list",
+          "expect": {
+            "result": {
+              "revision": 4,
+              "fields.length": 1,
+              "fields.0.id": "orderId"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "metadataFields.delete",
+          "args": {
+            "fieldId": "userId"
+          },
+          "expect": {
+            "error": {
+              "code": "metadata-field/not-found",
+              "status": 404
+            }
+          }
+        },
+        {
+          "operation": "projectSettings.get",
+          "expect": {
+            "result": {
+              "revision": 4,
+              "settings.blockUnmoderatedAssets": false
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
       "name": "policies keep revisions, reset to their preset and can't be deleted while in use",
       "mock": {},
       "steps": [

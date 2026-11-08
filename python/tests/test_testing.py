@@ -435,7 +435,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
     def test_enqueued_errors_match_real_failures(self):
         c = MockCalmLensServerClient(mock_options={"create_id": lambda prefix: "a1"})
         timeout, reset = TimeoutError("slow"), ConnectionResetError("reset")
-        api = CalmLensError("rate-limit/exceeded", status=429, retry_after=3)
+        api = CalmLensError("usage/free-uploads-exhausted", status=429, retry_after=3)
         c.enqueue_error(timeout).enqueue_error(reset).enqueue_error(api).enqueue_error(http.client.IncompleteRead(b""))
         for expected, cause in ((CalmLensTimeoutError, timeout), (CalmLensTransportError, reset)):
             with self.assertRaises(expected) as raised:
@@ -444,7 +444,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         with self.assertRaises(CalmLensAPIError) as raised:
             c.events.list()
         error = raised.exception
-        self.assertEqual((error.code, error.status, error.retry_after), ("rate-limit/exceeded", 429, 3.0))
+        self.assertEqual((error.code, error.status, error.retry_after), ("usage/free-uploads-exhausted", 429, 3.0))
         self.assertTrue(error.request_id)
         with self.assertRaises(CalmLensTransportError):
             c.cdn.serve({"assetId": "a1"})
@@ -499,6 +499,86 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         self.assertEqual([(r.query.get("partNumber"), r.headers["Idempotency-key"], r.status) for r in resumed],
                          [(1, "K", 200), (2, "K:part-2", 200), (3, "K:part-3", 200)])
         self.assertEqual(c.assets.retrieve(asset_id=asset["id"]), asset)
+
+class MockProjectConfigurationTests(unittest.TestCase):
+    """What the shared mock scenario leaves to each SDK: resets on replace, paging and targeted failures."""
+
+    def setUp(self) -> None:
+        self.client = MockCalmLensServerClient()
+
+    def test_replacing_a_preset_resets_the_fields_left_out(self) -> None:
+        first = self.client.upload_presets.ensure(upload_presets=[{
+            "key": "avatars", "name": "Avatars", "visibility": "public", "maxSizeInBytes": 10,
+            "allowedOrigins": ["https://a.example", "https://a.example"]}])["uploadPresets"][0]
+        self.assertEqual(first["allowedOrigins"], ["https://a.example"])
+        replaced = self.client.upload_presets.ensure(upload_presets=[{"key": "avatars", "name": "Avatars"}])["uploadPresets"][0]
+        self.assertEqual((replaced["id"], replaced["revision"]), (first["id"], 2))
+        self.assertEqual((replaced["visibility"], replaced["maxSizeInBytes"], replaced["allowedOrigins"]),
+                         ("private", None, None))
+
+    def test_a_revision_conflict_gives_the_key_and_current_revision_and_saves_nothing(self) -> None:
+        self.client.upload_presets.ensure(upload_presets=[{"key": "avatars", "name": "Avatars"}])
+        with self.assertRaises(CalmLensAPIError) as raised:
+            self.client.upload_presets.ensure(upload_presets=[
+                {"key": "banners", "name": "Banners"}, {"key": "avatars", "revision": 7, "name": "Changed"}])
+        self.assertEqual(raised.exception.code, error_codes.UPLOAD_PRESET_REVISION_CONFLICT)
+        self.assertEqual(raised.exception.details, {"key": "avatars", "revision": 1})
+        self.assertEqual([preset["name"] for preset in self.client.upload_presets.iter()], ["Avatars"])
+
+    def test_presets_page_oldest_first_unless_sorted(self) -> None:
+        keys = ["first", "second", "third"]
+        for key in keys:
+            self.client.upload_presets.ensure(upload_presets=[{"key": key, "name": key}])
+        self.assertEqual([preset["key"] for preset in self.client.upload_presets.iter(page_size=1)], keys)
+        newest = self.client.upload_presets.list(sort="-createdAt", page_size=2)
+        self.assertEqual([preset["key"] for preset in newest["items"]], ["third", "second"])
+        self.assertTrue(newest["hasMore"])
+
+    def test_settings_left_out_return_to_their_defaults_and_unchanged_settings_keep_the_revision(self) -> None:
+        settings = self.client.project_settings
+        changed = settings.update(settings={"blockUnmoderatedAssets": False, "humanReview": {"allowedSamplePercent": 5}})
+        self.assertEqual((changed["revision"], changed["settings"]["blockUnmoderatedAssets"]), (2, False))
+        self.assertEqual(changed["settings"]["humanReview"]["allowedSamplePercent"], 5)
+        self.assertEqual(changed["settings"]["humanReview"]["restrictedSamplePercent"], 0)
+        self.assertEqual(settings.update(settings=changed["settings"])["revision"], 2)
+        reset = settings.update(settings={})
+        self.assertEqual((reset["revision"], reset["settings"]["blockUnmoderatedAssets"]), (3, True))
+        self.assertEqual(reset["settings"]["humanReview"]["allowedSamplePercent"], 0)
+
+    def test_the_indexing_budget_is_sent_beside_the_settings(self) -> None:
+        self.client.project_settings.update(settings={"aiMediaSearchEnabled": True}, search_indexing_budget_units=12)
+        self.assertEqual(self.client.requests[-1].body, {"settings": {"aiMediaSearchEnabled": True},
+                                                         "searchIndexingBudgetUnits": 12})
+
+    def test_ensuring_fields_replaces_by_id_and_keeps_the_others_in_order(self) -> None:
+        fields = self.client.metadata_fields
+        user = {"id": "userId", "title": "User", "type": "string", "icon": "user", "color": "#2563eb"}
+        order = {"id": "orderId", "title": "Order", "type": "string", "icon": "tag", "color": "#16a34a"}
+        self.assertEqual(fields.ensure(fields=[user, order])["revision"], 2)
+        renamed = {**user, "title": "Account"}
+        region = {"id": "region", "title": "Region", "type": "string", "icon": "tag", "color": "#16a34a"}
+        result = fields.ensure(fields=[region, renamed])
+        self.assertEqual(result["fields"], [renamed, order, region])
+        self.assertEqual(result["revision"], 3)
+        self.assertEqual(fields.ensure(fields=[order])["revision"], 3)
+
+    def test_deleting_a_field_with_a_stale_revision_keeps_it(self) -> None:
+        fields = self.client.metadata_fields
+        fields.ensure(fields=[{"id": "userId", "title": "User", "type": "string", "icon": "user", "color": "#2563eb"}])
+        with self.assertRaises(CalmLensAPIError) as raised:
+            fields.delete(field_id="userId", revision=1)
+        self.assertEqual(raised.exception.code, error_codes.PROJECT_SETTINGS_REVISION_CONFLICT)
+        self.assertEqual([field["id"] for field in fields.list()["fields"]], ["userId"])
+        self.assertIsNone(fields.delete(field_id="userId", revision=2))
+        self.assertEqual(fields.list()["fields"], [])
+
+    def test_failures_target_the_configuration_operations(self) -> None:
+        self.client.fail_next_request("usage/free-uploads-exhausted", operation="metadataFields.delete")
+        self.assertEqual(self.client.metadata_fields.list()["fields"], [])
+        with self.assertRaises(CalmLensAPIError) as raised:
+            self.client.metadata_fields.delete(field_id="userId")
+        self.assertEqual(raised.exception.code, "usage/free-uploads-exhausted")
+
 
 if __name__ == "__main__":
     unittest.main()

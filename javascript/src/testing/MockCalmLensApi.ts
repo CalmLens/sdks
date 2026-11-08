@@ -12,9 +12,13 @@ import type {
   HashListEntryPage,
   Lens,
   LensPage,
+  MetadataFieldsResource,
   Policy,
   PolicyPage,
+  ProjectSettingsResource,
   UploadedAsset,
+  UploadPreset,
+  UploadPresetPage,
 } from "../client/CalmLensTypes";
 import {
   checkTransformOptions,
@@ -142,6 +146,15 @@ const MOCK_OPERATIONS = [
   "lenses.delete",
   "ensureLens",
   "ensureLenses",
+  "uploadPresets.list",
+  "uploadPresets.iterate",
+  "uploadPresets.ensure",
+  "uploadPresets.delete",
+  "projectSettings.get",
+  "projectSettings.update",
+  "metadataFields.list",
+  "metadataFields.ensure",
+  "metadataFields.delete",
 ] as const;
 
 export type MockCalmLensOperation = (typeof MOCK_OPERATIONS)[number];
@@ -720,6 +733,14 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
         return method === "GET" ? ["hashLists.list", "hashLists.iterate"] : ["hashLists.create"];
       case "policy":
         return method === "GET" ? ["policies.retrieveAssigned"] : ["policies.assign"];
+      case "upload-presets":
+        return method === "GET"
+          ? ["uploadPresets.list", "uploadPresets.iterate"]
+          : ["uploadPresets.ensure"];
+      case "settings":
+        return method === "GET" ? ["projectSettings.get"] : ["projectSettings.update"];
+      case "metadata-fields":
+        return method === "GET" ? ["metadataFields.list"] : ["metadataFields.ensure"];
       case "assets/search":
         return ["assets.search"];
       case "assets/batch":
@@ -734,6 +755,8 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
     if (segments[2] === "assets" && segments[4] === "timeline" && segments.length === 5) {
       return ["assets.listTimeline", "assets.iterateTimeline"];
     }
+    if (segments[2] === "metadata-fields" && segments.length === 4)
+      return ["metadataFields.delete"];
     return [];
   }
   if (root === "policies") {
@@ -756,6 +779,7 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
         ? ["lenses.update"]
         : ["lenses.delete"];
   }
+  if (root === "upload-presets" && segments.length === 2) return ["uploadPresets.delete"];
   if (root === "upload-presets") {
     // App clients: `/upload-presets/:id/assets[/:assetId[/part]]`.
     if (segments[3] === undefined) {
@@ -1398,8 +1422,23 @@ export class MockCalmLensApi {
           return [200, this.toPolicy(this.findPolicy(this.ensurePolicies()))];
         case "PUT policy":
           return [200, this.assignPolicy(this.json(request))];
+        case "GET upload-presets":
+          return [200, this.listUploadPresets(request.query)];
+        case "PUT upload-presets":
+          return [200, this.ensureUploadPresets(this.json(request))];
+        case "GET settings":
+          return [200, this.toProjectSettings()];
+        case "PUT settings":
+          return [200, this.updateProjectSettings(this.json(request))];
+        case "GET metadata-fields":
+          return [200, this.toMetadataFields()];
+        case "PUT metadata-fields":
+          return [200, this.ensureMetadataFields(this.json(request))];
       }
       const [, , collection, itemId, itemAction, ...more] = segments;
+      if (collection === "metadata-fields" && itemId !== undefined && itemAction === undefined) {
+        if (method === "DELETE") return [200, this.deleteMetadataField(itemId, request.query)];
+      }
       if (
         collection === "assets" &&
         itemId !== undefined &&
@@ -1440,6 +1479,9 @@ export class MockCalmLensApi {
         case "DELETE":
           return [200, this.deleteLens(id)];
       }
+    }
+    if (root === "upload-presets" && id !== undefined && action === undefined) {
+      if (method === "DELETE") return [200, this.deleteUploadPreset(id)];
     }
     if (root === "upload-presets" && id !== undefined && action === "assets") {
       return [200, await this.presetRoute(request, id, rest, session)];
@@ -3033,6 +3075,170 @@ export class MockCalmLensApi {
         message: `A folder named "${name}" already exists in this location.`,
       });
     }
+  }
+
+  // ---- Configuration: upload presets, project settings, metadata fields ----------------------
+
+  private readonly configuredPresets = new Map<string, UploadPreset>();
+  private settingsRevision = 1;
+  private projectSettingsValues: Record<string, unknown> = {};
+  private metadataFieldList: Record<string, unknown>[] = [];
+
+  /** A page of the project's upload presets, oldest first unless `sort` says otherwise. */
+  private listUploadPresets(query: URLSearchParams): UploadPresetPage {
+    return createPage([...this.configuredPresets.values()], this.pageQuery(query), {
+      scope: `upload-presets:${this.projectId}`,
+      fail: this.pageFailure,
+      defaultSort: [{ field: "createdAt", direction: "asc" }],
+    });
+  }
+
+  /** Like the API: every preset's revision and settings are checked before any is saved. */
+  private ensureUploadPresets(body: Record<string, unknown>) {
+    const definitions = Array.isArray(body.uploadPresets)
+      ? (body.uploadPresets as Record<string, any>[])
+      : [];
+    if (definitions.length === 0) throw invalidField("validation/too-small", "uploadPresets");
+    const plans = definitions.map((definition, index) => {
+      if (typeof definition.key !== "string" || !definition.key)
+        throw invalidField("validation/invalid-type", `uploadPresets.${index}.key`);
+      if (typeof definition.name !== "string" || !definition.name)
+        throw invalidField("validation/invalid-type", `uploadPresets.${index}.name`);
+      const existing = this.configuredPresets.get(definition.key);
+      if (definition.revision !== undefined && definition.revision !== (existing?.revision ?? 0))
+        throw fail(API_ERROR_CODES.UPLOAD_PRESET_REVISION_CONFLICT, {
+          details: { key: definition.key, revision: existing?.revision ?? 0 },
+        });
+      const list = (value: unknown) =>
+        Array.isArray(value) && value.length ? [...new Set(value as string[])] : null;
+      const values = {
+        key: definition.key,
+        name: definition.name,
+        access: definition.access ?? "token",
+        enabled: definition.enabled ?? true,
+        allowedContentTypes: list(definition.allowedContentTypes),
+        maxSizeInBytes: definition.maxSizeInBytes ?? null,
+        folderId: definition.folderId ?? null,
+        policyId: definition.policyId ?? null,
+        visibility: definition.visibility ?? "private",
+        processingOptions: definition.processingOptions ?? null,
+        revealDecision: definition.revealDecision ?? false,
+        dailyUploadLimit: definition.dailyUploadLimit ?? null,
+        allowedOrigins: list(definition.allowedOrigins),
+      } as const;
+      if (values.access === "anyone" && !values.dailyUploadLimit)
+        throw fail(API_ERROR_CODES.UPLOAD_PRESET_DAILY_LIMIT_REQUIRED);
+      return { existing, values };
+    });
+    return {
+      uploadPresets: plans.map(({ existing, values }) => {
+        if (existing) {
+          const unchanged = Object.entries(values).every(
+            ([key, value]) =>
+              stringifyJsonCanonical(value) ===
+              stringifyJsonCanonical(existing[key as keyof UploadPreset] ?? null),
+          );
+          if (unchanged) return existing;
+        }
+        const now = this.now();
+        const preset = {
+          id: existing?.id ?? this.createId("preset"),
+          projectId: this.projectId,
+          createdByUserId: null,
+          ...values,
+          revision: (existing?.revision ?? 0) + 1,
+          createdAt: existing?.createdAt ?? now,
+          updatedAt: now,
+        } as UploadPreset;
+        this.configuredPresets.set(preset.key, preset);
+        return preset;
+      }),
+    };
+  }
+
+  private deleteUploadPreset(uploadPresetId: string) {
+    const preset = [...this.configuredPresets.values()].find(({ id }) => id === uploadPresetId);
+    if (!preset) throw fail(API_ERROR_CODES.UPLOAD_PRESET_NOT_FOUND);
+    this.configuredPresets.delete(preset.key);
+    return {};
+  }
+
+  private toProjectSettings(): ProjectSettingsResource {
+    return {
+      projectId: this.projectId,
+      revision: this.settingsRevision,
+      settings: {
+        optOutJurisdictions: [],
+        blockUnmoderatedAssets: true,
+        storeSensitiveMetadata: false,
+        streamingEnabled: false,
+        aiMediaSearchEnabled: false,
+        remoteUrlRule: null,
+        websiteSubmissionsPerMinute: null,
+        ...this.projectSettingsValues,
+        humanReview: {
+          allowedSamplePercent: 0,
+          restrictedSamplePercent: 0,
+          uncertaintyMarginPercent: 0,
+          reviewMissingEvidence: false,
+          ...(this.projectSettingsValues.humanReview as object | undefined),
+        },
+      } as ProjectSettingsResource["settings"],
+    };
+  }
+
+  private checkSettingsRevision(revision: unknown) {
+    if (revision !== undefined && revision !== null && Number(revision) !== this.settingsRevision)
+      throw fail(API_ERROR_CODES.PROJECT_SETTINGS_REVISION_CONFLICT);
+  }
+
+  /** Replaces the settings: those left out return to their defaults. */
+  private updateProjectSettings(body: Record<string, unknown>): ProjectSettingsResource {
+    this.checkSettingsRevision(body.revision);
+    const settings = body.settings;
+    if (!settings || typeof settings !== "object" || Array.isArray(settings))
+      throw invalidField("validation/invalid-type", "settings");
+    const before = stringifyJsonCanonical(this.toProjectSettings().settings);
+    const previous = this.projectSettingsValues;
+    this.projectSettingsValues = { ...(settings as Record<string, unknown>) };
+    if (stringifyJsonCanonical(this.toProjectSettings().settings) === before)
+      this.projectSettingsValues = previous;
+    else this.settingsRevision += 1;
+    return this.toProjectSettings();
+  }
+
+  private toMetadataFields(): MetadataFieldsResource {
+    return {
+      projectId: this.projectId,
+      revision: this.settingsRevision,
+      fields: this.metadataFieldList as MetadataFieldsResource["fields"],
+    };
+  }
+
+  /** Creates or replaces fields by ID, keeping the others in order. */
+  private ensureMetadataFields(body: Record<string, unknown>): MetadataFieldsResource {
+    this.checkSettingsRevision(body.revision);
+    const fields = Array.isArray(body.fields) ? (body.fields as Record<string, unknown>[]) : [];
+    if (fields.length === 0) throw invalidField("validation/too-small", "fields");
+    const byId = new Map(fields.map((field) => [field.id, field]));
+    const merged = [
+      ...this.metadataFieldList.map((field) => byId.get(field.id) ?? field),
+      ...fields.filter((field) => !this.metadataFieldList.some(({ id }) => id === field.id)),
+    ];
+    if (stringifyJsonCanonical(merged) !== stringifyJsonCanonical(this.metadataFieldList)) {
+      this.metadataFieldList = merged;
+      this.settingsRevision += 1;
+    }
+    return this.toMetadataFields();
+  }
+
+  private deleteMetadataField(fieldId: string, query: URLSearchParams): MetadataFieldsResource {
+    if (!this.metadataFieldList.some(({ id }) => id === fieldId))
+      throw fail(API_ERROR_CODES.METADATA_FIELD_NOT_FOUND, { details: { fieldId } });
+    this.checkSettingsRevision(query.get("revision") ?? undefined);
+    this.metadataFieldList = this.metadataFieldList.filter(({ id }) => id !== fieldId);
+    this.settingsRevision += 1;
+    return this.toMetadataFields();
   }
 
   // ---- Lenses ------------------------------------------------------------------------------

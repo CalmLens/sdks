@@ -62,6 +62,9 @@ module CalmLens
       'lenses.list' => %w[cursor pageSize sort].freeze,
       'lenses.retrieve' => %w[lensId].freeze,
       'lenses.update' => %w[active description lensId name transform type].freeze,
+      'metadataFields.delete' => %w[fieldId revision].freeze,
+      'metadataFields.ensure' => %w[fields revision].freeze,
+      'metadataFields.list' => %w[].freeze,
       'policies.assign' => %w[policyId].freeze,
       'policies.create' => %w[description name presetId settings].freeze,
       'policies.delete' => %w[policyId].freeze,
@@ -73,10 +76,16 @@ module CalmLens
       'policies.setAutomaticUpdates' => %w[enabled policyId presetVersion revision].freeze,
       'policies.update' => %w[description name policyId revision settings].freeze,
       'policies.upgrade' => %w[policyId presetVersion revision].freeze,
+      'projectSettings.get' => %w[].freeze,
+      'projectSettings.update' => %w[revision searchIndexingBudgetUnits settings].freeze,
       'text.classify' => %w[
         authorId context description externalId externalUrl folderId metadata name processingOptions tags text
         uploadPresetId visibility
-      ].freeze
+      ].freeze,
+      'uploadPresets.delete' => %w[uploadPresetId].freeze,
+      'uploadPresets.each' => %w[cursor pageSize sort].freeze,
+      'uploadPresets.ensure' => %w[uploadPresets].freeze,
+      'uploadPresets.list' => %w[cursor pageSize sort].freeze
     }.freeze
 
     # The option keys each method sends as null when given nil; any other option given as nil

@@ -155,6 +155,12 @@ module CalmLens
         # reset `baseline`) and the one the project moderates with.
         @policies = {}
         @project_policy_id = nil
+        # The project's configuration: upload presets by key, the settings it has set, its metadata
+        # fields in display order and the revision the settings and fields share.
+        @upload_presets = {}
+        @project_settings = {}
+        @metadata_fields = []
+        @settings_revision = 1
         @request_count = 0
         # Each asset's latest `assetSequence`, which the API keeps on the asset row.
         @asset_event_sequences = Hash.new(0)
@@ -431,6 +437,7 @@ module CalmLens
                when 'hash-list-entries' then remove_hash_list_entry(method, parts)
                when 'policies' then policies(method, parts, query, json)
                when 'lenses' then lens(method, parts, json)
+               when 'upload-presets' then upload_preset(method, parts)
                else route_not_found!(method, parts)
                end
         data.is_a?(Response) ? data : respond(200, deep_copy(data))
@@ -458,6 +465,20 @@ module CalmLens
         in ['POST', ['assets', 'batch']] then batch(json)
         in ['POST', ['signed-asset-urls']] then sign_asset_url(json)
         in ['POST', ['assets']] then create_upload(request)
+        else configuration(method, parts, query, json)
+        end
+      end
+
+      # A project's upload presets, settings and metadata fields.
+      def configuration(method, parts, query, json)
+        case [method, parts[2..]]
+        in ['GET', ['upload-presets']] then upload_preset_page(query)
+        in ['PUT', ['upload-presets']] then ensure_upload_presets(json)
+        in ['GET', ['settings']] then show_project_settings
+        in ['PUT', ['settings']] then update_project_settings(json)
+        in ['GET', ['metadata-fields']] then show_metadata_fields
+        in ['PUT', ['metadata-fields']] then ensure_metadata_fields(json)
+        in ['DELETE', ['metadata-fields', String => field_id]] then delete_metadata_field(field_id, query)
         else route_not_found!(method, parts)
         end
       end
@@ -636,6 +657,129 @@ module CalmLens
         when Array then value.map { |item| canonical(item) }
         else value
         end
+      end
+
+      # A page of the project's upload presets, oldest first unless `sort` says otherwise.
+      def upload_preset_page(query)
+        page(@upload_presets.values, query, JSON.generate(['upload-presets', @project_id]),
+             default: { 'field' => 'createdAt', 'direction' => 'asc' })
+      end
+
+      # Like the API: every preset's revision and settings are checked before any is saved, and the
+      # stored presets come back in the order sent.
+      def ensure_upload_presets(json)
+        definitions = json['uploadPresets']
+        invalid!('validation/too-small', 'uploadPresets') unless definitions.is_a?(Array) && !definitions.empty?
+
+        plans = definitions.each_with_index.map do |definition, index|
+          %w[key name].each do |field|
+            value = definition[field]
+            invalid!('validation/invalid-type', "uploadPresets.#{index}.#{field}") unless value.is_a?(String) && !value.empty?
+          end
+          existing = @upload_presets[definition['key']]
+          stored = existing ? existing['revision'] : 0
+          if definition.key?('revision') && definition['revision'] != stored
+            fail!(ErrorCodes::UPLOAD_PRESET_REVISION_CONFLICT, details: { 'key' => definition['key'], 'revision' => stored })
+          end
+          values = upload_preset_values(definition)
+          limited = ![nil, 0].include?(values['dailyUploadLimit'])
+          fail!(ErrorCodes::UPLOAD_PRESET_DAILY_LIMIT_REQUIRED) if values['access'] == 'anyone' && !limited
+
+          [existing, values]
+        end
+        { 'uploadPresets' => plans.map { |existing, values| save_upload_preset(existing, values) } }
+      end
+
+      # The stored values a definition sets: fields left out take their defaults.
+      def upload_preset_values(definition)
+        given = ->(field, default = nil) { definition[field].nil? ? default : definition[field] }
+        list = ->(field) { definition[field].is_a?(Array) && !definition[field].empty? ? definition[field].uniq : nil }
+        { 'key' => definition['key'], 'name' => definition['name'], 'access' => given.call('access', 'token'),
+          'enabled' => given.call('enabled', true), 'allowedContentTypes' => list.call('allowedContentTypes'),
+          'maxSizeInBytes' => given.call('maxSizeInBytes'), 'folderId' => given.call('folderId'),
+          'policyId' => given.call('policyId'), 'visibility' => given.call('visibility', 'private'),
+          'processingOptions' => given.call('processingOptions'), 'revealDecision' => given.call('revealDecision', false),
+          'dailyUploadLimit' => given.call('dailyUploadLimit'), 'allowedOrigins' => list.call('allowedOrigins') }
+      end
+
+      # Saves a preset's values under its key; an unchanged preset keeps its revision.
+      def save_upload_preset(existing, values)
+        return existing if existing && existing.slice(*values.keys) == values
+
+        now = @now.call
+        @upload_presets[values['key']] =
+          { 'id' => existing ? existing['id'] : @create_id.call('preset'), 'projectId' => @project_id, 'createdByUserId' => nil,
+            **values, 'revision' => (existing ? existing['revision'] : 0) + 1,
+            'createdAt' => existing ? existing['createdAt'] : now, 'updatedAt' => now }
+      end
+
+      # DELETE /upload-presets/:id.
+      def upload_preset(method, parts)
+        route_not_found!(method, parts) unless method == 'DELETE' && parts.size == 2
+        preset = @upload_presets.values.find { |item| item['id'] == parts[1] }
+        fail!(ErrorCodes::UPLOAD_PRESET_NOT_FOUND) unless preset
+        @upload_presets.delete(preset['key'])
+        {}
+      end
+
+      def show_project_settings
+        settings = { 'optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true, 'storeSensitiveMetadata' => false,
+                     'streamingEnabled' => false, 'aiMediaSearchEnabled' => false, 'remoteUrlRule' => nil,
+                     'websiteSubmissionsPerMinute' => nil }.merge(@project_settings)
+        settings['humanReview'] = { 'allowedSamplePercent' => 0, 'restrictedSamplePercent' => 0, 'uncertaintyMarginPercent' => 0,
+                                    'reviewMissingEvidence' => false }.merge(@project_settings['humanReview'] || {})
+        { 'projectId' => @project_id, 'revision' => @settings_revision, 'settings' => settings }
+      end
+
+      # A revision to check, from a body or the query; none refuses nothing.
+      def check_settings_revision(revision)
+        return if revision.nil? || revision.to_s == @settings_revision.to_s
+
+        fail!(ErrorCodes::PROJECT_SETTINGS_REVISION_CONFLICT)
+      end
+
+      # Replaces the settings: those left out return to their defaults. A real change bumps the revision.
+      def update_project_settings(json)
+        check_settings_revision(json['revision'])
+        invalid!('validation/invalid-type', 'settings') unless json['settings'].is_a?(Hash)
+
+        before = show_project_settings['settings']
+        previous = @project_settings
+        @project_settings = json['settings']
+        if show_project_settings['settings'] == before
+          @project_settings = previous
+        else
+          @settings_revision += 1
+        end
+        show_project_settings
+      end
+
+      def show_metadata_fields = { 'projectId' => @project_id, 'revision' => @settings_revision, 'fields' => @metadata_fields }
+
+      # Creates or replaces fields by ID, keeping the others in order. A real change bumps the revision.
+      def ensure_metadata_fields(json)
+        check_settings_revision(json['revision'])
+        fields = json['fields']
+        invalid!('validation/too-small', 'fields') unless fields.is_a?(Array) && !fields.empty?
+
+        by_id = fields.to_h { |field| [field['id'], field] }
+        known = @metadata_fields.map { |field| field['id'] }
+        merged = @metadata_fields.map { |field| by_id.fetch(field['id'], field) } + fields.reject { |field| known.include?(field['id']) }
+        unless merged == @metadata_fields
+          @metadata_fields = merged
+          @settings_revision += 1
+        end
+        show_metadata_fields
+      end
+
+      def delete_metadata_field(field_id, query)
+        kept = @metadata_fields.reject { |field| field['id'] == field_id }
+        fail!(ErrorCodes::METADATA_FIELD_NOT_FOUND, details: { 'fieldId' => field_id }) if kept.size == @metadata_fields.size
+
+        check_settings_revision(query['revision'])
+        @metadata_fields = kept
+        @settings_revision += 1
+        show_metadata_fields
       end
 
       # Keyword search like the API: every whitespace-separated token (case-insensitive, at most 8

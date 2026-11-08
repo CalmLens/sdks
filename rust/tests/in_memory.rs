@@ -1,6 +1,7 @@
 //! The in-memory mock behind `MockServerClient::in_memory`.
 mod common;
 use calmlens::{models::*, testing::*, ErrorCode};
+use futures_util::TryStreamExt;
 use serde_json::json;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -905,4 +906,214 @@ async fn an_undecodable_stored_asset_never_reaches_moderate() {
     let error = mock.complete_processing(&asset.id, None).unwrap_err();
     assert_eq!(error.code(), &ErrorCode::InvalidResponse);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
+/// The shared scenario covers ensuring by key; this is what a replace does to fields left out,
+/// and what a refused revision reports.
+#[tokio::test]
+async fn ensuring_a_preset_replaces_it_and_reports_the_revision_it_conflicts_with() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    let ensure = |definition: UploadPresetDefinition| EnsureUploadPresets {
+        upload_presets: vec![definition],
+    };
+    let created = mock
+        .upload_presets()
+        .ensure(ensure(UploadPresetDefinition {
+            enabled: Some(false),
+            visibility: Some(Visibility::Public),
+            folder_id: Patch::Value("fldr_1".into()),
+            allowed_content_types: Patch::Value(vec!["image/*".into(), "image/*".into()]),
+            ..UploadPresetDefinition::new("avatars", "Avatars")
+        }))
+        .await
+        .unwrap()
+        .upload_presets
+        .remove(0);
+    assert_eq!(created.allowed_content_types, Some(vec!["image/*".into()]));
+
+    let replaced = mock
+        .upload_presets()
+        .ensure(ensure(UploadPresetDefinition::new("avatars", "Avatars")))
+        .await
+        .unwrap()
+        .upload_presets
+        .remove(0);
+    assert_eq!(replaced.id, created.id);
+    assert_eq!(replaced.revision, 2);
+    assert!(replaced.enabled);
+    assert_eq!(replaced.visibility, Visibility::Private);
+    assert_eq!(replaced.folder_id, None);
+    assert_eq!(replaced.allowed_content_types, None);
+
+    let error = mock
+        .upload_presets()
+        .ensure(ensure(UploadPresetDefinition {
+            revision: Some(1),
+            ..UploadPresetDefinition::new("avatars", "Avatars")
+        }))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::UploadPresetRevisionConflict);
+    assert_eq!(error.details()["key"], "avatars");
+    assert_eq!(error.details()["revision"], 2);
+}
+
+#[tokio::test]
+async fn iterating_presets_pages_oldest_first_and_fails_with_the_listing() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    let keys = ["first", "second", "third"];
+    for key in keys {
+        mock.upload_presets()
+            .ensure(EnsureUploadPresets {
+                upload_presets: vec![UploadPresetDefinition::new(key, key)],
+            })
+            .await
+            .unwrap();
+    }
+    let by_one = || ListUploadPresets {
+        page_size: Some(1),
+        ..Default::default()
+    };
+    let presets: Vec<UploadPreset> = mock
+        .upload_presets()
+        .iterate(by_one())
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(
+        presets.iter().map(|p| p.key.as_str()).collect::<Vec<_>>(),
+        keys
+    );
+    assert_eq!(
+        mock.requests().iter().filter(|r| r.method == "GET").count(),
+        3
+    );
+
+    mock.fail_next_request(
+        MockFailure::Api(ErrorCode::InternalError),
+        MockFailureOptions::new().operation("uploadPresets.iterate"),
+    )
+    .unwrap();
+    let error = mock
+        .upload_presets()
+        .iterate(by_one())
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::InternalError);
+}
+
+/// Settings left out return to their defaults, so a change to one setting starts from those read.
+#[tokio::test]
+async fn updating_settings_replaces_them_and_only_a_real_change_moves_the_revision() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    let settings = mock.project_settings();
+    let changed = settings
+        .update(UpdateProjectSettings::new(ProjectSettingsDefinition {
+            store_sensitive_metadata: Some(true),
+            remote_url_rule: Patch::Value(RemoteUrlRule::new(
+                RemoteUrlRuleMode::Allow,
+                vec!["example.com".into()],
+            )),
+            human_review: Some(HumanReviewSettings {
+                allowed_sample_percent: 2.5,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
+        .await
+        .unwrap();
+    assert_eq!(changed.revision, 2);
+
+    let read = settings.get().await.unwrap();
+    let mut definition = ProjectSettingsDefinition::from(read.settings.clone());
+    definition.streaming_enabled = Some(true);
+    let kept = settings
+        .update(UpdateProjectSettings {
+            revision: Some(read.revision),
+            ..UpdateProjectSettings::new(definition.clone())
+        })
+        .await
+        .unwrap();
+    assert_eq!(kept.revision, 3);
+    assert!(kept.settings.streaming_enabled);
+    assert!(kept.settings.store_sensitive_metadata);
+    assert_eq!(kept.settings.remote_url_rule, read.settings.remote_url_rule);
+    assert_eq!(kept.settings.human_review.allowed_sample_percent, 2.5);
+
+    let unchanged = settings
+        .update(UpdateProjectSettings::new(definition))
+        .await
+        .unwrap();
+    assert_eq!(unchanged.revision, 3);
+
+    let reset = settings
+        .update(UpdateProjectSettings::new(
+            ProjectSettingsDefinition::default(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(reset.revision, 4);
+    assert!(reset.settings.block_unmoderated_assets);
+    assert!(!reset.settings.store_sensitive_metadata);
+    assert_eq!(reset.settings.remote_url_rule, None);
+    assert_eq!(reset.settings.human_review.allowed_sample_percent, 0.0);
+}
+
+#[tokio::test]
+async fn ensuring_metadata_fields_replaces_by_id_and_keeps_the_others_in_order() {
+    let mock = MockServerClient::in_memory(options()).unwrap();
+    let field = |id: &str, title: &str| {
+        MetadataField::new(
+            id,
+            title,
+            MetadataFieldType::String,
+            MetadataFieldIcon::Tag,
+            "#2563eb",
+        )
+    };
+    let ensure = |fields: Vec<MetadataField>| EnsureMetadataFields {
+        revision: None,
+        fields,
+    };
+    let fields = mock.metadata_fields();
+    fields
+        .ensure(ensure(vec![
+            field("userId", "User"),
+            field("orderId", "Order"),
+        ]))
+        .await
+        .unwrap();
+    let changed = fields
+        .ensure(ensure(vec![
+            field("sku", "SKU"),
+            field("userId", "Account"),
+        ]))
+        .await
+        .unwrap();
+    assert_eq!(changed.revision, 3);
+    assert_eq!(
+        changed
+            .fields
+            .iter()
+            .map(|f| (f.id.as_str(), f.title.as_str()))
+            .collect::<Vec<_>>(),
+        [("userId", "Account"), ("orderId", "Order"), ("sku", "SKU")]
+    );
+    let unchanged = fields
+        .ensure(ensure(vec![field("sku", "SKU")]))
+        .await
+        .unwrap();
+    assert_eq!(unchanged.revision, 3);
+    assert_eq!(unchanged.fields, changed.fields);
+
+    let error = fields
+        .delete(DeleteMetadataField {
+            revision: Some(1),
+            ..DeleteMetadataField::new("sku")
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code(), &ErrorCode::ProjectSettingsRevisionConflict);
+    assert_eq!(fields.list().await.unwrap().fields.len(), 3);
 }

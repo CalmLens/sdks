@@ -101,6 +101,14 @@ export const API_ERROR_CODES = {
   UPLOAD_PRESET_DAILY_LIMIT_REACHED: "upload-preset/daily-limit-reached",
   UPLOAD_PRESET_ORIGIN_NOT_ALLOWED: "upload-preset/origin-not-allowed",
   UPLOAD_PRESET_FIELD_NOT_ALLOWED: "upload-preset/field-not-allowed",
+  UPLOAD_PRESET_REVISION_CONFLICT: "upload-preset/revision-conflict",
+  UPLOAD_PRESET_KEY_TAKEN: "upload-preset/key-taken",
+  UPLOAD_PRESET_DAILY_LIMIT_REQUIRED: "upload-preset/daily-limit-required",
+  UPLOAD_PRESET_INVALID_FOLDER: "upload-preset/invalid-folder",
+  UPLOAD_PRESET_INVALID_POLICY: "upload-preset/invalid-policy",
+  PROJECT_SETTINGS_REVISION_CONFLICT: "project-settings/revision-conflict",
+  SEARCH_ESTIMATE_CHANGED: "search/estimate-changed",
+  METADATA_FIELD_NOT_FOUND: "metadata-field/not-found",
   UPLOAD_TOKEN_INVALID: "upload-token/invalid",
   UPLOAD_TOKEN_EXPIRED: "upload-token/expired",
   UPLOAD_TOKEN_USED: "upload-token/used",
@@ -520,6 +528,38 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "upload-preset/field-not-allowed": {
     status: 400,
     message: "This field is set by the upload preset or the upload token and can't be changed by the upload.",
+  },
+  "upload-preset/revision-conflict": {
+    status: 409,
+    message: "The upload preset changed, or was created or deleted, since you read it. Retrieve it again and retry with its current revision.",
+  },
+  "upload-preset/key-taken": {
+    status: 409,
+    message: "Another upload preset in this project has this key. Choose a different key.",
+  },
+  "upload-preset/daily-limit-required": {
+    status: 400,
+    message: "A preset that anyone can upload to needs a daily upload limit.",
+  },
+  "upload-preset/invalid-folder": {
+    status: 400,
+    message: "The folder isn't in this project. Choose a folder from this project and try again.",
+  },
+  "upload-preset/invalid-policy": {
+    status: 400,
+    message: "The policy isn't one of this organisation's. Choose one of its policies and try again.",
+  },
+  "project-settings/revision-conflict": {
+    status: 409,
+    message: "The project's settings or metadata fields changed since you read them. Retrieve them again and retry with the current revision.",
+  },
+  "search/estimate-changed": {
+    status: 409,
+    message: "Turning on AI media search needs a searchIndexingBudgetUnits of at least the current indexing estimate, which details.indexingUnits gives.",
+  },
+  "metadata-field/not-found": {
+    status: 404,
+    message: "The project has no metadata field with this ID.",
   },
   "upload-token/invalid": {
     status: 401,

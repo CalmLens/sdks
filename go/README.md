@@ -76,6 +76,7 @@ Treat a status you don't recognise as not allowed. `Assets.Create` queues proces
 - [Read typed classification results](https://calmlens.com/docs/sdk/go/reference#classification-results), including categories, qualifiers and fields added after your SDK version.
 - [Moderate replies in their conversation](https://calmlens.com/docs/sdk/go/reference#conversation-context).
 - Manage assets, [folders](https://calmlens.com/docs/sdk/go/reference#folders), [hash lists](https://calmlens.com/docs/sdk/go/reference#hash-lists) and [lenses](https://calmlens.com/docs/sdk/go/reference#lenses), with [pagination iterators](https://calmlens.com/docs/sdk/go/reference#pagination).
+- Declare configuration as data, so deploys can send it every time: `UploadPresets` (`List`, `ListAll`, `Ensure`, `Delete`) creates or replaces upload presets by key, `ProjectSettings` (`Get`, `Update`) reads and replaces the project's settings, and `MetadataFields` (`List`, `Ensure`, `Delete`) manages its metadata fields. Send the `Revision` you read to refuse a change made since; unchanged configuration keeps its revision.
 - [Poll the project event feed](https://calmlens.com/docs/sdk/go/reference#events-feed) and decode each event's typed facts.
 - [Verify webhook deliveries](https://calmlens.com/docs/sdk/go/reference#webhooks) with `net/http`, chi or gin.
 - [Deliver content from the CDN](https://calmlens.com/docs/sdk/go/reference#cdn) with signed URLs, lenses, image transforms and [viewer claims](https://calmlens.com/docs/sdk/go/reference#viewer-claims).

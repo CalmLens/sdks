@@ -3133,6 +3133,462 @@
     }
   },
   {
+    "operation": "uploadPresets.list",
+    "options": {},
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/upload-presets",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "preset-1",
+          "projectId": "project-1",
+          "createdByUserId": null,
+          "key": "avatars",
+          "revision": 1,
+          "name": "Avatars",
+          "access": "token",
+          "enabled": true,
+          "allowedContentTypes": [
+            "image/*"
+          ],
+          "maxSizeInBytes": null,
+          "folderId": null,
+          "policyId": null,
+          "visibility": "private",
+          "processingOptions": null,
+          "revealDecision": false,
+          "dailyUploadLimit": null,
+          "allowedOrigins": null,
+          "createdAt": 1760000000000,
+          "updatedAt": 1760000000000
+        }
+      ],
+      "hasMore": false,
+      "nextCursor": null
+    }
+  },
+  {
+    "operation": "uploadPresets.list",
+    "options": {
+      "cursor": "opaque+/cursor=",
+      "pageSize": 10,
+      "sort": "-createdAt"
+    },
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/upload-presets",
+      "query": {
+        "cursor": "opaque+/cursor=",
+        "pageSize": "10",
+        "sort": "-createdAt"
+      },
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "preset-1",
+          "projectId": "project-1",
+          "createdByUserId": null,
+          "key": "avatars",
+          "revision": 1,
+          "name": "Avatars",
+          "access": "token",
+          "enabled": true,
+          "allowedContentTypes": [
+            "image/*"
+          ],
+          "maxSizeInBytes": null,
+          "folderId": null,
+          "policyId": null,
+          "visibility": "private",
+          "processingOptions": null,
+          "revealDecision": false,
+          "dailyUploadLimit": null,
+          "allowedOrigins": null,
+          "createdAt": 1760000000000,
+          "updatedAt": 1760000000000
+        }
+      ],
+      "hasMore": false,
+      "nextCursor": null
+    }
+  },
+  {
+    "operation": "uploadPresets.ensure",
+    "options": {
+      "uploadPresets": [
+        {
+          "key": "avatars",
+          "revision": 0,
+          "name": "Avatars",
+          "allowedContentTypes": [
+            "image/*"
+          ]
+        },
+        {
+          "key": "open-form",
+          "revision": 2,
+          "name": "Open form",
+          "access": "anyone",
+          "dailyUploadLimit": 20,
+          "folderId": null,
+          "allowedOrigins": [
+            "https://example.com"
+          ]
+        }
+      ]
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/upload-presets",
+      "query": {},
+      "body": {
+        "uploadPresets": [
+          {
+            "key": "avatars",
+            "revision": 0,
+            "name": "Avatars",
+            "allowedContentTypes": [
+              "image/*"
+            ]
+          },
+          {
+            "key": "open-form",
+            "revision": 2,
+            "name": "Open form",
+            "access": "anyone",
+            "dailyUploadLimit": 20,
+            "folderId": null,
+            "allowedOrigins": [
+              "https://example.com"
+            ]
+          }
+        ]
+      }
+    },
+    "response": {
+      "uploadPresets": [
+        {
+          "id": "preset-1",
+          "projectId": "project-1",
+          "createdByUserId": null,
+          "key": "avatars",
+          "revision": 1,
+          "name": "Avatars",
+          "access": "token",
+          "enabled": true,
+          "allowedContentTypes": [
+            "image/*"
+          ],
+          "maxSizeInBytes": null,
+          "folderId": null,
+          "policyId": null,
+          "visibility": "private",
+          "processingOptions": null,
+          "revealDecision": false,
+          "dailyUploadLimit": null,
+          "allowedOrigins": null,
+          "createdAt": 1760000000000,
+          "updatedAt": 1760000000000
+        },
+        {
+          "id": "preset-2",
+          "projectId": "project-1",
+          "createdByUserId": null,
+          "key": "open-form",
+          "revision": 1,
+          "name": "Avatars",
+          "access": "token",
+          "enabled": true,
+          "allowedContentTypes": [
+            "image/*"
+          ],
+          "maxSizeInBytes": null,
+          "folderId": null,
+          "policyId": null,
+          "visibility": "private",
+          "processingOptions": null,
+          "revealDecision": false,
+          "dailyUploadLimit": null,
+          "allowedOrigins": null,
+          "createdAt": 1760000000000,
+          "updatedAt": 1760000000000
+        }
+      ]
+    }
+  },
+  {
+    "operation": "uploadPresets.delete",
+    "options": {
+      "uploadPresetId": "preset-1"
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/upload-presets/preset-1",
+      "query": {},
+      "body": null
+    },
+    "response": {}
+  },
+  {
+    "operation": "uploadPresets.delete",
+    "options": {
+      "uploadPresetId": "a/b?c#d"
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/upload-presets/a%2Fb%3Fc%23d",
+      "query": {},
+      "body": null
+    },
+    "response": {}
+  },
+  {
+    "operation": "projectSettings.get",
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/settings",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "projectId": "project-1",
+      "revision": 5,
+      "settings": {
+        "optOutJurisdictions": [
+          "EU"
+        ],
+        "blockUnmoderatedAssets": false,
+        "storeSensitiveMetadata": false,
+        "streamingEnabled": false,
+        "aiMediaSearchEnabled": false,
+        "remoteUrlRule": null,
+        "websiteSubmissionsPerMinute": null,
+        "humanReview": {
+          "allowedSamplePercent": 0,
+          "restrictedSamplePercent": 0,
+          "uncertaintyMarginPercent": 0,
+          "reviewMissingEvidence": false
+        }
+      }
+    }
+  },
+  {
+    "operation": "projectSettings.update",
+    "options": {
+      "revision": 4,
+      "settings": {
+        "optOutJurisdictions": [
+          "EU"
+        ],
+        "blockUnmoderatedAssets": false,
+        "remoteUrlRule": null
+      }
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/settings",
+      "query": {},
+      "body": {
+        "revision": 4,
+        "settings": {
+          "optOutJurisdictions": [
+            "EU"
+          ],
+          "blockUnmoderatedAssets": false,
+          "remoteUrlRule": null
+        }
+      }
+    },
+    "response": {
+      "projectId": "project-1",
+      "revision": 5,
+      "settings": {
+        "optOutJurisdictions": [
+          "EU"
+        ],
+        "blockUnmoderatedAssets": false,
+        "storeSensitiveMetadata": false,
+        "streamingEnabled": false,
+        "aiMediaSearchEnabled": false,
+        "remoteUrlRule": null,
+        "websiteSubmissionsPerMinute": null,
+        "humanReview": {
+          "allowedSamplePercent": 0,
+          "restrictedSamplePercent": 0,
+          "uncertaintyMarginPercent": 0,
+          "reviewMissingEvidence": false
+        }
+      }
+    }
+  },
+  {
+    "operation": "projectSettings.update",
+    "options": {
+      "settings": {
+        "aiMediaSearchEnabled": true
+      },
+      "searchIndexingBudgetUnits": 120
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/settings",
+      "query": {},
+      "body": {
+        "settings": {
+          "aiMediaSearchEnabled": true
+        },
+        "searchIndexingBudgetUnits": 120
+      }
+    },
+    "response": {
+      "projectId": "project-1",
+      "revision": 5,
+      "settings": {
+        "optOutJurisdictions": [
+          "EU"
+        ],
+        "blockUnmoderatedAssets": false,
+        "storeSensitiveMetadata": false,
+        "streamingEnabled": false,
+        "aiMediaSearchEnabled": false,
+        "remoteUrlRule": null,
+        "websiteSubmissionsPerMinute": null,
+        "humanReview": {
+          "allowedSamplePercent": 0,
+          "restrictedSamplePercent": 0,
+          "uncertaintyMarginPercent": 0,
+          "reviewMissingEvidence": false
+        }
+      }
+    }
+  },
+  {
+    "operation": "metadataFields.list",
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/metadata-fields",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "projectId": "project-1",
+      "revision": 5,
+      "fields": [
+        {
+          "id": "userId",
+          "title": "User",
+          "type": "string",
+          "icon": "user",
+          "color": "#2563eb"
+        }
+      ]
+    }
+  },
+  {
+    "operation": "metadataFields.ensure",
+    "options": {
+      "revision": 4,
+      "fields": [
+        {
+          "id": "userId",
+          "title": "User",
+          "type": "string",
+          "icon": "user",
+          "color": "#2563eb"
+        }
+      ]
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/metadata-fields",
+      "query": {},
+      "body": {
+        "revision": 4,
+        "fields": [
+          {
+            "id": "userId",
+            "title": "User",
+            "type": "string",
+            "icon": "user",
+            "color": "#2563eb"
+          }
+        ]
+      }
+    },
+    "response": {
+      "projectId": "project-1",
+      "revision": 5,
+      "fields": [
+        {
+          "id": "userId",
+          "title": "User",
+          "type": "string",
+          "icon": "user",
+          "color": "#2563eb"
+        }
+      ]
+    }
+  },
+  {
+    "operation": "metadataFields.delete",
+    "options": {
+      "fieldId": "userId",
+      "revision": 5
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/projects/project-1/metadata-fields/userId",
+      "query": {
+        "revision": "5"
+      },
+      "body": null
+    },
+    "response": {
+      "projectId": "project-1",
+      "revision": 5,
+      "fields": [
+        {
+          "id": "userId",
+          "title": "User",
+          "type": "string",
+          "icon": "user",
+          "color": "#2563eb"
+        }
+      ]
+    }
+  },
+  {
+    "operation": "metadataFields.delete",
+    "options": {
+      "fieldId": "order.id"
+    },
+    "request": {
+      "method": "DELETE",
+      "path": "/v1/projects/project-1/metadata-fields/order.id",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "projectId": "project-1",
+      "revision": 5,
+      "fields": [
+        {
+          "id": "userId",
+          "title": "User",
+          "type": "string",
+          "icon": "user",
+          "color": "#2563eb"
+        }
+      ]
+    }
+  },
+  {
     "operation": "events.list",
     "options": {
       "cursor": "123_abc",
@@ -13323,6 +13779,336 @@
       ],
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "uploadPresets.list",
+    "options": {},
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/upload-presets",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "items": [
+        {
+          "id": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
+          "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+          "createdByUserId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
+          "key": "example",
+          "revision": 1,
+          "name": "example",
+          "access": "token",
+          "enabled": true,
+          "allowedContentTypes": [
+            "image/png"
+          ],
+          "maxSizeInBytes": 1,
+          "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
+          "policyId": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+          "visibility": "public",
+          "processingOptions": {
+            "keepContentAfterProcessing": true,
+            "storeSensitiveMetadata": true,
+            "features": {
+              "ocr": {
+                "enabled": true
+              },
+              "personDetection": {
+                "enabled": true
+              },
+              "faceDetection": {
+                "enabled": true,
+                "ageEstimation": true
+              },
+              "linkDetection": {
+                "enabled": true
+              },
+              "streaming": {
+                "enabled": true
+              }
+            }
+          },
+          "revealDecision": true,
+          "dailyUploadLimit": 1,
+          "allowedOrigins": [
+            "https://example.com"
+          ],
+          "createdAt": 1767225600000,
+          "updatedAt": 1767225900000
+        }
+      ],
+      "nextCursor": "example",
+      "hasMore": true
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "uploadPresets.ensure",
+    "options": {
+      "uploadPresets": [
+        {
+          "key": "avatars",
+          "revision": 0,
+          "name": "Avatars",
+          "allowedContentTypes": [
+            "image/*"
+          ]
+        },
+        {
+          "key": "open-form",
+          "revision": 2,
+          "name": "Open form",
+          "access": "anyone",
+          "dailyUploadLimit": 20,
+          "folderId": null,
+          "allowedOrigins": [
+            "https://example.com"
+          ]
+        }
+      ]
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/upload-presets",
+      "query": {},
+      "body": {
+        "uploadPresets": [
+          {
+            "key": "avatars",
+            "revision": 0,
+            "name": "Avatars",
+            "allowedContentTypes": [
+              "image/*"
+            ]
+          },
+          {
+            "key": "open-form",
+            "revision": 2,
+            "name": "Open form",
+            "access": "anyone",
+            "dailyUploadLimit": 20,
+            "folderId": null,
+            "allowedOrigins": [
+              "https://example.com"
+            ]
+          }
+        ]
+      }
+    },
+    "response": {
+      "uploadPresets": [
+        {
+          "id": "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P",
+          "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+          "createdByUserId": "user_4Rk9Xm2Lq7Vt3Wb8Np6C",
+          "key": "example",
+          "revision": 1,
+          "name": "example",
+          "access": "token",
+          "enabled": true,
+          "allowedContentTypes": [
+            "image/png"
+          ],
+          "maxSizeInBytes": 1,
+          "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
+          "policyId": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+          "visibility": "public",
+          "processingOptions": {
+            "keepContentAfterProcessing": true,
+            "storeSensitiveMetadata": true,
+            "features": {
+              "ocr": {
+                "enabled": true
+              },
+              "personDetection": {
+                "enabled": true
+              },
+              "faceDetection": {
+                "enabled": true,
+                "ageEstimation": true
+              },
+              "linkDetection": {
+                "enabled": true
+              },
+              "streaming": {
+                "enabled": true
+              }
+            }
+          },
+          "revealDecision": true,
+          "dailyUploadLimit": 1,
+          "allowedOrigins": [
+            "https://example.com"
+          ],
+          "createdAt": 1767225600000,
+          "updatedAt": 1767225900000
+        }
+      ]
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "projectSettings.get",
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/settings",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+      "revision": 1,
+      "settings": {
+        "optOutJurisdictions": [
+          "EU"
+        ],
+        "blockUnmoderatedAssets": true,
+        "storeSensitiveMetadata": true,
+        "streamingEnabled": true,
+        "aiMediaSearchEnabled": true,
+        "remoteUrlRule": {
+          "mode": "allow",
+          "domains": [
+            "example.com"
+          ]
+        },
+        "websiteSubmissionsPerMinute": 1,
+        "humanReview": {
+          "allowedSamplePercent": 1.5,
+          "restrictedSamplePercent": 1.5,
+          "uncertaintyMarginPercent": 1.5,
+          "reviewMissingEvidence": true
+        }
+      }
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "projectSettings.update",
+    "options": {
+      "revision": 4,
+      "settings": {
+        "optOutJurisdictions": [
+          "EU"
+        ],
+        "blockUnmoderatedAssets": false,
+        "remoteUrlRule": null
+      }
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/settings",
+      "query": {},
+      "body": {
+        "revision": 4,
+        "settings": {
+          "optOutJurisdictions": [
+            "EU"
+          ],
+          "blockUnmoderatedAssets": false,
+          "remoteUrlRule": null
+        }
+      }
+    },
+    "response": {
+      "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+      "revision": 1,
+      "settings": {
+        "optOutJurisdictions": [
+          "EU"
+        ],
+        "blockUnmoderatedAssets": true,
+        "storeSensitiveMetadata": true,
+        "streamingEnabled": true,
+        "aiMediaSearchEnabled": true,
+        "remoteUrlRule": {
+          "mode": "allow",
+          "domains": [
+            "example.com"
+          ]
+        },
+        "websiteSubmissionsPerMinute": 1,
+        "humanReview": {
+          "allowedSamplePercent": 1.5,
+          "restrictedSamplePercent": 1.5,
+          "uncertaintyMarginPercent": 1.5,
+          "reviewMissingEvidence": true
+        }
+      }
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "metadataFields.list",
+    "request": {
+      "method": "GET",
+      "path": "/v1/projects/project-1/metadata-fields",
+      "query": {},
+      "body": null
+    },
+    "response": {
+      "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+      "revision": 1,
+      "fields": [
+        {
+          "id": "example",
+          "title": "example",
+          "description": "example",
+          "type": "string",
+          "icon": "tag",
+          "color": "#2563eb"
+        }
+      ]
+    },
+    "fullModel": true
+  },
+  {
+    "operation": "metadataFields.ensure",
+    "options": {
+      "revision": 4,
+      "fields": [
+        {
+          "id": "userId",
+          "title": "User",
+          "type": "string",
+          "icon": "user",
+          "color": "#2563eb"
+        }
+      ]
+    },
+    "request": {
+      "method": "PUT",
+      "path": "/v1/projects/project-1/metadata-fields",
+      "query": {},
+      "body": {
+        "revision": 4,
+        "fields": [
+          {
+            "id": "userId",
+            "title": "User",
+            "type": "string",
+            "icon": "user",
+            "color": "#2563eb"
+          }
+        ]
+      }
+    },
+    "response": {
+      "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
+      "revision": 1,
+      "fields": [
+        {
+          "id": "example",
+          "title": "example",
+          "description": "example",
+          "type": "string",
+          "icon": "tag",
+          "color": "#2563eb"
+        }
+      ]
     },
     "fullModel": true
   },

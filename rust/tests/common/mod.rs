@@ -59,6 +59,9 @@ pub fn iterator(
         }
         "policies.iterate" => stream(input(options).map(|o| values(client.policies().iterate(o)))),
         "lenses.iterate" => stream(input(options).map(|o| values(client.lenses().iterate(o)))),
+        "uploadPresets.iterate" => {
+            stream(input(options).map(|o| values(client.upload_presets().iterate(o))))
+        }
         "events.iterate" | "events.pages" => {
             stream(input(options).map(|o| values(client.events().pages(o))))
         }
@@ -133,6 +136,14 @@ pub async fn invoke(
         "lenses.retrieve" => output(client.lenses().retrieve(input(options)?).await),
         "lenses.update" => output(client.lenses().update(input(options)?).await),
         "lenses.delete" => output(client.lenses().delete(input(options)?).await),
+        "uploadPresets.list" => output(client.upload_presets().list(input(options)?).await),
+        "uploadPresets.ensure" => output(client.upload_presets().ensure(input(options)?).await),
+        "uploadPresets.delete" => output(client.upload_presets().delete(input(options)?).await),
+        "projectSettings.get" => output(client.project_settings().get().await),
+        "projectSettings.update" => output(client.project_settings().update(input(options)?).await),
+        "metadataFields.list" => output(client.metadata_fields().list().await),
+        "metadataFields.ensure" => output(client.metadata_fields().ensure(input(options)?).await),
+        "metadataFields.delete" => output(client.metadata_fields().delete(input(options)?).await),
         "events.list" => output(client.events().list(input(options)?).await),
         "ensureLenses" => output(client.ensure_lenses(input(options)?).await),
         "cdn.serve" => {

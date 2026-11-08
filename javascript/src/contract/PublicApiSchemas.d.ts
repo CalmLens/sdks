@@ -6,7 +6,8 @@ import { t as Folder } from "./Folder-D1CVstEY.js";
 import { o as EventType } from "./EventCatalog-DlEUh7ot.js";
 import { t as CursorPage } from "./Page-Bwn9Pb4k.js";
 import "./Lens-CLZcyVve.js";
-import "./PublicErrorCodes-CkiMwF1T.js";
+import { i as PUBLIC_UPLOAD_PRESET_SCHEMA } from "./ProjectConfiguration-B_yBVsAP.js";
+import "./PublicErrorCodes-DW2iVL1b.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
   parentId: zod.ZodOptional<zod.ZodString>;
@@ -4186,4 +4187,14 @@ declare const POST_HASH_LIST_ENTRY_BODY_SCHEMA: zod.ZodObject<{
   label: zod.ZodOptional<zod.ZodNullable<zod.ZodPipe<zod.ZodString, zod.ZodTransform<string, string>>>>;
 }, zod.core.$strip>;
 type PostHashListEntryBody = zod.infer<typeof POST_HASH_LIST_ENTRY_BODY_SCHEMA>;
-export type { AssetBatchOperation, AssetTimelineSegment, GetAssetChildrenQuery, GetAssetTimelineQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, GetHashListEntriesQuery, GetHashListEntriesResponse, GetHashListsQuery, GetHashListsResponse, GetLensesQuery, PatchAssetBody, PatchFolderBody, PatchHashListBody, PatchLensBody, PostAssetBatchOperationResponse, PostAssetDecisionBody, PostFolderBody, PostHashListBody, PostHashListEntryBody, SignAssetUrlResponse };
+declare const GET_UPLOAD_PRESETS_QUERY_SCHEMA: zod.ZodObject<{
+  cursor: zod.ZodOptional<zod.ZodString>;
+  pageSize: zod.ZodOptional<zod.ZodNumber>;
+  sort: zod.ZodOptional<zod.ZodPipe<zod.ZodString, zod.ZodTransform<{
+    field: string;
+    direction: "asc" | "desc";
+  }[], string>>>;
+}, zod.core.$strict>;
+type GetUploadPresetsQuery = zod.input<typeof GET_UPLOAD_PRESETS_QUERY_SCHEMA>;
+type GetUploadPresetsResponse = CursorPage<zod.infer<typeof PUBLIC_UPLOAD_PRESET_SCHEMA>>;
+export type { AssetBatchOperation, AssetTimelineSegment, GetAssetChildrenQuery, GetAssetTimelineQuery, GetAssetsPageQuery, GetEventsQuery, GetEventsResponse, GetFoldersQuery, GetFoldersResponse, GetHashListEntriesQuery, GetHashListEntriesResponse, GetHashListsQuery, GetHashListsResponse, GetLensesQuery, GetUploadPresetsQuery, GetUploadPresetsResponse, PatchAssetBody, PatchFolderBody, PatchHashListBody, PatchLensBody, PostAssetBatchOperationResponse, PostAssetDecisionBody, PostFolderBody, PostHashListBody, PostHashListEntryBody, SignAssetUrlResponse };

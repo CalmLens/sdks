@@ -4993,3 +4993,567 @@ impl AssignPolicy {
         }
     }
 }
+
+string_enum! {
+    /// Who can upload through an upload preset from a browser or app.
+    UploadPresetAccess {
+        /// Needs an upload token signed by your server.
+        Token = "token",
+        /// Accepts the preset ID alone; the preset needs a daily upload limit.
+        Anyone = "anyone",
+    }
+}
+
+/// The rules for uploads from browsers and apps, addressed by its `key` in deploys that declare
+/// presets in code.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct UploadPreset {
+    /// The upload preset ID.
+    #[serde(default)]
+    pub id: String,
+    /// The owning project.
+    #[serde(default)]
+    pub project_id: String,
+    /// Who created the preset, when a person did.
+    #[serde(default)]
+    pub created_by_user_id: Option<String>,
+    /// The key, unique in the project.
+    #[serde(default)]
+    pub key: String,
+    /// Counts the preset's changes; send it back to refuse a change made since you read it.
+    #[serde(default)]
+    pub revision: u64,
+    /// The display name.
+    #[serde(default)]
+    pub name: String,
+    /// Who can upload from a browser or app.
+    #[serde(default)]
+    pub access: UploadPresetAccess,
+    /// Whether the preset accepts uploads.
+    #[serde(default)]
+    pub enabled: bool,
+    /// MIME types the preset accepts, such as `image/*`; `None` accepts any supported type.
+    #[serde(default)]
+    pub allowed_content_types: Option<Vec<String>>,
+    /// The largest upload the preset accepts, in bytes; `None` uses the standard upload limits.
+    #[serde(default)]
+    pub max_size_in_bytes: Option<u64>,
+    /// The folder uploads go into; `None` uses the project's root.
+    #[serde(default)]
+    pub folder_id: Option<String>,
+    /// The moderation policy for uploads through the preset; `None` uses the project's policy.
+    #[serde(default)]
+    pub policy_id: Option<String>,
+    /// The visibility of uploaded assets.
+    #[serde(default)]
+    pub visibility: Visibility,
+    /// Processing options for every upload through the preset.
+    #[serde(default)]
+    pub processing_options: Option<ProcessingOptions>,
+    /// Whether browser uploads see the moderation decision for their own upload.
+    #[serde(default)]
+    pub reveal_decision: bool,
+    /// The most uploads the preset accepts from each client (IP address) per UTC day.
+    #[serde(default)]
+    pub daily_upload_limit: Option<u64>,
+    /// Sites allowed to upload from the browser; `None` allows any site.
+    #[serde(default)]
+    pub allowed_origins: Option<Vec<String>>,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub created_at: u64,
+    /// Milliseconds since the Unix epoch.
+    #[serde(default)]
+    pub updated_at: Option<u64>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<UploadPreset, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A page of the project's upload presets.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct UploadPresetPage {
+    /// The upload presets on this page.
+    #[serde(default)]
+    pub items: Vec<UploadPreset>,
+    /// The cursor for the next page, or None.
+    #[serde(default)]
+    pub next_cursor: Option<String>,
+    /// Whether another page follows.
+    #[serde(default)]
+    pub has_more: Option<bool>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<UploadPresetPage, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Options for one page of the project's upload presets.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListUploadPresets {
+    /// The previous page's `next_cursor`; omit for the first page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// Upload presets per page, 1 to 100 (the API's default is 50).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt`. Oldest first by default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sort: Option<String>,
+}
+
+/// One upload preset's whole definition, by `key`, for
+/// [`UploadPresetsClient::ensure`](crate::UploadPresetsClient::ensure). The definition replaces
+/// the stored preset, so a field left out (`None` or [`Patch::Missing`]) takes its default rather
+/// than keeping its stored value.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadPresetDefinition {
+    /// The key, unique in the project: lowercase letters, digits and inner hyphens, at most 64
+    /// characters.
+    pub key: String,
+    /// The `revision` you last read, which refuses a preset changed since with
+    /// `upload-preset/revision-conflict`. Send 0 to create it only if no preset has this key;
+    /// omit it to create or replace the preset whatever its revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<u64>,
+    /// The display name.
+    pub name: String,
+    /// Who can upload from a browser or app. Defaults to `token`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub access: Option<UploadPresetAccess>,
+    /// Whether the preset accepts uploads. Defaults to `true`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    /// MIME types the preset accepts, such as `image/*`. Empty or left out accepts any supported
+    /// type.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub allowed_content_types: Patch<Vec<String>>,
+    /// The largest upload the preset accepts, in bytes. Left out uses the standard upload limits.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub max_size_in_bytes: Patch<u64>,
+    /// The folder uploads go into. Left out uses the project's root.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub folder_id: Patch<String>,
+    /// The moderation policy for uploads through the preset, one of the organisation's policies.
+    /// Left out uses the project's policy.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub policy_id: Patch<String>,
+    /// The visibility of uploaded assets. Defaults to `private`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<Visibility>,
+    /// Processing options for every upload through the preset.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub processing_options: Patch<ProcessingOptions>,
+    /// Whether browser uploads see the moderation decision for their own upload. Defaults to
+    /// `false`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reveal_decision: Option<bool>,
+    /// The most uploads the preset accepts from each client (IP address) per UTC day. Required
+    /// when `access` is `anyone`.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub daily_upload_limit: Patch<u64>,
+    /// Sites allowed to upload from the browser. Empty or left out allows any site.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub allowed_origins: Patch<Vec<String>>,
+}
+impl UploadPresetDefinition {
+    /// A preset `key` named `name`, with every other field at its default.
+    pub fn new(key: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            key: key.into(),
+            name: name.into(),
+            ..Self::default()
+        }
+    }
+}
+
+/// Options for [`UploadPresetsClient::ensure`](crate::UploadPresetsClient::ensure).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnsureUploadPresets {
+    /// The presets, returned in the same order.
+    pub upload_presets: Vec<UploadPresetDefinition>,
+}
+
+/// The stored presets from [`UploadPresetsClient::ensure`](crate::UploadPresetsClient::ensure).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct EnsureUploadPresetsResponse {
+    /// The stored presets, in the order they were sent.
+    #[serde(default)]
+    pub upload_presets: Vec<UploadPreset>,
+    /// Fields this SDK version does not know.
+    #[serde(
+        flatten,
+        deserialize_with = "extra_fields::<EnsureUploadPresetsResponse, _>"
+    )]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Identifies an upload preset.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadPresetId {
+    /// The upload preset ID.
+    pub upload_preset_id: String,
+}
+impl UploadPresetId {
+    /// Identifies upload preset `upload_preset_id`.
+    pub fn new(upload_preset_id: impl Into<String>) -> Self {
+        Self {
+            upload_preset_id: upload_preset_id.into(),
+        }
+    }
+}
+
+string_enum! {
+    /// An optional standard a project can opt out of. Jurisdictions with legal rules always
+    /// apply and can't be opted out.
+    OptOutJurisdiction {
+        /// The European Union's optional standard.
+        Eu = "EU",
+    }
+}
+
+string_enum! {
+    /// How a [`RemoteUrlRule`] treats its domains.
+    RemoteUrlRuleMode {
+        /// Accept only these domains.
+        Allow = "allow",
+        /// Accept every public domain except these.
+        Deny = "deny",
+    }
+}
+
+/// Restricts the domains a project accepts when content is submitted by URL, including websites.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteUrlRule {
+    /// How the rule treats its domains.
+    #[serde(default)]
+    pub mode: RemoteUrlRuleMode,
+    /// The domains, such as `example.com`.
+    #[serde(default)]
+    pub domains: Vec<String>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<RemoteUrlRule, _>")]
+    pub extra: HashMap<String, Value>,
+}
+impl RemoteUrlRule {
+    /// A rule treating `domains` as `mode` says.
+    pub fn new(mode: RemoteUrlRuleMode, domains: Vec<String>) -> Self {
+        Self {
+            mode,
+            domains,
+            extra: HashMap::new(),
+        }
+    }
+}
+
+/// Which automated decisions are sampled into the human review queue. The default samples none.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HumanReviewSettings {
+    /// The percentage of allowed decisions to sample.
+    #[serde(default)]
+    pub allowed_sample_percent: f64,
+    /// The percentage of restricted decisions to sample.
+    #[serde(default)]
+    pub restricted_sample_percent: f64,
+    /// Queues decisions whose policy score lies less than this many percentage points from the
+    /// policy threshold; 0 turns it off.
+    #[serde(default)]
+    pub uncertainty_margin_percent: f64,
+    /// Queues decisions whose report has evidence moderation couldn't assess.
+    #[serde(default)]
+    pub review_missing_evidence: bool,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<HumanReviewSettings, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A project's settings, with every default filled in.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ProjectSettings {
+    /// Optional standards this project doesn't serve.
+    #[serde(default)]
+    pub opt_out_jurisdictions: Vec<OptOutJurisdiction>,
+    /// Whether the CDN refuses to serve assets whose moderation is still pending.
+    #[serde(default)]
+    pub block_unmoderated_assets: bool,
+    /// Whether uploaded images keep their embedded metadata (EXIF, XMP and IPTC).
+    #[serde(default)]
+    pub store_sensitive_metadata: bool,
+    /// Preview. Whether every audio and video upload that keeps its content gets an adaptive
+    /// stream (HLS).
+    #[serde(default)]
+    pub streaming_enabled: bool,
+    /// Whether audio speech and video frames and transcripts are indexed for AI search.
+    #[serde(default)]
+    pub ai_media_search_enabled: bool,
+    /// The domains accepted when content is submitted by URL; `None` accepts every public domain.
+    #[serde(default)]
+    pub remote_url_rule: Option<RemoteUrlRule>,
+    /// How many websites the project can submit per minute; `None` uses the platform limit.
+    #[serde(default)]
+    pub website_submissions_per_minute: Option<u32>,
+    /// Which automated decisions are sampled into the human review queue.
+    #[serde(default)]
+    pub human_review: HumanReviewSettings,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<ProjectSettings, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A project's settings and the revision to send back with a change.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ProjectSettingsResource {
+    /// The project.
+    #[serde(default)]
+    pub project_id: String,
+    /// Counts changes to the project's settings and metadata fields, which share it.
+    #[serde(default)]
+    pub revision: u64,
+    /// The settings.
+    #[serde(default)]
+    pub settings: ProjectSettings,
+    /// Fields this SDK version does not know.
+    #[serde(
+        flatten,
+        deserialize_with = "extra_fields::<ProjectSettingsResource, _>"
+    )]
+    pub extra: HashMap<String, Value>,
+}
+
+/// A project's complete settings, for
+/// [`ProjectSettingsClient::update`](crate::ProjectSettingsClient::update). They replace the
+/// stored settings, so a setting left out (`None` or [`Patch::Missing`]) returns to its default.
+/// To change one setting, convert the [`ProjectSettings`] you read with `From` and change it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectSettingsDefinition {
+    /// Optional standards this project doesn't serve. Defaults to none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opt_out_jurisdictions: Option<Vec<OptOutJurisdiction>>,
+    /// Whether the CDN refuses to serve assets whose moderation is still pending. Defaults to
+    /// `true`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block_unmoderated_assets: Option<bool>,
+    /// Whether uploaded images keep their embedded metadata (EXIF, XMP and IPTC). Defaults to
+    /// `false`. An upload's `processing_options.store_sensitive_metadata` overrides it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub store_sensitive_metadata: Option<bool>,
+    /// Preview. Prepare an adaptive stream (HLS) of every audio and video upload that keeps its
+    /// content. Billed per started minute of media. Defaults to `false`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub streaming_enabled: Option<bool>,
+    /// Index audio speech and video frames and transcripts for AI search. Billed per indexed media
+    /// unit. Defaults to `false`; images are always searchable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai_media_search_enabled: Option<bool>,
+    /// The domains accepted when content is submitted by URL. Left out or null accepts every
+    /// public domain.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub remote_url_rule: Patch<RemoteUrlRule>,
+    /// Lowers how many websites the project can submit per minute. Left out or null uses the
+    /// platform limit.
+    #[serde(default, skip_serializing_if = "Patch::is_missing")]
+    pub website_submissions_per_minute: Patch<u32>,
+    /// Which automated decisions are sampled into the human review queue. Defaults to none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_review: Option<HumanReviewSettings>,
+    /// Settings this SDK version does not know, kept when settings you read are sent back.
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
+}
+impl From<ProjectSettings> for ProjectSettingsDefinition {
+    fn from(settings: ProjectSettings) -> Self {
+        Self {
+            opt_out_jurisdictions: Some(settings.opt_out_jurisdictions),
+            block_unmoderated_assets: Some(settings.block_unmoderated_assets),
+            store_sensitive_metadata: Some(settings.store_sensitive_metadata),
+            streaming_enabled: Some(settings.streaming_enabled),
+            ai_media_search_enabled: Some(settings.ai_media_search_enabled),
+            remote_url_rule: settings.remote_url_rule.map_or(Patch::Null, Patch::Value),
+            website_submissions_per_minute: settings
+                .website_submissions_per_minute
+                .map_or(Patch::Null, Patch::Value),
+            human_review: Some(settings.human_review),
+            extra: settings.extra,
+        }
+    }
+}
+
+/// Options for [`ProjectSettingsClient::update`](crate::ProjectSettingsClient::update).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProjectSettings {
+    /// The `revision` you last read, which refuses settings or metadata fields changed since with
+    /// `project-settings/revision-conflict`. Omit it to replace them whatever their revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<u64>,
+    /// The complete settings.
+    pub settings: ProjectSettingsDefinition,
+    /// Needed when turning on `ai_media_search_enabled`: the most indexing units you accept for
+    /// the project's existing media. A smaller value than the estimate is refused with
+    /// `search/estimate-changed`, whose details give the estimate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search_indexing_budget_units: Option<u64>,
+}
+impl UpdateProjectSettings {
+    /// Replaces the project's settings with `settings`, whatever their revision.
+    pub fn new(settings: impl Into<ProjectSettingsDefinition>) -> Self {
+        Self {
+            settings: settings.into(),
+            ..Self::default()
+        }
+    }
+}
+
+string_enum! {
+    /// The type of a metadata field's values.
+    MetadataFieldType {
+        /// Text.
+        String = "string",
+        /// A number.
+        Number = "number",
+        /// True or false.
+        Boolean = "boolean",
+        /// A date.
+        Date = "date",
+        /// A URL.
+        Url = "url",
+    }
+}
+
+string_enum! {
+    /// The icon the portal shows for a metadata field.
+    MetadataFieldIcon {
+        /// A tag.
+        Tag = "tag",
+        /// A hash sign.
+        Hash = "hash",
+        /// A person.
+        User = "user",
+        /// A folder.
+        Folder = "folder",
+        /// Stacked layers.
+        Layers = "layers",
+        /// A photo.
+        Photo = "photo",
+        /// A link.
+        Link = "link",
+    }
+}
+
+/// A metadata field the portal shows and filters by.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataField {
+    /// The field ID, which assets' metadata values refer to.
+    #[serde(default)]
+    pub id: String,
+    /// The display title.
+    #[serde(default)]
+    pub title: String,
+    /// A description.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// The type of the field's values (`type` on the wire).
+    #[serde(default, rename = "type")]
+    pub field_type: MetadataFieldType,
+    /// The icon the portal shows.
+    #[serde(default)]
+    pub icon: MetadataFieldIcon,
+    /// The color the portal shows, as `#rrggbb`.
+    #[serde(default)]
+    pub color: String,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<MetadataField, _>")]
+    pub extra: HashMap<String, Value>,
+}
+impl MetadataField {
+    /// A field without a description.
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        field_type: MetadataFieldType,
+        icon: MetadataFieldIcon,
+        color: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            field_type,
+            icon,
+            color: color.into(),
+            ..Self::default()
+        }
+    }
+}
+
+/// A project's metadata fields and the revision to send back with a change.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct MetadataFieldsResource {
+    /// The project.
+    #[serde(default)]
+    pub project_id: String,
+    /// Counts changes to the project's settings and metadata fields, which share it.
+    #[serde(default)]
+    pub revision: u64,
+    /// The fields, in display order.
+    #[serde(default)]
+    pub fields: Vec<MetadataField>,
+    /// Fields this SDK version does not know.
+    #[serde(
+        flatten,
+        deserialize_with = "extra_fields::<MetadataFieldsResource, _>"
+    )]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Options for [`MetadataFieldsClient::ensure`](crate::MetadataFieldsClient::ensure).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnsureMetadataFields {
+    /// The `revision` you last read, which refuses settings or metadata fields changed since with
+    /// `project-settings/revision-conflict`. Omit it to change them whatever their revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<u64>,
+    /// The fields to create or replace by ID; other fields are kept.
+    pub fields: Vec<MetadataField>,
+}
+
+/// Options for [`MetadataFieldsClient::delete`](crate::MetadataFieldsClient::delete).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteMetadataField {
+    /// The field ID.
+    pub field_id: String,
+    /// The `revision` you last read, which refuses settings or metadata fields changed since with
+    /// `project-settings/revision-conflict`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revision: Option<u64>,
+}
+impl DeleteMetadataField {
+    /// Deletes field `field_id`, whatever the revision.
+    pub fn new(field_id: impl Into<String>) -> Self {
+        Self {
+            field_id: field_id.into(),
+            revision: None,
+        }
+    }
+}

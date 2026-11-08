@@ -75,6 +75,7 @@ The latest applied review in `classification.moderation.manualReviews` takes pre
 - Record [reviewer decisions](https://calmlens.com/docs/guides/human-review), [retry failed processing](https://calmlens.com/docs/guides/asset-lifecycle#recover-from-processing-failure), and [organise assets in folders](https://calmlens.com/docs/sdk/javascript/reference#folders).
 - [Verify and parse webhooks](https://calmlens.com/docs/sdk/javascript#webhooks), or poll the [events feed](https://calmlens.com/docs/sdk/javascript/reference#events-feed).
 - [Handle errors](https://calmlens.com/docs/sdk/javascript/reference#errors) by stable code, and set [timeouts and request budgets](https://calmlens.com/docs/sdk/javascript/reference#request-budgets).
+- [Manage configuration in code](https://calmlens.com/docs/guides/configuration-as-code): `uploadPresets.ensure`, `projectSettings.get`/`update` and `metadataFields.ensure`, each guarded by a revision, or declare the project in `calmlens.config.json` and run `calmlens plan` and `calmlens apply` in CI.
 - Forward events to a local handler with the bundled [`calmlens` CLI](https://calmlens.com/docs/guides/local-development): `npx calmlens listen --forward-to http://localhost:3000/api/webhooks/calmlens`.
 
 Every public SDK operation accepts one options object, so call sites stay stable as optional fields are added. The [SDK reference](https://calmlens.com/docs/sdk/javascript/reference) lists every option and method.

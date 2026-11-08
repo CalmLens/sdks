@@ -400,6 +400,24 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		return one(c.Lenses.Update(ctx, into[UpdateLensOptions](t, args)))
 	case "lenses.delete":
 		return fixtureCall{}, c.Lenses.Delete(ctx, into[LensIDOptions](t, args))
+	case "uploadPresets.list":
+		return one(c.UploadPresets.List(ctx, into[ListUploadPresetsOptions](t, args)))
+	case "uploadPresets.iterate":
+		return collect(ctx, c.UploadPresets.ListAll(into[ListUploadPresetsOptions](t, args)))
+	case "uploadPresets.ensure":
+		return one(c.UploadPresets.Ensure(ctx, into[EnsureUploadPresetsOptions](t, args)))
+	case "uploadPresets.delete":
+		return fixtureCall{}, c.UploadPresets.Delete(ctx, into[UploadPresetIDOptions](t, args))
+	case "projectSettings.get":
+		return one(c.ProjectSettings.Get(ctx))
+	case "projectSettings.update":
+		return one(c.ProjectSettings.Update(ctx, into[UpdateProjectSettingsOptions](t, args)))
+	case "metadataFields.list":
+		return one(c.MetadataFields.List(ctx))
+	case "metadataFields.ensure":
+		return one(c.MetadataFields.Ensure(ctx, into[EnsureMetadataFieldsOptions](t, args)))
+	case "metadataFields.delete":
+		return fixtureCall{}, c.MetadataFields.Delete(ctx, into[DeleteMetadataFieldOptions](t, args))
 	case "ensureLens":
 		return one(c.EnsureLens(ctx, into[EnsureLensOptions](t, args)))
 	case "ensureLenses":

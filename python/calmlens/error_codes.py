@@ -99,6 +99,14 @@ WEBSITE_RATE_LIMIT_REACHED = "upload/website-rate-limit-reached"
 UPLOAD_PRESET_DAILY_LIMIT_REACHED = "upload-preset/daily-limit-reached"
 UPLOAD_PRESET_ORIGIN_NOT_ALLOWED = "upload-preset/origin-not-allowed"
 UPLOAD_PRESET_FIELD_NOT_ALLOWED = "upload-preset/field-not-allowed"
+UPLOAD_PRESET_REVISION_CONFLICT = "upload-preset/revision-conflict"
+UPLOAD_PRESET_KEY_TAKEN = "upload-preset/key-taken"
+UPLOAD_PRESET_DAILY_LIMIT_REQUIRED = "upload-preset/daily-limit-required"
+UPLOAD_PRESET_INVALID_FOLDER = "upload-preset/invalid-folder"
+UPLOAD_PRESET_INVALID_POLICY = "upload-preset/invalid-policy"
+PROJECT_SETTINGS_REVISION_CONFLICT = "project-settings/revision-conflict"
+SEARCH_ESTIMATE_CHANGED = "search/estimate-changed"
+METADATA_FIELD_NOT_FOUND = "metadata-field/not-found"
 UPLOAD_TOKEN_INVALID = "upload-token/invalid"
 UPLOAD_TOKEN_EXPIRED = "upload-token/expired"
 UPLOAD_TOKEN_USED = "upload-token/used"
@@ -225,6 +233,14 @@ STATUS_BY_CODE: dict[str, int] = {
     "upload-preset/daily-limit-reached": 429,
     "upload-preset/origin-not-allowed": 403,
     "upload-preset/field-not-allowed": 400,
+    "upload-preset/revision-conflict": 409,
+    "upload-preset/key-taken": 409,
+    "upload-preset/daily-limit-required": 400,
+    "upload-preset/invalid-folder": 400,
+    "upload-preset/invalid-policy": 400,
+    "project-settings/revision-conflict": 409,
+    "search/estimate-changed": 409,
+    "metadata-field/not-found": 404,
     "upload-token/invalid": 401,
     "upload-token/expired": 401,
     "upload-token/used": 409,

@@ -208,6 +208,22 @@ public final class ErrorCodes {
   public static final String UPLOAD_PRESET_ORIGIN_NOT_ALLOWED = "upload-preset/origin-not-allowed";
   /** {@code upload-preset/field-not-allowed} (HTTP 400). */
   public static final String UPLOAD_PRESET_FIELD_NOT_ALLOWED = "upload-preset/field-not-allowed";
+  /** {@code upload-preset/revision-conflict} (HTTP 409): the preset changed since the revision sent; {@code details} has its {@code key} and current {@code revision}. */
+  public static final String UPLOAD_PRESET_REVISION_CONFLICT = "upload-preset/revision-conflict";
+  /** {@code upload-preset/key-taken} (HTTP 409). */
+  public static final String UPLOAD_PRESET_KEY_TAKEN = "upload-preset/key-taken";
+  /** {@code upload-preset/daily-limit-required} (HTTP 400). */
+  public static final String UPLOAD_PRESET_DAILY_LIMIT_REQUIRED = "upload-preset/daily-limit-required";
+  /** {@code upload-preset/invalid-folder} (HTTP 400). */
+  public static final String UPLOAD_PRESET_INVALID_FOLDER = "upload-preset/invalid-folder";
+  /** {@code upload-preset/invalid-policy} (HTTP 400). */
+  public static final String UPLOAD_PRESET_INVALID_POLICY = "upload-preset/invalid-policy";
+  /** {@code project-settings/revision-conflict} (HTTP 409). */
+  public static final String PROJECT_SETTINGS_REVISION_CONFLICT = "project-settings/revision-conflict";
+  /** {@code search/estimate-changed} (HTTP 409): {@code details.indexingUnits} has the new estimate. */
+  public static final String SEARCH_ESTIMATE_CHANGED = "search/estimate-changed";
+  /** {@code metadata-field/not-found} (HTTP 404). */
+  public static final String METADATA_FIELD_NOT_FOUND = "metadata-field/not-found";
   /** {@code upload-token/invalid} (HTTP 401). */
   public static final String UPLOAD_TOKEN_INVALID = "upload-token/invalid";
   /** {@code upload-token/expired} (HTTP 401). */
@@ -358,6 +374,14 @@ public final class ErrorCodes {
       Map.entry(UPLOAD_PRESET_DAILY_LIMIT_REACHED, 429),
       Map.entry(UPLOAD_PRESET_ORIGIN_NOT_ALLOWED, 403),
       Map.entry(UPLOAD_PRESET_FIELD_NOT_ALLOWED, 400),
+      Map.entry(UPLOAD_PRESET_REVISION_CONFLICT, 409),
+      Map.entry(UPLOAD_PRESET_KEY_TAKEN, 409),
+      Map.entry(UPLOAD_PRESET_DAILY_LIMIT_REQUIRED, 400),
+      Map.entry(UPLOAD_PRESET_INVALID_FOLDER, 400),
+      Map.entry(UPLOAD_PRESET_INVALID_POLICY, 400),
+      Map.entry(PROJECT_SETTINGS_REVISION_CONFLICT, 409),
+      Map.entry(SEARCH_ESTIMATE_CHANGED, 409),
+      Map.entry(METADATA_FIELD_NOT_FOUND, 404),
       Map.entry(UPLOAD_TOKEN_INVALID, 401),
       Map.entry(UPLOAD_TOKEN_EXPIRED, 401),
       Map.entry(UPLOAD_TOKEN_USED, 409),

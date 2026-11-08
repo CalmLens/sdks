@@ -48,6 +48,10 @@ from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, Ass
                     AssignPolicyOptions, CreatePolicyOptions, ListPoliciesOptions, Policy, PolicyIdOptions, PolicyPage,
                     PolicySettings, ResetPolicyOptions, SetPolicyAutomaticUpdatesOptions, UpdatePolicyOptions,
                     UpgradePolicyOptions, LensIdOptions, LensPage, ListLensesOptions, UpdateLensOptions, AssetTimelineSegment,
+                    DeleteMetadataFieldOptions, EnsureMetadataFieldsOptions, EnsureUploadPresetsOptions,
+                    EnsureUploadPresetsResponse, ListUploadPresetsOptions, MetadataFieldDefinition, MetadataFieldsResource,
+                    ProjectSettingsResource, PublicProjectSettingsInput, UpdateProjectSettingsOptions, UploadPreset,
+                    UploadPresetDefinition, UploadPresetIdOptions, UploadPresetPage,
                     ViewerClaims, Visibility, WaitForDecisionOptions)
 from .webhooks import parse_webhook_event, verify_webhook_signature
 
@@ -1061,6 +1065,8 @@ class CalmLensServerClient:
         self.assets, self.folders, self.hash_lists = Assets(self), Folders(self), HashLists(self)
         self.upload_tokens = UploadTokens(self)
         self.policies, self.lenses = Policies(self), Lenses(self)
+        self.upload_presets, self.project_settings = UploadPresets(self), ProjectSettings(self)
+        self.metadata_fields = MetadataFields(self)
         self.text, self.events, self.cdn = Text(self), Events(self), CDN(self)
 
     def __repr__(self) -> str:
@@ -2004,6 +2010,95 @@ class Policies:
         an upload preset that names its own policy."""
         merged = _merge("policies.assign", options, policy_id=policy_id)
         return cast(Policy, self._c._request("PUT", self._c._project("policy"), body=merged))
+
+
+class UploadPresets:
+    """``client.upload_presets``: the project's upload presets, the rules for uploads from browsers
+    and apps. :meth:`ensure` creates or replaces presets by key, for deploys that declare them in
+    code; send each preset's ``revision`` to refuse a change made since you read it."""
+
+    def __init__(self, client: CalmLensServerClient):
+        self._c = client
+
+    def list(self, options: ListUploadPresetsOptions | None = None, /, *, cursor: str = _UNSET,
+             page_size: int = _UNSET, sort: str = _UNSET) -> UploadPresetPage:
+        """One page of the project's upload presets, oldest first unless ``sort`` (comma-separated
+        ``createdAt`` and ``id``, descending when prefixed with ``-``) says otherwise."""
+        merged = _merge("uploadPresets.list", options, cursor=cursor, page_size=page_size, sort=sort)
+        return cast(UploadPresetPage, self._c._request("GET", self._c._project("upload-presets"), query=merged))
+
+    def iter(self, options: ListUploadPresetsOptions | None = None, /, *, page_size: int = _UNSET,
+             sort: str = _UNSET) -> Iterator[UploadPreset]:
+        """Yield every upload preset of the project, requesting pages lazily."""
+        merged = _merge("uploadPresets.each", options, page_size=page_size, sort=sort)
+        return cast(Iterator[UploadPreset], _iterate_pages(
+            lambda index: self.list(cast(ListUploadPresetsOptions, {**merged, "cursor": index})), merged.get("cursor")))
+
+    def ensure(self, options: EnsureUploadPresetsOptions | None = None, /, *,
+               upload_presets: List[UploadPresetDefinition] = _UNSET) -> EnsureUploadPresetsResponse:
+        """Create each preset, or replace it with the definition sent, by key; fields left out take
+        their defaults. Every preset is checked before any is saved, and an unchanged preset keeps
+        its revision. Returns the stored presets in the order sent."""
+        merged = _merge("uploadPresets.ensure", options, upload_presets=upload_presets)
+        return cast(EnsureUploadPresetsResponse, self._c._request("PUT", self._c._project("upload-presets"), body=merged))
+
+    def delete(self, options: UploadPresetIdOptions | None = None, /, *, upload_preset_id: str = _UNSET) -> None:
+        """Delete an upload preset; assets already uploaded through it stay."""
+        merged = _merge("uploadPresets.delete", options, upload_preset_id=upload_preset_id)
+        self._c._request("DELETE", "/upload-presets/" + _id(merged.get("uploadPresetId"), "uploadPresetId"))
+
+
+class ProjectSettings:
+    """``client.project_settings``: the project's settings, with defaults filled in. Its policy and
+    metadata fields have their own methods."""
+
+    def __init__(self, client: CalmLensServerClient):
+        self._c = client
+
+    def get(self, options: Mapping[str, Any] | None = None, /) -> ProjectSettingsResource:
+        """The project's settings and the revision to send back with a change. It takes no options."""
+        _merge("projectSettings.get", options)
+        return cast(ProjectSettingsResource, self._c._request("GET", self._c._project("settings")))
+
+    def update(self, options: UpdateProjectSettingsOptions | None = None, /, *,
+               settings: PublicProjectSettingsInput = _UNSET, revision: int = _UNSET,
+               search_indexing_budget_units: float = _UNSET) -> ProjectSettingsResource:
+        """Replace the settings: those left out return to their defaults. Send the ``revision`` you
+        read to refuse a change made since; unchanged settings keep their revision. Turning on
+        ``aiMediaSearchEnabled`` needs ``search_indexing_budget_units``."""
+        merged = _merge("projectSettings.update", options, settings=settings, revision=revision,
+                        search_indexing_budget_units=search_indexing_budget_units)
+        return cast(ProjectSettingsResource, self._c._request("PUT", self._c._project("settings"), body=merged))
+
+
+class MetadataFields:
+    """``client.metadata_fields``: the project's metadata fields. They share the project settings'
+    ``revision``."""
+
+    def __init__(self, client: CalmLensServerClient):
+        self._c = client
+
+    def list(self, options: Mapping[str, Any] | None = None, /) -> MetadataFieldsResource:
+        """The project's fields in display order and the revision to send back with a change. It
+        takes no options."""
+        _merge("metadataFields.list", options)
+        return cast(MetadataFieldsResource, self._c._request("GET", self._c._project("metadata-fields")))
+
+    def ensure(self, options: EnsureMetadataFieldsOptions | None = None, /, *,
+               fields: List[MetadataFieldDefinition] = _UNSET, revision: int = _UNSET) -> MetadataFieldsResource:
+        """Create or replace fields by ID. Other fields are kept, new ones are added at the end, and
+        unchanged fields keep the revision. Send the ``revision`` you read to refuse a change made
+        since."""
+        merged = _merge("metadataFields.ensure", options, fields=fields, revision=revision)
+        return cast(MetadataFieldsResource, self._c._request("PUT", self._c._project("metadata-fields"), body=merged))
+
+    def delete(self, options: DeleteMetadataFieldOptions | None = None, /, *, field_id: str = _UNSET,
+               revision: int = _UNSET) -> None:
+        """Delete a field definition; assets keep their values. Send the ``revision`` you read to
+        refuse a change made since."""
+        merged = _merge("metadataFields.delete", options, field_id=field_id, revision=revision)
+        path = self._c._project("metadata-fields/" + _id(merged.get("fieldId"), "fieldId"))
+        self._c._request("DELETE", path, query={k: v for k, v in merged.items() if k != "fieldId"})
 
 
 class Lenses:

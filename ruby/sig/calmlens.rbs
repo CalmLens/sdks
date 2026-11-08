@@ -123,6 +123,9 @@ module CalmLens
     attr_reader events: Events
     attr_reader cdn: CDN
     attr_reader lenses: Lenses
+    attr_reader upload_presets: UploadPresets
+    attr_reader project_settings: ProjectSettings
+    attr_reader metadata_fields: MetadataFields
     attr_reader project_id: String
     attr_reader base_url: String
     attr_reader cdn_base_url: String
@@ -236,6 +239,25 @@ module CalmLens
     def retrieve: (lens_id_options options) -> lens
     def update: (update_lens_options options) -> lens
     def delete: (lens_id_options options) -> nil
+  end
+
+  class UploadPresets < Resource
+    def list: (?list_upload_presets_options options) -> upload_preset_page
+    def each: (?list_upload_presets_options options) { (upload_preset) -> void } -> nil
+            | (?list_upload_presets_options options) -> Enumerator[upload_preset, nil]
+    def ensure: (ensure_upload_presets_options options) -> ensure_upload_presets_response
+    def delete: (upload_preset_id_options options) -> nil
+  end
+
+  class ProjectSettings < Resource
+    def get: (?request_only_options options) -> project_settings_resource
+    def update: (update_project_settings_options options) -> project_settings_resource
+  end
+
+  class MetadataFields < Resource
+    def list: (?request_only_options options) -> metadata_fields_resource
+    def ensure: (ensure_metadata_fields_options options) -> metadata_fields_resource
+    def delete: (delete_metadata_field_options options) -> nil
   end
 
   class UploadTokens < Resource

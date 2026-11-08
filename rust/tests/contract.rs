@@ -12,7 +12,8 @@ use calmlens::testing::{
 };
 use calmlens::{
     AssetsClient, CdnClient, ErrorCode, EventsClient, FoldersClient, HashListsClient, LensesClient,
-    PoliciesClient, ServerClient, TextClient, UploadTokensClient,
+    MetadataFieldsClient, PoliciesClient, ProjectSettingsClient, ServerClient, TextClient,
+    UploadPresetsClient, UploadTokensClient,
 };
 use common::{compare_typed, fixture, input, invoke, iterator, typed, whole_numbers};
 use futures_util::FutureExt;
@@ -1606,6 +1607,15 @@ fn references() -> BTreeSet<&'static str> {
         "lenses().retrieve" => ServerClient::lenses, LensesClient::retrieve;
         "lenses().update" => ServerClient::lenses, LensesClient::update;
         "lenses().delete" => ServerClient::lenses, LensesClient::delete;
+        "upload_presets().list" => ServerClient::upload_presets, UploadPresetsClient::list;
+        "upload_presets().iterate" => ServerClient::upload_presets, UploadPresetsClient::iterate;
+        "upload_presets().ensure" => ServerClient::upload_presets, UploadPresetsClient::ensure;
+        "upload_presets().delete" => ServerClient::upload_presets, UploadPresetsClient::delete;
+        "project_settings().get" => ServerClient::project_settings, ProjectSettingsClient::get;
+        "project_settings().update" => ServerClient::project_settings, ProjectSettingsClient::update;
+        "metadata_fields().list" => ServerClient::metadata_fields, MetadataFieldsClient::list;
+        "metadata_fields().ensure" => ServerClient::metadata_fields, MetadataFieldsClient::ensure;
+        "metadata_fields().delete" => ServerClient::metadata_fields, MetadataFieldsClient::delete;
         "folders().iterate" => ServerClient::folders, FoldersClient::iterate;
         "hash_lists().iterate" => ServerClient::hash_lists, HashListsClient::iterate;
         "hash_lists().iterate_entries" => ServerClient::hash_lists, HashListsClient::iterate_entries;

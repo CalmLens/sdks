@@ -381,6 +381,18 @@ impl ServerClient {
     pub fn policies(&self) -> PoliciesClient<'_> {
         PoliciesClient(self)
     }
+    /// The project's upload presets: the rules for uploads from browsers and apps.
+    pub fn upload_presets(&self) -> UploadPresetsClient<'_> {
+        UploadPresetsClient(self)
+    }
+    /// The project's settings.
+    pub fn project_settings(&self) -> ProjectSettingsClient<'_> {
+        ProjectSettingsClient(self)
+    }
+    /// The project's metadata fields.
+    pub fn metadata_fields(&self) -> MetadataFieldsClient<'_> {
+        MetadataFieldsClient(self)
+    }
     /// Lens operations: the project's named CDN transforms.
     pub fn lenses(&self) -> LensesClient<'_> {
         LensesClient(self)
@@ -1837,6 +1849,119 @@ impl PoliciesClient<'_> {
         let path = self.0.project_path("policy")?;
         let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
         self.0.call(request).await
+    }
+}
+
+/// The project's upload presets: the rules for uploads from browsers and apps. Get it from
+/// [`ServerClient::upload_presets`]. [`UploadPresetsClient::ensure`] creates or replaces presets
+/// by key, for deploys that declare them in code; send each preset's `revision` to refuse a change
+/// made since you read it.
+#[derive(Debug, Clone, Copy)]
+pub struct UploadPresetsClient<'a>(&'a ServerClient);
+impl UploadPresetsClient<'_> {
+    /// One page of the project's upload presets, oldest first unless `sort` says otherwise. Pass
+    /// the page's `next_cursor` as `cursor` for the next page.
+    pub async fn list(&self, options: ListUploadPresets) -> Result<UploadPresetPage> {
+        let mut query = Query::default();
+        query.opt("cursor", options.cursor.as_ref());
+        query.opt("pageSize", options.page_size);
+        query.opt("sort", options.sort.as_ref());
+        let path = self.0.project_path("upload-presets")?;
+        self.0
+            .call(self.0.prepare(Method::GET, &path, &query.0)?)
+            .await
+    }
+    /// Every upload preset of the project from `options.cursor` on, ending and failing like
+    /// [`AssetsClient::iterate`].
+    pub fn iterate(&self, options: ListUploadPresets) -> BoxStream<'static, Result<UploadPreset>> {
+        let client = self.0.clone();
+        paginate(
+            options,
+            |options| options.cursor.clone(),
+            move |options| {
+                let client = client.clone();
+                async move {
+                    let page = client.upload_presets().list(options.clone()).await?;
+                    let next =
+                        next_cursor(&page.items, page.has_more, &page.next_cursor).map(|cursor| {
+                            ListUploadPresets {
+                                cursor: Some(cursor),
+                                ..options
+                            }
+                        });
+                    Ok((page.items, next))
+                }
+            },
+        )
+    }
+    /// Creates each preset, or replaces it with the definition sent, by key. Fields left out take
+    /// their defaults. An unchanged preset is returned as it is, with the same revision, so
+    /// deploys can send their presets every time. Every preset is checked before any is saved.
+    pub async fn ensure(
+        &self,
+        options: EnsureUploadPresets,
+    ) -> Result<EnsureUploadPresetsResponse> {
+        let path = self.0.project_path("upload-presets")?;
+        let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
+    /// Deletes an upload preset. Browsers can no longer upload through it; assets already
+    /// uploaded stay.
+    pub async fn delete(&self, options: UploadPresetId) -> Result<()> {
+        let path = format!("/upload-presets/{}", id(&options.upload_preset_id)?);
+        self.0
+            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .await
+    }
+}
+
+/// The project's settings. Get it from [`ServerClient::project_settings`].
+#[derive(Debug, Clone, Copy)]
+pub struct ProjectSettingsClient<'a>(&'a ServerClient);
+impl ProjectSettingsClient<'_> {
+    /// The project's settings, with every default filled in, and the revision to send back with
+    /// a change.
+    pub async fn get(&self) -> Result<ProjectSettingsResource> {
+        let path = self.0.project_path("settings")?;
+        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+    }
+    /// Replaces the project's settings: settings left out return to their defaults. Unchanged
+    /// settings keep their revision. Send the `revision` you read to refuse a change made since.
+    pub async fn update(&self, options: UpdateProjectSettings) -> Result<ProjectSettingsResource> {
+        let path = self.0.project_path("settings")?;
+        let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
+}
+
+/// The project's metadata fields, which share the project settings' `revision`. Get it from
+/// [`ServerClient::metadata_fields`].
+#[derive(Debug, Clone, Copy)]
+pub struct MetadataFieldsClient<'a>(&'a ServerClient);
+impl MetadataFieldsClient<'_> {
+    /// The project's metadata fields in display order, and the revision to send back with a
+    /// change.
+    pub async fn list(&self) -> Result<MetadataFieldsResource> {
+        let path = self.0.project_path("metadata-fields")?;
+        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+    }
+    /// Creates each field, or replaces it with the definition sent, by ID. Other fields are kept,
+    /// and new ones are added at the end. Unchanged fields keep their revision.
+    pub async fn ensure(&self, options: EnsureMetadataFields) -> Result<MetadataFieldsResource> {
+        let path = self.0.project_path("metadata-fields")?;
+        let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
+        self.0.call(request).await
+    }
+    /// Deletes a metadata field definition. Assets keep the metadata values they hold.
+    pub async fn delete(&self, options: DeleteMetadataField) -> Result<()> {
+        let path = self
+            .0
+            .project_path(&format!("metadata-fields/{}", id(&options.field_id)?))?;
+        let mut query = Query::default();
+        query.opt("revision", options.revision);
+        self.0
+            .call_empty(self.0.prepare(Method::DELETE, &path, &query.0)?)
+            .await
     }
 }
 

@@ -32,6 +32,9 @@ final class ServerClient
     public readonly HashLists $hashLists;
     public readonly Policies $policies;
     public readonly Lenses $lenses;
+    public readonly UploadPresets $uploadPresets;
+    public readonly ProjectSettings $projectSettings;
+    public readonly MetadataFields $metadataFields;
     public readonly Events $events;
     public readonly Text $text;
     public readonly Cdn $cdn;
@@ -78,6 +81,9 @@ final class ServerClient
         $this->hashLists = new HashLists($this->session);
         $this->policies = new Policies($this->session);
         $this->lenses = new Lenses($this->session);
+        $this->uploadPresets = new UploadPresets($this->session);
+        $this->projectSettings = new ProjectSettings($this->session);
+        $this->metadataFields = new MetadataFields($this->session);
         $this->events = new Events($this->session);
         $this->text = new Text($this->assets);
         $this->cdn = new Cdn($this->session);
