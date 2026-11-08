@@ -456,6 +456,84 @@
       "requests": []
     },
     {
+      "name": "an API key with a space is refused before any request",
+      "area": "base-url",
+      "client": {
+        "apiKey": "not a key"
+      },
+      "responses": [],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-config",
+              "status": null,
+              "requestId": null,
+              "retryAfter": null,
+              "details": null
+            }
+          }
+        }
+      ],
+      "requests": []
+    },
+    {
+      "name": "an API key with a line break is refused before any request",
+      "area": "base-url",
+      "client": {
+        "apiKey": "key\nX-Injected: 1"
+      },
+      "responses": [],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-config",
+              "status": null,
+              "requestId": null,
+              "retryAfter": null,
+              "details": null
+            }
+          }
+        }
+      ],
+      "requests": []
+    },
+    {
+      "name": "an empty project ID is refused before any request",
+      "area": "base-url",
+      "client": {
+        "projectId": ""
+      },
+      "responses": [],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-config",
+              "status": null,
+              "requestId": null,
+              "retryAfter": null,
+              "details": null
+            }
+          }
+        }
+      ],
+      "requests": []
+    },
+    {
       "name": "a project ID of .. is refused before any request",
       "area": "base-url",
       "client": {
@@ -636,6 +714,67 @@
         }
       ],
       "requests": []
+    },
+    {
+      "name": "an API key and project ID in any sendable format are left for the API to check",
+      "area": "base-url",
+      "client": {
+        "projectId": "also-bad"
+      },
+      "responses": [
+        {
+          "status": 401,
+          "body": {
+            "code": "api-key/invalid",
+            "message": "The API key is invalid, revoked or expired. Create a key under Developer → API Keys.",
+            "requestId": "req-1",
+            "details": {}
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": "asset-1"
+          },
+          "expect": {
+            "error": {
+              "code": "api-key/invalid",
+              "status": 401,
+              "requestId": "req-1",
+              "retryAfter": null,
+              "details": {}
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "GET",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/assets/asset-1",
+          "rawQuery": "",
+          "query": [],
+          "headers": {
+            "idempotency-key": {
+              "$absent": true
+            },
+            "accept": "application/json",
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": {
+              "$absent": true
+            }
+          },
+          "body": null
+        }
+      ]
     },
     {
       "name": "create sends text content as JSON with every optional field in the body",

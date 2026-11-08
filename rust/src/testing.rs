@@ -56,7 +56,7 @@ use std::{
 };
 
 /// A request captured by [`MockServerClient`], decoded so tests need not parse URLs by hand.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[non_exhaustive]
 pub struct Request {
     /// The HTTP method, e.g. `POST`.
@@ -76,6 +76,25 @@ pub struct Request {
     /// The HTTP status the mock answered with, or `None` when the request failed without a
     /// response (a transport error or timeout).
     pub response_status: Option<u16>,
+}
+impl std::fmt::Debug for Request {
+    /// Everything but the API key, which a mock built with [`MockServerClient::from_builder`] may
+    /// have been given for real.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut headers = self.headers.clone();
+        if let Some(api_key) = headers.get_mut("x-api-key") {
+            *api_key = "[redacted]".to_owned();
+        }
+        f.debug_struct("Request")
+            .field("method", &self.method)
+            .field("url", &self.url)
+            .field("path", &self.path)
+            .field("query", &self.query)
+            .field("headers", &headers)
+            .field("body", &self.body)
+            .field("response_status", &self.response_status)
+            .finish()
+    }
 }
 impl Request {
     /// The first value of query parameter `name`.
@@ -380,14 +399,19 @@ impl MockServerClient {
     /// processing removes the content unless the upload set `keep_content_after_processing`;
     /// `purged` removes it with reason `policy`.
     /// Retrieve, list (RSQL filter, ordering, folder, cursor), children, update, move, delete,
-    /// delete content, retry, keyword search, signed URLs, folders, hash lists, lenses and the
-    /// events feed read and change that storage, with the API's error codes, statuses and idempotent
+    /// delete content, retry, keyword search, signed URLs, folders, hash lists, lenses, upload
+    /// preset definitions, project settings, metadata fields and the events feed read and change
+    /// that storage, with the API's error codes, statuses and idempotent
     /// replays. `wait_for_decision` returns at once for a settled asset (processing `completed`
     /// or `failed`); a queued or processing one waits for [`decide`](Self::decide),
-    /// [`complete_processing`](Self::complete_processing) or the timeout. The CDN serves stored bytes, refusing
+    /// [`complete_processing`](Self::complete_processing) or the timeout. An API-key upload naming
+    /// a preset takes its folder, visibility and processing options and keeps to its limits. The
+    /// CDN serves stored bytes, refusing
     /// blocked and purged assets, age-restricted ones requested without
     /// `ViewerClaims::age_confirmed` set to `true` whatever the key, and private ones unless the
-    /// API key has an `assets:download` grant ([`create_mock_api_key`]). Served content has its stored `content-type` and
+    /// API key has an `assets:download` grant ([`create_mock_api_key`]). Without a grant or an API
+    /// key, a private asset answers `asset/not-found` whatever its state, for every resource but
+    /// its public placeholder. Served content has its stored `content-type` and
     /// the CDN's `cache-control`: `public` only when anyone may see the asset, otherwise
     /// `private`, with `max-age=31536000, immutable` for images and `max-age=3600` otherwise.
     /// Content is never classified or transformed.
@@ -450,7 +474,8 @@ impl MockServerClient {
     /// status changes (`purged` removes the content), the review is added to `manual_reviews`,
     /// and an `asset.<status>` event whose `actor` is a `user` joins the events feed (after an
     /// `asset.content-removed` event for a purge).
-    /// The report stays as moderation left it. Fails with `sdk/invalid-argument` for a decision
+    /// The report stays as moderation left it, but for any
+    /// [`pending_review`](MockDecision::pending_review), which this decision settles. Fails with `sdk/invalid-argument` for a decision
     /// that is not `allowed`, `limited`, `age-restricted`, `blocked` or `purged`, and with
     /// `asset/not-found` (status 404) for an unknown asset.
     ///
@@ -614,7 +639,8 @@ impl MockServerClient {
     }
     /// Fetches a CDN URL as a browser would, with a GET and without the API key: a signed asset
     /// URL from `cdn().sign_asset_url` (with a resource appended), or a public one from
-    /// `cdn().get_asset_url`. The request is recorded like any other, and the response is returned
+    /// `cdn().get_asset_url`. A private asset's plain URL answers `asset/not-found`, whatever the
+    /// asset's state, for every resource but its placeholder. The request is recorded like any other, and the response is returned
     /// whatever its status.
     pub async fn fetch_cdn(&self, url: &str) -> Result<crate::CdnResponse> {
         self.client.cdn().fetch_unauthenticated(url).await

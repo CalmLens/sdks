@@ -328,3 +328,48 @@ async fn a_split_upload_refuses_a_long_key_and_an_image_over_20_mib_before_sendi
         .unwrap();
     assert_eq!(mock.requests().len(), 3);
 }
+
+#[tokio::test]
+async fn a_multipart_upload_through_a_preset_takes_its_settings_and_its_declared_total_its_limit() {
+    let mock =
+        MockServerClient::in_memory(MockOptions::new().part_size_bytes(5 * MIB as u64)).unwrap();
+    let presets = mock
+        .upload_presets()
+        .ensure(EnsureUploadPresets {
+            upload_presets: vec![
+                UploadPresetDefinition {
+                    key: "public".into(),
+                    name: "Public".into(),
+                    visibility: Some(Visibility::Public),
+                    ..Default::default()
+                },
+                // Each part fits, but the declared total doesn't.
+                UploadPresetDefinition {
+                    key: "small".into(),
+                    name: "Small".into(),
+                    max_size_in_bytes: Patch::Value(6 * MIB as u64),
+                    ..Default::default()
+                },
+            ],
+        })
+        .await
+        .unwrap()
+        .upload_presets;
+    let upload = |preset: usize| SubmitAsset {
+        upload_preset_id: Some(presets[preset].id.clone()),
+        ..SubmitAsset::new("clip.mp4", Content::bytes(file_of(11 * MIB), "video/mp4"))
+    };
+    let asset = mock.assets().classify(upload(0)).await.unwrap();
+    assert_eq!(asset.visibility, Visibility::Public);
+    mock.clear_requests();
+    let error = mock.assets().classify(upload(1)).await.unwrap_err();
+    assert_eq!(*error.code(), ErrorCode::UploadTooLarge);
+    assert_eq!(error.status(), Some(413));
+    assert_eq!(
+        error.details().get("limitBytes"),
+        Some(&json!(6 * MIB)),
+        "{error:?}"
+    );
+    assert_eq!(error.details().get("source"), Some(&json!("preset")));
+    assert_eq!(mock.requests().len(), 1);
+}

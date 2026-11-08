@@ -1075,6 +1075,11 @@ impl Backend {
         let asset = storage.assets.get_mut(asset_id).expect("stored asset");
         apply_outcome(asset, &mut storage.content, decision, "requested", now);
         let moderation = &mut asset["classification"]["moderation"];
+        // Like the API: the human review queue's decision settles its review, one through the API
+        // leaves it waiting.
+        if note.is_null() {
+            moderation["pendingReview"] = Value::Null;
+        }
         if !moderation["manualReviews"].is_array() {
             moderation["manualReviews"] = json!([]);
         }
@@ -1616,7 +1621,7 @@ impl Backend {
     fn apply_decision(&mut self, asset: &mut Value, decision: &MockDecision, now: u64) {
         let status = decision.status().as_str();
         apply_outcome(asset, &mut self.storage.content, status, "policy", now);
-        if let Some(report) = decision.report() {
+        if let Some(report) = decision.report(now) {
             let moderation = &mut asset["classification"]["moderation"];
             for (key, value) in report {
                 moderation[key] = value;
@@ -1869,8 +1874,12 @@ impl Backend {
     }
 
     /// Saves a lens definition by its identifier: a new lens, the stored one unchanged when the
-    /// definition matches it, or the stored one changed to the definition.
+    /// definition matches it, or the stored one changed to the definition. Like the API, a lens
+    /// is active unless the definition says otherwise.
     fn save_lens(&mut self, mut definition: Value, now: u64) -> Value {
+        if definition["active"].is_null() {
+            definition["active"] = true.into();
+        }
         let identifier = text(&definition["identifier"]).to_owned();
         let old = self.lenses.get(&identifier);
         let same = old.is_some_and(|old| {
@@ -2245,7 +2254,7 @@ impl Backend {
     /// `POST /projects/:id/assets`. `x-calmlens-upload` is empty for a JSON body (plain text in
     /// `content` or `part`, or a URL), `content` for an upload form with the whole file and
     /// `part` for one with the first part of a multipart upload. Like the API, asset fields in
-    /// the query are refused.
+    /// the query are refused. An upload naming a preset takes its settings and keeps to its limits.
     fn create_asset(
         &mut self,
         (mode, content_type): (&str, &str),
@@ -2333,10 +2342,15 @@ impl Backend {
         let mime = mime.as_str();
         let raw = bytes.as_slice();
         check_metadata(options.get("metadata"))?;
+        let website = options.contains_key("url");
+        self.apply_upload_preset(
+            &mut options,
+            (!website && !mime.is_empty()).then_some(mime),
+            (!website).then(|| total.unwrap_or(raw.len() as u64)),
+        )?;
         if options.get("name").map_or("", text).is_empty() {
             return Err(invalid("Asset name is required"));
         }
-        let website = options.contains_key("url");
         if !website && !is_accepted_upload_mime_type(mime) {
             let mut failure = fail(
                 ErrorCode::UnsupportedUploadType,
@@ -2948,6 +2962,16 @@ impl Backend {
             grant.is_some()
                 || self.can_download(text(&asset["folderId"]), header(headers, "x-api-key"))
         };
+        // Like the CDN, a private asset answers anyone without a grant or an API key as an unknown
+        // asset does, whatever its state. Its placeholder is public, and its info has this rule of
+        // its own.
+        if !public
+            && grant.is_none()
+            && header(headers, "x-api-key").is_empty()
+            && !matches!(resource, "placeholder" | "info")
+        {
+            return not_found();
+        }
         if resource == "info" {
             return serve_info(asset, can_download(), q);
         }

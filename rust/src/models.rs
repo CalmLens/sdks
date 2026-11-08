@@ -1517,8 +1517,9 @@ pub struct LensDefinition {
     /// The asset type the lens applies to.
     #[serde(rename = "type")]
     pub lens_type: LensType,
-    /// Whether the CDN serves the lens.
-    pub active: bool,
+    /// Whether the CDN serves the lens. Defaults to `true`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active: Option<bool>,
     /// The image transform options the lens applies.
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub transform: Patch<ImageTransformOptions>,

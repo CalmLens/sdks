@@ -236,6 +236,12 @@ impl ServerClientBuilder {
             return Err(invalid_config("API key and project ID are required"));
         }
         id(&self.project_id).map_err(|_| invalid_config("Invalid project ID"))?;
+        // Only what can be sent as a header is checked: the API decides whether a key is real.
+        if !self.api_key.bytes().all(|byte| matches!(byte, 0x21..=0x7e)) {
+            return Err(invalid_config(
+                "The API key must be printable ASCII without spaces",
+            ));
+        }
         let api_key = HeaderValue::from_str(&self.api_key)
             .map_err(|_| invalid_config("The API key contains characters a header cannot"))?;
         let mut api_key = api_key;
@@ -444,8 +450,12 @@ impl ServerClient {
             let cache = self.inner.lenses.lock().unwrap_or_else(|e| e.into_inner());
             for lens in &options.lenses {
                 id(&lens.identifier)?;
-                let key = serde_json::to_string(lens)
-                    .map_err(|cause| invalid_argument(cause.to_string()).with_source(cause))?;
+                // A lens sent without `active` is active, so both spellings share a cache entry.
+                let key = serde_json::to_string(&LensDefinition {
+                    active: Some(lens.active.unwrap_or(true)),
+                    ..lens.clone()
+                })
+                .map_err(|cause| invalid_argument(cause.to_string()).with_source(cause))?;
                 match cache.get(&key) {
                     Some(cached) => {
                         resolved.insert(key.clone(), cached.clone());

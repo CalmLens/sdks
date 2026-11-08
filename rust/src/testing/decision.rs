@@ -107,8 +107,24 @@ fn likelihood(score: f64) -> &'static str {
     }
 }
 
+/// The CalmLens category named `category`.
+fn known_category(category: &str) -> Result<&'static str> {
+    CATEGORIES
+        .iter()
+        .find(|known| **known == category)
+        .copied()
+        .ok_or_else(|| invalid_argument(format!("{category} is not a CalmLens category")))
+}
+
 fn is_score(score: f64) -> bool {
     score.is_finite() && (0.0..=1.0).contains(&score)
+}
+
+/// Why a decision waits for human review.
+#[derive(Clone, Debug, PartialEq)]
+struct PendingReview {
+    reason: &'static str,
+    uncertain_categories: Vec<&'static str>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -125,7 +141,8 @@ struct Flag {
 /// A decided status fills the asset's report as the API would: every category (those not
 /// flagged evaluated with score 0), the policy's actions and
 /// `flagged_categories`. The policy acts on a category at 0.5 and above, so a flagged category
-/// at 0.5 or more is listed there unless the status is `allowed`.
+/// at 0.5 or more is listed there unless the status is `allowed`. Each evaluated category records
+/// where its action came from and, as its settings, the decision's action with no rules.
 ///
 /// ```
 /// # fn run() -> calmlens::Result<()> {
@@ -141,6 +158,7 @@ pub struct MockDecision {
     status: MockOutcome,
     flags: Vec<Flag>,
     not_evaluated: Vec<&'static str>,
+    pending_review: Option<PendingReview>,
 }
 impl From<MockOutcome> for MockDecision {
     fn from(status: MockOutcome) -> Self {
@@ -154,6 +172,7 @@ impl MockDecision {
             status,
             flags: Vec::new(),
             not_evaluated: Vec::new(),
+            pending_review: None,
         }
     }
     /// The decision's status.
@@ -209,13 +228,43 @@ impl MockDecision {
         self.not_evaluated.push(category);
         Ok(self)
     }
+    /// Leaves the decision waiting for human review, as `classification.moderation.pendingReview`
+    /// reports: `reason` is `sampled`, or `uncertain` with the `uncertain_categories` that made it
+    /// so. [`decide`](super::MockServerClient::decide) on the mock settles the review and clears
+    /// it; `assets().decide` leaves it waiting, as with the API.
+    ///
+    /// Fails with `sdk/invalid-argument` for a `pending` or `failed` decision, any other reason, a
+    /// `sampled` reason with uncertain categories, or an unknown category.
+    pub fn pending_review(mut self, reason: &str, uncertain_categories: &[&str]) -> Result<Self> {
+        if !self.status.is_decided() {
+            return Err(invalid_argument(format!(
+                "a {} decision can't wait for review",
+                self.status
+            )));
+        }
+        let reason = match reason {
+            "sampled" if !uncertain_categories.is_empty() => {
+                return Err(invalid_argument(
+                    "a sampled review has no uncertain categories",
+                ));
+            }
+            "sampled" => "sampled",
+            "uncertain" => "uncertain",
+            _ => return Err(invalid_argument("reason must be sampled or uncertain")),
+        };
+        let uncertain_categories = uncertain_categories
+            .iter()
+            .map(|category| known_category(category))
+            .collect::<Result<_>>()?;
+        self.pending_review = Some(PendingReview {
+            reason,
+            uncertain_categories,
+        });
+        Ok(self)
+    }
     /// The known category named `category`, which must not be in this decision yet.
     fn check_new(&self, category: &str) -> Result<&'static str> {
-        let Some(&known) = CATEGORIES.iter().find(|known| **known == category) else {
-            return Err(invalid_argument(format!(
-                "{category} is not a CalmLens category"
-            )));
-        };
+        let known = known_category(category)?;
         if !self.status.is_decided() {
             return Err(invalid_argument(format!(
                 "a {} decision has no findings",
@@ -252,8 +301,8 @@ impl MockDecision {
         }
     }
     /// The moderation fields a decided asset gets (`categories`, `score` and `policy`), or
-    /// `None` for `pending` and `failed`.
-    pub(super) fn report(&self) -> Option<Map<String, Value>> {
+    /// `None` for `pending` and `failed`. `requested_at` is when a pending review joined the queue.
+    pub(super) fn report(&self, requested_at: u64) -> Option<Map<String, Value>> {
         if !self.status.is_decided() {
             return None;
         }
@@ -294,9 +343,21 @@ impl MockDecision {
             .iter()
             .map(|(category, score)| {
                 let action = self.action(*score);
+                let source = if *score >= 0.5 {
+                    "default"
+                } else {
+                    "below-threshold"
+                };
                 (
                     (*category).to_owned(),
-                    json!({"score": score, "action": action}),
+                    json!({
+                        "score": score, "action": action, "source": {"kind": source},
+                        // The mock keeps no policies: the category's setting is the decision's own
+                        // action.
+                        "settings": {
+                            "action": self.status.action(), "allowances": [], "restrictions": [],
+                        },
+                    }),
                 )
             })
             .collect();
@@ -309,6 +370,15 @@ impl MockDecision {
         report.insert("explanationComplete".into(), true.into());
         // The mock keeps no policies, so no policy is named.
         report.insert("policy".into(), Value::Null);
+        report.insert(
+            "pendingReview".into(),
+            self.pending_review.as_ref().map_or(Value::Null, |review| {
+                json!({
+                    "requestedAt": requested_at, "reason": review.reason,
+                    "uncertainCategories": review.uncertain_categories,
+                })
+            }),
+        );
         report.insert("source".into(), "policy".into());
         report.insert("rule".into(), Value::Null);
         report.insert("automatedStatus".into(), self.status.as_str().into());

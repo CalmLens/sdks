@@ -1211,6 +1211,15 @@ fn build_decision(spec: &Value) -> calmlens::Result<MockDecision> {
     for category in spec["notEvaluated"].as_array().into_iter().flatten() {
         decision = decision.not_evaluated(category.as_str().unwrap())?;
     }
+    if let Some(review) = spec.get("pendingReview") {
+        let categories: Vec<&str> = review["uncertainCategories"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|category| category.as_str().unwrap())
+            .collect();
+        decision = decision.pending_review(review["reason"].as_str().unwrap(), &categories)?;
+    }
     Ok(decision)
 }
 

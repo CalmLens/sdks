@@ -301,7 +301,7 @@ pub enum TestInputPreset {
     AdultText,
     /// No instances, delivery blocked in `DE`, age-restricted in `GB` and limited in `FR`.
     RegionalDelivery,
-    /// A publicly displayed Nazi hate symbol.
+    /// No instances, delivery blocked in `DE`.
     Germany,
     /// Two harassment instances: documentary abuse and a threat.
     Mixed,
@@ -338,6 +338,7 @@ impl TestInputPreset {
         let instances = match self {
             Self::Clean
             | Self::RegionalDelivery
+            | Self::Germany
             | Self::OneFace
             | Self::NoFace
             | Self::AdultFace
@@ -346,10 +347,6 @@ impl TestInputPreset {
             Self::Limited => vec![one("harassment", &["harassment-abuse"])],
             Self::AdultImage => vec![one("sexual", &["sexual-pornographic-media"])],
             Self::AdultText => vec![one("sexual", &["sexual-explicit-language"])],
-            Self::Germany => vec![one(
-                "hate",
-                &["hate-symbol", "hate-nazi-symbols-public-display"],
-            )],
             Self::Mixed => vec![
                 one(
                     "harassment",
@@ -358,13 +355,19 @@ impl TestInputPreset {
                 one("harassment", &["harassment-threat"]),
             ],
         };
-        let regional_actions = (self == Self::RegionalDelivery).then(|| {
-            [("DE", "block"), ("GB", "age-restrict"), ("FR", "limit")]
+        let regional: &[(&str, &str)] = match self {
+            Self::RegionalDelivery => &[("DE", "block"), ("GB", "age-restrict"), ("FR", "limit")],
+            Self::Germany => &[("DE", "block")],
+            _ => &[],
+        };
+        let regional_actions = (!regional.is_empty()).then(|| {
+            regional
+                .iter()
                 .map(|(region, action)| TestRegionalAction {
-                    region: region.to_owned(),
-                    action: action.to_owned(),
+                    region: (*region).to_owned(),
+                    action: (*action).to_owned(),
                 })
-                .to_vec()
+                .collect()
         });
         TestInput {
             regional_actions,
@@ -482,10 +485,12 @@ pub fn test_input_for_signal(signal: &str, kind: TestInputKind) -> Result<TestIn
         ("harassment.insult", _) => TestInputPreset::Limited,
         ("sexual.adult", TestInputKind::Image) => TestInputPreset::AdultImage,
         ("sexual.adult", TestInputKind::Text) => TestInputPreset::AdultText,
-        ("hate.regional-symbol", _) => TestInputPreset::Germany,
         _ => {
             let one = match signal {
                 "sexual.involving-minors" => instance("sexual", &["sexual-minors"]),
+                "hate.regional-symbol" => {
+                    instance("hate", &["hate-symbol", "hate-nazi-symbols-public-display"])
+                }
                 "violence.graphic" => {
                     instance("violence", &["violence-injury", "violence-graphic"])
                 }

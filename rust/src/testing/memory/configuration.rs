@@ -1,6 +1,7 @@
-//! Upload presets, project settings and metadata fields in the in-memory API. The mock keeps these
-//! definitions only: it doesn't accept uploads through a preset, check that its folder and policy
-//! exist, or apply the settings to assets.
+//! Upload presets, project settings and metadata fields in the in-memory API. An API-key upload
+//! naming a preset takes its settings and keeps to its limits; otherwise the mock keeps these
+//! definitions only: it doesn't check that a preset's folder and policy exist when saving it, or
+//! apply the settings to assets.
 use super::Backend;
 use super::{bounded, cursor_ordering, fail, keyset_page, text, validation, Outcome};
 use crate::error::ErrorCode;
@@ -89,7 +90,108 @@ fn preset_values(definition: &Value, index: usize) -> Outcome<Map<String, Value>
     Ok(values)
 }
 
+/// Whether an upload named `name` of type `content_type` matches an allowed type: a type, a
+/// wildcard such as `image/*`, or a file extension such as `.pdf`.
+fn allows_type(allowed: &Value, name: &str, content_type: &str) -> bool {
+    let (name, content_type) = (name.to_lowercase(), content_type.to_lowercase());
+    allowed.as_array().into_iter().flatten().any(|pattern| {
+        let pattern = text(pattern).trim().to_lowercase();
+        if pattern == "*" || pattern == "*/*" {
+            true
+        } else if let Some(prefix) = pattern.strip_suffix('*').filter(|p| p.ends_with('/')) {
+            content_type.starts_with(prefix)
+        } else if pattern.starts_with('.') {
+            name.ends_with(&pattern)
+        } else {
+            content_type == pattern
+        }
+    })
+}
+
 impl Backend {
+    /// An API-key upload through a preset, as the API applies it: the preset gives the folder and
+    /// visibility, which the upload can't change, and the processing options unless the upload
+    /// sets its own, and refuses types and sizes it doesn't accept. `content_type` and `size` are
+    /// `None` for an upload without content of its own.
+    pub(super) fn apply_upload_preset(
+        &self,
+        options: &mut Map<String, Value>,
+        content_type: Option<&str>,
+        size: Option<u64>,
+    ) -> Outcome<()> {
+        let Some(id) = options.get("uploadPresetId").and_then(Value::as_str) else {
+            return Ok(());
+        };
+        let preset = self
+            .configuration
+            .presets
+            .iter()
+            .find(|preset| preset["id"] == id)
+            .ok_or_else(|| fail(ErrorCode::UploadPresetNotFound, "Upload preset not found"))?;
+        if preset["enabled"] != true {
+            return Err(fail(
+                ErrorCode::UploadPresetDisabled,
+                "This upload preset is disabled",
+            ));
+        }
+        let differs = |field: &str| {
+            options
+                .get(field)
+                .is_some_and(|sent| !sent.is_null() && *sent != preset[field])
+        };
+        let not_allowed = ["folderId", "visibility"]
+            .into_iter()
+            .filter(|field| !preset[*field].is_null())
+            .find(|field| differs(field));
+        if let Some(field) = not_allowed {
+            let mut failure = fail(
+                ErrorCode::UploadPresetFieldNotAllowed,
+                "This upload preset sets this field",
+            );
+            failure.details = json!({ "field": field });
+            return Err(failure);
+        }
+        let allowed = &preset["allowedContentTypes"];
+        if let Some(content_type) = content_type {
+            let name = options.get("name").map_or("", text);
+            if !allowed.is_null() && !allows_type(allowed, name, content_type) {
+                let mut failure = fail(
+                    ErrorCode::UnsupportedUploadType,
+                    "This upload preset doesn't accept this type of file",
+                );
+                failure.details = json!({
+                    "source": "preset", "contentType": content_type,
+                    "allowedContentTypes": allowed,
+                });
+                return Err(failure);
+            }
+        }
+        if let Some(limit) = preset["maxSizeInBytes"].as_u64() {
+            if size.is_some_and(|size| size > limit) {
+                let mut failure = fail(
+                    ErrorCode::UploadTooLarge,
+                    "The upload is larger than this upload preset accepts",
+                );
+                failure.details = json!({ "limitBytes": limit, "source": "preset" });
+                return Err(failure);
+            }
+        }
+        if !preset["folderId"].is_null() {
+            options.insert("folderId".into(), preset["folderId"].clone());
+        }
+        options.insert("visibility".into(), preset["visibility"].clone());
+        let own_options = options
+            .get("processingOptions")
+            .is_some_and(|processing| !processing.is_null());
+        if !own_options && !preset["processingOptions"].is_null() {
+            options.insert(
+                "processingOptions".into(),
+                preset["processingOptions"].clone(),
+            );
+        }
+        Ok(())
+    }
+
     /// A page of the project's upload presets, oldest first unless `sort` says otherwise.
     pub(super) fn list_upload_presets(&self, q: &HashMap<String, String>) -> Outcome<Value> {
         let size = bounded(q.get("pageSize"), 50, 1, 100, "pageSize")?;

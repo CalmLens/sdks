@@ -467,7 +467,7 @@ async fn concurrent_ensure_lenses_send_a_definition_once() {
                 identifier: "thumb".into(),
                 name: "thumb".into(),
                 lens_type: "image".into(),
-                active: true,
+                active: Some(true),
                 ..Default::default()
             }],
         })

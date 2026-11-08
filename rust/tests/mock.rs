@@ -1,8 +1,8 @@
 mod common;
 use calmlens::{
     models::*,
-    testing::{MockResponse, MockServerClient},
-    ErrorCode,
+    testing::{MockOptions, MockResponse, MockServerClient},
+    ErrorCode, ServerClient,
 };
 use common::typed;
 use serde_json::{json, Value};
@@ -438,9 +438,42 @@ fn lens(identifier: &str, name: &str) -> LensDefinition {
         identifier: identifier.into(),
         name: name.into(),
         lens_type: "image".into(),
-        active: true,
+        active: Some(true),
         ..Default::default()
     }
+}
+
+#[tokio::test]
+async fn a_lens_without_active_leaves_it_out_and_shares_a_cache_entry_with_active_true() {
+    let mock = MockServerClient::in_memory(MockOptions::new()).unwrap();
+    let omitted = LensDefinition {
+        active: None,
+        ..lens("thumb", "Thumb")
+    };
+    mock.ensure_lens(omitted).await.unwrap();
+    let body = mock.last_request().unwrap().json().unwrap();
+    assert_eq!(
+        body["lenses"][0].as_object().unwrap().get("active"),
+        None,
+        "{body}"
+    );
+    mock.ensure_lens(lens("thumb", "Thumb")).await.unwrap();
+    assert_eq!(mock.requests().len(), 1);
+}
+
+#[tokio::test]
+async fn a_captured_requests_debug_output_leaves_out_the_api_key() {
+    let mock = MockServerClient::from_builder(
+        ServerClient::builder("clsk_private_key", "project-1")
+            .base_url("https://api.example.test/v1")
+            .max_retries(0),
+    )
+    .unwrap();
+    mock.enqueue(200, json!({"id": "asset-1"}));
+    let _ = mock.assets().retrieve(AssetId::new("asset-1")).await;
+    let request = mock.last_request().unwrap();
+    assert_eq!(request.header("x-api-key"), Some("clsk_private_key"));
+    assert!(!format!("{request:?}").contains("clsk_private_key"));
 }
 
 #[tokio::test]

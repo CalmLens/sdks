@@ -395,7 +395,7 @@ pub fn lens_definitions() -> Vec<LensDefinition> {
             identifier: identifier.into(),
             name: name.into(),
             lens_type: "image".into(),
-            active: true,
+            active: Some(true),
             description: Patch::Missing,
             transform: Patch::Value(ImageTransformOptions {
                 fit: Some(fit.into()),
