@@ -103,6 +103,7 @@ module CalmLens
   # at the CDN's `hls` resource (`hls/index.m3u8`) and played by its `embed` resource. Renditions list
   # video from the largest down, then audio.
   type asset_hls = { "renditions" => Array[asset_hls_rendition] }
+  type asset_hls_status = { "status" => String, "reason" => String? }
   type asset_rendered_kind = "image" | "pdf" | "video" | "audio"
   # The asset's one displayable file, as the CDN's `rendered` resource serves it: an image, a PDF, or
   # browser-safe video or audio. `peaks` is an audio waveform's normalised peaks.
@@ -242,6 +243,7 @@ module CalmLens
     # Preview. The adaptive stream once streaming has prepared one for audio or video; `nil` for
     # other assets, until then, once the content is removed and while the asset is held.
     "hls" => asset_hls?,
+    "hlsStatus" => asset_hls_status?,
     "preview" => asset_preview?
   }
 

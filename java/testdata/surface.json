@@ -1960,6 +1960,12 @@
       "local": false
     },
     {
+      "code": "media/duration-limit",
+      "status": 422,
+      "retryable": false,
+      "local": false
+    },
+    {
       "code": "image/invalid",
       "status": 422,
       "retryable": false,

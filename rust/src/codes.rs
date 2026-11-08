@@ -70,6 +70,8 @@ error_codes! {
     UploadTooLarge = "upload/too-large", 413;
     /// `document/too-many-items` (HTTP 422): The document holds more embedded images or audio and video files than can be moderated: details.limit is `images` or `media` and details.maximum the most allowed. Split it into smaller documents.
     DocumentTooManyItems = "document/too-many-items", 422;
+    /// `media/duration-limit` (HTTP 422): The audio or video is longer than allowed: details.durationSeconds is what its file states and details.limitSeconds the limit. Trim it or split it into separate uploads; before billing is set up, setting it up raises the limit.
+    MediaDurationLimit = "media/duration-limit", 422;
     /// `image/invalid` (HTTP 422): The image is corrupt or cannot be decoded. Upload a valid image file.
     InvalidImage = "image/invalid", 422;
     /// `image/too-large` (HTTP 422): The image exceeds a processing limit: details.limit is `bytes`, `pixels` or `dimension`. Reduce its size before uploading.

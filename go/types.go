@@ -399,6 +399,9 @@ type AssetContent struct {
 	// the embed page plays, once streaming has prepared it from the rendered file; nil for other
 	// assets, until a stream is prepared, once the content is removed and while a safety hold is on.
 	HLS *AssetHls `json:"hls"`
+	// HLSStatus (preview) says whether the stream asked for is ready, or why it isn't; nil when none
+	// was asked for, once the content is removed and while a safety hold is on.
+	HLSStatus *AssetHlsStatus `json:"hlsStatus"`
 	// Preview is the still image CalmLens serves at ResourcePreview; nil when the asset has none
 	// (yet), once the content is removed and while a safety hold is on.
 	Preview *AssetPreview `json:"preview"`
@@ -436,6 +439,16 @@ type AssetRendered struct {
 type AssetHls struct {
 	// Renditions lists every rendition, video from the largest down, then audio.
 	Renditions []AssetHlsRendition `json:"renditions"`
+}
+
+// AssetHlsStatus says whether the adaptive stream asked for is ready, or why it isn't.
+type AssetHlsStatus struct {
+	// Status is preparing until the stream is saved, ready once Content.HLS lists it, and
+	// unavailable when it won't be prepared: see Reason.
+	Status string `json:"status"`
+	// Reason says why an unavailable stream isn't prepared: allowance-used, billing-required,
+	// spend-limit, processing-failed or content-not-kept. Nil otherwise.
+	Reason *string `json:"reason"`
 }
 
 // AssetHlsRenditionKind is what an AssetHlsRendition carries. It is a string type so kinds added

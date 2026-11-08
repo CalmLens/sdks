@@ -1633,7 +1633,7 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 		"width": nil, "height": nil, "durationSeconds": nil, "pageCount": nil,
 		"perceptualHash": nil, "perceptualHashQuality": nil, "metadata": nil, "extractedText": nil,
 		// Like the API, the rendered file and preview come with processing.
-		"rendered": nil, "hls": nil, "preview": nil,
+		"rendered": nil, "hls": nil, "hlsStatus": nil, "preview": nil,
 	}
 	uploadState := calmlens.JSON{"status": "completed", "updatedAt": now, "partsReceived": nil}
 	// The mock never reads test inputs.
@@ -1922,7 +1922,7 @@ func normalizedMimeType(mime string) string {
 // clearRendering removes an asset's rendered file and preview, which go with its content and
 // are withheld while a safety hold is on.
 func clearRendering(content calmlens.JSON) {
-	content["rendered"], content["hls"], content["preview"] = nil, nil, nil
+	content["rendered"], content["hls"], content["hlsStatus"], content["preview"] = nil, nil, nil, nil
 }
 
 // setRendering sets the rendered file and preview the API reports for an asset whose content

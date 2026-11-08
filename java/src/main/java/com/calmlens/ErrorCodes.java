@@ -80,6 +80,8 @@ public final class ErrorCodes {
   public static final String UPLOAD_TOO_LARGE = "upload/too-large";
   /** {@code document/too-many-items} (HTTP 422). */
   public static final String DOCUMENT_TOO_MANY_ITEMS = "document/too-many-items";
+  /** {@code media/duration-limit} (HTTP 422). */
+  public static final String MEDIA_DURATION_LIMIT = "media/duration-limit";
   /** {@code image/invalid} (HTTP 422). */
   public static final String INVALID_IMAGE = "image/invalid";
   /** {@code image/too-large} (HTTP 422). */
@@ -294,6 +296,7 @@ public final class ErrorCodes {
       Map.entry(INVALID_IMAGE, 422),
       Map.entry(IMAGE_TOO_LARGE, 422),
       Map.entry(DOCUMENT_TOO_MANY_ITEMS, 422),
+      Map.entry(MEDIA_DURATION_LIMIT, 422),
       Map.entry(FREE_UPLOADS_EXHAUSTED, 403),
       Map.entry(UPLOADS_PAUSED, 402),
       Map.entry(UNSUPPORTED_UPLOAD_TYPE, 415),

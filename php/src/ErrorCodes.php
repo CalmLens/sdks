@@ -47,6 +47,7 @@ final class ErrorCodes
     public const PERMISSION_DENIED = 'auth/permission-denied';
     public const UPLOAD_TOO_LARGE = 'upload/too-large';
     public const DOCUMENT_TOO_MANY_ITEMS = 'document/too-many-items';
+    public const MEDIA_DURATION_LIMIT = 'media/duration-limit';
     public const INVALID_IMAGE = 'image/invalid';
     public const IMAGE_TOO_LARGE = 'image/too-large';
     public const FREE_UPLOADS_EXHAUSTED = 'usage/free-uploads-exhausted';
@@ -161,6 +162,7 @@ final class ErrorCodes
         'auth/permission-denied' => 403,
         'upload/too-large' => 413,
         'document/too-many-items' => 422,
+        'media/duration-limit' => 422,
         'image/invalid' => 422,
         'image/too-large' => 422,
         'usage/free-uploads-exhausted' => 403,

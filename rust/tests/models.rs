@@ -3,6 +3,14 @@ use calmlens::models::*;
 use serde_json::json;
 
 #[test]
+fn hls_status_reads_its_status_and_reason() {
+    let status: AssetHlsStatus =
+        serde_json::from_value(json!({"status":"unavailable","reason":"allowance-used"})).unwrap();
+    assert_eq!(status.status, "unavailable");
+    assert_eq!(status.reason.as_deref(), Some("allowance-used"));
+}
+
+#[test]
 fn an_hls_stream_decodes_into_typed_renditions() {
     let hls: AssetHls = serde_json::from_value(json!({"renditions":[{"kind":"video","width":1280,"height":720,"bandwidth":2500000,"codecs":"avc1.64001f"},{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]})).unwrap();
     let summary: Vec<_> = hls

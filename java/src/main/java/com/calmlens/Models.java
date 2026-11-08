@@ -2187,6 +2187,8 @@ public final class Models {
    *     serves and the {@code embed} page plays, once streaming has prepared it from the rendered
    *     file; null for other assets, until a stream is prepared, once the content is removed and
    *     while a safety hold is on
+   * @param hlsStatus (preview) whether the stream asked for is ready, or why it isn't; null when
+   *     none was asked for, once the content is removed and while a safety hold is on
    * @param preview the still image the CDN's {@code preview} resource serves; null when the asset
    *     has none, like {@code rendered}
    */
@@ -2195,7 +2197,8 @@ public final class Models {
       SafetyHold safetyHold, String format, String extension, Long sizeInBytes, Checksums checksums,
       Integer width, Integer height, Double durationSeconds, Integer pageCount,
       String perceptualHash, Integer perceptualHashQuality, FileMetadata metadata,
-      ExtractedText extractedText, AssetRendered rendered, AssetHls hls, AssetPreview preview) {}
+      ExtractedText extractedText, AssetRendered rendered, AssetHls hls, AssetHlsStatus hlsStatus,
+      AssetPreview preview) {}
 
   /**
    * The one displayable file of an asset, as the CDN's {@code rendered} resource serves it.
@@ -2211,6 +2214,17 @@ public final class Models {
     /** Copies collections so the record stays immutable. */
     public AssetRendered { peaks = list(peaks); }
   }
+
+  /**
+   * Whether the adaptive stream asked for is ready, or why it isn't.
+   *
+   * @param status {@code preparing} until the stream is saved, {@code ready} once {@code
+   *     content.hls} lists it, {@code unavailable} when it won't be prepared: see {@code reason}
+   * @param reason why an {@code unavailable} stream isn't prepared: {@code allowance-used}, {@code
+   *     billing-required}, {@code spend-limit}, {@code processing-failed} or {@code
+   *     content-not-kept}; null otherwise
+   */
+  public record AssetHlsStatus(String status, String reason) {}
 
   /**
    * The adaptive (HLS) stream of audio or video, with fragmented MP4 (CMAF) segments, as the CDN's

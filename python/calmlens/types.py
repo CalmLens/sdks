@@ -38,7 +38,7 @@ __all__ = [
     "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "StreamingFeatureOptions", "AssetPreview", "AssetModerationTimeline", "AssetInfo", "AssetInfoContent", "AssetAvailability",
+    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "AssetHlsStatus", "StreamingFeatureOptions", "AssetPreview", "AssetModerationTimeline", "AssetInfo", "AssetInfoContent", "AssetAvailability",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions",
@@ -645,6 +645,15 @@ class AssetHls(TypedDict):
     renditions: list[AssetHlsRendition]
 
 
+class AssetHlsStatus(TypedDict):
+    """Preview. Whether the adaptive stream asked for is ready, or why it isn't."""
+    #: ``preparing`` until the stream is saved, ``ready`` once ``content.hls`` lists it,
+    #: ``unavailable`` when it won't be prepared: see ``reason``.
+    status: Literal["preparing", "ready", "unavailable"]
+    #: Why an ``unavailable`` stream isn't prepared; ``None`` otherwise.
+    reason: Optional[Literal["allowance-used", "billing-required", "spend-limit", "processing-failed", "content-not-kept"]]
+
+
 class _AssetRenderedRequired(TypedDict):
     kind: AssetRenderedKind
     #: MIME type of the rendered file. An image is served in the best format the client accepts,
@@ -895,6 +904,9 @@ class AssetContent(TypedDict):
     #: other assets, until a stream is prepared, once the content is removed and while the asset is
     #: held.
     hls: Optional[AssetHls]
+    #: Preview. Whether the stream asked for is ready, or why it isn't. ``None`` when none was asked
+    #: for, once the content is removed and while the asset is held.
+    hlsStatus: Optional[AssetHlsStatus]
     #: A still image for the asset, served at the ``preview`` resource (and its blurred placeholder
     #: at ``placeholder``). ``None`` when the asset has none, once the content is removed and while
     #: the asset is held.

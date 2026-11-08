@@ -35,6 +35,7 @@ API_KEY_NOT_ACCEPTED = "api-key/not-accepted"
 PERMISSION_DENIED = "auth/permission-denied"
 UPLOAD_TOO_LARGE = "upload/too-large"
 DOCUMENT_TOO_MANY_ITEMS = "document/too-many-items"
+MEDIA_DURATION_LIMIT = "media/duration-limit"
 INVALID_IMAGE = "image/invalid"
 IMAGE_TOO_LARGE = "image/too-large"
 FREE_UPLOADS_EXHAUSTED = "usage/free-uploads-exhausted"
@@ -160,6 +161,7 @@ STATUS_BY_CODE: dict[str, int] = {
     "auth/permission-denied": 403,
     "upload/too-large": 413,
     "document/too-many-items": 422,
+    "media/duration-limit": 422,
     "image/invalid": 422,
     "image/too-large": 422,
     "usage/free-uploads-exhausted": 403,

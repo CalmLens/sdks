@@ -37,6 +37,7 @@ module CalmLens
     PERMISSION_DENIED: String
     UPLOAD_TOO_LARGE: String
     DOCUMENT_TOO_MANY_ITEMS: String
+    MEDIA_DURATION_LIMIT: String
     INVALID_IMAGE: String
     IMAGE_TOO_LARGE: String
     FREE_UPLOADS_EXHAUSTED: String

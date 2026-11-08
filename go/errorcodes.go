@@ -75,6 +75,8 @@ const (
 	CodeUploadTooLarge = "upload/too-large"
 	// CodeDocumentTooManyItems is returned with HTTP 422.
 	CodeDocumentTooManyItems = "document/too-many-items"
+	// CodeMediaDurationLimit is returned with HTTP 422.
+	CodeMediaDurationLimit = "media/duration-limit"
 	// CodeInvalidImage is returned with HTTP 422.
 	CodeInvalidImage = "image/invalid"
 	// CodeImageTooLarge is returned with HTTP 422.
@@ -265,6 +267,7 @@ var publicErrorStatuses = map[string]int{
 	CodePermissionDenied:                  403,
 	CodeUploadTooLarge:                    413,
 	CodeDocumentTooManyItems:              422,
+	CodeMediaDurationLimit:                422,
 	CodeInvalidImage:                      422,
 	CodeImageTooLarge:                     422,
 	CodeFreeUploadsExhausted:              403,

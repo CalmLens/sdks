@@ -1120,6 +1120,38 @@
     }
   },
   {
+    "code": "media/duration-limit",
+    "status": 422,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-media-duration-limit"
+      },
+      "body": {
+        "code": "media/duration-limit",
+        "message": "The audio or video is longer than allowed: details.durationSeconds is what its file states and details.limitSeconds the limit. Trim it or split it into separate uploads; before billing is set up, setting it up raises the limit.",
+        "requestId": "req-media-duration-limit",
+        "details": {
+          "reason": "media_duration_limit"
+        }
+      }
+    },
+    "expected": {
+      "code": "media/duration-limit",
+      "status": 422,
+      "requestId": "req-media-duration-limit",
+      "retryAfter": null,
+      "details": {
+        "reason": "media_duration_limit"
+      }
+    }
+  },
+  {
     "code": "image/invalid",
     "status": 422,
     "operation": "assets.retrieve",

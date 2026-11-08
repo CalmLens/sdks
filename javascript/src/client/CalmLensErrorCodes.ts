@@ -37,6 +37,7 @@ export const API_ERROR_CODES = {
   PERMISSION_DENIED: "auth/permission-denied",
   UPLOAD_TOO_LARGE: "upload/too-large",
   DOCUMENT_TOO_MANY_ITEMS: "document/too-many-items",
+  MEDIA_DURATION_LIMIT: "media/duration-limit",
   INVALID_IMAGE: "image/invalid",
   IMAGE_TOO_LARGE: "image/too-large",
   FREE_UPLOADS_EXHAUSTED: "usage/free-uploads-exhausted",
@@ -263,6 +264,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "document/too-many-items": {
     status: 422,
     message: "The document holds more embedded images or audio and video files than can be moderated: details.limit is `images` or `media` and details.maximum the most allowed. Split it into smaller documents.",
+  },
+  "media/duration-limit": {
+    status: 422,
+    message: "The audio or video is longer than allowed: details.durationSeconds is what its file states and details.limitSeconds the limit. Trim it or split it into separate uploads; before billing is set up, setting it up raises the limit.",
   },
   "image/invalid": {
     status: 422,

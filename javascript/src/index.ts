@@ -131,6 +131,7 @@ export { DEFAULT_CDN_BASE_URL } from "./client/CalmLensUtils";
 export { SDK_VERSION } from "./client/CalmLensVersion";
 export type {
   AssetHls,
+  AssetHlsStatus,
   AssetHlsRendition,
   AssetPreview,
   AssetRendered,

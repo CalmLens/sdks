@@ -2058,6 +2058,10 @@ pub struct AssetContent {
     /// the asset is held.
     #[serde(default)]
     pub hls: Option<AssetHls>,
+    /// Preview. Whether the stream asked for is ready, or why it isn't. `None` when none was asked
+    /// for, once the content is removed and while the asset is held.
+    #[serde(default)]
+    pub hls_status: Option<AssetHlsStatus>,
     /// A still image for the asset, served at the preview resource (and its blurred placeholder
     /// at the placeholder resource). `None` when the asset has none (text, spreadsheets and other
     /// files, or a document, video or audio whose still isn't made yet), once the content is
@@ -3386,6 +3390,24 @@ pub struct AssetHls {
     pub renditions: Vec<AssetHlsRendition>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetHls, _>")]
+    pub extra: HashMap<String, Value>,
+}
+
+/// Whether the adaptive stream asked for is ready, or why it isn't.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetHlsStatus {
+    /// `preparing` until the stream is saved, `ready` once `content.hls` lists it, `unavailable`
+    /// when it won't be prepared: see `reason`.
+    #[serde(default)]
+    pub status: String,
+    /// Why an `unavailable` stream isn't prepared: `allowance-used`, `billing-required`,
+    /// `spend-limit`, `processing-failed` or `content-not-kept`. `None` otherwise.
+    #[serde(default)]
+    pub reason: Option<String>,
+    /// Fields this SDK version does not know.
+    #[serde(flatten, deserialize_with = "extra_fields::<AssetHlsStatus, _>")]
     pub extra: HashMap<String, Value>,
 }
 
