@@ -178,6 +178,44 @@ final class TestInputsTest extends TestCase
         self::assertSame($fixture['signals']['media'], TestInputs::MEDIA_SIGNALS);
     }
 
+    /**
+     * Each way a call can throw with the key on the stack, down to the helpers it passes the key
+     * to: an unknown signal, a bad key's check, and a scenario too large to sign.
+     *
+     * @return iterable<string, array{callable(string): mixed, string}>
+     */
+    public static function failingKeyedCalls(): iterable
+    {
+        $key = str_repeat('0123456789abcdef', 2);
+        // Base64 of this canonical JSON is over the 8000 characters a text code may hold.
+        $tooLarge = ['instances' => array_fill(0, 128, ['category' => 'harassment', 'qualifiers' => ['harassment-abuse', 'harassment-threat']])];
+        yield 'text code: checkKey' => [fn (#[\SensitiveParameter] string $secret) => TestInputs::generateTestTextCode('clean', $secret), 'not-hexadecimal-but-long-enough-to-spot'];
+        yield 'text code: textCode' => [fn (#[\SensitiveParameter] string $secret) => TestInputs::generateTestTextCode($tooLarge, $secret), $key];
+        yield 'image: checkKey' => [fn (#[\SensitiveParameter] string $secret) => TestInputs::paintTestImage('hate', $secret), 'not-hexadecimal-but-long-enough-to-spot'];
+        yield 'image: textCode' => [fn (#[\SensitiveParameter] string $secret) => TestInputs::paintTestImage($tooLarge, $secret), $key];
+        yield 'media: unknown signal' => [fn (#[\SensitiveParameter] string $secret) => TestInputs::generateMediaTestCode('no-such-signal', $secret), $key];
+        yield 'media: checkKey' => [fn (#[\SensitiveParameter] string $secret) => TestInputs::generateMediaTestCode('hate', $secret), 'not-hexadecimal-but-long-enough-to-spot'];
+    }
+
+    #[DataProvider('failingKeyedCalls')]
+    public function testATestInputKeyStaysOutOfStackTraces(callable $call, #[\SensitiveParameter] string $secret): void
+    {
+        $previous = ini_set('zend.exception_ignore_args', '0');
+        try {
+            $call($secret);
+            self::fail('Expected the call to throw');
+        } catch (InvalidArgumentException $error) {
+            // A trace string shortens each string argument to 15 characters.
+            self::assertStringNotContainsString(substr($secret, 0, 15), $error->getTraceAsString());
+            $arguments = array_merge(...array_map(fn (array $frame) => $frame['args'] ?? [], $error->getTrace()));
+            self::assertNotContains($secret, $arguments);
+            // The trace does hold its arguments, so their absence means they were redacted.
+            self::assertNotEmpty(array_filter($arguments, fn (mixed $argument) => $argument instanceof \SensitiveParameterValue));
+        } finally {
+            ini_set('zend.exception_ignore_args', (string) $previous);
+        }
+    }
+
     public function testDetectionLimitsAndAgePresetsMatchTheFixture(): void
     {
         $detections = self::fixture()['detections'];

@@ -93,8 +93,9 @@ final class ServerClient
     public function __debugInfo(): array { return ['projectId' => $this->projectId]; }
 
     /**
-     * Creates a named lens, or changes it to this definition. Sending the same definition again
-     * returns the lens unchanged, from the client's lens cache once it has seen it.
+     * Creates a named lens, or changes it to this definition; `active` is true unless it says
+     * otherwise. Sending the same definition again returns the lens unchanged, from the client's
+     * lens cache once it has seen it.
      */
     public function ensureLens(array $options): array
     {
@@ -121,7 +122,8 @@ final class ServerClient
             if (!is_array($definition) || !is_string($definition['identifier'] ?? null) || $definition['identifier'] === '') {
                 Values::invalid('Every lens needs an identifier');
             }
-            $key = Values::json(Values::canonical($definition));
+            // The API takes a lens without `active` as active, so both name the same definition.
+            $key = Values::json(Values::canonical($definition + ['active' => true]));
             $keys[] = $key;
             if (!isset($this->session->ensuredLenses[$key])) {
                 $missing[$key] = $definition;

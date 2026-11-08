@@ -915,6 +915,9 @@ final class ContractTest extends TestCase
         foreach ($spec['notEvaluated'] ?? [] as $category) {
             $decision->notEvaluated($category);
         }
+        if (isset($spec['pendingReview'])) {
+            $decision->pendingReview($spec['pendingReview']['reason'], $spec['pendingReview']['uncertainCategories'] ?? []);
+        }
         return $decision;
     }
 

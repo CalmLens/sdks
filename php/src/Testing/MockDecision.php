@@ -10,8 +10,8 @@ use CalmLens\SdkErrorCodes;
 /**
  * A moderation decision for `MockServerClient`'s `moderate` callable or `completeProcessing`,
  * started with `MockDecision::of($status)`: flag the categories it found, with their scores and
- * qualifiers, and mark the categories it couldn't assess. Each call checks its names and scores
- * and throws `InvalidArgumentException` (`sdk/invalid-argument`) for one CalmLens doesn't have.
+ * qualifiers, mark the categories it couldn't assess, and optionally leave it waiting for human
+ * review. Each call checks its names and scores and throws `InvalidArgumentException` (`sdk/invalid-argument`) for one CalmLens doesn't have.
  */
 final class MockDecision
 {
@@ -27,6 +27,8 @@ final class MockDecision
     private array $flags = [];
     /** @var array<string, true> */
     private array $notEvaluated = [];
+    /** @var ?array{reason: string, uncertainCategories: list<string>} */
+    private ?array $pendingReview = null;
 
     private function __construct(public readonly string $status)
     {
@@ -75,13 +77,41 @@ final class MockDecision
     }
 
     /**
-     * The report a decided asset gets, as the API sends it: every category (unflagged ones
-     * evaluated with score 0), the highest score, the policy's actions, the automated status and
-     * `flaggedCategories`. Null for `pending` and `failed`.
+     * Leaves the decision waiting for human review, as `classification.moderation.pendingReview`
+     * reports: `sampled`, or `uncertain` with the `$uncertainCategories` that made it so. The
+     * reviewer's decision (`decide` on the mock) clears it; `assets->decide` doesn't, as with the API.
      *
-     * @return ?array{categories: array, score: int|float, policy: array}
+     * @param list<string> $uncertainCategories
      */
-    public function report(): ?array
+    public function pendingReview(string $reason, array $uncertainCategories = []): self
+    {
+        if (!isset(self::ACTIONS[$this->status])) {
+            throw self::invalid("a {$this->status} decision can't wait for review");
+        }
+        if ($reason !== 'sampled' && $reason !== 'uncertain') {
+            throw self::invalid('reason must be sampled or uncertain');
+        }
+        if ($reason === 'sampled' && $uncertainCategories !== []) {
+            throw self::invalid('a sampled review has no uncertain categories');
+        }
+        foreach ($uncertainCategories as $category) {
+            if (!in_array($category, Classification::CATEGORIES, true)) {
+                throw self::invalid(json_encode($category) . ' is not a CalmLens category');
+            }
+        }
+        $this->pendingReview = ['reason' => $reason, 'uncertainCategories' => array_values($uncertainCategories)];
+        return $this;
+    }
+
+    /**
+     * The report a decided asset gets, as the API sends it: every category (unflagged ones
+     * evaluated with score 0), the policy-adjusted results, the automated status and
+     * `flaggedCategories`. `$requestedAt` is when a pending review joined the queue. Null for
+     * `pending` and `failed`.
+     *
+     * @return ?array{raw: array, categories: array, flaggedCategories: list<string>, pendingReview: ?array}
+     */
+    public function report(int $requestedAt = 0): ?array
     {
         $status = $this->status;
         if (!isset(self::ACTIONS[$status])) {
@@ -104,9 +134,14 @@ final class MockDecision
         }
         $flagged = array_keys(array_filter($evaluated, fn ($score) => $action($score) !== 'allow'));
         return ['raw' => ['categories' => $categories, 'hashMatches' => []],
-            'categories' => array_map(fn ($score) => ['score' => $score, 'action' => $action($score)], $evaluated),
+            'categories' => array_map(fn ($score) => ['score' => $score, 'action' => $action($score),
+                'source' => ['kind' => $score >= 0.5 ? 'default' : 'below-threshold'],
+                // The mock keeps no policies: the category's setting is the decision's own action.
+                'settings' => ['action' => self::ACTIONS[$status], 'allowances' => [], 'restrictions' => []]], $evaluated),
             // The mock keeps no policies, so no policy is named.
-            'explanationComplete' => true, 'policy' => null, 'source' => 'policy', 'rule' => null, 'automatedStatus' => $status, 'linkSafety' => null,
+            'explanationComplete' => true, 'policy' => null,
+            'pendingReview' => $this->pendingReview === null ? null : ['requestedAt' => $requestedAt] + $this->pendingReview,
+            'source' => 'policy', 'rule' => null, 'automatedStatus' => $status, 'linkSafety' => null,
             // The mock analyses no audio or video, so a decision has no findings timeline.
             'regions' => [], 'timeline' => null, 'flaggedCategories' => $flagged];
     }

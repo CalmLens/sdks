@@ -30,7 +30,8 @@ use Psr\Http\Message\ResponseInterface;
  * error handling, then reach an in-memory stand-in for the API and CDN instead of the network.
  *
  * The stand-in is stateful: uploads (including multipart uploads) create assets you can
- * retrieve, list, search, update, move and delete; folders, hash lists, policies, lenses, idempotency keys
+ * retrieve, list, search, update, move and delete; folders, hash lists, policies, lenses, upload presets,
+ * project settings, metadata fields, idempotency keys
  * and the events feed behave like the API's (uploads are not matched against hash lists); the CDN serves stored bytes and placeholders; and errors use
  * the API's codes, statuses, `X-Request-Id` header and body shape (schema errors are
  * `validation/invalid-request`, listing each field's `path`, `message` and issue `code`, such as
@@ -53,19 +54,26 @@ use Psr\Http\Message\ResponseInterface;
  * `automated` moderation for the pipeline's decisions, and a `user` for `decide`. The project starts on the organisation's own
  * General preset policy, `live`; the mock's presets have one release (version 1), every category at its default action with no rules, and policies never decide uploads.
  *
- * Like the CDN, a safety hold refuses every resource, the placeholder included, with 403
- * `asset/not-available`. Then it checks delivery: blocked, purged and failed assets, and assets whose
- * content was removed or is still uploading, return 403 `asset/not-available` whatever the key.
- * Then access: an age-restricted asset requested without `'viewerClaims' => ['ageConfirmed' => true]`
- * returns 403 `viewer/age-confirmation-required` whatever the key, and a private asset needs an
- * `assets:download` grant for its folder, or a grant from `cdn->signAssetUrl`, which `fetchCdn`
- * loads without the API key as a browser would. Then whether the asset has the resource (404
+ * Like the CDN, a private asset requested with neither the API key nor a grant from
+ * `cdn->signAssetUrl` answers as an unknown asset does, 404 `asset/not-found`, whatever its state;
+ * `fetchCdn` loads a URL without the key, as a browser would. Its placeholder stays public, and
+ * its `info` has its own rule. Otherwise a safety hold refuses every resource, the placeholder
+ * included, with 403 `asset/not-available`. Then it checks delivery: blocked, purged and failed
+ * assets, and assets whose content was removed or is still uploading, return 403
+ * `asset/not-available`. Then access: an age-restricted asset requested without
+ * `'viewerClaims' => ['ageConfirmed' => true]` returns 403 `viewer/age-confirmation-required`, and
+ * a private asset requested with the API key needs an `assets:download` grant for its folder (403
+ * `auth/permission-denied`). Then whether the asset has the resource (404
  * `asset/no-rendered-version`), and lenses and transforms only on a still image: the preview, or a
  * rendered image. The mock converts nothing: an upload stands in for its rendered file and an
  * image's preview, and the placeholder PNG for a website screenshot, document page or audio
  * waveform. The default
  * key has no grants, like a real key without `assets:download`; pass an `apiKey` from
  * `createApiKey()`, or call `setApiKeyGrants()`, to grant downloads.
+ *
+ * An API-key upload naming an `uploadPresetId` applies the preset from `uploadPresets->ensure`, as
+ * the API does: it gives the folder and visibility, which the upload can't change, and the
+ * processing options unless the upload sets its own, and refuses types and sizes it doesn't accept.
  *
  * Waits (retry backoff and `assets->waitForDecision`) take no real time: they advance a virtual
  * clock, so a decision that never comes times out at once.
@@ -368,7 +376,9 @@ final class MockServerClient
      * content with reason `requested` and first adds an `asset.content-removed` event), the review
      * joins `manualReviews`, and an `asset.<decision>` event with the catalog's severity (`low` for
      * `allowed` and `limited`, `high` otherwise) whose `actor` is a `user` joins the feed.
-     * The moderation report stays as it was. Throws `InvalidArgumentException`
+     * The moderation report stays as it was, except that this settles a review it was waiting for:
+     * `pendingReview` becomes null (a decision through `assets->decide` leaves it waiting, as with
+     * the API). Throws `InvalidArgumentException`
      * (`sdk/invalid-argument`) for another outcome, and `NotFoundException` (`asset/not-found`)
      * for an unknown asset. To finish processing as moderation would, use `completeProcessing`.
      */
@@ -380,6 +390,7 @@ final class MockServerClient
         $asset = $this->applyOutcome($this->ownAsset($assetId), $outcome, 'requested');
         // Like the API: a queued re-run no longer replaces a reviewed decision.
         unset($this->pendingReruns[$assetId]);
+        $asset['classification']['moderation']['pendingReview'] = null;
         $asset['classification']['moderation']['manualReviews'][] = self::review(($this->createId)('rev'), $outcome, null, ($this->now)());
         $this->assets[$assetId] = $asset;
         if ($outcome === 'purged') {
@@ -463,7 +474,7 @@ final class MockServerClient
                 'testInput' => $asset['classification']['testInput'], 'moderation' => ['status' => $asset['classification']['moderation']['status']]], 'content' => ['status' => $asset['content']['status']]];
     }
 
-    private static function grantsOf(string $apiKey): array
+    private static function grantsOf(#[\SensitiveParameter] string $apiKey): array
     {
         if (!str_starts_with($apiKey, 'sk_test_')) {
             return [];
@@ -1013,6 +1024,7 @@ final class MockServerClient
      */
     private function createAsset(array $options, bool $queue, ?string $bytes, bool $multipart): array
     {
+        $options = $this->applyUploadPreset($options, $bytes);
         $mime = (string) ($options['contentType'] ?? '');
         self::checkMetadata($options['metadata'] ?? null);
         // Like the API: content and a first part must be of a type CalmLens moderates; a URL is exempt.
@@ -1093,6 +1105,68 @@ final class MockServerClient
     }
 
     /**
+     * An API-key upload through a preset, as the API applies it: the preset gives the folder and
+     * visibility, which the upload can't change, and the processing options unless the upload sets
+     * its own, and refuses types and sizes it doesn't accept.
+     */
+    private function applyUploadPreset(array $options, ?string $bytes): array
+    {
+        $id = $options['uploadPresetId'] ?? null;
+        if ($id === null) {
+            return $options;
+        }
+        $preset = null;
+        foreach ($this->uploadPresets as $candidate) {
+            if ($candidate['id'] === $id) {
+                $preset = $candidate;
+            }
+        }
+        if ($preset === null) {
+            self::fail(ErrorCodes::UPLOAD_PRESET_NOT_FOUND, null, 'Upload preset not found.');
+        }
+        if (!$preset['enabled']) {
+            self::fail(ErrorCodes::UPLOAD_PRESET_DISABLED, null, 'This upload preset is disabled.');
+        }
+        if ($preset['folderId'] !== null && isset($options['folderId']) && $options['folderId'] !== $preset['folderId']) {
+            self::fail(ErrorCodes::UPLOAD_PRESET_FIELD_NOT_ALLOWED, null, 'The upload preset sets the folder.', ['field' => 'folderId']);
+        }
+        if (isset($options['visibility']) && $options['visibility'] !== $preset['visibility']) {
+            self::fail(ErrorCodes::UPLOAD_PRESET_FIELD_NOT_ALLOWED, null, 'The upload preset sets the visibility.', ['field' => 'visibility']);
+        }
+        $allowed = $preset['allowedContentTypes'];
+        if ($allowed !== null && isset($options['contentType']) && !self::acceptedByPreset((string) ($options['name'] ?? ''), $options['contentType'], $allowed)) {
+            self::fail(ErrorCodes::UNSUPPORTED_UPLOAD_TYPE, null, 'This upload preset does not accept this type.',
+                ['source' => 'preset', 'contentType' => $options['contentType'], 'allowedContentTypes' => $allowed]);
+        }
+        $size = isset($options['totalSizeInBytes']) ? (int) $options['totalSizeInBytes'] : ($bytes === null ? null : strlen($bytes));
+        if ($preset['maxSizeInBytes'] && $size !== null && $size > $preset['maxSizeInBytes']) {
+            self::fail(ErrorCodes::UPLOAD_TOO_LARGE, null, 'This upload is larger than the upload preset allows.',
+                ['limitBytes' => $preset['maxSizeInBytes'], 'source' => 'preset']);
+        }
+        $options['folderId'] = $preset['folderId'] ?? $options['folderId'] ?? null;
+        $options['visibility'] = $preset['visibility'];
+        $options['processingOptions'] = $options['processingOptions'] ?? $preset['processingOptions'];
+        return $options;
+    }
+
+    /** Whether a preset's `allowedContentTypes`, such as `image/*` or `.pdf`, accept a file. */
+    private static function acceptedByPreset(string $name, string $contentType, array $allowed): bool
+    {
+        $type = strtolower($contentType);
+        $name = strtolower($name);
+        foreach ($allowed as $pattern) {
+            $pattern = strtolower(trim($pattern));
+            if ($pattern === '*' || $pattern === '*/*'
+                || (str_ends_with($pattern, '/*') && str_starts_with($type, substr($pattern, 0, -1)))
+                || (str_starts_with($pattern, '.') && str_ends_with($name, $pattern))
+                || $type === $pattern) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Moderates an asset whose upload just completed, as the pipeline would: `asset.uploaded` with
      * the asset as it was, then the decision's events.
      */
@@ -1121,7 +1195,7 @@ final class MockServerClient
      */
     private function decided(array $asset, MockDecision $decision): array
     {
-        $next = $this->applyOutcome($asset, $decision->status, 'policy', $decision->report());
+        $next = $this->applyOutcome($asset, $decision->status, 'policy', $decision->report(($this->now)()));
         if ($next['classification']['status'] !== 'completed' || $asset['type'] !== 'image') {
             return $next;
         }
@@ -2386,6 +2460,8 @@ final class MockServerClient
     {
         $saved = [];
         foreach ($definitions as $definition) {
+            // Like the API, a definition without `active` is an active lens.
+            $definition += ['active' => true];
             $old = $this->lenses[$definition['identifier']] ?? null;
             $saved[] = $old === null ? $this->saveNewLens($definition) : $this->changeLens($old, $definition);
         }
@@ -2396,7 +2472,7 @@ final class MockServerClient
     {
         $now = ($this->now)();
         return $this->lenses[$definition['identifier']] = ['id' => ($this->createId)('lens'), 'projectId' => $this->projectId]
-            + $definition + ['createdAt' => $now, 'updatedAt' => $now];
+            + $definition + ['active' => true, 'createdAt' => $now, 'updatedAt' => $now];
     }
 
     /** `$old` with `$definition`'s fields, saved unless nothing changed. */
@@ -2697,6 +2773,11 @@ final class MockServerClient
         }
         if ($resource === 'original' && $grant !== null && !$grant['original']) {
             return $this->json(403, ['code' => ErrorCodes::SIGNED_URL_ORIGINAL_NOT_GRANTED, 'message' => "This signed asset URL doesn't grant the original file"]);
+        }
+        // Like the CDN, a private asset answers anyone without a grant or the project's API key as an
+        // unknown asset does, whatever its state. Its placeholder is public, and its info has its own rule.
+        if ($asset['visibility'] !== 'public' && $grant === null && !$keyed && !in_array($resource, ['placeholder', 'info'], true)) {
+            return $notFound();
         }
         // A grant authorises a private asset without the API key; a request without the key has no grants.
         $canDownload = fn (): bool => $grant !== null || ($keyed && $this->canDownload($asset['folderId'] ?? null));

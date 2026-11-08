@@ -42,7 +42,7 @@ final class TestInputs
 {
     /**
      * Ready-made scenarios: a clean input, a limited one, adult images and text, regional
-     * delivery, content restricted in Germany, mixed instances in one category, and person and
+     * delivery, content blocked only in Germany, mixed instances in one category, and person and
      * face detections: one person with one face (`oneFace`), nobody (`noFace`), one face
      * estimated as an adult (`adultFace`) or a minor (`minorFace`), and three people side by side
      * (`group`).
@@ -58,7 +58,7 @@ final class TestInputs
             ['region' => 'DE', 'action' => 'block'], ['region' => 'GB', 'action' => 'age-restrict'],
             ['region' => 'FR', 'action' => 'limit'],
         ], 'instances' => []],
-        'germany' => ['instances' => [['category' => 'hate', 'qualifiers' => ['hate-symbol', 'hate-nazi-symbols-public-display']]]],
+        'germany' => ['regionalActions' => [['region' => 'DE', 'action' => 'block']], 'instances' => []],
         'mixed' => ['instances' => [
             ['category' => 'harassment', 'qualifiers' => ['harassment-abuse', 'harassment-documentary']],
             ['category' => 'harassment', 'qualifiers' => ['harassment-threat']],
@@ -112,7 +112,7 @@ final class TestInputs
         return match (true) {
             $signal === 'harassment.insult' => self::PRESETS['limited'],
             $signal === 'sexual.adult' => self::PRESETS[$kind === 'image' ? 'adultImage' : 'adultText'],
-            $signal === 'hate.regional-symbol' => self::PRESETS['germany'],
+            $signal === 'hate.regional-symbol' => ['instances' => [['category' => 'hate', 'qualifiers' => ['hate-symbol', 'hate-nazi-symbols-public-display']]]],
             $signal === 'sexual.involving-minors' => ['instances' => [['category' => 'sexual', 'qualifiers' => ['sexual-minors']]]],
             $signal === 'violence.graphic' => ['instances' => [['category' => 'violence', 'qualifiers' => ['violence-injury', 'violence-graphic']]]],
             in_array($signal, Classification::CATEGORIES, true) => ['instances' => [['category' => $signal, 'qualifiers' => []]]],
@@ -127,7 +127,7 @@ final class TestInputs
      *
      * @param TestInput|string $scenario
      */
-    public static function generateTestTextCode(array|string $scenario, string $testInputKey): string
+    public static function generateTestTextCode(array|string $scenario, #[\SensitiveParameter] string $testInputKey): string
     {
         self::checkKey($testInputKey);
         return self::textCode(self::validate(is_string($scenario) ? self::testInputForSignal($scenario) : $scenario), $testInputKey);
@@ -143,7 +143,7 @@ final class TestInputs
      *
      * @param TestInput|string $scenario
      */
-    public static function paintTestImage(array|string $scenario, string $testInputKey): PaintedTestImage
+    public static function paintTestImage(array|string $scenario, #[\SensitiveParameter] string $testInputKey): PaintedTestImage
     {
         self::checkKey($testInputKey);
         $checked = self::validate(is_string($scenario) ? self::testInputForSignal($scenario, 'image') : $scenario);
@@ -166,7 +166,7 @@ final class TestInputs
      * one of `MEDIA_SIGNALS`, signed with `$testInputKey`: the project's secret test input key
      * from the portal.
      */
-    public static function generateMediaTestCode(string $signal, string $testInputKey): string
+    public static function generateMediaTestCode(string $signal, #[\SensitiveParameter] string $testInputKey): string
     {
         if (!in_array($signal, self::MEDIA_SIGNALS, true)) {
             throw self::invalid("Unsupported media test signal: $signal");
@@ -176,16 +176,16 @@ final class TestInputs
         return 'Calm Lens test ' . implode(' ', $words) . ' ' . str_replace(['.', '-'], ' ', $signal) . ' end test';
     }
 
-    private static function checkKey(string $key): void
+    private static function checkKey(#[\SensitiveParameter] string $testInputKey): void
     {
-        if (!preg_match('/^[a-f0-9]{32}$/D', $key)) {
+        if (!preg_match('/^[a-f0-9]{32}$/D', $testInputKey)) {
             throw self::invalid('The test input key must be 32 lowercase hexadecimal characters');
         }
     }
 
-    private static function tag(string $key, string $message): string
+    private static function tag(#[\SensitiveParameter] string $testInputKey, string $message): string
     {
-        return substr(hash_hmac('sha256', $message, $key), 0, 32);
+        return substr(hash_hmac('sha256', $message, $testInputKey), 0, 32);
     }
 
     /**
@@ -193,13 +193,13 @@ final class TestInputs
      *
      * @param TestInput $scenario
      */
-    private static function textCode(array $scenario, string $key): string
+    private static function textCode(array $scenario, #[\SensitiveParameter] string $testInputKey): string
     {
         $payload = rtrim(strtr(base64_encode(self::canonical($scenario)), '+/', '-_'), '=');
         if (strlen($payload) > 8000) {
             throw self::invalid('The test scenario is too large');
         }
-        return '<!calmlens-test ' . self::tag($key, "calmlens-test:v2:$payload") . " $payload>";
+        return '<!calmlens-test ' . self::tag($testInputKey, "calmlens-test:v2:$payload") . " $payload>";
     }
 
     /**

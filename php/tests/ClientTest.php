@@ -160,6 +160,22 @@ final class ClientTest extends TestCase
         self::assertSame('Lens', $calls[3][0]['name']);
     }
 
+    /** The API serves a lens sent without `active`, so that definition and an explicit `active: true` are the same to the cache. */
+    public function testEnsureCacheTreatsAnAbsentActiveAsTrue(): void
+    {
+        $definition = ['identifier' => 'thumb', 'name' => 'Thumb', 'type' => 'image'];
+        $sends = 0;
+        $client = new ServerClient('key', 'p', httpClient: new Client(['handler' => function () use (&$sends, $definition) {
+            $sends++;
+            return Create::promiseFor(new Response(200, [], json_encode(['lenses' => [['id' => 'lens-1', 'active' => true] + $definition]])));
+        }]));
+        $client->ensureLens($definition);
+        $client->ensureLens($definition + ['active' => true]);
+        self::assertSame(1, $sends);
+        $client->ensureLens($definition + ['active' => false]);
+        self::assertSame(2, $sends);
+    }
+
     /** A lens changed through `lenses` no longer has the definition `ensureLens` cached, so it is sent again. */
     public function testLensChangesDropTheEnsureCache(): void
     {

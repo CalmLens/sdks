@@ -36,8 +36,8 @@ final class Lenses extends Resource
     }
 
     /**
-     * Creates a lens from `identifier`, `name`, `type`, `active` and an optional `description` and
-     * `transform`. The identifier must be new to the project (`lens/identifier-taken` otherwise).
+     * Creates a lens from `identifier`, `name`, `type` and an optional `description`, `transform`
+     * and `active` (whether the CDN serves it, true by default). The identifier must be new to the project (`lens/identifier-taken` otherwise).
      */
     public function create(array $options): array
     {
@@ -55,7 +55,7 @@ final class Lenses extends Resource
 
     /**
      * Changes a lens's `name`, `description`, `type`, `transform` or whether the CDN serves it
-     * (`active`). The CDN serves the new transform from then on.
+     * (`active`); fields left out stay as they are. The CDN serves the new transform from then on.
      */
     public function update(array $options): array
     {
