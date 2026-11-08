@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'securerandom'
+
 module CalmLens
   # An upload payload: a binary String, or an IO streamed with an exact byte count (or, when its
   # length is unknown, until it ends, sent with chunked transfer encoding).
@@ -98,6 +100,20 @@ module CalmLens
       UploadBody.new(@source.slice(offset, length))
     end
 
+    # This body as the `file` part of an upload form, after an `options` part holding
+    # `options_json`: `multipart/form-data` with a random boundary. A stream stays a stream, read
+    # as the form is sent, and the form can be sent again whenever this body can.
+    # @return [Array(UploadBody, String)] the form and its Content-Type.
+    def to_form(options_json, type)
+      boundary = "calmlens-#{SecureRandom.uuid}"
+      head = "--#{boundary}\r\nContent-Disposition: form-data; name=\"options\"\r\nContent-Type: application/json\r\n\r\n".b +
+             options_json.b + "\r\n--#{boundary}\r\nContent-Disposition: form-data; name=\"file\"\r\n".b +
+             "Content-Type: #{type.delete("\r\n")}\r\n\r\n".b
+      tail = "\r\n--#{boundary}--\r\n".b
+      source = @source.is_a?(String) ? head + @source + tail : FormReader.new(head, @source, tail)
+      [UploadBody.new(source), "multipart/form-data; boundary=#{boundary}"]
+    end
+
     # The bytes, read fully. Used only by the offline mock.
     def read_all
       return @source if @source.is_a?(String)
@@ -111,9 +127,12 @@ module CalmLens
     class IOReader
       attr_reader :size
 
-      def initialize(io, size)
+      # @param bounded [Boolean] the stream goes on after `size` bytes (a slice of a larger file), so
+      #   reading stops there without checking for more.
+      def initialize(io, size, bounded: false)
         @io = io
         @size = size
+        @bounded = bounded
         @remaining = size
         @start = (io.pos if io.respond_to?(:pos) && io.respond_to?(:seek))
       rescue IOError, SystemCallError
@@ -125,7 +144,7 @@ module CalmLens
       # A reader of `length` bytes from `offset` of this rewindable stream, positioned there.
       def slice(offset, length)
         @io.seek(@start + offset)
-        IOReader.new(@io, length)
+        IOReader.new(@io, length, bounded: true)
       end
 
       def rewind
@@ -138,6 +157,8 @@ module CalmLens
         return read_unsized(length, buffer) if @size.nil?
 
         if @remaining.zero?
+          return length.nil? ? ''.b : buffer&.clear && nil if @bounded
+
           extra = @io.read(1)
           unless extra.nil? || extra.empty?
             raise Internal.invalid('The stream holds more bytes than sizeInBytes',
@@ -167,6 +188,68 @@ module CalmLens
 
       def readpartial(length, buffer = nil)
         read(length, buffer) || raise(EOFError)
+      end
+    end
+
+    # An upload form around a streamed file: the form's head, the file's bytes as an {IOReader}
+    # reads them, then its closing boundary.
+    class FormReader
+      def initialize(head, file, tail)
+        @head = head
+        @file = file
+        @tail = tail
+        @size = file.size && (head.bytesize + file.size + tail.bytesize)
+        rewind_pieces
+      end
+
+      attr_reader :size
+
+      def rewindable? = @file.rewindable?
+
+      def rewind
+        @file.rewind
+        rewind_pieces
+      end
+
+      # Reads like IO#read: everything left without a length, else up to `length` bytes, nil at the end.
+      def read(length = nil, buffer = nil)
+        return (buffer ? buffer.replace(''.b) : ''.b) if length&.zero?
+
+        output = ''.b
+        until @pieces.empty? || (length && output.bytesize >= length)
+          chunk = read_piece(length && (length - output.bytesize))
+          chunk.nil? || chunk.empty? ? next_piece : output << chunk
+        end
+        return buffer&.clear && nil if output.empty? && length
+
+        buffer ? buffer.replace(output) : output
+      end
+
+      def readpartial(length, buffer = nil)
+        read(length, buffer) || raise(EOFError)
+      end
+
+      private
+
+      def rewind_pieces
+        @pieces = %i[head file tail]
+        @offset = 0
+      end
+
+      def next_piece
+        @pieces.shift
+        @offset = 0
+      end
+
+      # Up to `length` bytes (all, without one) of the current piece; empty or nil once it is used up.
+      def read_piece(length)
+        piece = @pieces.first
+        return @file.read(length) if piece == :file
+
+        text = piece == :head ? @head : @tail
+        chunk = text.byteslice(@offset, length || text.bytesize).to_s
+        @offset += chunk.bytesize
+        chunk
       end
     end
   end

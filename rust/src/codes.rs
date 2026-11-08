@@ -82,6 +82,8 @@ error_codes! {
     UnsupportedUploadType = "upload/unsupported-type", 415;
     /// `upload-payload/invalid` (HTTP 400): Upload payload is invalid.
     InvalidUploadPayload = "upload-payload/invalid", 400;
+    /// `upload/options-in-query` (HTTP 400): Send the asset's name and fields in the request body (the JSON body, or the options part of a multipart/form-data upload), not in the query string.
+    UploadOptionsInQuery = "upload/options-in-query", 400;
     /// `upload/use-upload-part` (HTTP 409): Use uploadPart for multipart upload parts after the first part
     UseUploadPart = "upload/use-upload-part", 409;
     /// `upload/not-open` (HTTP 409): Asset is not accepting additional parts

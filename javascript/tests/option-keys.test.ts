@@ -89,7 +89,7 @@ describe("unknown option keys", () => {
     const client = new CalmLensServerClient({ apiKey: "key", projectId: "p", fetch: fetchImpl });
     await client.text.classify({ text: "hi", externalId: "post-1", idempotencyKey: "key-1" });
     expect(requests[0]!.headers.get("idempotency-key")).toBe("key-1");
-    expect(new URL(requests[0]!.url).searchParams.get("externalId")).toBe("post-1");
+    expect(((await requests[0]!.json()) as { externalId: string }).externalId).toBe("post-1");
   });
 
   test("the app client refuses keys its upload preset requests don't take", async () => {

@@ -273,11 +273,15 @@ class ClientCasesTest {
       if (want.has("body")) {
         if (want.get("body").isJsonNull()) assertEquals(0, got.body().length, label + ": no body");
         else assertEquals(want.get("body"), JsonParser.parseString(new String(got.body(), StandardCharsets.UTF_8)), label + ": body");
-      } else {
-        assertEquals(want.get("bodyLength").getAsLong(), got.body().length, label + ": body length");
-        assertEquals(want.get("bodySha256").getAsString(), HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(got.body())), label + ": body SHA-256");
-        if (want.has("bodyBase64")) assertEquals(want.get("bodyBase64").getAsString(), Base64.getEncoder().encodeToString(got.body()), label + ": body");
-      }
+      } else if (want.has("form")) {
+        // An upload form: exactly an options part, then a file part, under the request's boundary.
+        JsonObject form = want.getAsJsonObject("form");
+        UploadForm.Parsed parsed = UploadForm.read(got.body(), header(got.headers(), "Content-Type"));
+        assertEquals(form.get("options"), JsonParser.parseString(parsed.options()), label + ": options");
+        JsonObject file = form.getAsJsonObject("file");
+        assertEquals(file.get("contentType").isJsonNull() ? null : file.get("contentType").getAsString(), parsed.fileType(), label + ": file type");
+        assertRawBody(file, parsed.file(), label + ": file");
+      } else assertRawBody(want, got.body(), label + ": body");
     }
     if (clientCase.has("sleepsMs")) {
       JsonArray expected = clientCase.getAsJsonArray("sleepsMs");
@@ -290,6 +294,13 @@ class ClientCasesTest {
         else assertEquals(sleep.getAsLong(), actual, name + ": wait " + (i + 1));
       }
     }
+  }
+
+  /** Compares raw bytes with {@code bodyLength}, {@code bodySha256} and, when given, {@code bodyBase64}. */
+  private static void assertRawBody(JsonObject want, byte[] bytes, String label) throws Exception {
+    assertEquals(want.get("bodyLength").getAsLong(), bytes.length, label + " length");
+    assertEquals(want.get("bodySha256").getAsString(), HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)), label + " SHA-256");
+    if (want.has("bodyBase64")) assertEquals(want.get("bodyBase64").getAsString(), Base64.getEncoder().encodeToString(bytes), label);
   }
 
   private static String string(JsonObject options, String key) {

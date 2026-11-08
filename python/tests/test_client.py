@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from calmlens import (CalmLensServerClient, CalmLensError, CalmLensTimeoutError, CalmLensValidationError,
                       __version__, error_codes)
+from upload_form import read_upload_form
 
 #: The smallest response the client accepts as an asset.
 ASSET = {"id": "asset", "upload": {"status": "completed"},
@@ -62,19 +63,26 @@ class ClientTestCase(unittest.TestCase):
     def query(self, index=-1):
         return parse_qs(urlsplit(self.calls[index].full_url).query)
 
+    def json_body(self, index=-1):
+        self.assertEqual(self.calls[index].get_header("Content-type"), "application/json")
+        return json.loads(self.bodies[index])
+
+    def form(self, index=-1):
+        """The upload form request ``index`` sent: its options, file type and file bytes."""
+        return read_upload_form(self.bodies[index], self.calls[index].get_header("Content-type"))
+
 
 class ClientTests(ClientTestCase):
     def test_keyword_arguments_match_options_dicts(self):
         self.client.assets.classify(name="n", external_id="e1", processing_options={"keep_content_after_processing": False},
                                     metadata=[{"id": "snake_key", "value": 1}],
                                     content={"plain_text": "hi", "type": "text/plain"})
-        query = self.query()
-        self.assertEqual((query["externalId"], query["name"]), (["e1"], ["n"]))
-        self.assertEqual(json.loads(query["processingOptions"][0]), {"keepContentAfterProcessing": False})
-        self.assertEqual(json.loads(query["metadata"][0]), [{"id": "snake_key", "value": 1}])
-        self.assertEqual(self.calls[-1].data, b"hi")
+        self.assertEqual(self.json_body(), {"name": "n", "externalId": "e1",
+                                            "processingOptions": {"keepContentAfterProcessing": False},
+                                            "metadata": [{"id": "snake_key", "value": 1}],
+                                            "content": {"plainText": "hi", "type": "text/plain"}})
         self.client.text.classify(text="hi", tags=["catalogue", "backpacks"])
-        self.assertEqual(json.loads(self.query()["tags"][0]), ["catalogue", "backpacks"])
+        self.assertEqual(self.json_body()["tags"], ["catalogue", "backpacks"])
         with self.assertRaises(CalmLensValidationError) as raised:
             self.client.assets.retrieve({"assetId": "a"}, asset_id="b")
         self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_ARGUMENT)
@@ -92,12 +100,16 @@ class ClientTests(ClientTestCase):
         self.assertEqual(self.calls, [])
 
     def test_payload_forms_and_url(self):
-        for payload in ({"plainText": "abc"}, {"base64": "data:text/plain;base64,YWJj"}, {"data": b"abc"},
+        self.client.assets.create({"name": "x", "content": {"type": "text/plain", "plainText": "abc"}})
+        self.assertEqual(self.json_body(), {"name": "x", "content": {"plainText": "abc", "type": "text/plain"}})
+        self.assertEqual(self.query(), {"wait": ["false"]})
+        self.assertIsNone(self.calls[-1].get_header("X-calmlens-upload"))
+        for payload in ({"base64": "data:text/plain;base64,YWJj"}, {"data": b"abc"},
                         {"data": bytearray(b"abc")}, {"data": memoryview(b"abc")}):
             self.client.assets.create({"name": "x", "content": {"type": "text/plain", **payload}})
-            self.assertEqual(self.bodies[-1], b"abc")
-            self.assertEqual(self.query()["wait"], ["false"])
-            self.assertEqual(self.calls[-1].headers["Content-length"], "3")
+            self.assertEqual(self.form(), {"options": {"name": "x"}, "type": "text/plain", "bytes": b"abc"})
+            self.assertEqual(self.query(), {"wait": ["false"], "contentType": ["text/plain"], "sizeInBytes": ["3"]})
+            self.assertEqual(self.calls[-1].headers["Content-length"], str(len(self.bodies[-1])))
         self.client.assets.classify({"name": "site", "url": "https://example.com", "metadata": [{"id": "a", "value": 1}],
                                      "tags": ["landing"]})
         sent = json.loads(self.calls[-1].data)
@@ -129,9 +141,8 @@ class ClientTests(ClientTestCase):
         newest = "🌍" * 2001
         self.client.text.classify(text="reply", author_id="user-9",
                                   context={"items": [{"text": "older", "author_id": "user-1"}, {"text": newest}]})
-        query = self.query()
-        self.assertEqual(query["authorId"], ["user-9"])
-        self.assertEqual(json.loads(query["context"][0]), {"items": [{"text": newest}]})
+        sent = self.json_body()
+        self.assertEqual((sent["authorId"], sent["context"]), ("user-9", {"items": [{"text": newest}]}))
         for context in ({}, {"items": "post"}, None):
             with self.subTest(context=context), self.assertRaises(CalmLensValidationError) as raised:
                 self.client.text.classify({"text": "reply", "context": context})
@@ -151,12 +162,14 @@ class ClientTests(ClientTestCase):
         stream.seek(5)
         self.client.assets.create(name="x", content={"data": stream, "type": "text/plain"})
         self.assertEqual(self.query()["sizeInBytes"], ["8"])
-        self.assertEqual(self.calls[-1].headers["Content-length"], "8")
-        self.assertEqual(self.bodies[-1], b"streamed")
+        # The form is read from the file as it is sent, not buffered first.
+        self.assertTrue(hasattr(self.calls[-1].data, "read"))
+        self.assertEqual(self.calls[-1].headers["Content-length"], str(len(self.bodies[-1])))
+        self.assertEqual(self.form()["bytes"], b"streamed")
         # A longer stream sends exactly the declared size.
         self.client.assets.create(name="x", content={"data": Unseekable(b"abcdef"), "sizeInBytes": 3,
                                                      "type": "text/plain"})
-        self.assertEqual(self.bodies[-1], b"abc")
+        self.assertEqual(self.form()["bytes"], b"abc")
 
     def test_stream_shorter_than_declared_size_fails_clearly(self):
         with self.assertRaises(CalmLensValidationError) as raised:
@@ -438,7 +451,7 @@ class RetryTests(ClientTestCase):
         keys = {call.headers["Idempotency-key"] for call in self.calls}
         self.assertEqual(len(self.calls), 3)
         self.assertEqual(len(keys), 1)
-        self.assertEqual(self.bodies, [b"hello"] * 3)
+        self.assertEqual([self.form(index)["bytes"] for index in range(3)], [b"hello"] * 3)
         self.client.assets.create(name="x", content={"plainText": "a", "type": "text/plain"}, idempotency_key="mine")
         self.assertEqual(self.calls[-1].headers["Idempotency-key"], "mine")
         self.assertNotIn(self.calls[-1].headers["Idempotency-key"], keys)
@@ -493,8 +506,9 @@ class AutomaticMultipartTests(ClientTestCase):
                     ("/v1/assets/a1/part", {"partNumber": "3", "isFinal": "true", "sizeInBytes": "3"},
                      "K:part-3", "part"),
                 ])
-                self.assertEqual(self.calls[0].get_header("Content-type"), "video/mp4")
-                self.assertEqual(b"".join(self.bodies), data)
+                first = self.form(0)
+                self.assertEqual((first["options"], first["type"]), ({"name": "v.mp4"}, "video/mp4"))
+                self.assertEqual(first["bytes"] + b"".join(self.bodies[1:]), data)
 
     def test_content_of_one_part_or_from_a_pipe_is_sent_in_one_request(self):
         size = 5 * MIB
@@ -502,7 +516,9 @@ class AutomaticMultipartTests(ClientTestCase):
         self.client.assets.create(name="v.mp4", content={"data": Unseekable(b"x" * (size + 1)),
                                                          "sizeInBytes": size + 1, "type": "video/mp4"})
         self.client.assets.create(name="t.txt", content={"plainText": "x" * (size + 1), "type": "text/plain"})
-        self.assertEqual([call.get_header("X-calmlens-upload") for call in self.calls], ["content"] * 3)
+        # Text is one JSON request, whatever its size.
+        self.assertEqual([call.get_header("X-calmlens-upload") for call in self.calls], ["content", "content", None])
+        self.assertEqual(self.json_body()["content"]["plainText"], "x" * (size + 1))
 
     def test_a_dropped_part_is_retried_with_the_same_key_and_bytes(self):
         data = b"a" * (5 * MIB) + b"b" * 10

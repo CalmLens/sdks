@@ -143,6 +143,21 @@ public interface Transport {
       return new Body(length, null, null, () -> stream);
     }
 
+    /**
+     * {@code head}, then {@code body}, then {@code tail}, streamed as {@code body} is read: an
+     * upload form around its file. Its length is known when {@code body}'s is, and it can be sent
+     * again when {@code body} can.
+     */
+    static Body framed(byte[] head, Body body, byte[] tail) {
+      long length = body.length() < 0 ? -1 : head.length + body.length() + tail.length;
+      return new Body(length, null, null, () -> {
+        try {
+          return new java.io.SequenceInputStream(java.util.Collections.enumeration(List.of(
+              new ByteArrayInputStream(head), body.open(), new ByteArrayInputStream(tail))));
+        } catch (IOException e) { throw new java.io.UncheckedIOException(e); }
+      }, body.replayable());
+    }
+
     /** @return the exact body length in bytes, or -1 for a stream of unknown length */
     public long length() { return length; }
 
@@ -206,7 +221,7 @@ public interface Transport {
       }
       if (consumed) throw new IOException("A stream request body can be sent only once");
       consumed = true;
-      return stream.get();
+      try { return stream.get(); } catch (java.io.UncheckedIOException e) { throw e.getCause(); }
     }
 
     @Override public String toString() {

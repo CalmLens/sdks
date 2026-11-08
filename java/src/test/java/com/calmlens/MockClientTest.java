@@ -1,5 +1,6 @@
 package com.calmlens;
 
+import com.google.gson.JsonParser;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.charset.StandardCharsets;
@@ -15,7 +16,10 @@ class MockClientTest {
     MockCalmLensServerClient mock = new MockCalmLensServerClient().enqueue(200, Fixtures.asset("asset-1", "processing", "pending"));
     mock.client.assets.create(new Models.SubmitAsset("all-bytes.png", Models.Content.bytes(data, "image/png")));
     var sent = mock.requests().get(0);
-    assertArrayEquals(data, sent.body());
+    UploadForm.Parsed form = Fixtures.form(sent);
+    assertArrayEquals(data, form.file());
+    assertEquals("image/png", form.fileType());
+    assertEquals(com.google.gson.JsonParser.parseString("{\"name\":\"all-bytes.png\"}"), com.google.gson.JsonParser.parseString(form.options()));
     assertEquals("256", sent.query().get("sizeInBytes"));
     assertEquals("image/png", sent.query().get("contentType"));
     assertEquals("false", sent.query().get("wait"));
@@ -139,7 +143,7 @@ class MockClientTest {
     assertEquals(
         com.google.gson.JsonParser.parseString("{\"keepContentAfterProcessing\":false,\"features\":{\"ocr\":{\"enabled\":true},"
             + "\"personDetection\":{\"enabled\":true},\"faceDetection\":{\"enabled\":true,\"ageEstimation\":true}}}"),
-        com.google.gson.JsonParser.parseString(mock.requests().get(0).query().get("processingOptions")));
+        Fixtures.formOptions(mock.requests().get(0)).get("processingOptions"));
 
     Models.PersonDetectionResult people = asset.classification().personDetection();
     assertEquals("evaluated", people.status());
@@ -190,9 +194,12 @@ class MockClientTest {
     var classify = mock.requests().get(0);
     assertEquals("POST", classify.method());
     assertEquals("/projects/project-9/assets", classify.path());
-    assertEquals("content", classify.header("x-calmlens-upload"));
-    assertEquals("true", classify.query().get("wait"));
-    assertEquals("hello", classify.bodyText());
+    // Text goes as a JSON body, its fields never in the query.
+    assertNull(classify.header("x-calmlens-upload"));
+    assertEquals("application/json", classify.header("content-type"));
+    assertEquals(Map.of("wait", "true"), classify.query());
+    String sent = classify.bodyText();
+    assertEquals(JsonParser.parseString("{\"name\":\"text\",\"content\":{\"plainText\":\"hello\",\"type\":\"text/plain\"}}"), JsonParser.parseString(sent));
     assertEquals("ignored-key", classify.header("x-api-key"));
     assertFalse(classify.toString().contains("ignored-key"));
     var events = mock.requests().get(2);
@@ -201,7 +208,7 @@ class MockClientTest {
     assertNull(events.bodyText());
     byte[] captured = classify.body();
     captured[0] = 0;
-    assertEquals("hello", new String(mock.requests().get(0).body(), StandardCharsets.UTF_8));
+    assertEquals(sent, new String(mock.requests().get(0).body(), StandardCharsets.UTF_8));
   }
 
   private static Map<String, Object> withReport(Map<String, Object> asset, Map<String, Object> report) {

@@ -291,18 +291,50 @@ class ContractClientTest < Minitest::Test
       CLIENT_CASES['everyRequest']['headers'].merge(want['headers']).each do |name, value|
         check_header(label, name, header(got[:headers], name), value, uuids)
       end
-      check_body(label, want, got[:body])
+      check_body(label, want, got[:body], header(got[:headers], 'Content-Type'))
     end
   end
 
-  def check_body(label, want, body)
-    if want.key?('body')
+  def raw_body(bytes, with_base64)
+    actual = { 'bodyLength' => bytes.bytesize, 'bodySha256' => Digest::SHA256.hexdigest(bytes) }
+    actual['bodyBase64'] = [bytes].pack('m0') if with_base64
+    actual
+  end
+
+  def check_body(label, want, body, content_type)
+    if want.key?('form')
+      form = read_upload_form(body, content_type)
+      assert_equal want['form']['options'], form[:options], "#{label}: options"
+      file = want['form']['file']
+      assert_equal file, { 'contentType' => form[:type], **raw_body(form[:bytes], file.key?('bodyBase64')) }, "#{label}: file"
+    elsif want.key?('body')
       want['body'].nil? ? assert_empty(body, "#{label}: no body") : assert_equal(want['body'], JSON.parse(body), "#{label}: body")
     else
-      actual = { 'bodyLength' => body.bytesize, 'bodySha256' => Digest::SHA256.hexdigest(body) }
-      actual['bodyBase64'] = [body].pack('m0') if want.key?('bodyBase64')
-      assert_equal want.slice('bodyLength', 'bodySha256', 'bodyBase64'), actual, "#{label}: raw body"
+      assert_equal want.slice('bodyLength', 'bodySha256', 'bodyBase64'), raw_body(body, want.key?('bodyBase64')), "#{label}: raw body"
     end
+  end
+
+  # Reads an upload form as the API does: exactly an `options` part, then a `file` part, then the
+  # closing boundary.
+  def read_upload_form(body, content_type)
+    boundary = content_type.to_s.match(%r{\Amultipart/form-data;\s*boundary=(?:"([^"]+)"|([^;\s]+))}i)
+    flunk "not an upload form: #{content_type}" unless boundary
+    framed = "\r\n".b + body.b
+    delimiter = "\r\n--#{boundary[1] || boundary[2]}".b
+    assert framed.start_with?(delimiter), "the form doesn't start with its boundary"
+    parts = []
+    at = 0
+    until framed.byteslice(at + delimiter.bytesize, 2) == '--'
+      header_end = framed.index("\r\n\r\n", at)
+      following = header_end && framed.index(delimiter, header_end + 4)
+      flunk 'the form ends before its closing boundary' unless following
+      headers = framed.byteslice(at + delimiter.bytesize + 2, header_end - at - delimiter.bytesize - 2)
+      parts << { name: headers[/^content-disposition:\s*form-data;[^\r\n]*?\bname="([^"]*)"/i, 1],
+                 type: headers[/^content-type:\s*([^\r\n]*)/i, 1], bytes: framed.byteslice(header_end + 4, following - header_end - 4) }
+      at = following
+    end
+    assert_equal %w[options file], parts.map { |part| part[:name] }, 'the form holds options then file'
+    { options: JSON.parse(parts[0][:bytes].dup.force_encoding(Encoding::UTF_8)), type: parts[1][:type], bytes: parts[1][:bytes] }
   end
 
   def check_error(label, wanted, error)

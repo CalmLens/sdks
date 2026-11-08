@@ -586,27 +586,37 @@ impl ServerClient {
             ));
         }
         let idempotency_key = options.idempotency_key.clone().unwrap_or_else(uuid);
-        // Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+        // Only the posts CalmLens uses are sent.
         let context = options
             .context
             .as_ref()
             .map(|context| ModerationContext::new(select_moderation_context_items(&context.items)));
+        // The asset's fields go in the body (the JSON body, or an upload form's options part),
+        // never the query, which proxies and servers log. Null and unset values are left out.
+        let fields = serde_json::to_value(UploadFields {
+            name: &options.name,
+            description: options.description.as_ref(),
+            processing_options: options.processing_options.as_ref(),
+            visibility: options.visibility.as_ref(),
+            metadata: options.metadata.as_ref(),
+            tags: options.tags.as_ref(),
+            author_id: options.author_id.as_ref(),
+            context: context.as_ref(),
+            external_id: options.external_id.as_ref(),
+            external_url: options.external_url.as_ref(),
+            folder_id: match &options.folder_id {
+                Patch::Value(folder) => Some(folder),
+                _ => None,
+            },
+            upload_preset_id: options.upload_preset_id.as_ref(),
+        })
+        .map_err(|cause| invalid_argument(cause.to_string()).with_source(cause))?;
+        let serde_json::Value::Object(fields) = fields else {
+            unreachable!("upload fields serialize as an object")
+        };
+        // The query holds only transport values.
         let mut query = Query::default();
-        query.push("name", &options.name);
         query.push("wait", wait);
-        query.opt("description", options.description.as_ref());
-        query.json("processingOptions", options.processing_options.as_ref())?;
-        query.opt("visibility", options.visibility.as_ref());
-        query.json("metadata", options.metadata.as_ref())?;
-        query.json("tags", options.tags.as_ref())?;
-        query.opt("authorId", options.author_id.as_ref());
-        query.json("context", context.as_ref())?;
-        query.opt("externalId", options.external_id.as_ref());
-        query.opt("externalUrl", options.external_url.as_ref());
-        if let Patch::Value(folder) = &options.folder_id {
-            query.push("folderId", folder);
-        }
-        query.opt("uploadPresetId", options.upload_preset_id.as_ref());
         if let Some(url) = &options.url {
             #[derive(Serialize)]
             #[serde(rename_all = "camelCase")]
@@ -682,7 +692,21 @@ impl ServerClient {
         // Bytes in memory and files can be cut into parts and read again; readers and streams
         // cannot, and text stays one request.
         let part_size = self.inner.config.part_size_bytes;
+        let mut text = None;
         let (source, body, size) = match content.payload {
+            Payload::Text(value) => {
+                let size = value.len() as u64;
+                if content
+                    .size_in_bytes
+                    .is_some_and(|declared| declared != size)
+                {
+                    return Err(invalid_payload(
+                        "sizeInBytes must match the payload byte length",
+                    ));
+                }
+                text = Some(value);
+                (None, RequestBody::Empty, Some(size))
+            }
             Payload::File { path, size } if !multipart && size > part_size => {
                 if content
                     .size_in_bytes
@@ -721,7 +745,12 @@ impl ServerClient {
                 }
             }
             return self
-                .submit_in_parts(query, &content.mime_type, (source, total), idempotency_key)
+                .submit_in_parts(
+                    (query, &fields),
+                    &content.mime_type,
+                    (source, total),
+                    idempotency_key,
+                )
                 .await;
         }
         if multipart && !self.inner.transport.defers_upload_checks() {
@@ -736,6 +765,34 @@ impl ServerClient {
         if !multipart && !self.inner.transport.defers_upload_checks() {
             check_upload_size(&mime, size, false)?;
         }
+        if let Some(plain_text) = text {
+            // Plain text is one JSON body, with the fields beside it.
+            let mut body = fields;
+            let mut text = serde_json::Map::new();
+            text.insert("plainText".into(), plain_text.into());
+            text.insert("type".into(), content.mime_type.into());
+            if multipart {
+                if let Some(number) = content.part_number {
+                    text.insert("partNumber".into(), number.into());
+                }
+                text.insert("isFinal".into(), is_final.into());
+                body.insert("part".into(), text.into());
+                if let Some(size) = content.size_in_bytes {
+                    body.insert("sizeInBytes".into(), size.into());
+                }
+                if let Some(total) = options.total_size_in_bytes {
+                    body.insert("totalSizeInBytes".into(), total.into());
+                }
+            } else {
+                body.insert("content".into(), text.into());
+            }
+            let mut request = self
+                .prepare(Method::POST, &self.project_path("assets")?, &query.0)?
+                .header("idempotency-key", &idempotency_key)?
+                .json(&body)?;
+            request.deadline = deadline;
+            return self.call_upload(request).await;
+        }
         query.push("contentType", &content.mime_type);
         query.opt("sizeInBytes", size);
         if multipart {
@@ -743,9 +800,10 @@ impl ServerClient {
             query.push("isFinal", is_final);
             query.opt("totalSizeInBytes", options.total_size_in_bytes);
         }
+        let (form_type, body) = upload_form(&fields, &content.mime_type, body)?;
         let mut request = self
             .prepare(Method::POST, &self.project_path("assets")?, &query.0)?
-            .header("content-type", &content.mime_type)?
+            .header("content-type", &form_type)?
             .header(
                 "x-calmlens-upload",
                 if multipart { "part" } else { "content" },
@@ -809,13 +867,14 @@ impl ServerClient {
     }
 
     /// Uploads `bytes` as a multipart upload in `part_size_bytes` parts and returns the final
-    /// part's asset. The first part goes with the upload's fields in `query`; part `n` after it
+    /// part's asset. The first part goes as an upload form with the upload's `fields` and the
+    /// transport values in `query`; part `n` after it
     /// carries the key `<key>:part-<n>`, so each is retried safely and repeating the call with
     /// the same key replays the parts the API already has and sends the rest. A part the API
     /// already has is skipped, and a final part that finds the upload completed reads it back.
     async fn submit_in_parts(
         &self,
-        mut query: Query,
+        (mut query, fields): (Query, &serde_json::Map<String, serde_json::Value>),
         mime_type: &str,
         (source, total): (PartSource, u64),
         key: String,
@@ -834,12 +893,13 @@ impl ServerClient {
         query.push("partNumber", 1);
         query.push("isFinal", false);
         query.push("totalSizeInBytes", total);
+        let (form_type, body) = upload_form(fields, mime_type, RequestBody::Bytes(first))?;
         let mut request = self
             .prepare(Method::POST, &self.project_path("assets")?, &query.0)?
-            .header("content-type", mime_type)?
+            .header("content-type", &form_type)?
             .header("x-calmlens-upload", "part")?
             .header("idempotency-key", &key)?;
-        request.body = RequestBody::Bytes(first);
+        request.body = body;
         request.deadline = Deadline::Upload;
         let mut asset = self.call_upload(request).await?;
         let path = format!("/assets/{}/part", id(&asset.id)?);
@@ -1010,6 +1070,74 @@ fn upload_deadline(payload: &Payload) -> Deadline {
     }
 }
 
+/// The asset fields an upload of content or a first part carries in its body: a plain-text
+/// upload's JSON body, or an upload form's `options` part. The API refuses them in the query.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UploadFields<'a> {
+    name: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<&'a String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    processing_options: Option<&'a ProcessingOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    visibility: Option<&'a Visibility>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<&'a Vec<MetadataItem>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tags: Option<&'a Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    author_id: Option<&'a String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    context: Option<&'a ModerationContext>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    external_id: Option<&'a String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    external_url: Option<&'a String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    folder_id: Option<&'a String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    upload_preset_id: Option<&'a String>,
+}
+
+/// An upload form: `multipart/form-data` with the asset's `fields` as the JSON `options` part,
+/// then the file as the `file` part with its `mime_type`. Returns the form's Content-Type and
+/// body. Bytes are joined with the envelope, so the request can still be retried; a stream is
+/// still sent as it is read, with its length grown by the envelope's when it is known.
+fn upload_form(
+    fields: &serde_json::Map<String, serde_json::Value>,
+    mime_type: &str,
+    file: RequestBody,
+) -> Result<(String, RequestBody)> {
+    let boundary = format!("calmlens-{}", uuid());
+    let options = serde_json::to_string(fields)
+        .map_err(|cause| invalid_argument(cause.to_string()).with_source(cause))?;
+    let mime_type: String = mime_type
+        .chars()
+        .filter(|c| *c != '\r' && *c != '\n')
+        .collect();
+    let head = Bytes::from(format!(
+        "--{boundary}\r\nContent-Disposition: form-data; name=\"options\"\r\nContent-Type: application/json\r\n\r\n{options}\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file\"\r\nContent-Type: {mime_type}\r\n\r\n"
+    ));
+    let tail = Bytes::from(format!("\r\n--{boundary}--\r\n"));
+    let envelope = (head.len() + tail.len()) as u64;
+    let body = match file {
+        RequestBody::Empty => RequestBody::Bytes([head, tail].concat().into()),
+        RequestBody::Bytes(bytes) => RequestBody::Bytes([head, bytes, tail].concat().into()),
+        RequestBody::Stream(stream, size) => {
+            let stream = stream.map(|stream| -> crate::ByteStream {
+                Box::pin(
+                    futures_util::stream::once(async move { Ok(head) })
+                        .chain(stream)
+                        .chain(futures_util::stream::once(async move { Ok(tail) })),
+                )
+            });
+            RequestBody::Stream(stream, size.map(|size| size + envelope))
+        }
+    };
+    Ok((format!("multipart/form-data; boundary={boundary}"), body))
+}
+
 #[derive(Default)]
 struct Query(Vec<(String, String)>);
 impl Query {
@@ -1020,14 +1148,6 @@ impl Query {
         if let Some(value) = value {
             self.push(key, value);
         }
-    }
-    fn json(&mut self, key: &str, value: Option<&impl Serialize>) -> Result<()> {
-        if let Some(value) = value {
-            let text = serde_json::to_string(value)
-                .map_err(|cause| invalid_argument(cause.to_string()).with_source(cause))?;
-            self.push(key, text);
-        }
-        Ok(())
     }
 }
 

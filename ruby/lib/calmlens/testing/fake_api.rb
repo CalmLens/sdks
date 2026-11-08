@@ -43,8 +43,7 @@ module CalmLens
     # semantic search.
     # @api private
     class FakeAPI
-      JSON_QUERY = %w[wait isFinal sizeInBytes totalSizeInBytes partNumber pageSize processingOptions metadata
-                      tags context].freeze
+      JSON_QUERY = %w[wait isFinal sizeInBytes totalSizeInBytes partNumber pageSize].freeze
       # Keyword search fields, in the order matches are reported, and where each value sits in the asset.
       SEARCH_FIELDS = { 'name' => %w[name], 'id' => %w[id], 'externalId' => %w[externalId],
                         'description' => %w[description], 'tags' => %w[tags], 'type' => %w[type],
@@ -111,6 +110,35 @@ module CalmLens
       attr_reader :state
       # The mock API key's `{ 'actions', 'folderId', 'includeSubfolders' }` grants.
       attr_accessor :grants
+
+      # Splits an upload form as the API reads it: exactly an `options` part, then a `file` part, then
+      # the closing boundary.
+      # @return [Array(String, String), nil] the options part's text and the file's bytes, or nil
+      #   when the body isn't such a form.
+      def self.upload_form(body, content_type)
+        boundary = content_type.to_s.match(%r{\Amultipart/form-data\s*;\s*boundary=(?:"([^"]+)"|([^;\s]+))}i)
+        return nil unless boundary
+
+        framed = "\r\n".b + body.to_s.b
+        delimiter = "\r\n--#{boundary[1] || boundary[2]}".b
+        return nil unless framed.start_with?(delimiter)
+
+        parts = []
+        at = 0
+        until framed.byteslice(at + delimiter.bytesize, 2) == '--'
+          start = at + delimiter.bytesize
+          header_end = framed.index("\r\n\r\n".b, start)
+          following = header_end && framed.index(delimiter, header_end + 4)
+          return nil unless following
+
+          name = framed.byteslice(start, header_end - start)[/content-disposition:\s*form-data\s*;[^\r\n]*?\bname="([^"]*)"/i, 1]
+          parts << [name, framed.byteslice(header_end + 4, following - header_end - 4)]
+          at = following
+        end
+        return nil unless parts.map(&:first) == %w[options file]
+
+        [parts[0][1].force_encoding(Encoding::UTF_8), parts[1][1]]
+      end
 
       def initialize(project_id:, base_url:, cdn_base_url:, now:, create_id:, moderate:, api_key:, grants:)
         @project_id = project_id
@@ -357,19 +385,25 @@ module CalmLens
         json = content_type == 'application/json' && body && upload.nil? ? JSON.parse(body) : {}
         # HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
         key = header(headers, 'Idempotency-Key')&.to_s&.gsub(/\A[ \t\r\n]+|[ \t\r\n]+\z/, '')
-        return dispatch(method, parts, query, json, body, upload) unless key && method == 'POST'
+        request = { query: query, json: json, body: body, upload: upload, content_type: content_type }
+        return dispatch(method, parts, request) unless key && method == 'POST'
 
         fail!(ErrorCodes::INVALID_IDEMPOTENCY_KEY) unless key.match?(IDEMPOTENCY_KEY)
         # Like the API: a successful response is saved and replayed for the same key and request;
-        # a failed one frees the key.
-        fingerprint = [method, relative, content_type, Digest::SHA256.hexdigest(body.to_s)]
+        # a failed one frees the key. An upload form counts by its options and file, not its boundary.
+        form = upload && FakeAPI.upload_form(body, content_type)
+        fingerprint = if form
+                        [method, relative, 'multipart/form-data', form[0], Digest::SHA256.hexdigest(form[1])]
+                      else
+                        [method, relative, content_type, Digest::SHA256.hexdigest(body.to_s)]
+                      end
         saved = @state.idempotency[key]
         if saved
           fail!(ErrorCodes::IDEMPOTENCY_KEY_REUSED) unless saved[:fingerprint] == fingerprint
           return Response.new(status: saved[:status], body: saved[:body],
                               headers: saved[:headers].merge('idempotent-replayed' => 'true', 'x-request-id' => request_id))
         end
-        response = dispatch(method, parts, query, json, body, upload)
+        response = dispatch(method, parts, request)
         if response.success?
           @state.idempotency[key] = { fingerprint: fingerprint, status: response.status, body: response.body,
                                       headers: response.headers }
@@ -387,9 +421,10 @@ module CalmLens
         fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, "#{key} is not valid JSON")
       end
 
-      def dispatch(method, parts, query, json, body, upload)
+      def dispatch(method, parts, request)
+        query, json, body = request.values_at(:query, :json, :body)
         data = case parts.first
-               when 'projects' then project(method, parts, query, json, body, upload)
+               when 'projects' then project(method, parts, request)
                when 'assets' then asset(method, parts, query, json, body)
                when 'folders' then folder(method, parts, json)
                when 'hash-lists' then hash_list(method, parts, query, json)
@@ -403,29 +438,26 @@ module CalmLens
 
       def deep_copy(value) = JSON.parse(JSON.generate(value))
 
-      # `upload` is the X-CalmLens-Upload header, which picks how POST .../assets reads the
-      # request: absent is a JSON body, 'content' raw file content and 'part' a raw first part.
-      def project(method, parts, query, json, body, upload)
+      def project(method, parts, request)
         fail!(ErrorCodes::API_KEY_PROJECT_MISMATCH) unless parts[1] == @project_id
-        case [method, parts[2..], upload]
-        in ['GET', ['events'], _] then events(query)
-        in ['PUT', ['lenses'], _] then lenses(json.fetch('lenses', []))
-        in ['GET', ['lenses'], _] then page(@state.lenses.values, query, JSON.generate(['lenses', @project_id]))
-        in ['POST', ['lenses'], _] then create_lens(json)
-        in ['GET', ['folders'], _] then folder_page(query)
-        in ['POST', ['folders'], _] then create_folder(json)
-        in ['GET', ['hash-lists'], _] then page(project_hash_lists, query, JSON.generate([@project_id]))
-        in ['POST', ['hash-lists'], _] then create_hash_list(json)
-        in ['GET', ['policy'], _] then show_policy(find_policy(ensure_policies))
-        in ['PUT', ['policy'], _] then show_policy(assign_policy(json))
-        in ['GET', ['assets'], _] then list(query)
-        in ['GET', ['assets', 'search'], _] then search(query)
-        in ['GET', ['assets', String => asset_id, 'timeline'], _] then timeline(asset_id, query)
-        in ['POST', ['assets', 'batch'], _] then batch(json)
-        in ['POST', ['signed-asset-urls'], _] then sign_asset_url(json)
-        in ['POST', ['assets'], nil] then create_asset(json, query['wait'] == false, url: json['url'])
-        in ['POST', ['assets'], 'content'] then create_asset(query, query['wait'] == false, data: body)
-        in ['POST', ['assets'], 'part'] then start_multipart(query, body)
+        query, json = request.values_at(:query, :json)
+        case [method, parts[2..]]
+        in ['GET', ['events']] then events(query)
+        in ['PUT', ['lenses']] then lenses(json.fetch('lenses', []))
+        in ['GET', ['lenses']] then page(@state.lenses.values, query, JSON.generate(['lenses', @project_id]))
+        in ['POST', ['lenses']] then create_lens(json)
+        in ['GET', ['folders']] then folder_page(query)
+        in ['POST', ['folders']] then create_folder(json)
+        in ['GET', ['hash-lists']] then page(project_hash_lists, query, JSON.generate([@project_id]))
+        in ['POST', ['hash-lists']] then create_hash_list(json)
+        in ['GET', ['policy']] then show_policy(find_policy(ensure_policies))
+        in ['PUT', ['policy']] then show_policy(assign_policy(json))
+        in ['GET', ['assets']] then list(query)
+        in ['GET', ['assets', 'search']] then search(query)
+        in ['GET', ['assets', String => asset_id, 'timeline']] then timeline(asset_id, query)
+        in ['POST', ['assets', 'batch']] then batch(json)
+        in ['POST', ['signed-asset-urls']] then sign_asset_url(json)
+        in ['POST', ['assets']] then create_upload(request)
         else route_not_found!(method, parts)
         end
       end
@@ -729,13 +761,75 @@ module CalmLens
         fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'Multipart upload parts must be at least 5MiB except the final part.')
       end
 
+      # `POST .../assets` as the API reads it. Asset fields in the query are refused; then the
+      # `X-CalmLens-Upload` header picks the body: absent is JSON (text, a first text part or a URL),
+      # `content` an upload form with a whole file and `part` one with a first part.
+      def create_upload(request)
+        query, json, body, upload = request.values_at(:query, :json, :body, :upload)
+        in_query = Assets::UPLOAD_OPTION_KEYS.select { |key| query.key?(key) }
+        unless in_query.empty?
+          fail!(ErrorCodes::UPLOAD_OPTIONS_IN_QUERY, "Send the asset's fields in the request body, not in the query string",
+                details: { 'fields' => in_query })
+        end
+        queue = query['wait'] == false
+        return create_from_json(json, queue) if upload.nil?
+
+        route_not_found!('POST', ['assets']) unless %w[content part].include?(upload)
+
+        options, bytes = form_fields(body, request[:content_type])
+        fields = options.merge('contentType' => query['contentType'])
+        return create_asset(fields, queue, data: bytes) if upload == 'content'
+
+        start_multipart(fields.merge(query.slice('isFinal', 'totalSizeInBytes')), bytes, queue)
+      end
+
+      # A JSON create: text as `content` or a first `part` (`{ plainText, type }`), or a URL.
+      def create_from_json(json, queue)
+        key = %w[content part].find { |name| json.key?(name) }
+        return create_asset(json, queue, url: json['url']) unless key
+
+        text = json[key]
+        invalid!('validation/invalid-type', key) unless text.is_a?(Hash) && text['plainText'].is_a?(String) && text['type'].is_a?(String)
+        fields = json.except('content', 'part', 'sizeInBytes', 'totalSizeInBytes').merge('contentType' => text['type'])
+        data = text['plainText'].encode(Encoding::UTF_8).b
+        return create_asset(fields, queue, data: data) if key == 'content'
+
+        start_multipart(fields.merge('isFinal' => text['isFinal'] == true, 'totalSizeInBytes' => json['totalSizeInBytes']), data, queue)
+      end
+
+      # The asset fields in an upload form's options part, and the file's bytes. Like the API, a raw
+      # upload must be `multipart/form-data` (`request/unsupported-content-type`, 415), holding an
+      # `options` JSON object of known fields with a name, then a `file` part.
+      def form_fields(body, content_type)
+        mime = content_type.to_s.split(';').first.to_s.strip.downcase
+        unless mime == 'multipart/form-data'
+          fail!(ErrorCodes::UNSUPPORTED_CONTENT_TYPE, 'Send a raw upload as multipart/form-data: an options part, then a file part.',
+                details: { 'contentType' => mime.empty? ? nil : mime })
+        end
+        form = FakeAPI.upload_form(body, content_type)
+        fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, 'The upload form must hold an options part, then a file part') unless form
+
+        options = begin
+          JSON.parse(form[0])
+        rescue JSON::ParserError
+          nil
+        end
+        unless options.is_a?(Hash)
+          fail!(ErrorCodes::INVALID_UPLOAD_PAYLOAD, "The options part must be a JSON object with the asset's fields")
+        end
+        unknown = options.keys.find { |name| !Assets::UPLOAD_OPTION_KEYS.include?(name) }
+        invalid!('validation/unknown-field', unknown) if unknown
+        invalid!('validation/invalid-type', 'name') unless options['name'].is_a?(String)
+        [options, form[1]]
+      end
+
       # In the API's order: a declared total, then a single final part as the whole upload, then the
       # part itself. Whether to wait and the declared total are saved with an open upload.
-      def start_multipart(query, data)
-        check_upload(query)
-        total = query['totalSizeInBytes']
-        type = kind(query['contentType'].to_s, nil)
-        final = query['isFinal'] == true
+      def start_multipart(fields, data, queue)
+        check_upload(fields)
+        total = fields['totalSizeInBytes']
+        type = kind(fields['contentType'].to_s, nil)
+        final = fields['isFinal'] == true
         size = data.to_s.bytesize
         code = (total && image_size_error(type, total, true)) ||
                (final ? total_size_error(total, size, true) || image_size_error(type, size, true) : nil)
@@ -743,8 +837,8 @@ module CalmLens
         check_part_size(size, final)
         fail!(total_size_error(total, size, false)) if !final && total_size_error(total, size, false)
 
-        asset = create_asset(query, query['wait'] == false, data: data, open: !final)
-        @state.uploads[asset['id']] = { 'queue' => query['wait'] == false, 'total' => total } unless final
+        asset = create_asset(fields, queue, data: data, open: !final)
+        @state.uploads[asset['id']] = { 'queue' => queue, 'total' => total } unless final
         asset
       end
 

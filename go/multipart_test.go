@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -65,7 +66,7 @@ func equal(t *testing.T, name string, got, want []string) {
 func TestContentLargerThanPartSizeIsSentInPartsWithDerivedKeys(t *testing.T) {
 	c, h := splitClient(t, 5*mib, uploadReply("uploading", 1), uploadReply("uploading", 2), uploadReply("completed", nil))
 	file := fileOf(11 * mib)
-	asset, err := c.Assets.Classify(context.Background(), SubmitAssetOptions{Name: "clip.mp4", Content: &Content{Type: "video/mp4", Bytes: file}, IdempotencyKey: "upload-1"})
+	asset, err := c.Assets.Classify(context.Background(), SubmitAssetOptions{Name: "clip.mp4", Description: Ptr("a clip"), AuthorID: Ptr("user-2"), Context: &ModerationContext{Items: []ModerationContextItem{{Text: "earlier"}}}, Content: &Content{Type: "video/mp4", Bytes: file}, IdempotencyKey: "upload-1"})
 	if err != nil || asset.Upload.Status != "completed" {
 		t.Fatal(asset, err)
 	}
@@ -81,10 +82,15 @@ func TestContentLargerThanPartSizeIsSentInPartsWithDerivedKeys(t *testing.T) {
 	equal(t, "totalSizeInBytes", sentQuery(h, "totalSizeInBytes"), []string{"11534336", "", ""})
 	// Whether to wait goes with the first part, which saves it for the upload.
 	equal(t, "wait", sentQuery(h, "wait"), []string{"true", "", ""})
-	if h.calls[0].Header.Get("X-CalmLens-Upload") != "part" || h.calls[0].Header.Get("Content-Type") != "video/mp4" {
-		t.Fatal(h.calls[0].Header)
+	// The first part is a form carrying the asset's fields; later parts are the raw bytes.
+	options, fileType, first := h.form(t, 0)
+	if h.calls[0].Header.Get("X-CalmLens-Upload") != "part" || fileType != "video/mp4" || !reflect.DeepEqual(options, JSON{"name": "clip.mp4", "description": "a clip", "authorId": "user-2", "context": map[string]any{"items": []any{map[string]any{"text": "earlier"}}}}) {
+		t.Fatal(h.calls[0].Header, options, fileType)
 	}
-	if !bytes.Equal(bytes.Join(h.bodies, nil), file) {
+	for i := range h.calls {
+		h.transportQuery(t, i)
+	}
+	if !bytes.Equal(bytes.Join(append([][]byte{first}, h.bodies[1:]...), nil), file) {
 		t.Fatal("the parts do not join into the file")
 	}
 }
@@ -149,7 +155,10 @@ func TestContentOfOnePartAndStreamsGoInOneRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	equal(t, "partNumber", sentQuery(h, "partNumber"), []string{"", ""})
-	if len(h.bodies[0]) != 8*mib || !bytes.Equal(h.bodies[1], stream) {
+	if _, _, exact := h.form(t, 0); len(exact) != 8*mib {
+		t.Fatal("content was not sent whole")
+	}
+	if _, _, streamed := h.form(t, 1); !bytes.Equal(streamed, stream) {
 		t.Fatal("content was not sent whole")
 	}
 }

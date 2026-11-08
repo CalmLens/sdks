@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CalmLens\Testing;
 
+use CalmLens\Internal\UploadForm;
 use Psr\Http\Message\RequestInterface;
 
 /** One request a mock client sent, with the status it was answered with. */
@@ -39,6 +40,34 @@ final class RecordedRequest
             }
         }
         return new self($request->getMethod(), '/' . implode('/', self::segments($path)), self::query($request->getUri()->getQuery()), $status, $request);
+    }
+
+    /**
+     * The request body: null when empty; a JSON body decoded (plain text arrives as `['name' => …,
+     * 'content' => ['plainText' => …, 'type' => …]]`); an upload form as `['options' => <decoded
+     * options>, 'file' => <bytes>]`; otherwise its bytes, such as a later part's.
+     */
+    public function body(): mixed
+    {
+        $stream = $this->request->getBody();
+        $bytes = (string) $stream;
+        if ($stream->isSeekable()) {
+            $stream->rewind();
+        }
+        if ($bytes === '') {
+            return null;
+        }
+        $type = $this->request->getHeaderLine('Content-Type');
+        if (strtolower(trim(explode(';', $type, 2)[0])) === 'application/json') {
+            $data = json_decode($bytes, true);
+            return json_last_error() === JSON_ERROR_NONE ? $data : $bytes;
+        }
+        try {
+            $form = UploadForm::parse($type, $bytes);
+        } catch (\UnexpectedValueException) {
+            return $bytes;
+        }
+        return $form === null ? $bytes : ['options' => json_decode($form['options'], true), 'file' => $form['file']];
     }
 
     /** @return list<string> the decoded, non-empty segments of a path. */

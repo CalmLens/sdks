@@ -2,6 +2,7 @@
 
 require 'minitest/autorun'
 require 'calmlens'
+require 'calmlens/testing'
 require 'net/http'
 require 'stringio'
 
@@ -22,18 +23,29 @@ class ServerClientTest < Minitest::Test
     [CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport, retry_base_delay: 0, **options), sent]
   end
 
+  # A sent request's body, with a stream read.
+  def drain(request) = request.body.respond_to?(:read) ? request.body.read.to_s : request.body.to_s
+
+  # An upload form's options (parsed) and file bytes.
+  def form_of(request)
+    options, file = CalmLens::Testing::FakeAPI.upload_form(drain(request), request.headers['Content-Type'])
+    flunk "not an upload form: #{request.headers['Content-Type']}" unless options
+    [JSON.parse(options), file]
+  end
+
   def busy(status = 503, code = 'server/unavailable') = [status, %({"code":"#{code}"}), { 'retry-after' => '0' }]
 
   def test_streamed_uploads_rewind_before_a_retry
     client, sent = scripted(Errno::ECONNRESET.new, [200, OK])
     io = StringIO.new('streamed')
-    bodies = []
+    files = []
+    test = self
     sent.define_singleton_method(:<<) do |request|
-      bodies << request.body.read(100)
+      files << test.form_of(request).last
       super(request)
     end
     client.assets.create(name: 'note.txt', content: { data: io, type: 'text/plain' })
-    assert_equal %w[streamed streamed], bodies
+    assert_equal %w[streamed streamed], files
   end
 
   def test_not_found_is_known_by_status_or_code
@@ -53,7 +65,7 @@ class ServerClientTest < Minitest::Test
 
   def test_upload_timeout_limits_each_attempt_of_a_binary_upload_only
     slow = lambda do |request|
-      sleep 2 if request.headers['Content-Type'] == 'application/pdf'
+      sleep 2 if request.headers['Content-Type'].start_with?('multipart/form-data')
       CalmLens::Response.new(status: 200, body: OK)
     end
     client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: slow, upload_timeout: 0.1, max_retries: 0)
@@ -140,14 +152,41 @@ class ServerClientTest < Minitest::Test
     client, sent = scripted([200, OK])
     newest = 'x' * (CalmLens::ModerationContext::USED_CHARACTERS + 1)
     client.text.classify(text: 'Same to you', context: { items: [{ text: 'Older post', author_id: 'user-1' }, { text: newest }] })
-    query = URI.decode_www_form(URI(sent.first.url).query).to_h
-    assert_equal({ 'items' => [{ 'text' => newest }] }, JSON.parse(query['context']))
+    assert_equal({ 'items' => [{ 'text' => newest }] }, JSON.parse(sent.first.body)['context'])
   end
 
-  def test_a_raw_uploads_tags_are_sent_as_a_json_array_in_the_query
+  # Upload fields such as earlier posts, author IDs and descriptions never reach the URL, which
+  # proxies and servers log: text sends them in its JSON body, a file in its upload form.
+  PRIVATE_FIELDS = { description: 'Private description', author_id: 'pupil-7',
+                     context: { items: [{ text: 'Another pupil wrote this', author_id: 'pupil-8' }] } }.freeze
+
+  def refute_private_fields_in_url(url)
+    query = URI.decode_www_form(URI(url).query.to_s).to_h
+    assert_empty query.keys & CalmLens::Assets::UPLOAD_OPTION_KEYS, url
+    ['Private description', 'pupil-7', 'pupil-8', 'Another pupil'].each do |value|
+      refute_includes URI.decode_www_form_component(url), value
+    end
+  end
+
+  def test_text_classify_sends_its_fields_in_the_json_body_not_the_url
     client, sent = scripted([200, OK])
-    client.assets.create(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, tags: %w[catalogue backpacks])
-    assert_equal '["catalogue","backpacks"]', URI.decode_www_form(URI(sent.first.url).query).to_h['tags']
+    client.text.classify(text: 'Same to you', **PRIVATE_FIELDS)
+    refute_private_fields_in_url(sent.first.url)
+    assert_equal({ 'wait' => 'true' }, URI.decode_www_form(URI(sent.first.url).query).to_h)
+    body = JSON.parse(sent.first.body)
+    assert_equal ['Private description', 'pupil-7', [{ 'text' => 'Another pupil wrote this', 'authorId' => 'pupil-8' }]],
+                 [body['description'], body['authorId'], body.dig('context', 'items')]
+  end
+
+  def test_a_file_upload_sends_its_fields_in_the_form_not_the_url
+    client, sent = scripted([200, OK])
+    client.assets.create(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, tags: %w[catalogue backpacks],
+                         **PRIVATE_FIELDS)
+    refute_private_fields_in_url(sent.first.url)
+    options, file = form_of(sent.first)
+    assert_equal ['photo.png', 'Private description', 'pupil-7', %w[catalogue backpacks], 'hello'],
+                 [options['name'], options['description'], options['authorId'], options['tags'], file]
+    assert_equal [{ 'text' => 'Another pupil wrote this', 'authorId' => 'pupil-8' }], options.dig('context', 'items')
   end
 
   def test_structured_transform_numbers_match_javascript_and_other_values_are_rejected

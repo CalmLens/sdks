@@ -112,7 +112,7 @@ export default class CalmLensAppClient {
       });
       return expectUploadedAsset(data);
     }
-    const data = await this.#connection.submitRawUpload(
+    const data = await this.#connection.submitUpload(
       this.uploadsPath,
       options,
       wait,

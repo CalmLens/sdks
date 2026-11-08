@@ -87,6 +87,8 @@ const (
 	CodeUnsupportedUploadType = "upload/unsupported-type"
 	// CodeInvalidUploadPayload is returned with HTTP 400.
 	CodeInvalidUploadPayload = "upload-payload/invalid"
+	// CodeUploadOptionsInQuery is returned with HTTP 400.
+	CodeUploadOptionsInQuery = "upload/options-in-query"
 	// CodeUseUploadPart is returned with HTTP 409.
 	CodeUseUploadPart = "upload/use-upload-part"
 	// CodeUploadNotOpen is returned with HTTP 409.
@@ -107,10 +109,10 @@ const (
 	CodeNoRenderedVersion = "asset/no-rendered-version"
 	// CodeAssetNotFound is returned with HTTP 404.
 	CodeAssetNotFound = "asset/not-found"
-	// CodeAssetChildNotDeletable is returned with HTTP 409.
-	CodeAssetChildNotDeletable = "asset/child-not-deletable"
 	// CodeProjectNotFound is returned with HTTP 404.
 	CodeProjectNotFound = "project/not-found"
+	// CodeAssetChildNotDeletable is returned with HTTP 409.
+	CodeAssetChildNotDeletable = "asset/child-not-deletable"
 	// CodeAssetReviewChanged is returned with HTTP 409.
 	CodeAssetReviewChanged = "asset/review-changed"
 	// CodeAssetReviewNoteRequired is returned with HTTP 400.
@@ -269,6 +271,7 @@ var publicErrorStatuses = map[string]int{
 	CodeUploadsPaused:                     402,
 	CodeUnsupportedUploadType:             415,
 	CodeInvalidUploadPayload:              400,
+	CodeUploadOptionsInQuery:              400,
 	CodeUseUploadPart:                     409,
 	CodeUploadNotOpen:                     409,
 	CodeInvalidUploadPartNumber:           409,
@@ -279,8 +282,8 @@ var publicErrorStatuses = map[string]int{
 	CodeIdempotentRequestInProgress:       409,
 	CodeNoRenderedVersion:                 404,
 	CodeAssetNotFound:                     404,
-	CodeAssetChildNotDeletable:            409,
 	CodeProjectNotFound:                   404,
+	CodeAssetChildNotDeletable:            409,
 	CodeAssetReviewChanged:                409,
 	CodeAssetReviewNoteRequired:           400,
 	CodeAssetUpdateFailed:                 500,

@@ -490,6 +490,11 @@ const PUBLIC_ERROR_CODES = {
 		defaultMessage: "Upload payload is invalid.",
 		status: 400
 	}),
+	UPLOAD_OPTIONS_IN_QUERY: new ErrorCode({
+		id: "upload/options-in-query",
+		defaultMessage: "Send the asset's name and fields in the request body (the JSON body, or the options part of a multipart/form-data upload), not in the query string.",
+		status: 400
+	}),
 	USE_UPLOAD_PART: new ErrorCode({
 		id: "upload/use-upload-part",
 		defaultMessage: "Use uploadPart for multipart upload parts after the first part",

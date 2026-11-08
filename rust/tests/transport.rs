@@ -1,3 +1,4 @@
+mod common;
 use calmlens::{blocking, models::*, testing::MockServerClient, ServerClient};
 use std::{
     io::{Read, Write},
@@ -74,7 +75,13 @@ async fn blocking_client_can_be_created_and_dropped_inside_tokio() {
         AssetModerationStatus::Allowed
     );
     drop(client);
-    assert_eq!(worker.join().unwrap(), [b"hello".to_vec()]);
+    let bodies = worker.join().unwrap();
+    assert_eq!(bodies.len(), 1);
+    let body: serde_json::Value = serde_json::from_slice(&bodies[0]).unwrap();
+    assert_eq!(
+        body["content"],
+        serde_json::json!({"plainText": "hello", "type": "text/plain"})
+    );
 
     let mock = MockServerClient::new().unwrap();
     let blocking_mock = mock.blocking().unwrap();
@@ -257,7 +264,19 @@ async fn reader_uploads_stream_with_their_declared_length() {
         ))
         .await
         .unwrap();
-    assert_eq!(worker.join().unwrap(), [data]);
+    let bodies = worker.join().unwrap();
+    assert_eq!(bodies.len(), 1);
+    // The form's boundary opens its body.
+    let boundary = bodies[0].split(|byte| *byte == b'\r').next().unwrap();
+    let boundary = std::str::from_utf8(&boundary[2..]).unwrap();
+    let parts = common::parse_form(
+        &format!("multipart/form-data; boundary={boundary}"),
+        &bodies[0],
+        "reader upload",
+    );
+    let names: Vec<&str> = parts.iter().map(|part| part.name.as_str()).collect();
+    assert_eq!(names, ["options", "file"]);
+    assert_eq!(parts[1].body, data);
 }
 
 /// Binary uploads have no timeout unless `upload_timeout` or `with_timeout` sets one; text

@@ -10,6 +10,7 @@ import {
   MIN_MULTIPART_UPLOAD_PART_BYTES,
 } from "../src/contract/SharedConstants.js";
 import { CalmLensServerClient } from "../src/server";
+import { readUploadForm } from "./upload-form";
 
 const projectId = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 
@@ -86,10 +87,11 @@ describe("multipart binary field names", () => {
       }),
     ).rejects.toThrow("stop after capturing the request");
 
-    expect(bodies).toEqual([directStream, multipartStream]);
+    // Each body is a stream that sends the file as it is read, inside its upload form.
+    expect(bodies.map((body) => body instanceof ReadableStream)).toEqual([true, true]);
   });
 
-  test("serializes externalId, metadata, tags, processingOptions and wait=false on direct uploads", async () => {
+  test("sends externalId, metadata, tags and processingOptions in the options part, and wait=false in the query", async () => {
     const requests: Request[] = [];
     const fetchImpl: typeof fetch = async (input, init) => {
       requests.push(input instanceof Request ? input : new Request(input, init));
@@ -119,21 +121,27 @@ describe("multipart binary field names", () => {
     ).rejects.toThrow("stop after capturing the request");
 
     expect(requests).toHaveLength(1);
-    const url = new URL(requests[0]!.url);
+    const request = requests[0]!;
+    const url = new URL(request.url);
     expect(url.pathname).toBe(`/v1/projects/${projectId}/assets`);
-    expect(requests[0]!.headers.get("X-CalmLens-Upload")).toBe("content");
-    expect(url.searchParams.get("externalId")).toBe("external-image");
-    expect(url.searchParams.get("wait")).toBe("false");
-    expect(JSON.parse(url.searchParams.get("metadata")!)).toEqual([
-      { id: "source", value: "sdk-test" },
+    expect(request.headers.get("X-CalmLens-Upload")).toBe("content");
+    // The query holds transport values only; the asset's fields are in the options part.
+    expect([...url.searchParams]).toEqual([
+      ["wait", "false"],
+      ["contentType", "image/png"],
     ]);
-    expect(JSON.parse(url.searchParams.get("tags")!)).toEqual(["catalogue", "backpacks"]);
-    expect(JSON.parse(url.searchParams.get("processingOptions")!)).toEqual({
-      keepContentAfterProcessing: true,
+    const form = readUploadForm(await request.bytes(), request.headers.get("content-type"));
+    expect(form.options).toEqual({
+      name: "response-content.png",
+      externalId: "external-image",
+      metadata: [{ id: "source", value: "sdk-test" }],
+      tags: ["catalogue", "backpacks"],
+      processingOptions: { keepContentAfterProcessing: true },
     });
+    expect(form.file).toEqual({ type: "image/png", bytes: new Uint8Array([1, 2, 3]) });
   });
 
-  test("sends every supported payload input as raw bytes for every upload path", async () => {
+  test("sends every supported payload input for every upload path: text as JSON, files in a form, later parts raw", async () => {
     const binaryBytes = Uint8Array.from([1, 2, 3]);
     const textBytes = new TextEncoder().encode("plain text");
     const createReadableStream = (bytes: Uint8Array): ReadableStream<Uint8Array> =>
@@ -255,31 +263,41 @@ describe("multipart binary field names", () => {
     }
 
     expect(requests).toHaveLength(payloadCases.length * 3);
+    const isText = (payloadCase: (typeof payloadCases)[number]) =>
+      payloadCase.name === "plain-text";
     for (const [index, payloadCase] of payloadCases.entries()) {
-      const request = requests[index]!;
-      const url = new URL(request.url);
-      expect(url.pathname).toBe(`/v1/projects/${projectId}/assets`);
-      expect(request.headers.get("X-CalmLens-Upload")).toBe("content");
-      expect(url.searchParams.get("name")).toBe(`content-${payloadCase.name}.bin`);
-      expect(url.searchParams.get("contentType")).toBe(payloadCase.contentType);
-      expect(url.searchParams.get("sizeInBytes")).toBe(
-        String(payloadCase.expectedBytes.byteLength),
-      );
-      expect(await request.bytes()).toEqual(payloadCase.expectedBytes);
-    }
-    for (const [index, payloadCase] of payloadCases.entries()) {
-      const request = requests[index + payloadCases.length]!;
-      const url = new URL(request.url);
-      expect(url.pathname).toBe(`/v1/projects/${projectId}/assets`);
-      expect(request.headers.get("X-CalmLens-Upload")).toBe("part");
-      expect(url.searchParams.get("name")).toBe(`part-${payloadCase.name}.bin`);
-      expect(url.searchParams.get("contentType")).toBe(payloadCase.contentType);
-      expect(url.searchParams.get("partNumber")).toBe("1");
-      expect(url.searchParams.get("isFinal")).toBe("true");
-      expect(url.searchParams.get("sizeInBytes")).toBe(
-        String(payloadCase.expectedBytes.byteLength),
-      );
-      expect(await request.bytes()).toEqual(payloadCase.expectedBytes);
+      for (const [mode, request] of [
+        ["content", requests[index]!],
+        ["part", requests[index + payloadCases.length]!],
+      ] as const) {
+        const url = new URL(request.url);
+        const name = `${mode}-${payloadCase.name}.bin`;
+        expect(url.pathname).toBe(`/v1/projects/${projectId}/assets`);
+        if (isText(payloadCase)) {
+          expect([...url.searchParams]).toEqual([["wait", "false"]]);
+          expect(request.headers.get("X-CalmLens-Upload")).toBeNull();
+          const text = { plainText: "plain text", type: "text/plain" };
+          expect(await request.json()).toEqual(
+            mode === "content"
+              ? { name, content: text }
+              : { name, part: { ...text, isFinal: true } },
+          );
+          continue;
+        }
+        expect(request.headers.get("X-CalmLens-Upload")).toBe(mode);
+        expect(Object.fromEntries(url.searchParams)).toEqual({
+          wait: "false",
+          contentType: payloadCase.contentType,
+          sizeInBytes: String(payloadCase.expectedBytes.byteLength),
+          ...(mode === "part" ? { partNumber: "1", isFinal: "true" } : {}),
+        });
+        const form = readUploadForm(await request.bytes(), request.headers.get("content-type"));
+        expect(form.options).toEqual({ name });
+        expect(form.file).toEqual({
+          type: payloadCase.contentType,
+          bytes: payloadCase.expectedBytes,
+        });
+      }
     }
     for (const [index, payloadCase] of payloadCases.entries()) {
       const request = requests[index + payloadCases.length * 2]!;

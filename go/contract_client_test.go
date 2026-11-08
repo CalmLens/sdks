@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -799,6 +800,16 @@ type clientCase struct {
 		BodyLength *int
 		BodySha256 string
 		BodyBase64 *string
+		// Form is an upload form: its options part's JSON and its file part.
+		Form *struct {
+			Options json.RawMessage
+			File    struct {
+				ContentType string
+				BodyLength  int
+				BodySha256  string
+				BodyBase64  *string
+			}
+		}
 	}
 	SleepsMs []any
 }
@@ -1023,11 +1034,85 @@ func checkRequests(t *testing.T, clientCase clientCase, every map[string]any, re
 			}
 			continue
 		}
+		if want.Form != nil {
+			options, fileType, file := readUploadForm(t, label, got.body, got.header.Get("Content-Type"))
+			var gotOptions, wantOptions any
+			_ = json.Unmarshal(want.Form.Options, &wantOptions)
+			if err := json.Unmarshal(options, &gotOptions); err != nil || !reflect.DeepEqual(gotOptions, wantOptions) {
+				t.Fatalf("%s: form options %s, want %s", label, options, want.Form.Options)
+			}
+			sum := sha256.Sum256(file)
+			wantFile := want.Form.File
+			if fileType != wantFile.ContentType || len(file) != wantFile.BodyLength || hex.EncodeToString(sum[:]) != wantFile.BodySha256 || wantFile.BodyBase64 != nil && base64.StdEncoding.EncodeToString(file) != *wantFile.BodyBase64 {
+				t.Fatalf("%s: form file %q of %d bytes (%x), want %q of %d bytes (%s)", label, fileType, len(file), sum, wantFile.ContentType, wantFile.BodyLength, wantFile.BodySha256)
+			}
+			continue
+		}
 		sum := sha256.Sum256(got.body)
 		if want.BodyLength == nil || len(got.body) != *want.BodyLength || hex.EncodeToString(sum[:]) != want.BodySha256 || want.BodyBase64 != nil && base64.StdEncoding.EncodeToString(got.body) != *want.BodyBase64 {
 			t.Fatalf("%s: raw body of %d bytes (%x), want %v bytes (%s)", label, len(got.body), sum, want.BodyLength, want.BodySha256)
 		}
 	}
+}
+
+// readUploadForm reads an upload form as the API does (packages/sdk-contract/README.md,
+// "Scripted client cases"): with the boundary from contentType, exactly an options part, then a
+// file part, then the closing boundary. It returns the options JSON, the file part's
+// Content-Type and the file's bytes.
+func readUploadForm(t *testing.T, label string, body []byte, contentType string) (options []byte, fileType string, file []byte) {
+	t.Helper()
+	media, params, err := mime.ParseMediaType(contentType)
+	if err != nil || media != "multipart/form-data" || params["boundary"] == "" {
+		t.Fatalf("%s: Content-Type %q is not an upload form", label, contentType)
+	}
+	delimiter := []byte("\r\n--" + params["boundary"])
+	framed := append([]byte("\r\n"), body...)
+	if !bytes.HasPrefix(framed, delimiter) {
+		t.Fatalf("%s: the form doesn't start with its boundary", label)
+	}
+	type part struct {
+		name, contentType string
+		content           []byte
+	}
+	var parts []part
+	for at := 0; !bytes.HasPrefix(framed[at+len(delimiter):], []byte("--")); {
+		headerEnd := bytes.Index(framed[at:], []byte("\r\n\r\n"))
+		if headerEnd == -1 {
+			t.Fatalf("%s: the form ends before its closing boundary", label)
+		}
+		headerEnd += at
+		next := bytes.Index(framed[headerEnd+4:], delimiter)
+		if next == -1 {
+			t.Fatalf("%s: the form ends before its closing boundary", label)
+		}
+		next += headerEnd + 4
+		var p part
+		for _, line := range strings.Split(string(framed[at+len(delimiter)+2:headerEnd]), "\r\n") {
+			name, value, _ := strings.Cut(line, ":")
+			switch strings.ToLower(strings.TrimSpace(name)) {
+			case "content-disposition":
+				if _, disposition, err := mime.ParseMediaType(value); err == nil {
+					p.name = disposition["name"]
+				}
+			case "content-type":
+				p.contentType = strings.TrimSpace(value)
+			}
+		}
+		p.content = framed[headerEnd+4 : next]
+		parts = append(parts, p)
+		at = next
+	}
+	if !bytes.Equal(framed[len(framed)-len(delimiter)-4:], append(append([]byte(nil), delimiter...), "--\r\n"...)) {
+		t.Fatalf("%s: the form doesn't end with its closing boundary", label)
+	}
+	names := make([]string, len(parts))
+	for i, p := range parts {
+		names[i] = p.name
+	}
+	if strings.Join(names, ",") != "options,file" {
+		t.Fatalf("%s: the form holds %q, not options then file", label, names)
+	}
+	return parts[0].content, parts[1].contentType, parts[1].content
 }
 
 func checkHeader(t *testing.T, label, name string, values []string, expected any, uuids map[string]string) {

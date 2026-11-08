@@ -30,8 +30,8 @@ class StatefulMockTest {
     MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
     Models.Asset uploaded = mock.client.assets.classify(kept("photo.png").tags(List.of("catalogue", "backpacks")));
     assertEquals(List.of("catalogue", "backpacks"), uploaded.tags());
-    // A raw upload carries its tags as a JSON array in the query, like metadata.
-    assertEquals(JsonParser.parseString("[\"catalogue\",\"backpacks\"]"), JsonParser.parseString(mock.requests().get(0).query().get("tags")));
+    // A file upload carries its tags in the form's options part, like metadata.
+    assertEquals(JsonParser.parseString("[\"catalogue\",\"backpacks\"]"), Fixtures.formOptions(mock.requests().get(0)).get("tags"));
     Models.Asset text = mock.client.text.classify(new Models.ClassifyText("hello").tags(List.of("comments")));
     assertEquals(List.of("comments"), text.tags());
     Models.Asset linked = mock.client.assets.create(new Models.SubmitAsset().name("site").url("https://example.com").tags(List.of("links")));
@@ -180,28 +180,102 @@ class StatefulMockTest {
     assertEquals(code, issues.get(0).getAsJsonObject().get("code").getAsString(), path);
   }
 
-  /** A request sent straight to the in-memory API, as a client other than this SDK's could send it. */
+  /**
+   * A request sent straight to the in-memory API, as a client other than this SDK's could send it.
+   * With {@code upload}, it is an upload form: {@code json} (default {@code {"name":"x"}}) is its
+   * options and {@code hello} its file, of the query's {@code contentType}.
+   */
   private static JsonObject raw(MockApi api, String method, String path, java.util.Map<String, String> query, String upload, String json) throws Exception {
     java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
-    headers.put("Content-Type", upload == null ? "application/json" : "text/plain");
-    if (upload != null) headers.put("X-CalmLens-Upload", upload);
-    byte[] body = (json == null ? "hello" : json).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    byte[] body;
+    if (upload == null) {
+      headers.put("Content-Type", "application/json");
+      body = (json == null ? "hello" : json).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    } else {
+      UploadForm.Built form = UploadForm.build(JsonParser.parseString(json == null ? "{\"name\":\"x\"}" : json).getAsJsonObject(),
+          query.getOrDefault("contentType", "text/plain"), Transport.Body.ofBytes("hello".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+      headers.put("Content-Type", form.contentType());
+      headers.put("X-CalmLens-Upload", upload);
+      try (java.io.InputStream in = form.body().open()) { body = in.readAllBytes(); }
+    }
+    return send(api, method, path, query, headers, body);
+  }
+
+  private static JsonObject send(MockApi api, String method, String path, java.util.Map<String, String> query, java.util.Map<String, String> headers, byte[] body) throws Exception {
     Transport.Response response = api.answer(new MockCalmLensServerClient.Request(method, "https://api.calmlens.com/v1" + path, path, query, headers, body, null));
     JsonObject reply = JsonParser.parseString(new String(response.body().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
     reply.addProperty("status", response.status());
     return reply;
   }
 
+  private static int assetCount(MockApi api) throws Exception {
+    return send(api, "GET", "/projects/project-1/assets", java.util.Map.of(), java.util.Map.of(), null).getAsJsonArray("items").size();
+  }
+
+  @Test void theMockTakesUploadFieldsOnlyFromTheBody() throws Exception {
+    MockApi api = new MockApi("project-1", "https://api.calmlens.com/v1", "https://cdn.calmlens.com/v1", deterministic());
+    String assets = "/projects/project-1/assets";
+    // Asset fields in the query are refused, for an upload form and a JSON body alike, before anything is stored.
+    JsonObject form = raw(api, "POST", assets, java.util.Map.of("contentType", "text/plain", "authorId", "user-1", "description", "d"), "content", null);
+    assertEquals(400, form.get("status").getAsInt());
+    assertEquals(ErrorCodes.UPLOAD_OPTIONS_IN_QUERY, form.get("code").getAsString());
+    assertEquals(JsonParser.parseString("[\"description\",\"authorId\"]"), form.getAsJsonObject("details").get("fields"));
+    JsonObject json = raw(api, "POST", assets, java.util.Map.of("wait", "false", "context", "{}"), null,
+        "{\"name\":\"x\",\"content\":{\"plainText\":\"hi\",\"type\":\"text/plain\"}}");
+    assertEquals(ErrorCodes.UPLOAD_OPTIONS_IN_QUERY, json.get("code").getAsString());
+    assertEquals(JsonParser.parseString("[\"context\"]"), json.getAsJsonObject("details").get("fields"));
+    assertEquals(0, assetCount(api));
+
+    // A raw upload must be an upload form.
+    java.util.Map<String, String> plain = java.util.Map.of("Content-Type", "text/plain", "X-CalmLens-Upload", "content");
+    JsonObject bare = send(api, "POST", assets, java.util.Map.of("contentType", "text/plain"), plain, "hello".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    assertEquals(415, bare.get("status").getAsInt());
+    assertEquals(ErrorCodes.UNSUPPORTED_CONTENT_TYPE, bare.get("code").getAsString());
+    // Options the API's strict schema doesn't know are refused.
+    assertIssue(raw(api, "POST", assets, java.util.Map.of("contentType", "text/plain"), "content", "{\"name\":\"x\",\"wait\":true}"), "wait", ErrorCodes.UNKNOWN_FIELD);
+
+    // The fields come from the options part and the file from the file part.
+    JsonObject stored = raw(api, "POST", assets, java.util.Map.of("contentType", "text/plain"), "content", "{\"name\":\"note.txt\",\"authorId\":\"user-1\"}");
+    assertEquals(200, stored.get("status").getAsInt());
+    assertEquals("note.txt", stored.get("name").getAsString());
+    assertEquals("user-1", stored.get("authorId").getAsString());
+    assertEquals(5, stored.getAsJsonObject("content").get("sizeInBytes").getAsLong());
+    // Plain text in a JSON body is stored as its UTF-8 bytes.
+    JsonObject text = raw(api, "POST", assets, java.util.Map.of(), null,
+        "{\"name\":\"t.txt\",\"description\":\"d\",\"content\":{\"plainText\":\"h\u00e9\",\"type\":\"text/plain\"}}");
+    assertEquals("d", text.get("description").getAsString());
+    assertEquals(3, text.getAsJsonObject("content").get("sizeInBytes").getAsLong());
+  }
+
+  @Test void anUploadFormRetriedUnderANewBoundaryReplaysAndOtherOptionsReuseTheKey() throws Exception {
+    MockApi api = new MockApi("project-1", "https://api.calmlens.com/v1", "https://cdn.calmlens.com/v1", deterministic());
+    String assets = "/projects/project-1/assets";
+    java.util.function.Function<String, JsonObject> upload = options -> {
+      UploadForm.Built form = UploadForm.build(JsonParser.parseString(options).getAsJsonObject(), "text/plain",
+          Transport.Body.ofBytes("hello".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+      try (java.io.InputStream in = form.body().open()) {
+        return send(api, "POST", assets, java.util.Map.of("contentType", "text/plain"),
+            java.util.Map.of("Content-Type", form.contentType(), "X-CalmLens-Upload", "content", "Idempotency-Key", "key-1"), in.readAllBytes());
+      } catch (Exception e) { throw new IllegalStateException(e); }
+    };
+    JsonObject first = upload.apply("{\"name\":\"a.txt\"}");
+    JsonObject again = upload.apply("{\"name\":\"a.txt\"}");
+    assertEquals(first.get("id"), again.get("id"));
+    assertEquals(1, assetCount(api));
+    JsonObject other = upload.apply("{\"name\":\"b.txt\"}");
+    assertEquals(ErrorCodes.IDEMPOTENCY_KEY_REUSED, other.get("code").getAsString());
+  }
+
   @Test void theMockRefusesUploadTypesAndMetadataTheApiRefuses() throws Exception {
     MockApi api = new MockApi("project-1", "https://api.calmlens.com/v1", "https://cdn.calmlens.com/v1", deterministic());
     for (String type : List.of("application/zip", "application/octet-stream", "font/woff2")) {
-      JsonObject refused = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("name", "x", "contentType", type), "content", null);
+      JsonObject refused = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("contentType", type), "content", null);
       assertEquals(415, refused.get("status").getAsInt(), type);
       assertEquals(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, refused.get("code").getAsString(), type);
       assertEquals(type, refused.getAsJsonObject("details").get("mimeType").getAsString(), type);
       assertEquals("calmlens", refused.getAsJsonObject("details").get("source").getAsString(), type);
     }
-    assertEquals(200, raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("name", "x", "contentType", "TEXT/Markdown"), "content", null)
+    assertEquals(200, raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("contentType", "TEXT/Markdown"), "content", null)
         .get("status").getAsInt());
     // A URL upload has no content type to check.
     assertEquals(200, raw(api, "POST", "/projects/project-1/assets", java.util.Map.of(), null, "{\"name\":\"x\",\"url\":\"https://example.com/\"}")
@@ -209,8 +283,8 @@ class StatefulMockTest {
 
     JsonObject dict = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of(), null, "{\"name\":\"x\",\"url\":\"https://example.com/\",\"metadata\":{\"a\":1}}");
     assertIssue(dict, "metadata", "validation/invalid-type");
-    JsonObject query = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("name", "x", "contentType", "text/plain", "metadata", "[{\"id\":\"a\"}]"), "content", null);
-    assertIssue(query, "metadata.0.value", "validation/invalid-value");
+    JsonObject options = raw(api, "POST", "/projects/project-1/assets", java.util.Map.of("contentType", "text/plain"), "content", "{\"name\":\"x\",\"metadata\":[{\"id\":\"a\"}]}");
+    assertIssue(options, "metadata.0.value", "validation/invalid-value");
     // Schema checks come before the asset lookup.
     JsonObject update = raw(api, "PATCH", "/assets/asset_missing", java.util.Map.of(), null, "{\"metadata\":[{\"id\":7,\"value\":1}]}");
     assertEquals(400, update.get("status").getAsInt());

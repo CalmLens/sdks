@@ -128,9 +128,8 @@ final class Values
     }
 
     /**
-     * Serialises a query the way the API reads it: plain values as text and structured values
-     * (such as an upload's `metadata`, `tags`, `processingOptions` and `context`) as JSON. Every key
-     * and value is percent-encoded and null values are left out.
+     * Serialises a query the way the API reads it: plain values as text and structured values as
+     * JSON. Every key and value is percent-encoded and null values are left out.
      */
     public static function query(array $values): string
     {

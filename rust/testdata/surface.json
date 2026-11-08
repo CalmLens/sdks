@@ -1996,6 +1996,12 @@
       "local": false
     },
     {
+      "code": "upload/options-in-query",
+      "status": 400,
+      "retryable": false,
+      "local": false
+    },
+    {
       "code": "upload/use-upload-part",
       "status": 409,
       "retryable": false,

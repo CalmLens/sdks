@@ -46,6 +46,7 @@ module CalmLens
     UPLOADS_PAUSED = 'usage/uploads-paused'
     UNSUPPORTED_UPLOAD_TYPE = 'upload/unsupported-type'
     INVALID_UPLOAD_PAYLOAD = 'upload-payload/invalid'
+    UPLOAD_OPTIONS_IN_QUERY = 'upload/options-in-query'
     USE_UPLOAD_PART = 'upload/use-upload-part'
     UPLOAD_NOT_OPEN = 'upload/not-open'
     INVALID_UPLOAD_PART_NUMBER = 'upload-part/invalid-number'
@@ -159,6 +160,7 @@ module CalmLens
       'usage/uploads-paused' => 402,
       'upload/unsupported-type' => 415,
       'upload-payload/invalid' => 400,
+      'upload/options-in-query' => 400,
       'upload/use-upload-part' => 409,
       'upload/not-open' => 409,
       'upload-part/invalid-number' => 409,

@@ -47,12 +47,26 @@ module CalmLens
     #
     # `path` is relative to `base_url` for API calls (`/projects/<id>/assets`, without `/v1`) and to
     # `cdn_base_url` for CDN requests, with each segment decoded. `query` holds the decoded query
-    # string. `body` is the bytes sent: JSON text, or the uploaded content (streams are read), or
-    # nil. `status` is the HTTP status the mock answered with, or nil when the request failed
-    # without a response.
+    # string; an upload's holds only transport values (`wait`, `contentType`, sizes and part
+    # numbers). `body` is the bytes sent (streams are read), or nil: JSON text, including a text
+    # upload (`{name, ..., content: {plainText, type}}`), an upload form, or a later part's bytes.
+    # `status` is the HTTP status the mock answered with, or nil when the request failed without a
+    # response.
     Request = Struct.new(:method, :url, :path, :query, :headers, :body, :status, keyword_init: true) do
       # @return [Object] the body parsed as JSON.
       def json = body && JSON.parse(body)
+
+      # An upload form's asset fields and file: `{'options' => Hash, 'file' => String}`, the file as
+      # UTF-8 text for a `text/*` content type and binary otherwise; nil for any other body.
+      # @return [Hash, nil]
+      def form
+        type = headers.find { |name, _| name.to_s.casecmp?('Content-Type') }&.last
+        options, file = Testing::FakeAPI.upload_form(body, type)
+        return nil unless options
+
+        text = query['contentType'].to_s.downcase.start_with?('text/')
+        { 'options' => JSON.parse(options), 'file' => text ? file.dup.force_encoding(Encoding::UTF_8) : file }
+      end
     end
 
     # @return [Testing::State] the stored assets, folders, content and events.

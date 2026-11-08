@@ -193,6 +193,10 @@ func readAgain(raw io.Reader, size int64) *source {
 // uploaded in parts: part n after the first carries the Idempotency-Key "<key>:part-<n>" and is
 // retried on its own, and calling again with the same IdempotencyKey (at most 240 characters)
 // resumes an interrupted upload. Streams and text go in one request.
+//
+// The asset's fields always travel in the request body, never in the URL: text goes as JSON,
+// and other content as a multipart/form-data upload whose options part holds the fields and
+// whose file part holds the bytes.
 func (s *AssetsService) Create(ctx context.Context, options SubmitAssetOptions) (*Asset, error) {
 	return s.submit(ctx, options, false)
 }
@@ -231,7 +235,7 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	if options.TotalSizeInBytes != nil && (options.Part == nil || *options.TotalSizeInBytes <= 0) {
 		return nil, invalid(CodeSDKInvalidArgument, "TotalSizeInBytes must be positive and is only used with Part")
 	}
-	// Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+	// Only the posts CalmLens uses are sent.
 	options.Context = selectedContext(options.Context)
 	key := idempotencyKey(options.IdempotencyKey)
 	var result Asset
@@ -309,50 +313,192 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 			return nil, err
 		}
 	}
-	params, err := query(options)
-	if err != nil {
-		return nil, err
+	fields := uploadFieldsOf(options)
+	params := url.Values{"wait": {strconv.FormatBool(wait)}}
+	if content.PlainText != nil {
+		// Text is small: it goes as JSON with the asset's fields and keeps the API timeout.
+		body := textUpload{uploadFields: fields}
+		if multipart {
+			body.Part = &textPart{PlainText: *content.PlainText, Type: content.Type, PartNumber: 1, IsFinal: content.IsFinal}
+			body.SizeInBytes, body.TotalSizeInBytes = content.SizeInBytes, options.TotalSizeInBytes
+		} else {
+			body.Content = &textContent{PlainText: *content.PlainText, Type: content.Type}
+		}
+		err = s.c.send(ctx, call{method: "POST", path: s.c.project("assets"), params: params, body: body, idempotencyKey: key}, &result)
+		if err != nil {
+			return nil, err
+		}
+		return uploaded(&result)
 	}
-	params.Set("wait", strconv.FormatBool(wait))
 	params.Set("contentType", content.Type)
 	if split != nil {
-		return s.submitInParts(ctx, params, content.Type, split, key)
+		return s.submitInParts(ctx, params, fields, content.Type, split, key)
 	}
-	headers := http.Header{"Content-Type": {content.Type}, "X-Calmlens-Upload": {"content"}}
-	length := int64(-1)
+	mode := "content"
 	if size != nil {
-		length = *size
 		params.Set("sizeInBytes", strconv.FormatInt(*size, 10))
 	}
 	if multipart {
-		headers.Set("X-CalmLens-Upload", "part")
+		mode = "part"
 		params.Set("partNumber", "1")
 		params.Set("isFinal", strconv.FormatBool(content.IsFinal))
+		if options.TotalSizeInBytes != nil {
+			params.Set("totalSizeInBytes", strconv.FormatInt(*options.TotalSizeInBytes, 10))
+		}
 	}
-	// Text is small: it keeps the API timeout. Binary content uses UploadTimeout.
-	binary := content.PlainText == nil
-	err = s.c.send(ctx, call{method: "POST", path: s.c.project("assets"), params: params, raw: raw, size: length, headers: headers, idempotencyKey: key, binary: binary}, &result)
+	form, err := newUploadForm(fields, content.Type, raw, size)
+	if err != nil {
+		return nil, err
+	}
+	err = s.c.send(ctx, form.call(s.c.project("assets"), params, mode, key), &result)
 	if err != nil {
 		return nil, err
 	}
 	return uploaded(&result)
 }
 
+// uploadFields are the asset fields an upload carries in its body, never in the query string,
+// which proxies and servers log: the JSON body of text, or the options part of an upload form.
+type uploadFields struct {
+	Name              string             `json:"name"`
+	Description       *string            `json:"description,omitempty"`
+	ProcessingOptions *ProcessingOptions `json:"processingOptions,omitempty"`
+	Visibility        string             `json:"visibility,omitempty"`
+	Metadata          []MetadataItem     `json:"metadata,omitempty"`
+	Tags              []string           `json:"tags,omitempty"`
+	AuthorID          *string            `json:"authorId,omitempty"`
+	Context           *ModerationContext `json:"context,omitempty"`
+	ExternalID        *string            `json:"externalId,omitempty"`
+	ExternalURL       *string            `json:"externalUrl,omitempty"`
+	FolderID          *string            `json:"folderId,omitempty"`
+	UploadPresetID    *string            `json:"uploadPresetId,omitempty"`
+}
+
+func uploadFieldsOf(o SubmitAssetOptions) uploadFields {
+	return uploadFields{Name: o.Name, Description: o.Description, ProcessingOptions: o.ProcessingOptions, Visibility: o.Visibility, Metadata: o.Metadata, Tags: o.Tags, AuthorID: o.AuthorID, Context: o.Context, ExternalID: o.ExternalID, ExternalURL: o.ExternalURL, FolderID: o.FolderID, UploadPresetID: o.UploadPresetID}
+}
+
+// textUpload is the JSON body of a plain-text upload: the asset's fields and its text, as the
+// whole content or as the first part of a multipart upload.
+type textUpload struct {
+	uploadFields
+	Content          *textContent `json:"content,omitempty"`
+	Part             *textPart    `json:"part,omitempty"`
+	SizeInBytes      *int64       `json:"sizeInBytes,omitempty"`
+	TotalSizeInBytes *int64       `json:"totalSizeInBytes,omitempty"`
+}
+
+type textContent struct {
+	PlainText string `json:"plainText"`
+	Type      string `json:"type"`
+}
+
+type textPart struct {
+	PlainText  string `json:"plainText"`
+	Type       string `json:"type"`
+	PartNumber int    `json:"partNumber"`
+	IsFinal    bool   `json:"isFinal"`
+}
+
+// uploadForm is a multipart/form-data upload body: the asset's fields as the JSON options part,
+// then the file part with the file's own type. The file is streamed between head and tail.
+type uploadForm struct {
+	boundary   string
+	head, tail []byte
+	file       io.Reader
+	// length is the whole body's byte length, -1 when the file's size is unknown.
+	length int64
+}
+
+func newUploadForm(fields uploadFields, contentType string, file io.Reader, size *int64) (*uploadForm, error) {
+	options, err := encodeJSON(fields)
+	if err != nil {
+		return nil, argumentError("Could not encode the upload's fields", err)
+	}
+	boundary := "calmlens-" + newIdempotencyKey()
+	fileType := strings.NewReplacer("\r", "", "\n", "").Replace(contentType)
+	head := "--" + boundary + "\r\nContent-Disposition: form-data; name=\"options\"\r\nContent-Type: application/json\r\n\r\n" + string(options) +
+		"\r\n--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"\r\nContent-Type: " + fileType + "\r\n\r\n"
+	tail := "\r\n--" + boundary + "--\r\n"
+	form := &uploadForm{boundary: boundary, head: []byte(head), tail: []byte(tail), file: file, length: -1}
+	if size != nil {
+		form.length = int64(len(head)) + *size + int64(len(tail))
+	}
+	return form, nil
+}
+
+// call is the create request that sends the form: mode is "content" for a whole file and "part"
+// for a multipart upload's first part.
+func (f *uploadForm) call(path string, params url.Values, mode, key string) call {
+	headers := http.Header{"Content-Type": {"multipart/form-data; boundary=" + f.boundary}, "X-Calmlens-Upload": {mode}}
+	return call{method: "POST", path: path, params: params, raw: f.body(), size: f.length, headers: headers, idempotencyKey: key, binary: true}
+}
+
+// body reads the form. It can be sent again only when the file can be (an io.Seeker), so a
+// one-shot stream is never retried.
+func (f *uploadForm) body() io.Reader {
+	reader := io.MultiReader(bytes.NewReader(f.head), f.file, bytes.NewReader(f.tail))
+	seeker, ok := f.file.(io.Seeker)
+	if !ok {
+		return reader
+	}
+	start, err := seeker.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return reader
+	}
+	return &rewindableForm{form: f, seeker: seeker, start: start, reader: reader}
+}
+
+// rewindableForm is a form whose file can be read again from where it started. Its Seek only
+// reports and returns to the start, which is all a retry needs.
+type rewindableForm struct {
+	form   *uploadForm
+	seeker io.Seeker
+	start  int64
+	reader io.Reader
+	read   int64
+}
+
+func (r *rewindableForm) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	r.read += int64(n)
+	return n, err
+}
+
+func (r *rewindableForm) Seek(offset int64, whence int) (int64, error) {
+	switch {
+	case offset == 0 && whence == io.SeekCurrent:
+		return r.read, nil
+	case offset == 0 && whence == io.SeekStart:
+		if _, err := r.seeker.Seek(r.start, io.SeekStart); err != nil {
+			return 0, err
+		}
+		r.read = 0
+		r.reader = io.MultiReader(bytes.NewReader(r.form.head), r.form.file, bytes.NewReader(r.form.tail))
+		return 0, nil
+	}
+	return 0, errors.New("calmlens: an upload form can only be rewound to its start")
+}
+
 // submitInParts uploads src in parts of Options.PartSizeBytes and returns the final part's
-// asset. Part 1 starts the upload with the upload's query (params) and key; part n after it
-// carries "<key>:part-<n>", so a repeated call with the same key replays the parts the API
-// already has and sends the rest.
-func (s *AssetsService) submitInParts(ctx context.Context, params url.Values, contentType string, src *source, key string) (*Asset, error) {
+// asset. Part 1 starts the upload as a form with the upload's fields, its transport query
+// (params) and key; part n after it carries "<key>:part-<n>", so a repeated call with the same
+// key replays the parts the API already has and sends the rest.
+func (s *AssetsService) submitInParts(ctx context.Context, params url.Values, fields uploadFields, contentType string, src *source, key string) (*Asset, error) {
 	partSize := s.c.options.PartSizeBytes
 	count := int((src.size + partSize - 1) / partSize)
 	first := src.part(1, partSize)
-	params.Set("sizeInBytes", strconv.FormatInt(first.Size(), 10))
+	firstSize := first.Size()
+	params.Set("sizeInBytes", strconv.FormatInt(firstSize, 10))
 	params.Set("partNumber", "1")
 	params.Set("isFinal", "false")
 	params.Set("totalSizeInBytes", strconv.FormatInt(src.size, 10))
-	headers := http.Header{"Content-Type": {contentType}, "X-Calmlens-Upload": {"part"}}
+	form, err := newUploadForm(fields, contentType, first, &firstSize)
+	if err != nil {
+		return nil, err
+	}
 	var result Asset
-	if err := s.c.send(ctx, call{method: "POST", path: s.c.project("assets"), params: params, raw: first, size: first.Size(), headers: headers, idempotencyKey: key, binary: true}, &result); err != nil {
+	if err := s.c.send(ctx, form.call(s.c.project("assets"), params, "part", key), &result); err != nil {
 		return nil, err
 	}
 	asset, err := uploaded(&result)

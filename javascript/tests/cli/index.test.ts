@@ -37,7 +37,7 @@ for (const kind of ["node", "binary"] as const) {
       content: { plainText: "Hello", type: "text/plain" },
     });
     let received:
-      | { path: string; upload: string | null; body: string; key: string | null }
+      | { path: string; upload: string | null; body: unknown; key: string | null }
       | undefined;
     const server = Bun.serve({
       port: 0,
@@ -45,7 +45,7 @@ for (const kind of ["node", "binary"] as const) {
         received = {
           path: new URL(request.url).pathname,
           upload: request.headers.get("x-calmlens-upload"),
-          body: await request.text(),
+          body: await request.json(),
           key: request.headers.get("x-api-key"),
         };
         return Response.json(asset);
@@ -65,8 +65,12 @@ for (const kind of ["node", "binary"] as const) {
       expect(result.stdout).toContain(asset.classification.moderation.status);
       expect(received).toEqual({
         path: `/v1/projects/${projectId}/assets`,
-        upload: "content",
-        body: "Hello from the CalmLens CLI",
+        // Text goes as a JSON body, never as raw bytes with its fields in the URL.
+        upload: null,
+        body: {
+          name: expect.any(String),
+          content: { plainText: "Hello from the CalmLens CLI", type: "text/plain" },
+        },
         key: "offline-test",
       });
       const invalid = await run([
@@ -101,7 +105,9 @@ for (const kind of ["node", "binary"] as const) {
       ]);
       expect(keyed.exitCode).toBe(0);
       // `received` is set by the server callback, which TypeScript can't see.
-      const keyedBody = (received as { body: string } | undefined)?.body ?? "";
+      const keyedBody =
+        (received as { body: { content?: { plainText?: string } } } | undefined)?.body.content
+          ?.plainText ?? "";
       // The upload is a test input for this key only.
       expect(await detectTestTrigger(keyedBody, "5e1f0c2a5e1f0c2a5e1f0c2a5e1f0c2a")).toEqual({
         instances: [{ category: "hate", qualifiers: [] }],

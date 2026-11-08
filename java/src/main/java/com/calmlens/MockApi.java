@@ -77,7 +77,6 @@ final class MockApi {
 
   private record Saved(String fingerprint, int status, byte[] body) {}
 
-  private static final Set<String> JSON_QUERY = Set.of("metadata", "tags", "processingOptions", "context");
   private static final Set<String> INT_QUERY = Set.of("pageSize", "partNumber", "sizeInBytes", "totalSizeInBytes");
   private static final Set<String> BOOL_QUERY = Set.of("wait", "isFinal");
   /** A {@code sort} field: a name, descending when prefixed with {@code -}, as the API's {@code sortQueryField} reads it. */
@@ -279,23 +278,51 @@ final class MockApi {
     // HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
     if (key != null) key = key.replaceAll("^[ \\t\\r\\n]+|[ \\t\\r\\n]+$", "");
     if (key != null && !IDEMPOTENCY_KEY.matcher(key).matches()) return error(new Failure(ErrorCodes.INVALID_IDEMPOTENCY_KEY));
-    String fingerprint = request.method() + " " + request.url() + " " + digest(request.body());
+    String type = request.header("Content-Type");
+    String upload = Objects.requireNonNullElse(request.header("X-CalmLens-Upload"), "");
+    boolean create = request.method().equals("POST") && parts.size() == 3 && parts.get(0).equals("projects") && parts.get(2).equals("assets");
+    UploadForm.Parsed form = null;
+    if (create && !upload.isEmpty() && UploadForm.isForm(type)) {
+      try { form = UploadForm.read(Objects.requireNonNullElse(request.body(), new byte[0]), type); }
+      catch (IllegalArgumentException invalid) { /* The route refuses it below. */ }
+    }
+    // Like the API, an upload form is told apart by its options and file, not its boundary.
+    String fingerprint = request.method() + " " + request.url() + " "
+        + (form != null ? "multipart/form-data " + form.options() + " " + digest(form.file()) : digest(request.body()));
     if (key != null && idempotent.containsKey(key)) {
       Saved saved = idempotent.get(key);
       if (!saved.fingerprint().equals(fingerprint)) return error(new Failure(ErrorCodes.IDEMPOTENCY_KEY_REUSED));
       return respond(saved.status(), "application/json", saved.body(), "Idempotent-Replayed", "true");
     }
     JsonObject body = new JsonObject();
-    String type = request.header("Content-Type");
     if (request.body() != null && type != null && type.startsWith("application/json")) {
       JsonElement parsed = JsonParser.parseString(request.bodyText());
       if (parsed.isJsonObject()) body = parsed.getAsJsonObject();
     }
-    String upload = Objects.requireNonNullElse(request.header("X-CalmLens-Upload"), "");
+    byte[] raw = request.body();
     JsonElement result;
     created = false;
     try {
-      result = dispatch(request.method(), parts, query(request.query()), body, request.body(), upload);
+      if (create) {
+        // Like the API: asset fields belong in the body, and raw content in an upload form.
+        List<String> named = UploadForm.OPTION_KEYS.stream().filter(request.query()::containsKey).collect(Collectors.toList());
+        if (!named.isEmpty())
+          throw new Failure(ErrorCodes.UPLOAD_OPTIONS_IN_QUERY, 400, "Send the asset's name and fields in the request body, not in the query string.", Map.of("fields", named));
+        if (!upload.isEmpty()) {
+          String media = type == null ? "" : type.split(";", 2)[0].strip();
+          if (!UploadForm.isForm(type)) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("contentType", media.isEmpty() ? null : media);
+            throw new Failure(ErrorCodes.UNSUPPORTED_CONTENT_TYPE, 415, "Send a raw upload as multipart/form-data: an options part, then a file part.", details);
+          }
+          UploadForm.Parsed parsed;
+          try { parsed = form != null ? form : UploadForm.read(Objects.requireNonNullElse(raw, new byte[0]), type); }
+          catch (IllegalArgumentException invalid) { throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, invalid.getMessage()); }
+          body = uploadOptions(parsed.options());
+          raw = parsed.file();
+        }
+      }
+      result = dispatch(request.method(), parts, query(request.query()), body, raw, upload);
     } catch (Failure failure) {
       // A failed request frees its key, as the API does.
       return error(failure);
@@ -307,6 +334,19 @@ final class MockApi {
     int status = operations.contains("folders.create") || created ? 201 : operations.contains("assets.batch") ? 202 : 200;
     if (key != null) idempotent.put(key, new Saved(fingerprint, status, bytes));
     return respond(status, "application/json", bytes);
+  }
+
+  /** An upload form's options, checked like the API's strict schema. */
+  private static JsonObject uploadOptions(String text) throws Failure {
+    JsonElement parsed;
+    try { parsed = JsonParser.parseString(text); } catch (RuntimeException invalid) { parsed = null; }
+    if (parsed == null || !parsed.isJsonObject())
+      throw new Failure(ErrorCodes.INVALID_UPLOAD_PAYLOAD, "The options part must be a JSON object with the asset's fields");
+    JsonObject options = parsed.getAsJsonObject();
+    for (String key : options.keySet())
+      if (!UploadForm.OPTION_KEYS.contains(key)) throw Failure.validation(ErrorCodes.UNKNOWN_FIELD, key);
+    if (!(options.get("name") instanceof JsonPrimitive name) || !name.isString()) throw Failure.validation("validation/invalid-type", "name");
+    return options;
   }
 
   private static IOException unsupported(String method, String path) {
@@ -351,15 +391,13 @@ final class MockApi {
     }
   }
 
-  /** Decodes query values: numbers, booleans and JSON values. */
+  /** Decodes query values: numbers and booleans. */
   private static JsonObject query(Map<String, String> raw) {
     JsonObject query = new JsonObject();
     raw.forEach((key, value) -> {
       if (INT_QUERY.contains(key) && value.matches("-?\\d{1,18}")) query.addProperty(key, Long.parseLong(value));
       else if (BOOL_QUERY.contains(key) && (value.equals("true") || value.equals("false"))) query.addProperty(key, value.equals("true"));
-      else if (JSON_QUERY.contains(key)) {
-        try { query.add(key, JsonParser.parseString(value)); } catch (RuntimeException notJson) { query.addProperty(key, value); }
-      } else query.addProperty(key, value);
+      else query.addProperty(key, value);
     });
     return query;
   }
@@ -537,24 +575,42 @@ final class MockApi {
   }
 
   private JsonObject createAsset(String upload, JsonObject q, JsonObject body, byte[] raw, long now) throws Failure {
-    // X-CalmLens-Upload picks the mode: absent is a JSON body (a URL), "content" raw content and
-    // "part" the raw first part of a multipart upload.
-    boolean rawUpload = upload.equals("content") || upload.equals("part"), multipart = upload.equals("part");
-    JsonObject o = rawUpload ? q : body;
+    // X-CalmLens-Upload picks the mode: absent is a JSON body (plain text or a URL), "content" an
+    // upload form with the content and "part" one with the first part of a multipart upload. The
+    // asset's fields come from the JSON body or the form's options; the form's transport values
+    // (type, part number, final flag, declared total) from the query.
+    boolean form = upload.equals("content") || upload.equals("part");
+    JsonObject o = body;
+    JsonObject t = q;
+    boolean multipart = upload.equals("part");
+    if (!form && (o.has("content") || o.has("part"))) {
+      String field = o.has("content") ? "content" : "part";
+      if (!(o.get(field) instanceof JsonObject text) || str(text, "plainText") == null || str(text, "type") == null)
+        throw Failure.validation("validation/invalid-type", field);
+      multipart = field.equals("part");
+      raw = text.get("plainText").getAsString().getBytes(StandardCharsets.UTF_8);
+      t = new JsonObject();
+      t.addProperty("contentType", str(text, "type"));
+      if (multipart) {
+        t.addProperty("isFinal", bool(text, "isFinal"));
+        if (o.has("totalSizeInBytes") && !o.get("totalSizeInBytes").isJsonNull()) t.add("totalSizeInBytes", o.get("totalSizeInBytes"));
+      }
+    }
+    boolean rawUpload = form || t != q;
     checkMetadata(o.get("metadata"));
-    String mime = Objects.requireNonNullElse(str(o, "contentType"), "");
+    String mime = rawUpload ? Objects.requireNonNullElse(str(t, "contentType"), "") : "";
     // Like the API: content and a first part must have a type it can moderate; a URL is exempt.
     if (rawUpload && !CalmLensServerClient.isAcceptedUploadMimeType(mime))
       throw new Failure(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, 415, CalmLensServerClient.rejectedUploadMimeTypeMessage(mime), Map.of("mimeType", mime, "source", "calmlens"));
     String url = rawUpload ? null : str(o, "url");
     String kind = url != null ? "website" : assetType(mime.toLowerCase(Locale.ROOT));
     // wait=false queues the upload; the SDKs send wait=true to wait for the decision.
-    boolean queue = isFalse(q, "wait"), last = !multipart || bool(q, "isFinal");
+    boolean queue = isFalse(q, "wait"), last = !multipart || bool(t, "isFinal");
     long size = raw == null ? 0 : raw.length;
     if (multipart) {
       // In the API's order: a declared total first, then a single final part as the whole upload,
       // then the part itself (5 MiB unless it is the last).
-      Long total = q.has("totalSizeInBytes") ? q.get("totalSizeInBytes").getAsLong() : null;
+      Long total = t.has("totalSizeInBytes") ? t.get("totalSizeInBytes").getAsLong() : null;
       if (total != null) check(imageSizeError(kind, total, true));
       if (last) {
         check(totalSizeError(total, size, true));
@@ -652,7 +708,7 @@ final class MockApi {
     if (!last) {
       JsonObject open = new JsonObject();
       open.addProperty("queue", queue);
-      if (q.has("totalSizeInBytes")) open.add("total", q.get("totalSizeInBytes"));
+      if (t.has("totalSizeInBytes")) open.add("total", t.get("totalSizeInBytes"));
       uploads.put(id, open);
       storage.assets.put(id, asset);
       return asset;

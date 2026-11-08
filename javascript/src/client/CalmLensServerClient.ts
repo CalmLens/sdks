@@ -274,7 +274,7 @@ export default class CalmLensServerClient {
       );
     }
     if ("content" in body || "part" in body) {
-      return expectAsset(await this.#connection.submitRawUpload(uploadsPath, body, wait));
+      return expectAsset(await this.#connection.submitUpload(uploadsPath, body, wait));
     }
     const { idempotencyKey, ...fields } = body;
     const data = await this.#connection.json<unknown>("POST", uploadsPath, {

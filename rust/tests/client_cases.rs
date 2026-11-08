@@ -363,20 +363,42 @@ fn check_request(
                 .unwrap_or_else(|_| panic!("{label}: body is not JSON"))
         };
         assert_eq!(&actual, body, "{label}: body");
-    } else {
+    } else if let Some(form) = wanted.get("form") {
+        let content_type = request
+            .header("content-type")
+            .unwrap_or_else(|| panic!("{label}: no Content-Type"));
+        let parts = common::parse_form(content_type, &request.body, label);
+        let names: Vec<&str> = parts.iter().map(|part| part.name.as_str()).collect();
+        assert_eq!(names, ["options", "file"], "{label}: form parts");
+        let options: Value = serde_json::from_slice(&parts[0].body)
+            .unwrap_or_else(|_| panic!("{label}: options part is not JSON"));
+        assert_eq!(options, form["options"], "{label}: form options");
+        let file = &parts[1];
         assert_eq!(
-            request.body.len() as u64,
-            wanted["bodyLength"].as_u64().unwrap(),
-            "{label}: body length"
+            Some(file.content_type.as_str()),
+            form["file"]["contentType"].as_str(),
+            "{label}: file Content-Type"
         );
-        let digest: String = Sha256::digest(&request.body)
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        assert_eq!(digest, wanted["bodySha256"], "{label}: body SHA-256");
-        if let Some(encoded) = wanted["bodyBase64"].as_str() {
-            assert_eq!(STANDARD.encode(&request.body), encoded, "{label}: body");
-        }
+        check_bytes(&file.body, &form["file"], &format!("{label}: file"));
+    } else {
+        check_bytes(&request.body, wanted, label);
+    }
+}
+
+/// Checks `body` against a fixture's `bodyLength`, `bodySha256` and optional `bodyBase64`.
+fn check_bytes(body: &[u8], wanted: &Value, label: &str) {
+    assert_eq!(
+        body.len() as u64,
+        wanted["bodyLength"].as_u64().unwrap(),
+        "{label}: body length"
+    );
+    let digest: String = Sha256::digest(body)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    assert_eq!(digest, wanted["bodySha256"], "{label}: body SHA-256");
+    if let Some(encoded) = wanted["bodyBase64"].as_str() {
+        assert_eq!(STANDARD.encode(body), encoded, "{label}: body");
     }
 }
 

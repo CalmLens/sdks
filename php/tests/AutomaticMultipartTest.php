@@ -37,8 +37,9 @@ final class AutomaticMultipartTest extends TestCase
     }
 
     /**
-     * A client whose requests are recorded in `$sent` (path, query, Idempotency-Key, body) and
-     * answered by `$respond`, or like the API: uploading until the final part.
+     * A client whose requests are recorded in `$sent` (path, query, Idempotency-Key, and as body
+     * the bytes sent: the file part of an upload form, or a later part's raw body) and answered
+     * by `$respond`, or like the API: uploading until the final part.
      *
      * @param list<array{path: string, query: array, key: string, body: string}> $sent
      */
@@ -47,7 +48,10 @@ final class AutomaticMultipartTest extends TestCase
         $handler = function (RequestInterface $request) use (&$sent, $respond) {
             parse_str($request->getUri()->getQuery(), $query);
             $entry = ['path' => $request->getUri()->getPath(), 'query' => $query,
-                'key' => $request->getHeaderLine('Idempotency-Key'), 'body' => (string) $request->getBody()];
+                'key' => $request->getHeaderLine('Idempotency-Key'), 'body' => RecordedRequest::of($request, null)->body()];
+            if (is_array($entry['body'])) {
+                $entry['body'] = $entry['body']['file'];
+            }
             $sent[] = $entry;
             $response = $respond === null ? null : $respond($entry);
             $response ??= new Response(200, ['Content-Type' => 'application/json'], json_encode(($query['isFinal'] ?? null) === 'true'

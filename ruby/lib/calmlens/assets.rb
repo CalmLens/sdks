@@ -15,8 +15,11 @@ module CalmLens
     # The prefix of this resource's operations in Internal::OPTION_KEYS.
     OPERATIONS = 'assets'
 
-    SUBMIT_QUERY_KEYS = %w[name description processingOptions visibility metadata tags authorId context externalId
-                           externalUrl folderId uploadPresetId].freeze
+    # The asset fields an upload carries in its body: the JSON body for text, the `options` part of
+    # an upload form for files. They never go in the URL, which proxies and servers log, and the
+    # API refuses them there.
+    UPLOAD_OPTION_KEYS = %w[name description processingOptions visibility metadata tags authorId context externalId
+                            externalUrl folderId uploadPresetId].freeze
     MAX_MULTIPART_IMAGE_BYTES = 20 * 1024 * 1024
     # The API's limits for one-request uploads: images up to 10 MiB (larger ones are uploaded in
     # parts), audio and video up to 50 MiB and other files up to 5,000 MiB.
@@ -276,6 +279,11 @@ module CalmLens
     # `{type:, data:}` where `data` is a binary String or an IO. An IO streams without being read into
     # memory; pass `size_in_bytes:` when its length is unknown (a pipe or socket).
     #
+    # Text is sent as a JSON body. Other content is sent as `multipart/form-data`: the asset's fields
+    # (name, description, metadata, author ID, context and so on) in its `options` part, then the
+    # file. The URL carries only transport values (`wait`, the content type and sizes), never the
+    # asset's fields.
+    #
     # The request carries an `Idempotency-Key` (generated unless you pass
     # `request_options: {idempotency_key:}`), so a retried upload never creates a second asset.
     #
@@ -395,13 +403,37 @@ module CalmLens
       return upload_in_parts(options, request_options, wait, mime, body) if !multipart && splits?(content, body)
 
       check_upload_size(mime, body.size) unless multipart || @session.defer_upload_checks
-      query = options.slice(*SUBMIT_QUERY_KEYS).merge('wait' => wait, 'contentType' => content['type'],
-                                                      'sizeInBytes' => body.size)
-      query.merge!(first_part_query(options, content, mime, body)) if multipart
+      part_query = first_part_query(options, content, mime, body) if multipart
+      if content.key?('plainText')
+        return expect_asset(request('POST', project('assets'), query: { 'wait' => wait },
+                                                               body: text_body(options, content, multipart),
+                                                               idempotent: true, request_options: request_options))
+      end
+
+      query = { 'wait' => wait, 'contentType' => content['type'], 'sizeInBytes' => body.size }
+      send_form(query.merge(part_query || {}), upload_fields(options), content['type'], body, multipart, request_options)
+    end
+
+    # The asset fields an upload sends, without unset values.
+    def upload_fields(options) = options.slice(*UPLOAD_OPTION_KEYS).compact
+
+    # The JSON body of a text upload: its fields and `content`, or a first `part` with the sizes.
+    def text_body(options, content, multipart)
+      text = content.except('sizeInBytes')
+      return upload_fields(options).merge('content' => text) unless multipart
+
+      sizes = { 'sizeInBytes' => options['sizeInBytes'] || content['sizeInBytes'],
+                'totalSizeInBytes' => options['totalSizeInBytes'] }.compact
+      upload_fields(options).merge('part' => text, **sizes)
+    end
+
+    # Sends file content, or a first part, as an upload form: the fields in its `options` part and
+    # the bytes in its `file` part. The query holds only transport values.
+    def send_form(query, fields, type, body, multipart, request_options)
+      form, form_type = body.to_form(JSON.generate(fields), type)
       expect_asset(request('POST', project('assets'),
-                           query: query, raw: body, idempotent: true, request_options: request_options,
-                           upload: !content.key?('plainText'),
-                           headers: { 'Content-Type' => content['type'], 'X-CalmLens-Upload' => multipart ? 'part' : 'content' }))
+                           query: query, raw: form, idempotent: true, request_options: request_options, upload: true,
+                           headers: { 'Content-Type' => form_type, 'X-CalmLens-Upload' => multipart ? 'part' : 'content' }))
     end
 
     # Whether content goes in parts: not text, of known size, readable again and larger than a part.
@@ -428,12 +460,9 @@ module CalmLens
       piece = ->(number) { body.slice((number - 1) * part_size, [part_size, total - ((number - 1) * part_size)].min) }
       first = piece.call(1)
       type = options.dig('content', 'type')
-      query = options.slice(*SUBMIT_QUERY_KEYS).merge('wait' => wait, 'contentType' => type, 'sizeInBytes' => first.size,
-                                                      'partNumber' => 1, 'isFinal' => false, 'totalSizeInBytes' => total)
-      asset = expect_asset(request('POST', project('assets'),
-                                   query: query, raw: first, idempotent: true, upload: true,
-                                   request_options: request_options.merge(idempotency_key: key),
-                                   headers: { 'Content-Type' => type, 'X-CalmLens-Upload' => 'part' }))
+      query = { 'wait' => wait, 'contentType' => type, 'sizeInBytes' => first.size, 'partNumber' => 1, 'isFinal' => false,
+                'totalSizeInBytes' => total }
+      asset = send_form(query, upload_fields(options), type, first, true, request_options.merge(idempotency_key: key))
       send_remaining_parts(asset, count, piece, key, request_options)
     end
 
@@ -473,7 +502,7 @@ module CalmLens
                                                                                  headers: headers))
     end
 
-    # Keeps only the earlier posts CalmLens uses, which keeps a raw upload's query short.
+    # Keeps only the earlier posts CalmLens uses, which keeps an upload's body short.
     def with_used_context(options)
       return options unless options.key?('context')
 
@@ -483,7 +512,8 @@ module CalmLens
       options.merge('context' => { 'items' => ModerationContext.select_items(context['items']) })
     end
 
-    # The query of a first multipart part: its number, whether it is the last and the declared total.
+    # The transport values of a first multipart part: its number, whether it is the last and the
+    # declared total.
     def first_part_query(options, content, mime, body)
       total = options['totalSizeInBytes']
       unless total.nil? || (total.is_a?(Integer) && total.positive?)

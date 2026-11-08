@@ -37,6 +37,7 @@ from calmlens.client import _serialize_transform
 from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, sign_upload_token
 from calmlens.types import IMAGE_TRANSFORM_COLOUR_KEYS, ImageTransformOptions
 from calmlens.webhooks import create_webhook_headers, create_webhook_signature_header
+from upload_form import read_upload_form
 
 TESTDATA = Path(__file__).resolve().parents[2] / "go" / "testdata"
 
@@ -467,6 +468,14 @@ class _Scripted:
         return _Response(scripted.get("status", 200), scripted.get("headers", {}), body)
 
 
+def _raw_body(data: bytes, want: Mapping[str, Any]) -> dict[str, Any]:
+    """A raw body as a case records it: its length and SHA-256, and its base64 when ``want`` has it."""
+    body: dict[str, Any] = {"bodyLength": len(data), "bodySha256": hashlib.sha256(data).hexdigest()}
+    if "bodyBase64" in want:
+        body["bodyBase64"] = base64.b64encode(data).decode()
+    return body
+
+
 def _matches(want: Any, got: Any) -> bool:
     if isinstance(want, list):
         return want[0] <= got <= want[1]
@@ -552,18 +561,19 @@ class ClientCaseTests(unittest.TestCase):
                              sorted(tuple(pair) for pair in want["query"]), f"{label}: query")
             for name, value in {**CLIENT_CASES["everyRequest"]["headers"], **want["headers"]}.items():
                 self._check_header(f"{label}: {name}", got["headers"].get(name.lower()), value, uuids)
-            if "body" in want:
+            if "form" in want:
+                form = read_upload_form(got["body"], got["headers"].get("content-type"))
+                self.assertEqual(form["options"], want["form"]["options"], f"{label}: options")
+                self.assertEqual({"contentType": form["type"], **_raw_body(form["bytes"], want["form"]["file"])},
+                                 want["form"]["file"], f"{label}: file")
+            elif "body" in want:
                 if want["body"] is None:
                     self.assertEqual(got["body"], b"", f"{label}: no body")
                 else:
                     self.assertEqual(json.loads(got["body"]), want["body"], f"{label}: body")
             else:
-                actual = {"bodyLength": len(got["body"]), "bodySha256": hashlib.sha256(got["body"]).hexdigest()}
-                wanted = {"bodyLength": want["bodyLength"], "bodySha256": want["bodySha256"]}
-                if "bodyBase64" in want:
-                    actual["bodyBase64"] = base64.b64encode(got["body"]).decode()
-                    wanted["bodyBase64"] = want["bodyBase64"]
-                self.assertEqual(actual, wanted, f"{label}: raw body")
+                wanted = {key: want[key] for key in ("bodyLength", "bodySha256", "bodyBase64") if key in want}
+                self.assertEqual(_raw_body(got["body"], want), wanted, f"{label}: raw body")
         # The injected sleeper records every wait exactly (milliseconds).
         waits = [round(seconds * 1000) for seconds in sleeps]
         wanted_waits = case.get("sleepsMs") or []

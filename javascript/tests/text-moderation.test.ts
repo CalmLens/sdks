@@ -7,12 +7,12 @@ const projectId = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 
 describe("assets.classify", () => {
   test("text convenience uses the same synchronous asset path", async () => {
-    let query: URLSearchParams | undefined;
+    let request: { url: URL; body: unknown } | undefined;
     const client = new CalmLensServerClient({
       apiKey: "key",
       projectId,
-      uploadFetch: async (url) => {
-        query = new URL(String(url)).searchParams;
+      uploadFetch: async (url, init) => {
+        request = { url: new URL(String(url)), body: JSON.parse(String(init?.body)) };
         return Response.json({
           id: "asset",
           upload: { status: "completed" },
@@ -22,12 +22,14 @@ describe("assets.classify", () => {
     });
     const asset = await client.text.classify({ text: "hello" });
     expect(asset.classification.moderation.status).toBe("allowed");
-    expect(query?.get("wait")).toBe("true");
-    expect(query?.get("name")).toBe("text");
-    expect(query?.get("contentType")).toBe("text/plain");
+    expect([...request!.url.searchParams]).toEqual([["wait", "true"]]);
+    expect(request!.body).toEqual({
+      name: "text",
+      content: { plainText: "hello", type: "text/plain" },
+    });
   });
 
-  test("uploads the text synchronously as a plain-text asset", async () => {
+  test("uploads the text synchronously as a JSON body, its fields never in the URL", async () => {
     const requests: Array<{ url: URL; init?: RequestInit }> = [];
     const uploadFetch: typeof fetch = async (input, init) => {
       requests.push({ url: new URL(String(input)), init });
@@ -38,10 +40,14 @@ describe("assets.classify", () => {
       });
     };
     const client = new CalmLensServerClient({ apiKey: "test-api-key", projectId, uploadFetch });
+    const context = { items: [{ text: "Another pupil's post", authorId: "pupil-3" }] };
 
     const asset = await client.assets.classify({
       name: "text",
+      description: "A reply",
       externalId: "comment-42",
+      authorId: "pupil-7",
+      context,
       metadata: [{ id: "kind", value: "comment" }],
       content: { plainText: "Lovely photo!", type: "text/plain" },
     });
@@ -49,23 +55,30 @@ describe("assets.classify", () => {
     expect(asset.classification.moderation.status).toBe("allowed");
     expect(requests).toHaveLength(1);
     const [{ url, init }] = requests;
+    const headers = new Headers(init?.headers);
     expect(url.pathname).toBe(`/v1/projects/${projectId}/assets`);
-    expect(new Headers(init?.headers).get("X-CalmLens-Upload")).toBe("content");
-    expect(url.searchParams.get("wait")).toBe("true");
-    expect(url.searchParams.get("name")).toBe("text");
-    expect(url.searchParams.get("contentType")).toBe("text/plain");
-    expect(url.searchParams.get("externalId")).toBe("comment-42");
-    expect(new Headers(init?.headers).get("X-Api-Key")).toBe("test-api-key");
-    expect(await new Response(init?.body).text()).toBe("Lovely photo!");
+    expect([...url.searchParams]).toEqual([["wait", "true"]]);
+    expect(headers.get("X-CalmLens-Upload")).toBeNull();
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("X-Api-Key")).toBe("test-api-key");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      name: "text",
+      description: "A reply",
+      externalId: "comment-42",
+      authorId: "pupil-7",
+      context,
+      metadata: [{ id: "kind", value: "comment" }],
+      content: { plainText: "Lovely photo!", type: "text/plain" },
+    });
   });
 
   test("uses a custom asset name when provided", async () => {
-    let name: string | null = null;
+    let name: unknown = null;
     const client = new CalmLensServerClient({
       apiKey: "test-api-key",
       projectId,
-      uploadFetch: async (input) => {
-        name = new URL(String(input)).searchParams.get("name");
+      uploadFetch: async (_input, init) => {
+        name = JSON.parse(String(init?.body)).name;
         return Response.json({
           id: "asset-id",
           upload: { status: "completed" },

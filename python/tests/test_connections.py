@@ -9,6 +9,7 @@ import warnings
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from calmlens import CalmLensServerClient, CalmLensError
+from upload_form import read_upload_form
 
 
 class _RecordingServer:
@@ -76,9 +77,10 @@ class StreamingUploadTests(unittest.TestCase):
                     client.assets.create(name='photo.jpg', content={'data': file, 'type': 'image/jpeg'})
             line, headers, body = server.requests[-1]
             self.assertTrue(line.startswith('POST /v1/projects/project/assets?'))
-            self.assertEqual(headers.get('Content-Length'), '300000')
+            self.assertEqual(headers.get('Content-Length'), str(len(body)))
             self.assertNotIn('Transfer-Encoding', headers)
-            self.assertEqual(body, b'x' * 300_000)
+            form = read_upload_form(body, headers.get('Content-Type'))
+            self.assertEqual((form['options'], form['type'], form['bytes']), ({'name': 'photo.jpg'}, 'image/jpeg', b'x' * 300_000))
         finally:
             server.close()
 
@@ -95,7 +97,7 @@ class StreamingUploadTests(unittest.TestCase):
             line, headers, body = server.requests[-1]
             self.assertNotIn('sizeInBytes', line)
             self.assertEqual((headers.get('Transfer-Encoding'), headers.get('Content-Length')), ('chunked', None))
-            self.assertEqual(body, b'y' * 30_000)
+            self.assertEqual(read_upload_form(body, headers.get('Content-Type'))['bytes'], b'y' * 30_000)
         finally:
             server.close()
 

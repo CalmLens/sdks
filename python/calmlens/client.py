@@ -686,6 +686,55 @@ class _Body:
         return cast(BinaryIO, _LimitedReader(self.stream, self.size))
 
 
+class _ConcatReader(io.RawIOBase):
+    """Reads several binary sources one after another, so a form's file part is streamed."""
+
+    def __init__(self, sources: list[Any]):
+        super().__init__()
+        self._sources = sources
+
+    def readable(self) -> bool:
+        return True
+
+    def read(self, amount: int | None = -1) -> bytes:
+        if amount is None or amount < 0:
+            return b"".join(iter(lambda: self.read(1024 * 1024), b""))
+        while self._sources:
+            chunk = self._sources[0].read(amount)
+            if chunk:
+                return bytes(chunk)
+            self._sources.pop(0)
+        return b""
+
+
+class _FormBody:
+    """An upload form (``multipart/form-data``): the asset's fields as the JSON ``options`` part,
+    then the file's bytes as the ``file`` part. Asset fields never go in the URL, which proxies and
+    servers log. The file is read from its source as the form is sent, so a stream stays streamed
+    and the form can be resent only when its file can be."""
+
+    def __init__(self, options: Mapping[str, Any], mime: str, file: _Body):
+        boundary = "calmlens-" + uuid.uuid4().hex
+        self.content_type = "multipart/form-data; boundary=" + boundary
+        self.head = (f'--{boundary}\r\nContent-Disposition: form-data; name="options"\r\n'
+                     f"Content-Type: application/json\r\n\r\n{_json(options)}\r\n"
+                     f'--{boundary}\r\nContent-Disposition: form-data; name="file"\r\n'
+                     f"Content-Type: {_header_value('type', mime)}\r\n\r\n").encode("utf-8")
+        self.tail = f"\r\n--{boundary}--\r\n".encode("ascii")
+        self.file = file
+        self.size = None if file.size is None else len(self.head) + file.size + len(self.tail)
+
+    @property
+    def rewindable(self) -> bool:
+        return self.file.rewindable
+
+    def open(self) -> bytes | BinaryIO:
+        data = self.file.open()
+        if isinstance(data, bytes):
+            return self.head + data + self.tail
+        return cast(BinaryIO, _ConcatReader([io.BytesIO(self.head), data, io.BytesIO(self.tail)]))
+
+
 _PAYLOAD_KEYS = ("plainText", "base64", "data")
 
 
@@ -1070,7 +1119,7 @@ class CalmLensServerClient:
         return headers
 
     def _request(self, method: str, path: str, *, query: Mapping[str, Any] | None = None, body: Any = None,
-                 raw: _Body | None = None, headers: Mapping[str, str] | None = None,
+                 raw: _Body | _FormBody | None = None, headers: Mapping[str, str] | None = None,
                  idempotency_key: str | None = None, timeout: float | None = None) -> Any:
         request_headers = self._headers(headers)
         if idempotency_key is not None:
@@ -1311,8 +1360,10 @@ def _is_asset_info(data: Any) -> bool:
             and data.get("availability") in ("available", "age-restricted", "unavailable"))
 
 
-_SUBMIT_QUERY_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "tags", "authorId", "context",
-                      "externalId", "externalUrl", "folderId", "uploadPresetId")
+#: The asset fields an upload carries in its body (the JSON body or the form's ``options`` part):
+#: the API refuses them in the query string.
+_UPLOAD_OPTION_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "tags", "authorId",
+                       "context", "externalId", "externalUrl", "folderId", "uploadPresetId")
 
 
 class Assets:
@@ -1498,7 +1549,7 @@ class Assets:
             context = options["context"]
             if not isinstance(context, Mapping) or not isinstance(context.get("items"), list):
                 raise _invalid("context.items must be a list of earlier posts")
-            # Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+            # Only the posts CalmLens uses are sent, which keeps the request small.
             options["context"] = {"items": select_moderation_context_items(context["items"])}
         if sum(k in options for k in ("content", "part", "url")) != 1 or "isFinal" in options:
             raise _invalid("Supply exactly one of content, part, or url; isFinal belongs in part",
@@ -1532,8 +1583,9 @@ class Assets:
         body = _payload(payload, multipart, checked)
         if checked and multipart and normalized.startswith("image/"):
             _image_size(body.size)
-        query = {k: options[k] for k in _SUBMIT_QUERY_KEYS if k in options}
-        query.update(wait=wait, contentType=mime, sizeInBytes=body.size)
+        fields = {k: options[k] for k in _UPLOAD_OPTION_KEYS if options.get(k) is not None}
+        # The query holds only transport values; the asset's fields go in the body.
+        query: dict[str, Any] = {"wait": wait, "contentType": mime, "sizeInBytes": body.size}
         # Content the client can read again is split into parts when it is larger than one part.
         split = (not multipart and "plainText" not in payload and body.rewindable and body.size is not None
                  and body.size > self._c.part_size_bytes)
@@ -1545,21 +1597,37 @@ class Assets:
                 _image_size(body.size)
             elif checked:
                 _upload_size(normalized, body.size, in_parts=True)
-            return self._upload_in_parts(query, mime, body, key)
+            return self._upload_in_parts(fields, query, mime, body, key)
         if checked and not multipart:
             _upload_size(normalized, body.size)
+        if "plainText" in payload:
+            # Text is a JSON body, with only ``wait`` in the query, sent with the API timeout.
+            text: dict[str, Any] = {"plainText": payload["plainText"], "type": mime}
+            sent: dict[str, Any] = dict(fields)
+            if multipart:
+                sent["part"] = {**text, **({"partNumber": payload["partNumber"]} if "partNumber" in payload else {}),
+                                "isFinal": bool(payload.get("isFinal", False))}
+                if payload.get("sizeInBytes") is not None:
+                    sent["sizeInBytes"] = payload["sizeInBytes"]
+                if total is not None:
+                    sent["totalSizeInBytes"] = total
+            else:
+                sent["content"] = text
+            return _expect_asset(self._c._request("POST", self._c._project("assets"), query={"wait": wait},
+                                                  body=sent, idempotency_key=key))
         if multipart:
             query.update(partNumber=1, isFinal=payload.get("isFinal", False), totalSizeInBytes=total)
-        headers = {"Content-Type": _header_value("type", mime), "X-CalmLens-Upload": "part" if multipart else "content"}
-        if body.size is not None:
-            headers["Content-Length"] = str(body.size)
-        # Text is sent with the API timeout; binary content with the upload timeout when one is set.
-        binary = "plainText" not in payload and self._c.upload_timeout is not None
+        form = _FormBody(fields, mime, body)
+        headers = {"Content-Type": form.content_type, "X-CalmLens-Upload": "part" if multipart else "content"}
+        if form.size is not None:
+            headers["Content-Length"] = str(form.size)
+        # Binary content is sent with the upload timeout when one is set.
         return _expect_asset(self._c._request(
-            "POST", self._c._project("assets"), query=query, raw=body, headers=headers, idempotency_key=key,
-            timeout=self._c.upload_timeout if binary else None))
+            "POST", self._c._project("assets"), query=query, raw=form, headers=headers, idempotency_key=key,
+            timeout=self._c.upload_timeout))
 
-    def _upload_in_parts(self, query: dict[str, Any], mime: str, body: _Body, key: str) -> Asset:
+    def _upload_in_parts(self, fields: dict[str, Any], query: dict[str, Any], mime: str, body: _Body,
+                         key: str) -> Asset:
         """Upload ``body`` as a multipart upload of ``part_size_bytes`` parts and return the final
         part's asset. Part ``n`` after the first carries the key ``<key>:part-<n>``, so repeating
         the call with the same key replays the parts the API already has and sends the rest."""
@@ -1572,9 +1640,10 @@ class Assets:
 
         first = piece(1)
         query = {**query, "sizeInBytes": first.size, "partNumber": 1, "isFinal": False, "totalSizeInBytes": total}
-        headers = {"Content-Type": _header_value("type", mime), "X-CalmLens-Upload": "part",
-                   "Content-Length": str(first.size)}
-        asset = _expect_asset(self._c._request("POST", self._c._project("assets"), query=query, raw=first,
+        form = _FormBody(fields, mime, first)
+        headers = {"Content-Type": form.content_type, "X-CalmLens-Upload": "part",
+                   "Content-Length": str(form.size)}
+        asset = _expect_asset(self._c._request("POST", self._c._project("assets"), query=query, raw=form,
                                                headers=headers, idempotency_key=key, timeout=self._c.upload_timeout))
         asset_id = asset["id"]
         number = 2

@@ -380,6 +380,8 @@ module CalmLens
       # The HTTP status the mock answered with; nil when the request failed without a response.
       attr_accessor status: Integer?
       def json: () -> json_value
+      # An upload form's `options` (parsed) and `file` (its bytes); nil for any other body.
+      def form: () -> { 'options' => Hash[String, json_value], 'file' => String }?
     end
 
     interface _Clock

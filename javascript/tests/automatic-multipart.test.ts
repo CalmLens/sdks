@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { CalmLensAppClient } from "../src/app";
 import { CalmLensServerClient } from "../src/server";
 import { MockCalmLensServerClient } from "../src/testing";
+import { readUploadForm } from "./upload-form";
 
 const MiB = 1024 * 1024;
 const projectId = "project-1";
@@ -11,7 +12,10 @@ interface Sent {
   query: URLSearchParams;
   key: string | null;
   authorization: string | null;
+  /** The file's bytes: an upload form's file part, or a later part's raw body. */
   body: Uint8Array;
+  /** An upload form's options, for the request that starts an upload. */
+  options?: unknown;
 }
 
 /** Distinct bytes, so a part sent at the wrong offset shows. */
@@ -39,6 +43,11 @@ const scripted = (respond: (sent: Sent, index: number) => Response | Promise<Res
       authorization: headers.get("authorization"),
       body: new Uint8Array(await new Response(init?.body).arrayBuffer()),
     };
+    if (headers.get("content-type")?.startsWith("multipart/form-data")) {
+      const form = readUploadForm(request.body, headers.get("content-type"));
+      request.body = form.file.bytes;
+      request.options = form.options;
+    }
     sent.push(request);
     return respond(request, sent.length - 1);
   }) as typeof fetch;
@@ -86,8 +95,14 @@ describe("automatic multipart uploads", () => {
       String(MiB),
     ]);
     expect(sent[0]!.query.get("totalSizeInBytes")).toBe(String(11 * MiB));
-    // Whether to wait goes with the first part, which saves it for the upload.
+    // Whether to wait goes with the first part, which saves it for the upload, and so do the
+    // asset's fields, in the first part's options.
     expect(sent.map(({ query }) => query.get("wait"))).toEqual(["true", null, null]);
+    expect(sent.map(({ options }) => options)).toEqual([
+      { name: "clip.mp4" },
+      undefined,
+      undefined,
+    ]);
     expect(joined(sent).equals(Buffer.from(file))).toBe(true);
   });
 

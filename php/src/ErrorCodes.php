@@ -53,6 +53,7 @@ final class ErrorCodes
     public const UPLOADS_PAUSED = 'usage/uploads-paused';
     public const UNSUPPORTED_UPLOAD_TYPE = 'upload/unsupported-type';
     public const INVALID_UPLOAD_PAYLOAD = 'upload-payload/invalid';
+    public const UPLOAD_OPTIONS_IN_QUERY = 'upload/options-in-query';
     public const USE_UPLOAD_PART = 'upload/use-upload-part';
     public const UPLOAD_NOT_OPEN = 'upload/not-open';
     public const INVALID_UPLOAD_PART_NUMBER = 'upload-part/invalid-number';
@@ -166,6 +167,7 @@ final class ErrorCodes
         'usage/uploads-paused' => 402,
         'upload/unsupported-type' => 415,
         'upload-payload/invalid' => 400,
+        'upload/options-in-query' => 400,
         'upload/use-upload-part' => 409,
         'upload/not-open' => 409,
         'upload-part/invalid-number' => 409,

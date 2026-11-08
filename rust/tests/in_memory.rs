@@ -1,4 +1,5 @@
 //! The in-memory mock behind `MockServerClient::in_memory`.
+mod common;
 use calmlens::{models::*, testing::*, ErrorCode};
 use serde_json::json;
 use std::sync::{
@@ -271,8 +272,8 @@ async fn serves_the_embed_page_of_any_asset_and_no_hls_stream_until_it_is_blocke
     );
 }
 
-/// Raw uploads send tags as URL-encoded JSON in the query and URL uploads in the body, and the
-/// asset keeps them. Like the API, the asset doesn't return the processing options it was
+/// Uploads send tags in the body (a file's upload form options, a text or URL upload's JSON),
+/// never the query, and the asset keeps them. Like the API, the asset doesn't return the processing options it was
 /// uploaded with.
 #[tokio::test]
 async fn uploads_send_tags_and_the_asset_keeps_them() {
@@ -305,16 +306,19 @@ async fn uploads_send_tags_and_the_asset_keeps_them() {
     let requests = mock.requests();
     assert_eq!(
         (
-            requests[0].query_param("tags"),
-            requests[1].query_param("tags"),
+            common::upload_form(&requests[0]).0["tags"].clone(),
+            requests[1].json().unwrap()["tags"].clone(),
             requests[2].json().unwrap()["tags"].clone()
         ),
         (
-            Some(r#"["catalogue","backpacks"]"#),
-            Some(r#"["catalogue","backpacks"]"#),
+            json!(["catalogue", "backpacks"]),
+            json!(["catalogue", "backpacks"]),
             json!(["catalogue", "backpacks"])
         )
     );
+    for request in &requests {
+        assert_eq!(request.query_param("tags"), None, "{}", request.url);
+    }
     for asset in [&raw, &text, &linked] {
         let stored = mock
             .assets()

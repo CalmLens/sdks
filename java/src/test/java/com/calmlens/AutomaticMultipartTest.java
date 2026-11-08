@@ -47,6 +47,9 @@ class AutomaticMultipartTest {
       byte[] body;
       if (request.body() == null) body = new byte[0];
       else try (InputStream in = request.body().open()) { body = in.readAllBytes(); }
+      // A first part travels in an upload form; keep its file part.
+      String type = request.headers().get("Content-Type");
+      if (UploadForm.isForm(type)) body = UploadForm.read(body, type).file();
       Sent recorded = new Sent(request.uri().getRawPath(), query(request.uri().getRawQuery()), request.headers().get("Idempotency-Key"), body);
       sent.add(recorded);
       return respond.apply(recorded, sent.size() - 1);

@@ -70,17 +70,21 @@ class RobustnessTest {
     var transport = new Scripted(reply(200, ALLOWED), reply(503, "{}"));
     CalmLensServerClient client = transport.client();
     client.assets.create(new Models.SubmitAsset("photo.png", Models.Content.file(file, "image/png")));
-    Transport.Body sent = transport.requests.get(0).body();
-    assertEquals(file, sent.file());
+    // The upload form streams the file from disk with a known length, and can be sent again.
+    Transport.Request request = transport.requests.get(0);
+    Transport.Body sent = request.body();
     assertNull(sent.bytes());
-    assertArrayEquals(data, transport.bodies.get(0));
+    assertTrue(sent.replayable());
+    assertEquals(transport.bodies.get(0).length, sent.length());
+    assertArrayEquals(data, UploadForm.read(transport.bodies.get(0), request.headers().get("Content-Type")).file());
     assertEquals(Integer.toString(data.length), query(transport.requests.get(0)).get("sizeInBytes"));
 
     // A stream can be read once, so a request carrying it is not retried.
     InputStream stream = new ByteArrayInputStream(data);
     assertThrows(ApiException.class, () -> client.assets.create(new Models.SubmitAsset("photo.png", Models.Content.stream(stream, data.length, "image/png"))));
     assertEquals(2, transport.requests.size());
-    assertArrayEquals(data, transport.bodies.get(1));
+    assertFalse(transport.requests.get(1).body().replayable());
+    assertArrayEquals(data, UploadForm.read(transport.bodies.get(1), transport.requests.get(1).headers().get("Content-Type")).file());
     assertEquals(ErrorCodes.SDK_INVALID_ARGUMENT, assertThrows(CalmLensException.class,
         () -> client.assets.create(new Models.SubmitAsset("photo.png", Models.Content.file(directory.resolve("missing.png"), "image/png")))).getCode());
   }

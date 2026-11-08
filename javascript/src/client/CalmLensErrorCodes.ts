@@ -43,6 +43,7 @@ export const API_ERROR_CODES = {
   UPLOADS_PAUSED: "usage/uploads-paused",
   UNSUPPORTED_UPLOAD_TYPE: "upload/unsupported-type",
   INVALID_UPLOAD_PAYLOAD: "upload-payload/invalid",
+  UPLOAD_OPTIONS_IN_QUERY: "upload/options-in-query",
   USE_UPLOAD_PART: "upload/use-upload-part",
   UPLOAD_NOT_OPEN: "upload/not-open",
   INVALID_UPLOAD_PART_NUMBER: "upload-part/invalid-number",
@@ -286,6 +287,10 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   "upload-payload/invalid": {
     status: 400,
     message: "Upload payload is invalid.",
+  },
+  "upload/options-in-query": {
+    status: 400,
+    message: "Send the asset's name and fields in the request body (the JSON body, or the options part of a multipart/form-data upload), not in the query string.",
   },
   "upload/use-upload-part": {
     status: 409,

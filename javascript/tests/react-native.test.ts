@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { CalmLensAppClient } from "../src/app";
 import { type CalmLensError, CalmLensServerClient, SDK_VERSION } from "../src/server";
+import { readUploadForm } from "./upload-form";
 
 const PRESET_ID = "preset_4Lk8Qw2Xm9Rt5Vb3Nc7P";
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -83,8 +84,14 @@ describe("React Native", () => {
 
     expect(checked.id).toBe("asset-1");
     expect(requests.map(({ request }) => request.method)).toEqual(["POST", "POST", "GET"]);
-    expect(requests[0]!.bytes).toEqual(bytes);
-    expect(requests[1]!.bytes).toEqual(new Uint8Array([1, 2, 3]));
+    // The bytes go as they are in an upload form, with no Blob (React Native can't build one).
+    const files = requests
+      .slice(0, 2)
+      .map(({ request, bytes }) => readUploadForm(bytes, request.headers.get("content-type")).file);
+    expect(files).toEqual([
+      { type: "image/png", bytes },
+      { type: "image/png", bytes: new Uint8Array([1, 2, 3]) },
+    ]);
     expect(requests[2]!.request.headers.get("authorization")).toBe("Bearer clut_token");
     const keys = requests.slice(0, 2).map(({ request }) => request.headers.get("idempotency-key"));
     expect(keys[0]).toMatch(UUID_V4);

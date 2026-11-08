@@ -392,15 +392,16 @@ final class MockServerClientTest extends TestCase
         self::assertCount(3, $mock->requests());
     }
 
-    public function testUploadsKeepTheTagsTheyAreCreatedWithFromARawUploadOrAUrl(): void
+    public function testUploadsKeepTheTagsTheyAreCreatedWithFromAnUploadFormOrAUrl(): void
     {
         $mock = new MockServerClient();
         $client = $mock->client();
         $uploaded = $client->assets->create(['name' => 'photo.png', 'content' => ['data' => 'png-bytes', 'type' => 'image/png'],
             'tags' => ['catalogue', 'backpacks']]);
         $site = $client->assets->create(['name' => 'site', 'url' => 'https://example.com', 'tags' => ['landing']]);
-        // A raw upload sends its tags in the query as a JSON array, like its metadata.
-        self::assertSame('["catalogue","backpacks"]', $mock->requests()[0]->query['tags'] ?? null);
+        // A file's tags travel in its upload form's options, with its other fields.
+        self::assertSame(['name' => 'photo.png', 'tags' => ['catalogue', 'backpacks']], $mock->requests()[0]->body()['options']);
+        self::assertSame('png-bytes', $mock->requests()[0]->body()['file']);
         self::assertSame(['catalogue', 'backpacks'], $uploaded['tags']);
         self::assertSame(['landing'], $client->assets->retrieve(['assetId' => $site['id']])['tags']);
     }
@@ -435,16 +436,86 @@ final class MockServerClientTest extends TestCase
         self::assertSame(['stored', 'evaluated'], [$retrieved['content']['status'], $retrieved['classification']['personDetection']['status']]);
     }
 
+    /** Sends an upload form straight to the mock, past the SDK, as another client could. */
+    private static function sendForm(\GuzzleHttp\ClientInterface $http, string $query, string $options, string $file, string $type,
+        string $boundary = 'b1', ?string $key = null): \Psr\Http\Message\ResponseInterface
+    {
+        $body = "--$boundary\r\nContent-Disposition: form-data; name=\"options\"\r\nContent-Type: application/json\r\n\r\n$options\r\n"
+            . "--$boundary\r\nContent-Disposition: form-data; name=\"file\"\r\nContent-Type: $type\r\n\r\n$file\r\n--$boundary--\r\n";
+        return $http->request('POST', 'https://api.calmlens.invalid/v1/projects/project-1/assets' . $query, ['http_errors' => false, 'body' => $body,
+            'headers' => ['Content-Type' => "multipart/form-data; boundary=$boundary", 'X-CalmLens-Upload' => 'content']
+                + ($key === null ? [] : ['Idempotency-Key' => $key])]);
+    }
+
+    private static function http(MockServerClient $mock): \GuzzleHttp\ClientInterface
+    {
+        $session = (fn () => $this->session)->call($mock->client());
+        return (fn () => $this->http)->call($session);
+    }
+
+    /** @return array{0: int, 1: ?string, 2: mixed} the status, error code and details of a response */
+    private static function outcome(\Psr\Http\Message\ResponseInterface $response): array
+    {
+        $body = json_decode((string) $response->getBody(), true);
+        return [$response->getStatusCode(), $body['code'] ?? null, $body['details'] ?? null];
+    }
+
+    public function testTheMockRefusesAssetFieldsInAnUploadQueryBeforeStoringAnything(): void
+    {
+        $mock = new MockServerClient();
+        $http = self::http($mock);
+        $form = self::sendForm($http, '?contentType=image%2Fpng&description=d&context=%7B%7D&authorId=a', '{"name":"x"}', 'png', 'image/png');
+        self::assertSame([400, ErrorCodes::UPLOAD_OPTIONS_IN_QUERY, ['fields' => ['description', 'authorId', 'context']]], self::outcome($form));
+        $text = $http->request('POST', 'https://api.calmlens.invalid/v1/projects/project-1/assets?name=x', ['http_errors' => false,
+            'headers' => ['Content-Type' => 'application/json'], 'json' => ['name' => 'x', 'content' => ['plainText' => 'hi', 'type' => 'text/plain']]]);
+        self::assertSame([400, ErrorCodes::UPLOAD_OPTIONS_IN_QUERY, ['fields' => ['name']]], self::outcome($text));
+        self::assertSame([], $mock->assets);
+    }
+
+    public function testTheMockRefusesARawUploadThatIsNotAnUploadForm(): void
+    {
+        $mock = new MockServerClient();
+        $response = self::http($mock)->request('POST', 'https://api.calmlens.invalid/v1/projects/project-1/assets?contentType=image%2Fpng',
+            ['http_errors' => false, 'body' => 'png', 'headers' => ['Content-Type' => 'image/png', 'X-CalmLens-Upload' => 'content']]);
+        self::assertSame([415, ErrorCodes::UNSUPPORTED_CONTENT_TYPE, ['contentType' => 'image/png']], self::outcome($response));
+        $unknown = self::sendForm(self::http($mock), '?contentType=image%2Fpng', '{"name":"x","colour":"red"}', 'png', 'image/png');
+        self::assertSame([400, ErrorCodes::INVALID_REQUEST], array_slice(self::outcome($unknown), 0, 2));
+        self::assertSame('validation/unknown-field', self::outcome($unknown)[2]['issues'][0]['code']);
+        self::assertSame([], $mock->assets);
+    }
+
+    public function testTheMockReplaysAnUploadFormRetriedWithANewBoundaryAndRefusesOtherOptions(): void
+    {
+        $mock = new MockServerClient();
+        $http = self::http($mock);
+        $first = self::sendForm($http, '?contentType=image%2Fpng', '{"name":"x"}', 'png', 'image/png', 'b1', 'key-1');
+        $retried = self::sendForm($http, '?contentType=image%2Fpng', '{"name":"x"}', 'png', 'image/png', 'b2', 'key-1');
+        self::assertSame(200, $first->getStatusCode());
+        self::assertSame(['true', (string) $first->getBody()], [$retried->getHeaderLine('Idempotent-Replayed'), (string) $retried->getBody()]);
+        $other = self::sendForm($http, '?contentType=image%2Fpng', '{"name":"y"}', 'png', 'image/png', 'b1', 'key-1');
+        self::assertSame([409, ErrorCodes::IDEMPOTENCY_KEY_REUSED], array_slice(self::outcome($other), 0, 2));
+        self::assertCount(1, $mock->assets);
+    }
+
+    public function testTheMockStoresPlainTextSentAsJson(): void
+    {
+        $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => $input->content->bytes === 'hello there' ? 'blocked' : 'allowed');
+        $asset = $mock->client()->assets->classify(['name' => 'note.txt', 'content' => ['plainText' => 'hello there', 'type' => 'text/plain'],
+            'description' => 'A note', 'authorId' => 'pupil-7']);
+        self::assertSame(['blocked', 'A note', 'pupil-7'], [$asset['classification']['moderation']['status'], $asset['description'], $asset['authorId']]);
+        self::assertSame(['wait' => 'true'], $mock->requests()[0]->query);
+        self::assertSame(['name' => 'note.txt', 'description' => 'A note', 'authorId' => 'pupil-7',
+            'content' => ['plainText' => 'hello there', 'type' => 'text/plain']], $mock->requests()[0]->body());
+    }
+
     /** The SDK refuses these types itself, so each is sent past it, straight to the mock, as another client could. */
     public function testTheMockRefusesUploadsOfTypesTheApiRefuses(): void
     {
         $mock = new MockServerClient();
-        $session = (fn () => $this->session)->call($mock->client());
-        $http = (fn () => $this->http)->call($session);
+        $http = self::http($mock);
         $fixture = json_decode(file_get_contents(__DIR__ . '/../../ruby/testdata/upload-mime-types.json'), true, 512, JSON_THROW_ON_ERROR);
         foreach ($fixture['refused'] as $type) {
-            $response = $http->request('POST', 'https://api.calmlens.invalid/v1/projects/project-1/assets?name=x&sizeInBytes=5&contentType=' . rawurlencode($type),
-                ['headers' => ['Content-Type' => $type, 'X-CalmLens-Upload' => 'content'], 'body' => 'hello', 'http_errors' => false]);
+            $response = self::sendForm($http, '?sizeInBytes=5&contentType=' . rawurlencode($type), '{"name":"x"}', 'hello', $type);
             $body = json_decode((string) $response->getBody(), true);
             self::assertSame([415, ErrorCodes::UNSUPPORTED_UPLOAD_TYPE, ['mimeType' => $type, 'source' => 'calmlens']],
                 [$response->getStatusCode(), $body['code'] ?? null, $body['details'] ?? null], $type);

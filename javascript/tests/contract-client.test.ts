@@ -26,6 +26,7 @@ import {
 import { UPLOAD_TOKEN_DEFAULT_TTL_SECONDS } from "../src/contract/UploadToken.js";
 import { CalmLensError, CalmLensServerClient } from "../src/server";
 import { testdata } from "./testdata";
+import { readUploadForm } from "./upload-form";
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
@@ -212,7 +213,20 @@ interface ExpectedRequest {
   bodyLength?: number;
   bodySha256?: string;
   bodyBase64?: string;
+  /** An upload form: the options part's JSON, then the file part's type and bytes. */
+  form?: { options: Json; file: { contentType: string | null } & RawBody };
 }
+interface RawBody {
+  bodyLength: number;
+  bodySha256: string;
+  bodyBase64?: string;
+}
+/** A raw body as the fixtures record it, with its bytes when the fixture lists them. */
+const rawBody = (body: Uint8Array, withBytes: boolean): RawBody => ({
+  bodyLength: body.byteLength,
+  bodySha256: new Bun.CryptoHasher("sha256").update(body).digest("hex"),
+  ...(withBytes ? { bodyBase64: Buffer.from(body).toString("base64") } : {}),
+});
 interface ClientCase {
   name: string;
   area: string;
@@ -448,7 +462,17 @@ describe("scripted client cases", () => {
         })) {
           checkHeader(label, name, got.headers.get(name), value, uuids);
         }
-        if ("body" in want) {
+        if (want.form) {
+          const form = readUploadForm(got.body, got.headers.get("content-type"));
+          expect(form.options, `${label}: options`).toEqual(want.form.options);
+          expect(
+            {
+              contentType: form.file.type,
+              ...rawBody(form.file.bytes, want.form.file.bodyBase64 !== undefined),
+            },
+            `${label}: file`,
+          ).toEqual(want.form.file);
+        } else if ("body" in want) {
           if (want.body === null) expect(got.body.byteLength, `${label}: no body`).toBe(0);
           else {
             expect(JSON.parse(new TextDecoder().decode(got.body)), `${label}: body`).toEqual(

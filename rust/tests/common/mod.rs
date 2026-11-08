@@ -256,3 +256,88 @@ pub fn error_json(error: &calmlens::Error) -> Value {
         },
     })
 }
+
+/// One part of a `multipart/form-data` body.
+pub struct FormPart {
+    pub name: String,
+    pub content_type: String,
+    pub body: Vec<u8>,
+}
+
+/// The parts of a `multipart/form-data` body, split with the boundary from `content_type`.
+pub fn parse_form(content_type: &str, body: &[u8], label: &str) -> Vec<FormPart> {
+    let boundary =
+        regex_lite::Regex::new(r#"^multipart/form-data; ?boundary=(?:"([^"]+)"|(\S+))$"#)
+            .unwrap()
+            .captures(content_type)
+            .and_then(|captures| captures.get(1).or_else(|| captures.get(2)))
+            .unwrap_or_else(|| panic!("{label}: no form boundary in {content_type:?}"))
+            .as_str()
+            .to_owned();
+    let find = |needle: &[u8], from: usize| {
+        body.get(from..)
+            .and_then(|rest| rest.windows(needle.len()).position(|w| w == needle))
+            .map(|at| at + from)
+    };
+    let opening = format!("--{boundary}\r\n").into_bytes();
+    assert!(
+        body.starts_with(&opening),
+        "{label}: the form must open with its boundary"
+    );
+    let delimiter = format!("\r\n--{boundary}").into_bytes();
+    let name_pattern = regex_lite::Regex::new(r#"\bname="([^"]*)""#).unwrap();
+    let mut parts = Vec::new();
+    let mut start = opening.len();
+    loop {
+        let head_end =
+            find(b"\r\n\r\n", start).unwrap_or_else(|| panic!("{label}: form part headers"));
+        let head = std::str::from_utf8(&body[start..head_end]).unwrap();
+        let end =
+            find(&delimiter, head_end + 4).unwrap_or_else(|| panic!("{label}: form part end"));
+        let mut part = FormPart {
+            name: String::new(),
+            content_type: String::new(),
+            body: body[head_end + 4..end].to_vec(),
+        };
+        for line in head.split("\r\n") {
+            let (name, value) = line
+                .split_once(':')
+                .unwrap_or_else(|| panic!("{label}: form part header {line:?}"));
+            match name.to_ascii_lowercase().as_str() {
+                "content-disposition" => {
+                    part.name = name_pattern
+                        .captures(value)
+                        .unwrap_or_else(|| panic!("{label}: form part name in {value:?}"))[1]
+                        .to_owned();
+                }
+                "content-type" => part.content_type = value.trim().to_owned(),
+                _ => {}
+            }
+        }
+        parts.push(part);
+        let after = end + delimiter.len();
+        if body[after..] == *b"--\r\n" {
+            return parts;
+        }
+        assert_eq!(
+            body.get(after..after + 2),
+            Some(b"\r\n".as_slice()),
+            "{label}: form part delimiter"
+        );
+        start = after + 2;
+    }
+}
+
+/// A captured upload form request's `options` part as JSON and its `file` part, checking that
+/// it holds exactly those two parts in that order.
+pub fn upload_form(request: &calmlens::testing::Request) -> (Value, FormPart) {
+    let content_type = request
+        .header("content-type")
+        .expect("an upload form has a Content-Type");
+    let mut parts = parse_form(content_type, &request.body, "upload form");
+    let names: Vec<&str> = parts.iter().map(|part| part.name.as_str()).collect();
+    assert_eq!(names, ["options", "file"], "upload form parts");
+    let file = parts.pop().unwrap();
+    let options = serde_json::from_slice(&parts[0].body).expect("the options part is JSON");
+    (options, file)
+}

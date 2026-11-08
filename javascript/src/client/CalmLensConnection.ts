@@ -111,7 +111,10 @@ export const DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 const toBodyBytes = (value: Uint8Array): Uint8Array<ArrayBuffer> =>
   value.buffer instanceof ArrayBuffer ? (value as Uint8Array<ArrayBuffer>) : Uint8Array.from(value);
 
-const toRawUploadBody = (payload: AssetBinaryPayloadInput): BodyInit => {
+/** The bytes of an upload's content or part, as a Blob, bytes or a one-shot stream. */
+const toUploadData = (
+  payload: AssetBinaryPayloadInput,
+): Blob | Uint8Array<ArrayBuffer> | ReadableStream<Uint8Array> => {
   const data = assetToData(payload);
   if (data instanceof Response) {
     if (!data.body) {
@@ -121,19 +124,92 @@ const toRawUploadBody = (payload: AssetBinaryPayloadInput): BodyInit => {
     }
     return data.body;
   }
-  if (data instanceof ArrayBuffer || data instanceof Blob) {
-    return data;
-  }
-  if ("getReader" in data) {
-    return data as ReadableStream<Uint8Array>;
-  }
+  if (data instanceof Blob) return data;
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  if ("getReader" in data) return data as ReadableStream<Uint8Array>;
   return toBodyBytes(data);
 };
 
-const setOptionalQueryValue = (params: URLSearchParams, key: string, value: unknown) => {
-  if (value !== undefined && value !== null) {
-    params.set(key, typeof value === "string" ? value : JSON.stringify(value));
+/** An upload's bytes as a raw part body (parts after the first carry no options). */
+const toRawUploadBody = (payload: AssetBinaryPayloadInput): BodyInit => toUploadData(payload);
+
+const textEncoder = new TextEncoder();
+
+/**
+ * An upload form: `multipart/form-data` with the asset's fields as the JSON `options` part, then
+ * the bytes as the `file` part. Asset fields never go in the URL, which proxies and servers log.
+ * Bytes stay bytes (React Native can't build a Blob from them), a Blob stays a Blob, and a stream
+ * is wrapped so the file is still sent as it is read.
+ */
+const toUploadForm = (
+  options: Record<string, unknown>,
+  payload: AssetBinaryPayloadInput & { type: string },
+): { body: BodyInit; contentType: string } => {
+  const boundary = `calmlens-${randomUuid()}`;
+  const head = `--${boundary}\r\nContent-Disposition: form-data; name="options"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(options)}\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"\r\nContent-Type: ${payload.type.replace(/[\r\n]/g, "")}\r\n\r\n`;
+  const tail = `\r\n--${boundary}--\r\n`;
+  const contentType = `multipart/form-data; boundary=${boundary}`;
+  const data = toUploadData(payload);
+  if (data instanceof Blob) return { body: new Blob([head, data, tail]), contentType };
+  const headBytes = textEncoder.encode(head);
+  const tailBytes = textEncoder.encode(tail);
+  if (data instanceof Uint8Array) {
+    const body = new Uint8Array(headBytes.length + data.length + tailBytes.length);
+    body.set(headBytes);
+    body.set(data, headBytes.length);
+    body.set(tailBytes, headBytes.length + data.length);
+    return { body, contentType };
   }
+  const reader = data.getReader();
+  let stage: "head" | "file" | "done" = "head";
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (stage === "head") {
+        stage = "file";
+        controller.enqueue(headBytes);
+        return;
+      }
+      if (stage === "done") return;
+      const { done, value } = await reader.read();
+      if (!done) {
+        if (value.byteLength) controller.enqueue(value);
+        return;
+      }
+      stage = "done";
+      controller.enqueue(tailBytes);
+      controller.close();
+    },
+    cancel: (reason) => reader.cancel(reason),
+  });
+  return { body, contentType };
+};
+
+/** The options an upload sends, without the transport ones and without empty values. */
+const uploadFields = (options: Record<string, unknown>) =>
+  Object.fromEntries(
+    UPLOAD_OPTION_KEYS.flatMap((key) =>
+      options[key] === undefined || options[key] === null ? [] : [[key, options[key]]],
+    ),
+  );
+
+/** The asset fields an upload carries in its body: the API refuses them in the query string. */
+const UPLOAD_OPTION_KEYS = [
+  "name",
+  "description",
+  "processingOptions",
+  "visibility",
+  "metadata",
+  "tags",
+  "authorId",
+  "context",
+  "externalId",
+  "externalUrl",
+  "folderId",
+  "uploadPresetId",
+] as const;
+
+const setOptionalQueryValue = (params: URLSearchParams, key: string, value: unknown) => {
+  if (value !== undefined && value !== null) params.set(key, String(value));
 };
 
 const assertValidUploadMimeType = (mimeType: string) => {
@@ -278,7 +354,7 @@ export const prepareSubmitAssetOptions = (
     if (!options.context || !Array.isArray(options.context.items)) {
       throw invalidArgument("context.items must be an array of earlier posts");
     }
-    // Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+    // Only the posts CalmLens uses are sent.
     return { ...options, context: { items: selectModerationContextItems(options.context.items) } };
   }
 
@@ -420,49 +496,70 @@ export class CalmLensConnection {
 
   private upload(
     url: string,
-    payload: AssetBinaryPayloadInput,
+    body: BodyInit,
     headers: Record<string, string>,
     idempotencyKey: string,
+    text: boolean,
   ): Promise<unknown> {
     return this.transport.json<unknown>({
       method: "POST",
       url,
       headers,
-      body: toRawUploadBody(payload),
+      body,
       idempotencyKey,
-      timeoutMs: isTextPayload(payload) ? this.timeoutMs : this.options.uploadTimeoutMs,
+      timeoutMs: text ? this.timeoutMs : this.options.uploadTimeoutMs,
       deadline: "body",
       fetch: this.options.uploadFetch,
     });
   }
 
   /**
-   * Uploads file content or a first multipart part to `uploadsPath` (`.../assets`), as raw
-   * bytes with the options in the query.
+   * Uploads file content or a first multipart part to `uploadsPath` (`.../assets`). Plain text
+   * goes as a JSON body; other content as an upload form, the asset's fields in its options part
+   * and the bytes in its file part. Either way the query holds only transport values.
    */
-  submitRawUpload(
+  submitUpload(
     uploadsPath: string,
     options: Exclude<SubmitAssetOptions, { url: string }>,
     wait: boolean,
     authHeaders: Record<string, string> = {},
   ): Promise<unknown> {
-    const query = new URLSearchParams();
-    query.set("name", options.name);
-    query.set("wait", String(wait));
-    setOptionalQueryValue(query, "description", options.description);
-    setOptionalQueryValue(query, "processingOptions", options.processingOptions);
-    setOptionalQueryValue(query, "visibility", options.visibility);
-    setOptionalQueryValue(query, "metadata", options.metadata);
-    setOptionalQueryValue(query, "tags", options.tags);
-    setOptionalQueryValue(query, "authorId", options.authorId);
-    setOptionalQueryValue(query, "context", options.context);
-    setOptionalQueryValue(query, "externalId", options.externalId);
-    setOptionalQueryValue(query, "externalUrl", options.externalUrl);
-    setOptionalQueryValue(query, "folderId", options.folderId);
-    setOptionalQueryValue(query, "uploadPresetId", options.uploadPresetId);
-
     const isMultipart = "part" in options;
     const payload = isMultipart ? options.part : options.content;
+    const multipartOptions = options as Extract<
+      SubmitAssetOptions,
+      { part: CreateMultipartUploadPartOptions }
+    >;
+    const idempotencyKey = options.idempotencyKey ?? newIdempotencyKey();
+    const fields = uploadFields(options as unknown as Record<string, unknown>);
+
+    if (isTextPayload(payload)) {
+      const { sizeInBytes: _size, ...text } = payload as AssetBinaryPayloadInput & {
+        sizeInBytes?: number;
+      };
+      const body = isMultipart
+        ? {
+            ...fields,
+            part: text,
+            ...(multipartOptions.sizeInBytes === undefined
+              ? {}
+              : { sizeInBytes: multipartOptions.sizeInBytes }),
+            ...(multipartOptions.totalSizeInBytes === undefined
+              ? {}
+              : { totalSizeInBytes: multipartOptions.totalSizeInBytes }),
+          }
+        : { ...fields, content: text };
+      return this.upload(
+        this.url(uploadsPath, { wait }),
+        JSON.stringify(body),
+        { ...authHeaders, "Content-Type": "application/json" },
+        idempotencyKey,
+        true,
+      );
+    }
+
+    const query = new URLSearchParams();
+    query.set("wait", String(wait));
     query.set("contentType", payload.type);
     setOptionalQueryValue(
       query,
@@ -471,25 +568,22 @@ export class CalmLensConnection {
     );
     if (isMultipart) {
       const part = payload as CreateMultipartUploadPartOptions;
-      const multipartOptions = options as Extract<
-        SubmitAssetOptions,
-        { part: CreateMultipartUploadPartOptions }
-      >;
       query.set("partNumber", String(part.partNumber ?? 1));
       query.set("isFinal", String(part.isFinal ?? false));
       setOptionalQueryValue(query, "sizeInBytes", part.sizeInBytes ?? multipartOptions.sizeInBytes);
       setOptionalQueryValue(query, "totalSizeInBytes", multipartOptions.totalSizeInBytes);
     }
-
+    const form = toUploadForm(fields, payload);
     return this.upload(
       this.url(`${uploadsPath}?${query}`),
-      payload,
+      form.body,
       {
         ...authHeaders,
-        "Content-Type": payload.type,
+        "Content-Type": form.contentType,
         "X-CalmLens-Upload": isMultipart ? "part" : "content",
       },
-      options.idempotencyKey ?? newIdempotencyKey(),
+      idempotencyKey,
+      false,
     );
   }
 
@@ -528,7 +622,7 @@ export class CalmLensConnection {
     const key = idempotencyKey ?? newIdempotencyKey();
     const part = (partNumber: number) =>
       source.slice((partNumber - 1) * partSize, Math.min(partNumber * partSize, source.size));
-    const first = (await this.submitRawUpload(
+    const first = (await this.submitUpload(
       uploadsPath,
       {
         ...fields,
@@ -600,9 +694,10 @@ export class CalmLensConnection {
     );
     return this.upload(
       this.url(`${partPath}?${query}`),
-      part,
+      toRawUploadBody(part as AssetBinaryPayloadInput),
       { ...authHeaders, "X-CalmLens-Upload": "part" },
       idempotencyKey ?? newIdempotencyKey(),
+      isTextPayload(part as AssetBinaryPayloadInput),
     );
   }
 }

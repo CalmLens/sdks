@@ -172,7 +172,9 @@ class MockDecision:
                     for qualifier, some in qualifiers}
         return {"raw": {"categories": categories, "hashMatches": []},
             "categories": {category: {"score": value, "action": action(value)} for category, value in evaluated},
-            "explanationComplete": True, "source": "policy", "rule": None, "automatedStatus": status,
+            # The mock keeps no policies, so no policy is named.
+            "explanationComplete": True, "policy": None, "source": "policy", "rule": None,
+            "automatedStatus": status,
             # The mock analyses no audio or video, so a decision has no findings timeline.
             "regions": [], "linkSafety": None, "timeline": None,
             "flaggedCategories": [category for category, value in evaluated if action(value) != "allow"]}
@@ -229,7 +231,9 @@ def _to_decision(value: object) -> MockDecision:
 _MAX_UPLOAD_PARTS = 10_000
 _INT_QUERY = {"pageSize", "partNumber", "sizeInBytes", "totalSizeInBytes"}
 _BOOL_QUERY = {"wait", "isFinal"}
-_JSON_QUERY = {"metadata", "tags", "processingOptions", "context"}
+#: The asset fields an upload carries in its body: the API refuses them in the query string.
+_UPLOAD_OPTION_KEYS = ("name", "description", "processingOptions", "visibility", "metadata", "tags", "authorId",
+                       "context", "externalId", "externalUrl", "folderId", "uploadPresetId")
 _MIB = 1024 * 1024
 
 
@@ -316,8 +320,9 @@ class MockRequest:
 
     ``path`` is relative to ``base_url`` for API calls and to ``cdn_base_url`` for
     ``cdn.serve``, with each segment decoded, such as ``/projects/<id>/assets`` or
-    ``/assets/<id>``. ``query`` holds the decoded query values (numbers, booleans and JSON values
-    decoded); ``body`` is the JSON body as Python objects, the raw bytes of an upload, or None.
+    ``/assets/<id>``. ``query`` holds the decoded query values (numbers and booleans decoded);
+    ``body`` is the JSON body as Python objects (text uploads among them), ``{"options": ...,
+    "file": bytes}`` for an upload form, the raw bytes of a later multipart part, or None.
     ``headers`` has the API key redacted from ``repr``. ``status`` is the HTTP status the mock
     answered with, or None when the request failed without a response.
     """
@@ -347,11 +352,6 @@ def _decode_query(pairs: Iterable[tuple[str, str]]) -> dict[str, Any]:
             query[key] = int(value)
         elif key in _BOOL_QUERY and value in ("true", "false"):
             query[key] = value == "true"
-        elif key in _JSON_QUERY:
-            try:
-                query[key] = json.loads(value)
-            except ValueError:
-                query[key] = value
         else:
             query[key] = value
     return query
@@ -857,6 +857,42 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}_{body[:20]}"
 
 
+def _upload_form(raw: bytes | None, content_type: str) -> tuple[str, bytes]:
+    """A raw upload's ``multipart/form-data`` body read like the API: an ``options`` part, then a
+    ``file`` part, then the closing boundary; anything else is refused. Returns the options part's
+    text and the file's bytes."""
+    media_type = content_type.split(";")[0].strip()
+    if media_type.lower() != "multipart/form-data":
+        raise _Failure(error_codes.UNSUPPORTED_CONTENT_TYPE,
+                       "Send a raw upload as multipart/form-data: an options part, then a file part.", 415,
+                       {"contentType": media_type or None})
+    boundary = re.search(r';\s*boundary=(?:"([^"]+)"|([^;\s]+))', content_type, re.I)
+    if boundary is None:
+        raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "The multipart/form-data Content-Type needs a boundary")
+    delimiter = b"\r\n--" + (boundary.group(1) or boundary.group(2)).encode()
+    body = b"\r\n" + (raw or b"")
+    parts: list[tuple[str | None, bytes]] = []
+    at = body.find(delimiter)
+    while at != -1:
+        start = at + len(delimiter)
+        if body[start:start + 2] == b"--":
+            break
+        header_end = body.find(b"\r\n\r\n", start)
+        following = -1 if header_end == -1 else body.find(delimiter, header_end + 4)
+        if following == -1:
+            at = -1
+            break
+        headers = body[start:header_end].decode("utf-8", "replace")
+        name = re.search(r'content-disposition:\s*form-data\s*;[^\r\n]*?\bname="([^"]*)"', headers, re.I)
+        parts.append((name.group(1) if name else None, body[header_end + 4:following]))
+        at = following
+    if at == -1:
+        raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "The upload body ended before its closing boundary")
+    if [name for name, _ in parts] != ["options", "file"]:
+        raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "The upload form must hold an options part, then a file part")
+    return parts[0][1].decode("utf-8", "replace"), parts[1][1]
+
+
 def _invalid_field(code: str, path: str) -> _Failure:
     """A request the API's schema refuses: ``validation/invalid-request`` with HTTP 400, listing the
     field and its issue ``code`` (such as ``validation/too-big``) in ``details.issues``."""
@@ -1313,8 +1349,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return self._respond(status, body, headers)
 
     @staticmethod
-    def _operations(method: str, parts: list[str], query: Mapping[str, Any], headers: Mapping[str, str],
-                    cdn: bool) -> list[str]:
+    def _operations(method: str, parts: list[str], query: Mapping[str, Any], body: Any, cdn: bool) -> list[str]:
         """The JavaScript client methods that send a request, the one it is recorded under first,
         for ``fail_next_request``."""
         if cdn:
@@ -1342,8 +1377,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                     return ["assets.list", "assets.iterate"]
                 if query.get("wait") is False:
                     return ["assets.create"]
-                lower = {key.lower(): value for key, value in headers.items()}
-                text = lower.get("x-calmlens-upload") == "content" and lower.get("content-type") == "text/plain"
+                content = body.get("content") if isinstance(body, dict) else None
+                text = isinstance(content, dict) and "plainText" in content and content.get("type") == "text/plain"
                 return ["assets.classify", "text.classify"] if text else ["assets.classify"]
             return []
         resource = parts[0]
@@ -1391,8 +1426,15 @@ class MockCalmLensServerClient(CalmLensServerClient):
         body: Any = raw
         if raw is not None and content_type == "application/json" and upload not in ("content", "part"):
             body = json.loads(raw)
+        elif raw is not None and content_type.lower().startswith("multipart/form-data"):
+            # An upload form is recorded as its options and file, when it is one the API can read.
+            try:
+                options_text, file = _upload_form(raw, content_type)
+                body = {"options": json.loads(options_text), "file": file}
+            except (_Failure, ValueError):
+                pass
         parts = [unquote(p) for p in url.path.strip("/").split("/")]
-        operations = self._operations(request.get_method(), parts, query, headers, cdn)
+        operations = self._operations(request.get_method(), parts, query, body, cdn)
         recorded = MockRequest(method=request.get_method(), url=request.full_url, path="/" + "/".join(parts),
                                query=copy.deepcopy(query), body=copy.deepcopy(body), headers=copy.deepcopy(headers))
         with self._state_lock:
@@ -1439,9 +1481,18 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if key is not None:
             # HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
             key = key.strip(" \t\r\n")
-        # Like the API: raw uploads are told apart by their query, type and length, not their bytes.
+        # Like the API: raw uploads are told apart by their query, type and length, not their bytes,
+        # and an upload form by its options too, but not its boundary.
+        form = bool(upload) and content_type.lower().startswith("multipart/form-data")
+        options_text: str | None = None
+        if form and parts[-1] != "part":
+            try:
+                options_text = _upload_form(raw, content_type)[0]
+            except _Failure:
+                pass  # The route refuses it below.
         fingerprint = _json([request.get_method(), path, sorted(([k, v] for k, v in query.items()), key=str),
-                             content_type, upload, len(raw or b"") if upload else body])
+                             "multipart/form-data" if form else content_type, upload,
+                             len(raw or b"") if upload else body, options_text])
         with self._state_lock:
             if key is not None:
                 if not _IDEMPOTENCY_KEY.fullmatch(key):
@@ -1454,7 +1505,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
                         "Idempotent-Replayed": "true", "Content-Type": "application/json"})
             try:
                 result = copy.deepcopy(self._dispatch(request.get_method(), parts, query,
-                                                      body if isinstance(body, dict) else {}, raw, upload))
+                                                      body if isinstance(body, dict) and not form else {}, raw,
+                                                      upload, content_type))
             except _Failure as failure_response:
                 # A failed request frees its idempotency key.
                 return self._failure_response(failure_response)
@@ -1500,11 +1552,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
                 if f["projectId"] == self.project_id]
 
     def _dispatch(self, method: str, parts: list[str], query: dict[str, Any], body: dict[str, Any],
-                  raw: bytes | None, upload: str) -> Any:
+                  raw: bytes | None, upload: str, content_type: str = "") -> Any:
         if parts[0] == "projects":
             if parts[1] != self.project_id:
                 raise _Failure(error_codes.PROJECT_NOT_FOUND)
-            return self._dispatch_project(method, parts[2:], query, body, raw, upload)
+            return self._dispatch_project(method, parts[2:], query, body, raw, upload, content_type)
         if parts[0] == "policies":
             return self._dispatch_policy(method, parts, query, body)
         resource, identifier = parts[0], parts[1]
@@ -1526,7 +1578,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         return self._dispatch_folder(method, identifier, suffix, body)
 
     def _dispatch_project(self, method: str, parts: list[str], query: dict[str, Any], body: dict[str, Any],
-                          raw: bytes | None, upload: str) -> Any:
+                          raw: bytes | None, upload: str, content_type: str = "") -> Any:
         now = self.now()
         resource = parts[0]
         if resource == "events":
@@ -1571,7 +1623,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return self._search(query)
         if not suffix and method == "GET":
             return self._page(self._project_assets(), query, [self.project_id, query.get("filter")])
-        return self._create_asset(upload, query, body, raw, now)
+        return self._create_asset(upload, content_type, query, body, raw, now)
 
     def _sign_asset_url(self, body: dict[str, Any], now: int) -> dict[str, Any]:
         """Like the API (``POST /projects/:projectId/signed-asset-urls``): a grant to one asset, by ID
@@ -1631,16 +1683,53 @@ class MockCalmLensServerClient(CalmLensServerClient):
         result["ancestors"] = [f for f in everything if f["id"] in ids and f["id"] not in page_ids]
         return result
 
-    def _create_asset(self, upload: str, query: dict[str, Any], body: dict[str, Any], raw: bytes | None,
-                      now: int) -> dict[str, Any]:
-        # The X-CalmLens-Upload header picks the mode: absent is a JSON body, "content" raw
-        # file content and "part" the raw first part of a multipart upload.
-        raw_upload = upload in ("content", "part")
+    @staticmethod
+    def _upload_fields(upload: str, content_type: str, query: dict[str, Any], body: dict[str, Any],
+                       raw: bytes | None) -> tuple[dict[str, Any], bytes | None, bool, bool, Any]:
+        """The fields of ``POST .../assets`` like the API reads them: from the JSON body (text and
+        URLs) or an upload form's options (files), refusing asset fields in the query. Returns the
+        fields with ``contentType``, the content's bytes (None for a URL), whether it is a first
+        part, whether it is final and the declared total size."""
+        in_query = [key for key in _UPLOAD_OPTION_KEYS if key in query]
+        if in_query:
+            raise _Failure(error_codes.UPLOAD_OPTIONS_IN_QUERY, "Send the asset's fields in the request body", 400,
+                           {"fields": in_query})
+        # The X-CalmLens-Upload header picks the mode: absent is a JSON body, "content" an upload
+        # form with the whole file and "part" one with the first part of a multipart upload.
+        if upload not in ("content", "part"):
+            fields = {k: v for k, v in body.items() if k not in ("content", "part", "sizeInBytes", "totalSizeInBytes")}
+            text = body.get("content", body.get("part"))
+            if text is None:
+                return fields, None, False, True, None
+            if not isinstance(text, dict) or not isinstance(text.get("plainText"), str) \
+                    or not isinstance(text.get("type"), str):
+                raise _invalid_field("validation/invalid-type", "content" if "content" in body else "part")
+            part = body.get("part")
+            final = not isinstance(part, dict) or part.get("isFinal") is True
+            return ({**fields, "contentType": text["type"]}, text["plainText"].encode("utf-8"), part is not None,
+                    final, body.get("totalSizeInBytes"))
+        options_text, file = _upload_form(raw, content_type)
+        try:
+            options = json.loads(options_text)
+        except ValueError:
+            options = None
+        if not isinstance(options, dict):
+            raise _Failure(error_codes.INVALID_UPLOAD_PAYLOAD, "The options part must be a JSON object with the asset's fields")
+        unknown = next((key for key in options if key not in _UPLOAD_OPTION_KEYS), None)
+        if unknown is not None:
+            raise _invalid_field("validation/unknown-field", unknown)
+        if not isinstance(options.get("name"), str):
+            raise _invalid_field("validation/invalid-type", "name")
         multipart = upload == "part"
-        options = query if raw_upload else body
+        return ({**options, "contentType": query.get("contentType", "")}, file, multipart,
+                not multipart or bool(query.get("isFinal")), query.get("totalSizeInBytes"))
+
+    def _create_asset(self, upload: str, content_type: str, query: dict[str, Any], body: dict[str, Any],
+                      raw: bytes | None, now: int) -> dict[str, Any]:
+        options, content, multipart, final, total = self._upload_fields(upload, content_type, query, body, raw)
         _check_metadata(options.get("metadata"))
         mime = options.get("contentType", "")
-        if raw_upload and not (isinstance(mime, str) and _is_accepted_upload_mime_type(mime)):
+        if content is not None and not (isinstance(mime, str) and _is_accepted_upload_mime_type(mime)):
             # Like the API: an upload of a type CalmLens can't moderate is refused before it is stored.
             refused = _invalid_upload_mime_type(mime)
             raise _Failure(refused.code, refused.message, details=refused.details)
@@ -1648,9 +1737,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
             (k for k in ("image", "video", "audio") if mime.startswith(k + "/")),
             "plaintext-document" if mime.startswith("text/") else
             "multimedia-document" if "pdf" in mime or "document" in mime else "file")
-        total = query.get("totalSizeInBytes")
-        size = len(raw or b"") if raw_upload else None
-        final = not multipart or bool(query.get("isFinal"))
+        size = None if content is None else len(content)
         if multipart:
             # Like the API, a declared total is checked before anything is stored, then a single
             # final part is checked as the whole upload.
@@ -1710,16 +1797,16 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if not final:
             self._uploads[asset["id"]] = {"queue": queue, "total": total}
             self.database_storage.assets[asset["id"]] = cast(Asset, asset)
-            self.image_storage.content[asset["id"]] = {"type": mime, "parts": {1: raw or b""}}
+            self.image_storage.content[asset["id"]] = {"type": mime, "parts": {1: content or b""}}
             return asset
         if "url" not in options:
             asset["content"].update(_mock_rendering(asset, False))
         # Like the API: moderated as uploaded, then stored and recorded as uploaded and decided.
-        decision = self._decision_for(asset, "upload", queue, (raw or b"") if raw_upload else None)
+        decision = self._decision_for(asset, "upload", queue, content)
         uploaded = _event_asset(asset)
         self.database_storage.assets[asset["id"]] = cast(Asset, asset)
-        if raw_upload and raw is not None:
-            self.image_storage.content[asset["id"]] = {"type": mime, "parts": {1: raw}}
+        if content is not None:
+            self.image_storage.content[asset["id"]] = {"type": mime, "parts": {1: content}}
         if decision.status != "pending":
             self._decided(asset, decision)
         self._record_uploaded(asset, uploaded)

@@ -17,7 +17,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -164,7 +163,7 @@ class TransportErrorTest {
     }
   }
 
-  @Test void uploadsStreamFilesWithTheirLengthAndOutliveTheReadTimeout(@TempDir Path directory) throws Exception {
+  @Test void uploadsStreamFilesInAFormWithTheirLengthAndOutliveTheReadTimeout(@TempDir Path directory) throws Exception {
     Path file = directory.resolve("document.pdf");
     byte[] data = new byte[2 * 1024 * 1024];
     Arrays.fill(data, (byte) 7);
@@ -180,14 +179,22 @@ class TransportErrorTest {
       } catch (IOException | InterruptedException e) { throw new IllegalStateException(e); }
     });
     CalmLensServerClient client = CalmLensServerClient.builder("key", "project").baseUrl(url).timeout(Duration.ofSeconds(1)).uploadTimeout(Duration.ofSeconds(30)).build();
-    assertEquals("asset-1", client.assets.create(new Models.SubmitAsset("document.pdf", Models.Content.file(file, "application/pdf"))).id());
+    Models.SubmitAsset upload = new Models.SubmitAsset("document.pdf", Models.Content.file(file, "application/pdf"))
+        .description("Homework").authorId("pupil-7").context(new Models.ModerationContext(List.of(new Models.ModerationContextItem("An earlier post"))));
+    assertEquals("asset-1", client.assets.create(upload).id());
     String head = heads.get(0);
-    assertArrayEquals(data, received[0]);
-    assertEquals(Integer.toString(data.length), header(head, "content-length"));
+    // The asset's fields travel in the form's options part; the URL holds only transport values.
+    String target = head.substring(0, head.indexOf("\r\n"));
+    assertEquals("POST /v1/projects/project/assets?wait=false&contentType=application%2Fpdf&sizeInBytes=" + data.length + " HTTP/1.1", target);
+    UploadForm.Parsed form = UploadForm.read(received[0], header(head, "content-type"));
+    assertEquals(com.google.gson.JsonParser.parseString("{\"name\":\"document.pdf\",\"description\":\"Homework\",\"authorId\":\"pupil-7\","
+        + "\"context\":{\"items\":[{\"text\":\"An earlier post\"}]}}"), com.google.gson.JsonParser.parseString(form.options()));
+    assertEquals("application/pdf", form.fileType());
+    assertArrayEquals(data, form.file());
+    assertEquals(Integer.toString(received[0].length), header(head, "content-length"));
     assertNull(header(head, "transfer-encoding"));
     assertEquals("calmlens-java/" + CalmLensServerClient.VERSION + " (java/" + Runtime.version() + ")", header(head, "user-agent"));
     assertTrue(header(head, "idempotency-key").matches("[0-9a-f-]{36}"), head);
-    assertTrue(head.toLowerCase(Locale.ROOT).startsWith("post /v1/projects/project/assets?"), head);
     assertEquals("content", header(head, "x-calmlens-upload"));
   }
 

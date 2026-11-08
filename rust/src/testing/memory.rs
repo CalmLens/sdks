@@ -645,6 +645,119 @@ pub(super) fn under<'a>(url: &'a reqwest::Url, base: &str) -> Option<&'a str> {
     let rest = url.path().strip_prefix(base.path().trim_end_matches('/'))?;
     (rest.is_empty() || rest.starts_with('/')).then_some(rest)
 }
+/// The asset fields an upload carries in its body: the API refuses them in the query string.
+const UPLOAD_OPTION_KEYS: [&str; 12] = [
+    "name",
+    "description",
+    "processingOptions",
+    "visibility",
+    "metadata",
+    "tags",
+    "authorId",
+    "context",
+    "externalId",
+    "externalUrl",
+    "folderId",
+    "uploadPresetId",
+];
+
+/// Refuses a create that names asset fields in its query, like the API.
+fn check_no_upload_options_in_query(q: &HashMap<String, String>) -> Outcome<()> {
+    let fields: Vec<&str> = UPLOAD_OPTION_KEYS
+        .into_iter()
+        .filter(|key| q.contains_key(*key))
+        .collect();
+    if fields.is_empty() {
+        return Ok(());
+    }
+    let mut failure = fail(
+        ErrorCode::UploadOptionsInQuery,
+        "Send the asset's name and fields in the request body, not in the query string",
+    );
+    failure.details = json!({ "fields": fields });
+    Err(failure)
+}
+
+/// An upload form as the API reads it: the `options` part's JSON text, then the `file` part.
+struct UploadForm {
+    options: String,
+    file: Vec<u8>,
+}
+
+fn find_bytes(haystack: &[u8], needle: &[u8], from: usize) -> Option<usize> {
+    haystack
+        .get(from..)?
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .map(|at| at + from)
+}
+
+/// Reads a raw upload's `multipart/form-data` body like the API: an `options` part, then a
+/// `file` part, then the closing boundary. Anything else is refused.
+fn read_upload_form(content_type: &str, raw: &[u8]) -> Outcome<UploadForm> {
+    let media_type = content_type.split(';').next().unwrap_or("").trim();
+    if !media_type.eq_ignore_ascii_case("multipart/form-data") {
+        let mut failure = fail(
+            ErrorCode::UnsupportedContentType,
+            "Send a raw upload as multipart/form-data: an options part, then a file part.",
+        );
+        failure.details = json!({
+            "contentType": if media_type.is_empty() { Value::Null } else { media_type.into() },
+        });
+        return Err(failure);
+    }
+    let boundary = content_type.split(';').skip(1).find_map(|param| {
+        let (name, value) = param.split_once('=')?;
+        name.trim()
+            .eq_ignore_ascii_case("boundary")
+            .then(|| value.trim().trim_matches('"').to_owned())
+    });
+    let Some(boundary) = boundary.filter(|boundary| !boundary.is_empty()) else {
+        return Err(invalid(
+            "The multipart/form-data Content-Type needs a boundary",
+        ));
+    };
+    let delimiter = format!("\r\n--{boundary}").into_bytes();
+    let body = [b"\r\n".as_slice(), raw].concat();
+    let ended = || invalid("The upload body ended before its closing boundary");
+    let mut parts: Vec<(Option<String>, Vec<u8>)> = Vec::new();
+    let mut at = find_bytes(&body, &delimiter, 0).ok_or_else(ended)?;
+    loop {
+        let start = at + delimiter.len();
+        if body.get(start..start + 2) == Some(b"--") {
+            break;
+        }
+        let header_end = find_bytes(&body, b"\r\n\r\n", start).ok_or_else(ended)?;
+        let next = find_bytes(&body, &delimiter, header_end + 4).ok_or_else(ended)?;
+        let headers = String::from_utf8_lossy(&body[start..header_end]);
+        let name = headers.split("\r\n").find_map(|line| {
+            let (header, value) = line.split_once(':')?;
+            if !header.trim().eq_ignore_ascii_case("content-disposition") {
+                return None;
+            }
+            value.split(';').skip(1).find_map(|param| {
+                let (key, value) = param.split_once('=')?;
+                (key.trim() == "name").then(|| value.trim().trim_matches('"').to_owned())
+            })
+        });
+        parts.push((name, body[header_end + 4..next].to_vec()));
+        at = next;
+    }
+    match <[_; 2]>::try_from(parts) {
+        Ok([(Some(options), options_part), (Some(file), file_part)])
+            if options == "options" && file == "file" =>
+        {
+            Ok(UploadForm {
+                options: String::from_utf8_lossy(&options_part).into_owned(),
+                file: file_part,
+            })
+        }
+        _ => Err(invalid(
+            "The upload form must hold an options part, then a file part",
+        )),
+    }
+}
+
 pub(super) fn percent_decode(segment: &str) -> String {
     let bytes = segment.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
@@ -1234,16 +1347,26 @@ impl Backend {
                 .unwrap_or("\u{0}")
                 .trim_matches([' ', '\t', '\r', '\n'])
         });
-        // Like the API, raw uploads are compared by query, content type and length, not bytes.
+        // Like the API, raw uploads are compared by query, content type and length, not bytes,
+        // and an upload form by its options and file length too, but not its boundary.
+        let form = (!header(headers, "x-calmlens-upload").is_empty()
+            && !url.path().ends_with("/part"))
+        .then(|| read_upload_form(content_type, raw).ok())
+        .flatten();
         let fingerprint = format!(
-            "{method}\n{}\n{}\n{content_type}\n{}\n{}",
+            "{method}\n{}\n{}\n{}\n{}\n{}",
             url.path(),
             url.query().unwrap_or(""),
-            raw.len(),
-            if is_json {
-                String::from_utf8_lossy(raw)
+            if form.is_some() {
+                "multipart/form-data"
             } else {
-                "".into()
+                content_type
+            },
+            form.as_ref().map_or(raw.len(), |form| form.file.len()),
+            match &form {
+                Some(form) => form.options.as_str().into(),
+                None if is_json => String::from_utf8_lossy(raw),
+                None => "".into(),
             }
         );
         if raw_key.is_some() {
@@ -1355,9 +1478,16 @@ impl Backend {
                     ("POST", "assets/batch") => self.batch(body, now),
                     ("POST", "signed-asset-urls") => self.sign_asset_url(body, now),
                     (_, "policy") => self.project_policy_route(method, body),
-                    ("POST", "assets") => {
-                        self.create_asset(header(headers, "x-calmlens-upload"), body, q, raw, now)
-                    }
+                    ("POST", "assets") => self.create_asset(
+                        (
+                            header(headers, "x-calmlens-upload"),
+                            header(headers, "content-type"),
+                        ),
+                        body,
+                        q,
+                        raw,
+                        now,
+                    ),
                     _ => Err(unknown_route()),
                 }
             }
@@ -2087,44 +2217,101 @@ impl Backend {
         Ok(entry)
     }
 
-    /// `POST /projects/:id/assets`. `x-calmlens-upload` is empty for a JSON (URL) body,
-    /// `content` for raw content and `part` for the first part of a multipart upload.
+    /// `POST /projects/:id/assets`. `x-calmlens-upload` is empty for a JSON body (plain text in
+    /// `content` or `part`, or a URL), `content` for an upload form with the whole file and
+    /// `part` for one with the first part of a multipart upload. Like the API, asset fields in
+    /// the query are refused.
     fn create_asset(
         &mut self,
-        mode: &str,
+        (mode, content_type): (&str, &str),
         body: Map<String, Value>,
         q: &HashMap<String, String>,
         raw: &[u8],
         now: u64,
     ) -> Outcome<Value> {
-        let multipart = mode == "part";
+        check_no_upload_options_in_query(q)?;
         let mut options = body;
-        if mode == "content" || multipart {
-            options = Map::new();
-            for (key, value) in q {
-                let value = if ["metadata", "tags", "processingOptions", "context"]
-                    .contains(&key.as_str())
-                {
-                    serde_json::from_str(value).map_err(|_| {
-                        invalid("metadata, tags, processingOptions and context must be JSON")
-                    })?
-                } else {
-                    value.clone().into()
-                };
-                options.insert(key.clone(), value);
+        let (multipart, mime, bytes, part_number, is_final, total);
+        if mode == "content" || mode == "part" {
+            let form = read_upload_form(content_type, raw)?;
+            let parsed = serde_json::from_str::<Value>(&form.options);
+            let Ok(Value::Object(form_options)) = parsed else {
+                return Err(invalid(
+                    "The options part must be a JSON object with the asset's fields",
+                ));
+            };
+            if let Some(unknown) = form_options
+                .keys()
+                .find(|key| !UPLOAD_OPTION_KEYS.contains(&key.as_str()))
+            {
+                return Err(validation("unknown-field", unknown));
             }
+            if !form_options.get("name").is_some_and(Value::is_string) {
+                return Err(validation("invalid-type", "name"));
+            }
+            options = form_options;
             if q.get("sizeInBytes")
-                .is_some_and(|size| *size != raw.len().to_string())
+                .is_some_and(|size| *size != form.file.len().to_string())
             {
                 return Err(invalid("sizeInBytes does not match the body"));
             }
+            multipart = mode == "part";
+            mime = q.get("contentType").cloned().unwrap_or_default();
+            bytes = form.file;
+            part_number = q
+                .get("partNumber")
+                .and_then(|number| number.parse().ok())
+                .unwrap_or(1);
+            is_final = q.get("isFinal").is_some_and(|value| value == "true");
+            total = match q.get("totalSizeInBytes") {
+                None => None,
+                Some(total) => Some(
+                    total
+                        .parse::<u64>()
+                        .map_err(|_| validation("invalid-type", "totalSizeInBytes"))?,
+                ),
+            };
+        } else {
+            // Plain text arrives as `content` or `part` in the JSON body.
+            let content = options.remove("content");
+            let part = options.remove("part");
+            options.remove("sizeInBytes");
+            let declared_total = options.remove("totalSizeInBytes");
+            multipart = part.is_some();
+            match content.or(part) {
+                None => {
+                    (mime, bytes, part_number, is_final, total) =
+                        (String::new(), Vec::new(), 1, false, None);
+                }
+                Some(text) => {
+                    let field = if multipart { "part" } else { "content" };
+                    let (Some(plain_text), Some(kind)) =
+                        (text["plainText"].as_str(), text["type"].as_str())
+                    else {
+                        return Err(validation("invalid-type", field));
+                    };
+                    mime = kind.to_owned();
+                    bytes = plain_text.as_bytes().to_vec();
+                    part_number = text["partNumber"].as_u64().unwrap_or(1);
+                    is_final = text["isFinal"] == true;
+                    total = match declared_total {
+                        None | Some(Value::Null) => None,
+                        Some(total) => Some(
+                            total
+                                .as_u64()
+                                .ok_or_else(|| validation("invalid-type", "totalSizeInBytes"))?,
+                        ),
+                    };
+                }
+            }
         }
+        let mime = mime.as_str();
+        let raw = bytes.as_slice();
         check_metadata(options.get("metadata"))?;
         if options.get("name").map_or("", text).is_empty() {
             return Err(invalid("Asset name is required"));
         }
         let website = options.contains_key("url");
-        let mime = q.get("contentType").map_or("", String::as_str);
         if !website && !is_accepted_upload_mime_type(mime) {
             let mut failure = fail(
                 ErrorCode::UnsupportedUploadType,
@@ -2134,15 +2321,6 @@ impl Backend {
             return Err(failure);
         }
         let kind = if website { "website" } else { asset_type(mime) };
-        let is_final = q.get("isFinal").is_some_and(|value| value == "true");
-        let total = match q.get("totalSizeInBytes") {
-            None => None,
-            Some(total) => Some(
-                total
-                    .parse::<u64>()
-                    .map_err(|_| validation("invalid-type", "totalSizeInBytes"))?,
-            ),
-        };
         if multipart {
             // Like the API: a declared total is checked before anything is stored, then a
             // single final part as the whole upload, then the part itself.
@@ -2186,10 +2364,6 @@ impl Backend {
             .cloned()
             .unwrap_or_else(|| json!({"keepContentAfterProcessing": false}));
         let keep = processing["keepContentAfterProcessing"] == true;
-        let part_number: u64 = q
-            .get("partNumber")
-            .and_then(|number| number.parse().ok())
-            .unwrap_or(1);
         // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
         let context = match options.get("context") {
             None | Some(Value::Null) => Vec::new(),
@@ -3670,5 +3844,126 @@ mod tests {
             refused > 0 && accepted > 0,
             "the scenario refuses and accepts metadata"
         );
+    }
+
+    /// A backend and a request to `POST /projects/project-1/assets?<query>` with `headers`.
+    fn upload(
+        backend: &mut Backend,
+        query: &str,
+        headers: &[(&'static str, &str)],
+        body: &[u8],
+    ) -> (u16, Value, HeaderMap) {
+        let url = reqwest::Url::parse(&format!(
+            "{}/projects/project-1/assets?{query}",
+            backend.options.api_base_url
+        ))
+        .unwrap();
+        let mut map = HeaderMap::new();
+        map.insert("x-api-key", backend.options.api_key.parse().unwrap());
+        for (name, value) in headers {
+            map.insert(*name, value.parse().unwrap());
+        }
+        let response = backend.handle(&Method::POST, &url, &map, body).unwrap();
+        let body = serde_json::from_slice(&response.body).unwrap();
+        (response.status, body, response.headers)
+    }
+
+    fn form(boundary: &str, options: &str, file: &[u8]) -> Vec<u8> {
+        [
+            format!("--{boundary}\r\nContent-Disposition: form-data; name=\"options\"\r\nContent-Type: application/json\r\n\r\n{options}\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file\"\r\nContent-Type: image/png\r\n\r\n").as_bytes(),
+            file,
+            format!("\r\n--{boundary}--\r\n").as_bytes(),
+        ]
+        .concat()
+    }
+
+    /// Like the API, a create that names asset fields in its query is refused with the fields,
+    /// before anything is stored, whether its body is JSON or an upload form.
+    #[test]
+    fn refuses_upload_options_in_the_query() {
+        let mut backend = Backend::new(MockOptions::new());
+        let text = br#"{"name":"note.txt","content":{"plainText":"hello","type":"text/plain"}}"#;
+        let (status, body, _) = upload(
+            &mut backend,
+            "wait=false&description=d&authorId=pupil-7&context=%7B%7D",
+            &[("content-type", "application/json")],
+            text,
+        );
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (400, Some("upload/options-in-query"))
+        );
+        assert_eq!(
+            body["details"]["fields"],
+            serde_json::json!(["description", "authorId", "context"])
+        );
+        let (status, body, _) = upload(
+            &mut backend,
+            "wait=false&contentType=image%2Fpng&name=cat.png",
+            &[
+                ("content-type", "multipart/form-data; boundary=b"),
+                ("x-calmlens-upload", "content"),
+            ],
+            &form("b", r#"{"name":"cat.png"}"#, b"png"),
+        );
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (400, Some("upload/options-in-query"))
+        );
+        assert_eq!(body["details"]["fields"], serde_json::json!(["name"]));
+        assert!(backend.storage.assets.is_empty());
+    }
+
+    /// A raw upload must be an upload form: its file's own type is refused with 415.
+    #[test]
+    fn refuses_a_raw_upload_that_is_not_a_form() {
+        let mut backend = Backend::new(MockOptions::new());
+        let (status, body, _) = upload(
+            &mut backend,
+            "wait=false&contentType=image%2Fpng",
+            &[
+                ("content-type", "image/png"),
+                ("x-calmlens-upload", "content"),
+            ],
+            b"png",
+        );
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (415, Some("request/unsupported-content-type"))
+        );
+        assert!(backend.storage.assets.is_empty());
+    }
+
+    /// A retried upload form with a new boundary replays the first response; the same key with
+    /// other options is refused as reused.
+    #[test]
+    fn upload_form_fingerprints_ignore_the_boundary_but_not_the_options() {
+        let mut backend = Backend::new(MockOptions::new());
+        let send = |backend: &mut Backend, boundary: &str, options: &str| {
+            upload(
+                backend,
+                "wait=false&contentType=image%2Fpng&sizeInBytes=3",
+                &[
+                    (
+                        "content-type",
+                        &format!("multipart/form-data; boundary={boundary}"),
+                    ),
+                    ("x-calmlens-upload", "content"),
+                    ("idempotency-key", "upload-1"),
+                ],
+                &form(boundary, options, b"png"),
+            )
+        };
+        let (status, first, _) = send(&mut backend, "first", r#"{"name":"cat.png"}"#);
+        assert_eq!((status, first["name"].as_str()), (200, Some("cat.png")));
+        let (status, replay, headers) = send(&mut backend, "second", r#"{"name":"cat.png"}"#);
+        assert_eq!((status, &replay), (200, &first));
+        assert_eq!(headers.get("idempotent-replayed").unwrap(), "true");
+        let (status, reused, _) = send(&mut backend, "third", r#"{"name":"dog.png"}"#);
+        assert_eq!(
+            (status, reused["code"].as_str()),
+            (409, Some("idempotency/key-reused"))
+        );
+        assert_eq!(backend.storage.assets.len(), 1);
     }
 }

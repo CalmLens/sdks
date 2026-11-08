@@ -11,7 +11,8 @@ require 'uri'
 class AutomaticMultipartTest < Minitest::Test
   MIB = 1024 * 1024
 
-  Sent = Struct.new(:verb, :path, :query, :key, :body, keyword_init: true)
+  # `body` is the file's bytes: an upload form's file part, a text upload's text or a later part.
+  Sent = Struct.new(:verb, :path, :query, :key, :options, :body, keyword_init: true)
 
   # Distinct bytes, so a part sent from the wrong offset shows.
   PERIOD = Array.new(251) { |index| (index * 7) % 251 }.pack('C*').freeze
@@ -36,8 +37,17 @@ class AutomaticMultipartTest < Minitest::Test
     transport = lambda do |request|
       uri = URI(request.url)
       body = request.body.respond_to?(:read) ? request.body.read.to_s : request.body.to_s
+      type = request.headers['Content-Type'].to_s
+      fields = nil
+      if type.start_with?('multipart/form-data')
+        text, body = CalmLens::Testing::FakeAPI.upload_form(body, type)
+        fields = JSON.parse(text)
+      elsif type == 'application/json'
+        fields = JSON.parse(body)
+        body = fields.delete('content')['plainText']
+      end
       record = Sent.new(verb: request.method, path: uri.path, query: URI.decode_www_form(uri.query.to_s).to_h,
-                        key: request.headers['Idempotency-Key'], body: body.b)
+                        key: request.headers['Idempotency-Key'], options: fields, body: body.b)
       sent << record
       answer = respond.arity == 1 ? respond.call(record) : respond.call(record, sent.size - 1)
       raise answer if answer.is_a?(Exception)
@@ -50,7 +60,7 @@ class AutomaticMultipartTest < Minitest::Test
   def test_content_larger_than_a_part_is_sent_in_parts_with_derived_keys
     client, sent = scripted(part_size_bytes: 5 * MIB)
     file = file_of(11 * MIB)
-    result = client.assets.classify(name: 'clip.mp4', content: { data: file, type: 'video/mp4' },
+    result = client.assets.classify(name: 'clip.mp4', content: { data: file, type: 'video/mp4' }, author_id: 'pupil-7',
                                     request_options: { idempotency_key: 'upload-1' })
 
     assert_equal 'completed', result.dig('upload', 'status')
@@ -62,6 +72,9 @@ class AutomaticMultipartTest < Minitest::Test
     assert_equal (11 * MIB).to_s, sent[0].query['totalSizeInBytes']
     # Whether to wait goes with the first part, which saves it for the upload.
     assert_equal(['true', nil, nil], sent.map { |request| request.query['wait'] })
+    # The first part's form carries the asset's fields; the URL never does.
+    assert_equal [{ 'name' => 'clip.mp4', 'authorId' => 'pupil-7' }, nil, nil], sent.map(&:options)
+    assert_equal(%w[contentType isFinal partNumber sizeInBytes totalSizeInBytes wait], sent[0].query.keys.sort)
     assert_equal file, sent.map(&:body).join
   end
 

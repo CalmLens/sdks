@@ -125,8 +125,11 @@ type CapturedRequest struct {
 	Path   string
 	Query  url.Values
 	Header http.Header
-	// Body is the decoded JSON body, or nil for empty and raw upload bodies.
+	// Body is the decoded JSON body (plain text arrives as its content.plainText), the options of
+	// an upload form, or nil for empty bodies and raw parts.
 	Body calmlens.JSON
+	// File is an upload form's file bytes, or nil for any other request.
+	File []byte
 	// RawBody holds the exact bytes sent, including upload content.
 	RawBody []byte
 	CDN     bool
@@ -766,6 +769,14 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 	if jsonBody(req.Header) && len(raw) > 0 {
 		_ = json.Unmarshal(raw, &captured.Body)
 	}
+	// An upload form's options and file are kept apart, as the API reads them.
+	formText, formFile, formErr := "", []byte(nil), error(nil)
+	if isUploadForm(req.Header) {
+		if formText, formFile, formErr = readUploadForm(req.Header, raw); formErr == nil {
+			_ = json.Unmarshal([]byte(formText), &captured.Body)
+			captured.File = formFile
+		}
+	}
 	m.requests = append(m.requests, captured)
 	m.requestCount++
 	header := http.Header{"X-Request-Id": {fmt.Sprintf("req_mock_%d", m.requestCount)}}
@@ -794,12 +805,16 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 	}
 	// HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
 	key := strings.Trim(req.Header.Get("Idempotency-Key"), " \t\r\n")
-	// Like the API, raw uploads are compared by query, Content-Type and length, not bytes.
-	compared := ""
+	// Like the API, raw uploads are compared by query, Content-Type and length, not bytes, and an
+	// upload form by its options and file length, not its boundary.
+	compared, contentType, length := "", req.Header.Get("Content-Type"), len(raw)
 	if jsonBody(req.Header) {
 		compared = string(raw)
 	}
-	fingerprint := strings.Join([]string{req.Method, req.URL.EscapedPath(), req.URL.RawQuery, req.Header.Get("Content-Type"), req.Header.Get("X-Calmlens-Upload"), strconv.Itoa(len(raw)), compared}, "\n")
+	if isUploadForm(req.Header) && formErr == nil {
+		compared, contentType, length = formText, "multipart/form-data", len(formFile)
+	}
+	fingerprint := strings.Join([]string{req.Method, req.URL.EscapedPath(), req.URL.RawQuery, contentType, req.Header.Get("X-Calmlens-Upload"), strconv.Itoa(length), compared}, "\n")
 	if len(req.Header.Values("Idempotency-Key")) > 0 {
 		if !validIdempotencyKey(key) {
 			return m.jsonResponse(req, header, nil, fail(calmlens.CodeInvalidIdempotencyKey)), nil
@@ -1211,7 +1226,7 @@ func (m *MockServerClient) dispatch(method string, parts []string, q url.Values,
 		case len(parts) == 5 && parts[2] == "assets" && parts[4] == "timeline" && method == "GET":
 			return m.listTimeline(parts[3], q)
 		case route == "assets" && method == "POST":
-			return m.createAsset(headers.Get("X-CalmLens-Upload"), headers.Get("Content-Type"), body, q, raw, now)
+			return m.createAsset(headers, body, q, raw, now)
 		}
 		return nil, errUnknownRoute
 	}
@@ -1443,26 +1458,55 @@ func (m *MockServerClient) lensRoute(method, id, suffix string, body calmlens.JS
 }
 
 // createAsset handles POST .../assets. The X-CalmLens-Upload header picks the mode: absent is
-// a JSON body, "content" raw file content and "part" the raw first part of a multipart upload.
-func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON, q url.Values, raw []byte, now int64) (any, error) {
+// a JSON body (a URL, or plain text in content or part), "content" an upload form with the whole
+// file and "part" an upload form with the first part of a multipart upload. Like the API, asset
+// fields in the query are refused.
+func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, q url.Values, raw []byte, now int64) (any, error) {
+	if err := optionsInQuery(q); err != nil {
+		return nil, err
+	}
+	mode := headers.Get("X-CalmLens-Upload")
 	multipart := mode == "part"
 	options := body
-	if mode == "content" || multipart {
+	mime := q.Get("contentType")
+	isFinal := q.Get("isFinal") == "true"
+	declaredTotal := q.Get("totalSizeInBytes")
+	hasContent := mode == "content" || multipart
+	if hasContent {
+		text, file, err := readUploadForm(headers, raw)
+		if err != nil {
+			return nil, err
+		}
+		if options, err = formOptions(text); err != nil {
+			return nil, err
+		}
+		raw = file
+		if size := q.Get("sizeInBytes"); size != "" && size != strconv.Itoa(len(raw)) {
+			return nil, fail(calmlens.CodeInvalidUploadPayload)
+		}
+	} else if body["content"] != nil || body["part"] != nil {
+		field := "content"
+		if body["part"] != nil {
+			field, multipart = "part", true
+		}
+		text := asJSON(body[field])
+		plainText, isText := text["plainText"].(string)
+		textType, isType := text["type"].(string)
+		if !isText || !isType {
+			return nil, validation("validation/invalid-type", field)
+		}
 		options = calmlens.JSON{}
-		for key, values := range q {
-			value := values[0]
-			if key == "metadata" || key == "tags" || key == "processingOptions" || key == "context" {
-				var parsed any
-				if err := json.Unmarshal([]byte(value), &parsed); err != nil {
-					return nil, fail(calmlens.CodeInvalidUploadPayload)
-				}
-				options[key] = parsed
-			} else {
+		for key, value := range body {
+			if key != "content" && key != "part" && key != "sizeInBytes" && key != "totalSizeInBytes" {
 				options[key] = value
 			}
 		}
-		if size := q.Get("sizeInBytes"); size != "" && size != strconv.Itoa(len(raw)) {
-			return nil, fail(calmlens.CodeInvalidUploadPayload)
+		raw, mime, hasContent = []byte(plainText), textType, true
+		if multipart {
+			isFinal = text["isFinal"] == true
+			if total, ok := body["totalSizeInBytes"].(float64); ok {
+				declaredTotal = strconv.FormatFloat(total, 'f', -1, 64)
+			}
 		}
 	}
 	if err := checkMetadata(options["metadata"]); err != nil {
@@ -1472,16 +1516,9 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 		return nil, fail(calmlens.CodeInvalidUploadPayload)
 	}
 	// Like the API: content and a multipart upload's first part need a type CalmLens can moderate.
-	if mode == "content" || multipart {
-		contentType := bodyType
-		if values, ok := q["contentType"]; ok {
-			contentType = values[0]
-		}
-		if !contract.AcceptedUploadMimeType(contentType) {
-			return nil, &apiError{code: calmlens.CodeUnsupportedUploadType, status: http.StatusUnsupportedMediaType, details: calmlens.JSON{"mimeType": contentType, "source": "calmlens"}}
-		}
+	if hasContent && !contract.AcceptedUploadMimeType(mime) {
+		return nil, &apiError{code: calmlens.CodeUnsupportedUploadType, status: http.StatusUnsupportedMediaType, details: calmlens.JSON{"mimeType": mime, "source": "calmlens"}}
 	}
-	mime := q.Get("contentType")
 	lower := strings.ToLower(mime)
 	kind := calmlens.AssetTypeFile
 	if options["url"] != nil {
@@ -1501,10 +1538,10 @@ func (m *MockServerClient) createAsset(mode, bodyType string, body calmlens.JSON
 	}
 	// wait=false queues the asset; a multipart upload saves the choice for its final part.
 	queue := q.Get("wait") == "false"
-	open := multipart && q.Get("isFinal") != "true"
+	open := multipart && !isFinal
 	var total *int64
 	if multipart {
-		if declared := q.Get("totalSizeInBytes"); declared != "" {
+		if declared := declaredTotal; declared != "" {
 			size, err := strconv.ParseInt(declared, 10, 64)
 			if err != nil {
 				return nil, fail(calmlens.CodeInvalidUploadPayload)

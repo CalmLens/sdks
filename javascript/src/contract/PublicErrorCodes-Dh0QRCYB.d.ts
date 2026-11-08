@@ -48,6 +48,7 @@ declare const PUBLIC_ERROR_CODES: {
   readonly UPLOADS_PAUSED: RequestErrorCode;
   readonly UNSUPPORTED_UPLOAD_TYPE: RequestErrorCode;
   readonly INVALID_UPLOAD_PAYLOAD: RequestErrorCode;
+  readonly UPLOAD_OPTIONS_IN_QUERY: RequestErrorCode;
   readonly USE_UPLOAD_PART: RequestErrorCode;
   readonly UPLOAD_NOT_OPEN: RequestErrorCode;
   readonly INVALID_UPLOAD_PART_NUMBER: RequestErrorCode;

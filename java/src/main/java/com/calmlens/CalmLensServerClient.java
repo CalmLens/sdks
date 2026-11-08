@@ -1178,11 +1178,14 @@ public final class CalmLensServerClient implements AutoCloseable {
     return body;
   }
 
-  /** Sends an upload: text keeps the API deadline, binary content uses the upload deadline. */
+  /**
+   * Sends an upload: text keeps the API deadline, binary content uses the upload deadline. A null
+   * {@code mode} is a JSON body, without {@code X-CalmLens-Upload}.
+   */
   private Reply upload(String path, JsonObject query, Transport.Body body, String contentType, String mode, String key, boolean text) {
     Map<String, String> headers = baseHeaders("application/json");
     if (contentType != null) headers.put("Content-Type", contentType);
-    headers.put("X-CalmLens-Upload", mode);
+    if (mode != null) headers.put("X-CalmLens-Upload", mode);
     headers.put("Idempotency-Key", idempotencyKey(key));
     return execute(new Call("POST", baseUrl + path + query(query), headers, body, text ? timeout : uploadTimeout, true));
   }
@@ -1196,7 +1199,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     if (List.of("content", "part", "url").stream().filter(k -> o.has(k) && !o.get(k).isJsonNull()).count() != 1)
       throw payloadError("Supply exactly one of content, part, or url");
     if (options.contextValue() != null) {
-      // Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+      // Only the posts CalmLens uses are sent, which keeps the upload's options small.
       List<Models.ModerationContextItem> items = Models.selectModerationContextItems(options.contextValue().items());
       o.add("context", Json.GSON.toJsonTree(new Models.ModerationContext(items)));
     }
@@ -1232,16 +1235,33 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (!mime.startsWith("image/") && o.has("totalSizeInBytes") && !o.get("totalSizeInBytes").isJsonNull())
         checkUploadSize(o.get("totalSizeInBytes").getAsLong(), mime, true);
     } else checkUploadSize(body.length(), mime, false);
-    for (String k : List.of("name", "description", "processingOptions", "visibility", "metadata", "tags", "authorId", "context", "externalId", "externalUrl", "folderId", "uploadPresetId", "totalSizeInBytes"))
-      if (o.has(k)) query.add(k, o.get(k));
+    // The asset's fields go in the body, never the query, which proxies and servers log.
+    JsonObject fields = UploadForm.fields(o);
+    if (text) {
+      JsonObject json = fields.deepCopy();
+      JsonObject plain = new JsonObject();
+      plain.add("plainText", encoded.get("plainText"));
+      plain.addProperty("type", type);
+      if (multipart) {
+        if (encoded.has("partNumber") && !encoded.get("partNumber").isJsonNull()) plain.add("partNumber", encoded.get("partNumber"));
+        plain.addProperty("isFinal", flag(encoded, "isFinal"));
+        json.add("part", plain);
+        for (String k : List.of("sizeInBytes", "totalSizeInBytes"))
+          if (o.has(k) && !o.get(k).isJsonNull()) json.add(k, o.get(k));
+      } else json.add("content", plain);
+      Transport.Body jsonBody = Transport.Body.ofBytes(Json.write(json).getBytes(StandardCharsets.UTF_8));
+      return decode(upload(project("assets"), query, jsonBody, "application/json", null, key, true), Models.Asset.class);
+    }
     query.addProperty("contentType", type);
-    if (split) return uploadInParts(query, body, type, key);
+    if (split) return uploadInParts(fields, query, body, type, key);
     if (body.length() >= 0) query.addProperty("sizeInBytes", body.length());
     if (multipart) {
       query.addProperty("partNumber", 1);
       query.addProperty("isFinal", flag(encoded, "isFinal"));
+      if (o.has("totalSizeInBytes") && !o.get("totalSizeInBytes").isJsonNull()) query.add("totalSizeInBytes", o.get("totalSizeInBytes"));
     }
-    return decode(upload(project("assets"), query, body, type, multipart ? "part" : "content", key, text), Models.Asset.class);
+    UploadForm.Built form = UploadForm.build(fields, type, body);
+    return decode(upload(project("assets"), query, form.body(), form.contentType(), multipart ? "part" : "content", key, false), Models.Asset.class);
   }
 
   /**
@@ -1250,7 +1270,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    * carries {@code <key>:part-<n>}, so each is retried on its own and repeating the call with the
    * same key replays the parts the API already has and sends the rest.
    */
-  private Models.Asset uploadInParts(JsonObject query, Transport.Body body, String type, String key) {
+  private Models.Asset uploadInParts(JsonObject fields, JsonObject query, Transport.Body body, String type, String key) {
     String base = idempotencyKey(key);
     long total = body.length();
     long count = (total + partSizeBytes - 1) / partSizeBytes;
@@ -1259,7 +1279,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     query.addProperty("partNumber", 1);
     query.addProperty("isFinal", false);
     query.addProperty("totalSizeInBytes", total);
-    Models.Asset asset = decode(upload(project("assets"), query, first, type, "part", base, false), Models.Asset.class);
+    UploadForm.Built form = UploadForm.build(fields, type, first);
+    Models.Asset asset = decode(upload(project("assets"), query, form.body(), form.contentType(), "part", base, false), Models.Asset.class);
     String path = "/assets/" + id(asset.id()) + "/part";
     for (long number = 2; number <= count; ) {
       boolean last = number == count;

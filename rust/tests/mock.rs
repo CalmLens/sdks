@@ -218,8 +218,20 @@ async fn declared_payload_sizes_are_checked_for_first_and_later_parts() {
                 if declared == 5 {
                     assert_eq!(result.unwrap().id, "asset-1");
                     let request = mock.last_request().unwrap();
-                    assert_eq!(request.query_param("sizeInBytes"), Some("5"));
-                    assert_eq!(request.body, b"hello");
+                    if continuation {
+                        assert_eq!(request.query_param("sizeInBytes"), Some("5"));
+                        assert_eq!(request.body, b"hello");
+                    } else if request.header("x-calmlens-upload").is_none() {
+                        // A first text part is JSON, with its declared size beside it.
+                        let body = request.json().unwrap();
+                        assert_eq!(
+                            (&body["part"]["plainText"], &body["sizeInBytes"]),
+                            (&json!("hello"), &json!(5))
+                        );
+                    } else {
+                        assert_eq!(request.query_param("sizeInBytes"), Some("5"));
+                        assert_eq!(common::upload_form(&request).1.body, b"hello");
+                    }
                 } else {
                     assert_eq!(result.unwrap_err().code(), &ErrorCode::InvalidUploadPayload);
                     assert_eq!(mock.requests().len(), before);
@@ -305,8 +317,15 @@ async fn binary_reader_and_stream_content_arrive_unchanged() {
         ))
         .await
         .unwrap();
-    for sent in mock.requests() {
-        assert_eq!(sent.body, data);
+    let names = ["all-bytes.png", "reader.png", "stream.png"];
+    assert_eq!(mock.requests().len(), names.len());
+    for (sent, name) in mock.requests().iter().zip(names) {
+        let (options, file) = common::upload_form(sent);
+        assert_eq!(options, json!({ "name": name }));
+        assert_eq!(
+            (file.content_type.as_str(), file.body),
+            ("image/png", data.clone())
+        );
         assert_eq!(sent.query_param("sizeInBytes"), Some("256"));
         assert_eq!(sent.query_param("contentType"), Some("image/png"));
         assert_eq!(sent.query_param("wait"), Some("false"));
@@ -354,7 +373,7 @@ async fn files_stream_from_disk() {
         .unwrap();
     std::fs::remove_file(&path).unwrap();
     let sent = mock.last_request().unwrap();
-    assert_eq!(sent.body, b"from disk");
+    assert_eq!(common::upload_form(&sent).1.body, b"from disk");
     assert_eq!(sent.query_param("sizeInBytes"), Some("9"));
 }
 

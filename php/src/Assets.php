@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CalmLens;
 
 use CalmLens\Internal\UploadBody;
+use CalmLens\Internal\UploadForm;
 use CalmLens\Internal\Values;
 use GuzzleHttp\Psr7\LimitStream;
 use Psr\Http\Message\StreamInterface;
@@ -248,7 +249,7 @@ final class Assets extends Resource
             if (!is_array($api['context']) || !is_array($api['context']['items'] ?? null)) {
                 Values::invalid('context.items must be a list of earlier posts');
             }
-            // Only the posts CalmLens uses are sent, which keeps a raw upload's query short.
+            // Only the posts CalmLens uses are sent.
             $api['context'] = ['items' => ModerationContext::select($api['context']['items'])];
         }
         if (array_key_exists('url', $api)) {
@@ -286,31 +287,63 @@ final class Assets extends Resource
         } elseif ($direct) {
             self::checkSize($baseMime, $body->getSize(), $split);
         }
-        $query = array_intersect_key($api, array_flip(['name', 'description', 'processingOptions', 'visibility', 'metadata', 'tags', 'authorId', 'context', 'externalId', 'externalUrl', 'folderId', 'uploadPresetId']));
-        $query += ['wait' => $wait, 'contentType' => $mime, 'sizeInBytes' => $body->getSize()];
-        if ($split) {
-            return $this->submitInParts($query, $mime, $body, $request);
+        // The asset's fields travel in the body, never the URL, which proxies and servers log.
+        $fields = array_filter(array_intersect_key($api, array_flip(UploadForm::FIELDS)), fn ($value) => $value !== null);
+        $total = $multipart ? ($api['totalSizeInBytes'] ?? null) : null;
+        if (array_key_exists('plainText', $content)) {
+            $this->checkFirstPart($multipart, $baseMime, $total, $body->getSize());
+            return self::asset($this->session->request('POST', $this->session->project('assets'), query: ['wait' => $wait],
+                body: $fields + self::textBody($api, $content, $multipart), idempotent: true, options: $request));
         }
+        $query = ['wait' => $wait, 'contentType' => $mime, 'sizeInBytes' => $body->getSize()];
+        if ($split) {
+            return $this->submitInParts($fields, $query, $mime, $body, $request);
+        }
+        $this->checkFirstPart($multipart, $baseMime, $total, $body->getSize());
         if ($multipart) {
-            $total = $api['totalSizeInBytes'] ?? null;
+            $query += ['partNumber' => 1, 'isFinal' => $content['isFinal'] ?? false, 'totalSizeInBytes' => $total];
+        }
+        return $this->sendForm($fields, $query, $mime, $body, $multipart, $request);
+    }
+
+    /** Plain text's JSON body after its fields: `content`, or a first `part` with its sizes. */
+    private static function textBody(array $api, array $content, bool $multipart): array
+    {
+        $text = ['plainText' => $content['plainText'], 'type' => $content['type']];
+        if (!$multipart) {
+            return ['content' => $text];
+        }
+        $part = $text + (isset($content['partNumber']) ? ['partNumber' => $content['partNumber']] : []) + ['isFinal' => $content['isFinal'] ?? false];
+        return array_filter(['part' => $part, 'sizeInBytes' => $content['sizeInBytes'] ?? $api['sizeInBytes'] ?? null,
+            'totalSizeInBytes' => $api['totalSizeInBytes'] ?? null], fn ($value) => $value !== null);
+    }
+
+    /** Sends file content or a first part as an upload form: the fields in its options part, the bytes in its file part. */
+    private function sendForm(array $fields, array $query, string $mime, StreamInterface $body, bool $multipart, array $request): array
+    {
+        [$form, $type] = UploadForm::build($fields, $mime, $body);
+        return self::asset($this->session->request('POST', $this->session->project('assets'), query: $query, raw: $form,
+            headers: ['Content-Type' => $type, 'X-CalmLens-Upload' => $multipart ? 'part' : 'content'], idempotent: true,
+            options: $request, upload: true));
+    }
+
+    /** Refuses a first part's declared total the API would refuse, before anything is sent. */
+    private function checkFirstPart(bool $multipart, string $baseMime, mixed $total, ?int $size): void
+    {
+        if ($multipart) {
             if ($total !== null && (!is_int($total) || $total <= 0
-                || (!$this->session->deferUploadChecks && $total < $body->getSize()))) {
+                || (!$this->session->deferUploadChecks && $total < $size))) {
                 Values::invalid('Invalid totalSizeInBytes', ErrorCodes::INVALID_UPLOAD_PAYLOAD);
             }
             if (str_starts_with($baseMime, 'image/') && !$this->session->deferUploadChecks) {
-                $size = $total ?? $body->getSize();
-                if ($size > self::MAX_MULTIPART_IMAGE_BYTES) {
+                if (($total ?? $size) > self::MAX_MULTIPART_IMAGE_BYTES) {
                     self::tooLarge('Multipart image uploads cannot exceed 20 MiB', self::MAX_MULTIPART_IMAGE_BYTES);
                 }
             } elseif (!$this->session->deferUploadChecks) {
                 // A declared whole-file size over the limit for parts can never finish.
                 self::checkSize($baseMime, $total, true);
             }
-            $query += ['partNumber' => 1, 'isFinal' => $content['isFinal'] ?? false, 'totalSizeInBytes' => $total];
         }
-        return self::asset($this->session->request('POST', $this->session->project('assets'), query: $query, raw: $body,
-            headers: ['Content-Type' => $mime, 'X-CalmLens-Upload' => $multipart ? 'part' : 'content'], idempotent: true, options: $request,
-            upload: !array_key_exists('plainText', $content)));
     }
 
     /**
@@ -320,7 +353,7 @@ final class Assets extends Resource
      * the API already has and sends the rest. A part the API already has is skipped, and a final
      * part that finds the upload completed reads the asset back.
      */
-    private function submitInParts(array $query, string $mime, StreamInterface $body, array $request): array
+    private function submitInParts(array $fields, array $query, string $mime, StreamInterface $body, array $request): array
     {
         $total = (int) $body->getSize();
         $partSize = $this->session->partSizeBytes;
@@ -334,9 +367,7 @@ final class Assets extends Resource
         $first = $piece(1);
         $query['sizeInBytes'] = $first->getSize();
         $query += ['partNumber' => 1, 'isFinal' => false, 'totalSizeInBytes' => $total];
-        $asset = self::asset($this->session->request('POST', $this->session->project('assets'), query: $query, raw: $first,
-            headers: ['Content-Type' => $mime, 'X-CalmLens-Upload' => 'part'], idempotent: true,
-            options: ['idempotencyKey' => $key] + $request, upload: true));
+        $asset = $this->sendForm($fields, $query, $mime, $first, true, ['idempotencyKey' => $key] + $request);
         $path = '/assets/' . Values::segment($asset['id']) . '/part';
         for ($number = 2; $number <= $count;) {
             $final = $number === $count;

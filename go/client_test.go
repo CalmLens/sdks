@@ -84,6 +84,31 @@ func (h *harness) body() JSON {
 	json.Unmarshal(h.bodies[len(h.bodies)-1], &result)
 	return result
 }
+
+// form reads request i's upload form: its options, the file part's type and the file's bytes.
+func (h *harness) form(t *testing.T, i int) (JSON, string, []byte) {
+	t.Helper()
+	options, fileType, file := readUploadForm(t, fmt.Sprintf("request %d", i+1), h.bodies[i], h.calls[i].Header.Get("Content-Type"))
+	var fields JSON
+	if err := json.Unmarshal(options, &fields); err != nil {
+		t.Fatal(err)
+	}
+	return fields, fileType, file
+}
+
+// transportQuery fails unless request i's query holds only transport values: an upload's fields
+// travel in its body, never in the URL that proxies and servers log.
+func (h *harness) transportQuery(t *testing.T, i int) {
+	t.Helper()
+	for key := range h.calls[i].URL.Query() {
+		switch key {
+		case "wait", "contentType", "sizeInBytes", "partNumber", "isFinal", "totalSizeInBytes":
+		default:
+			t.Fatalf("request %d sent %s in its URL: %s", i+1, key, h.calls[i].URL)
+		}
+	}
+}
+
 func TestTextAndRawUploads(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
@@ -91,25 +116,39 @@ func TestTextAndRawUploads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(h.bodies[0]) != "héllo 🌍" || h.last().Header.Get("X-Api-Key") != "key" || h.last().Header.Get("Content-Type") != "text/plain" {
-		t.Fatal("incorrect body or headers")
+	// Text goes as JSON with the asset's fields; only wait is in the query.
+	want := JSON{"name": "text", "metadata": []any{map[string]any{"id": "x", "value": false}}, "tags": []any{"a b", "c"}, "processingOptions": map[string]any{"keepContentAfterProcessing": false}, "content": map[string]any{"plainText": "héllo 🌍", "type": "text/plain"}}
+	if !reflect.DeepEqual(h.body(), want) || h.last().Header.Get("X-Api-Key") != "key" || h.last().Header.Get("Content-Type") != "application/json" || h.last().Header.Get("X-CalmLens-Upload") != "" {
+		t.Fatalf("text upload %s %v", h.bodies[0], h.last().Header)
 	}
-	q := h.last().URL.Query()
-	if q.Get("wait") != "true" || q.Get("name") != "text" || q.Get("metadata") != `[{"id":"x","value":false}]` || q.Get("tags") != `["a b","c"]` || q.Get("processingOptions") != `{"keepContentAfterProcessing":false}` {
-		t.Fatal(q)
+	if h.last().URL.RawQuery != "wait=true" {
+		t.Fatal(h.last().URL)
 	}
 	if !strings.Contains(h.last().URL.EscapedPath(), "p%20%2F%3F") {
 		t.Fatal(h.last().URL)
 	}
-	forms := []Content{{PlainText: Ptr("abc")}, {Base64: Ptr("data:text/plain;base64,YWJj")}, {Bytes: []byte("abc")}, {Data: strings.NewReader("abc"), SizeInBytes: Ptr(int64(3))}}
+	// Bytes in every representation go as an upload form whose file part holds them as they are.
+	forms := []Content{{Base64: Ptr("data:text/plain;base64,YWJj")}, {Bytes: []byte("abc")}, {Data: strings.NewReader("abc"), SizeInBytes: Ptr(int64(3))}, {Data: io.MultiReader(strings.NewReader("abc"))}}
 	for _, content := range forms {
-		content.Type = "text/plain"
-		_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x", Content: &content})
+		content.Type = "text/csv"
+		_, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x", Description: Ptr("rows"), Content: &content})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(h.bodies[len(h.bodies)-1]) != "abc" {
-			t.Fatal("payload mismatch")
+		last := len(h.calls) - 1
+		options, fileType, file := h.form(t, last)
+		if !reflect.DeepEqual(options, JSON{"name": "x", "description": "rows"}) || fileType != "text/csv" || string(file) != "abc" || h.last().Header.Get("X-CalmLens-Upload") != "content" {
+			t.Fatalf("form %v %q %q", options, fileType, file)
+		}
+		h.transportQuery(t, last)
+		if q := h.last().URL.Query(); q.Get("contentType") != "text/csv" {
+			t.Fatal(h.last().URL)
+		}
+		// The whole form's length is sent when the file's size is known.
+		if content.Data == nil || content.SizeInBytes != nil {
+			if h.last().ContentLength != int64(len(h.bodies[last])) {
+				t.Fatal("Content-Length", h.last().ContentLength, len(h.bodies[last]))
+			}
 		}
 	}
 	_, err = c.Assets.Classify(ctx, SubmitAssetOptions{Name: "site", URL: "https://example.com", Metadata: []MetadataItem{{ID: "a", Value: 1}}})
@@ -120,6 +159,43 @@ func TestTextAndRawUploads(t *testing.T) {
 		t.Fatal("JSON metadata must remain an array")
 	}
 }
+
+// The first part of a multipart upload carries the asset's fields in its body too: plain text
+// as JSON, bytes in the form's options part.
+func TestFirstPartsCarryTheAssetFieldsInTheirBody(t *testing.T) {
+	c, h := setup(t)
+	ctx := context.Background()
+	thread := &ModerationContext{Items: []ModerationContextItem{{Text: "earlier", AuthorID: Ptr("user-1")}}}
+	total := int64(6 * mib)
+	fields := SubmitAssetOptions{Name: "clip.mp4", Description: Ptr("a clip"), AuthorID: Ptr("user-2"), Context: thread, TotalSizeInBytes: &total}
+	binary := fields
+	binary.Part = &Content{Type: "video/mp4", Bytes: fileOf(5 * mib)}
+	if _, err := c.Assets.Create(ctx, binary); err != nil {
+		t.Fatal(err)
+	}
+	options, fileType, file := h.form(t, 0)
+	wantFields := JSON{"name": "clip.mp4", "description": "a clip", "authorId": "user-2", "context": map[string]any{"items": []any{map[string]any{"text": "earlier", "authorId": "user-1"}}}}
+	if !reflect.DeepEqual(options, wantFields) || fileType != "video/mp4" || !bytes.Equal(file, fileOf(5*mib)) || h.last().Header.Get("X-CalmLens-Upload") != "part" {
+		t.Fatalf("first part form %v %q", options, fileType)
+	}
+	h.transportQuery(t, 0)
+	if q := h.last().URL.Query(); q.Get("totalSizeInBytes") != "6291456" || q.Get("partNumber") != "1" || q.Get("isFinal") != "false" || q.Get("sizeInBytes") != "5242880" {
+		t.Fatal(h.last().URL)
+	}
+	text := fields
+	text.Name = "notes.txt"
+	text.Part = &Content{Type: "text/plain", PlainText: Ptr("hi"), IsFinal: true}
+	text.TotalSizeInBytes = Ptr(int64(2))
+	if _, err := c.Assets.Create(ctx, text); err != nil {
+		t.Fatal(err)
+	}
+	wantText := JSON{"name": "notes.txt", "description": "a clip", "authorId": "user-2", "context": wantFields["context"], "part": map[string]any{"plainText": "hi", "type": "text/plain", "partNumber": json.Number("1"), "isFinal": true}, "totalSizeInBytes": json.Number("2")}
+	var sent JSON
+	if err := decodeJSON(h.bodies[1], &sent); err != nil || !reflect.DeepEqual(sent, wantText) || h.last().URL.RawQuery != "wait=false" || h.last().Header.Get("X-CalmLens-Upload") != "" {
+		t.Fatalf("text part %s %s", h.bodies[1], h.last().URL)
+	}
+}
+
 func TestMultipartLeavesTheWaitChoiceToTheServer(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
@@ -184,8 +260,19 @@ func TestIdempotencyKeysAreSentAndReusedAcrossRetries(t *testing.T) {
 		t.Fatal("key not reused", key)
 	}
 	for i := range h.bodies {
-		if string(h.bodies[i]) != "hello" {
+		if !bytes.Equal(h.bodies[i], h.bodies[0]) || !strings.Contains(string(h.bodies[i]), `"plainText":"hello"`) {
 			t.Fatalf("attempt %d sent %q", i, h.bodies[i])
+		}
+	}
+	// A file the SDK can read again is sent again whole in its form.
+	h.next = []reply{{err: errors.New("connection reset")}}
+	sent := len(h.calls)
+	if _, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x", Content: &Content{Type: "application/pdf", Data: bytes.NewReader([]byte("%PDF"))}}); err != nil || len(h.calls) != sent+2 {
+		t.Fatal(err, len(h.calls)-sent)
+	}
+	for i := sent; i < len(h.calls); i++ {
+		if _, _, file := h.form(t, i); string(file) != "%PDF" {
+			t.Fatalf("attempt %d sent %q", i-sent, file)
 		}
 	}
 	if _, err = c.Assets.Create(ctx, SubmitAssetOptions{Name: "x", Content: &Content{Type: "text/plain", PlainText: Ptr("hello")}}); err != nil {
@@ -615,7 +702,7 @@ func TestWithRequestOptionsChangesRetriesAndSharesTheLensCache(t *testing.T) {
 
 func TestUploadTimeoutBoundsBinaryUploadsOnly(t *testing.T) {
 	hang := roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if r.URL.Query().Get("contentType") == "text/plain" {
+		if r.Header.Get("Content-Type") == "application/json" {
 			return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"id":"a"}`)), Request: r}, nil
 		}
 		<-r.Context().Done()

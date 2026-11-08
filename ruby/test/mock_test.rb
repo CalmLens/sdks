@@ -326,7 +326,83 @@ class MockTest < Minitest::Test
     mock = CalmLens::MockServerClient.new
     mock.assets.classify(name: 'text', content: { plain_text: 'hi', type: 'text/plain' })
     mock.requests[0].body.replace('changed')
-    assert_equal 'hi', mock.requests[0].body
+    assert_equal 'hi', mock.requests[0].json.dig('content', 'plainText')
     assert_empty CalmLens::MockServerClient.new.requests
+  end
+
+  PRIVATE_FIELDS = { description: 'Private description', author_id: 'pupil-7',
+                     context: { items: [{ text: 'Another pupil wrote this', author_id: 'pupil-8' }] } }.freeze
+  EARLIER_POSTS = { 'items' => [{ 'text' => 'Another pupil wrote this', 'authorId' => 'pupil-8' }] }.freeze
+
+  # Upload fields such as earlier posts, author IDs and descriptions travel in the body, so a
+  # request's recorded query (and URL) holds only transport values.
+  def test_uploads_send_their_fields_in_the_body_and_only_transport_values_in_the_query
+    mock = CalmLens::MockServerClient.new
+    text = mock.text.classify(text: 'Same to you', **PRIVATE_FIELDS)
+    file = mock.assets.create(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, **PRIVATE_FIELDS)
+    sent_text, sent_file = mock.requests
+
+    assert_equal [{ 'wait' => 'true' }, { 'wait' => 'false', 'contentType' => 'image/png', 'sizeInBytes' => '5' }],
+                 [sent_text.query, sent_file.query]
+    [sent_text, sent_file].each do |request|
+      ['Private description', 'pupil-7', 'pupil-8', 'Another pupil'].each do |value|
+        refute_includes URI.decode_www_form_component(request.url), value
+      end
+    end
+    assert_equal [{ 'plainText' => 'Same to you', 'type' => 'text/plain' }, 'pupil-7', EARLIER_POSTS],
+                 sent_text.json.values_at('content', 'authorId', 'context')
+    assert_nil sent_text.form
+    assert_equal({ 'options' => { 'name' => 'photo.png', 'description' => 'Private description', 'authorId' => 'pupil-7',
+                                  'context' => EARLIER_POSTS },
+                   'file' => 'hello' }, sent_file.form)
+    [text, file].each { |asset| assert_equal ['Private description', 'pupil-7'], asset.values_at('description', 'authorId') }
+  end
+
+  def form_body(boundary, options, file)
+    "--#{boundary}\r\nContent-Disposition: form-data; name=\"options\"\r\nContent-Type: application/json\r\n\r\n" \
+      "#{JSON.generate(options)}\r\n--#{boundary}\r\nContent-Disposition: form-data; name=\"file\"\r\n" \
+      "Content-Type: image/png\r\n\r\n#{file}\r\n--#{boundary}--\r\n"
+  end
+
+  # Sends a request to the mock as a client of another SDK would, and returns the response.
+  def raw_upload(mock, query, body, content_type, key: nil)
+    headers = { 'X-Api-Key' => mock.instance_variable_get(:@api_key), 'Content-Type' => content_type,
+                'X-CalmLens-Upload' => 'content' }
+    headers['Idempotency-Key'] = key if key
+    request = CalmLens::Transport::Request.new(method: 'POST', url: "#{mock.base_url}/projects/project-1/assets?#{query}",
+                                               headers: headers, body: body)
+    mock.send(:receive, request)
+  end
+
+  def test_the_mock_refuses_upload_fields_in_the_query_before_storing_anything
+    mock = CalmLens::MockServerClient.new
+    form = form_body('b1', { name: 'photo.png' }, 'hello')
+    response = raw_upload(mock, 'wait=false&contentType=image%2Fpng&context=%7B%7D&authorId=pupil-7', form,
+                          'multipart/form-data; boundary=b1')
+    body = JSON.parse(response.body)
+    assert_equal [400, CalmLens::ErrorCodes::UPLOAD_OPTIONS_IN_QUERY, { 'fields' => %w[authorId context] }],
+                 [response.status, body['code'], body['details']]
+    assert_empty mock.state.assets
+  end
+
+  def test_the_mock_refuses_a_raw_upload_that_is_not_an_upload_form
+    mock = CalmLens::MockServerClient.new
+    response = raw_upload(mock, 'wait=false&contentType=image%2Fpng', 'hello', 'image/png')
+    assert_equal [415, CalmLens::ErrorCodes::UNSUPPORTED_CONTENT_TYPE], [response.status, JSON.parse(response.body)['code']]
+    assert_empty mock.state.assets
+  end
+
+  # Like the API, a retried upload form matches by its options and file, not its boundary.
+  def test_an_upload_form_retried_with_a_new_boundary_replays_and_other_options_reuse_the_key
+    mock = CalmLens::MockServerClient.new
+    query = 'wait=false&contentType=image%2Fpng'
+    first = raw_upload(mock, query, form_body('b1', { name: 'a.png' }, 'hello'), 'multipart/form-data; boundary=b1', key: 'k1')
+    again = raw_upload(mock, query, form_body('b2', { name: 'a.png' }, 'hello'), 'multipart/form-data; boundary=b2', key: 'k1')
+    other = raw_upload(mock, query, form_body('b3', { name: 'b.png' }, 'hello'), 'multipart/form-data; boundary=b3', key: 'k1')
+
+    assert_equal [200, 'true'], [again.status, again.headers['idempotent-replayed']]
+    assert_equal JSON.parse(first.body)['id'], JSON.parse(again.body)['id']
+    assert_equal CalmLens::ErrorCodes::IDEMPOTENCY_KEY_REUSED, JSON.parse(other.body)['code']
+    assert_equal 1, mock.state.assets.size
   end
 end

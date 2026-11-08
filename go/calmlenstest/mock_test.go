@@ -172,7 +172,8 @@ func TestMockCapturesRequestsAndAcceptsClientOptions(t *testing.T) {
 		t.Fatalf("%+v", create)
 	}
 	upload := requests[1]
-	if upload.Path != "/projects/my project/assets" || upload.Header.Get("X-CalmLens-Upload") != "content" || upload.Query.Get("wait") != "false" || upload.Query.Get("folderId") != folder.ID || string(upload.RawBody) != "hi" || upload.Body != nil {
+	// Text arrives as JSON with the asset's fields; only wait is in the query.
+	if upload.Path != "/projects/my project/assets" || upload.Header.Get("X-CalmLens-Upload") != "" || len(upload.Query) != 1 || upload.Query.Get("wait") != "false" || !reflect.DeepEqual(upload.Body, calmlens.JSON{"name": "note", "folderId": folder.ID, "content": map[string]any{"plainText": "hi", "type": "text/plain"}}) || upload.File != nil {
 		t.Fatalf("%+v", upload)
 	}
 	if requests[2].Method != "GET" || requests[2].Path != "/assets/"+a.ID || !reflect.DeepEqual(create.Status, calmlens.Ptr(http.StatusCreated)) || !reflect.DeepEqual(requests[2].Status, calmlens.Ptr(http.StatusOK)) {
@@ -849,8 +850,13 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 		t.Fatal(err)
 	}
 	upload := func(mode string) http.Header {
-		return http.Header{"X-Calmlens-Upload": {mode}, "Content-Type": {"text/plain"}}
+		return http.Header{"X-Calmlens-Upload": {mode}, "Content-Type": {"multipart/form-data; boundary=b"}}
 	}
+	// form is an upload form body: the options part, then the file part.
+	form := func(options string) string {
+		return "--b\r\nContent-Disposition: form-data; name=\"options\"\r\nContent-Type: application/json\r\n\r\n" + options + "\r\n--b\r\nContent-Disposition: form-data; name=\"file\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--b--\r\n"
+	}
+	fileFirst := "--b\r\nContent-Disposition: form-data; name=\"file\"\r\n\r\nhello\r\n--b\r\nContent-Disposition: form-data; name=\"options\"\r\n\r\n{\"name\":\"x\"}\r\n--b--\r\n"
 	jsonHeader := http.Header{"Content-Type": {"application/json"}}
 	assets := "/projects/project-1/assets"
 	signing := "/projects/project-1/signed-asset-urls"
@@ -862,9 +868,14 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 		details                   map[string]any
 	}{
 		{"JSON metadata object", "POST", assets, "wait=true", jsonHeader, `{"name":"x","url":"https://example.com","metadata":{"a":1}}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata")},
-		{"raw upload metadata item not an object", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`["source"]`), upload("content"), "hello", calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata.0")},
-		{"raw upload metadata id not a string", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":7,"value":1}]`), upload("content"), "hello", calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata.0.id")},
-		{"raw upload metadata without a value", "POST", assets, "name=x&contentType=text%2Fplain&metadata=" + url.QueryEscape(`[{"id":"source"}]`), upload("content"), "hello", calmlens.CodeInvalidRequest, issue("validation/invalid-value", "metadata.0.value")},
+		{"raw upload metadata item not an object", "POST", assets, "contentType=text%2Fplain", upload("content"), form(`{"name":"x","metadata":["source"]}`), calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata.0")},
+		{"raw upload metadata id not a string", "POST", assets, "contentType=text%2Fplain", upload("content"), form(`{"name":"x","metadata":[{"id":7,"value":1}]}`), calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata.0.id")},
+		{"raw upload metadata without a value", "POST", assets, "contentType=text%2Fplain", upload("content"), form(`{"name":"x","metadata":[{"id":"source"}]}`), calmlens.CodeInvalidRequest, issue("validation/invalid-value", "metadata.0.value")},
+		{"upload form option the API doesn't know", "POST", assets, "contentType=text%2Fplain", upload("content"), form(`{"name":"x","colour":"red"}`), calmlens.CodeInvalidRequest, issue("validation/unknown-field", "colour")},
+		{"upload form with its file first", "POST", assets, "contentType=text%2Fplain", upload("content"), fileFirst, calmlens.CodeInvalidUploadPayload, map[string]any{}},
+		{"raw upload that isn't a form", "POST", assets, "contentType=text%2Fplain", http.Header{"X-Calmlens-Upload": {"content"}, "Content-Type": {"text/plain"}}, "hello", calmlens.CodeUnsupportedContentType, map[string]any{"contentType": "text/plain"}},
+		{"upload form with fields in its query", "POST", assets, "contentType=text%2Fplain&description=d&authorId=u", upload("content"), form(`{"name":"x"}`), calmlens.CodeUploadOptionsInQuery, map[string]any{"fields": []any{"description", "authorId"}}},
+		{"JSON text with fields in its query", "POST", assets, "wait=true&context=" + url.QueryEscape(`{"items":[]}`), jsonHeader, `{"name":"x","content":{"plainText":"hi","type":"text/plain"}}`, calmlens.CodeUploadOptionsInQuery, map[string]any{"fields": []any{"context"}}},
 		{"update metadata object", "PATCH", "/assets/missing", "", jsonHeader, `{"metadata":{"a":1}}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "metadata")},
 		{"update null name", "PATCH", "/assets/missing", "", jsonHeader, `{"name":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "name")},
 		{"signed URL null externalId", "POST", signing, "", jsonHeader, `{"externalId":null}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "externalId")},
@@ -875,8 +886,9 @@ func TestMockValidatesRequestsTheClientCannotSend(t *testing.T) {
 		{"signed URL lifetime of 0", "POST", signing, "", jsonHeader, `{"assetId":"missing","expiresIn":0}`, calmlens.CodeInvalidRequest, issue("validation/too-small", "expiresIn")},
 		{"signed URL lifetime above 24 hours", "POST", signing, "", jsonHeader, `{"assetId":"missing","expiresIn":86401}`, calmlens.CodeInvalidRequest, issue("validation/too-big", "expiresIn")},
 		{"signed URL original not a boolean", "POST", signing, "", jsonHeader, `{"assetId":"missing","original":"yes"}`, calmlens.CodeInvalidRequest, issue("validation/invalid-type", "original")},
-		{"raw upload of a refused type", "POST", assets, "name=x&contentType=application%2Fzip", upload("content"), "hello", calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/zip", "source": "calmlens"}},
-		{"first part of a refused type", "POST", assets, "name=x&isFinal=true&contentType=application%2Fx-made-up", upload("part"), "hello", calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/x-made-up", "source": "calmlens"}},
+		{"raw upload of a refused type", "POST", assets, "contentType=application%2Fzip", upload("content"), form(`{"name":"x"}`), calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/zip", "source": "calmlens"}},
+		{"first part of a refused type", "POST", assets, "isFinal=true&contentType=application%2Fx-made-up", upload("part"), form(`{"name":"x"}`), calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/x-made-up", "source": "calmlens"}},
+		{"text of a refused type", "POST", assets, "wait=true", jsonHeader, `{"name":"x","content":{"plainText":"hi","type":"application/x-made-up"}}`, calmlens.CodeUnsupportedUploadType, map[string]any{"mimeType": "application/x-made-up", "source": "calmlens"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -938,5 +950,33 @@ func TestMockStoresUploadTagsAndKeepsProcessingOptionsOutOfTheAsset(t *testing.T
 	// The upload's processing options still apply, though the asset doesn't return them.
 	if _, ok := uploaded.Raw["processingOptions"]; ok || uploaded.Content.Status != calmlens.ContentStatusStored {
 		t.Fatal(uploaded.Raw["processingOptions"], uploaded.Content.Status)
+	}
+}
+
+// Like the API, a repeated upload form is told apart by its options, not its random boundary.
+func TestMockReplaysAnUploadFormByItsOptionsNotItsBoundary(t *testing.T) {
+	c, err := NewServerClient(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	upload := func(description string) (*calmlens.Asset, error) {
+		return c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "photo.png", Description: &description, Content: &calmlens.Content{Type: "image/png", Bytes: []byte{1, 2, 3}}, IdempotencyKey: "upload-1"})
+	}
+	first, err := upload("a photo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := upload("a photo")
+	requests := c.Requests()
+	boundary := func(r CapturedRequest) string { return r.Header.Get("Content-Type") }
+	if err != nil || again.ID != first.ID || len(c.DatabaseStorage.Assets) != 1 || boundary(requests[0]) == boundary(requests[1]) {
+		t.Fatal(again, err, boundary(requests[0]), boundary(requests[1]))
+	}
+	if _, err = upload("another photo"); calmlens.ErrorCode(err) != calmlens.CodeIdempotencyKeyReused {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(requests[0].Body, calmlens.JSON{"name": "photo.png", "description": "a photo"}) || !reflect.DeepEqual(requests[0].File, []byte{1, 2, 3}) {
+		t.Fatalf("captured %v %v", requests[0].Body, requests[0].File)
 	}
 }

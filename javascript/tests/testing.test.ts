@@ -1114,8 +1114,12 @@ describe("MockCalmLensServerClient", () => {
     ]);
     const [classify] = client.callsTo("text.classify");
     expect(classify).toMatchObject({
-      query: { name: "text", externalId: "comment-1", wait: "true", contentType: "text/plain" },
-      body: "hello",
+      query: { wait: "true" },
+      body: {
+        name: "text",
+        externalId: "comment-1",
+        content: { plainText: "hello", type: "text/plain" },
+      },
     });
     expect(client.callsTo("assets.waitForDecision").map(({ path }) => path)).toEqual([
       `/assets/${moderated.id}`,

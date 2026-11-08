@@ -92,6 +92,8 @@ public final class ErrorCodes {
   public static final String UNSUPPORTED_UPLOAD_TYPE = "upload/unsupported-type";
   /** {@code upload-payload/invalid} (HTTP 400). */
   public static final String INVALID_UPLOAD_PAYLOAD = "upload-payload/invalid";
+  /** {@code upload/options-in-query} (HTTP 400): an upload named asset fields in its query string. */
+  public static final String UPLOAD_OPTIONS_IN_QUERY = "upload/options-in-query";
   /** {@code upload/use-upload-part} (HTTP 409). */
   public static final String USE_UPLOAD_PART = "upload/use-upload-part";
   /** {@code upload/not-open} (HTTP 409). */
@@ -296,6 +298,7 @@ public final class ErrorCodes {
       Map.entry(UPLOADS_PAUSED, 402),
       Map.entry(UNSUPPORTED_UPLOAD_TYPE, 415),
       Map.entry(INVALID_UPLOAD_PAYLOAD, 400),
+      Map.entry(UPLOAD_OPTIONS_IN_QUERY, 400),
       Map.entry(USE_UPLOAD_PART, 409),
       Map.entry(UPLOAD_NOT_OPEN, 409),
       Map.entry(INVALID_UPLOAD_PART_NUMBER, 409),

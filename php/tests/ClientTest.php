@@ -8,6 +8,7 @@ use CalmLens\Exception;
 use CalmLens\Testing\MockServerClient;
 use CalmLens\ServerClient;
 use CalmLens\Testing\MockTransport;
+use CalmLens\Testing\RecordedRequest;
 use CalmLens\Webhooks;
 use GuzzleHttp\Client;
 use GuzzleHttp\Promise\Create;
@@ -112,8 +113,9 @@ final class ClientTest extends TestCase
     {
         $calls = [];
         $client = new ServerClient('key', 'p', httpClient: new Client(['handler' => function ($request, $options) use (&$calls) {
-            $calls[] = [$request->getBody()->getContents(), $request->getHeaderLine('Idempotency-Key')];
-            self::assertSame('7', $request->getHeaderLine('Content-Length'));
+            $body = $request->getBody()->getContents();
+            $calls[] = [$body, $request->getHeaderLine('Idempotency-Key'), RecordedRequest::of($request, null)->body()['file'] ?? null];
+            self::assertSame((string) strlen($body), $request->getHeaderLine('Content-Length'));
             self::assertFalse($options['allow_redirects']);
             return Create::promiseFor(count($calls) === 1 ? new Response(503, ['Retry-After' => '0'], '{"code":"server/unavailable"}') : new Response(200, [], json_encode(self::ASSET)));
         }]));
@@ -121,7 +123,7 @@ final class ClientTest extends TestCase
         $stream->seek(6);
         self::assertSame(self::ASSET, $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream]]));
         self::assertCount(2, $calls);
-        self::assertSame('payload', $calls[0][0]);
+        self::assertSame('payload', $calls[0][2]);
         self::assertSame($calls[0], $calls[1]);
         self::assertMatchesRegularExpression('/^[a-f0-9-]{36}$/', $calls[0][1]);
     }
@@ -262,7 +264,7 @@ final class ClientTest extends TestCase
         $client->assets->create(['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream]]);
         $stream->rewind();
         $stream->write('replaced');
-        self::assertSame('original', (string) $mock->requests()[0]->request->getBody());
+        self::assertSame('original', $mock->requests()[0]->body()['file']);
         self::assertSame(0, $mock->pending());
         $this->expectException(\OutOfBoundsException::class);
         $client->assets->retrieve(['assetId' => 'a']);

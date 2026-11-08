@@ -102,10 +102,9 @@ func TestProcessingOptionsEncodeOnlySetFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	q := h.last().URL.Query()
-	want := `{"features":{"ocr":{"enabled":true},"personDetection":{"enabled":false},"streaming":{"enabled":false}}}`
-	if q.Get("processingOptions") != want || q.Get("uploadPresetId") != "preset-1" {
-		t.Fatalf("got %s and %q", q.Get("processingOptions"), q.Get("uploadPresetId"))
+	want := map[string]any{"features": map[string]any{"ocr": map[string]any{"enabled": true}, "personDetection": map[string]any{"enabled": false}, "streaming": map[string]any{"enabled": false}}}
+	if sent := h.body(); !reflect.DeepEqual(sent["processingOptions"], want) || sent["uploadPresetId"] != "preset-1" {
+		t.Fatalf("text body %s", h.bodies[len(h.bodies)-1])
 	}
 	if _, err = c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "site", URL: "https://example.com", UploadPresetID: Ptr("preset-2"), ProcessingOptions: &ProcessingOptions{KeepContentAfterProcessing: Ptr(true)}}); err != nil {
 		t.Fatal(err)
@@ -121,7 +120,7 @@ func TestClassifyTextForwardsUploadPreset(t *testing.T) {
 	if _, err := c.Text.Classify(context.Background(), ClassifyTextOptions{Text: "hi", UploadPresetID: Ptr("preset-1")}); err != nil {
 		t.Fatal(err)
 	}
-	if got := h.last().URL.Query().Get("uploadPresetId"); got != "preset-1" {
+	if got := h.body()["uploadPresetId"]; got != "preset-1" {
 		t.Fatalf("uploadPresetId %q", got)
 	}
 }
@@ -133,12 +132,12 @@ func TestClassifyTextKeepsAnOverLongNewestPost(t *testing.T) {
 	if _, err := c.Text.Classify(context.Background(), ClassifyTextOptions{Text: "hi", Context: &ModerationContext{Items: items}}); err != nil {
 		t.Fatal(err)
 	}
-	var sent ModerationContext
-	if err := json.Unmarshal([]byte(h.last().URL.Query().Get("context")), &sent); err != nil {
+	var sent struct{ Context ModerationContext }
+	if err := json.Unmarshal(h.bodies[len(h.bodies)-1], &sent); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(sent.Items, []ModerationContextItem{{Text: newest}}) {
-		t.Fatalf("sent %d items, want only the newest", len(sent.Items))
+	if !reflect.DeepEqual(sent.Context.Items, []ModerationContextItem{{Text: newest}}) {
+		t.Fatalf("sent %d items, want only the newest", len(sent.Context.Items))
 	}
 }
 

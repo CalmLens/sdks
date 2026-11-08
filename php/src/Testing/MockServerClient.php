@@ -10,6 +10,7 @@ use CalmLens\Cdn;
 use CalmLens\ErrorCodes;
 use CalmLens\Internal\Session;
 use CalmLens\Internal\Transforms;
+use CalmLens\Internal\UploadForm;
 use CalmLens\Internal\Values;
 use CalmLens\ModerationContext;
 use CalmLens\SdkErrorCodes;
@@ -181,7 +182,7 @@ final class MockServerClient
      * @param ?string $apiKey the client's API key. Its grants, from `createApiKey()`, decide CDN
      *   downloads of private and age-restricted content; the default key has none.
      * @param ?callable $createId receives the prefix of the new object's ID (`asset`, `fldr`, `hl`,
-     *   `hle`, `pol`, `lens`, `evt`, `rev` or `batch`) and returns the ID; by default, like the API, the prefix, `_`
+     *   `hle`, `pol`, `lens`, `preset`, `evt`, `rev` or `batch`) and returns the ID; by default, like the API, the prefix, `_`
      *   and 20 random base62 characters, such as `asset_5Gm2Rk8XqT3wLp9VbN4c`.
      * @param int $maxRetries retries for the mock's client; 0 by default so enqueued failures surface.
      * @param int $maxResponseBytes the largest response body the mock's client reads, as for `ServerClient`.
@@ -578,7 +579,17 @@ final class MockServerClient
         if ($key !== null && (strlen($key) > 255 || !preg_match('/^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/D', $key))) {
             return $this->error(ErrorCodes::INVALID_IDEMPOTENCY_KEY, 'Invalid idempotency key');
         }
-        $fingerprint = hash('sha256', Values::json([$request->getMethod(), $path, $request->getUri()->getQuery(), hash('sha256', $body)]));
+        // Like the API, an upload form is told apart by its options and file, not its boundary.
+        $form = null;
+        if ($request->hasHeader('X-CalmLens-Upload') && end($parts) !== 'part') {
+            try {
+                $form = UploadForm::parse($request->getHeaderLine('Content-Type'), $body);
+            } catch (\UnexpectedValueException) {
+                // The route refuses it below.
+            }
+        }
+        $fingerprint = hash('sha256', Values::json([$request->getMethod(), $path, $request->getUri()->getQuery(),
+            $form === null ? hash('sha256', $body) : ['multipart/form-data', $form['options'], hash('sha256', $form['file'])]]));
         if ($key !== null && isset($this->idempotent[$key])) {
             [$saved, $status, $bytes] = $this->idempotent[$key];
             return $saved !== $fingerprint
@@ -713,8 +724,7 @@ final class MockServerClient
                 $route === 'GET assets/search' => $this->search($query),
                 $route === 'POST assets/batch' => $this->batch($json),
                 $route === 'POST signed-asset-urls' => $this->signAssetUrl($json),
-                $route === 'POST assets' && $upload === '' => $this->createAsset($json, !self::waits($query), null, false),
-                $route === 'POST assets' && in_array($upload, ['content', 'part'], true) => $this->createAsset($query, !self::waits($query), $body, $upload === 'part'),
+                $route === 'POST assets' && in_array($upload, ['', 'content', 'part'], true) => $this->createUpload($request, $upload, $query, $json, $body),
                 default => throw new \LogicException("MockServerClient does not emulate $route; enqueue a response for it"),
             };
         }
@@ -910,11 +920,66 @@ final class MockServerClient
         }
     }
 
+    /**
+     * `POST /projects/:projectId/assets`, read like the API: a URL or plain text as JSON, a file or a
+     * first part as an upload form, its fields in the options part and its transport values in the
+     * query. Asset fields in the query are refused.
+     */
+    private function createUpload(RequestInterface $request, string $upload, array $query, array $json, string $body): array
+    {
+        $named = array_values(array_intersect(UploadForm::FIELDS, array_keys($query)));
+        if ($named !== []) {
+            self::fail(ErrorCodes::UPLOAD_OPTIONS_IN_QUERY, null, 'Send the asset\'s fields in the request body, not the query', ['fields' => $named]);
+        }
+        $queue = !self::waits($query);
+        if ($upload === '') {
+            $fields = array_diff_key($json, array_flip(['content', 'part', 'sizeInBytes', 'totalSizeInBytes']));
+            $multipart = array_key_exists('part', $json);
+            if (!$multipart && !array_key_exists('content', $json)) {
+                return $this->createAsset($fields, $queue, null, false);
+            }
+            $text = $json[$multipart ? 'part' : 'content'];
+            if (!is_array($text) || !is_string($text['plainText'] ?? null) || !is_string($text['type'] ?? null)) {
+                self::invalid('validation/invalid-type', $multipart ? 'part' : 'content');
+            }
+            return $this->createAsset(array_replace($fields, ['contentType' => $text['type'], 'isFinal' => $text['isFinal'] ?? false,
+                'totalSizeInBytes' => $json['totalSizeInBytes'] ?? null]), $queue, $text['plainText'], $multipart);
+        }
+        $type = $request->getHeaderLine('Content-Type');
+        try {
+            $form = UploadForm::parse($type, $body);
+        } catch (\UnexpectedValueException $error) {
+            self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, $error->getMessage());
+        }
+        if ($form === null) {
+            $base = trim(explode(';', $type, 2)[0]);
+            self::fail(ErrorCodes::UNSUPPORTED_CONTENT_TYPE, null, 'Send a raw upload as multipart/form-data: an options part, then a file part.',
+                ['contentType' => $base === '' ? null : $base]);
+        }
+        if (!json_decode($form['options']) instanceof \stdClass) {
+            self::fail(ErrorCodes::INVALID_UPLOAD_PAYLOAD, null, 'The options part must be a JSON object with the asset\'s fields');
+        }
+        $options = json_decode($form['options'], true);
+        foreach (array_keys($options) as $key) {
+            if (!in_array($key, UploadForm::FIELDS, true)) {
+                self::invalid('validation/unknown-field', (string) $key);
+            }
+        }
+        if (!is_string($options['name'] ?? null)) {
+            self::invalid('validation/invalid-type', 'name');
+        }
+        return $this->createAsset($options + ['contentType' => $query['contentType'] ?? '', 'isFinal' => $query['isFinal'] ?? null,
+            'totalSizeInBytes' => $query['totalSizeInBytes'] ?? null], $queue, $form['file'], $upload === 'part');
+    }
+
+    /**
+     * Stores an uploaded asset from its fields, with `contentType`, `isFinal` and `totalSizeInBytes`
+     * for content (`$bytes`); without bytes, it is a URL upload.
+     */
     private function createAsset(array $options, bool $queue, ?string $bytes, bool $multipart): array
     {
         $mime = (string) ($options['contentType'] ?? '');
-        $decode = fn (string $key) => is_string($options[$key] ?? null) && $bytes !== null ? json_decode($options[$key], true) : ($options[$key] ?? null);
-        self::checkMetadata($decode('metadata'));
+        self::checkMetadata($options['metadata'] ?? null);
         // Like the API: content and a first part must be of a type CalmLens moderates; a URL is exempt.
         if ($bytes !== null && !Values::acceptedUploadMimeType($mime)) {
             self::fail(ErrorCodes::UNSUPPORTED_UPLOAD_TYPE, null, Values::refusedUploadMimeTypeMessage($mime), ['mimeType' => $mime, 'source' => 'calmlens']);
@@ -945,10 +1010,10 @@ final class MockServerClient
             }
         }
         $now = ($this->now)();
-        $processing = $decode('processingOptions') ?? ['keepContentAfterProcessing' => false];
+        $processing = $options['processingOptions'] ?? ['keepContentAfterProcessing' => false];
         $keep = is_array($processing) && ($processing['keepContentAfterProcessing'] ?? false) === true;
         // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
-        $context = ModerationContext::select($decode('context')['items'] ?? []);
+        $context = ModerationContext::select($options['context']['items'] ?? []);
         // Fields the API returns as null when they are not set.
         $asset = [
             'id' => ($this->createId)('asset'), 'projectId' => $this->projectId, 'parentId' => null, 'parentPages' => [],
@@ -956,8 +1021,8 @@ final class MockServerClient
             'createdAt' => $now, 'updatedAt' => $now, 'name' => $options['name'] ?? null,
             'description' => $options['description'] ?? null, 'externalId' => $options['externalId'] ?? null,
             'externalUrl' => $url ?? ($multipart ? null : ($options['externalUrl'] ?? null)),
-            'type' => $type, 'metadata' => $decode('metadata') ?? [],
-            'authorId' => $options['authorId'] ?? null, 'context' => $context === [] ? null : ['items' => $context], 'tags' => $decode('tags') ?? [],
+            'type' => $type, 'metadata' => $options['metadata'] ?? [],
+            'authorId' => $options['authorId'] ?? null, 'context' => $context === [] ? null : ['items' => $context], 'tags' => $options['tags'] ?? [],
             'visibility' => $options['visibility'] ?? 'private',
             'content' => ['status' => $keep ? 'stored' : 'temporary', 'removalReason' => null, 'updatedAt' => $now,
                 'safetyHold' => null, 'format' => $mime === '' ? null : $mime, 'extension' => null, 'sizeInBytes' => $size,

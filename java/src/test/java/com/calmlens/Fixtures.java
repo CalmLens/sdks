@@ -99,6 +99,12 @@ final class Fixtures {
     return request;
   }
 
+  /** The upload form a mock client's request carried. */
+  static UploadForm.Parsed form(MockCalmLensServerClient.Request request) { return UploadForm.read(request.body(), request.header("Content-Type")); }
+
+  /** The JSON options part of the upload form a mock client's request carried. */
+  static JsonObject formOptions(MockCalmLensServerClient.Request request) { return JsonParser.parseString(form(request).options()).getAsJsonObject(); }
+
   static byte[] body(Transport.Request request) throws IOException {
     if (request.body() == null) return null;
     try (InputStream in = request.body().open()) { return in.readAllBytes(); }

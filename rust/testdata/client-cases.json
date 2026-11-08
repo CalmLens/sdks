@@ -638,7 +638,7 @@
       "requests": []
     },
     {
-      "name": "create sends text content with every optional field in the query",
+      "name": "create sends text content as JSON with every optional field in the body",
       "area": "uploads",
       "responses": [
         {
@@ -688,6 +688,18 @@
                 "value": "comment"
               }
             ],
+            "tags": [
+              "forum"
+            ],
+            "authorId": "pupil-7",
+            "context": {
+              "items": [
+                {
+                  "text": "An earlier post",
+                  "authorId": "pupil-3"
+                }
+              ]
+            },
             "externalId": "post-1",
             "externalUrl": "https://example.test/posts/1",
             "folderId": "folder-1",
@@ -722,66 +734,55 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=note.txt&wait=false&description=A+note&processingOptions=%7B%22keepContentAfterProcessing%22%3Afalse%7D&visibility=private&metadata=%5B%7B%22id%22%3A%22source%22%2C%22value%22%3A%22comment%22%7D%5D&externalId=post-1&externalUrl=https%3A%2F%2Fexample.test%2Fposts%2F1&folderId=folder-1&uploadPresetId=preset-1&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=false",
           "query": [
-            [
-              "name",
-              "note.txt"
-            ],
             [
               "wait",
               "false"
-            ],
-            [
-              "description",
-              "A note"
-            ],
-            [
-              "processingOptions",
-              "{\"keepContentAfterProcessing\":false}"
-            ],
-            [
-              "visibility",
-              "private"
-            ],
-            [
-              "metadata",
-              "[{\"id\":\"source\",\"value\":\"comment\"}]"
-            ],
-            [
-              "externalId",
-              "post-1"
-            ],
-            [
-              "externalUrl",
-              "https://example.test/posts/1"
-            ],
-            [
-              "folderId",
-              "folder-1"
-            ],
-            [
-              "uploadPresetId",
-              "preset-1"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
             "idempotency-key": "upload-1",
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "note.txt",
+            "description": "A note",
+            "processingOptions": {
+              "keepContentAfterProcessing": false
+            },
+            "visibility": "private",
+            "metadata": [
+              {
+                "id": "source",
+                "value": "comment"
+              }
+            ],
+            "tags": [
+              "forum"
+            ],
+            "authorId": "pupil-7",
+            "context": {
+              "items": [
+                {
+                  "text": "An earlier post",
+                  "authorId": "pupil-3"
+                }
+              ]
+            },
+            "externalId": "post-1",
+            "externalUrl": "https://example.test/posts/1",
+            "folderId": "folder-1",
+            "uploadPresetId": "preset-1",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         }
       ]
     },
@@ -854,23 +855,11 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=note.txt&wait=true&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=true",
           "query": [
-            [
-              "name",
-              "note.txt"
-            ],
             [
               "wait",
               "true"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
@@ -878,17 +867,196 @@
               "$uuid": "generated-1"
             },
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         }
       ]
     },
     {
-      "name": "create sends base64 content as raw bytes",
+      "name": "create sends a file as an upload form with every optional field in its options part",
+      "area": "uploads",
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "id": "asset-1",
+            "name": "asset-1.txt",
+            "createdAt": 1760000000000,
+            "content": {
+              "status": "stored"
+            },
+            "upload": {
+              "status": "completed"
+            },
+            "classification": {
+              "status": "processing",
+              "moderation": {
+                "status": "pending",
+                "flaggedCategories": [],
+                "regions": []
+              }
+            }
+          },
+          "headers": {
+            "x-request-id": "req-1",
+            "content-type": "application/json"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "assets.create",
+          "args": {
+            "name": "doc.pdf",
+            "description": "A worksheet",
+            "content": {
+              "uint8Array": {
+                "$bytes": "JVBERi0xLjQKJWNhbG1sZW5zCg=="
+              },
+              "type": "application/pdf"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "private",
+            "metadata": [
+              {
+                "id": "source",
+                "value": {
+                  "nested": [
+                    1,
+                    null
+                  ]
+                }
+              }
+            ],
+            "tags": [
+              "homework"
+            ],
+            "authorId": "pupil-7",
+            "context": {
+              "items": [
+                {
+                  "text": "Can someone check mine?",
+                  "authorId": "pupil-3"
+                }
+              ]
+            },
+            "externalId": "post-2",
+            "externalUrl": "https://example.test/posts/2",
+            "folderId": "folder-1",
+            "uploadPresetId": "preset-1",
+            "idempotencyKey": "upload-2"
+          },
+          "expect": {
+            "result": {
+              "id": "asset-1",
+              "name": "asset-1.txt",
+              "createdAt": 1760000000000,
+              "content": {
+                "status": "stored"
+              },
+              "upload": {
+                "status": "completed"
+              },
+              "classification": {
+                "status": "processing",
+                "moderation": {
+                  "status": "pending",
+                  "flaggedCategories": [],
+                  "regions": []
+                }
+              }
+            }
+          }
+        }
+      ],
+      "requests": [
+        {
+          "method": "POST",
+          "origin": "https://api.calmlens.com",
+          "path": "/v1/projects/project-1/assets",
+          "rawQuery": "wait=false&contentType=application%2Fpdf&sizeInBytes=19",
+          "query": [
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "application/pdf"
+            ],
+            [
+              "sizeInBytes",
+              "19"
+            ]
+          ],
+          "headers": {
+            "idempotency-key": "upload-2",
+            "accept": "application/json",
+            "x-calmlens-upload": "content",
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
+          },
+          "form": {
+            "options": {
+              "name": "doc.pdf",
+              "description": "A worksheet",
+              "processingOptions": {
+                "keepContentAfterProcessing": true
+              },
+              "visibility": "private",
+              "metadata": [
+                {
+                  "id": "source",
+                  "value": {
+                    "nested": [
+                      1,
+                      null
+                    ]
+                  }
+                }
+              ],
+              "tags": [
+                "homework"
+              ],
+              "authorId": "pupil-7",
+              "context": {
+                "items": [
+                  {
+                    "text": "Can someone check mine?",
+                    "authorId": "pupil-3"
+                  }
+                ]
+              },
+              "externalId": "post-2",
+              "externalUrl": "https://example.test/posts/2",
+              "folderId": "folder-1",
+              "uploadPresetId": "preset-1"
+            },
+            "file": {
+              "contentType": "application/pdf",
+              "bodyLength": 19,
+              "bodySha256": "ff0834c90aeea19da3eb5720d1169cd07e597ba29b5501380d7a7787bc88908c",
+              "bodyBase64": "JVBERi0xLjQKJWNhbG1sZW5zCg=="
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create sends base64 content as its bytes in an upload form",
       "area": "uploads",
       "responses": [
         {
@@ -956,12 +1124,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=pixel.png&wait=false&contentType=image%2Fpng&sizeInBytes=68",
+          "rawQuery": "wait=false&contentType=image%2Fpng&sizeInBytes=68",
           "query": [
-            [
-              "name",
-              "pixel.png"
-            ],
             [
               "wait",
               "false"
@@ -981,11 +1145,21 @@
             },
             "accept": "application/json",
             "x-calmlens-upload": "content",
-            "content-type": "image/png"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 68,
-          "bodySha256": "63ef318d96b5d0d0ceba6e04a4e622b1158335cdc67c49e27839132c6f655058",
-          "bodyBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+          "form": {
+            "options": {
+              "name": "pixel.png"
+            },
+            "file": {
+              "contentType": "image/png",
+              "bodyLength": 68,
+              "bodySha256": "63ef318d96b5d0d0ceba6e04a4e622b1158335cdc67c49e27839132c6f655058",
+              "bodyBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+            }
+          }
         }
       ]
     },
@@ -1060,12 +1234,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=doc.pdf&wait=false&contentType=application%2Fpdf&sizeInBytes=19",
+          "rawQuery": "wait=false&contentType=application%2Fpdf&sizeInBytes=19",
           "query": [
-            [
-              "name",
-              "doc.pdf"
-            ],
             [
               "wait",
               "false"
@@ -1085,11 +1255,21 @@
             },
             "accept": "application/json",
             "x-calmlens-upload": "content",
-            "content-type": "application/pdf"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 19,
-          "bodySha256": "ff0834c90aeea19da3eb5720d1169cd07e597ba29b5501380d7a7787bc88908c",
-          "bodyBase64": "JVBERi0xLjQKJWNhbG1sZW5zCg=="
+          "form": {
+            "options": {
+              "name": "doc.pdf"
+            },
+            "file": {
+              "contentType": "application/pdf",
+              "bodyLength": 19,
+              "bodySha256": "ff0834c90aeea19da3eb5720d1169cd07e597ba29b5501380d7a7787bc88908c",
+              "bodyBase64": "JVBERi0xLjQKJWNhbG1sZW5zCg=="
+            }
+          }
         }
       ]
     },
@@ -1165,12 +1345,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=doc.pdf&wait=false&contentType=application%2Fpdf&sizeInBytes=19",
+          "rawQuery": "wait=false&contentType=application%2Fpdf&sizeInBytes=19",
           "query": [
-            [
-              "name",
-              "doc.pdf"
-            ],
             [
               "wait",
               "false"
@@ -1190,11 +1366,21 @@
             },
             "accept": "application/json",
             "x-calmlens-upload": "content",
-            "content-type": "application/pdf"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 19,
-          "bodySha256": "ff0834c90aeea19da3eb5720d1169cd07e597ba29b5501380d7a7787bc88908c",
-          "bodyBase64": "JVBERi0xLjQKJWNhbG1sZW5zCg=="
+          "form": {
+            "options": {
+              "name": "doc.pdf"
+            },
+            "file": {
+              "contentType": "application/pdf",
+              "bodyLength": 19,
+              "bodySha256": "ff0834c90aeea19da3eb5720d1169cd07e597ba29b5501380d7a7787bc88908c",
+              "bodyBase64": "JVBERi0xLjQKJWNhbG1sZW5zCg=="
+            }
+          }
         }
       ]
     },
@@ -1269,12 +1455,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=doc.pdf&wait=false&contentType=application%2Fpdf",
+          "rawQuery": "wait=false&contentType=application%2Fpdf",
           "query": [
-            [
-              "name",
-              "doc.pdf"
-            ],
             [
               "wait",
               "false"
@@ -1290,11 +1472,21 @@
             },
             "accept": "application/json",
             "x-calmlens-upload": "content",
-            "content-type": "application/pdf"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 19,
-          "bodySha256": "ff0834c90aeea19da3eb5720d1169cd07e597ba29b5501380d7a7787bc88908c",
-          "bodyBase64": "JVBERi0xLjQKJWNhbG1sZW5zCg=="
+          "form": {
+            "options": {
+              "name": "doc.pdf"
+            },
+            "file": {
+              "contentType": "application/pdf",
+              "bodyLength": 19,
+              "bodySha256": "ff0834c90aeea19da3eb5720d1169cd07e597ba29b5501380d7a7787bc88908c",
+              "bodyBase64": "JVBERi0xLjQKJWNhbG1sZW5zCg=="
+            }
+          }
         }
       ]
     },
@@ -1368,23 +1560,11 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=note.txt&wait=false&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=false",
           "query": [
-            [
-              "name",
-              "note.txt"
-            ],
             [
               "wait",
               "false"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
@@ -1392,12 +1572,18 @@
               "$uuid": "generated-1"
             },
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         }
       ]
     },
@@ -1621,7 +1807,7 @@
       ]
     },
     {
-      "name": "a first multipart part goes through create with its sizes and X-CalmLens-Upload: part",
+      "name": "a first multipart part goes through create as an upload form with its sizes and X-CalmLens-Upload: part",
       "area": "uploads",
       "responses": [
         {
@@ -1656,6 +1842,8 @@
           "operation": "assets.create",
           "args": {
             "name": "clip.mp4",
+            "description": "A recorded lesson",
+            "authorId": "teacher-1",
             "part": {
               "uint8Array": {
                 "$fill": {
@@ -1697,12 +1885,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=clip.mp4&wait=false&contentType=video%2Fmp4&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=6291456",
+          "rawQuery": "wait=false&contentType=video%2Fmp4&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=6291456",
           "query": [
-            [
-              "name",
-              "clip.mp4"
-            ],
             [
               "wait",
               "false"
@@ -1732,10 +1916,22 @@
             "idempotency-key": "part-1",
             "accept": "application/json",
             "x-calmlens-upload": "part",
-            "content-type": "video/mp4"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 5242880,
-          "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+          "form": {
+            "options": {
+              "name": "clip.mp4",
+              "description": "A recorded lesson",
+              "authorId": "teacher-1"
+            },
+            "file": {
+              "contentType": "video/mp4",
+              "bodyLength": 5242880,
+              "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+            }
+          }
         }
       ]
     },
@@ -1809,12 +2005,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=clip.mp4&wait=true&contentType=video%2Fmp4&sizeInBytes=22&partNumber=1&isFinal=true",
+          "rawQuery": "wait=true&contentType=video%2Fmp4&sizeInBytes=22&partNumber=1&isFinal=true",
           "query": [
-            [
-              "name",
-              "clip.mp4"
-            ],
             [
               "wait",
               "true"
@@ -1842,11 +2034,21 @@
             },
             "accept": "application/json",
             "x-calmlens-upload": "part",
-            "content-type": "video/mp4"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 22,
-          "bodySha256": "eb638999bb6b1d938d1b1ef482bf0ad14786037c3ce228991c346043f5480aba",
-          "bodyBase64": "AAAAGGZ0eXBtcDQyZmluYWwtcGFydA=="
+          "form": {
+            "options": {
+              "name": "clip.mp4"
+            },
+            "file": {
+              "contentType": "video/mp4",
+              "bodyLength": 22,
+              "bodySha256": "eb638999bb6b1d938d1b1ef482bf0ad14786037c3ce228991c346043f5480aba",
+              "bodyBase64": "AAAAGGZ0eXBtcDQyZmluYWwtcGFydA=="
+            }
+          }
         }
       ]
     },
@@ -2285,12 +2487,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=clip.mp4&wait=true&contentType=video%2Fmp4&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=11534336",
+          "rawQuery": "wait=true&contentType=video%2Fmp4&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=11534336",
           "query": [
-            [
-              "name",
-              "clip.mp4"
-            ],
             [
               "wait",
               "true"
@@ -2320,10 +2518,20 @@
             "idempotency-key": "upload-1",
             "accept": "application/json",
             "x-calmlens-upload": "part",
-            "content-type": "video/mp4"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 5242880,
-          "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+          "form": {
+            "options": {
+              "name": "clip.mp4"
+            },
+            "file": {
+              "contentType": "video/mp4",
+              "bodyLength": 5242880,
+              "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+            }
+          }
         },
         {
           "method": "POST",
@@ -2495,12 +2703,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=clip.mp4&wait=false&contentType=video%2Fmp4&sizeInBytes=8388608&partNumber=1&isFinal=false&totalSizeInBytes=9437184",
+          "rawQuery": "wait=false&contentType=video%2Fmp4&sizeInBytes=8388608&partNumber=1&isFinal=false&totalSizeInBytes=9437184",
           "query": [
-            [
-              "name",
-              "clip.mp4"
-            ],
             [
               "wait",
               "false"
@@ -2530,10 +2734,20 @@
             "idempotency-key": "upload-2",
             "accept": "application/json",
             "x-calmlens-upload": "part",
-            "content-type": "video/mp4"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 8388608,
-          "bodySha256": "0c77bc0a0795a93612d45256897456d0fcb24f151c44c150d07ecd03f4ef5168"
+          "form": {
+            "options": {
+              "name": "clip.mp4"
+            },
+            "file": {
+              "contentType": "video/mp4",
+              "bodyLength": 8388608,
+              "bodySha256": "0c77bc0a0795a93612d45256897456d0fcb24f151c44c150d07ecd03f4ef5168"
+            }
+          }
         },
         {
           "method": "POST",
@@ -2773,12 +2987,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=clip.mp4&wait=false&contentType=video%2Fmp4&sizeInBytes=13631488&partNumber=1&isFinal=false&totalSizeInBytes=53477376",
+          "rawQuery": "wait=false&contentType=video%2Fmp4&sizeInBytes=13631488&partNumber=1&isFinal=false&totalSizeInBytes=53477376",
           "query": [
-            [
-              "name",
-              "clip.mp4"
-            ],
             [
               "wait",
               "false"
@@ -2808,10 +3018,20 @@
             "idempotency-key": "upload-3",
             "accept": "application/json",
             "x-calmlens-upload": "part",
-            "content-type": "video/mp4"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 13631488,
-          "bodySha256": "1b306b5e97569fa26ea5746bafef56cc276e0f6cb1cf30fbcdb3c6ec7fbf3f83"
+          "form": {
+            "options": {
+              "name": "clip.mp4"
+            },
+            "file": {
+              "contentType": "video/mp4",
+              "bodyLength": 13631488,
+              "bodySha256": "1b306b5e97569fa26ea5746bafef56cc276e0f6cb1cf30fbcdb3c6ec7fbf3f83"
+            }
+          }
         },
         {
           "method": "POST",
@@ -2972,7 +3192,7 @@
       "requests": []
     },
     {
-      "name": "text.classify sends the text as text/plain with a custom name and options",
+      "name": "text.classify sends the text as JSON with a custom name and options",
       "area": "uploads",
       "responses": [
         {
@@ -3009,6 +3229,14 @@
             "text": "héllo 🌍",
             "name": "comment-1",
             "description": "A comment",
+            "authorId": "pupil-7",
+            "context": {
+              "items": [
+                {
+                  "text": "An earlier post"
+                }
+              ]
+            },
             "metadata": [
               {
                 "id": "source",
@@ -3047,50 +3275,45 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=comment-1&wait=true&description=A+comment&metadata=%5B%7B%22id%22%3A%22source%22%2C%22value%22%3A%22comment%22%7D%5D&externalId=comment-1&folderId=folder-1&contentType=text%2Fplain&sizeInBytes=11",
+          "rawQuery": "wait=true",
           "query": [
-            [
-              "name",
-              "comment-1"
-            ],
             [
               "wait",
               "true"
-            ],
-            [
-              "description",
-              "A comment"
-            ],
-            [
-              "metadata",
-              "[{\"id\":\"source\",\"value\":\"comment\"}]"
-            ],
-            [
-              "externalId",
-              "comment-1"
-            ],
-            [
-              "folderId",
-              "folder-1"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "11"
             ]
           ],
           "headers": {
             "idempotency-key": "text-1",
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 11,
-          "bodySha256": "cbbcee01a3fc5f1c0db23e02be25316adf28ede876031fdbabe5f4fabe47ed7f",
-          "bodyBase64": "aMOpbGxvIPCfjI0="
+          "body": {
+            "name": "comment-1",
+            "description": "A comment",
+            "metadata": [
+              {
+                "id": "source",
+                "value": "comment"
+              }
+            ],
+            "authorId": "pupil-7",
+            "context": {
+              "items": [
+                {
+                  "text": "An earlier post"
+                }
+              ]
+            },
+            "externalId": "comment-1",
+            "folderId": "folder-1",
+            "content": {
+              "plainText": "héllo 🌍",
+              "type": "text/plain"
+            }
+          }
         }
       ]
     },
@@ -3159,23 +3382,11 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=text&wait=true&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=true",
           "query": [
-            [
-              "name",
-              "text"
-            ],
             [
               "wait",
               "true"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
@@ -3183,12 +3394,18 @@
               "$uuid": "generated-1"
             },
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "text",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         }
       ]
     },
@@ -5013,12 +5230,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=report.pdf&wait=false&contentType=application%2Fpdf&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=16777216",
+          "rawQuery": "wait=false&contentType=application%2Fpdf&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=16777216",
           "query": [
-            [
-              "name",
-              "report.pdf"
-            ],
             [
               "wait",
               "false"
@@ -5048,10 +5261,20 @@
             "idempotency-key": "upload-3",
             "accept": "application/json",
             "x-calmlens-upload": "part",
-            "content-type": "application/pdf"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 5242880,
-          "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+          "form": {
+            "options": {
+              "name": "report.pdf"
+            },
+            "file": {
+              "contentType": "application/pdf",
+              "bodyLength": 5242880,
+              "bodySha256": "dba67a476fa78973aabb087f214a1010f3bebca053674e0af50dfe5a582112be"
+            }
+          }
         },
         {
           "method": "POST",
@@ -6046,23 +6269,11 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=note.txt&wait=false&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=false",
           "query": [
-            [
-              "name",
-              "note.txt"
-            ],
             [
               "wait",
               "false"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
@@ -6070,34 +6281,28 @@
               "$uuid": "generated-1"
             },
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         },
         {
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=note.txt&wait=false&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=false",
           "query": [
-            [
-              "name",
-              "note.txt"
-            ],
             [
               "wait",
               "false"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
@@ -6105,12 +6310,18 @@
               "$uuid": "generated-1"
             },
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         }
       ],
       "sleepsMs": [
@@ -6199,67 +6410,55 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=note.txt&wait=false&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=false",
           "query": [
-            [
-              "name",
-              "note.txt"
-            ],
             [
               "wait",
               "false"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
             "idempotency-key": "upload-1",
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         },
         {
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=note.txt&wait=false&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=false",
           "query": [
-            [
-              "name",
-              "note.txt"
-            ],
             [
               "wait",
               "false"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
             "idempotency-key": "upload-1",
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         }
       ],
       "sleepsMs": [
@@ -6582,12 +6781,8 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=doc.pdf&wait=false&contentType=application%2Fpdf",
+          "rawQuery": "wait=false&contentType=application%2Fpdf",
           "query": [
-            [
-              "name",
-              "doc.pdf"
-            ],
             [
               "wait",
               "false"
@@ -6603,11 +6798,21 @@
             },
             "accept": "application/json",
             "x-calmlens-upload": "content",
-            "content-type": "application/pdf"
+            "content-type": {
+              "$regex": "^multipart/form-data; ?boundary="
+            }
           },
-          "bodyLength": 19,
-          "bodySha256": "ff0834c90aeea19da3eb5720d1169cd07e597ba29b5501380d7a7787bc88908c",
-          "bodyBase64": "JVBERi0xLjQKJWNhbG1sZW5zCg=="
+          "form": {
+            "options": {
+              "name": "doc.pdf"
+            },
+            "file": {
+              "contentType": "application/pdf",
+              "bodyLength": 19,
+              "bodySha256": "ff0834c90aeea19da3eb5720d1169cd07e597ba29b5501380d7a7787bc88908c",
+              "bodyBase64": "JVBERi0xLjQKJWNhbG1sZW5zCg=="
+            }
+          }
         }
       ]
     },
@@ -7611,34 +7816,28 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=note.txt&wait=false&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=false",
           "query": [
-            [
-              "name",
-              "note.txt"
-            ],
             [
               "wait",
               "false"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
             "idempotency-key": "upload-1",
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         }
       ]
     },
@@ -7740,23 +7939,11 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=note.txt&wait=false&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=false",
           "query": [
-            [
-              "name",
-              "note.txt"
-            ],
             [
               "wait",
               "false"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
@@ -7764,12 +7951,18 @@
               "$uuid": "generated-1"
             },
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         }
       ]
     },
@@ -8171,23 +8364,11 @@
           "method": "POST",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "name=note.txt&wait=false&contentType=text%2Fplain&sizeInBytes=5",
+          "rawQuery": "wait=false",
           "query": [
-            [
-              "name",
-              "note.txt"
-            ],
             [
               "wait",
               "false"
-            ],
-            [
-              "contentType",
-              "text/plain"
-            ],
-            [
-              "sizeInBytes",
-              "5"
             ]
           ],
           "headers": {
@@ -8195,12 +8376,18 @@
               "$uuid": "generated-1"
             },
             "accept": "application/json",
-            "x-calmlens-upload": "content",
-            "content-type": "text/plain"
+            "x-calmlens-upload": {
+              "$absent": true
+            },
+            "content-type": "application/json"
           },
-          "bodyLength": 5,
-          "bodySha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-          "bodyBase64": "aGVsbG8="
+          "body": {
+            "name": "note.txt",
+            "content": {
+              "plainText": "hello",
+              "type": "text/plain"
+            }
+          }
         }
       ]
     },

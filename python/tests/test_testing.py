@@ -12,6 +12,15 @@ from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, defa
 
 DOWNLOAD = create_mock_api_key([{"actions": ["assets:download"], "folderId": None, "includeSubfolders": True}])
 
+_BOUNDARY = "test-boundary"
+
+
+def _upload_form(options, mime_type, data):
+    """An upload form as the API reads it: the ``options`` part, then the ``file`` part."""
+    return (f'--{_BOUNDARY}\r\nContent-Disposition: form-data; name="options"\r\nContent-Type: application/json\r\n\r\n'
+            f'{json.dumps(options)}\r\n--{_BOUNDARY}\r\nContent-Disposition: form-data; name="file"\r\n'
+            f'Content-Type: {mime_type}\r\n\r\n').encode() + data + f"\r\n--{_BOUNDARY}--\r\n".encode()
+
 
 class MockTests(unittest.TestCase):
     def setUp(self):
@@ -289,16 +298,53 @@ class MockTests(unittest.TestCase):
         fixture = Path(__file__).resolve().parents[2] / "go" / "testdata" / "upload-mime-types.json"
         for mime_type in json.loads(fixture.read_text())["refused"]:
             with self.subTest(mime_type):
-                query = urlencode({"name": "x", "wait": "false", "contentType": mime_type, "sizeInBytes": 5})
+                query = urlencode({"wait": "false", "contentType": mime_type, "sizeInBytes": 5})
                 request = Request(f"{self.client.base_url}/projects/{self.client.project_id}/assets?{query}",
-                                  data=b"hello", method="POST",
-                                  headers={"Content-Type": mime_type, "X-CalmLens-Upload": "content"})
+                                  data=_upload_form({"name": "x"}, mime_type, b"hello"), method="POST",
+                                  headers={"Content-Type": "multipart/form-data; boundary=" + _BOUNDARY,
+                                           "X-CalmLens-Upload": "content"})
                 with self.client.transport(request, 1) as response:
                     self.assertEqual(response.status, 415)
                     body = json.loads(response.read())
                 self.assertEqual(body["code"], error_codes.UNSUPPORTED_UPLOAD_TYPE)
                 self.assertEqual(body["details"], {"mimeType": mime_type, "source": "calmlens"})
                 self.assertEqual(self.client.database_storage.assets, {})
+
+    def test_refuses_upload_fields_in_the_query_and_raw_uploads_that_are_not_forms(self):
+        """Like the API: asset fields in a create's query are refused whatever the body, and a raw
+        upload must be an upload form. Nothing is stored either way."""
+        assets = f"{self.client.base_url}/projects/{self.client.project_id}/assets"
+        form = {"Content-Type": "multipart/form-data; boundary=" + _BOUNDARY, "X-CalmLens-Upload": "content"}
+        cases = [
+            (urlencode({"wait": "false", "contentType": "application/pdf", "authorId": "pupil-7", "description": "d"}),
+             _upload_form({"name": "x.pdf"}, "application/pdf", b"%PDF"), form,
+             400, error_codes.UPLOAD_OPTIONS_IN_QUERY, {"fields": ["description", "authorId"]}),
+            (urlencode({"wait": "false", "context": '{"items":[{"text":"hi"}]}'}),
+             json.dumps({"name": "x.txt", "content": {"plainText": "hi", "type": "text/plain"}}).encode(),
+             {"Content-Type": "application/json"}, 400, error_codes.UPLOAD_OPTIONS_IN_QUERY, {"fields": ["context"]}),
+            (urlencode({"wait": "false", "contentType": "application/pdf", "sizeInBytes": 4}), b"%PDF",
+             {"Content-Type": "application/pdf", "X-CalmLens-Upload": "content"},
+             415, error_codes.UNSUPPORTED_CONTENT_TYPE, {"contentType": "application/pdf"}),
+        ]
+        for query, data, headers, status, code, details in cases:
+            with self.subTest(code=code, query=query):
+                request = Request(f"{assets}?{query}", data=data, method="POST", headers=headers)
+                with self.client.transport(request, 1) as response:
+                    self.assertEqual(response.status, status)
+                    body = json.loads(response.read())
+                self.assertEqual((body["code"], body["details"]), (code, details))
+                self.assertEqual(self.client.database_storage.assets, {})
+
+    def test_an_upload_form_is_told_apart_by_its_options_not_its_boundary(self):
+        c = MockCalmLensServerClient()
+        first = c.assets.create(name="a.pdf", content={"data": b"%PDF", "type": "application/pdf"}, idempotency_key="k")
+        # The retry is a new form with a new boundary: it replays the first result.
+        again = c.assets.create(name="a.pdf", content={"data": b"%PDF", "type": "application/pdf"}, idempotency_key="k")
+        self.assertEqual(again["id"], first["id"])
+        self.assertEqual(len(c.database_storage.assets), 1)
+        with self.assertRaises(CalmLensAPIError) as raised:
+            c.assets.create(name="b.pdf", content={"data": b"%PDF", "type": "application/pdf"}, idempotency_key="k")
+        self.assertEqual(raised.exception.code, error_codes.IDEMPOTENCY_KEY_REUSED)
 
     def test_refuses_null_and_invalid_fields_where_the_api_does_before_the_asset_lookup(self):
         # The client refuses these first, so the requests go straight to the mock's transport.
@@ -366,19 +412,25 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         c.cdn.serve({"assetId": "a1", "lens": "thumb"}).close()
         upload, update, events, serve = c.requests
         self.assertEqual((upload.method, upload.path, upload.status), ("POST", "/projects/p1/assets", 200))
-        self.assertEqual(upload.headers["X-calmlens-upload"], "content")
-        self.assertEqual(upload.query["externalId"], "e1")
-        self.assertIs(upload.query["wait"], True)
-        self.assertEqual(upload.body, b"hi")
-        self.assertEqual(upload.headers["Content-type"], "text/plain")
+        self.assertNotIn("X-calmlens-upload", upload.headers)
+        self.assertEqual(upload.query, {"wait": True})
+        self.assertEqual(upload.body, {"name": "note", "externalId": "e1",
+                                       "content": {"plainText": "hi", "type": "text/plain"}})
+        self.assertEqual(upload.headers["Content-type"], "application/json")
         self.assertIn("Idempotency-key", upload.headers)
         self.assertNotIn(c.api_key, repr(upload))
         self.assertTrue(upload.url.startswith(c.base_url + "/projects/p1/assets?"))
         self.assertEqual((update.method, update.path, update.body), ("PATCH", "/assets/a1", {"tags": ["x"]}))
         self.assertEqual(events.query, {"cursor": cursor, "pageSize": 5})
         self.assertEqual((serve.method, serve.path), ("GET", "/assets/p1/a1/rendered/@thumb"))
-        c.requests[0].query["externalId"] = "changed"
-        self.assertEqual(c.requests[0].query["externalId"], "e1")
+        c.requests[0].body["externalId"] = "changed"
+        self.assertEqual(c.requests[0].body["externalId"], "e1")
+        c.clear_requests()
+        c.assets.create(name="doc.pdf", author_id="pupil-7", content={"data": b"%PDF", "type": "application/pdf"})
+        (form,) = c.requests
+        self.assertEqual(form.headers["X-calmlens-upload"], "content")
+        self.assertEqual(form.query, {"wait": False, "contentType": "application/pdf", "sizeInBytes": 4})
+        self.assertEqual(form.body, {"options": {"name": "doc.pdf", "authorId": "pupil-7"}, "file": b"%PDF"})
 
     def test_enqueued_errors_match_real_failures(self):
         c = MockCalmLensServerClient(mock_options={"create_id": lambda prefix: "a1"})

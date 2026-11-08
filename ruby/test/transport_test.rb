@@ -2,6 +2,7 @@
 
 require 'minitest/autorun'
 require 'calmlens'
+require 'calmlens/testing'
 require 'socket'
 require 'stringio'
 require 'timeout'
@@ -109,7 +110,8 @@ class TransportTest < Minitest::Test
     with_server do |client, server|
       client.assets.create(name: 'big.txt', content: { data: io, type: 'text/plain' })
       request = server.requests.pop
-      assert_equal ['200000', 200_000], [request[:headers]['content-length'], request[:body].bytesize]
+      _, file = CalmLens::Testing::FakeAPI.upload_form(request[:body], request[:headers]['content-type'])
+      assert_equal [request[:body].bytesize.to_s, 'x' * 200_000], [request[:headers]['content-length'], file]
       assert reads.none?(&:nil?), "the stream was read whole: #{reads.inspect}"
       assert_operator reads.size, :>, 1
     end
@@ -122,8 +124,9 @@ class TransportTest < Minitest::Test
     with_server do |client, server|
       client.assets.create(name: 'pipe.txt', content: { data: reader, type: 'text/plain' })
       request = server.requests.pop
+      _, file = CalmLens::Testing::FakeAPI.upload_form(request[:body], request[:headers]['content-type'])
       assert_equal ['chunked', nil, 'piped content'],
-                   [request[:headers]['transfer-encoding'], request[:headers]['content-length'], request[:body]]
+                   [request[:headers]['transfer-encoding'], request[:headers]['content-length'], file]
       refute_includes request[:line], 'sizeInBytes'
     end
   end

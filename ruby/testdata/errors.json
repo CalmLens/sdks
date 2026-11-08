@@ -1312,6 +1312,38 @@
     }
   },
   {
+    "code": "upload/options-in-query",
+    "status": 400,
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "application/json",
+        "x-request-id": "req-upload-options-in-query"
+      },
+      "body": {
+        "code": "upload/options-in-query",
+        "message": "Send the asset's name and fields in the request body (the JSON body, or the options part of a multipart/form-data upload), not in the query string.",
+        "requestId": "req-upload-options-in-query",
+        "details": {
+          "reason": "upload_options_in_query"
+        }
+      }
+    },
+    "expected": {
+      "code": "upload/options-in-query",
+      "status": 400,
+      "requestId": "req-upload-options-in-query",
+      "retryAfter": null,
+      "details": {
+        "reason": "upload_options_in_query"
+      }
+    }
+  },
+  {
     "code": "upload/use-upload-part",
     "status": 409,
     "operation": "assets.retrieve",

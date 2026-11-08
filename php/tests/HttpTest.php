@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use CalmLens\CalmLensException;
+use CalmLens\Internal\UploadForm;
 use CalmLens\ServerClient;
 use PHPUnit\Framework\TestCase;
 
@@ -22,7 +23,8 @@ final class HttpTest extends TestCase
         fclose($socket);
         self::$url = 'http://' . $address;
         self::$log = tempnam(sys_get_temp_dir(), 'calmlens-http-');
-        self::$process = proc_open([PHP_BINARY, '-S', $address, __DIR__ . '/http-router.php'],
+        // The fixture reads every body as sent, an upload form too, rather than PHP parsing it.
+        self::$process = proc_open([PHP_BINARY, '-d', 'enable_post_data_reading=0', '-S', $address, __DIR__ . '/http-router.php'],
             [0 => ['pipe', 'r'], 1 => ['file', self::$log, 'a'], 2 => ['file', self::$log, 'a']], $pipes);
         fclose($pipes[0]);
         $deadline = microtime(true) + 5;
@@ -46,7 +48,7 @@ final class HttpTest extends TestCase
         unlink(self::$log);
     }
 
-    public function testRealHttpUploadSendsStoredBytesHeadersAndNestedQuery(): void
+    public function testRealHttpUploadSendsAFormWithTheStoredBytesAndFieldsAndOnlyTransportValuesInTheQuery(): void
     {
         $client = new ServerClient('local-key', 'project', baseUrl: self::$url . '/v1');
         $file = tmpfile();
@@ -56,11 +58,12 @@ final class HttpTest extends TestCase
             $received = $client->assets->create(['name' => 'file', 'content' => ['type' => 'image/png', 'data' => $file], 'metadata' => [['id' => 'source', 'value' => 'a&b']]]);
             self::assertSame('POST', $received['method']);
             self::assertSame('/v1/projects/project/assets', $received['path']);
-            self::assertSame("\0binary\xff✓", base64_decode($received['bytes']));
+            $form = UploadForm::parse($received['contentType'], base64_decode($received['bytes']));
+            self::assertSame("\0binary\xff✓", $form['file']);
+            self::assertSame('image/png', $form['fileType']);
+            self::assertSame(['name' => 'file', 'metadata' => [['id' => 'source', 'value' => 'a&b']]], json_decode($form['options'], true));
             self::assertSame('local-key', $received['apiKey']);
-            self::assertSame('image/png', $received['contentType']);
-            self::assertSame('[{"id":"source","value":"a&b"}]', $received['query']['metadata']);
-            self::assertSame('false', $received['query']['wait']);
+            self::assertSame(['wait' => 'false', 'contentType' => 'image/png', 'sizeInBytes' => (string) strlen("\0binary\xff✓")], $received['query']);
             self::assertMatchesRegularExpression('/^[a-f0-9-]{36}$/', $received['idempotencyKey']);
         } finally {
             fclose($file);

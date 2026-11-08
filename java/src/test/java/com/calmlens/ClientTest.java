@@ -48,8 +48,8 @@ class ClientTest {
   @Test void anOverLongNewestPostIsStillSentAlone() {
     String[] context = {null};
     CalmLensServerClient client = client(request -> {
-      for (String pair : request.uri().getRawQuery().split("&"))
-        if (pair.startsWith("context=")) context[0] = java.net.URLDecoder.decode(pair.substring(8), StandardCharsets.UTF_8);
+      // Text goes as a JSON body, its context with it.
+      context[0] = JsonParser.parseString(new String(Fixtures.body(request), StandardCharsets.UTF_8)).getAsJsonObject().get("context").toString();
       return Fixtures.json(200, Fixtures.assetJson("a", "completed", "allowed"));
     });
     String newest = "z".repeat(Models.MODERATION_CONTEXT_USED_CHARACTERS + 1);

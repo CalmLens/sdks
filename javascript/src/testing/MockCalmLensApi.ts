@@ -165,7 +165,11 @@ export interface MockCalmLensCall {
   query: Record<string, string>;
   /** Request headers, with lowercase names. */
   headers: Record<string, string>;
-  /** The JSON body, the text of a `text/*` upload, the bytes of another upload, or `undefined`. */
+  /**
+   * The JSON body (plain text arrives as `{ name, content: { plainText, type } }`), an upload
+   * form as `{ options, file }` (the file as text for a `text/*` type, else bytes), the bytes of a
+   * later part, or `undefined`.
+   */
   body: unknown;
   /** The HTTP status the mock answered with, or `undefined` when the request failed without one. */
   status: number | undefined;
@@ -503,6 +507,89 @@ const invalidField = (code: string, path: string) =>
     issues: [{ path, message: `Invalid ${path}`, code }],
   });
 
+/** The asset fields an upload carries in its body; the API refuses them in the query string. */
+const UPLOAD_OPTION_KEYS = [
+  "name",
+  "description",
+  "processingOptions",
+  "visibility",
+  "metadata",
+  "tags",
+  "authorId",
+  "context",
+  "externalId",
+  "externalUrl",
+  "folderId",
+  "uploadPresetId",
+] as const;
+
+const indexOfBytes = (haystack: Uint8Array, needle: Uint8Array, from = 0) => {
+  for (let index = haystack.indexOf(needle[0]!, from); index !== -1; ) {
+    if (index + needle.length > haystack.length) return -1;
+    let offset = 1;
+    while (offset < needle.length && haystack[index + offset] === needle[offset]) offset++;
+    if (offset === needle.length) return index;
+    index = haystack.indexOf(needle[0]!, index + 1);
+  }
+  return -1;
+};
+
+/** An upload form as the API reads it: the `options` part's JSON text, then the `file` part. */
+interface UploadForm {
+  options: string;
+  bytes: Uint8Array<ArrayBuffer>;
+}
+
+/**
+ * Reads a raw upload's `multipart/form-data` body like the API: an `options` part, then a `file`
+ * part, then the closing boundary. Anything else is refused.
+ */
+const readUploadForm = (request: MockRequest): UploadForm => {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.split(";")[0]!.trim().toLowerCase() !== "multipart/form-data") {
+    throw new ApiFailure(
+      415,
+      API_ERROR_CODES.UNSUPPORTED_CONTENT_TYPE,
+      "Send a raw upload as multipart/form-data: an options part, then a file part.",
+      { contentType: contentType.split(";")[0]!.trim() || null },
+    );
+  }
+  const boundary = /;\s*boundary=(?:"([^"]+)"|([^;\s]+))/i.exec(contentType);
+  const invalid = (message: string) => fail(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, { message });
+  if (!boundary) throw invalid("The multipart/form-data Content-Type needs a boundary");
+  const encoder = new TextEncoder();
+  const delimiter = encoder.encode(`\r\n--${boundary[1] ?? boundary[2]}`);
+  const body = new Uint8Array(2 + request.bytes.length);
+  body.set(encoder.encode("\r\n"));
+  body.set(request.bytes, 2);
+  const parts: Array<{ name: string | undefined; content: Uint8Array<ArrayBuffer> }> = [];
+  let at = indexOfBytes(body, delimiter);
+  while (at !== -1) {
+    const start = at + delimiter.length;
+    if (body[start] === 0x2d && body[start + 1] === 0x2d) break;
+    const headerEnd = indexOfBytes(body, encoder.encode("\r\n\r\n"), start);
+    const next = headerEnd === -1 ? -1 : indexOfBytes(body, delimiter, headerEnd + 4);
+    if (next === -1) throw invalid("The upload body ended before its closing boundary");
+    const headers = new TextDecoder().decode(body.slice(start, headerEnd));
+    const name = /content-disposition:\s*form-data\s*;[^\r\n]*?\bname="([^"]*)"/i.exec(
+      headers,
+    )?.[1];
+    parts.push({ name, content: body.slice(headerEnd + 4, next) });
+    at = next;
+  }
+  if (at === -1) throw invalid("The upload body ended before its closing boundary");
+  if (parts.length !== 2 || parts[0]!.name !== "options" || parts[1]!.name !== "file") {
+    throw invalid("The upload form must hold an options part, then a file part");
+  }
+  return { options: new TextDecoder().decode(parts[0]!.content), bytes: parts[1]!.content };
+};
+
+/** A request that names asset fields in its query, which the API refuses. */
+const assertNoUploadOptionsInQuery = (query: URLSearchParams) => {
+  const fields = UPLOAD_OPTION_KEYS.filter((key) => query.has(key));
+  if (fields.length) throw fail(API_ERROR_CODES.UPLOAD_OPTIONS_IN_QUERY, { details: { fields } });
+};
+
 /**
  * Refuses `metadata` the API's schema refuses (METADATA_ITEM_SCHEMA): it is `null` or a list of
  * `{ id, value }` objects with a string `id` and any JSON `value`.
@@ -720,9 +807,16 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
   return [];
 };
 
-const isTextUpload = (request: MockRequest) =>
-  request.headers.get("x-calmlens-upload") === "content" &&
-  request.headers.get("content-type") === "text/plain";
+/** A plain-text upload: the SDKs send text as a JSON body with `content.plainText`. */
+const isTextUpload = (request: MockRequest) => {
+  if (request.headers.get("x-calmlens-upload")) return false;
+  try {
+    const body = JSON.parse(new TextDecoder().decode(request.bytes));
+    return typeof body?.content?.plainText === "string";
+  } catch {
+    return false;
+  }
+};
 
 /** Like the API: a new folder is 201 Created, a queued batch 202 Accepted, everything else 200. */
 const SUCCESS_STATUS: Partial<Record<MockCalmLensOperation, number>> = {
@@ -740,7 +834,7 @@ const decodeSegment = (segment: string) => {
   }
 };
 
-/** The upload fields of a create request, from its query (raw uploads) or JSON body (URLs). */
+/** The upload fields of a create request, from its JSON body or its upload form's options. */
 interface UploadFields {
   name: string;
   description?: string;
@@ -1118,9 +1212,24 @@ export class MockCalmLensApi {
     return failure;
   }
 
-  private describeBody({ bytes, headers }: MockRequest): unknown {
+  private describeBody(request: MockRequest): unknown {
+    const { bytes, headers } = request;
     if (bytes.byteLength === 0) return undefined;
     const type = headers.get("content-type") ?? "";
+    if (type.startsWith("multipart/form-data")) {
+      try {
+        const form = readUploadForm(request);
+        const file = request.query.get("contentType") ?? "";
+        return {
+          options: JSON.parse(form.options),
+          file: file.startsWith("text/")
+            ? new TextDecoder().decode(form.bytes)
+            : form.bytes.slice(),
+        };
+      } catch {
+        return bytes.slice();
+      }
+    }
     const text = () => new TextDecoder().decode(bytes);
     if (type === "application/json") {
       try {
@@ -1193,15 +1302,27 @@ export class MockCalmLensApi {
     }
     // HTTP stacks trim header values, so the API sees the key without surrounding whitespace.
     const key = headers.get("idempotency-key")?.replace(/^[\t\n\r ]+|[\t\n\r ]+$/g, "");
-    // Like the API, raw uploads are told apart by their query, type and length, not their bytes.
+    // Like the API, raw uploads are told apart by their query, type and length, not their bytes,
+    // and an upload form by its options too, but not its boundary.
     const upload = headers.get("x-calmlens-upload");
+    const contentType = headers.get("content-type");
+    const isForm = !!upload && /^multipart\/form-data\b/i.test(contentType ?? "");
+    let formOptions: string | undefined;
+    if (isForm && request.segments.at(-1) !== "part") {
+      try {
+        formOptions = readUploadForm(request).options;
+      } catch {
+        // The route refuses it below.
+      }
+    }
     const fingerprint = JSON.stringify([
       request.method,
       request.segments,
       [...request.query].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
-      headers.get("content-type"),
+      isForm ? "multipart/form-data" : contentType,
       upload,
       upload ? request.bytes.byteLength : new TextDecoder().decode(request.bytes),
+      formOptions ?? null,
     ]);
     if (key !== undefined) {
       if (!isValidIdempotencyKey(key)) {
@@ -2041,42 +2162,71 @@ export class MockCalmLensApi {
 
   // ---- Uploads -----------------------------------------------------------------------------
 
-  /** The upload fields of `POST .../assets`: raw uploads carry them in the query. */
+  /**
+   * The upload fields of `POST .../assets`, from the JSON body (text and URLs) or an upload form's
+   * options (files). Like the API, asset fields in the query are refused.
+   */
   private uploadFields(request: MockRequest): UploadFields {
+    const { query } = request;
+    assertNoUploadOptionsInQuery(query);
     const upload = request.headers.get("x-calmlens-upload");
     if (upload !== "content" && upload !== "part") {
       const body = this.json(request);
       checkMetadata(body.metadata);
-      return body as unknown as UploadFields;
-    }
-    const { query } = request;
-    const text = (name: string) => query.get(name) ?? undefined;
-    const parsed = (name: string) => {
-      const raw = query.get(name);
-      if (raw === null) return undefined;
-      try {
-        return JSON.parse(raw);
-      } catch {
-        throw invalidField("validation/invalid-value", name);
+      const {
+        content,
+        part,
+        sizeInBytes: _size,
+        totalSizeInBytes,
+        ...fields
+      } = body as Record<string, unknown> & {
+        content?: { plainText?: unknown; type?: unknown };
+        part?: { plainText?: unknown; type?: unknown; partNumber?: unknown; isFinal?: unknown };
+        totalSizeInBytes?: unknown;
+      };
+      const text = content ?? part;
+      if (text === undefined) return fields as unknown as UploadFields;
+      if (typeof text.plainText !== "string" || typeof text.type !== "string") {
+        throw invalidField("validation/invalid-type", content ? "content" : "part");
       }
-    };
+      return {
+        ...(fields as unknown as UploadFields),
+        contentType: text.type,
+        bytes: new TextEncoder().encode(text.plainText) as Uint8Array<ArrayBuffer>,
+        part: part
+          ? {
+              partNumber: typeof part.partNumber === "number" ? part.partNumber : 1,
+              isFinal: part.isFinal === true,
+              totalSizeInBytes: typeof totalSizeInBytes === "number" ? totalSizeInBytes : undefined,
+            }
+          : undefined,
+      };
+    }
+    const form = readUploadForm(request);
+    let options: Record<string, unknown>;
+    try {
+      options = JSON.parse(form.options);
+    } catch {
+      throw fail(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, {
+        message: "The options part must be a JSON object with the asset's fields",
+      });
+    }
+    if (!options || typeof options !== "object" || Array.isArray(options)) {
+      throw fail(API_ERROR_CODES.INVALID_UPLOAD_PAYLOAD, {
+        message: "The options part must be a JSON object with the asset's fields",
+      });
+    }
+    const unknown = Object.keys(options).find(
+      (key) => !(UPLOAD_OPTION_KEYS as readonly string[]).includes(key),
+    );
+    if (unknown !== undefined) throw invalidField("validation/unknown-field", unknown);
+    if (typeof options.name !== "string") throw invalidField("validation/invalid-type", "name");
+    checkMetadata(options.metadata);
     const total = query.get("totalSizeInBytes");
-    checkMetadata(parsed("metadata"));
     return {
-      name: query.get("name") ?? "",
-      description: text("description"),
-      processingOptions: parsed("processingOptions"),
-      visibility: text("visibility") as Asset["visibility"] | undefined,
-      metadata: parsed("metadata"),
-      tags: parsed("tags"),
-      authorId: text("authorId"),
-      context: parsed("context"),
-      externalId: text("externalId"),
-      externalUrl: text("externalUrl"),
-      folderId: text("folderId"),
-      uploadPresetId: text("uploadPresetId"),
-      contentType: query.get("contentType") ?? request.headers.get("content-type") ?? "",
-      bytes: request.bytes,
+      ...(options as unknown as UploadFields),
+      contentType: query.get("contentType") ?? "",
+      bytes: form.bytes,
       part:
         upload === "part"
           ? {

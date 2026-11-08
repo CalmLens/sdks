@@ -371,6 +371,42 @@ final class ContractTest extends TestCase
         return $pairs;
     }
 
+    /**
+     * An upload form as the API reads it, parsed with the boundary from its Content-Type: exactly
+     * an `options` part, then a `file` part, then the closing boundary. Null for any other body.
+     *
+     * @return ?array{form: array{options: mixed, file: array}}
+     */
+    private static function uploadForm(string $contentType, string $body): ?array
+    {
+        if (!preg_match('/^multipart\/form-data;\s*boundary=([^;\s]+)$/i', $contentType, $match)) {
+            return null;
+        }
+        $boundary = $match[1];
+        $open = "--$boundary\r\n";
+        $between = "\r\n--$boundary\r\n";
+        $close = "\r\n--$boundary--\r\n";
+        self::assertStringStartsWith($open, $body, 'the form opens with its boundary');
+        self::assertStringEndsWith($close, $body, 'the form ends with its closing boundary');
+        $optionsHeadEnd = strpos($body, "\r\n\r\n", strlen($open));
+        $split = strpos($body, $between, (int) $optionsHeadEnd);
+        self::assertNotFalse($split, 'the form has a second part');
+        $optionsHead = substr($body, strlen($open), $optionsHeadEnd - strlen($open));
+        $options = substr($body, $optionsHeadEnd + 4, $split - $optionsHeadEnd - 4);
+        $fileHeadStart = $split + strlen($between);
+        $fileHeadEnd = strpos($body, "\r\n\r\n", $fileHeadStart);
+        $fileHead = substr($body, $fileHeadStart, $fileHeadEnd - $fileHeadStart);
+        $file = substr($body, $fileHeadEnd + 4, strlen($body) - strlen($close) - $fileHeadEnd - 4);
+        self::assertMatchesRegularExpression('/^Content-Disposition: form-data; name="options"\r\nContent-Type: application\/json$/iD', $optionsHead, 'the options part');
+        self::assertMatchesRegularExpression('/^Content-Disposition: form-data; name="file"(?:; filename="[^"]*")?\r\nContent-Type: ([^\r\n]+)$/iD', $fileHead, 'the file part');
+        preg_match('/Content-Type: ([^\r\n]+)$/iD', $fileHead, $type);
+        self::assertStringNotContainsString($between, $file, 'the form has exactly two parts');
+        return ['form' => ['options' => json_decode($options, true, 512, JSON_THROW_ON_ERROR), 'file' => [
+            'contentType' => $type[1], 'bodyLength' => strlen($file), 'bodySha256' => hash('sha256', $file)]
+            // A large file is kept as its length and hash alone, as a large raw body is.
+            + (strlen($file) > 1024 * 1024 ? [] : ['bodyBase64' => base64_encode($file)])]];
+    }
+
     #[DataProvider('clientCases')]
     public function testScriptedClientCase(array $case): void
     {
@@ -382,7 +418,8 @@ final class ContractTest extends TestCase
             // A large raw body is kept as its length and hash, all its check reads, so a file sent
             // in many parts isn't held in memory once for each.
             $content = (string) $request->getBody();
-            $received[] = [$request, strlen($content) > 1024 * 1024 ? ['bodyLength' => strlen($content), 'bodySha256' => hash('sha256', $content)] : $content];
+            $form = self::uploadForm($request->getHeaderLine('Content-Type'), $content);
+            $received[] = [$request, $form ?? (strlen($content) > 1024 * 1024 ? ['bodyLength' => strlen($content), 'bodySha256' => hash('sha256', $content)] : $content)];
             $scripted = $case['responses'][count($received) - 1] ?? null;
             if ($scripted === null) {
                 throw new \LogicException('request ' . count($received) . ' has no scripted response');
@@ -481,7 +518,16 @@ final class ContractTest extends TestCase
             foreach ($want['headers'] + self::fixtures('client-cases')['everyRequest']['headers'] as $name => $value) {
                 self::checkHeader($label, $name, $request->hasHeader($name) ? $request->getHeaderLine($name) : null, $value, $uuids);
             }
-            if (array_key_exists('body', $want)) {
+            if (array_key_exists('form', $want)) {
+                self::assertIsArray($body, "$label: an upload form");
+                self::assertArrayHasKey('form', $body, "$label: an upload form");
+                self::assertSameJson($want['form']['options'], $body['form']['options'], "$label: form options");
+                $file = $body['form']['file'];
+                if (!isset($want['form']['file']['bodyBase64'])) {
+                    unset($file['bodyBase64']);
+                }
+                self::assertSame($want['form']['file'], $file, "$label: form file");
+            } elseif (array_key_exists('body', $want)) {
                 if ($want['body'] === null) {
                     self::assertSame('', $body, "$label: no body");
                 } else {
