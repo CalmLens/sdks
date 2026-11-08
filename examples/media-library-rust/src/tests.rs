@@ -20,6 +20,52 @@ const SECRET: &str = "a-local-development-secret";
 
 // ------------------------------------------------------------ helpers
 
+/// A captured upload's `options` part as JSON and its `file` part's bytes: a raw upload is a
+/// `multipart/form-data` body of those two parts, in that order.
+fn upload_form(request: &calmlens::testing::Request) -> (Value, Vec<u8>) {
+    let content_type = request
+        .header("content-type")
+        .expect("an upload form has a Content-Type");
+    let boundary = content_type
+        .split("boundary=")
+        .nth(1)
+        .expect("a form boundary")
+        .trim_matches('"');
+    let delimiter = format!("--{boundary}").into_bytes();
+    let mut parts: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut at = 0;
+    let find = |needle: &[u8], from: usize| {
+        request.body[from..]
+            .windows(needle.len())
+            .position(|window| window == needle)
+            .map(|position| position + from)
+    };
+    while let Some(start) = find(&delimiter, at) {
+        let head_start = start + delimiter.len();
+        if request.body[head_start..].starts_with(b"--") {
+            break;
+        }
+        let head_end = find(b"\r\n\r\n", head_start).expect("form part headers");
+        let head = String::from_utf8_lossy(&request.body[head_start..head_end]).into_owned();
+        let end = find(&delimiter, head_end + 4).expect("form part end");
+        let name = head
+            .split("name=\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .expect("form part name")
+            .to_owned();
+        parts.push((name, request.body[head_end + 4..end - 2].to_vec()));
+        at = end;
+    }
+    let names: Vec<&str> = parts.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(names, ["options", "file"], "upload form parts");
+    let file = parts.pop().unwrap().1;
+    (
+        serde_json::from_slice(&parts[0].1).expect("the options part is JSON"),
+        file,
+    )
+}
+
 struct App {
     state: SharedState,
     router: Router,
@@ -490,27 +536,27 @@ async fn live_upload_sends_folder_metadata_catalogue_id_and_keeps_content() {
     let sent = mock.last_request().unwrap();
     assert_eq!(sent.path, "/projects/project-1/assets");
     assert_eq!(sent.header("x-calmlens-upload"), Some("content"));
-    assert_eq!(sent.body, PNG);
-    assert_eq!(sent.query_param("folderId"), Some("folder-1"));
-    assert_eq!(
-        sent.query_param("externalId"),
-        Some("calmlibrary:CAM-2026-014")
-    );
-    assert_eq!(sent.query_param("visibility"), Some("private"));
     assert_eq!(sent.query_param("contentType"), Some("image/png"));
     assert_eq!(sent.query_param("wait"), Some("false"));
-    let metadata: Value = serde_json::from_str(sent.query_param("metadata").unwrap()).unwrap();
+    let (options, file) = upload_form(&sent);
+    assert_eq!(file, PNG);
+    assert_eq!(options["name"], json!("Harbour at dawn"));
+    assert_eq!(options["description"], json!("Boats leaving the harbour"));
+    assert_eq!(options["folderId"], json!("folder-1"));
+    assert_eq!(options["externalId"], json!("calmlibrary:CAM-2026-014"));
+    assert_eq!(options["visibility"], json!("private"));
     assert_eq!(
-        metadata,
+        options["metadata"],
         json!([
             {"id": "photographer", "value": "Ana Ruiz"},
             {"id": "licence", "value": "cc-by-4.0"},
             {"id": "campaign", "value": "Spring launch"}
         ])
     );
-    let processing: Value =
-        serde_json::from_str(sent.query_param("processingOptions").unwrap()).unwrap();
-    assert_eq!(processing["keepContentAfterProcessing"], json!(true));
+    assert_eq!(
+        options["processingOptions"]["keepContentAfterProcessing"],
+        json!(true)
+    );
 }
 
 #[tokio::test]

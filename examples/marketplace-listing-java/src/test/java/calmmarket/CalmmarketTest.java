@@ -116,6 +116,29 @@ class CalmmarketTest {
         + "\"description\":null,\"assetId\":\"" + assetId + "\",\"asset\":{\"id\":\"" + assetId + "\",\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"status\":\"allowed\"}},\"content\":{\"status\":\"stored\"}},\"facts\":" + facts + ",\"createdAt\":1760000000000}";
   }
 
+  // An upload's asset fields travel in its body, never in the URL: a JSON body, or the "options" part
+  // of the multipart form that carries a photo's bytes in its "file" part.
+  static JsonObject options(MockCalmLensServerClient.Request request) {
+    if (!isForm(request)) return JsonParser.parseString(request.bodyText()).getAsJsonObject();
+    return JsonParser.parseString(new String(formPart(request, "options"), StandardCharsets.UTF_8)).getAsJsonObject();
+  }
+
+  static boolean isForm(MockCalmLensServerClient.Request request) {
+    String type = request.header("Content-Type");
+    return type != null && type.startsWith("multipart/form-data");
+  }
+
+  static byte[] formPart(MockCalmLensServerClient.Request request, String name) {
+    String type = request.header("Content-Type");
+    String boundary = "--" + type.substring(type.indexOf("boundary=") + "boundary=".length()).replace("\"", "");
+    byte[] body = request.body();
+    // ISO-8859-1 maps bytes to characters one to one, so string offsets are byte offsets.
+    String raw = new String(body, StandardCharsets.ISO_8859_1);
+    int start = raw.indexOf("\r\n\r\n", raw.indexOf("name=\"" + name + "\"")) + 4;
+    int end = raw.indexOf("\r\n" + boundary, start);
+    return java.util.Arrays.copyOfRange(body, start, end);
+  }
+
   static String html(Calmmarket.Response response) { return new String(response.body(), StandardCharsets.UTF_8); }
 
   static void expire(Calmmarket.Listing listing) {
@@ -207,21 +230,22 @@ class CalmmarketTest {
     assertEquals("/listings/" + listing.id + "?notice=submitted", response.headers().get("location"));
     List<MockCalmLensServerClient.Request> sent = mock.requests();
     assertEquals(5, sent.size());
-    assertEquals(listing.id + ":title", sent.get(0).query().get("externalId"));
+    assertEquals(listing.id + ":title", options(sent.get(0)).get("externalId").getAsString());
     assertEquals("true", sent.get(0).query().get("wait"), "text waits for its decision");
     assertEquals(listing.id + ":title", sent.get(0).header("Idempotency-Key"), "the listing's own key makes a retried submission safe");
-    assertEquals(listing.id + ":description", sent.get(1).query().get("externalId"));
+    assertEquals(listing.id + ":description", options(sent.get(1)).get("externalId").getAsString());
     for (int i = 0; i < 3; i++) {
       MockCalmLensServerClient.Request upload = sent.get(2 + i);
-      JsonObject options = JsonParser.parseString(upload.query().get("processingOptions")).getAsJsonObject();
+      JsonObject sentFields = options(upload);
+      JsonObject options = sentFields.getAsJsonObject("processingOptions");
       assertTrue(options.getAsJsonObject("features").getAsJsonObject("ocr").get("enabled").getAsBoolean(), "photo " + (i + 1));
       assertTrue(options.get("keepContentAfterProcessing").getAsBoolean());
       assertEquals("false", upload.query().get("wait"), "photos are classified in the background");
-      assertEquals("private", upload.query().get("visibility"));
-      assertEquals(listing.id + ":photo-" + (i + 1), upload.query().get("externalId"));
+      assertEquals("private", sentFields.get("visibility").getAsString());
+      assertEquals(listing.id + ":photo-" + (i + 1), sentFields.get("externalId").getAsString());
       assertEquals(listing.id + ":photo-" + (i + 1), upload.header("Idempotency-Key"));
       assertEquals(i == 1 ? "image/gif" : "image/png", upload.query().get("contentType"));
-      assertArrayEquals(i == 1 ? GIF : PNG, upload.body());
+      assertArrayEquals(i == 1 ? GIF : PNG, formPart(upload, "file"));
     }
     assertEquals(List.of("photo-1", "photo-2", "photo-3"), listing.photos.stream().map(photo -> photo.assetId).toList());
     assertEquals(Calmmarket.State.IN_REVIEW, listing.state());

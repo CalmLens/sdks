@@ -183,8 +183,14 @@ func TestMultipartAboveThreshold(t *testing.T) {
 		t.Fatalf("unexpected requests: %+v", requests)
 	}
 	first := requests[0].Query
-	if first.Get("partNumber") != "1" || first.Get("isFinal") != "false" || first.Get("visibility") != "private" || first.Get("contentType") != "video/mp4" || !strings.Contains(first.Get("processingOptions"), `"keepContentAfterProcessing":true`) {
+	if first.Get("partNumber") != "1" || first.Get("isFinal") != "false" || first.Get("contentType") != "video/mp4" {
 		t.Fatalf("first part: %v", first)
+	}
+	// The asset's own fields travel in the first part's options, never in the URL.
+	options := requests[0].Body
+	processing, _ := options["processingOptions"].(map[string]any)
+	if options["visibility"] != "private" || processing["keepContentAfterProcessing"] != true {
+		t.Fatalf("first part options: %v", options)
 	}
 	for i, r := range requests[1:] {
 		final := strconv.FormatBool(i == 1)

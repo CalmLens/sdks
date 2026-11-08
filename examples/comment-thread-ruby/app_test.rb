@@ -83,6 +83,9 @@ module TestHelpers
   def home(app) = request(app, 'GET', '/').last
   def home_as_author(app) = request(app, 'GET', '/', headers: { 'Cookie' => "calmthread_csrf=#{token(app)}" }).last
   def states(app) = app.discussion.replies.map { |reply| reply[:state] }
+  # The asset fields of an upload: they travel in the JSON body, never in the URL.
+  def fields(item) = JSON.parse(item.body)
+  def sent_text(item) = (fields(item).dig('content', 'plainText') if item.body.to_s.start_with?('{'))
   def calls(mock) = mock.requests.map { |item| [item.method, item.path] }
 end
 
@@ -96,11 +99,11 @@ class SubmissionTest < Minitest::Test
     assert_equal 303, post_reply(app, name: 'Second').first
     moderations = mock.requests.select { |item| item.method == 'POST' && item.path == '/projects/project-1/assets' }
     assert_equal 4, moderations.size
-    moderations.each { |item| assert_equal HOLD_POLICY, JSON.parse(item.query['processingOptions']) }
-    assert_equal ['Calmthread display name', 'Calmthread reply'] * 2, moderations.map { |item| item.query['name'] }
+    moderations.each { |item| assert_equal HOLD_POLICY, fields(item).fetch('processingOptions') }
+    assert_equal ['Calmthread display name', 'Calmthread reply'] * 2, moderations.map { |item| fields(item).fetch('name') }
     assert_equal ['true'] * 4, moderations.map { |item| item.query['wait'] }
     reply = app.discussion.replies.last
-    assert_equal ["#{reply[:id]}:name", "#{reply[:id]}:text"], moderations.first(2).map { |item| item.query['externalId'] }
+    assert_equal ["#{reply[:id]}:name", "#{reply[:id]}:text"], moderations.first(2).map { |item| fields(item).fetch('externalId') }
     assert_equal({ name: 'name-1', text: 'text-1' }, reply[:asset_ids])
   end
 
@@ -145,7 +148,7 @@ class SubmissionTest < Minitest::Test
   def test_a_blocked_name_holds_the_reply_but_still_sends_the_text_for_review
     app, mock = live_app(CURSOR, asset('name-1', 'blocked'), asset('text-1', 'allowed'))
     post_reply(app, name: 'Rude Name', text: 'Fine words')
-    assert_equal 'Fine words', mock.requests.last.body
+    assert_equal 'Fine words', sent_text(mock.requests.last)
     reply = app.discussion.replies.first
     assert_equal [:held, [:name]], [reply[:state], reply[:held_fields]]
     refute_includes home(app), 'Rude Name'
@@ -168,7 +171,7 @@ class SubmissionTest < Minitest::Test
         app, mock = live_app(*responses)
         assert_equal :failed, app.discussion.submit('Ada', 'Secret text')
         assert_empty app.discussion.replies, "kept #{status.inspect}"
-        assert_equal(responses.size == 2 ? 1 : 0, mock.requests.count { |item| item.body == 'Secret text' })
+        assert_equal(responses.size == 2 ? 1 : 0, mock.requests.count { |item| sent_text(item) == 'Secret text' })
       end
     end
     # The SDK refuses a response that is not a well-formed asset, so nothing is kept or published.
@@ -180,7 +183,7 @@ class SubmissionTest < Minitest::Test
         error = assert_raises(CalmLens::InvalidResponseError) { app.discussion.submit('Ada', 'Secret text') }
         assert_equal CalmLens::SdkErrorCodes::INVALID_RESPONSE, error.code
         assert_empty app.discussion.replies, "kept #{text.inspect}"
-        assert_equal(responses.size == 2 ? 1 : 0, mock.requests.count { |item| item.body == 'Secret text' })
+        assert_equal(responses.size == 2 ? 1 : 0, mock.requests.count { |item| sent_text(item) == 'Secret text' })
       end
     end
     app, = live_app(asset('n', 'allowed'), asset('t', 'blocked'))

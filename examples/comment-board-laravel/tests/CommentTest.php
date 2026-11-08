@@ -43,8 +43,10 @@ final class CommentTest extends TestCase
         $mock->enqueueJson(self::asset($status));
         $this->app->instance(ServerClient::class, $mock->client());
         $this->post('/comments', ['comment' => 'Hello'])->assertRedirect('/')->assertSessionHas('comments', [['text' => 'Hello', 'assetId' => 'asset-1']]);
-        self::assertSame('Hello', (string) $mock->requests()[0]->request->getBody());
-        self::assertSame('text/plain', $mock->requests()[0]->request->getHeaderLine('Content-Type'));
+        // The text travels as the JSON upload's plain-text content, not as a raw body.
+        $sent = json_decode((string) $mock->requests()[0]->request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(['plainText' => 'Hello', 'type' => 'text/plain'], $sent['content']);
+        self::assertSame('application/json', $mock->requests()[0]->request->getHeaderLine('Content-Type'));
     }
 
     public static function withheld(): iterable

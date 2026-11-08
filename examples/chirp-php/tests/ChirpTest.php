@@ -156,7 +156,8 @@ final class ChirpTest extends TestCase
         $this->signIn('alice');
         self::assertSame(303, $this->request('POST', '/posts', ['text' => $text])->status);
         $post = $this->onlyPost();
-        self::assertSame($text, (string) $this->mock->requests()[array_key_last($this->mock->requests())]->request->getBody());
+        $sent = json_decode((string) $this->mock->requests()[array_key_last($this->mock->requests())]->request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($text, $sent['content']['plainText']);
         $this->cookies = [];
         self::assertSame([$post['id']], self::shown($this->request('GET', '/')));
         self::assertSame(200, $this->request('GET', '/post/' . $post['id'])->status);
