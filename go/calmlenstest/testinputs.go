@@ -70,8 +70,10 @@ type TestInputPresetSet struct {
 	AdultImage       TestInput `json:"adultImage"`
 	AdultText        TestInput `json:"adultText"`
 	RegionalDelivery TestInput `json:"regionalDelivery"`
-	Germany          TestInput `json:"germany"`
-	Mixed            TestInput `json:"mixed"`
+	// Germany is an input blocked only in Germany, with no findings of its own. The
+	// hate.regional-symbol signal is the finding behind such a block.
+	Germany TestInput `json:"germany"`
+	Mixed   TestInput `json:"mixed"`
 	// OneFace is one person with one face, without an age.
 	OneFace TestInput `json:"oneFace"`
 	// NoFace is person and face detection finding nobody.
@@ -103,7 +105,7 @@ func TestInputPresets() TestInputPresetSet {
 		RegionalDelivery: TestInput{Instances: []TestInstance{}, RegionalActions: []TestRegionalAction{
 			{Region: "DE", Action: "block"}, {Region: "GB", Action: "age-restrict"}, {Region: "FR", Action: "limit"},
 		}},
-		Germany: one("hate", "hate-symbol", "hate-nazi-symbols-public-display"),
+		Germany: TestInput{Instances: []TestInstance{}, RegionalActions: []TestRegionalAction{{Region: "DE", Action: "block"}}},
 		Mixed: TestInput{Instances: []TestInstance{
 			{Category: "harassment", Qualifiers: []string{"harassment-abuse", "harassment-documentary"}},
 			{Category: "harassment", Qualifiers: []string{"harassment-threat"}},
@@ -148,7 +150,7 @@ func TestInputForSignal(signal string, kind TestInputKind) (TestInput, error) {
 		}
 		return presets.AdultText, nil
 	case "hate.regional-symbol":
-		return presets.Germany, nil
+		return TestInput{Instances: []TestInstance{{Category: "hate", Qualifiers: []string{"hate-symbol", "hate-nazi-symbols-public-display"}}}}, nil
 	case "sexual.involving-minors":
 		return TestInput{Instances: []TestInstance{{Category: "sexual", Qualifiers: []string{"sexual-minors"}}}}, nil
 	case "violence.graphic":

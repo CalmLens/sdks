@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -104,8 +105,8 @@ type Options struct {
 	Now func() int64
 	// Moderate decides each asset the mock moderates: completed uploads (Assets.Create,
 	// Assets.Classify, Text.Classify and final parts), Assets.Retry, Assets.Explain with Rerun,
-	// and CompleteProcessing without a decision. Return NewDecision(status), with any Flag and
-	// NotEvaluated calls; nil, or no Moderate, means DefaultModerate: queued work stays pending
+	// and CompleteProcessing without a decision. Return NewDecision(status), with any Flag,
+	// NotEvaluated and PendingReview calls; nil, or no Moderate, means DefaultModerate: queued work stays pending
 	// and the rest is allowed. A pending decision leaves the asset processing; for a re-run it
 	// keeps the asset's decision until CompleteProcessing, and a failed re-run keeps it. Finished
 	// processing removes content unless the upload set
@@ -360,7 +361,8 @@ func (m *MockServerClient) EnqueueEvent(events ...calmlens.Event) []calmlens.Eve
 // changes (purged also removes the content with removal reason requested, recording an
 // asset.content-removed event first), the review joins manualReviews, and an "asset.<decision>"
 // event whose Actor is a calmlens.ActorUser joins the events feed. The moderation report stays as
-// it was. It returns a *calmlens.Error with code asset/not-found for an unknown asset, and
+// it was, except that a pending review is settled (Assets.Decide leaves it waiting, as with the
+// API). It returns a *calmlens.Error with code asset/not-found for an unknown asset, and
 // sdk/invalid-argument for another decision, such as OutcomePending or OutcomeFailed.
 func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, error) {
 	switch decision {
@@ -375,6 +377,7 @@ func (m *MockServerClient) Decide(assetID, decision string) (*calmlens.Asset, er
 		return nil, &calmlens.Error{Code: calmlens.CodeAssetNotFound, Message: "Asset not found", Status: http.StatusNotFound}
 	}
 	m.recordReview(a, decision, nil)
+	section(section(a, "classification"), "moderation")["pendingReview"] = nil
 	return toAsset(a)
 }
 
@@ -1393,14 +1396,19 @@ func (m *MockServerClient) ensureLenses(body calmlens.JSON, now int64) (any, err
 			result = append(result, m.saveNewLens(definition, now))
 			continue
 		}
+		// Unlike an update, an ensure gives the whole definition: leaving active out means true.
+		if _, sent := definition["active"]; !sent {
+			definition = maps.Clone(definition)
+			definition["active"] = true
+		}
 		result = append(result, m.changeLens(old, definition, now))
 	}
 	return calmlens.JSON{"lenses": result}, nil
 }
 
-// saveNewLens stores a lens from definition.
+// saveNewLens stores a lens from definition; like the API, it is active unless that says otherwise.
 func (m *MockServerClient) saveNewLens(definition map[string]any, now int64) calmlens.JSON {
-	lens := calmlens.JSON{"id": m.options.CreateID("lens"), "projectId": m.options.ProjectID, "description": nil, "createdAt": now, "updatedAt": now}
+	lens := calmlens.JSON{"id": m.options.CreateID("lens"), "projectId": m.options.ProjectID, "description": nil, "active": true, "createdAt": now, "updatedAt": now}
 	for key, item := range definition {
 		lens[key] = item
 	}
@@ -1545,6 +1553,15 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 		}
 	}
 	if err := checkMetadata(options["metadata"]); err != nil {
+		return nil, err
+	}
+	// A multipart upload is checked against its declared total, when it gives one.
+	uploadSize := int64(len(raw))
+	if declared, err := strconv.ParseInt(declaredTotal, 10, 64); multipart && err == nil {
+		uploadSize = declared
+	}
+	options, err := m.applyUploadPreset(options, hasContent, mime, uploadSize)
+	if err != nil {
 		return nil, err
 	}
 	if text(options["name"]) == "" {
@@ -1810,7 +1827,7 @@ func (m *MockServerClient) decide(a calmlens.JSON, decision *Decision) {
 	if decision.status == OutcomePending {
 		return
 	}
-	m.applyOutcome(a, decision.status, calmlens.ContentRemovalReasonPolicy, decision.report())
+	m.applyOutcome(a, decision.status, calmlens.ContentRemovalReasonPolicy, decision.report(m.options.Now()))
 	classification := section(a, "classification")
 	if a["type"] != calmlens.AssetTypeImage || classification["status"] != calmlens.ClassificationStatusCompleted {
 		return
@@ -2799,7 +2816,9 @@ const mockEmbedHTML = `<!doctype html><html lang="en"><head><meta charset="utf-8
 // the upload; rendered the image, PDF, video or audio file content.rendered describes; preview
 // the still content.preview describes; and placeholder its ThumbHash as a PNG. The mock converts
 // nothing: an upload stands in for its rendered file, an image for its own preview, and the
-// placeholder PNG for a screenshot, page or waveform. Errors are JSON bodies with 400, 403 or 404.
+// placeholder PNG for a screenshot, page or waveform. Errors are JSON bodies with 400, 403 or 404;
+// a private asset fetched without a grant or the API key is always 404 asset/not-found, apart from
+// its public placeholder and /info, which has its own rule.
 func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, header http.Header) (int, []byte, string) {
 	errorBody := func(status int, code, message string) (int, []byte, string) {
 		data, _ := json.Marshal(calmlens.JSON{"code": code, "message": message})
@@ -2876,6 +2895,12 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 	// A grant authorises a private asset without the API key.
 	canDownload := func() bool {
 		return grant != nil || m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key"))
+	}
+	// Like the CDN, a private asset answers anyone without a grant or the project's API key as an
+	// unknown asset does, whatever its state. Its placeholder is public.
+	if asset["visibility"] != calmlens.VisibilityPublic && req.Header.Get("X-Api-Key") != m.options.APIKey && !canDownload() &&
+		resource != calmlens.ResourcePlaceholder && resource != calmlens.ResourceInfo {
+		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 	}
 	if resource == calmlens.ResourceInfo {
 		return m.serveInfo(req, asset, canDownload(), header)

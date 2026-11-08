@@ -105,6 +105,62 @@ func TestMockLifecycle(t *testing.T) {
 }
 
 // A grant serves until its expiry, then the CDN refuses it; a held asset can't be signed.
+func TestDecisionPendingReviewIsRequestedWhenApplied(t *testing.T) {
+	c, err := NewServerClient(Options{
+		Now: func() int64 { return 1234 },
+		Moderate: func(ModerationInput) *Decision {
+			return NewDecision(OutcomeLimited).PendingReview(PendingReviewUncertain, "violence")
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset, err := c.Assets.Classify(context.Background(), calmlens.SubmitAssetOptions{Name: "a.txt", Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hi")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &calmlens.AssetPendingReview{RequestedAt: 1234, Reason: PendingReviewUncertain, UncertainCategories: []string{"violence"}}
+	if got := asset.Classification.Moderation.PendingReview; !reflect.DeepEqual(got, want) {
+		t.Fatalf("%+v", got)
+	}
+}
+
+// The shared scenarios upload through a preset whole; a multipart upload's first part is checked
+// against its declared total and takes the preset's fields too.
+func TestUploadPresetAppliesToAMultipartFirstPart(t *testing.T) {
+	c, err := NewServerClient(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	limit := int64(10)
+	presets, err := c.UploadPresets.Ensure(ctx, calmlens.EnsureUploadPresetsOptions{UploadPresets: []calmlens.UploadPresetDefinition{
+		{Key: "small", Name: "Small", Visibility: calmlens.VisibilityPublic, MaxSizeInBytes: &limit, AllowedContentTypes: []string{"image/*"}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := &presets.UploadPresets[0].ID
+	first := func(total int64, kind string) calmlens.SubmitAssetOptions {
+		return calmlens.SubmitAssetOptions{Name: "a", UploadPresetID: id, TotalSizeInBytes: &total, Part: &calmlens.Content{Type: kind, Base64: calmlens.Ptr("aGVsbG8="), PartNumber: 1, IsFinal: total == 5}}
+	}
+	var tooLarge *calmlens.Error
+	if _, err = c.Assets.Create(ctx, first(11, "image/png")); !errors.As(err, &tooLarge) || tooLarge.Code != calmlens.CodeUploadTooLarge || tooLarge.Details["source"] != "preset" {
+		t.Fatal(err)
+	}
+	var refused *calmlens.Error
+	if _, err = c.Assets.Create(ctx, first(5, "application/pdf")); !errors.As(err, &refused) || refused.Code != calmlens.CodeUnsupportedUploadType || refused.Details["source"] != "preset" {
+		t.Fatal(err)
+	}
+	asset, err := c.Assets.Create(ctx, first(5, "image/png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asset.Visibility != calmlens.VisibilityPublic {
+		t.Fatal(asset.Visibility)
+	}
+}
+
 func TestMockSignedAssetURLExpiresAndHeldAssetsAreNotSigned(t *testing.T) {
 	now := int64(1000)
 	c, err := NewServerClient(Options{Now: func() int64 { return now }})

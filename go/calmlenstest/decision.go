@@ -23,7 +23,7 @@ const (
 	// like an allowed one.
 	OutcomeLimited = "limited"
 	// OutcomeAgeRestricted finishes processing with moderation age-restricted; the mock CDN then
-	// serves the asset only to keys allowed to download it, like a private asset.
+	// serves the asset only with viewer claims confirming the viewer's age.
 	OutcomeAgeRestricted = "age-restricted"
 	// OutcomeBlocked finishes processing with moderation blocked.
 	OutcomeBlocked = "blocked"
@@ -39,6 +39,14 @@ var statusAction = map[string]string{
 	OutcomeAllowed: "allow", OutcomeLimited: "limit", OutcomeAgeRestricted: "age-restrict",
 	OutcomeBlocked: "block", OutcomePurged: "purge",
 }
+
+// Why a decision waits for human review, for Decision.PendingReview.
+const (
+	// PendingReviewSampled is a decision sampled for review.
+	PendingReviewSampled = "sampled"
+	// PendingReviewUncertain is a decision uncertain about some categories.
+	PendingReviewUncertain = "uncertain"
+)
 
 // Why the mock moderates an asset, for ModerationInput.Trigger.
 const (
@@ -89,16 +97,24 @@ type flag struct {
 }
 
 // Decision is a moderation decision for Options.Moderate or CompleteProcessing, started with
-// NewDecision: Flag the categories it found, with their scores and qualifiers, and mark the
-// categories it couldn't assess with NotEvaluated. The calls chain. A call with a status,
-// category, qualifier or score CalmLens doesn't have, a category already in the decision, or
-// findings on a pending or failed decision makes Err return an sdk/invalid-argument
+// NewDecision: Flag the categories it found, with their scores and qualifiers, mark the
+// categories it couldn't assess with NotEvaluated, and leave it waiting for human review with
+// PendingReview. The calls chain. A call with a status, category, qualifier or score CalmLens
+// doesn't have, a category already in the decision, findings or a pending review on a pending or
+// failed decision, or a review PendingReview refuses makes Err return an sdk/invalid-argument
 // *calmlens.Error, and the mock returns that error from the call that uses the decision.
 type Decision struct {
 	status       string
 	flags        map[string]flag
 	notEvaluated map[string]bool
+	review       *pendingReview
 	err          error
+}
+
+// pendingReview is the review a decision waits for.
+type pendingReview struct {
+	reason              string
+	uncertainCategories []string
 }
 
 // NewDecision starts a decision with status: OutcomePending, OutcomeFailed, OutcomeAllowed,
@@ -182,6 +198,36 @@ func (d *Decision) NotEvaluated(category string) *Decision {
 	return d
 }
 
+// PendingReview leaves the decision waiting for human review, as
+// classification.moderation.pendingReview reports: PendingReviewSampled, or
+// PendingReviewUncertain with the categories that made it so. requestedAt is the mock clock when
+// the decision is applied. MockServerClient.Decide, the review queue's decision, clears it;
+// Assets.Decide doesn't, as with the API. A pending or failed decision, another reason, uncertain
+// categories on a sampled review or an unknown category makes Err return an error.
+func (d *Decision) PendingReview(reason string, uncertainCategories ...string) *Decision {
+	switch {
+	case d.err != nil:
+		return d
+	case !decided(d.status):
+		d.fail("a %s decision can't wait for review", d.status)
+		return d
+	case reason != PendingReviewSampled && reason != PendingReviewUncertain:
+		d.fail("reason must be %s or %s, not %q", PendingReviewSampled, PendingReviewUncertain, reason)
+		return d
+	case reason == PendingReviewSampled && len(uncertainCategories) > 0:
+		d.fail("a sampled review has no uncertain categories")
+		return d
+	}
+	for _, category := range uncertainCategories {
+		if !slices.Contains(mockCategories, category) {
+			d.fail("%s is not a CalmLens category", category)
+			return d
+		}
+	}
+	d.review = &pendingReview{reason: reason, uncertainCategories: slices.Clone(uncertainCategories)}
+	return d
+}
+
 // scoreToLikelihood is the likelihood the API reports for a score.
 func scoreToLikelihood(score float64) string {
 	switch {
@@ -202,8 +248,9 @@ func decided(status string) bool { return status != OutcomePending && status != 
 
 // report is the moderation report fields a decided asset gets, as the API sends them: every
 // category (unflagged ones evaluated with score 0), the policy's actions
-// and flaggedCategories. It is nil for pending and failed decisions.
-func (d *Decision) report() calmlens.JSON {
+// and flaggedCategories. requestedAt is when a pending review joined the queue. It is nil for
+// pending and failed decisions.
+func (d *Decision) report(requestedAt int64) calmlens.JSON {
 	if !decided(d.status) {
 		return nil
 	}
@@ -231,12 +278,29 @@ func (d *Decision) report() calmlens.JSON {
 			evaluated["qualifiers"] = qualifiers
 		}
 		categories[category] = evaluated
-		policyCategories[category] = calmlens.JSON{"score": entry.score, "action": action(entry.score)}
+		sourceKind := "below-threshold"
+		if entry.score >= 0.5 {
+			sourceKind = "default"
+		}
+		policyCategories[category] = calmlens.JSON{
+			"score": entry.score, "action": action(entry.score), "source": calmlens.JSON{"kind": sourceKind},
+			// The mock keeps no policies: the category's setting is the decision's own action.
+			"settings": calmlens.JSON{"action": statusAction[d.status], "allowances": []any{}, "restrictions": []any{}},
+		}
 		if action(entry.score) != "allow" {
 			flagged = append(flagged, category)
 		}
 	}
+	var review any
+	if d.review != nil {
+		uncertain := []any{}
+		for _, category := range d.review.uncertainCategories {
+			uncertain = append(uncertain, category)
+		}
+		review = calmlens.JSON{"requestedAt": requestedAt, "reason": d.review.reason, "uncertainCategories": uncertain}
+	}
 	return calmlens.JSON{
+		"pendingReview":       review,
 		"raw":                 calmlens.JSON{"categories": categories, "hashMatches": []any{}},
 		"categories":          policyCategories,
 		"explanationComplete": true,
@@ -249,7 +313,7 @@ func (d *Decision) report() calmlens.JSON {
 
 // flaggedCategories is the report's flaggedCategories, empty when undecided.
 func (d *Decision) flaggedCategories() []any {
-	report := d.report()
+	report := d.report(0)
 	if report == nil {
 		return []any{}
 	}

@@ -620,9 +620,9 @@ type ProcessingOptions struct {
 type ProcessingFeatures struct {
 	// OCR stores extracted text on the image asset and adds text moderation.
 	OCR *OCRFeatureOptions `json:"ocr,omitempty"`
-	// PersonDetection (preview) locates people; results are in Report.Features.
+	// PersonDetection (preview) locates people; results are in AssetClassification.PersonDetection.
 	PersonDetection *PersonDetectionFeatureOptions `json:"personDetection,omitempty"`
-	// FaceDetection (preview) locates faces; results are in Report.Features.
+	// FaceDetection (preview) locates faces; results are in AssetClassification.FaceDetection.
 	FaceDetection *FaceDetectionFeatureOptions `json:"faceDetection,omitempty"`
 	// LinkDetection finds QR codes and web links in images (free), and moderates QR code text.
 	// It runs unless set with Enabled false; results are in AssetClassification.LinkDetection.
@@ -1420,8 +1420,9 @@ type EnsureLensOptions struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
 	// Type is one of the LensType constants.
-	Type   string `json:"type"`
-	Active bool   `json:"active"`
+	Type string `json:"type"`
+	// Active is whether the CDN serves the lens. Nil means true.
+	Active *bool `json:"active,omitempty"`
 	// Transform holds the options, applied in one pass, that produce the derived asset:
 	// ImageTransformOptions, or any other value that encodes as a JSON object with the same
 	// option names. Lenses decoded from the API hold map[string]any with json.Number numbers.
@@ -1437,11 +1438,21 @@ type EnsureLensesOptions struct {
 // Lens is a stored lens: a named CDN transformation. The CDN serves files made with its current
 // definition.
 type Lens struct {
-	EnsureLensOptions
 	ID        string  `json:"id"`
 	ProjectID *string `json:"projectId"`
-	CreatedAt int64   `json:"createdAt"`
-	UpdatedAt *int64  `json:"updatedAt"`
+	// Identifier is used in CDN URLs after "@".
+	Identifier  string  `json:"identifier"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	// Type is one of the LensType constants.
+	Type string `json:"type"`
+	// Active is whether the CDN serves the lens.
+	Active bool `json:"active"`
+	// Transform holds the options that produce the derived asset, as map[string]any with
+	// json.Number numbers.
+	Transform any    `json:"transform"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt *int64 `json:"updatedAt"`
 }
 
 // ListLensesOptions selects a page of the project's lenses. Cursor is the previous page's
@@ -1462,13 +1473,13 @@ type LensPage struct {
 }
 
 // CreateLensOptions is a new lens; its Identifier must be new to the project. Fields work as in
-// EnsureLensOptions; a nil Description or Transform is left out.
+// EnsureLensOptions; a nil Description, Active or Transform is left out.
 type CreateLensOptions struct {
 	Identifier  string  `json:"identifier"`
 	Name        string  `json:"name"`
 	Description *string `json:"description,omitempty"`
 	Type        string  `json:"type"`
-	Active      bool    `json:"active"`
+	Active      *bool   `json:"active,omitempty"`
 	Transform   any     `json:"transform,omitempty"`
 }
 

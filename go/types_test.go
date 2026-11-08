@@ -225,7 +225,7 @@ func TestImageTransformOptionsDecode(t *testing.T) {
 
 func TestEnsureLensSendsTypedTransform(t *testing.T) {
 	c, h := setup(t)
-	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: LensTypeImage, Active: true,
+	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: LensTypeImage, Active: Ptr(true),
 		Transform: ImageTransformOptions{Format: ImageFormatAVIF, Width: Ptr(128)}}
 	h.result = JSON{"lenses": []JSON{{"id": "l", "identifier": "thumb", "name": "Thumb", "type": "image", "active": true,
 		"transform": JSON{"format": "avif", "width": 128}}}}

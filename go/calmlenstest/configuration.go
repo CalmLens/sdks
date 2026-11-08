@@ -3,8 +3,11 @@ package calmlenstest
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/url"
+	"slices"
 	"strconv"
+	"strings"
 
 	calmlens "github.com/CalmLens/sdks/go"
 )
@@ -146,6 +149,80 @@ func (m *MockServerClient) ensureUploadPresets(body calmlens.JSON, now int64) (a
 		result = append(result, preset)
 	}
 	return calmlens.JSON{"uploadPresets": result}, nil
+}
+
+// applyUploadPreset is an API-key upload through a preset, as the API applies it: the preset gives
+// the folder and visibility, which the upload can't change, and the processing options unless the
+// upload sets its own, and refuses types and sizes it doesn't accept. mime and size describe the
+// upload's content, when hasContent. options is returned as it is without a preset.
+func (m *MockServerClient) applyUploadPreset(options calmlens.JSON, hasContent bool, mime string, size int64) (calmlens.JSON, error) {
+	id := text(options["uploadPresetId"])
+	if id == "" {
+		return options, nil
+	}
+	var preset calmlens.JSON
+	for _, candidate := range m.config.presets {
+		if candidate["id"] == id {
+			preset = candidate
+		}
+	}
+	if preset == nil {
+		return nil, fail(calmlens.CodeUploadPresetNotFound)
+	}
+	if preset["enabled"] != true {
+		return nil, fail(calmlens.CodeUploadPresetDisabled)
+	}
+	notAllowed := func(field string) error {
+		failure := fail(calmlens.CodeUploadPresetFieldNotAllowed).(*apiError)
+		failure.details = calmlens.JSON{"field": field}
+		return failure
+	}
+	if folder := text(preset["folderId"]); folder != "" && text(options["folderId"]) != "" && options["folderId"] != folder {
+		return nil, notAllowed("folderId")
+	}
+	if text(options["visibility"]) != "" && options["visibility"] != preset["visibility"] {
+		return nil, notAllowed("visibility")
+	}
+	if hasContent {
+		allowed, _ := preset["allowedContentTypes"].([]any)
+		if len(allowed) > 0 && !acceptedByPreset(text(options["name"]), mime, allowed) {
+			failure := fail(calmlens.CodeUnsupportedUploadType).(*apiError)
+			failure.details = calmlens.JSON{"source": "preset", "contentType": mime, "allowedContentTypes": allowed}
+			return nil, failure
+		}
+		if limit := number(preset["maxSizeInBytes"]); limit > 0 && float64(size) > limit {
+			failure := fail(calmlens.CodeUploadTooLarge).(*apiError)
+			failure.details = calmlens.JSON{"limitBytes": limit, "source": "preset"}
+			return nil, failure
+		}
+	}
+	applied := maps.Clone(options)
+	applied["visibility"] = preset["visibility"]
+	if preset["folderId"] != nil {
+		applied["folderId"] = preset["folderId"]
+	}
+	if applied["processingOptions"] == nil && preset["processingOptions"] != nil {
+		applied["processingOptions"] = preset["processingOptions"]
+	}
+	return applied, nil
+}
+
+// acceptedByPreset reads a preset's allowed types as the browser's file accept patterns: a
+// wildcard, a type family such as image/*, a file extension or an exact type.
+func acceptedByPreset(name, mime string, allowed []any) bool {
+	name, mime = strings.ToLower(name), strings.ToLower(mime)
+	return slices.ContainsFunc(allowed, func(value any) bool {
+		pattern := strings.ToLower(strings.TrimSpace(text(value)))
+		switch {
+		case pattern == "*", pattern == "*/*":
+			return true
+		case strings.HasSuffix(pattern, "/*"):
+			return strings.HasPrefix(mime, strings.TrimSuffix(pattern, "*"))
+		case strings.HasPrefix(pattern, "."):
+			return strings.HasSuffix(name, pattern)
+		}
+		return mime == pattern
+	})
 }
 
 // uploadPresetRoute answers /upload-presets/:id, of which the mock serves only delete.

@@ -53,7 +53,8 @@ const (
 
 // Options configures NewServerClient. APIKey and ProjectID are required.
 type Options struct {
-	// APIKey is the project API key. It is sent as X-Api-Key and never printed by String.
+	// APIKey is the project API key. It is sent as X-Api-Key, so it can only hold printable ASCII
+	// without spaces, and is never printed by String.
 	APIKey string
 	// ProjectID is the project the key belongs to.
 	ProjectID string
@@ -146,19 +147,26 @@ type ServerClient struct {
 	deferUploadChecks bool
 }
 
-// String describes the client without its API key.
-func (c *ServerClient) String() string {
+// String describes the client without its API key. It takes a value so a dereferenced client
+// doesn't print its fields, API key included.
+func (c ServerClient) String() string {
 	return fmt.Sprintf("calmlens.ServerClient{ProjectID: %q, BaseURL: %q}", c.options.ProjectID, c.options.BaseURL)
 }
 
 // GoString is used by %#v and also omits the API key.
-func (c *ServerClient) GoString() string { return c.String() }
+func (c ServerClient) GoString() string { return c.String() }
 
 // NewServerClient validates every option before applying defaults or copying the HTTP client.
 // Invalid options return a *Error with code sdk/invalid-config.
 func NewServerClient(options Options) (*ServerClient, error) {
 	if options.APIKey == "" || options.ProjectID == "" {
 		return nil, invalid(CodeSDKInvalidConfig, "API key and project ID are required")
+	}
+	// Only what can be sent as a header is checked: the API decides whether a key is real.
+	for _, char := range options.APIKey {
+		if char < 0x21 || char > 0x7e {
+			return nil, invalid(CodeSDKInvalidConfig, "API key must be printable ASCII without spaces")
+		}
 	}
 	if options.ProjectID == "." || options.ProjectID == ".." {
 		return nil, invalid(CodeSDKInvalidConfig, `ProjectID cannot be "." or ".."`)
@@ -642,6 +650,10 @@ func (c *ServerClient) EnsureLenses(ctx context.Context, options EnsureLensesOpt
 	for i, lens := range options.Lenses {
 		if lens.Identifier == "" {
 			return nil, invalid(CodeSDKInvalidArgument, "Lens identifier is required")
+		}
+		// A lens sent without Active is served, so both spellings are one definition.
+		if lens.Active == nil {
+			lens.Active = Ptr(true)
 		}
 		encoded, err := json.Marshal(lens)
 		if err != nil {

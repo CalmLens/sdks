@@ -308,8 +308,8 @@ func toAny[T any](values map[string]T) map[string]any {
 // ---- Shared mock behaviour scenarios --------------------------------------------------------
 // packages/sdk-contract/mockScenarios.ts writes them and every SDK's offline mock replays them.
 
-// decisionSpec is a decision as the builder makes it: a status, or a status with Flag and
-// NotEvaluated calls.
+// decisionSpec is a decision as the builder makes it: a status, or a status with Flag,
+// NotEvaluated and PendingReview calls.
 type decisionSpec struct {
 	Status string
 	Flags  []struct {
@@ -317,7 +317,11 @@ type decisionSpec struct {
 		Score      float64
 		Qualifiers map[string]float64
 	}
-	NotEvaluated []string
+	NotEvaluated  []string
+	PendingReview *struct {
+		Reason              string
+		UncertainCategories []string
+	}
 }
 
 func (spec *decisionSpec) UnmarshalJSON(data []byte) error {
@@ -346,6 +350,9 @@ func (spec decisionSpec) build() *Decision {
 	}
 	for _, category := range spec.NotEvaluated {
 		decision.NotEvaluated(category)
+	}
+	if review := spec.PendingReview; review != nil {
+		decision.PendingReview(review.Reason, review.UncertainCategories...)
 	}
 	return decision
 }

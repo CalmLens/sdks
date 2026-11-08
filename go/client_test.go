@@ -371,7 +371,7 @@ func TestRequestsIdentifyTheSDKAndHideTheKey(t *testing.T) {
 	if got := h.last().Header.Get("User-Agent"); !strings.HasPrefix(got, "calmlens-go/"+Version+" (go") {
 		t.Fatal(got)
 	}
-	for _, text := range []string{fmt.Sprint(c), fmt.Sprintf("%+v", c), fmt.Sprintf("%#v", c), fmt.Sprint(c.options), fmt.Sprintf("%#v", c.options), fmt.Sprintf("%+v", c.options)} {
+	for _, text := range []string{fmt.Sprint(c), fmt.Sprintf("%+v", c), fmt.Sprintf("%#v", c), fmt.Sprintf("%+v", *c), fmt.Sprintf("%#v", *c), fmt.Sprint(c.options), fmt.Sprintf("%#v", c.options), fmt.Sprintf("%+v", c.options)} {
 		if strings.Contains(text, "sk_live_secret") {
 			t.Fatal("API key printed:", text)
 		}
@@ -432,11 +432,60 @@ func TestIteratorsFollowEveryPage(t *testing.T) {
 	}
 }
 
+// storedLens is the lens the API answers an ensure of definition with.
+func storedLens(id string, definition EnsureLensOptions) Lens {
+	return Lens{ID: id, Identifier: definition.Identifier, Name: definition.Name, Description: definition.Description, Type: definition.Type, Active: true, Transform: definition.Transform}
+}
+
+// Only what can't be sent as a header is refused; the API decides whether a key is real.
+func TestNewServerClientChecksTheAPIKeyCanBeAHeader(t *testing.T) {
+	for _, key := range []string{"clé", "key\x7f", "key\tvalue"} {
+		if _, err := NewServerClient(Options{APIKey: key, ProjectID: "project-1"}); ErrorCode(err) != CodeSDKInvalidConfig {
+			t.Errorf("%q: %v", key, err)
+		}
+	}
+	if _, err := NewServerClient(Options{APIKey: "!any~FORMAT.at_all", ProjectID: "project-1"}); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestEnsureLensCacheTreatsAbsentActiveAsTrue(t *testing.T) {
+	c, h := setup(t)
+	ctx := context.Background()
+	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image"}
+	h.result = JSON{"lenses": []Lens{storedLens("l", lens)}}
+	if _, err := c.EnsureLens(ctx, lens); err != nil {
+		t.Fatal(err)
+	}
+	var sent struct {
+		Lenses []map[string]any `json:"lenses"`
+	}
+	if err := json.Unmarshal(h.bodies[0], &sent); err != nil {
+		t.Fatal(err)
+	}
+	if _, present := sent.Lenses[0]["active"]; present {
+		t.Fatalf("sent active for a lens that didn't set it: %s", h.bodies[0])
+	}
+	active := lens
+	active.Active = Ptr(true)
+	if _, err := c.EnsureLens(ctx, active); err != nil || len(h.calls) != 1 {
+		t.Fatal("an explicit true is the same definition", err, len(h.calls))
+	}
+	inactive := lens
+	inactive.Active = Ptr(false)
+	if _, err := c.EnsureLens(ctx, inactive); err != nil || len(h.calls) != 2 {
+		t.Fatal("false is another definition", err, len(h.calls))
+	}
+	if !strings.Contains(string(h.bodies[1]), `"active":false`) {
+		t.Fatalf("sent %s", h.bodies[1])
+	}
+}
+
 func TestLensCache(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
-	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true, Transform: ImageTransformOptions{Width: Ptr(20)}}
-	h.result = JSON{"lenses": []Lens{{ID: "l", EnsureLensOptions: lens}}}
+	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: Ptr(true), Transform: ImageTransformOptions{Width: Ptr(20)}}
+	h.result = JSON{"lenses": []Lens{storedLens("l", lens)}}
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
@@ -463,11 +512,11 @@ func TestLensCache(t *testing.T) {
 	// A changed definition is sent, and replaces the lens's cached one.
 	changed := lens
 	changed.Name = "Thumb 2"
-	h.result = JSON{"lenses": []Lens{{ID: "l", EnsureLensOptions: changed}}}
+	h.result = JSON{"lenses": []Lens{storedLens("l", changed)}}
 	if _, err = c.EnsureLens(ctx, changed); err != nil {
 		t.Fatal(err)
 	}
-	h.result = JSON{"lenses": []Lens{{ID: "l", EnsureLensOptions: lens}}}
+	h.result = JSON{"lenses": []Lens{storedLens("l", lens)}}
 	if _, err = c.EnsureLens(ctx, lens); err != nil {
 		t.Fatal(err)
 	}
@@ -478,8 +527,8 @@ func TestLensCache(t *testing.T) {
 
 func TestLensChangesDropTheEnsuredDefinition(t *testing.T) {
 	ctx := context.Background()
-	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true}
-	stored := Lens{ID: "lens-1", EnsureLensOptions: lens}
+	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: Ptr(true)}
+	stored := storedLens("lens-1", lens)
 	for name, change := range map[string]func(*ServerClient) error{
 		"update": func(c *ServerClient) error {
 			_, err := c.Lenses.Update(ctx, UpdateLensOptions{LensID: "lens-1", Name: Ptr("Renamed")})
@@ -487,7 +536,7 @@ func TestLensChangesDropTheEnsuredDefinition(t *testing.T) {
 		},
 		"delete": func(c *ServerClient) error { return c.Lenses.Delete(ctx, LensIDOptions{LensID: "lens-1"}) },
 		"create": func(c *ServerClient) error {
-			_, err := c.Lenses.Create(ctx, CreateLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true})
+			_, err := c.Lenses.Create(ctx, CreateLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: Ptr(true)})
 			return err
 		},
 	} {
@@ -674,8 +723,8 @@ func TestWaitForDecisionStopsWhenCancelled(t *testing.T) {
 func TestWithRequestOptionsChangesRetriesAndSharesTheLensCache(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
-	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: true}
-	h.result = JSON{"lenses": []Lens{{ID: "l", EnsureLensOptions: lens}}}
+	lens := EnsureLensOptions{Identifier: "thumb", Name: "Thumb", Type: "image", Active: Ptr(true)}
+	h.result = JSON{"lenses": []Lens{storedLens("l", lens)}}
 	if _, err := c.EnsureLens(ctx, lens); err != nil {
 		t.Fatal(err)
 	}
