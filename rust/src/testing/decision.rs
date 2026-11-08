@@ -307,6 +307,8 @@ impl MockDecision {
         );
         report.insert("categories".into(), policy_categories.into());
         report.insert("explanationComplete".into(), true.into());
+        // The mock keeps no policies, so no policy is named.
+        report.insert("policy".into(), Value::Null);
         report.insert("source".into(), "policy".into());
         report.insert("rule".into(), Value::Null);
         report.insert("automatedStatus".into(), self.status.as_str().into());

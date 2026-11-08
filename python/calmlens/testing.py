@@ -1786,7 +1786,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                                "completedAt": None, "progress": None, "testInput": False,
                                # Like the API, every moderation field is null until moderation decides.
                                "moderation": {"status": "pending", "manualReviews": [], "automatedStatus": None,
-                                              "source": None, "rule": None, "explanationComplete": None,
+                                              "policy": None, "pendingReview": None, "source": None, "rule": None, "explanationComplete": None,
                                               "categories": None, "flaggedCategories": [], "regions": [],
                                               "linkSafety": None, "raw": None, "timeline": None},
                                # A feature's result is null until it has run.

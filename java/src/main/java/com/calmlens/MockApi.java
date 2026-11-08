@@ -679,7 +679,7 @@ final class MockApi {
     moderation.addProperty("status", "pending");
     moderation.add("manualReviews", new JsonArray());
     // Like the API, the decision's fields are null until moderation decides.
-    for (String undecided : List.of("automatedStatus", "source", "rule", "explanationComplete", "categories"))
+    for (String undecided : List.of("automatedStatus", "policy", "pendingReview", "source", "rule", "explanationComplete", "categories"))
       moderation.add(undecided, JsonNull.INSTANCE);
     moderation.add("flaggedCategories", new JsonArray());
     moderation.add("regions", new JsonArray());

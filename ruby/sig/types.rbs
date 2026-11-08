@@ -194,13 +194,32 @@ module CalmLens
   # What decided the automated status: the `policy`'s categories, the asset's `children`, a
   # `hash-list` match, a `mandatory-rule` or `link-safety`.
   type moderation_source = "policy" | "children" | "hash-list" | "mandatory-rule" | "link-safety"
+  # The policy that made a decision: its ID, its revision then and, for a policy from a preset, the
+  # preset release it used.
+  type decision_policy = {
+    "id" => String,
+    "revision" => Integer,
+    "preset" => { "id" => String, "version" => Integer }?
+  }
+  # A review the human review queue is waiting for: when the asset joined it (Unix milliseconds),
+  # why, and the categories that made the decision uncertain.
+  type asset_pending_review = {
+    "requestedAt" => Integer,
+    "reason" => "sampled" | "uncertain",
+    "uncertainCategories" => Array[String]
+  }
   # Every field but `status`, `manualReviews`, `flaggedCategories`, `regions` and `timeline` is `nil`
-  # until moderation decides.
+  # until moderation decides; `pendingReview` is `nil` when no review is waiting.
   type asset_moderation = {
     "manualReviews" => Array[asset_review],
     "status" => asset_moderation_status,
     # The policy's original decision; a reviewer's decision can change `status` without changing it.
     "automatedStatus" => asset_moderation_decision?,
+    # The policy that made the automated decision, as it was then.
+    "policy" => decision_policy?,
+    # The review the human review queue is waiting for, set with the automated decision that
+    # joined the queue; `nil` when no review is waiting.
+    "pendingReview" => asset_pending_review?,
     "source" => moderation_source?,
     # The mandatory rule that decided, when `source` is `mandatory-rule`; otherwise `nil`.
     "rule" => String?,
@@ -431,7 +450,7 @@ module CalmLens
   # What decided a category's action: its `default` action, a policy score `below-threshold`, or the
   # `allowance` or `restriction` rules listed by `indexes` (at least one, the decisive rule first).
   type category_policy_source = { "kind" => "default" | "below-threshold" } |
-                                { "kind" => "allowance" | "restriction", "indexes" => Array[Integer] }
+                                { "kind" => "allowance" | "restriction", "indexes" => Array[Integer], "conditionScore" => Float }
   type category_policy_settings_snapshot = {
     "action" => flagged_content_action,
     "allowances" => Array[policy_rule_snapshot], "restrictions" => Array[policy_rule_snapshot]

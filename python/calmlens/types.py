@@ -28,7 +28,7 @@ class ViewerClaims(TypedDict, total=False):
 __all__ = [
     "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "CategoryPolicyDefaultSource", "CategoryPolicyRuleSource", "RegionalDecision", "ViewerClaims", "CategoryPolicyScore",
     "AgeRange", "Asset", "AssetClassificationFailureReason", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
-    "Actor", "ActorType", "ReviewActor", "AssetReview", "AssetModeration", "ModerationRaw", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetTimelinePage", "AssetTimelineSegment", "AssetClassification", "ClassificationProgress", "AssetUpload",
+    "Actor", "ActorType", "ReviewActor", "AssetReview", "AssetModeration", "AssetPendingReview", "DecisionPolicy", "DecisionPolicyPreset", "ModerationRaw", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetTimelinePage", "AssetTimelineSegment", "AssetClassification", "ClassificationProgress", "AssetUpload",
     "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
     "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
     "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
@@ -579,6 +579,10 @@ class CategoryPolicyRuleSource(TypedDict):
     #: deciding rules, the decisive one first. Several allowances list every rule that covers the
     #: content together.
     indexes: List[int]
+    #: The evidence that triggered the rules, from 0 to 1: a restriction's same-content presence,
+    #: or the allowances' coverage. A rule with ``unless`` qualifiers, or several ``when``
+    #: qualifiers, is assessed as a whole, so its qualifiers can be missing from ``raw``.
+    conditionScore: float
 
 
 #: What decided a category's action; narrow on ``source["kind"]``.
@@ -802,12 +806,41 @@ class ModerationRaw(_ModerationRawRequired):
     """The scores and hash matches behind a moderation decision."""
 
 
+class DecisionPolicyPreset(TypedDict):
+    """The built-in preset release a decision's policy used."""
+    id: str
+    version: int
+
+
+class DecisionPolicy(TypedDict):
+    """The policy that made a decision: its ID, its revision then and the preset release it used."""
+    id: str
+    revision: int
+    #: ``None`` for a policy not made from a preset.
+    preset: Optional[DecisionPolicyPreset]
+
+
+class AssetPendingReview(TypedDict):
+    """A review the human review queue is waiting for."""
+    #: When the asset joined the queue, in Unix milliseconds.
+    requestedAt: int
+    #: ``sampled`` or ``uncertain``.
+    reason: Literal["sampled", "uncertain"]
+    #: The categories that made the decision uncertain; empty for a sampled decision.
+    uncertainCategories: List[str]
+
+
 class AssetModeration(TypedDict):
     manualReviews: List[AssetReview]
     status: AssetModerationStatus
     #: The status automated moderation decided; ``None`` before a decision. Manual reviews can
     #: change ``status`` without changing this, so the two differ when a reviewer overrode it.
     automatedStatus: Optional[AssetModerationDecision]
+    #: The policy that made the automated decision, as it was then; ``None`` before a decision.
+    policy: Optional[DecisionPolicy]
+    #: The review the human review queue is waiting for, set with the automated decision that
+    #: joined the queue; ``None`` when no review is waiting. Hold content until it is ``None``.
+    pendingReview: Optional[AssetPendingReview]
     #: What decided ``automatedStatus``, such as ``policy`` or ``hash-list``; ``None`` before a decision.
     source: Optional[str]
     #: The mandatory rule that decided, when ``source`` is ``mandatory-rule``; otherwise ``None``.

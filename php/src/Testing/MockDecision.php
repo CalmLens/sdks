@@ -105,7 +105,8 @@ final class MockDecision
         $flagged = array_keys(array_filter($evaluated, fn ($score) => $action($score) !== 'allow'));
         return ['raw' => ['categories' => $categories, 'hashMatches' => []],
             'categories' => array_map(fn ($score) => ['score' => $score, 'action' => $action($score)], $evaluated),
-            'explanationComplete' => true, 'source' => 'policy', 'rule' => null, 'automatedStatus' => $status, 'linkSafety' => null,
+            // The mock keeps no policies, so no policy is named.
+            'explanationComplete' => true, 'policy' => null, 'source' => 'policy', 'rule' => null, 'automatedStatus' => $status, 'linkSafety' => null,
             // The mock analyses no audio or video, so a decision has no findings timeline.
             'regions' => [], 'timeline' => null, 'flaggedCategories' => $flagged];
     }

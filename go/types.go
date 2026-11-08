@@ -274,6 +274,12 @@ type AssetModeration struct {
 	// ModerationStatusPurged); a later applied review takes precedence in Status. It, Source,
 	// Rule, ExplanationComplete, Categories and Raw are nil until moderation decides.
 	AutomatedStatus *string `json:"automatedStatus"`
+	// Policy is the policy that made the automated decision, as it was then; nil until
+	// moderation decides.
+	Policy *DecisionPolicy `json:"policy"`
+	// PendingReview is the review the human review queue is waiting for, set with the automated
+	// decision that joined the queue; nil when no review is waiting.
+	PendingReview *AssetPendingReview `json:"pendingReview"`
 	// Source is what decided the asset, one of the DecisionSource constants.
 	Source *string `json:"source"`
 	// Rule names the mandatory rule that decided the asset, when Source is
@@ -291,6 +297,31 @@ type AssetModeration struct {
 	// nil when the policy doesn't act on links and until moderation decides.
 	LinkSafety *LinkSafetyDecision `json:"linkSafety"`
 	Extra      JSON                `json:"-"`
+}
+
+// DecisionPolicy is the policy that made a decision: its ID, its revision then and, for a policy
+// from a built-in preset, the preset release it used.
+type DecisionPolicy struct {
+	ID       string `json:"id"`
+	Revision int    `json:"revision"`
+	// Preset is nil for a policy not made from a preset.
+	Preset *DecisionPolicyPreset `json:"preset"`
+}
+
+// DecisionPolicyPreset is the built-in preset release a decision's policy used.
+type DecisionPolicyPreset struct {
+	ID      string `json:"id"`
+	Version int    `json:"version"`
+}
+
+// AssetPendingReview is a review the human review queue is waiting for.
+type AssetPendingReview struct {
+	// RequestedAt is when the asset joined the queue, in Unix milliseconds.
+	RequestedAt int64 `json:"requestedAt"`
+	// Reason is "sampled" or "uncertain".
+	Reason string `json:"reason"`
+	// UncertainCategories are the categories that made the decision uncertain.
+	UncertainCategories []string `json:"uncertainCategories"`
 }
 
 // LinkSafetyDecision (preview) is what the policy's link-safety settings made of an asset's links.
@@ -655,6 +686,11 @@ type CategoryPolicySource struct {
 	// Indexes are the deciding allowance or restriction rules, the decisive rule first; empty
 	// for the other kinds.
 	Indexes []int `json:"indexes,omitempty"`
+	// ConditionScore is the evidence that triggered the deciding rules, from 0 to 1: a
+	// restriction's same-content presence or the allowances' coverage. A rule with unless
+	// qualifiers, or several when qualifiers, is assessed as a whole, so its qualifiers can be
+	// missing from Raw. Nil for the other kinds.
+	ConditionScore *float64 `json:"conditionScore,omitempty"`
 }
 
 // PolicyRuleSnapshot records a rule in force when the asset was decided.

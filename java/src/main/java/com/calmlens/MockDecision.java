@@ -179,6 +179,8 @@ public final class MockDecision {
     report.add("flaggedCategories", flagged);
     report.add("categories", policyCategories);
     report.addProperty("explanationComplete", true);
+    // The mock keeps no policies, so no policy is named.
+    report.add("policy", JsonNull.INSTANCE);
     JsonObject raw = new JsonObject();
     raw.add("categories", categories);
     raw.add("hashMatches", new JsonArray());

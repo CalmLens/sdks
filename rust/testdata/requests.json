@@ -3575,17 +3575,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -3606,6 +3615,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -4020,17 +4036,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -4051,6 +4076,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -4514,17 +4546,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -4545,6 +4586,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -4998,17 +5046,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -5029,6 +5086,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -5502,17 +5566,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -5533,6 +5606,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -5957,17 +6037,26 @@
                 ],
                 "automatedStatus": "allowed",
                 "source": "policy",
+                "policy": {
+                  "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+                  "revision": 1,
+                  "preset": {
+                    "id": "general-community",
+                    "version": 1
+                  }
+                },
+                "pendingReview": {
+                  "requestedAt": 1,
+                  "reason": "sampled",
+                  "uncertainCategories": [
+                    "sexual"
+                  ]
+                },
                 "explanationComplete": true,
                 "categories": {
                   "sexual": {
                     "score": 0.5,
                     "action": "allow",
-                    "source": {
-                      "kind": "allowance",
-                      "indexes": [
-                        1
-                      ]
-                    },
                     "settings": {
                       "action": "allow",
                       "allowances": [
@@ -5988,6 +6077,13 @@
                           "action": "allow"
                         }
                       ]
+                    },
+                    "source": {
+                      "kind": "allowance",
+                      "indexes": [
+                        1
+                      ],
+                      "conditionScore": 0.5
                     }
                   }
                 },
@@ -6416,17 +6512,26 @@
               ],
               "automatedStatus": "allowed",
               "source": "policy",
+              "policy": {
+                "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+                "revision": 1,
+                "preset": {
+                  "id": "general-community",
+                  "version": 1
+                }
+              },
+              "pendingReview": {
+                "requestedAt": 1,
+                "reason": "sampled",
+                "uncertainCategories": [
+                  "sexual"
+                ]
+              },
               "explanationComplete": true,
               "categories": {
                 "sexual": {
                   "score": 0.5,
                   "action": "allow",
-                  "source": {
-                    "kind": "allowance",
-                    "indexes": [
-                      1
-                    ]
-                  },
                   "settings": {
                     "action": "allow",
                     "allowances": [
@@ -6447,6 +6552,13 @@
                         "action": "allow"
                       }
                     ]
+                  },
+                  "source": {
+                    "kind": "allowance",
+                    "indexes": [
+                      1
+                    ],
+                    "conditionScore": 0.5
                   }
                 }
               },
@@ -6870,17 +6982,26 @@
               ],
               "automatedStatus": "allowed",
               "source": "policy",
+              "policy": {
+                "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+                "revision": 1,
+                "preset": {
+                  "id": "general-community",
+                  "version": 1
+                }
+              },
+              "pendingReview": {
+                "requestedAt": 1,
+                "reason": "sampled",
+                "uncertainCategories": [
+                  "sexual"
+                ]
+              },
               "explanationComplete": true,
               "categories": {
                 "sexual": {
                   "score": 0.5,
                   "action": "allow",
-                  "source": {
-                    "kind": "allowance",
-                    "indexes": [
-                      1
-                    ]
-                  },
                   "settings": {
                     "action": "allow",
                     "allowances": [
@@ -6901,6 +7022,13 @@
                         "action": "allow"
                       }
                     ]
+                  },
+                  "source": {
+                    "kind": "allowance",
+                    "indexes": [
+                      1
+                    ],
+                    "conditionScore": 0.5
                   }
                 }
               },
@@ -7324,17 +7452,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -7355,6 +7492,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -7899,17 +8043,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -7930,6 +8083,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -8344,17 +8504,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -8375,6 +8544,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -8794,17 +8970,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -8825,6 +9010,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -9239,17 +9431,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -9270,6 +9471,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -9687,17 +9895,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -9718,6 +9935,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },
@@ -10169,17 +10393,26 @@
           ],
           "automatedStatus": "allowed",
           "source": "policy",
+          "policy": {
+            "id": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
+            "revision": 1,
+            "preset": {
+              "id": "general-community",
+              "version": 1
+            }
+          },
+          "pendingReview": {
+            "requestedAt": 1,
+            "reason": "sampled",
+            "uncertainCategories": [
+              "sexual"
+            ]
+          },
           "explanationComplete": true,
           "categories": {
             "sexual": {
               "score": 0.5,
               "action": "allow",
-              "source": {
-                "kind": "allowance",
-                "indexes": [
-                  1
-                ]
-              },
               "settings": {
                 "action": "allow",
                 "allowances": [
@@ -10200,6 +10433,13 @@
                     "action": "allow"
                   }
                 ]
+              },
+              "source": {
+                "kind": "allowance",
+                "indexes": [
+                  1
+                ],
+                "conditionScore": 0.5
               }
             }
           },

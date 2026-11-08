@@ -91,7 +91,8 @@ module CalmLens
       { 'raw' => { 'categories' => MockClassification::CATEGORIES.to_h { |category| [category, category_report(category)] },
                    'hashMatches' => [] },
         'categories' => evaluated.to_h { |category, value| [category, { 'score' => value, 'action' => action(value) }] },
-        'explanationComplete' => true, 'source' => 'policy', 'rule' => nil, 'automatedStatus' => @status,
+        # The mock keeps no policies, so no policy is named.
+        'explanationComplete' => true, 'policy' => nil, 'source' => 'policy', 'rule' => nil, 'automatedStatus' => @status,
         'regions' => [], 'linkSafety' => nil, 'flaggedCategories' => evaluated.reject { |_, value| action(value) == 'allow' }.map(&:first) }
     end
 

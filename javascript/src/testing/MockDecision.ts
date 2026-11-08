@@ -162,6 +162,9 @@ export class MockDecision {
         evaluated.map(([category, score]) => [category, { score, action: action(score) }]),
       ),
       explanationComplete: true,
+      // The mock keeps no policies, so no policy is named, nor a review queue to wait for.
+      policy: null,
+      pendingReview: null,
       source: "policy",
       rule: null,
       automatedStatus: status,

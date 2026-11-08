@@ -1,4 +1,4 @@
-import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, o as backfill, s as updatedAt, t as EXAMPLE_IDS } from "./Ids-BZszWHCN.js";
+import { a as primaryIdField, c as createMetaType, l as metaStore, n as idField, o as backfill, s as updatedAt, t as EXAMPLE_IDS } from "./Ids-BESMSxGb.js";
 import { t as CLASSIFICATION_CATEGORIES } from "./ModerationCategories-CHFRoeWV.js";
 import "./Media-B2PMcUf7.js";
 import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
@@ -6,7 +6,7 @@ import "./SharedConstants-DxUCZwLZ.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
 import { i as msg, n as MODERATION_QUALIFIERS, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-C2mw3ntb.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-LWQvqyxL.js";
-import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-BlHEKHKk.js";
+import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-DPNlE8m-.js";
 import * as zod from "zod";
 // packages/shared/src/DocMetaTypes.ts
 const docPropertyInfo = createMetaType({ id: "docPropertyInfo" });
@@ -261,6 +261,13 @@ const POLICY_ALLOWANCE_SCHEMA = policyRuleSchema("Qualifiers describing the cont
 });
 /** Acts when one qualifying instance meets every selected qualifier and no exclusion. */
 const POLICY_RESTRICTION_SCHEMA = policyRuleSchema("Qualifiers describing restricted content. Every selected qualifier must hold on the same instance. One matching qualifying instance can trigger this restriction.", "Any action except `allow`, including one weaker than the category action.");
+/** The built-in policies (`BUILT_IN_MODERATION_PROFILES`), in the order the portal offers them. */
+const POLICY_PRESET_IDS = [
+	"general-community",
+	"children-platform",
+	"education-support",
+	"wholesome-community"
+];
 // packages/shared/src/Subscriptions.ts
 /**
 * Product IDs are chosen by the repo (Stripe accepts an `id` on product creation) so the admin Stripe
@@ -682,10 +689,14 @@ const CATEGORY_SETTINGS_SNAPSHOT_SCHEMA = zod.object({
 	restrictions: zod.array(POLICY_RESTRICTION_SCHEMA).max(50)
 }).strict().optional().describe("The category's default action and rules in force at decision time.");
 const RULE_INDEXES_SCHEMA = zod.array(zod.number().int().nonnegative()).min(1).describe("Indexes into the category's `settings.allowances` or `settings.restrictions` of the rules that decided the action, the decisive one first. Several allowances list every rule that covers the content together.");
-/** What the policy made of one category. */
-const CATEGORY_ASSESSMENT_SCHEMA = zod.object({
+const CATEGORY_ASSESSMENT_FIELDS = {
 	score: zod.number().min(0).max(1).describe(POLICY_SCORE_DESCRIPTION),
 	action: POLICY_ACTION_SCHEMA.describe("What the policy does with this category. `allow` when the policy score is below 0.5."),
+	settings: CATEGORY_SETTINGS_SNAPSHOT_SCHEMA
+};
+/** What the policy made of one category, as a decision records it. */
+const CATEGORY_ASSESSMENT_SCHEMA = zod.object({
+	...CATEGORY_ASSESSMENT_FIELDS,
 	source: zod.discriminatedUnion("kind", [
 		zod.object({ kind: zod.literal("default") }).strict(),
 		zod.object({ kind: zod.literal("below-threshold") }).strict(),
@@ -697,17 +708,48 @@ const CATEGORY_ASSESSMENT_SCHEMA = zod.object({
 			kind: zod.literal("restriction"),
 			indexes: RULE_INDEXES_SCHEMA
 		}).strict()
+	]).optional()
+}).strict();
+const CONDITION_SCORE_SCHEMA = zod.number().min(0).max(1).describe("The evidence that triggered the rules, from 0 to 1. For a restriction: how likely some of the category's content meets the rule, with all its `when` qualifiers and none of its `unless` qualifiers on the same content. For allowances: how much of the category's content they cover together. A rule with `unless` qualifiers, or with several `when` qualifiers, is assessed as a whole, so its qualifiers can be missing from `raw`.");
+/** What the policy made of one category, as the API shows it: with the evidence behind its rules. */
+const PUBLIC_CATEGORY_ASSESSMENT_SCHEMA = zod.object({
+	...CATEGORY_ASSESSMENT_FIELDS,
+	source: zod.discriminatedUnion("kind", [
+		zod.object({ kind: zod.literal("default") }).strict(),
+		zod.object({ kind: zod.literal("below-threshold") }).strict(),
+		zod.object({
+			kind: zod.literal("allowance"),
+			indexes: RULE_INDEXES_SCHEMA,
+			conditionScore: CONDITION_SCORE_SCHEMA
+		}).strict(),
+		zod.object({
+			kind: zod.literal("restriction"),
+			indexes: RULE_INDEXES_SCHEMA,
+			conditionScore: CONDITION_SCORE_SCHEMA
+		}).strict()
 	]).meta(metaStore([docPropertyInfo({
-		description: "What decided the category's action: its `default` action, a policy score `below-threshold`, or the `allowance` or `restriction` rules listed by `indexes`.",
+		description: "What decided the category's action: its `default` action, a policy score `below-threshold`, or the `allowance` or `restriction` rules listed by `indexes`, with the `conditionScore` that triggered them.",
 		namedType: "CategoryAssessmentSource"
-	})])).optional(),
-	settings: CATEGORY_SETTINGS_SNAPSHOT_SCHEMA
+	})])).optional()
 }).strict().meta(metaStore([docPropertyInfo({
 	description: "What the policy made of one category",
 	namedType: "CategoryAssessment"
 })]));
+/** The policy a decision was made with, as it was then. */
+const DECISION_POLICY_SCHEMA = zod.object({
+	id: idField("pol").describe("The policy's ID"),
+	revision: zod.number().int().positive().describe("The policy's `revision` when it made the decision"),
+	preset: zod.object({
+		id: zod.enum(POLICY_PRESET_IDS).describe("The built-in preset the policy started from"),
+		version: zod.number().int().positive().describe("The preset release the policy used when it made the decision")
+	}).strict().nullable().describe("The preset release the policy used, `null` for a policy not made from a preset")
+}).strict().meta(metaStore([docPropertyInfo({
+	description: "The policy that made a decision, as it was when it made it",
+	namedType: "DecisionPolicy"
+})]));
 /** What the project's policy made of the report when the asset was decided. */
 const MODERATION_ASSESSMENT_FIELDS_SCHEMA = zod.object({
+	policy: DECISION_POLICY_SCHEMA.optional().describe("The policy that made the decision. Absent from a preview, which no saved policy made."),
 	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, CATEGORY_ASSESSMENT_SCHEMA).describe("Each assessed category's policy score and action. Unassessed categories are left out."),
 	explanationComplete: zod.boolean().describe("Whether all questions needed for a complete explanation of this decision were answered. False means questions that could not change any action were skipped; the actions are still final."),
 	source: zod.enum(DECISION_SOURCES),
@@ -770,6 +812,69 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 	message: "moderation/rule-required",
 	path: ["rule"]
 });
+// packages/shared/src/AssetConstants.ts
+const ASSET_REJECTION_NOTE_MAX_LENGTH = 1499;
+// packages/shared/src/HumanReview.ts
+const SAMPLE_PERCENT_SCHEMA = zod.number().min(0).max(100);
+zod.object({
+	allowedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
+	restrictedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
+	/**
+	* Queues decisions with a moderated category whose policy score lies less than this many
+	* percentage points from the policy threshold. 0 turns it off.
+	*/
+	uncertaintyMarginPercent: zod.number().min(0).max(50).default(0),
+	/** Queues decisions whose report has evidence the moderation pipeline couldn't assess. */
+	reviewMissingEvidence: zod.boolean().default(false)
+}).strict();
+/** The decisions a reviewer can make, and the statuses they review. */
+const HUMAN_REVIEW_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA;
+/**
+* Automated outcomes that can be sampled. Purged content is deleted as soon as it is decided, for
+* safety and legal reasons, so there is never anything left to review.
+*/
+const HUMAN_REVIEW_SAMPLED_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA.exclude(["purged"]);
+const HUMAN_REVIEW_STATUS_SCHEMA = zod.enum(["pending", "completed"]);
+/**
+* Why an asset joined the queue: drawn by the random sample, or routed because its decision was
+* uncertain. An asset drawn by the sample is `sampled` even when it is also uncertain, so the
+* random sample stays representative.
+*/
+const HUMAN_REVIEW_REASON_SCHEMA = zod.enum(["sampled", "uncertain"]);
+const HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA = zod.array(zod.enum(CLASSIFICATION_CATEGORIES));
+zod.object({
+	id: primaryIdField("rev"),
+	projectId: idField("proj"),
+	assetId: idField("asset"),
+	automatedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA,
+	reason: HUMAN_REVIEW_REASON_SCHEMA,
+	/** The categories whose decision was uncertain when the asset was queued, sampled or not. */
+	uncertainCategories: HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA,
+	status: HUMAN_REVIEW_STATUS_SCHEMA,
+	decision: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
+	/**
+	* The decision the reviewer judged: the asset's status when they decided, which differs from
+	* the automated outcome when someone decided the asset after sampling. Set once completed.
+	*/
+	reviewedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
+	note: zod.string().max(ASSET_REJECTION_NOTE_MAX_LENGTH).nullish(),
+	reviewerUserId: zod.string().nullish(),
+	/** Whether the decision changed the asset's status (only when it overturned `reviewedOutcome`). */
+	appliedToAsset: zod.boolean().nullish(),
+	createdAt: createdAtField(),
+	reviewedAt: zod.number().int().nullish()
+});
+zod.object({
+	decision: HUMAN_REVIEW_OUTCOME_SCHEMA,
+	confirmPurge: zod.boolean().optional(),
+	note: zod.string().trim().max(ASSET_REJECTION_NOTE_MAX_LENGTH).nullish()
+}).strict().superRefine((body, ctx) => {
+	if (body.decision === "purged" && body.confirmPurge !== true) ctx.addIssue({
+		code: "custom",
+		path: ["confirmPurge"],
+		message: "Confirm permanent deletion"
+	});
+});
 // packages/shared/src/ModerationContext.ts
 const MODERATION_AUTHOR_ID_SCHEMA = zod.string().min(1).max(256).meta(metaStore([docPropertyInfo({
 	description: `Your identifier for who wrote the content, up to 256 characters. CalmLens only compares it with the author IDs in \`context\`, to tell which posts share a speaker, so any stable opaque value works. See [Threaded moderation](/docs/guides/threaded-moderation).`,
@@ -829,6 +934,15 @@ const STORED_ASSET_REVIEW_SCHEMA = ASSET_REVIEW_SCHEMA.extend({
 	reviewerName: zod.string().nullable(),
 	reviewerEmail: zod.string().nullable()
 });
+/** A review the project's human review queue is waiting for. */
+const ASSET_PENDING_REVIEW_SCHEMA = zod.object({
+	requestedAt: zod.number().int().describe("When the asset joined the queue, in milliseconds since the Unix epoch"),
+	reason: HUMAN_REVIEW_REASON_SCHEMA.describe("Why it joined: `sampled` by the project's sample rate, or `uncertain` because a category's policy score was close to the threshold or its evidence was missing"),
+	uncertainCategories: HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA.describe("The categories that made the decision uncertain. Empty for a sampled decision.")
+}).strict().meta(metaStore([docPropertyInfo({
+	description: "A review the human review queue is waiting for",
+	namedType: "AssetPendingReview"
+})]));
 /**
 * Whether CalmLens holds the asset's content (source, preview and extracted text): kept only until
 * processing finishes (`temporary`), retained (`stored`) or deleted (`removed`).
@@ -1157,6 +1271,8 @@ const STORED_ASSET_SCHEMA = zod.object({
 	moderationStatus: ASSET_MODERATION_STATUS_SCHEMA,
 	manualReviews: zod.array(STORED_ASSET_REVIEW_SCHEMA).default([]).meta(metaStore([backfill({ value: [] })])),
 	reviewRevision: zod.number().int().default(0).meta(metaStore([backfill({ value: 0 })])),
+	/** The review the project's human review queue is waiting for (`AssetPendingReview`). */
+	pendingReview: ASSET_PENDING_REVIEW_SCHEMA.nullish(),
 	completedAt: zod.number().int().nullish(),
 	contentStatus: ASSET_CONTENT_STATUS_SCHEMA,
 	contentRemovalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullish(),
@@ -1206,9 +1322,11 @@ const ASSET_MODERATION_SCHEMA = zod.object({
 	manualReviews: zod.array(ASSET_REVIEW_SCHEMA).describe("Review history, oldest first. Later applied reviews supersede earlier decisions."),
 	automatedStatus: ASSET_MODERATION_DECISION_SCHEMA.nullable().describe("The status automated moderation decided, `null` until it decides. Manual reviews can change `status` without changing this, so the two differ when a reviewer overrode the automated decision."),
 	source: ASSESSMENT_FIELDS.source.nullable().describe("What decided the automated status: the `policy`'s categories, the asset's `children`, a `hash-list` match, a `mandatory-rule` or `link-safety`. `null` until moderation decides."),
+	policy: DECISION_POLICY_SCHEMA.nullable().describe("The policy that made the automated decision: its ID, its `revision` then and the preset release it used. `null` until moderation decides."),
+	pendingReview: ASSET_PENDING_REVIEW_SCHEMA.nullable().describe("The review your human review queue is waiting for, set together with the automated decision that joined the queue. `null` when no review is waiting: once a reviewer decides it, or when the asset leaves the queue unreviewed because its content was removed."),
 	rule: ASSESSMENT_FIELDS.rule.unwrap().nullable().describe("The mandatory rule that decided, when `source` is `mandatory-rule`; otherwise `null`"),
 	explanationComplete: ASSESSMENT_FIELDS.explanationComplete.nullable().describe("Whether all questions needed for a complete explanation of the decision were answered, `null` until moderation decides. False means questions that could not change any action were skipped; the actions are still final."),
-	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, CATEGORY_ASSESSMENT_SCHEMA).nullable().describe("Each assessed category's policy score and action, `null` until moderation decides. Unassessed categories are left out."),
+	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, PUBLIC_CATEGORY_ASSESSMENT_SCHEMA).nullable().describe("Each assessed category's policy score and action, `null` until moderation decides. Unassessed categories are left out."),
 	flaggedCategories: ASSESSMENT_FIELDS.flaggedCategories,
 	regions: zod.array(ASSET_REGIONAL_DECISION_SCHEMA).describe("Stricter decisions in jurisdictions the project serves, which apply to viewers there. Empty when there are none."),
 	linkSafety: zod.object({
@@ -1332,6 +1450,15 @@ STORED_ASSET_SCHEMA.pick({
 				status: "allowed",
 				manualReviews: [],
 				automatedStatus: "allowed",
+				policy: {
+					id: EXAMPLE_IDS.pol,
+					revision: 3,
+					preset: {
+						id: "general-community",
+						version: 35
+					}
+				},
+				pendingReview: null,
 				source: "policy",
 				rule: null,
 				explanationComplete: true,
@@ -1440,69 +1567,6 @@ const CONNECTOR_TYPE_SCHEMA = zod.enum([
 	"slack",
 	"email"
 ]);
-// packages/shared/src/AssetConstants.ts
-const ASSET_REJECTION_NOTE_MAX_LENGTH = 1499;
-// packages/shared/src/HumanReview.ts
-const SAMPLE_PERCENT_SCHEMA = zod.number().min(0).max(100);
-zod.object({
-	allowedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
-	restrictedSamplePercent: SAMPLE_PERCENT_SCHEMA.default(0),
-	/**
-	* Queues decisions with a moderated category whose policy score lies less than this many
-	* percentage points from the policy threshold. 0 turns it off.
-	*/
-	uncertaintyMarginPercent: zod.number().min(0).max(50).default(0),
-	/** Queues decisions whose report has evidence the moderation pipeline couldn't assess. */
-	reviewMissingEvidence: zod.boolean().default(false)
-}).strict();
-/** The decisions a reviewer can make, and the statuses they review. */
-const HUMAN_REVIEW_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA;
-/**
-* Automated outcomes that can be sampled. Purged content is deleted as soon as it is decided, for
-* safety and legal reasons, so there is never anything left to review.
-*/
-const HUMAN_REVIEW_SAMPLED_OUTCOME_SCHEMA = ASSET_MODERATION_DECISION_SCHEMA.exclude(["purged"]);
-const HUMAN_REVIEW_STATUS_SCHEMA = zod.enum(["pending", "completed"]);
-/**
-* Why an asset joined the queue: drawn by the random sample, or routed because its decision was
-* uncertain. An asset drawn by the sample is `sampled` even when it is also uncertain, so the
-* random sample stays representative.
-*/
-const HUMAN_REVIEW_REASON_SCHEMA = zod.enum(["sampled", "uncertain"]);
-const HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA = zod.array(zod.enum(CLASSIFICATION_CATEGORIES));
-zod.object({
-	id: primaryIdField("rev"),
-	projectId: idField("proj"),
-	assetId: idField("asset"),
-	automatedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA,
-	reason: HUMAN_REVIEW_REASON_SCHEMA,
-	/** The categories whose decision was uncertain when the asset was queued, sampled or not. */
-	uncertainCategories: HUMAN_REVIEW_UNCERTAIN_CATEGORIES_SCHEMA,
-	status: HUMAN_REVIEW_STATUS_SCHEMA,
-	decision: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
-	/**
-	* The decision the reviewer judged: the asset's status when they decided, which differs from
-	* the automated outcome when someone decided the asset after sampling. Set once completed.
-	*/
-	reviewedOutcome: HUMAN_REVIEW_OUTCOME_SCHEMA.nullish(),
-	note: zod.string().max(ASSET_REJECTION_NOTE_MAX_LENGTH).nullish(),
-	reviewerUserId: zod.string().nullish(),
-	/** Whether the decision changed the asset's status (only when it overturned `reviewedOutcome`). */
-	appliedToAsset: zod.boolean().nullish(),
-	createdAt: createdAtField(),
-	reviewedAt: zod.number().int().nullish()
-});
-zod.object({
-	decision: HUMAN_REVIEW_OUTCOME_SCHEMA,
-	confirmPurge: zod.boolean().optional(),
-	note: zod.string().trim().max(ASSET_REJECTION_NOTE_MAX_LENGTH).nullish()
-}).strict().superRefine((body, ctx) => {
-	if (body.decision === "purged" && body.confirmPurge !== true) ctx.addIssue({
-		code: "custom",
-		path: ["confirmPurge"],
-		message: "Confirm permanent deletion"
-	});
-});
 // packages/shared/src/ProjectAccess.ts
 const PROJECT_MEMBER_ROLE_SCHEMA = zod.enum([...ACCESS_ROLE_SCHEMA.options, "reviewer"]);
 zod.object({

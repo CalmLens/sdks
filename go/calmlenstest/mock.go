@@ -1640,7 +1640,7 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 	classification := calmlens.JSON{"status": calmlens.ClassificationStatusProcessing, "failureReason": nil, "updatedAt": now, "completedAt": nil, "progress": nil,
 		"testInput": false, "moderation": calmlens.JSON{"status": calmlens.ModerationStatusPending, "manualReviews": []any{},
 			// Like the API, moderation's findings are null until moderation decides.
-			"automatedStatus": nil, "source": nil, "rule": nil, "explanationComplete": nil, "categories": nil, "raw": nil, "linkSafety": nil,
+			"automatedStatus": nil, "policy": nil, "pendingReview": nil, "source": nil, "rule": nil, "explanationComplete": nil, "categories": nil, "raw": nil, "linkSafety": nil,
 			"flaggedCategories": []any{}, "regions": []any{}, "timeline": nil},
 		// Like the API, a feature's result is null until it has run.
 		"ocr": nil, "linkDetection": nil}

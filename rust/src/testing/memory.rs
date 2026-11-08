@@ -2413,6 +2413,10 @@ impl Backend {
                 "linkDetection": null, "linkSafety": null,
             },
         });
+        // Like the API, no policy is named and no review waits before a decision; set apart from
+        // the literal above, which is at the macro's recursion limit.
+        asset["classification"]["moderation"]["policy"] = Value::Null;
+        asset["classification"]["moderation"]["pendingReview"] = Value::Null;
         self.processing_options.insert(id.clone(), processing);
         for key in [
             "name",

@@ -1935,6 +1935,51 @@ pub struct ReviewActor {
     pub id: Option<String>,
 }
 
+/// The policy that made a decision: its ID, its revision then and the preset release it used.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct DecisionPolicy {
+    /// The policy's ID.
+    #[serde(default)]
+    pub id: String,
+    /// The policy's revision when it made the decision.
+    #[serde(default)]
+    pub revision: u64,
+    /// The preset release the policy used; `None` for a policy not made from a preset.
+    #[serde(default)]
+    pub preset: Option<DecisionPolicyPreset>,
+}
+
+/// The built-in preset release a decision's policy used.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct DecisionPolicyPreset {
+    /// The preset's ID.
+    #[serde(default)]
+    pub id: String,
+    /// The preset release.
+    #[serde(default)]
+    pub version: u64,
+}
+
+/// A review the human review queue is waiting for.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct AssetPendingReview {
+    /// When the asset joined the queue, in Unix milliseconds.
+    #[serde(default)]
+    pub requested_at: i64,
+    /// `sampled` or `uncertain`.
+    #[serde(default)]
+    pub reason: String,
+    /// The categories that made the decision uncertain; empty for a sampled decision.
+    #[serde(default)]
+    pub uncertain_categories: Vec<ClassificationCategory>,
+}
+
 /// Content-safety findings and decision.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1952,6 +1997,14 @@ pub struct AssetModeration {
     /// automated decision.
     #[serde(default)]
     pub automated_status: Option<AssetModerationDecision>,
+    /// The policy that made the automated decision, as it was then; `None` until moderation
+    /// decides.
+    #[serde(default)]
+    pub policy: Option<DecisionPolicy>,
+    /// The review the human review queue is waiting for, set with the automated decision that
+    /// joined the queue; `None` when no review is waiting.
+    #[serde(default)]
+    pub pending_review: Option<AssetPendingReview>,
     /// What determined the automated status.
     #[serde(default)]
     pub source: Option<String>,
@@ -2133,6 +2186,12 @@ pub struct CategoryPolicySource {
     /// first; `None` for `default` and `below-threshold`.
     #[serde(default)]
     pub indexes: Option<Vec<usize>>,
+    /// For an allowance or restriction, the evidence that triggered the rules, from 0 to 1: a
+    /// restriction's same-content presence or the allowances' coverage. A rule with `unless`
+    /// qualifiers, or several `when` qualifiers, is assessed as a whole, so its qualifiers can be
+    /// missing from `raw`. `None` for the other kinds.
+    #[serde(default)]
+    pub condition_score: Option<f64>,
 }
 
 /// A named rule in force when the asset was decided.

@@ -139,6 +139,36 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
           "mandatory-rule": "mandatory-rule";
           policy: "policy";
         }>>;
+        policy: zod.ZodNullable<zod.ZodObject<{
+          id: zod.ZodString;
+          revision: zod.ZodNumber;
+          preset: zod.ZodNullable<zod.ZodObject<{
+            id: zod.ZodEnum<{
+              "children-platform": "children-platform";
+              "education-support": "education-support";
+              "general-community": "general-community";
+              "wholesome-community": "wholesome-community";
+            }>;
+            version: zod.ZodNumber;
+          }, zod.core.$strict>>;
+        }, zod.core.$strict>>;
+        pendingReview: zod.ZodNullable<zod.ZodObject<{
+          requestedAt: zod.ZodNumber;
+          reason: zod.ZodEnum<{
+            sampled: "sampled";
+            uncertain: "uncertain";
+          }>;
+          uncertainCategories: zod.ZodArray<zod.ZodEnum<{
+            "criminal-activity": "criminal-activity";
+            harassment: "harassment";
+            hate: "hate";
+            "personal-information": "personal-information";
+            profanity: "profanity";
+            "self-harm": "self-harm";
+            sexual: "sexual";
+            violence: "violence";
+          }>>;
+        }, zod.core.$strict>>;
         rule: zod.ZodNullable<zod.ZodString>;
         explanationComplete: zod.ZodNullable<zod.ZodBoolean>;
         categories: zod.ZodNullable<zod.ZodRecord<zod.ZodEnum<{
@@ -159,17 +189,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
             limit: "limit";
             purge: "purge";
           }>;
-          source: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
-            kind: zod.ZodLiteral<"default">;
-          }, zod.core.$strict>, zod.ZodObject<{
-            kind: zod.ZodLiteral<"below-threshold">;
-          }, zod.core.$strict>, zod.ZodObject<{
-            kind: zod.ZodLiteral<"allowance">;
-            indexes: zod.ZodArray<zod.ZodNumber>;
-          }, zod.core.$strict>, zod.ZodObject<{
-            kind: zod.ZodLiteral<"restriction">;
-            indexes: zod.ZodArray<zod.ZodNumber>;
-          }, zod.core.$strict>], "kind">>;
           settings: zod.ZodOptional<zod.ZodObject<{
             action: zod.ZodEnum<{
               "age-restrict": "age-restrict";
@@ -755,6 +774,19 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
               }>;
             }, zod.core.$strict>>;
           }, zod.core.$strict>>;
+          source: zod.ZodOptional<zod.ZodDiscriminatedUnion<[zod.ZodObject<{
+            kind: zod.ZodLiteral<"default">;
+          }, zod.core.$strict>, zod.ZodObject<{
+            kind: zod.ZodLiteral<"below-threshold">;
+          }, zod.core.$strict>, zod.ZodObject<{
+            kind: zod.ZodLiteral<"allowance">;
+            indexes: zod.ZodArray<zod.ZodNumber>;
+            conditionScore: zod.ZodNumber;
+          }, zod.core.$strict>, zod.ZodObject<{
+            kind: zod.ZodLiteral<"restriction">;
+            indexes: zod.ZodArray<zod.ZodNumber>;
+            conditionScore: zod.ZodNumber;
+          }, zod.core.$strict>], "kind">>;
         }, zod.core.$strict>>>;
         flaggedCategories: zod.ZodArray<zod.ZodEnum<{
           "criminal-activity": "criminal-activity";

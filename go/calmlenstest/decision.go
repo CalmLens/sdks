@@ -240,7 +240,9 @@ func (d *Decision) report() calmlens.JSON {
 		"raw":                 calmlens.JSON{"categories": categories, "hashMatches": []any{}},
 		"categories":          policyCategories,
 		"explanationComplete": true,
-		"source":              "policy", "rule": nil, "automatedStatus": d.status, "regions": []any{}, "flaggedCategories": flagged,
+		// The mock keeps no policies, so no policy is named.
+		"policy": nil,
+		"source": "policy", "rule": nil, "automatedStatus": d.status, "regions": []any{}, "flaggedCategories": flagged,
 		"linkSafety": nil,
 	}
 }

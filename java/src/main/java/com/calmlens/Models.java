@@ -2090,6 +2090,10 @@ public final class Models {
    * @param automatedStatus the policy's own outcome before any reviewer decision: {@code allowed},
    *     {@code limited}, {@code age-restricted}, {@code blocked} or {@code purged}; null before a
    *     decision
+   * @param policy the policy that made the automated decision, as it was then; null before a
+   *     decision
+   * @param pendingReview the review the human review queue is waiting for, set with the automated
+   *     decision that joined the queue; null when no review is waiting
    * @param regions the regions where the asset is restricted, each with its own status
    * @param linkSafety (preview) what the policy's link safety settings made of the asset's links;
    *     null when the policy doesn't act on links
@@ -2097,11 +2101,42 @@ public final class Models {
    *     pages through; null for other assets and before analysis
    */
   public record AssetModeration(AssetModerationStatus status, List<AssetReview> manualReviews,
-      AssetModerationStatus automatedStatus, String source, String rule, List<String> flaggedCategories,
+      AssetModerationStatus automatedStatus, DecisionPolicy policy, AssetPendingReview pendingReview,
+      String source, String rule, List<String> flaggedCategories,
       LinkSafetyDecision linkSafety,
       List<RegionalDecision> regions, Boolean explanationComplete,
       Map<String, CategoryPolicyScore> categories, ModerationRaw raw, ModerationTimeline timeline) {
     public AssetModeration { categories = map(categories); manualReviews = list(manualReviews); flaggedCategories = listOrEmpty(flaggedCategories); regions = listOrEmpty(regions); }
+  }
+
+  /**
+   * The policy that made a decision, as it was when it made it.
+   *
+   * @param id the policy's ID
+   * @param revision the policy's revision when it made the decision
+   * @param preset the preset release the policy used; null for a policy not made from a preset
+   */
+  public record DecisionPolicy(String id, Integer revision, DecisionPolicyPreset preset) {}
+
+  /**
+   * The built-in preset release a decision's policy used.
+   *
+   * @param id the preset's ID
+   * @param version the preset release
+   */
+  public record DecisionPolicyPreset(String id, Integer version) {}
+
+  /**
+   * A review the human review queue is waiting for.
+   *
+   * @param requestedAt when the asset joined the queue, in Unix milliseconds
+   * @param reason {@code sampled} or {@code uncertain}
+   * @param uncertainCategories the categories that made the decision uncertain; empty for a sampled
+   *     decision
+   */
+  public record AssetPendingReview(Long requestedAt, String reason, List<String> uncertainCategories) {
+    /** Copies collections so the record stays immutable. */
+    public AssetPendingReview { uncertainCategories = listOrEmpty(uncertainCategories); }
   }
 
   /**
@@ -2278,8 +2313,12 @@ public final class Models {
    * @param kind {@code default}, {@code below-threshold}, {@code allowance} or {@code restriction}
    * @param indexes for {@code allowance} and {@code restriction}, the positions of the deciding
    *     rules in the category's settings, the decisive rule first; empty otherwise
+   * @param conditionScore for {@code allowance} and {@code restriction}, the evidence that triggered
+   *     the rules, from 0 to 1: a restriction's same-content presence or the allowances' coverage.
+   *     A rule with {@code unless} qualifiers, or several {@code when} qualifiers, is assessed as a
+   *     whole, so its qualifiers can be missing from {@code raw}; null otherwise
    */
-  public record CategoryPolicySource(String kind, List<Integer> indexes) {
+  public record CategoryPolicySource(String kind, List<Integer> indexes, Double conditionScore) {
     public CategoryPolicySource { indexes = list(indexes); }
   }
 

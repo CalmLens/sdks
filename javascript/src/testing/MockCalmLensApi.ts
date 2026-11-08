@@ -2362,6 +2362,8 @@ export class MockCalmLensApi {
           status: "pending",
           manualReviews: [],
           automatedStatus: null,
+          policy: null,
+          pendingReview: null,
           source: null,
           rule: null,
           explanationComplete: null,

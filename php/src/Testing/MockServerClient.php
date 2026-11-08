@@ -1035,7 +1035,8 @@ final class MockServerClient
             'classification' => ['status' => $final ? 'processing' : 'queued', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
                 // The mock analyses nothing in sections, and never reads test inputs.
                 'progress' => null, 'testInput' => false,
-                'moderation' => ['status' => 'pending', 'manualReviews' => [], 'automatedStatus' => null, 'source' => null, 'rule' => null,
+                'moderation' => ['status' => 'pending', 'manualReviews' => [], 'automatedStatus' => null, 'policy' => null,
+                    'pendingReview' => null, 'source' => null, 'rule' => null,
                     'explanationComplete' => null, 'categories' => null, 'flaggedCategories' => [], 'regions' => [], 'raw' => null,
                     'linkSafety' => null, 'timeline' => null],
                 // Like the API, a feature's result is null until it has run.
