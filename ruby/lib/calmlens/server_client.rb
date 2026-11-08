@@ -134,7 +134,7 @@ module CalmLens
     # them. Definitions this client already saved are not sent again, and sending the same
     # definition again returns the lens unchanged. More than 100 new definitions are sent in
     # consecutive requests, in order. {#lenses} manages lenses one by one.
-    # @option options [Array<Hash>] :lenses `[{identifier:, name:, type:, active:, transform:, ...}]`
+    # @option options [Array<Hash>] :lenses `[{identifier:, name:, type:, transform:, ...}]`, each served unless `active: false`
     # @return [Array<Hash>] the saved lenses, in the given order.
     def ensure_lenses(options) = @lenses.ensure_lenses(options)
 

@@ -95,7 +95,7 @@ client.hash_lists.delete(hash_list_id: hash_list['id'])
 
 lenses = client.ensure_lenses(lenses: [{ identifier: 'thumb', name: 'Thumb', type: 'image', active: true,
                                          transform: { width: 128, format: 'webp' } }])
-lens = client.ensure_lens(identifier: 'small', name: 'Small', type: 'image', active: true)
+lens = client.ensure_lens(identifier: 'small', name: 'Small', type: 'image')
 lens_width = lenses.first&.dig('transform', 'width')
 card = client.lenses.create(identifier: 'card', name: 'Card', type: 'image', active: true, description: nil,
                             transform: { width: 600 })

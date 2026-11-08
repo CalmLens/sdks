@@ -35,7 +35,7 @@ module CalmLens
     # @option options [String] :identifier
     # @option options [String] :name
     # @option options [String] :type `image`
-    # @option options [Boolean] :active whether the CDN serves it
+    # @option options [Boolean] :active whether the CDN serves it; true by default
     # @option options [String, nil] :description
     # @option options [Hash, String, nil] :transform
     # @return [Hash] the lens

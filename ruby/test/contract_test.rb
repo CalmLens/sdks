@@ -116,6 +116,8 @@ class ContractTest < Minitest::Test
     decision = CalmLens::MockDecision.of(spec['status'])
     spec.fetch('flags', []).each { |flag| decision.flag(flag['category'], flag['score'], flag.fetch('qualifiers', {})) }
     spec.fetch('notEvaluated', []).each { |category| decision.not_evaluated(category) }
+    review = spec['pendingReview']
+    decision.pending_review(review['reason'], review.fetch('uncertainCategories', [])) if review
     decision
   end
 

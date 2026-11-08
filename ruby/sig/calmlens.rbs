@@ -470,8 +470,11 @@ module CalmLens
     # Flags `category` with a score from 0 to 1 and optional qualifier scores.
     def flag: (String | Symbol category, Numeric score, ?Hash[String | Symbol, Numeric] qualifiers) -> self
     def not_evaluated: (String | Symbol category) -> self
+    # Leaves the decision waiting for human review: `sampled`, or `uncertain` with the categories that made it so.
+    def pending_review: ("sampled" | "uncertain" | :sampled | :uncertain reason, ?Array[String | Symbol] uncertain_categories) -> self
     # The `categories`, `score` and `policy` a decided asset gets; nil for `pending` and `failed`.
-    def report: () -> Hash[String, json_value]?
+    # `requested_at` is when a pending review joined the queue, in epoch milliseconds.
+    def report: (?Integer requested_at) -> Hash[String, json_value]?
   end
 
   # What MockServerClient's `moderate:` callback receives.

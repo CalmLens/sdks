@@ -67,7 +67,7 @@ class MockTest < Minitest::Test
     asset = mock.assets.classify(name: 'photo.png', content: { data: 'hello', type: 'image/png' }, processing_options: KEEP)
     assert_equal 200, mock.cdn.serve(asset_id: asset['id']).status
     refused = mock.fetch_cdn(mock.cdn.get_asset_url(asset_id: asset['id'], resource: 'rendered'))
-    assert_equal [403, 'auth/permission-denied'], [refused.status, JSON.parse(refused.body)['code']]
+    assert_equal [404, 'asset/not-found'], [refused.status, JSON.parse(refused.body)['code']]
     assert_equal [DOWNLOAD, nil], mock.requests.map { |request| request.headers['X-Api-Key'] }.last(2)
   end
 

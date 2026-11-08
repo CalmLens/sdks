@@ -51,13 +51,11 @@
       ]
     },
     "germany": {
-      "instances": [
+      "instances": [],
+      "regionalActions": [
         {
-          "category": "hate",
-          "qualifiers": [
-            "hate-symbol",
-            "hate-nazi-symbols-public-display"
-          ]
+          "region": "DE",
+          "action": "block"
         }
       ]
     },
@@ -912,17 +910,15 @@
       "name": "preset germany",
       "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
       "input": {
-        "instances": [
+        "instances": [],
+        "regionalActions": [
           {
-            "category": "hate",
-            "qualifiers": [
-              "hate-symbol",
-              "hate-nazi-symbols-public-display"
-            ]
+            "region": "DE",
+            "action": "block"
           }
         ]
       },
-      "code": "<!calmlens-test a477e0e43e9dc3d4d16ae9f029ebb404 eyJpbnN0YW5jZXMiOlt7ImNhdGVnb3J5IjoiaGF0ZSIsInF1YWxpZmllcnMiOlsiaGF0ZS1zeW1ib2wiLCJoYXRlLW5hemktc3ltYm9scy1wdWJsaWMtZGlzcGxheSJdfV19>"
+      "code": "<!calmlens-test 1b8c1755ce69150baa359bc316e61e1c eyJyZWdpb25hbEFjdGlvbnMiOlt7InJlZ2lvbiI6IkRFIiwiYWN0aW9uIjoiYmxvY2sifV0sImluc3RhbmNlcyI6W119>"
     },
     {
       "name": "preset mixed",
@@ -2718,21 +2714,19 @@
       "name": "preset germany",
       "key": "1a2b3c4d1a2b3c4d1a2b3c4d1a2b3c4d",
       "input": {
-        "instances": [
+        "instances": [],
+        "regionalActions": [
           {
-            "category": "hate",
-            "qualifiers": [
-              "hate-symbol",
-              "hate-nazi-symbols-public-display"
-            ]
+            "region": "DE",
+            "action": "block"
           }
         ]
       },
-      "width": 486,
-      "height": 486,
-      "cells": 27,
-      "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrrrr1021301221221311103133102rr3312202201310302303330030rr3000303313202100311100310rr0330012002123021033330110rr1303200011223303103320112rr0211113231302303102222110rr1121000301311200110201310rr0130232000023120322300113rr2312100030302311101321030rr2203033233312222002023222rr2110201113301311023202012rr1131132331121322002013101rr2311102131331302201001111rr2112122031222100123131323rr1011202301010030022220103rr3210002333123333113322012rr0332302001231321303011303rr2330131120122101023322212rr2233312213122220103220221rr3310300101000110302131223rr3002313203322202011112003rr2012112001110302002223300rr0111202111313200120003020rr2001233132220123230030133rr0301102122210212220122230rrrrrrrrrrrrrrrrrrrrrrrrrrrr",
-      "rgbaSha256": "75874b7698241081cbadab747d502c9a08288297a7e168dc28e1a395be1ece7b"
+      "width": 500,
+      "height": 500,
+      "cells": 25,
+      "levels": "rrrrrrrrrrrrrrrrrrrrrrrrrr10213301130031233223011rr10131001201003112313122rr22223302323131200033021rr03031003300133221110300rr32120133130320031113310rr00032303222221003333303rr30210032021232202013203rr11201311210200203233213rr10210220322212003023100rr02111320310132121030130rr11232012103102120322210rr11013012032113032311032rr12212033000323120211312rr12231111121310301301101rr30131230311230300303211rr23312030310030012030113rr30002010332332332220133rr00033112301333222212200rr22222302313133233000010rr22331101202030311312222rr02203323031330022033020rr32203321210032122210302rr12230203133211212132220rrrrrrrrrrrrrrrrrrrrrrrrrr",
+      "rgbaSha256": "8475154816de191122ba3cc222c2da2d3f86cdf56142055bbe8dcb345668361b"
     },
     {
       "name": "preset mixed",

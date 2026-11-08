@@ -272,6 +272,9 @@ module CalmLens
         # Like the API: a queued re-run no longer replaces a reviewed decision.
         @reruns.delete(item['id'])
         apply_outcome(item, decision, 'requested')
+        # Like the API: the human review queue's decision settles its review, one through the API
+        # leaves it waiting.
+        item['classification']['moderation']['pendingReview'] = nil unless by_api_key
         review = { 'id' => @create_id.call('rev'), 'decision' => decision, 'note' => note,
                    'decidedBy' => { 'type' => 'api-key', 'id' => nil }, 'reviewedAt' => @now.call, 'applied' => true }
         actor = by_api_key ? API_KEY_ACTOR : REVIEWER_ACTOR
@@ -613,6 +616,7 @@ module CalmLens
         old = @state.lenses[definition['identifier']]
         return new_lens(definition) unless old
 
+        definition = active_by_default(definition)
         same = %w[name type active].all? { |key| old[key] == definition[key] } &&
                old['description'] == definition['description'] && canonical(old['transform']) == canonical(definition['transform'])
         return old if same
@@ -622,9 +626,12 @@ module CalmLens
 
       def new_lens(definition)
         now = @now.call
-        lens = { 'id' => @create_id.call('lens'), 'projectId' => @project_id }.merge(definition)
+        lens = { 'id' => @create_id.call('lens'), 'projectId' => @project_id }.merge(active_by_default(definition))
         @state.lenses[definition['identifier']] = lens.merge('createdAt' => now, 'updatedAt' => now)
       end
+
+      # Like the API, a lens is served unless its definition says otherwise.
+      def active_by_default(definition) = definition['active'].nil? ? definition.merge('active' => true) : definition
 
       # POST /projects/:id/lenses: like the API, the identifier must be new to the project.
       def create_lens(json)
@@ -923,23 +930,70 @@ module CalmLens
 
         options, bytes = form_fields(body, request[:content_type])
         fields = options.merge('contentType' => query['contentType'])
-        return create_asset(fields, queue, data: bytes) if upload == 'content'
+        return create_asset(apply_upload_preset(fields, bytes), queue, data: bytes) if upload == 'content'
 
-        start_multipart(fields.merge(query.slice('isFinal', 'totalSizeInBytes')), bytes, queue)
+        start_multipart(apply_upload_preset(fields.merge(query.slice('isFinal', 'totalSizeInBytes')), bytes), bytes, queue)
+      end
+
+      # An API-key upload through a preset, as the API applies it: the preset gives the folder and
+      # visibility, which the upload can't change, and the processing options unless the upload sets
+      # its own, and refuses types and sizes it doesn't accept.
+      def apply_upload_preset(fields, data = nil)
+        return fields unless fields['uploadPresetId']
+
+        preset = @upload_presets.values.find { |item| item['id'] == fields['uploadPresetId'] }
+        fail!(ErrorCodes::UPLOAD_PRESET_NOT_FOUND) unless preset
+        fail!(ErrorCodes::UPLOAD_PRESET_DISABLED) unless preset['enabled']
+        check_preset_fields(preset, fields)
+        check_preset_limits(preset, fields, data)
+        fields.merge('folderId' => preset['folderId'] || fields['folderId'], 'visibility' => preset['visibility'],
+                     'processingOptions' => fields['processingOptions'] || deep_copy(preset['processingOptions']))
+      end
+
+      def check_preset_fields(preset, fields)
+        if preset['folderId'] && fields['folderId'] && fields['folderId'] != preset['folderId']
+          fail!(ErrorCodes::UPLOAD_PRESET_FIELD_NOT_ALLOWED, details: { 'field' => 'folderId' })
+        end
+        return unless fields['visibility'] && fields['visibility'] != preset['visibility']
+
+        fail!(ErrorCodes::UPLOAD_PRESET_FIELD_NOT_ALLOWED, details: { 'field' => 'visibility' })
+      end
+
+      def check_preset_limits(preset, fields, data)
+        allowed = preset['allowedContentTypes']
+        type = fields['contentType']
+        if allowed && type && allowed.none? { |pattern| preset_accepts?(pattern, fields['name'], type) }
+          fail!(ErrorCodes::UNSUPPORTED_UPLOAD_TYPE,
+                details: { 'source' => 'preset', 'contentType' => type, 'allowedContentTypes' => allowed })
+        end
+        limit = preset['maxSizeInBytes']
+        size = fields['totalSizeInBytes'] || data&.bytesize
+        fail!(ErrorCodes::UPLOAD_TOO_LARGE, details: { 'limitBytes' => limit, 'source' => 'preset' }) if limit && size && size > limit
+      end
+
+      # Whether an upload matches one entry of a preset's list, such as `image/*`, `text/plain` or `.pdf`.
+      def preset_accepts?(pattern, name, type)
+        pattern = pattern.strip.downcase
+        return true if ['*', '*/*'].include?(pattern)
+        return type.downcase.start_with?(pattern.delete_suffix('*')) if pattern.end_with?('/*')
+        return name.to_s.downcase.end_with?(pattern) if pattern.start_with?('.')
+
+        type.downcase == pattern
       end
 
       # A JSON create: text as `content` or a first `part` (`{ plainText, type }`), or a URL.
       def create_from_json(json, queue)
         key = %w[content part].find { |name| json.key?(name) }
-        return create_asset(json, queue, url: json['url']) unless key
+        return create_asset(apply_upload_preset(json), queue, url: json['url']) unless key
 
         text = json[key]
         invalid!('validation/invalid-type', key) unless text.is_a?(Hash) && text['plainText'].is_a?(String) && text['type'].is_a?(String)
         fields = json.except('content', 'part', 'sizeInBytes', 'totalSizeInBytes').merge('contentType' => text['type'])
         data = text['plainText'].encode(Encoding::UTF_8).b
-        return create_asset(fields, queue, data: data) if key == 'content'
+        return create_asset(apply_upload_preset(fields, data), queue, data: data) if key == 'content'
 
-        start_multipart(fields.merge('isFinal' => text['isFinal'] == true, 'totalSizeInBytes' => json['totalSizeInBytes']), data, queue)
+        part = fields.merge('isFinal' => text['isFinal'] == true, 'totalSizeInBytes' => json['totalSizeInBytes'])
+        start_multipart(apply_upload_preset(part, data), data, queue)
       end
 
       # The asset fields in an upload form's options part, and the file's bytes. Like the API, a raw
@@ -1023,7 +1077,7 @@ module CalmLens
       # faces in an image, so a decided image reports that the features its upload ran found nothing:
       # OCR and person and face detection when turned on, link detection unless turned off.
       def decided(asset, decision)
-        apply_outcome(asset, decision.status, 'policy', decision.report)
+        apply_outcome(asset, decision.status, 'policy', decision.report(@now.call))
         classification = asset['classification']
         return asset unless classification['status'] == 'completed' && asset['type'] == 'image'
 
@@ -1746,9 +1800,9 @@ module CalmLens
         grant, item = resolve_asset(raw_segments[2])
         return grant if grant.is_a?(Response)
         return asset_not_found unless item && RESOURCES.include?(resource)
-        if resource == 'original' && grant && !grant[:original]
-          return error(ErrorCodes::SIGNED_URL_ORIGINAL_NOT_GRANTED, "This signed asset URL doesn't grant the original file", status: 403)
-        end
+
+        refused = refuse_viewer(item, resource, grant, headers)
+        return refused if refused
 
         params = URI.decode_www_form(query.to_s).to_h
         # A grant authorises a private asset without the API key.
@@ -1758,6 +1812,18 @@ module CalmLens
         return placeholder(method, item) if resource == 'placeholder'
 
         deliver(method, item, resource, params, selected ? options || {} : nil, authorised)
+      end
+
+      # What a grant doesn't cover, or, like the CDN, a private asset for anyone without a grant or the
+      # project's API key: it answers as an unknown asset does, whatever its state, except for its
+      # public placeholder and its info, which has its own rule. An error response, or nil.
+      def refuse_viewer(item, resource, grant, headers)
+        if resource == 'original' && grant && !grant[:original]
+          return error(ErrorCodes::SIGNED_URL_ORIGINAL_NOT_GRANTED, "This signed asset URL doesn't grant the original file", status: 403)
+        end
+        return if grant || item['visibility'] == 'public' || header(headers, 'X-Api-Key') == @api_key
+
+        asset_not_found unless %w[placeholder info].include?(resource)
       end
 
       # Whether the path after the resource selects a lens or transform, and its options; nil when the

@@ -19,7 +19,10 @@ module CalmLens
     # @!attribute open_timeout [Numeric] seconds allowed to open a connection.
     # @!attribute timeout [Numeric] seconds allowed for each read or write; not a whole-transfer deadline.
     Request = Struct.new(:method, :url, :headers, :body, :open_timeout, :timeout, keyword_init: true) do
+      # Struct's own `to_s` and `pretty_print` would show the headers, which hold the API key.
       def inspect = "#<#{self.class.name} #{method} #{url}>"
+      def to_s = inspect
+      def pretty_print(printer) = printer.text(inspect)
     end
 
     # Exceptions that mean the connection failed before a complete response arrived.

@@ -3,6 +3,7 @@
 require 'minitest/autorun'
 require 'calmlens'
 require 'calmlens/testing'
+require 'pp'
 require 'socket'
 require 'stringio'
 require 'timeout'
@@ -81,6 +82,12 @@ class TransportTest < Minitest::Test
   ensure
     client&.close
     server&.close
+  end
+
+  def test_a_request_never_shows_its_headers_when_printed
+    request = CalmLens::Transport::Request.new(method: 'GET', url: 'https://api.calmlens.invalid/v1',
+                                               headers: { 'X-Api-Key' => 'secret-api-key' })
+    [request.inspect, request.to_s, request.pretty_inspect].each { |text| refute_includes text, 'secret-api-key' }
   end
 
   def test_connections_are_reused_and_closed

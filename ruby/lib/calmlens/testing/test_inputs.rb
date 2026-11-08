@@ -56,7 +56,7 @@ module CalmLens
     person = { 'box' => [2500, 1500, 5000, 8500] }
     face = ->(age = nil) { { 'box' => [3500, 2000, 3000, 3500], **(age ? { 'age' => age } : {}) } }
     # Ready-made scenarios (deeply frozen): a clean input, a limited one, adult images and text,
-    # regional delivery, content restricted in Germany, mixed instances in one category, and test
+    # regional delivery, delivery blocked in Germany, mixed instances in one category, and test
     # images with one person and face, nobody, an adult's face, a minor's face and a group of three.
     PRESETS = deep_freeze.call(
       clean: { 'instances' => [] },
@@ -66,7 +66,7 @@ module CalmLens
       regional_delivery: { 'instances' => [], 'regionalActions' => [{ 'region' => 'DE', 'action' => 'block' },
                                                                     { 'region' => 'GB', 'action' => 'age-restrict' },
                                                                     { 'region' => 'FR', 'action' => 'limit' }] },
-      germany: one.call('hate', 'hate-symbol', 'hate-nazi-symbols-public-display'),
+      germany: { 'instances' => [], 'regionalActions' => [{ 'region' => 'DE', 'action' => 'block' }] },
       mixed: { 'instances' => [{ 'category' => 'harassment', 'qualifiers' => %w[harassment-abuse harassment-documentary] },
                                { 'category' => 'harassment', 'qualifiers' => ['harassment-threat'] }] },
       one_face: { 'instances' => [], 'detections' => { 'people' => [person], 'faces' => [face.call] } },
@@ -97,7 +97,8 @@ module CalmLens
       preset = case signal
                when 'harassment.insult' then PRESETS[:limited]
                when 'sexual.adult' then PRESETS[kind == 'image' ? :adult_image : :adult_text]
-               when 'hate.regional-symbol' then PRESETS[:germany]
+               when 'hate.regional-symbol'
+                 { 'instances' => [{ 'category' => 'hate', 'qualifiers' => %w[hate-symbol hate-nazi-symbols-public-display] }] }
                when 'sexual.involving-minors' then { 'instances' => [{ 'category' => 'sexual', 'qualifiers' => ['sexual-minors'] }] }
                when 'violence.graphic'
                  { 'instances' => [{ 'category' => 'violence', 'qualifiers' => %w[violence-injury violence-graphic] }] }

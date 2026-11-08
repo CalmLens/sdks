@@ -635,12 +635,12 @@ module CalmLens
   type transform_input = String | image_transform_options_input
 
   type lens_type = "image" | "video" | "audio" | "document" | "website"
-  # ENSURE_LENS_BODY_SCHEMA: a lens definition, which the CDN serves once it is saved.
+  # ENSURE_LENS_BODY_SCHEMA: a lens definition, which the CDN serves once it is saved unless `active` is false.
   type lens_definition = {
     identifier: String,
     name: String,
     type: lens_type,
-    active: bool,
+    ?active: bool,
     ?description: String?,
     ?transform: image_transform_options_input?
   }
@@ -1168,7 +1168,7 @@ module CalmLens
     identifier: String,
     name: String,
     type: lens_type,
-    active: bool,
+    ?active: bool,
     ?description: String?,
     ?transform: image_transform_options_input?,
     ?request_options: request_options

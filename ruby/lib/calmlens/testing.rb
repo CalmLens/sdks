@@ -27,8 +27,10 @@ module CalmLens
   # grant (the default key has no grants), or the URL is signed: {CDN#sign_asset_url} returns
   # `{cdn_base_url}/assets/{project_id}/sig_…`, a readable grant that only the mock's CDN accepts,
   # which serves `original` only when signed with `original: true`. {#fetch_cdn} loads such a URL
-  # without the API key, as a browser would. {#decide} applies a reviewer's decision, and
-  # {Assets#wait_for_decision} takes no real time: a pending asset times out at once.
+  # without the API key, as a browser would; without the key or a grant, a private asset answers
+  # as an unknown one does, `asset/not-found` (404) whatever its state, and only its placeholder is
+  # public. {#decide} applies a reviewer's decision, and {Assets#wait_for_decision} takes no real
+  # time: a pending asset times out at once.
   # Filters join comparisons with `;` (and), which binds tighter than `,` (or), and group them with
   # `( … )`; list cursors resume after the last item returned. {Assets#search} is the API's keyword
   # search: every query word (case-insensitive, up to 8) must appear in a searchable field, and
@@ -78,7 +80,7 @@ module CalmLens
     REQUEST_FAILURES = %w[transport-error timeout].freeze
     # The methods {#fail_next_request} can target, by resource. Iterators are their list calls.
     OPERATIONS = { assets: %i[search list retrieve list_children list_timeline update create classify upload_part move
-                              retry explain wait_for_decision remove_content delete batch],
+                              retry explain decide wait_for_decision remove_content delete batch],
                    folders: %i[list retrieve create update delete move],
                    hash_lists: %i[list retrieve create update delete list_entries add_entry remove_entry],
                    policies: %i[list retrieve retrieve_assigned create update reset upgrade set_automatic_updates delete
@@ -200,8 +202,9 @@ module CalmLens
 
     # Applies a reviewer's decision to a stored asset, as the portal or API would: the moderation
     # status changes (`purged` also removes the content), the review joins `manualReviews` with
-    # `decidedBy` the mock API key (`{ 'type' => 'api-key', 'id' => nil }`) and `applied: true`, and an
-    # `asset.<decision>` event whose `actor` is a `user` joins the events feed.
+    # `decidedBy` the mock API key (`{ 'type' => 'api-key', 'id' => nil }`) and `applied: true`, an
+    # `asset.<decision>` event whose `actor` is a `user` joins the events feed, and a waiting
+    # `pendingReview` is settled ({Assets#decide} leaves it waiting, as with the API).
     # @param asset_id [String]
     # @param decision [String] `allowed`, `limited`, `age-restricted`, `blocked` or `purged`
     # @return [Hash] the asset
@@ -271,7 +274,8 @@ module CalmLens
     # Fetches a URL of the mock's CDN as a browser would, with a GET and without the API key: a signed
     # asset URL from {CDN#sign_asset_url} (with a resource appended), or a public one from
     # {CDN#get_asset_url}. The request is recorded like any other. Error statuses are returned, not
-    # raised.
+    # raised. A private asset without a grant answers `asset/not-found` (404) whatever its state,
+    # except for its public placeholder.
     # @param url [String]
     # @return [Response] with its body read
     def fetch_cdn(url)

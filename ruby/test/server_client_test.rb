@@ -91,6 +91,21 @@ class ServerClientTest < Minitest::Test
     assert_equal 1, sent.size
   end
 
+  def test_a_lens_without_active_is_the_same_definition_as_an_active_one
+    sent = []
+    transport = lambda do |request|
+      sent << request.url
+      CalmLens::Response.new(status: 200, body: JSON.generate('lenses' => [{ 'id' => 'lens-1', 'identifier' => 'thumb' }]))
+    end
+    client = CalmLens::ServerClient.new(api_key: 'key', project_id: 'project', transport: transport)
+    lens = { identifier: 'thumb', name: 'Thumb', type: 'image' }
+    client.ensure_lens(lens)
+    client.ensure_lens(lens.merge(active: true))
+    assert_equal 1, sent.size
+    client.ensure_lens(lens.merge(active: false))
+    assert_equal 2, sent.size
+  end
+
   def test_a_lens_changed_through_lenses_update_is_sent_again_by_ensure_lens
     methods = []
     transport = lambda do |request|
