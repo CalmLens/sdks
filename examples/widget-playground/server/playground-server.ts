@@ -134,9 +134,14 @@ const mockApi = async (request: IncomingMessage, response: ServerResponse, url: 
       isFinal: query.get("isFinal") === "true",
     });
     if (request.method === "POST" && !route[2]) {
-      const data = new Blob([await readSlowly(request)]);
+      // A create request is a form: the asset's fields as the "options" part, then the file.
+      const { options, file } = readUploadForm(
+        await readSlowly(request),
+        request.headers["content-type"] ?? "",
+      );
+      const data = new Blob([new Uint8Array(file)]);
       const type = query.get("contentType") ?? "application/octet-stream";
-      const name = query.get("name") ?? "upload";
+      const name = options.name ?? "upload";
       const inParts = request.headers["x-calmlens-upload"] === "part";
       const upload = await client.assets.create(
         inParts
@@ -173,6 +178,27 @@ const mockApi = async (request: IncomingMessage, response: ServerResponse, url: 
       ...(error.details && { details: error.details }),
     });
   }
+};
+
+/**
+ * Splits an upload form into its JSON "options" part and its "file" part. The file part carries no
+ * filename, so a form parser would hand it back as text and corrupt the bytes.
+ */
+const readUploadForm = (body: Buffer, contentType: string) => {
+  const boundary = /boundary=(?:"([^"]+)"|([^;]+))/.exec(contentType);
+  const delimiter = Buffer.from(`--${boundary?.[1] ?? boundary?.[2] ?? ""}`);
+  const parts = new Map<string, Buffer>();
+  let at = body.indexOf(delimiter);
+  while (at !== -1) {
+    const headEnd = body.indexOf("\r\n\r\n", at);
+    const next = body.indexOf(delimiter, at + delimiter.length);
+    if (headEnd === -1 || next === -1) break;
+    const name = /name="([^"]*)"/.exec(body.subarray(at, headEnd).toString("latin1"))?.[1];
+    if (name) parts.set(name, body.subarray(headEnd + 4, next - 2));
+    at = next;
+  }
+  const options = JSON.parse(parts.get("options")?.toString("utf8") ?? "{}") as { name?: string };
+  return { options, file: parts.get("file") ?? Buffer.alloc(0) };
 };
 
 /** Where the mock's CDN lives: the asset URLs it signs start here. */
