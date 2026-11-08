@@ -86,6 +86,10 @@ export const validateServerClientOptions = (options: CalmLensServerClientOptions
   if (!options.apiKey || typeof options.apiKey !== "string") {
     throw invalidConfig("API key is required");
   }
+  // Only what can be sent as a header is checked: the API decides whether a key is real.
+  if (!/^[\x21-\x7e]+$/.test(options.apiKey)) {
+    throw invalidConfig("API key must be printable ASCII without spaces");
+  }
   if (!options.projectId) throw invalidConfig("Project ID is required");
   configPathSegment(options.projectId, "Project ID");
   validateConnectionOptions(options);

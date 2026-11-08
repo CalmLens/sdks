@@ -1103,6 +1103,9 @@ export class MockCalmLensApi {
     this.pendingReruns.delete(asset.id);
     const decided = await this.applyOutcome(asset, decision, "requested");
     const now = this.now();
+    // Like the API: the human review queue's decision settles its review, one through the API
+    // leaves it waiting.
+    if (!review) decided.classification.moderation.pendingReview = null;
     decided.classification.moderation.manualReviews = [
       ...(decided.classification.moderation.manualReviews ?? []),
       {
@@ -2287,7 +2290,64 @@ export class MockCalmLensApi {
   }
 
   private async createAsset(request: MockRequest): Promise<Asset> {
-    return this.storeAsset(this.uploadFields(request), request.query.get("wait") === "false");
+    return this.storeAsset(
+      this.applyUploadPreset(this.uploadFields(request)),
+      request.query.get("wait") === "false",
+    );
+  }
+
+  /**
+   * An API-key upload through a preset, as the API applies it: the preset gives the folder and
+   * visibility, which the upload can't change, and the processing options unless the upload sets
+   * its own, and refuses types and sizes it doesn't accept.
+   */
+  private applyUploadPreset(fields: UploadFields): UploadFields {
+    if (!fields.uploadPresetId) return fields;
+    const preset = [...this.configuredPresets.values()].find(
+      ({ id }) => id === fields.uploadPresetId,
+    );
+    if (!preset) throw fail(API_ERROR_CODES.UPLOAD_PRESET_NOT_FOUND);
+    if (!preset.enabled) throw fail(API_ERROR_CODES.UPLOAD_PRESET_DISABLED);
+    if (preset.folderId && fields.folderId && fields.folderId !== preset.folderId) {
+      throw fail(API_ERROR_CODES.UPLOAD_PRESET_FIELD_NOT_ALLOWED, {
+        details: { field: "folderId" },
+      });
+    }
+    if (fields.visibility && fields.visibility !== preset.visibility) {
+      throw fail(API_ERROR_CODES.UPLOAD_PRESET_FIELD_NOT_ALLOWED, {
+        details: { field: "visibility" },
+      });
+    }
+    const contentType = fields.contentType;
+    if (
+      preset.allowedContentTypes?.length &&
+      contentType !== undefined &&
+      !isFileAccepted(
+        { name: fields.name, type: contentType },
+        preset.allowedContentTypes.join(","),
+      )
+    ) {
+      throw fail(API_ERROR_CODES.UNSUPPORTED_UPLOAD_TYPE, {
+        details: {
+          source: "preset",
+          contentType,
+          allowedContentTypes: preset.allowedContentTypes,
+        },
+      });
+    }
+    const size = fields.part?.totalSizeInBytes ?? fields.bytes?.byteLength;
+    if (preset.maxSizeInBytes && size !== undefined && size > preset.maxSizeInBytes) {
+      throw fail(API_ERROR_CODES.UPLOAD_TOO_LARGE, {
+        details: { limitBytes: preset.maxSizeInBytes, source: "preset" },
+      });
+    }
+    return {
+      ...fields,
+      folderId: preset.folderId ?? fields.folderId,
+      visibility: preset.visibility,
+      processingOptions:
+        fields.processingOptions ?? (preset.processingOptions as UploadFields["processingOptions"]),
+    };
   }
 
   private async storeAsset(fields: UploadFields, queue: boolean): Promise<Asset> {
@@ -2562,7 +2622,12 @@ export class MockCalmLensApi {
    * it, a decided image reports the person and face detection its upload turned on.
    */
   private async decided(asset: Asset, decision: MockDecision): Promise<Asset> {
-    const next = await this.applyOutcome(asset, decision.status, "policy", decision.report());
+    const next = await this.applyOutcome(
+      asset,
+      decision.status,
+      "policy",
+      decision.report(this.now()),
+    );
     const features = this.processingOptions.get(asset.id)?.features;
     if (next.classification.status !== "completed" || asset.type !== "image") return next;
     return {
@@ -2841,7 +2906,13 @@ export class MockCalmLensApi {
         preset.allowedContentTypes.join(","),
       )
     ) {
-      throw fail(API_ERROR_CODES.UNSUPPORTED_UPLOAD_TYPE, { details: { source: "preset" } });
+      throw fail(API_ERROR_CODES.UNSUPPORTED_UPLOAD_TYPE, {
+        details: {
+          source: "preset",
+          contentType: fields.contentType ?? "",
+          allowedContentTypes: preset.allowedContentTypes,
+        },
+      });
     }
     const size = fields.part?.totalSizeInBytes ?? fields.bytes?.byteLength;
     if (
@@ -3257,11 +3328,11 @@ export class MockCalmLensApi {
       existing.name === options.name &&
       (existing.description ?? null) === (options.description ?? null) &&
       existing.type === options.type &&
-      existing.active === options.active &&
+      existing.active === (options.active ?? true) &&
       stringifyJsonCanonical(existing.transform ?? null) ===
         stringifyJsonCanonical(options.transform ?? null);
     if (hasMatchingDefinition) return existing;
-    const lens = { ...existing, ...options, updatedAt: this.now() };
+    const lens = { ...existing, ...options, active: options.active ?? true, updatedAt: this.now() };
     this.lenses.set(lens.identifier, lens);
     return lens;
   }
@@ -3272,6 +3343,7 @@ export class MockCalmLensApi {
       id: this.createId("lens"),
       projectId: this.projectId,
       ...options,
+      active: options.active ?? true,
       createdAt: now,
       updatedAt: now,
     };
@@ -3412,12 +3484,24 @@ export class MockCalmLensApi {
         { code: "asset/not-available", message: "Asset is not available" },
         url,
       );
-    const grants = request.headers.get("x-api-key") === this.apiKey ? this.grants : [];
+    const hasApiKey = request.headers.get("x-api-key") === this.apiKey;
+    const grants = hasApiKey ? this.grants : [];
     const folders = (await this.databaseStorage.listFolders?.(this.projectId)) ?? [];
     const canDownload = () => permits(grants, "assets:download", asset.folderId ?? null, folders);
     const status = asset.classification.moderation.status;
     const isHead = request.method === "HEAD";
     const { rendered, preview } = asset.content;
+    // Like the CDN, a private asset answers anyone without a grant or the project's API key as an
+    // unknown asset does, whatever its state. Its placeholder is public.
+    if (
+      asset.visibility !== "public" &&
+      !grant &&
+      !hasApiKey &&
+      resource !== "placeholder" &&
+      resource !== "info"
+    ) {
+      return notFound();
+    }
     if (resource === "info") return this.serveInfo(request, asset, Boolean(grant) || canDownload());
     // Like the CDN, a safety hold refuses every resource.
     if (asset.content.safetyHold) return notAvailable();

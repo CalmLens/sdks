@@ -428,7 +428,10 @@ function testInputForSignal(signal, kind = "text") {
 	switch (signal) {
 		case "harassment.insult": return TEST_INPUT_PRESETS.limited;
 		case "sexual.adult": return kind === "image" ? TEST_INPUT_PRESETS.adultImage : TEST_INPUT_PRESETS.adultText;
-		case "hate.regional-symbol": return TEST_INPUT_PRESETS.germany;
+		case "hate.regional-symbol": return { instances: [{
+			category: "hate",
+			qualifiers: ["hate-symbol", "hate-nazi-symbols-public-display"]
+		}] };
 		case "sexual.involving-minors": return { instances: [{
 			category: "sexual",
 			qualifiers: ["sexual-minors"]
@@ -549,10 +552,13 @@ const TEST_INPUT_PRESETS = {
 			}
 		]
 	},
-	germany: { instances: [{
-		category: "hate",
-		qualifiers: ["hate-symbol", "hate-nazi-symbols-public-display"]
-	}] },
+	germany: {
+		instances: [],
+		regionalActions: [{
+			region: "DE",
+			action: "block"
+		}]
+	},
 	mixed: { instances: [{
 		category: "harassment",
 		qualifiers: ["harassment-abuse", "harassment-documentary"]

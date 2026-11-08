@@ -393,7 +393,7 @@ describe("MockCalmLensServerClient", () => {
     const unsigned = await client.fetchCdn(
       client.cdn.getAssetUrl({ assetId: asset.id, resource: "rendered" }),
     );
-    expect(await unsigned.json()).toMatchObject({ code: "auth/permission-denied" });
+    expect(await unsigned.json()).toMatchObject({ code: "asset/not-found" });
 
     now += 60_000;
     const expired = await client.fetchCdn(`${signed.url}/rendered`);

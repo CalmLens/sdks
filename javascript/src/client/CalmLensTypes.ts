@@ -526,8 +526,11 @@ export interface GetAssetInfoOptions {
 
 export type EnsureLensOptions = Pick<
   Lens,
-  "identifier" | "name" | "description" | "type" | "active" | "transform"
->;
+  "identifier" | "name" | "description" | "type" | "transform"
+> & {
+  /** Whether the CDN serves the lens. Defaults to true. */
+  active?: boolean;
+};
 
 export interface EnsureLensesOptions {
   lenses: EnsureLensOptions[];

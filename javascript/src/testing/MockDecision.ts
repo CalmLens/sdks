@@ -37,6 +37,9 @@ const STATUS_ACTION = {
 
 type Category = (typeof MOCK_CATEGORIES)[number];
 
+/** Why a decision waits for human review: `sampled`, or `uncertain` about some categories. */
+export type MockPendingReviewReason = "sampled" | "uncertain";
+
 /** The likelihood the API reports for a score (ClassificationCategories.ts, scoreToLikelihood). */
 const scoreToLikelihood = (score: number) =>
   score >= 0.8
@@ -65,6 +68,7 @@ export class MockDecision {
     { score: number; qualifiers: Array<[qualifier: string, score: number]> }
   >();
   readonly #notEvaluated = new Set<Category>();
+  #pendingReview?: { reason: MockPendingReviewReason; uncertainCategories: Category[] };
 
   constructor(status: MockAssetOutcome) {
     if (!OUTCOMES.includes(status)) {
@@ -113,6 +117,26 @@ export class MockDecision {
     return this;
   }
 
+  /**
+   * Leaves the decision waiting for human review, as `classification.moderation.pendingReview`
+   * reports: `sampled`, or `uncertain` with the `uncertainCategories` that made it so. The queue's
+   * decision (`decide` on the mock) clears it; `assets.decide` doesn't, as with the API.
+   */
+  pendingReview(reason: MockPendingReviewReason, uncertainCategories: Category[] = []): this {
+    if (this.status === "pending" || this.status === "failed") {
+      throw invalidArgument(`a ${this.status} decision can't wait for review`);
+    }
+    if (reason !== "sampled" && reason !== "uncertain") {
+      throw invalidArgument("reason must be sampled or uncertain");
+    }
+    if (reason === "sampled" && uncertainCategories.length) {
+      throw invalidArgument("a sampled review has no uncertain categories");
+    }
+    for (const category of uncertainCategories) this.#checkCategory(category);
+    this.#pendingReview = { reason, uncertainCategories: [...uncertainCategories] };
+    return this;
+  }
+
   #checkCategory(category: string): asserts category is Category {
     if (!(MOCK_CATEGORIES as readonly string[]).includes(category)) {
       throw invalidArgument(`${category} is not a CalmLens category`);
@@ -122,9 +146,10 @@ export class MockDecision {
   /**
    * The report a decided asset gets, as the API sends it: every category (unflagged ones
    * evaluated with score 0), policy-adjusted results and the automated status and
-   * `flaggedCategories`. `undefined` for `pending` and `failed`.
+   * `flaggedCategories`. `requestedAt` is when a pending review joined the queue. `undefined` for
+   * `pending` and `failed`.
    */
-  report(): Omit<AssetModeration, "status" | "manualReviews"> | undefined {
+  report(requestedAt = 0): Omit<AssetModeration, "status" | "manualReviews"> | undefined {
     const status = this.status;
     if (status === "pending" || status === "failed") return undefined;
     const action = (score: number) =>
@@ -159,12 +184,25 @@ export class MockDecision {
     );
     return {
       categories: Object.fromEntries(
-        evaluated.map(([category, score]) => [category, { score, action: action(score) }]),
+        evaluated.map(([category, score]) => [
+          category,
+          {
+            score,
+            action: action(score),
+            source: { kind: score >= 0.5 ? ("default" as const) : ("below-threshold" as const) },
+            // The mock keeps no policies: the category's setting is the decision's own action.
+            settings: {
+              action: status === "allowed" ? ("allow" as const) : STATUS_ACTION[status],
+              allowances: [],
+              restrictions: [],
+            },
+          },
+        ]),
       ),
       explanationComplete: true,
-      // The mock keeps no policies, so no policy is named, nor a review queue to wait for.
+      // The mock keeps no policies, so no policy is named.
       policy: null,
-      pendingReview: null,
+      pendingReview: this.#pendingReview ? { requestedAt, ...this.#pendingReview } : null,
       source: "policy",
       rule: null,
       automatedStatus: status,

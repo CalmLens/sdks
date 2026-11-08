@@ -287,9 +287,10 @@ declare const TEST_INPUT_PRESETS: {
     })[];
   };
   germany: {
-    instances: {
-      category: "hate";
-      qualifiers: ("hate-nazi-symbols-public-display" | "hate-symbol")[];
+    instances: never[];
+    regionalActions: {
+      region: "DE";
+      action: "block";
     }[];
   };
   mixed: {

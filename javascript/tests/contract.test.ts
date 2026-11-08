@@ -128,6 +128,7 @@ type DecisionSpec =
       status: string;
       flags?: { category: string; score: number; qualifiers?: Record<string, number> }[];
       notEvaluated?: string[];
+      pendingReview?: { reason: string; uncertainCategories?: string[] };
     };
 type Scenario = {
   name: string;
@@ -189,6 +190,10 @@ const buildDecision = (spec: DecisionSpec) => {
     decision.flag(category as never, score, qualifiers);
   }
   for (const category of spec.notEvaluated ?? []) decision.notEvaluated(category as never);
+  if (spec.pendingReview) {
+    const { reason, uncertainCategories } = spec.pendingReview;
+    decision.pendingReview(reason as never, uncertainCategories as never);
+  }
   return decision;
 };
 

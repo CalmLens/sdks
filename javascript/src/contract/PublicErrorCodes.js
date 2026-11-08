@@ -487,7 +487,7 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	UNSUPPORTED_UPLOAD_TYPE: new ErrorCode({
 		id: "upload/unsupported-type",
-		defaultMessage: "The file type is not accepted. details.source is `calmlens` when CalmLens cannot store and process it (use a concrete MIME type such as image/png, application/pdf or text/plain) or `preset` when the upload preset doesn't allow it.",
+		defaultMessage: "The file type is not accepted. details.source is `calmlens` when CalmLens cannot store and process it (use a concrete MIME type such as image/png, application/pdf or text/plain) or `preset` when the upload preset doesn't allow it (details.contentType and details.allowedContentTypes say what was sent and what it accepts).",
 		status: 415
 	}),
 	INVALID_UPLOAD_PAYLOAD: new ErrorCode({

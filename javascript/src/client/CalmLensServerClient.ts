@@ -136,7 +136,7 @@ const getEnsureLensCacheKey = (options: EnsureLensOptions): string =>
     name: options.name,
     description: options.description ?? null,
     type: options.type,
-    active: options.active,
+    active: options.active ?? true,
     transform: options.transform ?? null,
   });
 
