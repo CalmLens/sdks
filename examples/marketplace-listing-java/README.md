@@ -127,13 +127,15 @@ export CALMLENS_WEBHOOK_SECRET='a-local-development-secret'
 mvn -q compile exec:java
 ```
 
-In another terminal:
+In another terminal, with the
+[CalmLens CLI](https://calmlens.com/docs/guides/local-development#install-the-cli) installed
+(`curl -fsSL https://calmlens.com/install.sh | sh`):
 
 ```sh
 export CALMLENS_API_KEY='your-project-api-key'
 export CALMLENS_PROJECT_ID='proj_8fK2mQx7Lp4NvB3tRz9Y'
 export CALMLENS_WEBHOOK_SECRET='a-local-development-secret'
-npx calmlens listen --forward-to http://127.0.0.1:6404/webhooks/calmlens
+calmlens listen --forward-to http://127.0.0.1:6404/webhooks/calmlens
 ```
 
 The handler passes the **exact raw body bytes** to `CalmLensServerClient.parseWebhookEvent`, which

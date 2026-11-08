@@ -14,16 +14,22 @@ Usage:
   calmlens listen --forward-to <url> [options]
   calmlens trigger [sexual|violence|self-harm|harassment|hate|criminal-activity|clean] [options]
 
-Run it with \`npx calmlens\`, or install it with \`npm install -g calmlens\`.
+Install it with \`brew install calmlens/sdks/calmlens\` (after
+\`brew tap calmlens/sdks https://github.com/CalmLens/sdks\`), the install script at
+https://calmlens.com/install.sh, a download from https://github.com/CalmLens/sdks/releases,
+or \`npm install -g calmlens\`. See https://calmlens.com/docs/guides/local-development.
 
 Commands:
   login     Sign in through your browser and choose a project. The CLI keeps the key it
             receives, so listen and trigger need no API key or project ID.
   logout    Revoke and forget the key from login.
   listen    Forward your project's events to a local webhook handler with the same flat
-            body (id, projectId, type, severity, title, description, assetId, asset, facts,
-            createdAt) and headers (x-calmlens-timestamp, x-calmlens-signature: v1=...) as
-            real deliveries. No public URL needed.
+            body (id, projectId, actor, type, severity, title, description, assetId,
+            assetSequence, asset, facts, createdAt) and headers (x-calmlens-delivery,
+            x-calmlens-timestamp, x-calmlens-signature: v1=...) as real deliveries. No
+            public URL needed. Like real deliveries, network errors, timeouts, 408, 425, 429
+            and 5xx responses are retried, up to 7 attempts with the same delivery ID, here
+            after 1, 2, 4, 8, 15 and 30 seconds (longer if Retry-After asks, up to 60).
   trigger   Moderate a harmless test comment so CalmLens creates real events. Each trigger
             counts as one upload. Test comments other than clean are signed with the
             project's test input key (Project settings → Test inputs in the portal, with

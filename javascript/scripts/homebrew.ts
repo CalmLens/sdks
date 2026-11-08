@@ -1,25 +1,22 @@
 import { resolve } from "node:path";
 import { version } from "../package.json";
+import { readReleaseChecksums, releaseUrl } from "./release-checksums";
 
 // Generates Formula/calmlens.rb, the Homebrew formula for this version's CLI, from the checksums
 // attached to its `cli-v<version>` GitHub release (.github/workflows/release-cli.yml).
 const directory = process.argv[2];
 if (!directory) throw new Error("Pass the release artifact directory.");
-const checksums = await Bun.file(resolve(directory, "SHA256SUMS")).text();
 const platforms = ["darwin-arm64", "darwin-x64", "linux-arm64", "linux-x64"];
-const entries = platforms.map((platform) => {
-  const archive = `calmlens-${version}-${platform}.tar.gz`;
-  const checksum = checksums
-    .split("\n")
-    .find((line) => line.trim().endsWith(` ${archive}`))
-    ?.split(/\s+/)[0];
-  if (!checksum || !/^[a-f0-9]{64}$/.test(checksum))
-    throw new Error(`Missing checksum for ${archive}`);
-  return { platform, archive, checksum };
-});
+const archives = platforms.map((platform) => `calmlens-${version}-${platform}.tar.gz`);
+const checksums = await readReleaseChecksums(directory, archives);
+const entries = platforms.map((platform, i) => ({
+  platform,
+  archive: archives[i]!,
+  checksum: checksums[archives[i]!]!,
+}));
 const stanza = (platform: string) => {
   const entry = entries.find((entry) => entry.platform === platform)!;
-  return `      url "https://github.com/CalmLens/sdks/releases/download/cli-v${version}/${entry.archive}"\n      sha256 "${entry.checksum}"`;
+  return `      url "${releaseUrl(version, entry.archive)}"\n      sha256 "${entry.checksum}"`;
 };
 await Bun.write(
   resolve(directory, "calmlens.rb"),

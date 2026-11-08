@@ -93,7 +93,9 @@ includes the JavaScript SDK and its commit's SDK Tests and SDK examples runs hav
 `release-npm.yml` tags `javascript/v<version>` and publishes one packed build to npm with
 provenance, as `calmlens` and as `@calmlens/sdk`. `release-cli.yml` tags `cli-v<version>`,
 attaches the CLI's standalone executables to that GitHub release and updates the Homebrew
-formula in `Formula/`. Go tags and proxy validation run here too. `release-php.yml` tags PHP
+formula in `Formula/`; calmlens.com serves install scripts for those releases. It also builds a
+Scoop manifest, winget manifests and a container image, published only when the
+`PUBLISH_SCOOP_BUCKET` and `PUBLISH_GHCR` repository variables are `true`. Go tags and proxy validation run here too. `release-php.yml` tags PHP
 releases `v<version>`; Packagist installs `calmlens/sdk` from those tags, through the root
 `composer.json`, with `.gitattributes` keeping the archive to the PHP package.
 

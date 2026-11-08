@@ -164,7 +164,9 @@ export CALMLENS_WEBHOOK_SECRET='a-local-development-secret'
 go run .
 ```
 
-In another terminal:
+In another terminal, with the
+[CalmLens CLI](https://calmlens.com/docs/guides/local-development#install-the-cli) installed
+(`curl -fsSL https://calmlens.com/install.sh | sh`):
 
 ```sh
 export CALMLENS_API_KEY='your-project-api-key'

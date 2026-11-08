@@ -89,7 +89,7 @@ Set the same secret on the app and on the
 [CalmLens CLI](https://calmlens.com/docs/guides/local-development) listener, then forward events:
 
 ```sh
-npx calmlens listen --forward-to http://127.0.0.1:6407/webhooks/calmlens
+calmlens listen --forward-to http://127.0.0.1:6407/webhooks/calmlens
 ```
 
 The handler passes the **exact raw body** to `CalmLens\Webhooks::parseEvent`, which verifies the

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   createLocalSigningSecret,
+  deliverEvent,
   describeEventTypes,
   type EventSource,
   formatForwardLine,
@@ -82,6 +83,115 @@ describe("calmlens listen", () => {
     });
     expect(unreachable).toMatchObject({ ok: false, error: "ECONNREFUSED" });
     expect(formatForwardLine(event, unreachable)).toContain("is your server running?");
+  });
+
+  test("retries failed deliveries as one delivery, signed again on each attempt", async () => {
+    const secret = createLocalSigningSecret();
+    const event = makeEvent(EXAMPLE_IDS.evt, "asset.allowed");
+    const attempts: Headers[] = [];
+    const responses = [
+      () => {
+        throw new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } });
+      },
+      () => new Response(null, { status: 503 }),
+      () => new Response(null, { status: 429 }),
+      () => new Response(null, { status: 204 }),
+    ];
+    const lines: string[] = [];
+    const result = await deliverEvent(event, {
+      forwardTo: "http://localhost:3000/hook",
+      secret,
+      retryDelaysMs: [0, 0, 0, 0],
+      log: (line) => lines.push(line),
+      fetchImpl: async (_url, init) => {
+        const headers = new Headers(init?.headers);
+        attempts.push(headers);
+        expect(
+          await verifyWebhookSignature({
+            payload: String(init?.body),
+            signature: headers.get("x-calmlens-signature"),
+            timestamp: headers.get("x-calmlens-timestamp"),
+            secret,
+          }),
+        ).toBe(true);
+        return responses[attempts.length - 1]!();
+      },
+    });
+
+    expect(result).toMatchObject({ ok: true, status: 204 });
+    expect(attempts).toHaveLength(4);
+    const deliveryIds = new Set(attempts.map((headers) => headers.get("x-calmlens-delivery")));
+    expect(deliveryIds.size).toBe(1);
+    expect(isId([...deliveryIds][0], "dlv")).toBe(true);
+    expect(lines).toHaveLength(4);
+  });
+
+  test("doesn't retry responses a real delivery wouldn't retry, and gives up after the last attempt", async () => {
+    const event = makeEvent(EXAMPLE_IDS.evt, "asset.blocked");
+    for (const status of [301, 400, 401, 404]) {
+      let calls = 0;
+      const result = await deliverEvent(event, {
+        forwardTo: "http://localhost:3000/hook",
+        secret: "s",
+        retryDelaysMs: [0, 0],
+        log: () => {},
+        fetchImpl: async () => {
+          calls++;
+          return new Response(null, { status });
+        },
+      });
+      expect({ status: result.status, calls }).toEqual({ status, calls: 1 });
+    }
+    for (const status of [408, 425, 500, 502]) {
+      let calls = 0;
+      const result = await deliverEvent(event, {
+        forwardTo: "http://localhost:3000/hook",
+        secret: "s",
+        retryDelaysMs: [0, 0],
+        log: () => {},
+        fetchImpl: async () => {
+          calls++;
+          return new Response(null, { status });
+        },
+      });
+      expect({ status: result.status, calls }).toEqual({ status, calls: 3 });
+    }
+  });
+
+  test("waits as long as a Retry-After header asks before retrying", async () => {
+    const event = makeEvent(EXAMPLE_IDS.evt, "asset.allowed");
+    const times: number[] = [];
+    await deliverEvent(event, {
+      forwardTo: "http://localhost:3000/hook",
+      secret: "s",
+      retryDelaysMs: [0],
+      log: () => {},
+      fetchImpl: async () => {
+        times.push(Date.now());
+        return times.length === 1
+          ? new Response(null, { status: 429, headers: { "retry-after": "1" } })
+          : new Response(null, { status: 200 });
+      },
+    });
+    expect(times).toHaveLength(2);
+    expect(times[1]! - times[0]!).toBeGreaterThanOrEqual(990);
+  });
+
+  test("stops retrying when listening stops", async () => {
+    const controller = new AbortController();
+    let calls = 0;
+    const result = await deliverEvent(makeEvent(EXAMPLE_IDS.evt, "asset.allowed"), {
+      forwardTo: "http://localhost:3000/hook",
+      secret: "s",
+      retryDelaysMs: [60_000, 60_000],
+      signal: controller.signal,
+      log: () => controller.abort(),
+      fetchImpl: async () => {
+        calls++;
+        return new Response(null, { status: 500 });
+      },
+    });
+    expect({ status: result.status, calls }).toEqual({ status: 500, calls: 1 });
   });
 
   test("starts from now, follows the cursor and filters event types", async () => {
