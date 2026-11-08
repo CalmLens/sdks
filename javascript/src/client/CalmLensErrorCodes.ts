@@ -253,7 +253,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "auth/permission-denied": {
     status: 403,
-    message: "This API key lacks a permission the request needs (details.permission names it, such as assets:download for an asset's folder), or the resource belongs to another project.",
+    message: "This API key lacks a permission the request needs (details.permission names it, such as assets:download for an asset's folder, and details.role the least role that includes it), or the resource belongs to another project.",
   },
   "upload/too-large": {
     status: 413,

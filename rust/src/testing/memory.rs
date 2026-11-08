@@ -2802,7 +2802,7 @@ impl Backend {
                 ErrorCode::PermissionDenied,
                 "This API key needs assets:download permission for this asset's folder.",
             );
-            failure.details = json!({ "permission": "assets:download" });
+            failure.details = json!({ "permission": "assets:download", "role": "viewer" });
             return failure.response();
         }
         // The embed page shows any asset that may be delivered, as its viewer for the asset's type

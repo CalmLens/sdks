@@ -447,7 +447,7 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	PERMISSION_DENIED: new ErrorCode({
 		id: "auth/permission-denied",
-		defaultMessage: "This API key lacks a permission the request needs (details.permission names it, such as assets:download for an asset's folder), or the resource belongs to another project.",
+		defaultMessage: "This API key lacks a permission the request needs (details.permission names it, such as assets:download for an asset's folder, and details.role the least role that includes it), or the resource belongs to another project.",
 		status: 403
 	}),
 	UPLOAD_TOO_LARGE: new ErrorCode({

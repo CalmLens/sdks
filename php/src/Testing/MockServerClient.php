@@ -2472,7 +2472,7 @@ final class MockServerClient
         $private = $asset['visibility'] !== 'public';
         if ($private && !$canDownload()) {
             return $this->json(403, ['code' => ErrorCodes::PERMISSION_DENIED, 'message' => 'This API key needs assets:download permission for this asset’s folder.',
-                'details' => ['permission' => 'assets:download']]);
+                'details' => ['permission' => 'assets:download', 'role' => 'viewer']]);
         }
         // The embed page shows any asset that may be delivered, as its viewer for the asset's type
         // or a notice that the type has none.

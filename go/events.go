@@ -316,8 +316,8 @@ type UsageFreeUploadsExhaustedFacts struct {
 }
 
 // ProjectMemberJoinedFacts are the facts of EventProjectMemberJoined. Role is "admin",
-// "editor", "viewer" or "custom"; other values may be added. MemberName stays in the portal and is
-// nil on webhook deliveries.
+// "configurator", "editor", "viewer" or "custom"; other values may be added. MemberName stays in
+// the portal and is nil on webhook deliveries.
 type ProjectMemberJoinedFacts struct {
 	MemberUserID string  `json:"member-user-id"`
 	MemberName   *string `json:"member-name"`

@@ -1431,6 +1431,7 @@ const CATEGORY_LABELS = {
 /** Project roles as the portal names them. */
 const PROJECT_ROLE_LABELS = {
 	admin: msg("Administrator"),
+	configurator: msg("Configurator"),
 	editor: msg("Editor"),
 	viewer: msg("Viewer"),
 	custom: msg("Custom"),
@@ -1772,7 +1773,7 @@ const PROJECT_MEMBER_JOINED = defineEventType({
 		}),
 		role: field(PROJECT_MEMBER_ROLE_SCHEMA, {
 			label: msg("Role"),
-			description: "The member's role: `admin`, `editor`, `viewer` or `custom`.",
+			description: "The member's role: `admin`, `configurator`, `editor`, `viewer` or `custom`.",
 			display: "enum",
 			valueLabels: PROJECT_ROLE_LABELS
 		})
@@ -2318,7 +2319,7 @@ const API_KEY_CREATED = defineEventType({
 		}),
 		role: field(ACCESS_ROLE_SCHEMA, {
 			label: msg("Role"),
-			description: "The access the key was created with: `admin`, `editor`, `viewer` or `custom`.",
+			description: "The access the key was created with: `admin`, `configurator`, `editor`, `viewer` or `custom`.",
 			display: "enum",
 			valueLabels: PROJECT_ROLE_LABELS
 		}),

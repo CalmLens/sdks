@@ -64,7 +64,7 @@ error_codes! {
     ApiKeyProjectMismatch = "api-key/project-mismatch", 403;
     /// `api-key/not-accepted` (HTTP 403): API keys are only accepted by the public API at /v1.
     ApiKeyNotAccepted = "api-key/not-accepted", 403;
-    /// `auth/permission-denied` (HTTP 403): This API key lacks a permission the request needs (details.permission names it, such as assets:download for an asset's folder), or the resource belongs to another project.
+    /// `auth/permission-denied` (HTTP 403): This API key lacks a permission the request needs (details.permission names it, such as assets:download for an asset's folder, and details.role the least role that includes it), or the resource belongs to another project.
     PermissionDenied = "auth/permission-denied", 403;
     /// `upload/too-large` (HTTP 413): The file is larger than allowed. details.limitBytes is the limit, and details.source says whether it is the plan's (`plan`) or the upload preset's (`preset`).
     UploadTooLarge = "upload/too-large", 413;

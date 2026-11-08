@@ -1877,6 +1877,7 @@ declare const EVENT_TYPE_INFO: {
       memberName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       role: EventFieldDefinition<zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -1886,7 +1887,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       memberUserId: string;
       memberName?: string | null | undefined;
-      role: "admin" | "custom" | "editor" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
     }>;
     factInfo: {
       label: string;
@@ -1914,6 +1915,7 @@ declare const EVENT_TYPE_INFO: {
       memberName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       role: zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -1940,6 +1942,7 @@ declare const EVENT_TYPE_INFO: {
       memberName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       role: EventFieldDefinition<zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -1949,7 +1952,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       memberUserId: string;
       memberName?: string | null | undefined;
-      role: "admin" | "custom" | "editor" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
     }>;
     factInfo: {
       label: string;
@@ -1977,6 +1980,7 @@ declare const EVENT_TYPE_INFO: {
       memberName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       role: zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -2003,6 +2007,7 @@ declare const EVENT_TYPE_INFO: {
       memberName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       role: EventFieldDefinition<zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -2012,7 +2017,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       memberUserId: string;
       memberName?: string | null | undefined;
-      role: "admin" | "custom" | "editor" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
     }>;
     factInfo: {
       label: string;
@@ -2040,6 +2045,7 @@ declare const EVENT_TYPE_INFO: {
       memberName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       role: zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -2066,12 +2072,14 @@ declare const EVENT_TYPE_INFO: {
       memberName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       previousRole: EventFieldDefinition<zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
       }>>;
       role: EventFieldDefinition<zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -2081,8 +2089,8 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       memberUserId: string;
       memberName?: string | null | undefined;
-      previousRole: "admin" | "custom" | "editor" | "viewer";
-      role: "admin" | "custom" | "editor" | "viewer";
+      previousRole: "admin" | "configurator" | "custom" | "editor" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
     }>;
     factInfo: {
       label: string;
@@ -2110,12 +2118,14 @@ declare const EVENT_TYPE_INFO: {
       memberName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       previousRole: zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
       }>;
       role: zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -2141,6 +2151,7 @@ declare const EVENT_TYPE_INFO: {
       inviteeEmail: EventFieldDefinition<zod.ZodString>;
       role: EventFieldDefinition<zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -2149,7 +2160,7 @@ declare const EVENT_TYPE_INFO: {
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       inviteeEmail: string;
-      role: "admin" | "custom" | "editor" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
     }>;
     factInfo: {
       label: string;
@@ -2176,6 +2187,7 @@ declare const EVENT_TYPE_INFO: {
       inviteeEmail: zod.ZodString;
       role: zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -2273,6 +2285,7 @@ declare const EVENT_TYPE_INFO: {
       keyName: EventFieldDefinition<zod.ZodOptional<zod.ZodNullable<zod.ZodString>>>;
       role: EventFieldDefinition<zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";
@@ -2283,7 +2296,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       keyId: string;
       keyName?: string | null | undefined;
-      role: "admin" | "custom" | "editor" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
       createdByName?: string | null | undefined;
     }>;
     factInfo: {
@@ -2312,6 +2325,7 @@ declare const EVENT_TYPE_INFO: {
       keyName: zod.ZodOptional<zod.ZodNullable<zod.ZodString>>;
       role: zod.ZodEnum<{
         admin: "admin";
+        configurator: "configurator";
         custom: "custom";
         editor: "editor";
         viewer: "viewer";

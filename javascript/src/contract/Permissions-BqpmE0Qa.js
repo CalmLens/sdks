@@ -57,6 +57,7 @@ const GRANT_SCHEMA = zod.object({
 const GRANTS_SCHEMA = zod.array(GRANT_SCHEMA).max(100);
 const ACCESS_ROLE_SCHEMA = zod.enum([
 	"admin",
+	"configurator",
 	"editor",
 	"viewer",
 	"custom"
