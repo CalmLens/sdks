@@ -604,7 +604,7 @@ class ContractTest {
     return Arrays.stream(Outcome.values()).filter(outcome -> outcome.value().equals(value)).findFirst().orElseThrow();
   }
 
-  /** Builds a decision with the builder, in the order the fixture lists its calls: a status, or a status with flags and notEvaluated. */
+  /** Builds a decision with the builder, in the order the fixture lists its calls: a status, or a status with flags, notEvaluated and pendingReview. */
   static MockDecision buildDecision(JsonElement spec) {
     if (spec.isJsonPrimitive()) return MockDecision.of(spec.getAsString());
     JsonObject object = spec.getAsJsonObject();
@@ -617,6 +617,14 @@ class ContractTest {
         decision.flag(flag.get("category").getAsString(), flag.get("score").getAsDouble(), qualifiers);
       }
     if (object.has("notEvaluated")) for (JsonElement category : object.getAsJsonArray("notEvaluated")) decision.notEvaluated(category.getAsString());
+    if (object.has("pendingReview")) {
+      JsonObject review = object.getAsJsonObject("pendingReview");
+      String reason = review.get("reason").getAsString();
+      if (!review.has("uncertainCategories")) return decision.pendingReview(reason);
+      List<String> uncertain = new ArrayList<>();
+      review.getAsJsonArray("uncertainCategories").forEach(category -> uncertain.add(category.getAsString()));
+      decision.pendingReview(reason, uncertain);
+    }
     return decision;
   }
 

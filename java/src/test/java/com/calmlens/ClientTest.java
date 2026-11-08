@@ -207,6 +207,20 @@ class ClientTest {
     }
   }
 
+  @Test void aDefinitionWithoutActiveSendsNoneAndSharesTheCacheWithAnActiveOne() {
+    List<JsonObject> sent = new ArrayList<>();
+    CalmLensServerClient client = client(request -> {
+      sent.add(JsonParser.parseString(new String(Fixtures.body(request), StandardCharsets.UTF_8)).getAsJsonObject());
+      return lensReply(request);
+    });
+    Models.Lens lens = client.ensureLens(new Models.LensDefinition("thumb", "Thumbnail", "image"));
+    assertFalse(sent.get(0).getAsJsonArray("lenses").get(0).getAsJsonObject().has("active"));
+    assertEquals(lens, client.ensureLens(new Models.LensDefinition("thumb", "Thumbnail", "image", true)));
+    assertEquals(1, sent.size());
+    client.ensureLens(new Models.LensDefinition("thumb", "Thumbnail", "image", false));
+    assertEquals(2, sent.size());
+  }
+
   @Test void aLensChangedThroughTheLensesResourceIsEnsuredAgain() {
     List<String> methods = new ArrayList<>();
     CalmLensServerClient client = client(request -> {

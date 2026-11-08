@@ -30,6 +30,11 @@ class ConfigurationTest {
     return new Models.EnsureUploadPresets(List.of(definitions));
   }
 
+  @Test void anApiKeyOutsidePrintableAsciiIsRefusedBeforeAnyRequest() {
+    for (String key : List.of("k\u00e9y", "key\u007f", "key\u0000"))
+      assertEquals(ErrorCodes.SDK_INVALID_CONFIG, assertThrows(CalmLensException.class, () -> new CalmLensServerClient(key, "project-1")).getCode());
+  }
+
   @Test void everyPresetSetterReachesTheStoredPreset() {
     MockCalmLensServerClient mock = mock();
     Models.ProcessingOptions processing = new Models.ProcessingOptions().keepContentAfterProcessing(true);

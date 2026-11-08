@@ -200,35 +200,99 @@
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "violence": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "self-harm": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "harassment": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "hate": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "criminal-activity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "personal-information": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "profanity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 }
               },
               "classification.moderation.raw": {
@@ -297,35 +361,99 @@
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "violence": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "self-harm": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "harassment": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "hate": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "criminal-activity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "personal-information": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "profanity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 }
               },
               "classification.moderation.raw": {
@@ -398,35 +526,99 @@
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "violence": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "self-harm": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "harassment": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "hate": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "criminal-activity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "personal-information": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "profanity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 }
               },
               "classification.moderation.raw": {
@@ -539,31 +731,87 @@
               "classification.moderation.categories": {
                 "violence": {
                   "score": 0.92,
-                  "action": "block"
+                  "action": "block",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "default"
+                  }
                 },
                 "self-harm": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "harassment": {
                   "score": 0.3,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "hate": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "criminal-activity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "personal-information": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "profanity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "block",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 }
               },
               "classification.moderation.raw": {
@@ -644,35 +892,99 @@
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "limit",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "violence": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "limit",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "self-harm": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "limit",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "harassment": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "limit",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "hate": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "limit",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "criminal-activity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "limit",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "personal-information": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "limit",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "profanity": {
                   "score": 0.7,
-                  "action": "limit"
+                  "action": "limit",
+                  "settings": {
+                    "action": "limit",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "default"
+                  }
                 }
               },
               "classification.moderation.raw": {
@@ -10054,35 +10366,99 @@
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0.8,
-                  "action": "age-restrict"
+                  "action": "age-restrict",
+                  "settings": {
+                    "action": "age-restrict",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "default"
+                  }
                 },
                 "violence": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "age-restrict",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "self-harm": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "age-restrict",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "harassment": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "age-restrict",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "hate": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "age-restrict",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "criminal-activity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "age-restrict",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "personal-information": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "age-restrict",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "profanity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "age-restrict",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 }
               },
               "classification.moderation.raw": {
@@ -10246,35 +10622,99 @@
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "violence": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "self-harm": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "harassment": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "hate": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "criminal-activity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "personal-information": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 },
                 "profanity": {
                   "score": 0,
-                  "action": "allow"
+                  "action": "allow",
+                  "settings": {
+                    "action": "allow",
+                    "allowances": [],
+                    "restrictions": []
+                  },
+                  "source": {
+                    "kind": "below-threshold"
+                  }
                 }
               },
               "classification.moderation.raw": {
@@ -11187,9 +11627,1411 @@
           },
           "expect": {
             "cdn": {
-              "status": 403,
-              "code": "auth/permission-denied"
+              "status": 404,
+              "code": "asset/not-found"
             }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a private asset's plain URL answers as an unknown asset does, whatever its state, to anyone without the API key",
+      "mock": {
+        "moderate": {
+          "byName": {
+            "restricted.png": "age-restricted"
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "private.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "kept",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.getAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            }
+          },
+          "save": "keptUrl"
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$concat": [
+                {
+                  "$ref": "keptUrl"
+                },
+                "/original"
+              ]
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/not-found"
+            }
+          }
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$concat": [
+                {
+                  "$ref": "keptUrl"
+                },
+                "/rendered"
+              ]
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/not-found"
+            }
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            },
+            "outcome": "blocked"
+          }
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$concat": [
+                {
+                  "$ref": "keptUrl"
+                },
+                "/rendered"
+              ]
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/not-found"
+            }
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetId": {
+              "$ref": "kept.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "removed.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "removed",
+          "expect": {
+            "result": {
+              "content.status": "removed"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.getAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "removed.id"
+            }
+          },
+          "save": "removedUrl"
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$concat": [
+                {
+                  "$ref": "removedUrl"
+                },
+                "/rendered"
+              ]
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/not-found"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "restricted.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "restricted",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.getAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "restricted.id"
+            }
+          },
+          "save": "restrictedUrl"
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$concat": [
+                {
+                  "$ref": "restrictedUrl"
+                },
+                "/rendered"
+              ]
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 404,
+              "code": "asset/not-found"
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "public.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            },
+            "visibility": "public"
+          },
+          "save": "public",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "public.id"
+            },
+            "outcome": "blocked"
+          }
+        },
+        {
+          "operation": "cdn.getAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "public.id"
+            }
+          },
+          "save": "publicUrl"
+        },
+        {
+          "operation": "mock.fetchCdn",
+          "args": {
+            "url": {
+              "$concat": [
+                {
+                  "$ref": "publicUrl"
+                },
+                "/rendered"
+              ]
+            }
+          },
+          "expect": {
+            "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an API-key upload through an upload preset takes its visibility, folder and retention, and keeps to its limits",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Avatars"
+          },
+          "save": "folder",
+          "expect": {
+            "httpStatus": 201
+          }
+        },
+        {
+          "operation": "folders.create",
+          "args": {
+            "name": "Other"
+          },
+          "save": "other",
+          "expect": {
+            "httpStatus": 201
+          }
+        },
+        {
+          "operation": "uploadPresets.ensure",
+          "args": {
+            "uploadPresets": [
+              {
+                "key": "public-kept",
+                "name": "Public and kept",
+                "visibility": "public",
+                "folderId": {
+                  "$ref": "folder.id"
+                },
+                "processingOptions": {
+                  "keepContentAfterProcessing": true
+                },
+                "allowedContentTypes": [
+                  "image/*"
+                ],
+                "maxSizeInBytes": 10
+              },
+              {
+                "key": "tiny",
+                "name": "Tiny",
+                "maxSizeInBytes": 4
+              },
+              {
+                "key": "paused",
+                "name": "Paused",
+                "enabled": false
+              }
+            ]
+          },
+          "save": "presets",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "preset.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "uploadPresetId": {
+              "$ref": "presets.uploadPresets.0.id"
+            }
+          },
+          "save": "uploaded",
+          "expect": {
+            "result": {
+              "visibility": "public",
+              "folderId": {
+                "$ref": "folder.id"
+              },
+              "uploadPresetId": {
+                "$ref": "presets.uploadPresets.0.id"
+              },
+              "content.status": "stored"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetId": {
+              "$ref": "uploaded.id"
+            },
+            "resource": "original"
+          },
+          "expect": {
+            "cdn": {
+              "status": 200,
+              "body": "hello",
+              "headers": {
+                "Content-Type": "image/png",
+                "Cache-Control": "public, max-age=31536000, immutable"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "own-options.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "uploadPresetId": {
+              "$ref": "presets.uploadPresets.0.id"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": false
+            }
+          },
+          "expect": {
+            "result": {
+              "visibility": "public",
+              "content.status": "removed"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "same.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "uploadPresetId": {
+              "$ref": "presets.uploadPresets.0.id"
+            },
+            "visibility": "public",
+            "folderId": {
+              "$ref": "folder.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "visibility": "public"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "private.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "uploadPresetId": {
+              "$ref": "presets.uploadPresets.0.id"
+            },
+            "visibility": "private"
+          },
+          "expect": {
+            "error": {
+              "code": "upload-preset/field-not-allowed",
+              "status": 400,
+              "details": {
+                "field": "visibility"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "elsewhere.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "uploadPresetId": {
+              "$ref": "presets.uploadPresets.0.id"
+            },
+            "folderId": {
+              "$ref": "other.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload-preset/field-not-allowed",
+              "status": 400,
+              "details": {
+                "field": "folderId"
+              }
+            }
+          }
+        },
+        {
+          "operation": "text.classify",
+          "args": {
+            "text": "hello",
+            "uploadPresetId": {
+              "$ref": "presets.uploadPresets.0.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload/unsupported-type",
+              "status": 415,
+              "details": {
+                "source": "preset",
+                "contentType": "text/plain",
+                "allowedContentTypes": [
+                  "image/*"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "big.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "uploadPresetId": {
+              "$ref": "presets.uploadPresets.1.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload/too-large",
+              "status": 413,
+              "details": {
+                "limitBytes": 4,
+                "source": "preset"
+              }
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "paused.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "uploadPresetId": {
+              "$ref": "presets.uploadPresets.2.id"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "upload-preset/disabled",
+              "status": 403
+            }
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "unknown.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "uploadPresetId": "preset_missing"
+          },
+          "expect": {
+            "error": {
+              "code": "upload-preset/not-found",
+              "status": 404
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a mock decision can leave an asset waiting for human review",
+      "mock": {
+        "moderate": {
+          "byName": {
+            "sampled.png": {
+              "status": "allowed",
+              "pendingReview": {
+                "reason": "sampled"
+              }
+            },
+            "uncertain.png": {
+              "status": "limited",
+              "flags": [
+                {
+                  "category": "violence",
+                  "score": 0.5
+                }
+              ],
+              "pendingReview": {
+                "reason": "uncertain",
+                "uncertainCategories": [
+                  "violence"
+                ]
+              }
+            },
+            "uncertain-api.png": {
+              "status": "allowed",
+              "pendingReview": {
+                "reason": "uncertain",
+                "uncertainCategories": [
+                  "hate"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "plain.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.pendingReview": null
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "sampled.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "sampled",
+          "expect": {
+            "result": {
+              "classification.moderation.status": "allowed",
+              "classification.moderation.pendingReview.reason": "sampled",
+              "classification.moderation.pendingReview.uncertainCategories": []
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "sampled.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.pendingReview.requestedAt": {
+                "$ref": "sampled.classification.moderation.pendingReview.requestedAt"
+              }
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "uncertain.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "uncertain",
+          "expect": {
+            "result": {
+              "classification.moderation.status": "limited",
+              "classification.moderation.pendingReview.reason": "uncertain",
+              "classification.moderation.pendingReview.uncertainCategories": [
+                "violence"
+              ]
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.decide",
+          "args": {
+            "assetId": {
+              "$ref": "uncertain.id"
+            },
+            "outcome": "allowed"
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "uncertain.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.pendingReview": null
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "uncertain-api.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "viaApi",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.decide",
+          "args": {
+            "assetId": {
+              "$ref": "viaApi.id"
+            },
+            "decision": "blocked",
+            "note": "Reviewed"
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.pendingReview.reason": "uncertain"
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "the decision builder refuses a pending review it can't record",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "pending",
+            "pendingReview": {
+              "reason": "sampled"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "allowed",
+            "pendingReview": {
+              "reason": "other"
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "allowed",
+            "pendingReview": {
+              "reason": "sampled",
+              "uncertainCategories": [
+                "hate"
+              ]
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "mock.buildDecision",
+          "args": {
+            "status": "allowed",
+            "pendingReview": {
+              "reason": "uncertain",
+              "uncertainCategories": [
+                "not-a-category"
+              ]
+            }
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/invalid-argument",
+              "status": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "every API operation can be made to fail by name",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "folders.list"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "folders.retrieve"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "folders.create"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "folders.update"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "folders.delete"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "folders.move"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.create"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.uploadPart"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.list"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.search"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.retrieve"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.listChildren"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.listTimeline"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.update"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.removeContent"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.delete"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.move"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.retry"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.explain"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.decide"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.batch"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "cdn.signAssetUrl"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "ensureLenses"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "lenses.list"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "lenses.create"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "lenses.retrieve"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "lenses.update"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "lenses.delete"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "events.list"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "hashLists.list"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "hashLists.retrieve"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "hashLists.create"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "hashLists.update"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "hashLists.delete"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "hashLists.listEntries"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "hashLists.addEntry"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "hashLists.removeEntry"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "policies.list"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "policies.retrieve"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "policies.create"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "policies.update"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "policies.reset"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "policies.upgrade"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "policies.setAutomaticUpdates"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "policies.delete"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "policies.retrieveAssigned"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "policies.assign"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "uploadPresets.list"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "uploadPresets.ensure"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "uploadPresets.delete"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "projectSettings.get"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "projectSettings.update"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "metadataFields.list"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "metadataFields.ensure"
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "metadataFields.delete"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a failure named for assets.decide fails only that request",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "reported.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": true
+            }
+          },
+          "save": "reported",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.failNext",
+          "args": {
+            "failure": "transport-error",
+            "operation": "assets.decide"
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "reported.id"
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.decide",
+          "args": {
+            "assetId": {
+              "$ref": "reported.id"
+            },
+            "decision": "blocked",
+            "note": "Spam"
+          },
+          "expect": {
+            "error": {
+              "code": "sdk/transport-error",
+              "status": null
+            }
+          }
+        },
+        {
+          "operation": "assets.decide",
+          "args": {
+            "assetId": {
+              "$ref": "reported.id"
+            },
+            "decision": "blocked",
+            "note": "Spam"
+          },
+          "expect": {
+            "result": {
+              "classification.moderation.status": "blocked"
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "a lens sent without active is served, and a patch leaves active as it is",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "ensureLenses",
+          "args": {
+            "lenses": [
+              {
+                "identifier": "card",
+                "name": "Card",
+                "type": "image"
+              }
+            ]
+          },
+          "save": "ensured",
+          "expect": {
+            "result": {
+              "0.active": true
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "ensureLenses",
+          "args": {
+            "lenses": [
+              {
+                "identifier": "card",
+                "name": "Card",
+                "type": "image"
+              }
+            ]
+          },
+          "expect": {
+            "result": {
+              "0.active": true,
+              "0.updatedAt": {
+                "$ref": "ensured.0.updatedAt"
+              }
+            }
+          }
+        },
+        {
+          "operation": "ensureLenses",
+          "args": {
+            "lenses": [
+              {
+                "identifier": "card",
+                "name": "Card",
+                "type": "image",
+                "active": false
+              }
+            ]
+          },
+          "expect": {
+            "result": {
+              "0.active": false
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "lenses.update",
+          "args": {
+            "lensId": {
+              "$ref": "ensured.0.id"
+            },
+            "name": "Renamed"
+          },
+          "expect": {
+            "result": {
+              "name": "Renamed",
+              "active": false
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "ensuring a preset again with its processing options in another key order keeps its revision",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "uploadPresets.ensure",
+          "args": {
+            "uploadPresets": [
+              {
+                "key": "avatars",
+                "name": "Avatars",
+                "processingOptions": {
+                  "keepContentAfterProcessing": true,
+                  "features": {
+                    "personDetection": {
+                      "enabled": true
+                    },
+                    "faceDetection": {
+                      "enabled": true,
+                      "ageEstimation": true
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "expect": {
+            "result": {
+              "uploadPresets.0.revision": 1
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "uploadPresets.ensure",
+          "args": {
+            "uploadPresets": [
+              {
+                "key": "avatars",
+                "name": "Avatars",
+                "processingOptions": {
+                  "features": {
+                    "faceDetection": {
+                      "ageEstimation": true,
+                      "enabled": true
+                    },
+                    "personDetection": {
+                      "enabled": true
+                    }
+                  },
+                  "keepContentAfterProcessing": true
+                }
+              }
+            ]
+          },
+          "expect": {
+            "result": {
+              "uploadPresets.0.revision": 1
+            },
+            "httpStatus": 200
           }
         }
       ]

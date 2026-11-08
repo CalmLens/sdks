@@ -197,7 +197,8 @@ public final class CalmLensServerClient implements AutoCloseable {
    *
    * @param apiKey a project API key
    * @param projectId the project ID
-   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_CONFIG} for a missing key or project
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_CONFIG} for a missing key or project, or
+   *     a key that can't be sent as a header
    */
   public CalmLensServerClient(String apiKey, String projectId) { this(builder(apiKey, projectId), null, null, null, DEFAULT_MAX_RETRIES); }
 
@@ -227,6 +228,8 @@ public final class CalmLensServerClient implements AutoCloseable {
     // Validate every option before building anything.
     if (options.apiKey == null || options.apiKey.isBlank() || options.projectId == null || options.projectId.isBlank())
       throw config("API key and project ID are required");
+    // Only what can be sent as a header is checked: the API decides whether a key is real.
+    if (!options.apiKey.chars().allMatch(c -> c >= 0x21 && c <= 0x7e)) throw config("API key must be printable ASCII without spaces");
     if (options.projectId.equals(".") || options.projectId.equals("..")) throw config("Project ID is invalid");
     positive("timeout", options.timeout, false);
     positive("connectTimeout", options.connectTimeout, false);
@@ -2497,7 +2500,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (!lens.isJsonObject() || str(lens.getAsJsonObject(), "identifier", "").isEmpty()) throw argument("Lens identifier is required");
       JsonObject value = lens.getAsJsonObject();
       id(str(value, "identifier", null));
-      String key = Json.write(canonical(value));
+      String key = lensCacheKey(value);
       keys.add(key);
       if (!lensCache.ensured.containsKey(key)) missing.putIfAbsent(key, value);
     }
@@ -2538,6 +2541,13 @@ public final class CalmLensServerClient implements AutoCloseable {
     return List.copyOf(result);
   }
 
+  /** A definition's cache key: without {@code active} it is the same as an active lens. */
+  private static String lensCacheKey(JsonObject definition) {
+    JsonObject filled = definition.deepCopy();
+    if (!filled.has("active")) filled.addProperty("active", true);
+    return Json.write(canonical(filled));
+  }
+
   /** {@code value} with object keys sorted at every level, so equal definitions share a cache key. */
   private static JsonElement canonical(JsonElement value) {
     if (value.isJsonObject()) {
@@ -2573,7 +2583,7 @@ public final class CalmLensServerClient implements AutoCloseable {
         if (lens == null || !identifier.equals(lens.identifier()))
           throw new CalmLensException(ErrorCodes.SDK_INVALID_RESPONSE, "Expected lens \"" + identifier + "\" at position " + index);
         lensCache.ensured.entrySet().removeIf(cached -> identifier.equals(cached.getValue().identifier()));
-        lensCache.ensured.put(Json.write(canonical(chunk.get(index))), lens);
+        lensCache.ensured.put(lensCacheKey(chunk.get(index)), lens);
       }
     }
   }

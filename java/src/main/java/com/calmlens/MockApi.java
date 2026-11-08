@@ -623,11 +623,16 @@ final class MockApi {
     // Like the API: content and a first part must have a type it can moderate; a URL is exempt.
     if (rawUpload && !CalmLensServerClient.isAcceptedUploadMimeType(mime))
       throw new Failure(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, 415, CalmLensServerClient.rejectedUploadMimeTypeMessage(mime), Map.of("mimeType", mime, "source", "calmlens"));
+    long size = raw == null ? 0 : raw.length;
+    if (str(o, "uploadPresetId") != null) {
+      JsonElement declaredTotal = t.get("totalSizeInBytes");
+      Long presetSize = !rawUpload ? null : multipart && declaredTotal != null ? Long.valueOf(declaredTotal.getAsLong()) : Long.valueOf(size);
+      o = withUploadPreset(o, rawUpload ? mime : null, presetSize);
+    }
     String url = rawUpload ? null : str(o, "url");
     String kind = url != null ? "website" : assetType(mime.toLowerCase(Locale.ROOT));
     // wait=false queues the upload; the SDKs send wait=true to wait for the decision.
     boolean queue = isFalse(q, "wait"), last = !multipart || bool(t, "isFinal");
-    long size = raw == null ? 0 : raw.length;
     if (multipart) {
       // In the API's order: a declared total first, then a single final part as the whole upload,
       // then the part itself (5 MiB unless it is the last).
@@ -748,6 +753,51 @@ final class MockApi {
   }
 
   /**
+   * An API-key upload through a preset, as the API applies it: the preset gives the folder and
+   * visibility, which the upload can't change, and the processing options unless the upload sets
+   * its own, and refuses types and sizes it doesn't accept.
+   *
+   * @param contentType the upload's type, or null for a URL
+   * @param size the upload's size, or null for a URL
+   * @return the upload's fields with the preset's applied
+   */
+  private JsonObject withUploadPreset(JsonObject fields, String contentType, Long size) throws Failure {
+    String presetId = str(fields, "uploadPresetId");
+    JsonObject preset = configuredPresets.values().stream().filter(p -> presetId.equals(str(p, "id"))).findFirst()
+        .orElseThrow(() -> new Failure(ErrorCodes.UPLOAD_PRESET_NOT_FOUND, "Upload preset not found"));
+    if (!bool(preset, "enabled")) throw new Failure(ErrorCodes.UPLOAD_PRESET_DISABLED);
+    String presetFolder = str(preset, "folderId"), folder = str(fields, "folderId");
+    if (presetFolder != null && folder != null && !folder.equals(presetFolder))
+      throw Failure.of(ErrorCodes.UPLOAD_PRESET_FIELD_NOT_ALLOWED, Map.of("field", "folderId"));
+    String visibility = str(fields, "visibility");
+    if (visibility != null && !visibility.equals(str(preset, "visibility")))
+      throw Failure.of(ErrorCodes.UPLOAD_PRESET_FIELD_NOT_ALLOWED, Map.of("field", "visibility"));
+    if (contentType != null && preset.get("allowedContentTypes").isJsonArray()) {
+      List<String> allowed = new ArrayList<>();
+      preset.getAsJsonArray("allowedContentTypes").forEach(type -> allowed.add(type.getAsString()));
+      if (!isFileAccepted(str(fields, "name"), contentType, allowed))
+        throw Failure.of(ErrorCodes.UNSUPPORTED_UPLOAD_TYPE, Map.of("source", "preset", "contentType", contentType, "allowedContentTypes", allowed));
+    }
+    if (size != null && !preset.get("maxSizeInBytes").isJsonNull() && preset.get("maxSizeInBytes").getAsLong() > 0 && size > preset.get("maxSizeInBytes").getAsLong())
+      throw Failure.of(ErrorCodes.UPLOAD_TOO_LARGE, Map.of("limitBytes", preset.get("maxSizeInBytes").getAsLong(), "source", "preset"));
+    JsonObject applied = fields.deepCopy();
+    if (presetFolder != null) applied.addProperty("folderId", presetFolder);
+    applied.add("visibility", preset.get("visibility").deepCopy());
+    if ((!fields.has("processingOptions") || fields.get("processingOptions").isJsonNull()) && !preset.get("processingOptions").isJsonNull())
+      applied.add("processingOptions", preset.get("processingOptions").deepCopy());
+    return applied;
+  }
+
+  /** Whether a preset's accepted types take a file: {@code *}, {@code image/*}, {@code .png} or an exact type. */
+  private static boolean isFileAccepted(String name, String contentType, List<String> patterns) {
+    String type = contentType.toLowerCase(Locale.ROOT), file = name == null ? "" : name.toLowerCase(Locale.ROOT);
+    return patterns.stream().map(pattern -> pattern.trim().toLowerCase(Locale.ROOT)).anyMatch(pattern ->
+        pattern.equals("*") || pattern.equals("*/*")
+            || (pattern.endsWith("/*") ? type.startsWith(pattern.substring(0, pattern.length() - 1))
+            : pattern.startsWith(".") ? file.endsWith(pattern) : type.equals(pattern)));
+  }
+
+  /**
    * Records {@code asset.uploaded} for a completed upload, with the asset before moderation, then
    * settles it with {@code decision}.
    */
@@ -785,7 +835,8 @@ final class MockApi {
    * for link detection unless its upload turned it off.
    */
   private void decided(JsonObject asset, MockDecision decision) {
-    applyOutcome(asset, decision.status(), "policy", now(), decision.report());
+    long now = now();
+    applyOutcome(asset, decision.status(), "policy", now, decision.report(now));
     JsonObject classification = asset.getAsJsonObject("classification");
     if (!"completed".equals(str(classification, "status")) || !"image".equals(str(asset, "type"))) return;
     if (feature(asset, "ocr") == Boolean.TRUE) classification.add("ocr", evaluated("textRegions"));
@@ -2424,20 +2475,28 @@ final class MockApi {
   private JsonObject ensureLens(JsonObject definition) {
     JsonObject existing = lenses.get(str(definition, "identifier"));
     if (existing == null) return saveNewLens(definition);
-    boolean same = LENS_FIELDS.stream().allMatch(key -> canonical(existing.get(key)).equals(canonical(definition.get(key))));
+    JsonObject wanted = withLensDefaults(definition);
+    boolean same = LENS_FIELDS.stream().allMatch(key -> canonical(existing.get(key)).equals(canonical(wanted.get(key))));
     if (same) return existing;
     JsonObject lens = existing.deepCopy();
-    definition.entrySet().forEach(e -> lens.add(e.getKey(), e.getValue().deepCopy()));
+    wanted.entrySet().forEach(e -> lens.add(e.getKey(), e.getValue().deepCopy()));
     lens.addProperty("updatedAt", now());
     lenses.put(str(lens, "identifier"), lens);
     return lens;
+  }
+
+  /** Like the API, a definition without {@code active} is an active lens. */
+  private static JsonObject withLensDefaults(JsonObject definition) {
+    JsonObject filled = definition.deepCopy();
+    if (!filled.has("active") || filled.get("active").isJsonNull()) filled.addProperty("active", true);
+    return filled;
   }
 
   private JsonObject saveNewLens(JsonObject definition) {
     JsonObject lens = new JsonObject();
     lens.addProperty("id", createId("lens"));
     lens.addProperty("projectId", projectId);
-    definition.entrySet().forEach(e -> lens.add(e.getKey(), e.getValue().deepCopy()));
+    withLensDefaults(definition).entrySet().forEach(e -> lens.add(e.getKey(), e.getValue().deepCopy()));
     long now = now();
     lens.addProperty("createdAt", now);
     lens.addProperty("updatedAt", now);
@@ -2612,6 +2671,9 @@ final class MockApi {
     JsonObject content = asset.getAsJsonObject("content");
     JsonObject rendered = content.get("rendered") instanceof JsonObject value ? value : null;
     JsonObject preview = content.get("preview") instanceof JsonObject value ? value : null;
+    // Like the CDN, a private asset answers anyone without a grant or the project's API key as an
+    // unknown asset does, whatever its state. Its placeholder is public.
+    if (!isPublic && grant == null && apiKey == null && !resource.equals("placeholder") && !resource.equals("info")) return error(notFound);
     if (resource.equals("info")) return info(request, asset, grant != null || canDownload(str(asset, "folderId"), apiKey));
     // Like the CDN, a safety hold refuses every resource.
     if (held(asset)) return error(notAvailable);

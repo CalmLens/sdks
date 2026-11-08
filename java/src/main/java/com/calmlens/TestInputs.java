@@ -77,8 +77,8 @@ public final class TestInputs {
   /** No findings, but blocked in DE, age-restricted in GB and limited in FR. */
   public static final TestInput REGIONAL_DELIVERY = new TestInput(List.of(
       new TestInput.RegionalAction("DE", "block"), new TestInput.RegionalAction("GB", "age-restrict"), new TestInput.RegionalAction("FR", "limit")), null, List.of(), null);
-  /** A Nazi symbol on public display, which German law restricts. */
-  public static final TestInput GERMANY = one("hate", "hate-symbol", "hate-nazi-symbols-public-display");
+  /** No findings, but blocked in DE. */
+  public static final TestInput GERMANY = new TestInput(List.of(new TestInput.RegionalAction("DE", "block")), null, List.of(), null);
   /** Documentary harassment abuse alongside a harassment threat. */
   public static final TestInput MIXED = new TestInput(List.of(
       new TestInput.Instance("harassment", List.of("harassment-abuse", "harassment-documentary")),
@@ -146,7 +146,8 @@ public final class TestInputs {
     switch (signal) {
       case "harassment.insult": return LIMITED;
       case "sexual.adult": return kind == Kind.IMAGE ? ADULT_IMAGE : ADULT_TEXT;
-      case "hate.regional-symbol": return GERMANY;
+      // A Nazi symbol on public display, which German law restricts.
+      case "hate.regional-symbol": return one("hate", "hate-symbol", "hate-nazi-symbols-public-display");
       case "sexual.involving-minors": return one("sexual", "sexual-minors");
       case "violence.graphic": return one("violence", "violence-injury", "violence-graphic");
       default:

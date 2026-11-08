@@ -24,7 +24,8 @@ import java.util.Set;
  *
  * <p>A decided status fills the asset's {@code classification.moderation} report as the API does:
  * every category (unflagged ones evaluated with score 0), the policy's
- * actions and {@code flaggedCategories}. Each call checks its names and scores and throws {@link
+ * actions and {@code flaggedCategories}. {@link #pendingReview(String, List)} leaves it waiting for
+ * human review. Each call checks its names and scores and throws {@link
  * ErrorCodes#SDK_INVALID_ARGUMENT} for one CalmLens does not have.
  */
 public final class MockDecision {
@@ -41,6 +42,8 @@ public final class MockDecision {
   private final MockCalmLensServerClient.Outcome status;
   private final Map<String, Flag> flags = new LinkedHashMap<>();
   private final Set<String> notEvaluated = new LinkedHashSet<>();
+  private String pendingReviewReason;
+  private List<String> uncertainCategories = List.of();
 
   private MockDecision(MockCalmLensServerClient.Outcome status) { this.status = status; }
 
@@ -110,6 +113,40 @@ public final class MockDecision {
     return this;
   }
 
+  /**
+   * Leaves the decision waiting for human review with no uncertain categories, such as a {@code
+   * sampled} one. See {@link #pendingReview(String, List)}.
+   *
+   * @param reason {@code sampled} or {@code uncertain}
+   * @return this decision
+   */
+  public MockDecision pendingReview(String reason) { return pendingReview(reason, List.of()); }
+
+  /**
+   * Leaves the decision waiting for human review, as {@code classification.moderation.pendingReview}
+   * reports: {@code sampled}, or {@code uncertain} with the categories that made it so. Its {@code
+   * requestedAt} is when the decision is applied. The review queue's decision ({@link
+   * MockCalmLensServerClient#decide}) clears it; {@code assets.decide} doesn't, as with the API.
+   *
+   * @param reason {@code sampled} or {@code uncertain}
+   * @param uncertainCategories the CalmLens categories it is uncertain about; none for {@code sampled}
+   * @return this decision
+   * @throws CalmLensException {@link ErrorCodes#SDK_INVALID_ARGUMENT} on a {@code pending} or {@code
+   *     failed} decision, for another reason, for a {@code sampled} reason with uncertain
+   *     categories, or for an unknown category
+   */
+  public MockDecision pendingReview(String reason, List<String> uncertainCategories) {
+    Objects.requireNonNull(uncertainCategories, "uncertainCategories");
+    if (!decided()) throw invalid("a " + status.value() + " decision can't wait for review");
+    if (!"sampled".equals(reason) && !"uncertain".equals(reason)) throw invalid("reason must be sampled or uncertain");
+    if (reason.equals("sampled") && !uncertainCategories.isEmpty()) throw invalid("a sampled review has no uncertain categories");
+    for (String category : uncertainCategories)
+      if (category == null || !MockClassification.CATEGORIES.contains(category)) throw invalid(category + " is not a CalmLens category");
+    pendingReviewReason = reason;
+    this.uncertainCategories = List.copyOf(uncertainCategories);
+    return this;
+  }
+
   private void checkFinding(String category) {
     if (!MockClassification.CATEGORIES.contains(category)) throw invalid(category + " is not a CalmLens category");
     if (!decided()) throw invalid("a " + status.value() + " decision has no findings");
@@ -132,8 +169,10 @@ public final class MockDecision {
   /**
    * The report a decided asset gets, as the API sends it: {@code categories}, {@code score} and
    * {@code policy}. Null for {@code pending} and {@code failed}.
+   *
+   * @param requestedAt when a pending review joined the queue
    */
-  JsonObject report() {
+  JsonObject report(long requestedAt) {
     if (!decided()) return null;
     JsonObject categories = new JsonObject(), policyCategories = new JsonObject();
     JsonArray flagged = new JsonArray();
@@ -165,6 +204,15 @@ public final class MockDecision {
       JsonObject policyCategory = new JsonObject();
       policyCategory.addProperty("score", score);
       policyCategory.addProperty("action", action(score));
+      JsonObject source = new JsonObject();
+      source.addProperty("kind", score >= 0.5 ? "default" : "below-threshold");
+      policyCategory.add("source", source);
+      // The mock keeps no policies: the category's setting is the decision's own action.
+      JsonObject settings = new JsonObject();
+      settings.addProperty("action", STATUS_ACTION.get(status));
+      settings.add("allowances", new JsonArray());
+      settings.add("restrictions", new JsonArray());
+      policyCategory.add("settings", settings);
       policyCategories.add(category, policyCategory);
       if (!action(score).equals("allow")) flagged.add(category);
     }
@@ -181,6 +229,16 @@ public final class MockDecision {
     report.addProperty("explanationComplete", true);
     // The mock keeps no policies, so no policy is named.
     report.add("policy", JsonNull.INSTANCE);
+    JsonObject pendingReview = null;
+    if (pendingReviewReason != null) {
+      pendingReview = new JsonObject();
+      pendingReview.addProperty("requestedAt", requestedAt);
+      pendingReview.addProperty("reason", pendingReviewReason);
+      JsonArray uncertain = new JsonArray();
+      uncertainCategories.forEach(uncertain::add);
+      pendingReview.add("uncertainCategories", uncertain);
+    }
+    report.add("pendingReview", pendingReview == null ? JsonNull.INSTANCE : pendingReview);
     JsonObject raw = new JsonObject();
     raw.add("categories", categories);
     raw.add("hashMatches", new JsonArray());
@@ -190,11 +248,11 @@ public final class MockDecision {
 
   /** @return the categories the policy acted on, in the API's order */
   List<String> flaggedCategories() {
-    JsonObject report = report();
+    JsonObject report = report(0);
     List<String> flagged = new ArrayList<>();
     if (report != null) report.getAsJsonArray("flaggedCategories").forEach(c -> flagged.add(c.getAsString()));
     return flagged;
   }
 
-  @Override public String toString() { return "MockDecision[status=" + status.value() + ", flags=" + flags.keySet() + ", notEvaluated=" + notEvaluated + "]"; }
+  @Override public String toString() { return "MockDecision[status=" + status.value() + ", flags=" + flags.keySet() + ", notEvaluated=" + notEvaluated + ", pendingReview=" + pendingReviewReason + "]"; }
 }

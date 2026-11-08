@@ -1712,7 +1712,15 @@ public final class Models {
      * @param identifier stable identifier used in CDN URLs
      * @param name display name
      * @param lensType lens type, such as {@code image}
-     * @param active whether the CDN serves the lens
+     */
+    public LensDefinition(String identifier, String name, String lensType) {
+      this.identifier = identifier; this.name = name; this.lensType = lensType;
+    }
+    /**
+     * @param identifier stable identifier used in CDN URLs
+     * @param name display name
+     * @param lensType lens type, such as {@code image}
+     * @param active whether the CDN serves the lens; null or unset means it does
      */
     public LensDefinition(String identifier, String name, String lensType, Boolean active) {
       this.identifier = identifier; this.name = name; this.lensType = lensType; this.active = active;
@@ -1722,6 +1730,7 @@ public final class Models {
     public LensDefinition description(Patch<String> value) { description = value; return this; }
     /** @param value the lens type ({@code type} in the API) @return this definition */
     public LensDefinition lensType(String value) { lensType = value; return this; }
+    /** @param value whether the CDN serves the lens; null or unset means it does @return this definition */
     public LensDefinition active(Boolean value) { active = value; return this; }
     public LensDefinition transform(Patch<ImageTransformOptions> value) { transform = value; return this; }
     String identifierValue() { return identifier; }
@@ -1769,7 +1778,7 @@ public final class Models {
     public UpdateLens description(Patch<String> value) { description = value; return this; }
     /** @param value the lens type ({@code type} in the API) @return these options */
     public UpdateLens lensType(String value) { lensType = value; return this; }
-    /** @param value whether the CDN serves the lens @return these options */
+    /** @param value whether the CDN serves the lens; unset keeps its value @return these options */
     public UpdateLens active(Boolean value) { active = value; return this; }
     /** @param value the new transform; the CDN serves files made with it from then on @return these options */
     public UpdateLens transform(Patch<ImageTransformOptions> value) { transform = value; return this; }

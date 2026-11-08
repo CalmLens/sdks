@@ -1,6 +1,7 @@
 package com.calmlens;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.io.InputStream;
@@ -632,8 +633,9 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    * matching {@code asset.<status>} event with the asset's snapshot, the event catalog's severity
    * ({@code low} for {@code allowed} and {@code limited}, {@code high} otherwise) and a {@code
    * user} actor. {@code purged} removes the content with reason {@code requested}, adding an
-   * {@code asset.content-removed} event by the same actor first, as the API does. The moderation report
-   * stays as the pipeline left it.
+   * {@code asset.content-removed} event by the same actor first, as the API does. The review queue's
+   * decision settles any {@code pendingReview}; the rest of the moderation report stays as the
+   * pipeline left it.
    *
    * @param assetId a stored asset
    * @param outcome the reviewer's decision
@@ -649,6 +651,9 @@ public final class MockCalmLensServerClient implements AutoCloseable {
     JsonObject asset = stored(assetId);
     long now = api.now();
     api.applyOutcome(asset, outcome, "requested", now, null);
+    // Like the API: the human review queue's decision settles its review, one through the API
+    // leaves it waiting.
+    asset.getAsJsonObject("classification").getAsJsonObject("moderation").add("pendingReview", JsonNull.INSTANCE);
     JsonObject review = new JsonObject();
     review.addProperty("id", api.createId("rev"));
     review.addProperty("decision", outcome.value());
@@ -778,7 +783,9 @@ public final class MockCalmLensServerClient implements AutoCloseable {
   /**
    * Fetches a URL of the mock's CDN as a browser would, without the API key: a signed asset URL
    * from {@code cdn.signAssetUrl} (with a resource appended), or a public one from {@code
-   * cdn.getAssetUrl}. The request is recorded like any other, and queued responses answer it first.
+   * cdn.getAssetUrl}. Without a grant, a private asset answers 404 {@code asset/not-found}, whatever
+   * its state, for every resource but its placeholder and {@code info}. The request is recorded like
+   * any other, and queued responses answer it first.
    *
    * @param url the CDN URL
    * @return the response, including non-2xx statuses; close it when done

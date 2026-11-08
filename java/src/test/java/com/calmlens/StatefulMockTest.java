@@ -437,4 +437,32 @@ class StatefulMockTest {
     assertNull(decided.content().rendered());
     assertNull(decided.content().preview());
   }
+
+  @Test void aPendingReviewIsRequestedWhenItsDecisionIsApplied() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    Models.Asset queued = mock.client.assets.create(kept("queued.png"));
+    Models.Asset decided = mock.completeProcessing(queued.id(), MockDecision.of("allowed").pendingReview("sampled"));
+    assertEquals(decided.classification().completedAt().toEpochMilli(), decided.classification().moderation().pendingReview().requestedAt());
+  }
+
+  @Test void aPresetWithoutAFolderKeepsTheUploadsOwn() {
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(deterministic());
+    Models.Folder folder = mock.client.folders.create(new Models.CreateFolder("Own"));
+    Models.UploadPreset preset = mock.client.uploadPresets.ensure(new Models.EnsureUploadPresets(List.of(
+        new Models.UploadPresetDefinition("plain", "Plain")))).uploadPresets().get(0);
+    Models.Asset asset = mock.client.assets.create(kept("own.png").uploadPresetId(preset.id()).folderId(Models.Patch.value(folder.id())));
+    assertEquals(folder.id(), asset.folderId());
+    assertEquals(Models.Visibility.PRIVATE, asset.visibility());
+  }
+
+  @Test void aPresetSizeLimitChecksAMultipartUploadsDeclaredTotal() {
+    long mib = 1 << 20;
+    MockCalmLensServerClient mock = new MockCalmLensServerClient(CalmLensServerClient.builder("mock-key", "project-1").partSizeBytes(5 * mib), deterministic());
+    Models.UploadPreset preset = mock.client.uploadPresets.ensure(new Models.EnsureUploadPresets(List.of(
+        new Models.UploadPresetDefinition("small", "Small").maxSizeInBytes(6 * mib)))).uploadPresets().get(0);
+    ApiException refused = assertThrows(ApiException.class, () -> mock.client.assets.create(
+        new Models.SubmitAsset("clip.mp4", Models.Content.bytes(new byte[(int) (11 * mib)], "video/mp4")).uploadPresetId(preset.id())));
+    assertEquals(ErrorCodes.UPLOAD_TOO_LARGE, refused.getCode());
+    assertEquals("preset", refused.getDetails().get("source"));
+  }
 }
