@@ -31,6 +31,7 @@ module CalmLens
                      ?headers: Hash[String, String], ?request_id: String?) -> void
     # Whole seconds from the `Retry-After` header.
     def retry_after: () -> Integer?
+    def local?: () -> bool
     def not_found?: () -> bool
     def retryable?: () -> bool
     def self.build: (String code, ?String? message, ?status: Integer?, ?details: Hash[String, json_value]?,

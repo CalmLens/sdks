@@ -98,6 +98,18 @@ func (e *Error) Retryable() bool {
 	return e.Code == CodeSDKTransportError || e.Code == CodeSDKTimeout || e.Code == CodeIdempotentRequestInProgress
 }
 
+// Local reports whether the SDK raised the error itself, with no HTTP response: before sending
+// (an invalid argument or option, or content it checks first, such as CodeUnsupportedUploadType),
+// or because no response arrived (a timeout, a cancellation or a connection failure). The code is
+// the one the API would use; Status is 0 and RequestID is empty, so branch on Code.
+func (e *Error) Local() bool { return e.Status == 0 }
+
+// IsLocal reports whether err is a *Error whose Local method returns true.
+func IsLocal(err error) bool {
+	var e *Error
+	return errors.As(err, &e) && e.Local()
+}
+
 // ErrorCode returns the Code of a *Error in err's chain, or "" when there is none.
 func ErrorCode(err error) string {
 	var e *Error

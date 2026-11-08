@@ -909,7 +909,11 @@ class ContractTest {
       } else {
         errors.add(new ApiException(code, null, null, entry.get("status").getAsInt(), Map.of(), null));
       }
-      for (CalmLensException error : errors) assertEquals(expected, error.isRetryable(), error.getClass().getSimpleName());
+      boolean local = entry.get("local").getAsBoolean();
+      for (CalmLensException error : errors) {
+        assertEquals(expected, error.isRetryable(), error.getClass().getSimpleName());
+        assertEquals(local, error.isLocal(), error.getClass().getSimpleName());
+      }
     });
   }
 
@@ -1063,7 +1067,11 @@ class ContractTest {
       }
       Throwable failure = assertThrows(Throwable.class, () -> Fixtures.invoke(client, rejection.get("operation").getAsString(), options));
       assertInstanceOf(CalmLensException.class, failure);
-      assertEquals(rejection.get("error").getAsString(), ((CalmLensException) failure).getCode());
+      CalmLensException error = (CalmLensException) failure;
+      assertEquals(rejection.get("error").getAsString(), error.getCode());
+      assertTrue(error.isLocal(), name);
+      assertEquals(0, error.getStatus(), name);
+      assertNull(error.getRequestId(), name);
     });
   }
 }

@@ -85,6 +85,17 @@ class CalmLensException extends \RuntimeException
         return $seconds === null ? null : (float) $seconds;
     }
 
+    /**
+     * True when the SDK raised this exception itself, with no HTTP response: before sending (an
+     * invalid argument or option, or content it checks first, such as `upload/unsupported-type`),
+     * or because no response arrived (a timeout or a connection failure). The code is the one the
+     * API would use; `status` and `requestId` are null, so branch on `errorCode`.
+     */
+    public function isLocal(): bool
+    {
+        return $this->status === null;
+    }
+
     /** True when the resource does not exist. */
     public function isNotFound(): bool
     {

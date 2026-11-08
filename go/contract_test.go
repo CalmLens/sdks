@@ -542,7 +542,33 @@ func TestRejections(t *testing.T) {
 			if got := ErrorCode(err); got != rejection.Error || len(transport.received) != 0 {
 				t.Fatalf("got %q (%v) after %d requests; want %q before any request", got, err, len(transport.received), rejection.Error)
 			}
+			var failure *Error
+			if !errors.As(err, &failure) || !failure.Local() || !IsLocal(err) || failure.Status != 0 || failure.RequestID != "" {
+				t.Fatalf("got %#v; want a local error without a status or request ID", err)
+			}
 		})
+	}
+}
+
+// TestRetryableAndLocalFollowTheCodeAndStatus replays surface.json's retryable table: whether an
+// error is retryable, and whether the SDK raised it locally, follow from its code and status alone.
+func TestRetryableAndLocalFollowTheCodeAndStatus(t *testing.T) {
+	surface := fixtures.Read[struct {
+		Retryable []struct {
+			Code      string
+			Status    *int
+			Retryable bool
+			Local     bool
+		}
+	}](t, "surface.json")
+	for _, entry := range surface.Retryable {
+		failure := &Error{Code: entry.Code}
+		if entry.Status != nil {
+			failure.Status = *entry.Status
+		}
+		if failure.Retryable() != entry.Retryable || failure.Local() != entry.Local {
+			t.Errorf("%s %v: retryable %v, local %v; want %v, %v", entry.Code, entry.Status, failure.Retryable(), failure.Local(), entry.Retryable, entry.Local)
+		}
 	}
 }
 

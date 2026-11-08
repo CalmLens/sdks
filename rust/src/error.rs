@@ -241,6 +241,14 @@ impl Error {
     pub fn headers(&self) -> Option<&http::HeaderMap> {
         self.inner.headers.as_ref()
     }
+    /// Whether the SDK raised this error itself, with no HTTP response: before sending (an
+    /// invalid argument or option, or content it checks first, such as
+    /// [`ErrorCode::UnsupportedUploadType`]), or because no response arrived (a timeout or a
+    /// connection failure). The code is the one the API would use; [`status`](Self::status) and
+    /// [`request_id`](Self::request_id) are `None`, so branch on [`code`](Self::code).
+    pub fn is_local(&self) -> bool {
+        self.inner.status.is_none()
+    }
     /// Whether the resource was not found: a `404` status or a `*/not-found` code.
     pub fn is_not_found(&self) -> bool {
         self.inner.status == Some(404) || self.inner.code.as_str().ends_with("/not-found")

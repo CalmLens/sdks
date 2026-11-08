@@ -112,6 +112,16 @@ export class CalmLensError extends Error {
     return CalmLensError.isCalmLensError(value);
   }
 
+  /**
+   * Whether the SDK raised this error itself, with no HTTP response: before sending (an invalid
+   * argument or option, or content it checks first, such as `upload/unsupported-type`), or because
+   * no response arrived (a timeout, a cancellation or a connection failure). The code is the one
+   * the API would use; there is no `status` or `requestId`, so branch on `code`.
+   */
+  isLocal(): boolean {
+    return this.status === undefined;
+  }
+
   /** The resource does not exist or is not visible to this API key. */
   isNotFound(): boolean {
     return this.status === 404;

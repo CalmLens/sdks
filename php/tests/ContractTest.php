@@ -672,6 +672,7 @@ final class ContractTest extends TestCase
         foreach ([new CalmLensException($entry['code'], status: $entry['status']),
             CalmLensException::create($entry['code'], status: $entry['status'])] as $error) {
             self::assertSame($entry['retryable'], $error->isRetryable(), $error::class);
+            self::assertSame($entry['local'], $error->isLocal(), $error::class);
         }
     }
 
@@ -1163,6 +1164,9 @@ final class ContractTest extends TestCase
             self::fail('Expected ' . $fixture['error']);
         } catch (CalmLensException $error) {
             self::assertSame($fixture['error'], $error->errorCode);
+            self::assertTrue($error->isLocal());
+            self::assertNull($error->status);
+            self::assertNull($error->requestId);
         }
     }
 }

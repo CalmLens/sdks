@@ -676,6 +676,7 @@ class SurfaceTests(unittest.TestCase):
                 with self.subTest(case["code"], status=case["status"], error_class=error_class.__name__):
                     error = error_class(case["code"], status=case["status"])
                     self.assertIs(error.is_retryable, case["retryable"])
+                    self.assertIs(error.is_local, case["local"])
 
     def test_defaults(self) -> None:
         """The client defaults equal JavaScript's, and the cases that observe them exist."""
@@ -709,6 +710,9 @@ class SurfaceTests(unittest.TestCase):
                 with self.assertRaises(CalmLensError) as raised:
                     _invoke(_client(), case["operation"], case["options"])
                 self.assertEqual(raised.exception.code, case["error"])
+                self.assertIs(raised.exception.is_local, True)
+                self.assertIsNone(raised.exception.status)
+                self.assertIsNone(raised.exception.request_id)
 
 
 # ---- upload-tokens.json -----------------------------------------------------------------------

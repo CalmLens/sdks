@@ -448,7 +448,7 @@ const surface: {
     body: unknown;
     expected: { code: string; status: number; requestId: string; retryAfterSeconds: number };
   };
-  retryable: { code: string; status: number | null; retryable: boolean }[];
+  retryable: { code: string; status: number | null; retryable: boolean; local: boolean }[];
 } = testdata("surface.json");
 
 // Server entry exports, and `testing.*` for `@calmlens/sdk/testing`.
@@ -559,10 +559,11 @@ describe("SDK surface", () => {
 });
 
 describe("retryable errors", () => {
-  for (const { code, status, retryable } of surface.retryable) {
+  for (const { code, status, retryable, local } of surface.retryable) {
     test(`${code}${status === null ? "" : ` (HTTP ${status})`} is ${retryable ? "" : "not "}retryable`, () => {
       const error = new CalmLensError(code, status === null ? {} : { status });
       expect(error.isRetryable()).toBe(retryable);
+      expect(error.isLocal()).toBe(local);
     });
   }
 });
@@ -585,11 +586,17 @@ describe("rejections", () => {
         maxRetries: 0,
       });
       const [resource, method] = operation.split(".") as [string, string];
-      const code = await (capturing as any)[resource][method](options).then(
-        () => "accepted",
-        (failure: server.CalmLensError) => failure.code,
+      const failure = await (capturing as any)[resource][method](options).then(
+        () => undefined,
+        (raised: server.CalmLensError) => raised,
       );
-      expect({ code, sent }).toEqual({ code: error, sent: 0 });
+      expect({
+        code: failure?.code,
+        local: failure?.isLocal(),
+        status: failure?.status,
+        requestId: failure?.requestId,
+        sent,
+      }).toEqual({ code: error, local: true, status: undefined, requestId: undefined, sent: 0 });
     });
   }
 });

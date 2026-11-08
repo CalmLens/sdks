@@ -4,6 +4,7 @@
   "type": "library",
   "license": "MIT",
   "homepage": "https://calmlens.com/docs/sdk/php",
+  "readme": "php/README.md",
   "support": {
     "docs": "https://calmlens.com/docs/sdk/php",
     "issues": "https://github.com/CalmLens/sdks/issues",

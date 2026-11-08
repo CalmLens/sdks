@@ -1650,637 +1650,764 @@
     {
       "code": "sdk/transport-error",
       "status": null,
-      "retryable": true
+      "retryable": true,
+      "local": true
     },
     {
       "code": "sdk/timeout",
       "status": null,
-      "retryable": true
+      "retryable": true,
+      "local": true
     },
     {
       "code": "sdk/cancelled",
       "status": null,
-      "retryable": false
+      "retryable": false,
+      "local": true
     },
     {
       "code": "sdk/invalid-response",
       "status": null,
-      "retryable": false
+      "retryable": false,
+      "local": true
     },
     {
       "code": "sdk/http-error",
       "status": null,
-      "retryable": false
+      "retryable": false,
+      "local": true
     },
     {
       "code": "sdk/response-too-large",
       "status": null,
-      "retryable": false
+      "retryable": false,
+      "local": true
     },
     {
       "code": "sdk/invalid-argument",
       "status": null,
-      "retryable": false
+      "retryable": false,
+      "local": true
     },
     {
       "code": "sdk/invalid-config",
       "status": null,
-      "retryable": false
+      "retryable": false,
+      "local": true
     },
     {
       "code": "sdk/no-fetch",
       "status": null,
-      "retryable": false
+      "retryable": false,
+      "local": true
     },
     {
       "code": "sdk/invalid-webhook-signature",
       "status": null,
-      "retryable": false
+      "retryable": false,
+      "local": true
     },
     {
       "code": "sdk/invalid-webhook-payload",
       "status": null,
-      "retryable": false
+      "retryable": false,
+      "local": true
     },
     {
       "code": "sdk/http-error",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "sdk/http-error",
       "status": 429,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "sdk/http-error",
       "status": 500,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "sdk/http-error",
       "status": 502,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "sdk/http-error",
       "status": 503,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "sdk/http-error",
       "status": 504,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "viewer-claims/invalid",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "viewer/age-confirmation-required",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "viewer-region/invalid",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "viewer/region-required",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/regional-evidence-required",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "signed-url/expired",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "signed-url/invalid",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "signed-url/original-not-granted",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "validation/invalid-request",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "validation/invalid-type",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "validation/too-small",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "validation/too-big",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "validation/invalid-format",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "validation/invalid-value",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "validation/unknown-field",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "request/unsupported-content-type",
       "status": 415,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "filter/invalid",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "ordering/unsupported-field",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "request/route-not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "server/internal-error",
       "status": 500,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "auth/unauthenticated",
       "status": 401,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "session-token/expired",
       "status": 401,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "session-token/invalid",
       "status": 401,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "search/unavailable",
       "status": 503,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "transform/invalid",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "transform-options/invalid",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "remote-url/too-many-redirects",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "cursor/invalid",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "api-key/missing",
       "status": 401,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "api-key/invalid",
       "status": 401,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "api-key/project-mismatch",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "api-key/not-accepted",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "auth/permission-denied",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload/too-large",
       "status": 413,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "document/too-many-items",
       "status": 422,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "image/invalid",
       "status": 422,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "image/too-large",
       "status": 422,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "usage/free-uploads-exhausted",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "usage/uploads-paused",
       "status": 402,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload/unsupported-type",
       "status": 415,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload-payload/invalid",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload/use-upload-part",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload/not-open",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload-part/invalid-number",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload/missing",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload/size-mismatch",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "idempotency/invalid-key",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "idempotency/key-reused",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "idempotency/request-in-progress",
       "status": 409,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "asset/no-rendered-version",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "project/not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/child-not-deletable",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/review-changed",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/review-note-required",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/update-failed",
       "status": 500,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "asset/held",
       "status": 423,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/processing",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/decision-not-allowed",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/decision-unchanged",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/not-retryable",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/content-unavailable",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/content-purged",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/not-decided",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/policy-changed",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/reviewed",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "support-ticket/not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "asset/duplicate-external-id",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "folder/not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "folder/duplicate-name",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "folder/not-empty",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "folder/parent-cycle",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "lens/not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "lens/identifier-taken",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "lens/identifier-reserved",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "hash-list/not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "hash-list-entry/not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "hash-list/limit-reached",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "hash-list-entry/limit-reached",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "hash-list/asset-not-hashed",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "policy/not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "policy/revision-conflict",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "policy/projects-changed",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "policy/in-use",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "policy/used-by-another-project",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "policy/no-preset",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "policy/preset-version-conflict",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "policy/preset-update-unavailable",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "policy/automatic-updates-unavailable",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload-preset/not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload-preset/disabled",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload-preset/token-required",
       "status": 401,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "remote-url/not-allowed",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload/website-rate-limit-reached",
       "status": 429,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "upload-preset/daily-limit-reached",
       "status": 429,
-      "retryable": true
+      "retryable": true,
+      "local": false
     },
     {
       "code": "upload-preset/origin-not-allowed",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload-preset/field-not-allowed",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload-token/invalid",
       "status": 401,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload-token/expired",
       "status": 401,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "upload-token/used",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "remote-url/invalid",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "remote-url/unavailable",
       "status": 422,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "appeal/not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "appeal/judgment-not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "appeal/asset-not-found",
       "status": 404,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "appeal/permission-denied",
       "status": 403,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "appeal/already-reviewed",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "appeal/decision-changed",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "appeal/invalid-action",
       "status": 400,
-      "retryable": false
+      "retryable": false,
+      "local": false
     },
     {
       "code": "appeal/content-unavailable",
       "status": 409,
-      "retryable": false
+      "retryable": false,
+      "local": false
     }
   ],
   "defaults": [

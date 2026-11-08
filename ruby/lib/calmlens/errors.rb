@@ -61,6 +61,15 @@ module CalmLens
       Error.parse_retry_after(headers['retry-after'])
     end
 
+    # @return [Boolean] true when the SDK raised this error itself, with no HTTP response: before
+    #   sending (an invalid argument or option, or content it checks first, such as
+    #   `upload/unsupported-type`), or because no response arrived (a timeout or a connection
+    #   failure). The code is the one the API would use; `status` and `request_id` are nil, so
+    #   branch on `code`.
+    def local?
+      status.nil?
+    end
+
     # @return [Boolean] true when the resource does not exist.
     def not_found?
       status == 404 || code.end_with?('/not-found')

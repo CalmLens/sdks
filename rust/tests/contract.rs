@@ -1865,6 +1865,11 @@ async fn retryable_follows_code_and_status() {
                 expected,
                 "Error::new {code} {status:?}"
             );
+            assert_eq!(
+                built.is_local(),
+                case["local"].as_bool().unwrap(),
+                "Error::new {code} {status:?}"
+            );
             // The error a client raises for an API response with this code and status.
             if let Some(status) = status {
                 let mock = MockServerClient::new().unwrap();
@@ -1884,6 +1889,7 @@ async fn retryable_follows_code_and_status() {
                     (code, Some(status))
                 );
                 assert_eq!(raised.is_retryable(), expected, "raised {code} {status}");
+                assert!(!raised.is_local(), "raised {code} {status}");
             }
         },
     )
@@ -1953,6 +1959,8 @@ async fn refuses_rejected_requests_before_sending() {
                         .unwrap_or_else(|cause| panic!("{name}: {cause}"))
                         .expect_err(name);
                     assert_eq!(rejection["error"], error.code().as_str(), "{name}");
+                    assert!(error.is_local(), "{name}");
+                    assert_eq!((error.status(), error.request_id()), (None, None), "{name}");
                 }
             }
         },

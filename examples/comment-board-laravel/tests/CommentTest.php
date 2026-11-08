@@ -99,6 +99,9 @@ final class CommentTest extends TestCase
         $this->call('POST', '/api/webhooks/calmlens', [], [], [], $headers, $body)->assertNoContent();
         self::assertNull(Cache::get('calmlens-last-event'));
         $this->call('POST', '/api/webhooks/calmlens', [], [], [], $headers, $body . ' ')->assertStatus(401)->assertJsonPath('code', 'sdk/invalid-webhook-signature');
+        $notAnEvent = '{"hello":"world"}';
+        $signed = ['HTTP_X_CALMLENS_SIGNATURE' => Webhooks::signatureHeader($notAnEvent, time(), 'test-secret')] + $headers;
+        $this->call('POST', '/api/webhooks/calmlens', [], [], [], $signed, $notAnEvent)->assertStatus(400)->assertJsonPath('code', 'sdk/invalid-webhook-payload');
     }
 
     public function testTestDeliveryDoesNotRecordAnEvent(): void

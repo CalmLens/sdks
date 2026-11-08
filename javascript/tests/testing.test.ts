@@ -794,6 +794,29 @@ describe("MockCalmLensServerClient", () => {
     ).rejects.toMatchObject({ code: PUBLIC_ERROR_CODES.ASSET_NOT_FOUND.getId() });
   });
 
+  it("waits for decisions with a signal, and stops when it aborts", async () => {
+    const client = createClient({ moderate: () => "blocked" });
+    const asset = await client.assets.create({
+      name: "image.png",
+      content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
+    });
+    const live = new AbortController();
+    expect(
+      await client.assets.waitForDecision({ assetId: asset.id, signal: live.signal }),
+    ).toMatchObject({ id: asset.id, classification: { moderation: { status: "blocked" } } });
+
+    const waiting = createClient();
+    const pending = await waiting.assets.create({
+      name: "note.txt",
+      content: { plainText: "hello", type: "text/plain" },
+    });
+    const aborted = new AbortController();
+    aborted.abort();
+    await expect(
+      waiting.assets.waitForDecision({ assetId: pending.id, signal: aborted.signal }),
+    ).rejects.toMatchObject({ code: "sdk/cancelled" });
+  });
+
   it("retries failed assets, and only failed ones", async () => {
     const client = createClient({
       moderate: ({ trigger }) => (trigger === "upload" ? "failed" : "pending"),

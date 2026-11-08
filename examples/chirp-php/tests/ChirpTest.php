@@ -326,6 +326,9 @@ final class ChirpTest extends TestCase
         $this->mock->completeProcessing($assetId, 'allowed');
         $tampered = $this->request('POST', '/webhooks/calmlens', headers: ['x-calmlens-signature' => $signature, 'x-calmlens-timestamp' => $timestamp], body: $body . ' ');
         self::assertSame(401, $tampered->status);
+        $notAnEvent = '{"hello":"world"}';
+        $signedNotAnEvent = $this->request('POST', '/webhooks/calmlens', headers: ['x-calmlens-signature' => CalmLensWebhooks::signatureHeader($notAnEvent, $timestamp, self::SECRET), 'x-calmlens-timestamp' => $timestamp], body: $notAnEvent);
+        self::assertSame(400, $signedNotAnEvent->status);
         self::assertSame('pending', $this->onlyPost()['image']['status']);
 
         // A test send changes nothing.

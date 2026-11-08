@@ -176,6 +176,8 @@ const inspectSymbol = Symbol.for("nodejs.util.inspect.custom");
  */
 export default class CalmLensServerClient {
   readonly #apiKey: string;
+  /** The options this client was created with, without the API key, for `withRequestOptions`. */
+  readonly #options: Omit<CalmLensServerClientOptions, "apiKey">;
   readonly #settings: ServerClientSettings;
   readonly #lenses: LensCache;
   readonly #connection: CalmLensConnection;
@@ -209,6 +211,7 @@ export default class CalmLensServerClient {
     }
     const { apiKey, ...rest } = options;
     this.#apiKey = apiKey;
+    this.#options = rest;
     this.#settings = {
       ...resolveConnectionOptions(rest),
       cdnBaseUrl: (
@@ -228,7 +231,7 @@ export default class CalmLensServerClient {
   withRequestOptions(options: RequestOptions): CalmLensServerClient {
     validateRequestOptions(options);
     return new CalmLensServerClient(
-      { ...this.#settings, ...options, apiKey: this.#apiKey },
+      { ...this.#options, ...options, apiKey: this.#apiKey },
       this.#lenses,
     );
   }

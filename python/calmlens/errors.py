@@ -91,6 +91,15 @@ class CalmLensError(Exception):
         return f"{type(self).__name__}({', '.join(parts)})"
 
     @property
+    def is_local(self) -> bool:
+        """True when the SDK raised this error itself, with no HTTP response: before sending (an
+        invalid argument or option, or content it checks first, such as ``upload/unsupported-type``),
+        or because no response arrived (a timeout, a cancellation or a connection failure). The code
+        is the one the API would use; ``status`` and ``request_id`` are ``None``, so branch on
+        ``code``."""
+        return self.status is None
+
+    @property
     def is_not_found(self) -> bool:
         """True for ``*/not-found`` codes and HTTP 404 responses."""
         return self.status == 404 or self.code.endswith("/not-found")

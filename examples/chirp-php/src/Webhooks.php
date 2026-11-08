@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Chirp;
 
 use CalmLens\CalmLensException;
+use CalmLens\SdkErrorCodes;
 use CalmLens\Webhooks as CalmLensWebhooks;
 
 /**
@@ -32,7 +33,8 @@ final class Webhooks
             // The exact raw bytes: never a re-encoded copy of the parsed JSON.
             $event = CalmLensWebhooks::parseEvent($rawBody, $signature, $timestamp, $this->secret);
         } catch (CalmLensException $error) {
-            return 401;
+            // A forged or stale delivery is 401; a verified body that is not an event is 400.
+            return $error->errorCode === SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE ? 401 : 400;
         }
         if ($event['projectId'] !== $this->projectId) {
             return 403;

@@ -367,6 +367,7 @@ class ContractTest < Minitest::Test
     [CalmLens::Error.build(entry['code'], status: entry['status']),
      CalmLens::Error.new(entry['code'], status: entry['status'])].each do |error|
       assert_equal entry['retryable'], error.retryable?, "#{error.class} #{label}"
+      assert_equal entry['local'], error.local?, "#{error.class} #{label}"
     end
   end
   each_case('retryable', SURFACE['retryable']) { |entry| "#{entry['code']} #{entry['status']}" }
@@ -392,6 +393,9 @@ class ContractTest < Minitest::Test
       client.public_send(snake_name(resource)).public_send(snake_name(method), rejection['options'])
     end
     assert_equal rejection['error'], error.code, rejection['name']
+    assert error.local?, rejection['name']
+    assert_nil error.status, rejection['name']
+    assert_nil error.request_id, rejection['name']
   end
   each_case('rejection', fixture('rejections')) { |rejection| rejection['name'] }
 end

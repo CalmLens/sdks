@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use CalmLens\CalmLensException;
+use CalmLens\SdkErrorCodes;
 use CalmLens\Webhooks;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -19,7 +20,9 @@ final class WebhookController
                 (string) config('calmlens.webhook_secret'),
             );
         } catch (CalmLensException $error) {
-            return response()->json(['code' => $error->errorCode], 401);
+            // A forged or stale delivery is 401; a verified body that is not an event is 400.
+            $status = $error->errorCode === SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE ? 401 : 400;
+            return response()->json(['code' => $error->errorCode], $status);
         }
         if ($event['projectId'] !== config('calmlens.project_id')) {
             return response()->json(['code' => 'example/project-mismatch'], 403);

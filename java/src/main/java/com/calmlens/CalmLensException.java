@@ -48,6 +48,17 @@ public class CalmLensException extends RuntimeException {
   /** @return the {@code X-Request-Id} of the failed request, or null when there was no response */
   public String getRequestId() { return null; }
 
+  /**
+   * Whether the SDK raised this exception itself, with no HTTP response: before sending (an
+   * invalid argument or option, or content it checks first, such as {@link
+   * ErrorCodes#UNSUPPORTED_UPLOAD_TYPE}), or because no response arrived (a timeout, an interruption
+   * or a connection failure). The code is the one the API would use; {@link #getStatus()} is 0 and
+   * {@link #getRequestId()} null, so branch on {@link #getCode()}.
+   *
+   * @return whether no HTTP response produced this exception
+   */
+  public final boolean isLocal() { return getStatus() == 0; }
+
   /** @return whether the API reported that the resource does not exist (HTTP 404) */
   public boolean isNotFound() { return getStatus() == 404; }
 
