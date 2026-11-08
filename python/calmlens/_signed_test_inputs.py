@@ -118,7 +118,7 @@ _HEX_WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven", "ei
               "alpha", "bravo", "charlie", "delta", "echo", "foxtrot")
 
 #: Ready-made scenarios: a clean input, a limited one, adult images and text, regional delivery,
-#: content restricted in Germany, mixed instances in one category, and person and face
+#: an explicit block in Germany, mixed instances in one category, and person and face
 #: detections: one person and face, nobody, an adult face, a minor's face and a group of three.
 TEST_INPUT_PRESETS: dict[str, SignedTestInput] = {
     "clean": {"instances": []},
@@ -128,7 +128,7 @@ TEST_INPUT_PRESETS: dict[str, SignedTestInput] = {
     "regional_delivery": {"instances": [], "regionalActions": [
         {"region": "DE", "action": "block"}, {"region": "GB", "action": "age-restrict"},
         {"region": "FR", "action": "limit"}]},
-    "germany": {"instances": [{"category": "hate", "qualifiers": ["hate-symbol", "hate-nazi-symbols-public-display"]}]},
+    "germany": {"instances": [], "regionalActions": [{"region": "DE", "action": "block"}]},
     "mixed": {"instances": [
         {"category": "harassment", "qualifiers": ["harassment-abuse", "harassment-documentary"]},
         {"category": "harassment", "qualifiers": ["harassment-threat"]}]},
@@ -160,7 +160,7 @@ def signal_test_input(signal: ClassificationTestSignal, kind: Literal["text", "i
     elif signal == "sexual.adult":
         preset = TEST_INPUT_PRESETS["adult_image" if kind == "image" else "adult_text"]
     elif signal == "hate.regional-symbol":
-        preset = TEST_INPUT_PRESETS["germany"]
+        preset = {"instances": [{"category": "hate", "qualifiers": ["hate-symbol", "hate-nazi-symbols-public-display"]}]}
     elif signal == "sexual.involving-minors":
         preset = {"instances": [{"category": "sexual", "qualifiers": ["sexual-minors"]}]}
     elif signal == "violence.graphic":

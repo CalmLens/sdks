@@ -1680,6 +1680,7 @@ class ClassifyTextOptions(_ClassifyTextRequired, total=False):
     externalId: str
     externalUrl: str
     folderId: Optional[str]
+    uploadPresetId: str
 
 
 class ListAssetsOptions(TypedDict, total=False):
@@ -1763,6 +1764,7 @@ class _LensRequired(TypedDict):
 class LensDefinition(_LensRequired, total=False):
     """A lens definition for ``ensure_lens``, ``ensure_lenses`` and ``lenses.create``."""
     description: Optional[str]
+    #: Whether the CDN serves the lens. Defaults to true.
     active: bool
     transform: Optional[ImageTransformOptions]
 
@@ -1775,7 +1777,7 @@ class UpdateLensOptions(LensIdOptions, total=False):
     name: str
     description: Optional[str]
     type: LensType
-    #: Whether the CDN serves the lens.
+    #: Whether the CDN serves the lens. Left out, it stays as it is.
     active: bool
     transform: Optional[ImageTransformOptions]
 

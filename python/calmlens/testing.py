@@ -28,7 +28,7 @@ import threading
 import time
 import uuid
 import zlib
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Optional, TypedDict, Union, cast
 from urllib.parse import parse_qsl, quote, unquote, urlsplit
@@ -57,7 +57,7 @@ from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Actor, Asset, Event, EventAsset
                     HashList, HashListEntry, SignedUploadToken, SignUploadTokenOptions)
 
 __all__ = ["MockCalmLensServerClient", "MOCK_PROJECT_ID", "MockRequest", "MockOptions", "MockAssetOutcome",
-           "MockDecision", "MockModerationContent", "MockModerationInput", "MockModerationTrigger", "MockModerate",
+           "MockDecision", "MockPendingReviewReason", "MockModerationContent", "MockModerationInput", "MockModerationTrigger", "MockModerate",
            "MockApiKeyGrant", "MockFailure", "StoredContent",
            "InMemoryMockDatabaseStorage", "InMemoryMockImageStorage", "create_mock_api_key", "default_moderate",
            "mock_decision", "sign_upload_token",
@@ -80,6 +80,9 @@ MockAssetOutcome = Literal["pending", "failed", "allowed", "limited", "age-restr
 #: (``assets.explain`` with ``rerun=True``) or ``complete`` (``complete_processing`` without a
 #: decision of its own).
 MockModerationTrigger = Literal["upload", "retry", "rerun", "complete"]
+
+#: Why a decision waits for human review: ``sampled``, or ``uncertain`` about some categories.
+MockPendingReviewReason = Literal["sampled", "uncertain"]
 
 #: The policy action that gives each decided status.
 _STATUS_ACTION = {"allowed": "allow", "limited": "limit", "age-restricted": "age-restrict", "blocked": "block",
@@ -107,8 +110,9 @@ def _is_score(score: object) -> bool:
 class MockDecision:
     """A moderation decision for ``mock_options["moderate"]`` or ``complete_processing``, built
     with ``mock_decision(status)``: flag the categories it found, with their scores and
-    qualifiers, and mark the categories it couldn't assess. Each call checks its names and scores
-    and raises ``sdk/invalid-argument`` for one CalmLens doesn't have."""
+    qualifiers, mark the categories it couldn't assess, and leave it waiting for human review with
+    :meth:`pending_review`. Each call checks its names and scores and raises
+    ``sdk/invalid-argument`` for one CalmLens doesn't have."""
 
     def __init__(self, status: MockAssetOutcome):
         if status not in _MOCK_OUTCOMES:
@@ -116,6 +120,7 @@ class MockDecision:
         self.status: MockAssetOutcome = status
         self._flags: dict[str, tuple[float, list[tuple[str, float]]]] = {}
         self._not_evaluated: set[str] = set()
+        self._pending_review: tuple[str, list[str]] | None = None
 
     def flag(self, category: str, score: float, qualifiers: Mapping[str, float] | None = None) -> MockDecision:
         """Record findings in ``category`` with its ``score`` (0 to 1) and, optionally, scores for
@@ -139,6 +144,25 @@ class MockDecision:
         self._not_evaluated.add(category)
         return self
 
+    def pending_review(self, reason: MockPendingReviewReason, uncertain_categories: Sequence[str] = ()) -> MockDecision:
+        """Leave the decision waiting for human review, as ``classification.moderation.pendingReview``
+        reports: ``sampled``, or ``uncertain`` with the ``uncertain_categories`` that made it so. The
+        queue's decision (``decide`` on the mock) clears it; ``assets.decide`` doesn't, as with the
+        API. Raises ``sdk/invalid-argument`` on a ``pending`` or ``failed`` decision, for another
+        reason, for a ``sampled`` review with uncertain categories and for an unknown category."""
+        if self.status in ("pending", "failed"):
+            raise _invalid(f"a {self.status} decision can't wait for review")
+        if reason not in ("sampled", "uncertain"):
+            raise _invalid("reason must be sampled or uncertain")
+        categories = list(uncertain_categories)
+        if reason == "sampled" and categories:
+            raise _invalid("a sampled review has no uncertain categories")
+        for category in categories:
+            if category not in CATEGORIES:
+                raise _invalid(f"{category} is not a CalmLens category")
+        self._pending_review = (reason, categories)
+        return self
+
     def _check_finding(self, category: str) -> None:
         if category not in CATEGORIES:
             raise _invalid(f"{category} is not a CalmLens category")
@@ -147,10 +171,11 @@ class MockDecision:
         if category in self._flags or category in self._not_evaluated:
             raise _invalid(f"{category} is already in this decision")
 
-    def report(self) -> dict[str, Any] | None:
+    def report(self, requested_at: int = 0) -> dict[str, Any] | None:
         """The report a decided asset gets, as the API sends it: every category (unflagged ones
         evaluated with score 0), the policy's actions, the automated status and
-        ``flaggedCategories``. ``None`` for ``pending`` and ``failed``."""
+        ``flaggedCategories``. ``requested_at`` is when a pending review joined the queue. ``None``
+        for ``pending`` and ``failed``."""
         status = self.status
         if status in ("pending", "failed"):
             return None
@@ -171,9 +196,17 @@ class MockDecision:
                     qualifier: {"status": "evaluated", "someScore": some, "likelihood": _score_to_likelihood(some)}
                     for qualifier, some in qualifiers}
         return {"raw": {"categories": categories, "hashMatches": []},
-            "categories": {category: {"score": value, "action": action(value)} for category, value in evaluated},
+            "categories": {category: {
+                "score": value, "action": action(value),
+                "source": {"kind": "default" if value >= 0.5 else "below-threshold"},
+                # The mock keeps no policies: the category's setting is the decision's own action.
+                "settings": {"action": _STATUS_ACTION[status], "allowances": [], "restrictions": []},
+            } for category, value in evaluated},
             # The mock keeps no policies, so no policy is named.
             "explanationComplete": True, "policy": None, "source": "policy", "rule": None,
+            "pendingReview": None if self._pending_review is None else {
+                "requestedAt": requested_at, "reason": self._pending_review[0],
+                "uncertainCategories": list(self._pending_review[1])},
             "automatedStatus": status,
             # The mock analyses no audio or video, so a decision has no findings timeline.
             "regions": [], "linkSafety": None, "timeline": None,
@@ -1032,6 +1065,20 @@ def _bounded_int(value: Any, path: str, maximum: int) -> int:
     return value
 
 
+def _is_file_accepted(name: object, content_type: str, accepted: Iterable[str]) -> bool:
+    """Whether a preset's accepted types take a file, each a MIME type, a ``type/*`` wildcard or a
+    ``.extension``, as the upload controller reads them."""
+    file_type, file_name = content_type.lower(), name.lower() if isinstance(name, str) else ""
+
+    def matches(pattern: str) -> bool:
+        if pattern in ("*", "*/*"):
+            return True
+        if pattern.endswith("/*"):
+            return file_type.startswith(pattern[:-1])
+        return file_name.endswith(pattern) if pattern.startswith(".") else file_type == pattern
+    return any(matches(pattern.strip().lower()) for pattern in accepted)
+
+
 def _code_points(value: str) -> list[int]:
     # Like the database: names compare by code point (UTF-16 code units in JavaScript), so case matters.
     return [ord(char) for char in value]
@@ -1126,8 +1173,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
     def fetch_cdn(self, url: str) -> CDNResponse:
         """Fetch a URL of the mock's CDN as a browser would, with a GET and without the API key: a
         signed asset URL from ``cdn.sign_asset_url`` (with a resource appended), or a public one
-        from ``cdn.get_asset_url``. The request is recorded like any other. Close the response, or
-        use it as a context manager."""
+        from ``cdn.get_asset_url``. Without a grant, a private asset answers ``404``
+        ``asset/not-found`` whatever its state, like an unknown one. The request is recorded like
+        any other. Close the response, or use it as a context manager."""
         if not isinstance(url, str) or not url.startswith(self.cdn_base_url + "/"):
             raise _invalid(f"url must be beneath the mock's CDN base URL, {self.cdn_base_url}")
         return CDNResponse(self.transport(Request(url, headers={"User-Agent": USER_AGENT}, method="GET"),
@@ -1245,8 +1293,8 @@ class MockCalmLensServerClient(CalmLensServerClient):
         """Apply a reviewer's decision to a stored asset, as the portal or API would: the
         moderation status changes (``purged`` also removes the content, with reason
         ``requested`` and an ``asset.content-removed`` event), the review joins
-        ``manualReviews``, and an ``asset.<decision>`` event whose ``actor`` is a ``user`` joins
-        the events feed. Raises ``asset/not-found`` for an unknown asset."""
+        ``manualReviews``, a ``pendingReview`` is settled, and an ``asset.<decision>`` event whose
+        ``actor`` is a ``user`` joins the events feed. Raises ``asset/not-found`` for an unknown asset."""
         if decision not in _REVIEW_DECISIONS:
             raise _invalid(f"Unknown review decision {decision!r}")
         with self._state_lock:
@@ -1266,6 +1314,10 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self._reruns.discard(record["id"])
         self._apply_outcome(record, decision, "requested")
         now = self.now()
+        # Like the API: the human review queue's decision settles its review, one through the API
+        # leaves it waiting.
+        if not by_api_key:
+            record["classification"]["moderation"]["pendingReview"] = None
         review: dict[str, Any] = {"id": self.create_id("rev"), "decision": decision, "note": note,
                                   "decidedBy": {"type": "api-key", "id": None}, "reviewedAt": now,
                                   "applied": True}
@@ -1760,6 +1812,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
     def _create_asset(self, upload: str, content_type: str, query: dict[str, Any], body: dict[str, Any],
                       raw: bytes | None, now: int) -> dict[str, Any]:
         options, content, multipart, final, total = self._upload_fields(upload, content_type, query, body, raw)
+        options = self._apply_upload_preset(options, total if total is not None or content is None else len(content))
         _check_metadata(options.get("metadata"))
         mime = options.get("contentType", "")
         if content is not None and not (isinstance(mime, str) and _is_accepted_upload_mime_type(mime)):
@@ -1846,6 +1899,35 @@ class MockCalmLensServerClient(CalmLensServerClient):
         self._record_processing_events(asset, decision)
         return asset
 
+    def _apply_upload_preset(self, options: dict[str, Any], size: int | None) -> dict[str, Any]:
+        """An API-key upload through a preset, as the API applies it: the preset gives the folder and
+        visibility, which the upload can't change, and the processing options unless the upload sets
+        its own, and refuses types and sizes it doesn't accept."""
+        preset_id = options.get("uploadPresetId")
+        if not preset_id:
+            return options
+        preset = next((preset for preset in self._upload_presets.values() if preset["id"] == preset_id), None)
+        if preset is None:
+            raise _Failure(error_codes.UPLOAD_PRESET_NOT_FOUND)
+        if not preset["enabled"]:
+            raise _Failure(error_codes.UPLOAD_PRESET_DISABLED)
+        if preset["folderId"] and options.get("folderId") and options["folderId"] != preset["folderId"]:
+            raise _Failure(error_codes.UPLOAD_PRESET_FIELD_NOT_ALLOWED, details={"field": "folderId"})
+        if options.get("visibility") and options["visibility"] != preset["visibility"]:
+            raise _Failure(error_codes.UPLOAD_PRESET_FIELD_NOT_ALLOWED, details={"field": "visibility"})
+        allowed = preset["allowedContentTypes"]
+        mime = options.get("contentType")
+        if allowed and mime is not None and not _is_file_accepted(options.get("name"), mime, allowed):
+            raise _Failure(error_codes.UNSUPPORTED_UPLOAD_TYPE, details={
+                "source": "preset", "contentType": mime, "allowedContentTypes": allowed})
+        limit = preset["maxSizeInBytes"]
+        if limit and size is not None and size > limit:
+            raise _Failure(error_codes.UPLOAD_TOO_LARGE, details={"limitBytes": limit, "source": "preset"})
+        own = options.get("processingOptions")
+        return {**options, "folderId": preset["folderId"] or options.get("folderId"),
+                "visibility": preset["visibility"],
+                "processingOptions": own if own is not None else preset["processingOptions"]}
+
     @staticmethod
     def _image_size_error(kind: str, size: int) -> str | None:
         """Like the API: image uploads in parts total at most 20 MiB."""
@@ -1882,7 +1964,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         """Decide ``asset`` as ``decision`` says, with its report. Like the API for an image with no
         text, codes, people or faces in it, a decided image reports the OCR and person and face
         detection its upload turned on, and link detection unless it was turned off."""
-        self._apply_outcome(asset, decision.status, "policy", decision.report())
+        self._apply_outcome(asset, decision.status, "policy", decision.report(self.now()))
         classification = asset["classification"]
         if classification["status"] != "completed" or asset["type"] != "image":
             return
@@ -2486,7 +2568,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
 
     def _save_lens(self, definition: Mapping[str, Any], now: int) -> dict[str, Any]:
         """Save a lens definition like the API: a new lens, the lens unchanged when its definition
-        is, or the lens changed to it."""
+        is, or the lens changed to it. Like the API, a definition without ``active`` is served."""
+        active = definition.get("active")
+        definition = {**definition, "active": True if active is None else active}
         old = self._mock_lenses.get(definition["identifier"])
         if old is None:
             lens = {"id": self.create_id("lens"), "projectId": self.project_id, **definition,
@@ -2706,6 +2790,11 @@ class MockCalmLensServerClient(CalmLensServerClient):
                     error_codes.SIGNED_URL_ORIGINAL_NOT_GRANTED, "This signed asset URL doesn't grant the original file", 403))
             # A grant authorises a private asset without the API key.
             authorised = grant is not None or (with_api_key and self._can_download(asset.get("folderId")))
+            # Like the CDN, a private asset answers anyone without a grant or the project's API key
+            # as an unknown asset does, whatever its state. Its placeholder is public.
+            if (asset["visibility"] != "public" and grant is None and not with_api_key
+                    and resource not in ("placeholder", "info")):
+                return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
             if resource == "info":
                 return self._serve_info(method, asset, query, authorised)
             status = asset["classification"]["moderation"].get("status")

@@ -290,6 +290,23 @@ class ClientTests(ClientTestCase):
                 CalmLensServerClient()
         self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_CONFIG)
 
+    def test_an_api_key_that_cant_be_a_header_value_is_refused_and_any_other_is_left_for_the_api(self):
+        for api_key in ("key\n", "k\u00e9y", "a\tb", "\x7f"):
+            with self.subTest(api_key=api_key), self.assertRaises(CalmLensValidationError) as raised:
+                CalmLensServerClient(api_key=api_key, project_id="p", transport=lambda r, t: None)
+            self.assertEqual(raised.exception.code, error_codes.SDK_INVALID_CONFIG)
+        self.assertEqual(CalmLensServerClient(api_key="!~", project_id="p", transport=lambda r, t: None).api_key, "!~")
+
+    def test_a_lens_without_active_shares_its_cached_definition_with_one_that_is_active(self):
+        lens = {"identifier": "thumb", "name": "Thumb", "type": "image"}
+        self.result = {"lenses": [{"id": "l", **lens, "active": True}]}
+        self.client.ensure_lens(lens)
+        self.client.ensure_lens({**lens, "active": True})
+        self.assertEqual(len(self.calls), 1)
+        self.result = {"lenses": [{"id": "l", **lens, "active": False}]}
+        self.client.ensure_lens({**lens, "active": False})
+        self.assertEqual(len(self.calls), 2)
+
     def test_lens_cache_concurrency_invalidation_and_failure(self):
         lens = {"identifier": "thumb", "name": "Thumb", "type": "image", "active": True}
         self.result = {"lenses": [{"id": "l", **lens}]}

@@ -938,6 +938,9 @@ def _build_decision(spec: Any) -> testing.MockDecision:
         decision.flag(flag["category"], flag["score"], flag.get("qualifiers"))
     for category in spec.get("notEvaluated", []):
         decision.not_evaluated(category)
+    review = spec.get("pendingReview")
+    if review is not None:
+        decision.pending_review(review["reason"], review.get("uncertainCategories", []))
     return decision
 
 

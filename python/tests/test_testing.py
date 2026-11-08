@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 from urllib.request import Request
 
 from calmlens import CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError, error_codes
-from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, default_moderate
+from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, default_moderate, mock_decision
 
 DOWNLOAD = create_mock_api_key([{"actions": ["assets:download"], "folderId": None, "includeSubfolders": True}])
 
@@ -25,6 +25,24 @@ def _upload_form(options, mime_type, data):
 class MockTests(unittest.TestCase):
     def setUp(self):
         self.client = MockCalmLensServerClient(mock_options={"now": lambda: 123})
+
+    def test_a_pending_review_is_requested_when_the_decision_is_applied(self):
+        clock = [1000]
+        c = MockCalmLensServerClient(mock_options={"now": lambda: clock[0], "moderate": lambda m: "pending"})
+        asset = c.assets.create(name="a.png", content={"data": b"png", "type": "image/png"})
+        clock[0] = 2000
+        decided = c.complete_processing(asset["id"], mock_decision("allowed").pending_review("sampled"))
+        self.assertEqual(decided["classification"]["moderation"]["pendingReview"],
+                         {"requestedAt": 2000, "reason": "sampled", "uncertainCategories": []})
+
+    def test_a_first_part_declaring_more_than_its_preset_allows_is_refused(self):
+        preset = self.client.upload_presets.ensure(
+            upload_presets=[{"key": "tiny", "name": "Tiny", "maxSizeInBytes": 4}])["uploadPresets"][0]
+        with self.assertRaises(CalmLensAPIError) as raised:
+            self.client.assets.create(name="a.png", upload_preset_id=preset["id"], total_size_in_bytes=5,
+                                      part={"data": b"png", "type": "image/png", "isFinal": False})
+        self.assertEqual((raised.exception.code, raised.exception.status, raised.exception.details),
+                         (error_codes.UPLOAD_TOO_LARGE, 413, {"limitBytes": 4, "source": "preset"}))
 
     def test_signs_upload_tokens_with_the_mock_key_without_a_request(self):
         signed = self.client.upload_tokens.sign(upload_preset_id="preset-1")

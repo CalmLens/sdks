@@ -105,6 +105,8 @@ USER_AGENT = f"calmlens-python/{__version__} ({platform.python_implementation().
 
 _RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 _ENV_API_KEY, _ENV_PROJECT_ID = "CALMLENS_API_KEY", "CALMLENS_PROJECT_ID"
+# Only what can be sent as a header is checked: the API decides whether a key is real.
+_API_KEY_HEADER_VALUE = re.compile(r"[\x21-\x7e]+")
 
 
 class _Unset:
@@ -1037,6 +1039,8 @@ class CalmLensServerClient:
         connect_timeout = _positive_number("connect_timeout", connect_timeout)
         if not isinstance(api_key, str) or not api_key:
             raise _invalid(f"api_key is required (or set {_ENV_API_KEY})", error_codes.SDK_INVALID_CONFIG)
+        if not _API_KEY_HEADER_VALUE.fullmatch(api_key):
+            raise _invalid("api_key must be printable ASCII without spaces", error_codes.SDK_INVALID_CONFIG)
         if not isinstance(project_id, str) or not project_id or project_id in (".", ".."):
             raise _invalid(f"project_id is required (or set {_ENV_PROJECT_ID})", error_codes.SDK_INVALID_CONFIG)
         for name, url in (("base_url", base_url), ("cdn_base_url", cdn_base_url)):
@@ -1192,7 +1196,8 @@ class CalmLensServerClient:
     def ensure_lens(self, options: LensDefinition | None = None, /, *, identifier: str = _UNSET, name: str = _UNSET,
                     type: LensType = _UNSET, description: str | None = _UNSET,
                     active: bool = _UNSET, transform: ImageTransformOptions | None = _UNSET) -> Lens:
-        """Create one named lens, or change it to this definition (see :meth:`ensure_lenses`)."""
+        """Create one named lens, or change it to this definition (see :meth:`ensure_lenses`).
+        ``active`` defaults to true."""
         # A lens definition is sent as given: ``description=None`` clears the lens's description.
         lens = _merge_options(options, identifier=identifier, name=name, type=type,
                               description=description, active=active, transform=transform)
@@ -1202,7 +1207,8 @@ class CalmLensServerClient:
                       lenses: list[LensDefinition] = _UNSET) -> list[Lens]:
         """Create each named lens, or change it to the definition sent, by identifier. Sending the
         same definition again returns the lens unchanged, from the client's lens cache once it has
-        seen it, so applications can send their lenses every time they start.
+        seen it, so applications can send their lenses every time they start. A definition without
+        ``active`` is served.
 
         Identical concurrent calls share one request; a changed definition replaces the cached one
         for that identifier. More than ``ENSURE_LENSES_MAX_PER_REQUEST`` new definitions are sent in
@@ -1215,9 +1221,9 @@ class CalmLensServerClient:
             raise _invalid("At least one lens with an identifier is required")
 
         def cache_key(lens: Mapping[str, Any]) -> str:
-            return json.dumps({k: lens.get(k) for k in (
-                "identifier", "name", "description", "type", "active", "transform"
-            )}, sort_keys=True, separators=(",", ":"))
+            # Absent ``active`` is the API's default, true.
+            return json.dumps({**{k: lens.get(k) for k in ("identifier", "name", "description", "type", "transform")},
+                               "active": lens.get("active", True)}, sort_keys=True, separators=(",", ":"))
         keys = [cache_key(lens) for lens in definitions]
         # Serialize ensure calls so identical concurrent definitions use one request.
         with self._lens_lock:
@@ -2132,8 +2138,8 @@ class Lenses:
     def create(self, options: LensDefinition | None = None, /, *, identifier: str = _UNSET, name: str = _UNSET,
                type: LensType = _UNSET, description: str | None = _UNSET, active: bool = _UNSET,
                transform: ImageTransformOptions | None = _UNSET) -> Lens:
-        """Create a lens. Its identifier must be new to the project (``lens/identifier-taken``
-        otherwise); use :meth:`CalmLensServerClient.ensure_lens` to create or change one by
+        """Create a lens, served unless ``active`` is false. Its identifier must be new to the
+        project (``lens/identifier-taken`` otherwise); use :meth:`CalmLensServerClient.ensure_lens` to create or change one by
         identifier."""
         merged = _merge("lenses.create", options, identifier=identifier, name=name, type=type, description=description,
                         active=active, transform=transform)
@@ -2150,8 +2156,8 @@ class Lenses:
                description: str | None = _UNSET, type: LensType = _UNSET, active: bool = _UNSET,
                transform: ImageTransformOptions | None = _UNSET) -> Lens:
         """Change a lens's name, description, type, transform or whether the CDN serves it
-        (``active``). ``description=None`` and ``transform=None`` clear them. The CDN serves the new
-        transform from then on."""
+        (``active``); what you leave out stays as it is. ``description=None`` and ``transform=None``
+        clear them. The CDN serves the new transform from then on."""
         merged = _merge("lenses.update", options, lens_id=lens_id, name=name, description=description, type=type,
                         active=active, transform=transform)
         lens = cast(Lens, self._c._request("PATCH", self._path(merged.get("lensId")),
@@ -2442,12 +2448,13 @@ class Text:
                  description: str = _UNSET, processing_options: ProcessingOptions = _UNSET,
                  metadata: List[MetadataItem] = _UNSET, tags: List[str] = _UNSET, author_id: str = _UNSET,
                  context: ModerationContext = _UNSET, external_id: str = _UNSET, external_url: str = _UNSET,
-                 folder_id: str | None = _UNSET, idempotency_key: str | None = None) -> Asset:
+                 folder_id: str | None = _UNSET, upload_preset_id: str = _UNSET,
+                 idempotency_key: str | None = None) -> Asset:
         """Classify UTF-8 text and wait for the decision (asset name defaults to ``text``).
-        ``author_id`` and ``context`` work as in :meth:`Assets.create`."""
+        ``author_id``, ``context`` and ``upload_preset_id`` work as in :meth:`Assets.create`."""
         merged = _merge("text.classify", options, text=text, name=name, description=description, processing_options=processing_options,
                         metadata=metadata, tags=tags, author_id=author_id, context=context, external_id=external_id,
-                        external_url=external_url, folder_id=folder_id)
+                        external_url=external_url, folder_id=folder_id, upload_preset_id=upload_preset_id)
         value = merged.pop("text", None)
         if not isinstance(value, str) or not value.strip():
             raise _invalid("Text to classify must be a non-empty string")
