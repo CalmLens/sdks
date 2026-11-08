@@ -874,7 +874,8 @@ module CalmLens
                                 # Like the API, moderation's results are null until it decides, and a
                                 # feature's result is null until it has run.
                                 'moderation' => { 'status' => 'pending', 'manualReviews' => [], 'automatedStatus' => nil,
-                                                  'policy' => nil, 'pendingReview' => nil, 'source' => nil, 'rule' => nil, 'explanationComplete' => nil,
+                                                  'policy' => nil, 'pendingReview' => nil, 'source' => nil, 'rule' => nil,
+                                                  'explanationComplete' => nil,
                                                   'categories' => nil, 'flaggedCategories' => [], 'regions' => [],
                                                   'raw' => nil, 'timeline' => nil },
                                 'ocr' => nil, 'linkDetection' => nil }

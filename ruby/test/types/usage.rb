@@ -202,4 +202,5 @@ painted = CalmLens::TestInputs.paint_image('violence', test_input_key).png
 [status, processing, failure, reviews, removal, format, camera, score, ages, names, more, children, matched, expires, available,
  lens_width, url,
  renditions, embed, hls, bytes, webhook_status, webhook_test, earlier, author, used, limits, completed, answered, fetched, signed, scored,
- phrase, painted, automated, regional, flagged_links, batched, webhook_actor, segments, lens_names, mode, token, flagged, webhook_facts]
+ phrase, painted, automated, regional, flagged_links, batched, webhook_actor, segments, lens_names, mode, token, flagged, webhook_facts,
+ sampled_percent]
