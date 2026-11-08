@@ -191,8 +191,7 @@ const LABELS: Record<ChangeKind, string> = {
 
 /** The stored values a preset definition sets, with the API's defaults (toUploadPresetValues). */
 const presetValues = (definition: Omit<UploadPresetDefinition, "revision">) => {
-  const list = (value: string[] | null | undefined) =>
-    value?.length ? [...new Set(value)] : null;
+  const list = (value: string[] | null | undefined) => (value?.length ? [...new Set(value)] : null);
   return {
     key: definition.key,
     name: definition.name,
@@ -264,8 +263,7 @@ export const planConfiguration = (
     if (!existing) changes.push({ kind: "policy", action: "create", name });
     else
       update("policy", name, [
-        ...(definition.description !== undefined &&
-        definition.description !== existing.description
+        ...(definition.description !== undefined && definition.description !== existing.description
           ? ["description"]
           : []),
         ...(definition.settings && !same(definition.settings, existing.settings)
@@ -404,7 +402,10 @@ export const applyConfiguration = async (
   if (fields.length) {
     ({ revision } = await client.metadataFields.ensure({
       revision,
-      fields: fields.map((change) => ({ id: change.name, ...config.metadataFields![change.name]! })),
+      fields: fields.map((change) => ({
+        id: change.name,
+        ...config.metadataFields![change.name]!,
+      })),
     }));
     log(`Saved ${plural(fields.length, "metadata field")}.`);
   }

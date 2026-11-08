@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CalmLensError } from "../../src/server";
 import {
   applyConfiguration,
   ConfigurationError,
@@ -12,6 +11,7 @@ import {
   readConfigurationState,
 } from "../../src/cli/configuration";
 import { EXAMPLE_IDS } from "../../src/contract/Ids.js";
+import { CalmLensError } from "../../src/server";
 import { createMockApiKey, MockCalmLensServerClient } from "../../src/testing";
 
 const newClient = () =>
@@ -79,9 +79,9 @@ test("a changed file updates only what differs, and prune deletes only when aske
   };
 
   const kept = await apply(client, changed);
-  expect(kept.changes.map(({ action, kind, name, fields }) => [action, kind, name, fields])).toEqual([
-    ["update", "uploadPreset", "avatars", ["name"]],
-  ]);
+  expect(
+    kept.changes.map(({ action, kind, name, fields }) => [action, kind, name, fields]),
+  ).toEqual([["update", "uploadPreset", "avatars", ["name"]]]);
   expect((await client.uploadPresets.list()).items.map(({ key }) => key)).toEqual([
     "avatars",
     "feedback",
@@ -108,7 +108,9 @@ test("apply refuses a change made after the project was read", async () => {
   const state = await readConfigurationState(client, changed);
   const plan = planConfiguration(changed, state);
   // Someone saves in the meantime.
-  await client.uploadPresets.ensure({ uploadPresets: [{ key: "avatars", name: "From the portal" }] });
+  await client.uploadPresets.ensure({
+    uploadPresets: [{ key: "avatars", name: "From the portal" }],
+  });
 
   const error = await applyConfiguration(client, changed, state, plan).catch((caught) => caught);
   expect(error).toBeInstanceOf(CalmLensError);

@@ -25,7 +25,6 @@ import type { HashList, HashListEntry } from "../contract/HashList.js";
 import type { PUBLIC_LENS_SCHEMA } from "../contract/Lens.js";
 import type { ModerationContext } from "../contract/ModerationContext.js";
 import type { CursorPage } from "../contract/Page.js";
-import type { UploadPreset } from "../contract/UploadPreset.js";
 import type {
   GetPoliciesQuery,
   GetPoliciesResponse,
@@ -72,6 +71,7 @@ import type {
   PostHashListBody,
   PostHashListEntryBody,
 } from "../contract/PublicApiSchemas.js";
+import type { UploadPreset } from "../contract/UploadPreset.js";
 
 // ---- Models -------------------------------------------------------------------------------
 
