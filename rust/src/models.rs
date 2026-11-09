@@ -2702,7 +2702,7 @@ pub struct OcrResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<FeatureNotEvaluatedReason>,
     /// Where OCR found text, and personal information within it, when `status` is `Evaluated`;
-    /// empty when the image has no text. Redaction transforms blur these regions.
+    /// empty when the image has no text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text_regions: Option<Vec<TextRegion>>,
     /// Fields this SDK version does not know.
@@ -3924,21 +3924,6 @@ pub struct ImageBorder {
     pub width: Option<f64>,
 }
 
-/// Regions found when the image was processed, blurred before any other option applies.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImageRedaction {
-    /// Blur text regions. Text regions need OCR on the upload.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub text: Option<bool>,
-    /// Blur regions holding personal information.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub personal_information: Option<bool>,
-    /// Preview. Blur the faces face detection found. Face boxes need face detection on the upload.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub faces: Option<bool>,
-}
-
 string_enum! {
     /// A named trim mode.
     TrimMode {
@@ -4144,9 +4129,6 @@ pub struct ImageTransformOptions {
     /// The blur radius.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blur: Option<f64>,
-    /// Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub redact: Option<ImageRedaction>,
     /// A border drawn around the image.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub border: Option<ImageBorder>,

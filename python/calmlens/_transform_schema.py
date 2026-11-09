@@ -45,20 +45,6 @@ TRANSFORM_OPTIONS_SCHEMA: Dict[str, Any] = json.loads("""
     "blur": {
       "type": "number"
     },
-    "redact": {
-      "type": "object",
-      "properties": {
-        "text": {
-          "type": "boolean"
-        },
-        "personalInformation": {
-          "type": "boolean"
-        },
-        "faces": {
-          "type": "boolean"
-        }
-      }
-    },
     "border": {
       "type": "object",
       "properties": {

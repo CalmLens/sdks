@@ -201,9 +201,8 @@ type AssetClassification struct {
 	// analysing the content. Never use test results, such as age ranges, for real decisions.
 	TestInput  bool            `json:"testInput"`
 	Moderation AssetModeration `json:"moderation"`
-	// OCR holds where OCR found text, and personal information within it, in an image. Redaction
-	// transforms (ImageRedaction) blur its text regions. Nil until OCR has run, and when it
-	// wasn't requested. Each feature result below is nil in the same way.
+	// OCR holds where OCR found text, and personal information within it, in an image. Nil until
+	// OCR has run, and when it wasn't requested. Each feature result below is nil in the same way.
 	OCR             *OCRResult             `json:"ocr,omitempty"`
 	PersonDetection *PersonDetectionResult `json:"personDetection,omitempty"`
 	FaceDetection   *FaceDetectionResult   `json:"faceDetection,omitempty"`

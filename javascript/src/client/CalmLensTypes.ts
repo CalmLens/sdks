@@ -201,15 +201,6 @@ export interface ImageTransformOptions {
   background?: string;
   /** The blur radius. */
   blur?: number;
-  /** Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged. */
-  redact?: {
-    /** Blurs every paragraph of text OCR found. */
-    text?: boolean;
-    /** Blurs the email addresses, phone numbers, card numbers, IBANs and social security numbers OCR found. */
-    personalInformation?: boolean;
-    /** Preview. Blurs every face that face detection found when the image was uploaded. */
-    faces?: boolean;
-  };
   /** A border drawn around the image. */
   border?: {
     /** The border colour. */

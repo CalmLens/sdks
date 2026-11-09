@@ -41,20 +41,6 @@ const transformOptionsSchemaJSON = `{
     "blur": {
       "type": "number"
     },
-    "redact": {
-      "type": "object",
-      "properties": {
-        "text": {
-          "type": "boolean"
-        },
-        "personalInformation": {
-          "type": "boolean"
-        },
-        "faces": {
-          "type": "boolean"
-        }
-      }
-    },
     "border": {
       "type": "object",
       "properties": {

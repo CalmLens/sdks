@@ -118,8 +118,6 @@ type ImageTransformOptions struct {
 	Background string `json:"background,omitempty"`
 	// Blur: The blur radius.
 	Blur *float64 `json:"blur,omitempty"`
-	// Redact: Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged.
-	Redact *ImageRedaction `json:"redact,omitempty"`
 	// Border: A border drawn around the image.
 	Border *ImageBorder `json:"border,omitempty"`
 	// Brightness: The brightness factor.
@@ -181,16 +179,6 @@ func (q *ImageQuality) UnmarshalJSON(data []byte) error {
 type ImageBorder struct {
 	Color string   `json:"color,omitempty"`
 	Width *float64 `json:"width,omitempty"`
-}
-
-// ImageRedaction blurs regions found when the image was processed. Text blurs text regions
-// (the upload needs OCR), PersonalInformation blurs regions holding personal information, and
-// Faces (preview) blurs the faces face detection found (the upload needs face detection).
-// Pointers keep an explicit false in the selector.
-type ImageRedaction struct {
-	Text                *bool `json:"text,omitempty"`
-	PersonalInformation *bool `json:"personalInformation,omitempty"`
-	Faces               *bool `json:"faces,omitempty"`
 }
 
 // ImageGravity chooses the focal point when cropping. Set Side for a named position ("face",

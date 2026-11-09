@@ -739,27 +739,6 @@ public final class Models {
     public ImageBorder width(Double value) { return new ImageBorder(color, value); }
   }
 
-  /**
-   * Regions to blur, from those found when the image was processed.
-   *
-   * @param text blur every text region (needs OCR on the upload)
-   * @param personalInformation blur text regions holding personal information
-   * @param faces (preview) blur the faces face detection found (needs face detection on the upload)
-   */
-  public record Redaction(Boolean text, Boolean personalInformation, Boolean faces) {
-    /** No redaction settings. */
-    public Redaction() { this(null, null, null); }
-
-    /** @param value whether to blur every text region @return a copy with this setting */
-    public Redaction text(Boolean value) { return new Redaction(value, personalInformation, faces); }
-
-    /** @param value whether to blur text regions holding personal information @return a copy with this setting */
-    public Redaction personalInformation(Boolean value) { return new Redaction(text, value, faces); }
-
-    /** @param value (preview) whether to blur the faces face detection found @return a copy with this setting */
-    public Redaction faces(Boolean value) { return new Redaction(text, personalInformation, value); }
-  }
-
   /** What an image transform trims: a uniform border ({@link #border()}) or edges ({@link #edges(TrimEdges)}). */
   @JsonAdapter(Trim.Adapter.class)
   public static final class Trim {
@@ -908,7 +887,6 @@ public final class Models {
     private Boolean anim;
     private String background;
     private Double blur;
-    private Redaction redact;
     private ImageBorder border;
     private Double brightness;
     private Double contrast;
@@ -954,10 +932,6 @@ public final class Models {
     public ImageTransformOptions blur(Double value) { blur = value; return this; }
     /** @return The blur radius. */
     public Double blur() { return blur; }
-    /** @param value Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged. @return these options */
-    public ImageTransformOptions redact(Redaction value) { redact = value; return this; }
-    /** @return Blurs regions found when the image was processed, before any other option applies. Text regions need OCR on the upload. An image without such regions is served unchanged. */
-    public Redaction redact() { return redact; }
     /** @param value A border drawn around the image. @return these options */
     public ImageTransformOptions border(ImageBorder value) { border = value; return this; }
     /** @return A border drawn around the image. */
@@ -1950,7 +1924,7 @@ public final class Models {
    *
    * @param status {@code evaluated} or {@code not-evaluated}
    * @param reason why the feature was not evaluated: {@code not-supported}, {@code unavailable} or {@code in-children}
-   * @param textRegions the text regions found in the image; {@code redact} transform options blur them
+   * @param textRegions the text regions found in the image
    */
   public record OcrResult(String status, String reason, List<TextRegion> textRegions) {
     /** Copies collections so the record stays immutable. */
@@ -2057,7 +2031,7 @@ public final class Models {
   public record ProvenanceSignal(String kind, String value) {}
 
   /**
-   * A text region found by OCR; {@code redact} transform options blur these.
+   * A text region found by OCR.
    *
    * @param box where the text is in the image
    * @param personalInformation whether the region holds personal information

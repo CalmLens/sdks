@@ -434,8 +434,7 @@ module CalmLens
   }
   # Where OCR found text in an image, and whether it is personal information.
   type text_region = { "box" => bounding_box, "personalInformation" => bool }
-  # `status: "evaluated"` carries `textRegions`, where OCR found text (redaction transforms blur
-  # these regions); `"not-evaluated"` carries `reason`. The text itself is `content.extractedText`.
+  # `status: "evaluated"` carries `textRegions`, where OCR found text; `"not-evaluated"` carries `reason`. The text itself is `content.extractedText`.
   type ocr_result = {
     "status" => "evaluated" | "not-evaluated",
     ?"textRegions" => Array[text_region],
@@ -543,11 +542,6 @@ module CalmLens
     ?anim: bool,
     ?background: String,
     ?blur: number,
-    ?redact: {
-      ?text: bool,
-      ?personalInformation: bool,
-      ?faces: bool
-    },
     ?border: {
       ?color: String,
       ?width: number
@@ -590,11 +584,6 @@ module CalmLens
     ?"anim" => bool,
     ?"background" => String,
     ?"blur" => number,
-    ?"redact" => {
-      ?"text" => bool,
-      ?"personalInformation" => bool,
-      ?"faces" => bool
-    },
     ?"border" => {
       ?"color" => String,
       ?"width" => number

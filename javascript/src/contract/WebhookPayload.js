@@ -512,7 +512,7 @@ const createFeatureResultSchema = (name, description, shape) => zod.discriminate
 	description,
 	namedType: name
 })]));
-const OCR_RESULT_SCHEMA = createFeatureResultSchema("OcrResult", "What OCR found in the image. Its text is `content.extractedText`.", { textRegions: zod.array(TEXT_REGION_SCHEMA).max(200).describe("Where OCR found text, and personal information within it. Redaction transforms blur these regions. Empty when the image has no text.") });
+const OCR_RESULT_SCHEMA = createFeatureResultSchema("OcrResult", "What OCR found in the image. Its text is `content.extractedText`.", { textRegions: zod.array(TEXT_REGION_SCHEMA).max(200).describe("Where OCR found text, and personal information within it. Empty when the image has no text.") });
 const PERSON_DETECTION_RESULT_SCHEMA = createFeatureResultSchema("PersonDetectionResult", "Preview. The people person detection found", { people: zod.array(DETECTED_PERSON_SCHEMA) });
 const FACE_DETECTION_RESULT_SCHEMA = createFeatureResultSchema("FaceDetectionResult", "Preview. The faces face detection found", { faces: zod.array(DETECTED_FACE_SCHEMA) });
 const DETECTED_QR_CODE_SCHEMA = zod.object({
@@ -1250,6 +1250,7 @@ const STORED_ASSET_SCHEMA = zod.object({
 	context: USED_MODERATION_CONTEXT_SCHEMA.nullish(),
 	previewImage: PREVIEW_IMAGE_SCHEMA.nullish().describe("The still image served at the preview resource: an image's own picture (or its converted HEIC), a document's first page, a website's screenshot, a video's poster or an audio waveform"),
 	renderedMedia: RENDERED_MEDIA_SCHEMA.nullish().describe("Browser-safe copy of an audio or video upload, served at the rendered resource; `null` until processing makes one"),
+	renderFailedStorageId: saneStringField().nullish().describe("The `storageId` of the upload whose browser rendering failed for good, so a newer upload is never marked by it. Stored only."),
 	storageId: saneStringField().nullish().describe("Internal storage key of the retained content; `null` when nothing is stored"),
 	uploadPartsReceived: zod.number().int().nullish().describe("Number of parts received so far for a multipart upload"),
 	type: ASSET_TYPE_SCHEMA.describe("Asset type, detected from the content's MIME type"),
