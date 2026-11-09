@@ -1369,33 +1369,47 @@ impl AssetsClient<'_> {
     /// decisions without polling.
     pub async fn wait_for_decision(&self, options: WaitForDecision) -> Result<Asset> {
         let timeout = options.timeout.unwrap_or(DEFAULT_DECISION_TIMEOUT);
-        let asset_id = AssetId::new(options.asset_id);
+        let options_asset_id = options.asset_id;
+        let asset_id = AssetId::new(options_asset_id.clone());
         // A timeout too large to add to the clock never runs out.
         let transport = &self.0.inner.transport;
         let deadline = transport.now().checked_add(timeout);
         let mut delay = DECISION_POLL_FIRST_INTERVAL;
+        let mut details = serde_json::Map::new();
+        details.insert("assetId".into(), options_asset_id.into());
+        details.insert("classificationStatus".into(), serde_json::Value::Null);
+        details.insert("moderationStatus".into(), serde_json::Value::Null);
+        let remaining =
+            || deadline.map(|deadline| deadline.saturating_duration_since(transport.now()));
         loop {
-            let asset = self.retrieve(asset_id.clone()).await?;
+            let request = self.retrieve(asset_id.clone());
+            let result = match remaining() {
+                Some(Duration::ZERO) if !timeout.is_zero() => break,
+                Some(left) if !timeout.is_zero() => match tokio::time::timeout(left, request).await
+                {
+                    Ok(result) => result,
+                    Err(_) => break,
+                },
+                _ => request.await,
+            };
+            let remaining = remaining();
+            if !timeout.is_zero() && remaining == Some(Duration::ZERO) {
+                break;
+            }
+            let asset = result?;
             if asset.is_decided() {
                 return Ok(asset);
             }
-            let remaining =
-                deadline.map(|deadline| deadline.saturating_duration_since(transport.now()));
+            details.insert(
+                "classificationStatus".into(),
+                asset.classification.status.as_str().into(),
+            );
+            details.insert(
+                "moderationStatus".into(),
+                asset.classification.moderation.status.as_str().into(),
+            );
             if remaining == Some(Duration::ZERO) {
-                let processing = asset.classification.status.as_str();
-                let moderation = asset.classification.moderation.status.as_str();
-                let mut details = serde_json::Map::new();
-                details.insert("assetId".into(), asset.id.clone().into());
-                details.insert("classificationStatus".into(), processing.into());
-                details.insert("moderationStatus".into(), moderation.into());
-                return Err(Error::new(
-                    ErrorCode::Timeout,
-                    format!(
-                        "Asset {} had no moderation decision after {timeout:?} (processing {processing}, moderation {moderation})",
-                        asset.id
-                    ),
-                )
-                .with_details(details));
+                break;
             }
             transport
                 .sleep(remaining.map_or(delay, |remaining| remaining.min(delay)))
@@ -1404,6 +1418,11 @@ impl AssetsClient<'_> {
                 .mul_f64(DECISION_POLL_INTERVAL_FACTOR)
                 .min(DECISION_POLL_MAX_INTERVAL);
         }
+        Err(Error::new(
+            ErrorCode::Timeout,
+            format!("No moderation decision within {timeout:?}"),
+        )
+        .with_details(details))
     }
     /// Updates an asset; [`Patch::Missing`] fields are left unchanged.
     pub async fn update(&self, options: UpdateAsset) -> Result<Asset> {
@@ -2294,7 +2313,7 @@ impl AssetLocation<'_> {
             None if selected => {
                 return Err(invalid_argument(
                     "A lens or transform needs a resource, such as rendered",
-                ))
+                ));
             }
             None => {}
             Some(resource) => {

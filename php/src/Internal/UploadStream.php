@@ -27,6 +27,7 @@ final class UploadStream implements StreamInterface
     public function getSize(): ?int { return $this->size; }
     public function tell(): int { return $this->position; }
     public function eof(): bool { return $this->size === null ? $this->stream->eof() : $this->position === $this->size; }
+    public function isSeekable(): bool { return $this->size !== null && $this->stream->isSeekable(); }
     public function isWritable(): bool { return false; }
     public function write(string $string): int { throw new \RuntimeException('Upload stream is read-only'); }
     public function rewind(): void { $this->seek(0); }

@@ -128,6 +128,26 @@ final class ClientTest extends TestCase
         self::assertMatchesRegularExpression('/^[a-f0-9-]{36}$/', $calls[0][1]);
     }
 
+    public function testUnsizedSeekableStreamReturnsTheApiErrorWithoutRetrying(): void
+    {
+        $stream = new class (Utils::streamFor('payload')) implements \Psr\Http\Message\StreamInterface {
+            use \GuzzleHttp\Psr7\StreamDecoratorTrait;
+
+            public function __construct(private \Psr\Http\Message\StreamInterface $stream) {}
+            public function getSize(): ?int { return null; }
+        };
+        $calls = 0;
+        $client = new ServerClient('key', 'p', maxRetries: 1, httpClient: new Client(['handler' => function ($request) use (&$calls) {
+            ++$calls;
+            self::assertStringContainsString('payload', $request->getBody()->getContents());
+            return Create::promiseFor(new Response(503, ['Retry-After' => '0'], '{"code":"server/unavailable"}'));
+        }]));
+        $error = $this->error('server/unavailable', fn () => $client->assets->create(
+            ['name' => 'x', 'content' => ['type' => 'text/plain', 'data' => $stream]]));
+        self::assertSame(503, $error->status);
+        self::assertSame(1, $calls);
+    }
+
     public function testUnsizedStreamDetectsShortAndLongBodies(): void
     {
         foreach ([2, 4] as $size) {

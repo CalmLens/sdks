@@ -439,21 +439,36 @@ final class Assets extends Resource
         Values::segment($options['assetId'] ?? null);
         $deadline = ($this->session->clock)() + $timeout;
         $delay = self::DECISION_FIRST_INTERVAL;
+        [$api, $request] = $this->split($options, 'retrieve');
+        $path = $this->path($api, 'assets', 'assetId');
+        $classification = [];
+        $status = null;
         do {
-            $asset = $this->retrieve($options);
+            try {
+                $asset = $this->session->request('GET', $path, options: $request, deadline: $timeout > 0 ? $deadline : null);
+            } catch (CalmLensException $error) {
+                if ($error->errorCode !== 'sdk/timeout' || $timeout == 0 || ($this->session->clock)() < $deadline) {
+                    throw $error;
+                }
+                break;
+            }
+            $remaining = $deadline - ($this->session->clock)();
+            if ($timeout > 0 && $remaining <= 0) {
+                break;
+            }
             $classification = $asset['classification'] ?? [];
             $status = $classification['moderation']['status'] ?? null;
             if (in_array($classification['status'] ?? null, ['completed', 'failed'], true)) {
                 return $asset;
             }
-            $remaining = $deadline - ($this->session->clock)();
             if ($remaining <= 0) {
-                throw CalmLensException::create('sdk/timeout', "Asset {$options['assetId']} had no moderation decision after {$timeout}s",
-                    details: ['assetId' => $asset['id'] ?? $options['assetId'], 'classificationStatus' => $classification['status'] ?? null, 'moderationStatus' => $status]);
+                break;
             }
             ($this->session->sleep)(min($delay, $remaining));
             $delay = min($delay * self::DECISION_INTERVAL_FACTOR, self::DECISION_MAX_INTERVAL);
         } while (true);
+        throw CalmLensException::create('sdk/timeout', "Asset {$options['assetId']} had no moderation decision after {$timeout}s",
+            details: ['assetId' => $options['assetId'], 'classificationStatus' => $classification['status'] ?? null, 'moderationStatus' => $status]);
     }
 
     /**

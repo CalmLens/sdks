@@ -438,7 +438,7 @@ class WaitForDecisionTests(ClientTestCase):
         self.assertEqual(raised.exception.details,
                          {"assetId": "asset-1", "classificationStatus": "processing", "moderationStatus": "pending"})
         self.assertEqual(self.sleeps, [0.5, 0.75, 1.125, 1.6875] + [2.0] * 7 + [1.9375])
-        self.assertEqual(len(self.calls), 13)
+        self.assertEqual(len(self.calls), 12)
 
     def test_keeps_waiting_while_the_asset_is_queued_or_processing_even_once_a_reviewer_decided_it(self):
         def asset(classification, moderation):

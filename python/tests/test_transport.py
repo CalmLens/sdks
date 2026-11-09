@@ -153,6 +153,43 @@ class DefaultTransportFailureTests(unittest.TestCase):
         self.assertEqual(error.code, 'sdk/transport-error')
         self.assertIsInstance(error.__cause__, http.client.IncompleteRead)
 
+    def test_cdn_iteration_rejects_a_truncated_body(self):
+        server = _RawServer(lambda c: c.sendall(
+            b'HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nabc'))
+        try:
+            with CalmLensServerClient(api_key='key', project_id='project', cdn_base_url=server.url) as client:
+                with client.cdn.serve(asset_id='asset') as response:
+                    chunks = response.iter_bytes(chunk_size=3)
+                    self.assertEqual(next(chunks), b'abc')
+                    with self.assertRaises(CalmLensError) as raised:
+                        next(chunks)
+                    self.assertEqual(raised.exception.code, 'sdk/transport-error')
+        finally:
+            server.close()
+
+    def test_decision_deadline_interrupts_a_drip_fed_response(self):
+        def handler(connection):
+            body = b'{"id":"asset","classification":{"status":"completed","moderation":{"status":"allowed"}}}'
+            try:
+                connection.sendall(f'HTTP/1.1 200 OK\r\nContent-Length: {len(body)}\r\n\r\n'.encode())
+                for offset in range(0, len(body), 10):
+                    connection.sendall(body[offset:offset + 10])
+                    time.sleep(.02)
+            except OSError:
+                pass
+
+        server = _RawServer(handler)
+        try:
+            with CalmLensServerClient(api_key='key', project_id='project', base_url=server.url,
+                                      max_retries=0) as client:
+                with self.assertRaises(CalmLensError) as raised:
+                    client.assets.wait_for_decision(asset_id='asset', timeout=.08)
+                self.assertEqual(raised.exception.code, 'sdk/timeout')
+                self.assertEqual(raised.exception.details, {
+                    'assetId': 'asset', 'classificationStatus': None, 'moderationStatus': None})
+        finally:
+            server.close()
+
     def test_malformed_status_line(self):
         error = self.request(lambda c: c.sendall(b'NOT HTTP\r\n\r\n'))
         self.assertEqual(error.code, 'sdk/transport-error')

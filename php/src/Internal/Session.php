@@ -76,7 +76,7 @@ final class Session
      * marks a binary upload, whose deadline is `uploadTimeout` (none unless set).
      */
     public function request(string $method, string $path, array $query = [], mixed $body = null,
-        ?StreamInterface $raw = null, array $headers = [], bool $idempotent = false, array $options = [], bool $upload = false): mixed
+        ?StreamInterface $raw = null, array $headers = [], bool $idempotent = false, array $options = [], bool $upload = false, ?float $deadline = null): mixed
     {
         $url = $this->baseUrl . $path;
         $params = Values::query($query);
@@ -99,7 +99,7 @@ final class Session
         if ($upload) {
             $settings['timeout'] = $options['uploadTimeout'] ?? $options['timeout'] ?? $this->defaults['uploadTimeout'] ?? null;
         }
-        $response = $this->execute($method, $url, $headers, $raw, $settings);
+        $response = $this->execute($method, $url, $headers, $raw, $settings, deadline: $deadline);
         $status = $response->getStatusCode();
         $bytes = $this->readBounded($response, $settings['maxResponseBytes']);
         if ($bytes === '' && ($status === 204 || $method === 'DELETE')) {
@@ -177,7 +177,7 @@ final class Session
     }
 
     /** `$apiKey` false sends the request without the API key, as a browser loading a CDN URL. */
-    private function execute(string $method, string $url, array $headers, ?StreamInterface $body, array $settings, bool $cdn = false, bool $apiKey = true): ResponseInterface
+    private function execute(string $method, string $url, array $headers, ?StreamInterface $body, array $settings, bool $cdn = false, bool $apiKey = true, ?float $deadline = null): ResponseInterface
     {
         foreach ($headers as $key => $_) {
             if (in_array(strtolower((string) $key), ['x-api-key', 'user-agent', 'authorization'], true)) {
@@ -192,12 +192,14 @@ final class Session
         $retryable = (in_array($method, ['GET', 'HEAD'], true) || isset($headers['Idempotency-Key']))
             && ($body === null || $body->isSeekable());
         for ($attempt = 0; ; $attempt++) {
+            $remaining = $this->decisionTimeLeft($deadline);
+            $attemptTimeout = $remaining === null ? $settings['timeout'] : min($remaining, $settings['timeout'] ?? INF);
             $again = $retryable && $attempt < $settings['maxRetries'];
             try {
                 $response = $this->http->send(new Request($method, $url, $headers, $body), [
                     'http_errors' => false, 'allow_redirects' => false,
-                    'timeout' => $settings['timeout'] ?? 0, 'connect_timeout' => $settings['connectTimeout'],
-                    'read_timeout' => $settings['timeout'] ?? 0, 'stream' => $cdn,
+                    'timeout' => $attemptTimeout ?? 0, 'connect_timeout' => min($settings['connectTimeout'], $remaining ?? INF),
+                    'read_timeout' => $attemptTimeout ?? 0, 'stream' => $cdn,
                 ]);
             } catch (\InvalidArgumentException $error) {
                 throw CalmLensException::create('sdk/invalid-argument', $error->getMessage(), previous: $error);
@@ -208,9 +210,13 @@ final class Session
                 if (!$again) {
                     throw $failure;
                 }
-                $this->wait(self::retryDelayMs($attempt));
+                $this->wait(self::retryDelayMs($attempt), $deadline);
                 $body?->rewind();
                 continue;
+            }
+            if ($deadline !== null && ($this->clock)() >= $deadline) {
+                $response->getBody()->close();
+                throw CalmLensException::create('sdk/timeout', 'Decision deadline expired');
             }
             $status = $response->getStatusCode();
             // Redirects are never followed: they could send the API key to another origin.
@@ -237,14 +243,26 @@ final class Session
             if (!$again || !$error->isRetryable() || $delay > self::RETRY_AFTER_MAX_MS) {
                 throw $error;
             }
-            $this->wait($delay);
+            $this->wait($delay, $deadline);
             $body?->rewind();
         }
     }
 
-    private function wait(int $milliseconds): void
+    private function decisionTimeLeft(?float $deadline): ?float
     {
-        ($this->sleep)($milliseconds / 1000);
+        if ($deadline === null) {
+            return null;
+        }
+        $remaining = $deadline - ($this->clock)();
+        if ($remaining <= 0) {
+            throw CalmLensException::create('sdk/timeout', 'Decision deadline expired');
+        }
+        return $remaining;
+    }
+
+    private function wait(int $milliseconds, ?float $deadline = null): void
+    {
+        ($this->sleep)(min($milliseconds / 1000, $this->decisionTimeLeft($deadline) ?? INF));
     }
 
     /** Reads at most `$limit` bytes, failing with `sdk/response-too-large` beyond that, or for a larger declared length. */

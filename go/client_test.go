@@ -655,8 +655,8 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 	if !errors.As(err, &failure) || failure.Code != CodeSDKTimeout || failure.Details["assetId"] != "a" || failure.Details["classificationStatus"] != ClassificationStatusProcessing || failure.Details["moderationStatus"] != ModerationStatusPending {
 		t.Fatal(err)
 	}
-	// The last wait is cut short so the final check lands on the deadline.
-	if len(h.calls) != 4 || fmt.Sprint(h.slept) != "[500ms 750ms 750ms]" {
+	// The last wait is cut short and no request starts at the deadline.
+	if len(h.calls) != 3 || fmt.Sprint(h.slept) != "[500ms 750ms 750ms]" {
 		t.Fatal(len(h.calls), h.slept)
 	}
 	// The default timeout is 60s, and waits grow by 1.5 up to 2s.
@@ -669,7 +669,7 @@ func TestWaitForDecisionTimesOutWithTheLastStatus(t *testing.T) {
 	for _, d := range h.slept {
 		total += d
 	}
-	if fmt.Sprint(h.slept[:6]) != "[500ms 750ms 1.125s 1.6875s 2s 2s]" || h.slept[len(h.slept)-1] != 1937500*time.Microsecond || total != 60*time.Second || len(h.calls) != len(h.slept)+1 {
+	if fmt.Sprint(h.slept[:6]) != "[500ms 750ms 1.125s 1.6875s 2s 2s]" || h.slept[len(h.slept)-1] != 1937500*time.Microsecond || total != 60*time.Second || len(h.calls) != len(h.slept) {
 		t.Fatal(h.slept, total, len(h.calls))
 	}
 	h.calls = nil
@@ -697,6 +697,23 @@ func TestWaitForDecisionWaitsWhileQueuedOrProcessingEvenOnceDecided(t *testing.T
 	h.calls, h.next = nil, []reply{asset(ClassificationStatusFailed, ModerationStatusPending)}
 	if got, err = c.Assets.WaitForDecision(context.Background(), WaitForDecisionOptions{AssetID: "a"}); err != nil || got.Classification.Status != ClassificationStatusFailed || len(h.calls) != 1 {
 		t.Fatal(got, err, len(h.calls))
+	}
+}
+
+func TestWaitForDecisionCancelsTheInFlightLookup(t *testing.T) {
+	c, _ := setup(t)
+	requests := 0
+	c.http.Transport = roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		requests++
+		<-request.Context().Done()
+		return nil, request.Context().Err()
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err := c.Assets.WaitForDecision(ctx, WaitForDecisionOptions{AssetID: "a", Timeout: Ptr(50 * time.Millisecond)})
+	var failure *Error
+	if !errors.As(err, &failure) || failure.Code != CodeSDKTimeout || failure.Details["assetId"] != "a" || requests != 1 || ctx.Err() != nil {
+		t.Fatal(err, requests, ctx.Err())
 	}
 }
 

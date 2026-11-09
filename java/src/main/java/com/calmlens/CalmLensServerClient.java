@@ -957,25 +957,39 @@ public final class CalmLensServerClient implements AutoCloseable {
    * retrying when allowed. A 2xx reply is returned; anything else is thrown.
    */
   private Reply execute(Call call) {
+    return execute(call, null);
+  }
+
+  private Reply execute(Call call, java.util.function.LongSupplier remainingBudget) {
     for (int attempt = 0; ; attempt++) {
+      Duration attemptTimeout = call.timeout();
+      if (remainingBudget != null) {
+        Duration budget = Duration.ofNanos(decisionTimeLeft(remainingBudget));
+        if (attemptTimeout == null || budget.compareTo(attemptTimeout) < 0) attemptTimeout = budget;
+      }
+      Call current = new Call(call.method(), call.url(), call.headers(), call.body(), attemptTimeout, call.retryable());
       Transport.Response response;
       byte[] body;
       try {
         long started = System.nanoTime();
-        response = send(call);
+        response = send(current);
         try (response) {
           // A redirect is an HTTP failure like any other: repeating the request redirects again.
           if (isRedirect(response.status()))
             throw new ApiException(ErrorCodes.SDK_HTTP_ERROR, "Unexpected redirect (HTTP " + response.status() + ")", null, response.status(), response.headers(), null);
           if (declaredLength(response) > maxResponseBytes) throw tooLarge(response);
-          body = Timeouts.readAll(response.body(), maxResponseBytes, remaining(call.timeout(), started));
+          body = Timeouts.readAll(response.body(), maxResponseBytes, remaining(current.timeout(), started));
         } catch (IOException failure) {
           throw transportError(failure);
         }
       } catch (TransportException failure) {
-        if (canRetry(call, attempt) && !Thread.currentThread().isInterrupted()) { pause(retryDelay(attempt, ThreadLocalRandom.current().nextDouble())); continue; }
+        if (canRetry(call, attempt) && !Thread.currentThread().isInterrupted()) {
+          pauseWithinBudget(retryDelay(attempt, ThreadLocalRandom.current().nextDouble()), remainingBudget);
+          continue;
+        }
         throw failure;
       }
+      if (remainingBudget != null) decisionTimeLeft(remainingBudget);
       if (body == null) throw tooLarge(response);
       Reply reply = parse(response, body);
       if (reply.status() >= 200 && reply.status() < 300) return reply;
@@ -983,12 +997,26 @@ public final class CalmLensServerClient implements AutoCloseable {
       if (canRetry(call, attempt) && error.isRetryable()) {
         Duration wait = error.getRetryAfter().isPresent() ? error.getRetryAfter().get() : retryDelay(attempt, ThreadLocalRandom.current().nextDouble());
         if (wait.compareTo(RETRY_AFTER_MAX) <= 0) {
-          pause(wait);
+          pauseWithinBudget(wait, remainingBudget);
           continue;
         }
       }
       throw error;
     }
+  }
+
+  private static long decisionTimeLeft(java.util.function.LongSupplier remainingBudget) {
+    long left = remainingBudget.getAsLong();
+    if (left <= 0) throw new RequestTimeoutException("Decision deadline expired", null);
+    return left;
+  }
+
+  private void pauseWithinBudget(Duration delay, java.util.function.LongSupplier remainingBudget) {
+    if (remainingBudget != null) {
+      Duration left = Duration.ofNanos(decisionTimeLeft(remainingBudget));
+      if (left.compareTo(delay) < 0) delay = left;
+    }
+    pause(delay);
   }
 
   private static String errorCode(JsonElement json) {
@@ -1472,22 +1500,27 @@ public final class CalmLensServerClient implements AutoCloseable {
       long limitNanos;
       try { limitNanos = limit.toNanos(); } catch (ArithmeticException tooLong) { limitNanos = Long.MAX_VALUE; }
       long started = nanoTime.getAsLong();
+      long budget = limitNanos;
+      java.util.function.LongSupplier timeLeft = () -> budget - (nanoTime.getAsLong() - started);
+      String path = baseUrl + "/assets/" + id(assetId);
+      Call lookup = new Call("GET", path, baseHeaders("application/json"), null, timeout, true);
+      Models.Asset last = null;
       long delay = DECISION_POLL_FIRST_DELAY.toNanos();
       for (;;) {
         if (Thread.currentThread().isInterrupted())
           throw new CalmLensException(ErrorCodes.SDK_CANCELLED, "Interrupted while waiting for a decision");
-        Models.Asset asset = retrieve(new Models.AssetId(assetId));
-        if (isSettled(asset)) return asset;
-        long remaining = limitNanos - (nanoTime.getAsLong() - started);
-        if (remaining <= 0) {
-          String processing = asset.classification().status().value(), moderation = asset.classification().moderation().status().value();
-          Map<String, Object> details = new LinkedHashMap<>();
-          details.put("assetId", asset.id());
-          details.put("classificationStatus", processing);
-          details.put("moderationStatus", moderation);
-          throw new CalmLensException(ErrorCodes.SDK_TIMEOUT, "Asset " + asset.id() + " had no moderation decision after "
-              + limit.toMillis() + "ms (processing " + processing + ", moderation " + moderation + ")", details, null);
+        Models.Asset asset;
+        try {
+          asset = decode(execute(lookup, limit.isZero() ? null : timeLeft), Models.Asset.class);
+        } catch (RequestTimeoutException failure) {
+          if (limit.isZero() || timeLeft.getAsLong() > 0) throw failure;
+          break;
         }
+        long remaining = timeLeft.getAsLong();
+        if (!limit.isZero() && remaining <= 0) break;
+        if (isSettled(asset)) return asset;
+        last = asset;
+        if (remaining <= 0) break;
         try {
           sleeper.sleep(Duration.ofNanos(Math.min(delay, remaining)));
         } catch (InterruptedException interrupted) {
@@ -1496,6 +1529,11 @@ public final class CalmLensServerClient implements AutoCloseable {
         }
         delay = Math.min(DECISION_POLL_MAX_DELAY.toNanos(), Math.round(delay * DECISION_POLL_DELAY_FACTOR));
       }
+      Map<String, Object> details = new LinkedHashMap<>();
+      details.put("assetId", assetId);
+      details.put("classificationStatus", last == null ? null : last.classification().status().value());
+      details.put("moderationStatus", last == null ? null : last.classification().moderation().status().value());
+      throw new CalmLensException(ErrorCodes.SDK_TIMEOUT, "Asset " + assetId + " did not settle within " + limit, details, null);
     }
 
     /** Whether the asset is settled: its {@code classification.status} is {@code completed} or {@code failed}. */

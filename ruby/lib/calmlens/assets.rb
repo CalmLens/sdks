@@ -359,24 +359,31 @@ module CalmLens
     def poll_for_decision(asset_id, request_options, timeout)
       deadline = @session.monotonic + timeout
       delay = DECISION_POLL_FIRST_DELAY
+      processing = moderation = nil
       loop do
-        asset = retrieve('assetId' => asset_id, 'request_options' => request_options)
+        remaining = deadline - @session.monotonic
+        break if timeout.positive? && !remaining.positive?
+
+        # The outer deadline covers transport retries and the entire response read.
+        asset = ::Timeout.timeout(timeout.zero? ? nil : remaining) do
+          retrieve('assetId' => asset_id, 'request_options' => request_options)
+        end
+        remaining = deadline - @session.monotonic
+        break if timeout.positive? && !remaining.positive?
+
         processing = asset.dig('classification', 'status')
         moderation = asset.dig('classification', 'moderation', 'status')
         return asset if SETTLED_STATUSES.include?(processing)
-
-        remaining = deadline - @session.monotonic
-        unless remaining.positive?
-          raise TimeoutError.new(SdkErrorCodes::TIMEOUT,
-                                 "Asset #{asset['id']} was not settled after #{timeout}s " \
-                                 "(processing #{processing}, moderation #{moderation})",
-                                 details: { 'assetId' => asset['id'], 'classificationStatus' => processing,
-                                            'moderationStatus' => moderation })
-        end
+        break unless remaining.positive?
 
         sleep([delay, remaining].min)
         delay = [delay * DECISION_POLL_FACTOR, DECISION_POLL_MAX_DELAY].min
       end
+      raise ::Timeout::Error
+    rescue ::Timeout::Error
+      raise TimeoutError.new(SdkErrorCodes::TIMEOUT, "Asset #{asset_id} was not settled after #{timeout}s",
+                             details: { 'assetId' => asset_id, 'classificationStatus' => processing,
+                                        'moderationStatus' => moderation })
     end
 
     def submit(options, request_options, wait)

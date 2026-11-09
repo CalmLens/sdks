@@ -124,28 +124,52 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 		return nil, invalid(CodeSDKInvalidArgument, "Timeout cannot be negative")
 	}
 	deadline := s.c.now().Add(timeout)
+	pollCtx := ctx
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		pollCtx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	delay := decisionPollFirstDelay
+	var last *Asset
+	timedOut := func() (*Asset, error) {
+		details := JSON{"assetId": options.AssetID, "classificationStatus": nil, "moderationStatus": nil}
+		if last != nil {
+			details["classificationStatus"] = last.Classification.Status
+			details["moderationStatus"] = last.Classification.Moderation.Status
+		}
+		return nil, &Error{Code: CodeSDKTimeout, Message: "Asset " + options.AssetID + " did not settle within " + timeout.String(), Details: details}
+	}
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, transportError(err)
 		}
-		asset, err := s.Retrieve(ctx, AssetIDOptions{AssetID: options.AssetID})
+		if timeout > 0 && (pollCtx.Err() != nil || !s.c.now().Before(deadline)) {
+			return timedOut()
+		}
+		asset, err := s.Retrieve(pollCtx, AssetIDOptions{AssetID: options.AssetID})
+		if ctx.Err() != nil {
+			return nil, transportError(ctx.Err())
+		}
+		if timeout > 0 && (pollCtx.Err() != nil || !s.c.now().Before(deadline)) {
+			return timedOut()
+		}
 		if err != nil {
 			return nil, err
 		}
+		last = asset
 		switch {
 		case asset.Classification.Status == ClassificationStatusCompleted, asset.Classification.Status == ClassificationStatusFailed:
 			return asset, nil
 		}
 		remaining := deadline.Sub(s.c.now())
 		if remaining <= 0 {
-			return nil, &Error{
-				Code:    CodeSDKTimeout,
-				Message: "Asset " + asset.ID + " had no moderation decision after " + timeout.String() + " (processing " + asset.Classification.Status + ", moderation " + asset.Classification.Moderation.Status + ")",
-				Details: JSON{"assetId": asset.ID, "classificationStatus": asset.Classification.Status, "moderationStatus": asset.Classification.Moderation.Status},
-			}
+			return timedOut()
 		}
-		if err = s.c.sleep(ctx, min(delay, remaining)); err != nil {
+		if err = s.c.sleep(pollCtx, min(delay, remaining)); err != nil {
+			if ctx.Err() == nil && pollCtx.Err() != nil {
+				return timedOut()
+			}
 			return nil, transportError(err)
 		}
 		delay = min(decisionPollMaxDelay, time.Duration(float64(delay)*decisionPollFactor))

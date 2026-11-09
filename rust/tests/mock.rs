@@ -724,8 +724,8 @@ async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
         Value::Object(error.details().clone()),
         json!({"assetId": "asset-1", "classificationStatus": "processing", "moderationStatus": "pending"})
     );
-    // Checks at 0, 0.5, 1.25 and 2.375s, then a shortened wait so the last check is at 3s.
-    assert_eq!(mock.requests().len(), 5);
+    // Checks at 0, 0.5, 1.25 and 2.375s, then stop at the 3s deadline.
+    assert_eq!(mock.requests().len(), 4);
     assert_eq!(mock.elapsed(), std::time::Duration::from_secs(3));
 }
 

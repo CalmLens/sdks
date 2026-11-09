@@ -15,6 +15,7 @@ import queue
 import random
 import re
 import select
+import socket
 import threading
 import time
 import uuid
@@ -424,8 +425,9 @@ def _retry_delay(attempt: int) -> float:
 
 class _PooledResponse:
     def __init__(self, response: http.client.HTTPResponse, connection: http.client.HTTPConnection,
-                 pool: _ConnectionPool):
+                 pool: _ConnectionPool, stop_deadline: Callable[[], bool] | None = None):
         self._response: http.client.HTTPResponse = response
+        self._stop_deadline = stop_deadline
         self._connection: http.client.HTTPConnection | None = connection
         self._pool = pool
         self.status, self.headers = response.status, response.headers
@@ -438,13 +440,19 @@ class _PooledResponse:
             raise
         if self._response.isclosed() and self._connection is not None:
             connection, self._connection = self._connection, None
-            self._pool.release(connection, not self._response.will_close)
+            expired = self._stop_deadline is not None and self._stop_deadline()
+            self._pool.release(connection, not expired and not self._response.will_close
+                               and not self._response.length)
+            if expired:
+                raise TimeoutError("Decision deadline expired")
         return data
 
     def close(self) -> None:
         self._response.close()
         if self._connection is not None:
             connection, self._connection = self._connection, None
+            if self._stop_deadline is not None:
+                self._stop_deadline()
             self._pool.release(connection, False)
 
     def __enter__(self) -> _PooledResponse:
@@ -534,7 +542,9 @@ class _Transport:
             self.pools = {}
             self.pid = os.getpid()
 
-    def __call__(self, request: Request, timeout: float) -> _PooledResponse:
+    def __call__(self, request: Request, timeout: float, *,
+                 decision_budget: float | None = None) -> _PooledResponse:
+        deadline = None if decision_budget is None else time.monotonic() + decision_budget
         self._after_fork()
         url = urlsplit(request.full_url)
         if url.scheme not in ("http", "https") or not url.hostname:
@@ -581,17 +591,51 @@ class _Transport:
                 connection.set_tunnel(url.hostname, url.port or 443, headers=proxy_headers)  # type: ignore[arg-type]
             return connection
 
+        def remaining() -> float:
+            if deadline is None:
+                return math.inf
+            left = deadline - time.monotonic()
+            if left <= 0:
+                raise TimeoutError("Decision deadline expired")
+            return left
+
         def send(connection: http.client.HTTPConnection) -> _PooledResponse:
+            timer = None
+            expired = threading.Event()
+
+            def stop_deadline() -> bool:
+                if timer is not None:
+                    timer.cancel()
+                    timer.join()
+                return expired.is_set()
+
             try:
                 if connection.sock is None:
-                    connection.timeout = self.connect_timeout
+                    connection.timeout = min(self.connect_timeout, remaining())
                     connection.connect()
                 connection.timeout = timeout
-                connection.sock.settimeout(timeout)
+                sock = connection.sock
+                sock.settimeout(min(timeout, remaining()))
+                if deadline is not None:
+                    def interrupt() -> None:
+                        expired.set()
+                        try:
+                            sock.shutdown(socket.SHUT_RDWR)
+                        except OSError:
+                            pass
+
+                    # Interrupt a drip-fed response. Stop the timer before returning this socket to the pool.
+                    timer = threading.Timer(remaining(), interrupt)
+                    timer.daemon = True
+                    timer.start()
                 connection.request(request.get_method(), target, body=request.data, headers=headers)
-                return _PooledResponse(connection.getresponse(), connection, pool)
+                return _PooledResponse(connection.getresponse(), connection, pool,
+                                       stop_deadline if timer is not None else None)
             except BaseException:
+                timed_out = stop_deadline()
                 pool.release(connection, False)
+                if timed_out:
+                    raise TimeoutError("Decision deadline expired") from None
                 raise
 
         # A stream body cannot be sent twice, so it always gets a new connection.
@@ -1130,7 +1174,8 @@ class CalmLensServerClient:
 
     def _request(self, method: str, path: str, *, query: Mapping[str, Any] | None = None, body: Any = None,
                  raw: _Body | _FormBody | None = None, headers: Mapping[str, str] | None = None,
-                 idempotency_key: str | None = None, timeout: float | None = None) -> Any:
+                 idempotency_key: str | None = None, timeout: float | None = None,
+                 deadline: float | None = None) -> Any:
         request_headers = self._headers(headers)
         if idempotency_key is not None:
             request_headers["Idempotency-Key"] = _header_value("Idempotency-Key", idempotency_key)
@@ -1140,26 +1185,44 @@ class CalmLensServerClient:
         url = self._url(path, query)
         retryable = (method in ("GET", "HEAD") or idempotency_key is not None) and (raw is None or raw.rewindable)
         limit = self.max_response_bytes
+        def remaining() -> float:
+            if deadline is None:
+                return math.inf
+            left = deadline - self._clock()
+            if left <= 0:
+                raise CalmLensTimeoutError(error_codes.SDK_TIMEOUT, "Decision deadline expired")
+            return left
+
+        def pause(delay: float) -> None:
+            self._sleep(min(delay, remaining()))
+
         attempt = 0
         while True:
+            budget = remaining()
+            attempt_timeout = min(self.timeout if timeout is None else timeout, budget)
             can_retry = retryable and attempt < self.max_retries
             request = Request(url, data=raw.open() if raw is not None else None, headers=request_headers, method=method)
             error: CalmLensError | None = None
             content: bytes | None = None
             try:
-                with self.transport(request, self.timeout if timeout is None else timeout) as response:
+                exchange = (self.transport(request, attempt_timeout, decision_budget=budget)
+                            if deadline is not None and isinstance(self.transport, _Transport)
+                            else self.transport(request, attempt_timeout))
+                with exchange as response:
                     status, response_headers = response.status, _response_headers(response)
                     if _is_redirect(status, response_headers):
                         error = _redirect_error(status, response_headers)
                     else:
                         content = _read_body(response, response_headers, limit)
             except _TRANSPORT_ERRORS as cause:
+                remaining()
                 failure = _transport_error(cause)
                 if not can_retry:
                     raise failure from cause
-                self._sleep(_retry_delay(attempt))
+                pause(_retry_delay(attempt))
                 attempt += 1
                 continue
+            remaining()
             if error is None:
                 if content is None:
                     error = _too_large(status, response_headers, limit)
@@ -1176,7 +1239,7 @@ class CalmLensServerClient:
             delay = error.retry_after if error.retry_after is not None else _retry_delay(attempt)
             if not (can_retry and error.is_retryable and delay <= MAX_RETRY_AFTER_SECONDS):
                 raise error
-            self._sleep(delay)
+            pause(delay)
             attempt += 1
 
     @staticmethod
@@ -1427,29 +1490,36 @@ class Assets:
         report decisions without polling.
         """
         merged = _merge("assets.waitForDecision", options, asset_id=asset_id, timeout=timeout)
-        _id(merged.get("assetId"), "assetId")
-        wanted = cast(AssetIdOptions, {"assetId": merged["assetId"]})
+        asset_id = merged.get("assetId")
+        path = "/assets/" + _id(asset_id, "assetId")
         limit = merged.get("timeout", DEFAULT_DECISION_TIMEOUT)
         if isinstance(limit, bool) or not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit < 0:
             raise _invalid("timeout must be a non-negative number of seconds")
         deadline = self._c._clock() + limit
         delay = DECISION_POLL_FIRST_DELAY
+        classification_status = moderation_status = None
         while True:
-            asset = self.retrieve(wanted)
+            try:
+                asset = self._c._request("GET", path, deadline=deadline if limit else None)
+            except CalmLensTimeoutError:
+                if not limit or self._c._clock() < deadline:
+                    raise
+                break
             classification_status = asset["classification"]["status"]
             moderation_status = asset["classification"]["moderation"]["status"]
             if classification_status in ("completed", "failed"):
-                return asset
+                return cast(Asset, asset)
             remaining = deadline - self._c._clock()
             if remaining <= 0:
-                raise CalmLensError(
-                    error_codes.SDK_TIMEOUT,
-                    f"Asset {asset.get('id')} had no moderation decision after {limit:g}s "
-                    f"(processing {classification_status}, moderation {moderation_status})",
-                    {"assetId": asset.get("id"), "classificationStatus": classification_status,
-                     "moderationStatus": moderation_status})
+                break
             self._c._sleep(min(delay, remaining))
             delay = min(DECISION_POLL_MAX_DELAY, delay * DECISION_POLL_DELAY_FACTOR)
+        raise CalmLensError(
+            error_codes.SDK_TIMEOUT,
+            f"Asset {asset_id} had no moderation decision after {limit:g}s "
+            f"(processing {classification_status}, moderation {moderation_status})",
+            {"assetId": asset_id, "classificationStatus": classification_status,
+             "moderationStatus": moderation_status})
 
     def update(self, options: UpdateAssetOptions | None = None, /, *, asset_id: str = _UNSET, name: str = _UNSET,
                description: str | None = _UNSET, tags: List[str] | None = _UNSET,
@@ -2361,7 +2431,7 @@ class CDN:
             can_retry = attempt < self._c.max_retries
             try:
                 response = CDNResponse(self._c.transport(Request(url, headers=headers, method=method),
-                                                         self._c.timeout))
+                                                         self._c.timeout), method=method)
             except _TRANSPORT_ERRORS as error:
                 if not can_retry:
                     raise _transport_error(error) from error
@@ -2387,11 +2457,15 @@ class CDNResponse:
     (``sdk/transport-error`` or ``sdk/timeout``, with the native ``__cause__``) when the
     body cannot be read."""
 
-    def __init__(self, response: TransportResponse):
+    def __init__(self, response: TransportResponse, *, method: str = "GET"):
         self._response = response
         self.status: int = response.status
         #: Response headers with lower-case names.
         self.headers: dict[str, str] = _response_headers(response)
+        length = self.headers.get("content-length", "")
+        has_body = method != "HEAD" and self.status not in (204, 205, 304)
+        self._remaining = (int(length) if has_body and not self.headers.get("transfer-encoding")
+                           and length.isascii() and length.isdecimal() and len(length) <= 20 else None)
 
     def __repr__(self) -> str:
         return f"CDNResponse(status={self.status}, content_type={self.content_type!r})"
@@ -2412,7 +2486,12 @@ class CDNResponse:
     def read(self, amount: int | None = None) -> bytes:
         """Read the rest of the body, or at most ``amount`` bytes."""
         try:
-            return self._response.read() if amount is None else self._response.read(amount)
+            data = self._response.read() if amount is None else self._response.read(amount)
+            if self._remaining is not None:
+                self._remaining -= len(data)
+                if self._remaining > 0 and (amount is None or amount < 0 or amount > 0 and not data):
+                    raise http.client.IncompleteRead(data, self._remaining)
+            return data
         except _TRANSPORT_ERRORS as error:
             self.close()
             raise _transport_error(error) from error
