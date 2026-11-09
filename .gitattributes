@@ -8,6 +8,7 @@
 /Formula export-ignore
 /assets export-ignore
 /biome.json export-ignore
+/bucket export-ignore
 /bun.lock export-ignore
 /dev-pad.config.ts export-ignore
 /examples export-ignore
