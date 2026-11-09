@@ -3069,10 +3069,10 @@ pub struct WebhookEventPayload {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actor: Option<Actor>,
     /// The severity.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub severity: Option<EventSeverity>,
     /// The title.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     /// The description, or `None` when the event has none.
     #[serde(default)]

@@ -124,6 +124,22 @@ func TestADroppedPartIsRetriedWithItsKeyAndAPartTheAPIHasIsSkipped(t *testing.T)
 	}
 }
 
+func TestMultipartResumeStartsAfterThePartsAlreadyRecorded(t *testing.T) {
+	c, h := splitClient(t, 5*mib, uploadReply("uploading", 3), uploadReply("completed", nil))
+	file := fileOf(16 * mib)
+	asset, err := c.Assets.Create(context.Background(), SubmitAssetOptions{
+		Name: "report.pdf", Content: &Content{Type: "application/pdf", Bytes: file},
+		IdempotencyKey: "resume",
+	})
+	if err != nil || asset.Upload.Status != "completed" {
+		t.Fatal(asset, err)
+	}
+	equal(t, "part numbers", sentQuery(h, "partNumber"), []string{"1", "4"})
+	if !bytes.Equal(h.bodies[1], file[15*mib:]) {
+		t.Fatal("resume sent bytes from the wrong offset")
+	}
+}
+
 func TestAFinalPartThatFindsTheUploadCompletedReadsTheAssetBack(t *testing.T) {
 	c, h := splitClient(t, DefaultPartSizeBytes,
 		uploadReply("uploading", 1),

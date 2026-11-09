@@ -794,6 +794,26 @@ describe("MockCalmLensServerClient", () => {
     ).rejects.toMatchObject({ code: PUBLIC_ERROR_CODES.ASSET_NOT_FOUND.getId() });
   });
 
+  it("can let timers drive a mock decision wait", async () => {
+    const client = createClient({ useTimers: true });
+    const asset = await client.assets.create({
+      name: "note.txt",
+      content: { plainText: "hello", type: "text/plain" },
+    });
+    const decision = client.assets.waitForDecision({ assetId: asset.id, timeoutMs: 1000 });
+    const complete = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        void client.completeProcessing(asset.id).then(() => resolve());
+      }, 10);
+    });
+    await Promise.all([
+      complete,
+      expect(decision).resolves.toMatchObject({
+        classification: { moderation: { status: "allowed" } },
+      }),
+    ]);
+  });
+
   it("waits for decisions with a signal, and stops when it aborts", async () => {
     const client = createClient({ moderate: () => "blocked" });
     const asset = await client.assets.create({
@@ -1175,8 +1195,12 @@ describe("MockCalmLensAppClient", () => {
     expect(new Uint8Array(await served.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
     expect((await app.server.cdn.serve({ assetId: bad.id })).status).toBe(403);
     expect((await app.server.cdn.serve({ assetId: bad.id, resource: "placeholder" })).status).toBe(
-      200,
+      403,
     );
+    const blockedUrl = app.server.cdn.getAssetUrl({ assetId: bad.id });
+    await expect(app.server.cdn.getAssetInfo(blockedUrl)).rejects.toMatchObject({
+      code: "asset/not-available",
+    });
   });
 
   it("applies the preset's token, type and size rules with the API's error codes", async () => {

@@ -926,6 +926,7 @@ export class MockCalmLensApi {
     [];
   private requestCount = 0;
   /** Time the clients have spent waiting: mock waits advance it instead of sleeping. */
+  useTimers = false;
   waitedMs = 0;
 
   constructor(options: MockCalmLensApiOptions) {
@@ -3487,14 +3488,8 @@ export class MockCalmLensApi {
     const isHead = request.method === "HEAD";
     const { rendered, preview } = asset.content;
     // Like the CDN, a private asset answers anyone without a grant or the project's API key as an
-    // unknown asset does, whatever its state. Its placeholder is public.
-    if (
-      asset.visibility !== "public" &&
-      !grant &&
-      !hasApiKey &&
-      resource !== "placeholder" &&
-      resource !== "info"
-    ) {
+    // unknown asset does, whatever its state.
+    if (asset.visibility !== "public" && !grant && !hasApiKey && resource !== "info") {
       return notFound();
     }
     if (resource === "info") return this.serveInfo(request, asset, Boolean(grant) || canDownload());
@@ -3502,14 +3497,16 @@ export class MockCalmLensApi {
     if (asset.content.safetyHold) return notAvailable();
 
     if (resource === "placeholder") {
-      // Like the CDN's placeholder handler: the preview's ThumbHash, public whatever the asset's
-      // visibility or moderation status; refused for purged assets and assets without one (not
-      // yet processed, without a preview, or content removed).
+      if (asset.visibility !== "public" && !grant && !canDownload()) return notFound();
+      if (status === "blocked" && !grant && !canDownload()) return notAvailable();
       const thumbhash = preview?.thumbhash;
       if (!thumbhash || status === "purged") return notAvailable();
       return this.cdnResponse(isHead, mockPlaceholderPng(thumbhash), url, {
         "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=3600",
+        "Cache-Control":
+          asset.visibility !== "public" || status === "blocked"
+            ? "private, no-store"
+            : "public, no-cache",
         "Cache-Tag": `asset-${asset.id}`,
         ETag: `"${thumbhash}"`,
       });
@@ -3661,6 +3658,9 @@ export class MockCalmLensApi {
       return this.jsonResponse(400, { code: "viewer-claims/invalid" }, url);
     }
     const status = asset.classification.moderation.status;
+    const restrictedInfo = isPrivate || status === "blocked" || status === "purged";
+    if (restrictedInfo && !authorised)
+      return this.jsonResponse(403, { code: "asset/not-available" }, url);
     const availability =
       asset.content.safetyHold ||
       asset.upload.status === "uploading" ||
@@ -3693,7 +3693,7 @@ export class MockCalmLensApi {
     const bytes = new TextEncoder().encode(JSON.stringify(info));
     return this.cdnResponse(request.method === "HEAD", bytes, url, {
       "Content-Type": "application/json",
-      "Cache-Control": `${isPrivate ? "private" : "public"}, max-age=60`,
+      "Cache-Control": restrictedInfo ? "private, no-store" : "public, no-cache",
       "Cache-Tag": `asset-${asset.id}`,
     });
   }

@@ -229,10 +229,11 @@ class ServerClientTest < Minitest::Test
   INFO = '{"id":"a","projectId":"project","type":"image","externalUrl":null,"content":{},"availability":"available"}'
 
   def test_asset_info_is_read_beneath_the_url_without_the_api_key_and_with_the_viewers_claims
-    client, sent = scripted([200, INFO], [200, INFO], [403, '{"code":"signed-url/expired"}'])
+    restricted = INFO.sub('"availability":"available"', '"availability":"age-restricted"')
+    client, sent = scripted([200, restricted], [200, INFO], [403, '{"code":"signed-url/expired"}'])
     signed = 'https://cdn.example/v1/assets/project/sig_00/?viewerClaims=%7B%22region%22%3A%22DE%22%7D'
-    assert_equal 'available', client.cdn.get_asset_info(signed)['availability']
-    client.cdn.get_asset_info(signed, viewer_claims: { age_confirmed: true })
+    assert_equal 'age-restricted', client.cdn.get_asset_info(signed)['availability']
+    assert_equal 'available', client.cdn.get_asset_info(signed, viewer_claims: { age_confirmed: true })['availability']
     error = assert_raises(CalmLens::PermissionDeniedError) { client.cdn.get_asset_info(signed) }
     assert_equal ['signed-url/expired', 403], [error.code, error.status]
     assert_equal ['https://cdn.example/v1/assets/project/sig_00/info?viewerClaims=%7B%22region%22%3A%22DE%22%7D',

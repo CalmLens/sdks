@@ -483,7 +483,7 @@ func (r *rewindableForm) Seek(offset int64, whence int) (int64, error) {
 // submitInParts uploads src in parts of Options.PartSizeBytes and returns the final part's
 // asset. Part 1 starts the upload as a form with the upload's fields, its transport query
 // (params) and key; part n after it carries "<key>:part-<n>", so a repeated call with the same
-// key replays the parts the API already has and sends the rest.
+// key uses the upload progress in the replay response and sends the remaining parts.
 func (s *AssetsService) submitInParts(ctx context.Context, params url.Values, fields uploadFields, contentType string, src *source, key string) (*Asset, error) {
 	partSize := s.c.options.PartSizeBytes
 	count := int((src.size + partSize - 1) / partSize)
@@ -505,7 +505,14 @@ func (s *AssetsService) submitInParts(ctx context.Context, params url.Values, fi
 	if err != nil {
 		return nil, err
 	}
-	for n := 2; n <= count; {
+	if asset.Upload.Status == "completed" {
+		return asset, nil
+	}
+	nextPart := 2
+	if received := asset.Upload.PartsReceived; received != nil && *received >= 2 && *received < count {
+		nextPart = *received + 1
+	}
+	for n := nextPart; n <= count; {
 		final := n == count
 		piece := src.part(n, partSize)
 		size := piece.Size()

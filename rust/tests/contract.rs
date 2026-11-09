@@ -421,6 +421,30 @@ async fn webhook_signature_contracts() {
     .await;
 }
 
+#[test]
+fn a_signed_webhook_can_omit_severity_and_title() {
+    let event: Event = typed(serde_json::json!({
+        "id": "evt_example", "type": "asset.allowed", "projectId": "proj_example",
+        "createdAt": 1_700_000_000_000_u64
+    }));
+    let payload = WebhookEventPayload::from_event(&event);
+    let body = serde_json::to_vec(&payload).unwrap();
+    let timestamp = "1700000000";
+    let signature = calmlens::create_webhook_signature_header(&body, timestamp, "secret");
+    let parsed = calmlens::construct_webhook_event_at(
+        &body,
+        &signature,
+        timestamp,
+        "secret",
+        1_700_000_000,
+        300,
+    )
+    .unwrap();
+    assert_eq!(parsed.id, "evt_example");
+    assert_eq!(parsed.severity, None);
+    assert_eq!(parsed.title, None);
+}
+
 #[tokio::test]
 async fn webhook_payload_contracts() {
     let fixtures = fixture("webhooks");

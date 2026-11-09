@@ -47,6 +47,8 @@ export interface MockCalmLensServerClientOptions
   /** Defaults to `project-1`. */
   projectId?: string;
   mockOptions?: {
+    /** Use normal timer delays for polling and retry backoff, including under fake timers. */
+    useTimers?: boolean;
     databaseStorage?: MockDatabaseStorage;
     imageStorage?: MockImageStorage;
     /**
@@ -93,14 +95,17 @@ export const mockClientOptions = (
   endpoints: () => MockEndpoints,
   session?: MockAppSession,
 ) => {
+  const { useTimers } = api;
   const fetch = api.createFetch(endpoints, session);
   const hooks: MockHooks = {
-    sleep: async (ms, signal) => {
-      // Yield, so other tasks (such as a `decide`) run, then move the clock on instead of waiting.
-      await sleep(0, signal);
-      api.waitedMs += ms;
-    },
-    now: () => api.waitedMs,
+    sleep: useTimers
+      ? sleep
+      : async (ms, signal) => {
+          // Yield, so other tasks (such as a `decide`) run, then move the clock on instead of waiting.
+          await sleep(0, signal);
+          api.waitedMs += ms;
+        },
+    now: useTimers ? () => Date.now() : () => api.waitedMs,
     uploadTokenTime: () => ({ now: api.now(), nonce: randomUuid() }),
     deferUploadChecks: true,
     defaultCdnBaseUrl: "mock://calmlens/v1",
@@ -140,6 +145,7 @@ export class MockCalmLensServerClient extends CalmLensServerClient {
       now: mockOptions.now ?? createMonotonicClock(),
       moderate: mockOptions.moderate ?? defaultModerate,
     });
+    api.useTimers = mockOptions.useTimers ?? false;
     let endpoints: MockEndpoints | undefined;
     super({
       maxRetries: 0,
