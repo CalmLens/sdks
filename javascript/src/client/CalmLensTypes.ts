@@ -461,10 +461,8 @@ export interface ViewerClaims {
   region?: string;
   /**
    * Your platform's confirmation that the viewer passed its age check. Defaults to false,
-   * including authenticated requests. Your platform confirms the viewer's age; CalmLens does not
-   * verify this claim. It is never signed: anyone holding an asset URL, public or signed, can
-   * add it, so it doesn't restrict who loads an age-restricted asset; your app decides whom it
-   * gives the URL to.
+   * including authenticated requests. Your platform confirms the viewer's age; viewer claims are
+   * assertions from your app, and CalmLens doesn't verify them.
    */
   ageConfirmed?: boolean;
 }
@@ -490,7 +488,7 @@ export interface CdnAssetLocation {
   /** Transform options, applied after the lens. Needs a resource that takes them. */
   transform?: CdnTransform;
   /**
-   * The viewer's region and age confirmation, which your app asserts. They are unsigned, sent as
+   * The viewer's region and age confirmation, which your app asserts, sent as
    * the URL's query, and left out when they are the defaults (no region, age not confirmed).
    */
   viewerClaims?: ViewerClaims;

@@ -310,7 +310,8 @@ module CalmLens
     end
 
     # Uploads content and waits for the moderation decision where the content type supports it.
-    # Audio and video are always processed asynchronously. Takes the options of {#create}.
+    # Documents, websites, audio, video and files over 20 MiB sent in parts always finish in the
+    # background and return `pending`. Takes the options of {#create}.
     # @return [Hash] the asset; show it to everyone only when `classification.moderation.status` is
     #   `allowed` or `limited` (reduce the reach of `limited` assets). Serve `age-restricted` assets
     #   only behind your own age check, through signed URLs.

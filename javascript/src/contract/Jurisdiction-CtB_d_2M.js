@@ -57,6 +57,6 @@ const EU_COUNTRIES = new Set("AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT
 /** Customer assertions used only for this CDN request. */
 const VIEWER_CLAIMS_SCHEMA = z.object({
 	region: VIEWER_REGION_SCHEMA.optional().describe("Viewer country. Defaults to the country of the connection reaching CalmLens; proxies should forward the viewer country explicitly."),
-	ageConfirmed: z.boolean().optional().describe("Your platform's confirmation that the viewer passed its age check, so age-restricted content may be delivered. Defaults to false. Your platform confirms the viewer's age; CalmLens does not verify this claim. Anyone requesting an asset's URL, public or signed, can set it: a signed URL's signature does not cover viewer claims, so the claim is not an access control. To restrict who can load an age-restricted asset, make it private and issue signed URLs only to viewers who passed your age check.")
+	ageConfirmed: z.boolean().optional().describe("Your platform's confirmation that the viewer passed its age check, so age-restricted content may be delivered. Defaults to false. Your platform confirms the viewer's age. Viewer claims are assertions from your application; CalmLens doesn't verify them. To restrict who can load an age-restricted asset, make it private and issue signed URLs only to viewers who passed your age check.")
 }).strict();
 export { VIEWER_REGION_SCHEMA as a, VIEWER_CLAIMS_SCHEMA as i, JURISDICTION_SCHEMA as n, SERVED_JURISDICTIONS_SCHEMA as r, EU_COUNTRIES as t };

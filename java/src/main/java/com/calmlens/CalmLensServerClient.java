@@ -2234,8 +2234,7 @@ public final class CalmLensServerClient implements AutoCloseable {
      * {@link #signAssetUrl}. Lenses and transforms apply to {@code preview}, and to {@code
      * rendered} when it is an image (the CDN refuses them on rendered PDFs, video and audio with
      * {@code transform/invalid}); the SDK refuses them without a resource and on the other
-     * resources. Viewer claims are your app's unsigned assertions: CalmLens does not verify an age
-     * confirmation, and anyone holding the URL can add it.
+     * resources. Viewer claims are assertions from your app; CalmLens doesn't verify them.
      *
      * @param options the asset, resource, selector and viewer claims
      * @return the URL

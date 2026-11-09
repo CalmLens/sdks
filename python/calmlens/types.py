@@ -16,8 +16,7 @@ class ViewerClaims(TypedDict, total=False):
 
     ``region`` is the viewer's ISO 3166-1 alpha-2 country, such as ``DE``. ``ageConfirmed`` is
     your platform's confirmation that the viewer passed its age check, and defaults to false.
-    Claims are your app's unsigned assertions, sent with any asset URL, signed or not: CalmLens
-    does not verify them, and anyone holding a URL can add them. Default claims (no region, age
+    Viewer claims are assertions from your application; CalmLens doesn't verify them. Default claims (no region, age
     not confirmed) are left out of URLs so default URLs stay cacheable.
     """
 

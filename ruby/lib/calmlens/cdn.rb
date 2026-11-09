@@ -69,7 +69,7 @@ module CalmLens
     #   alpha-2 country. The CDN serves an asset whose moderation status is `age-restricted` only with
     #   `age_confirmed: true`, even with a signed URL or the API key. Set it only where your app has
     #   already decided the viewer may see age-restricted content. Your platform confirms the viewer's
-    #   age; CalmLens does not verify this claim, and anyone can add it to a URL.
+    #   age; viewer claims are assertions from your app, and CalmLens doesn't verify them.
     # @return [String]
     def get_asset_url(options)
       call(options, __method__) { |api, _request| asset_url(api) }

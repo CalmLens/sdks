@@ -2241,9 +2241,9 @@ class CDN:
         ``preview``, and ``rendered`` when it is an image, optionally go through a named ``lens``, a
         ``transform``, or both (the lens runs first); the other resources take neither.
 
-        ``viewer_claims`` are your app's unsigned assertions about the viewer, such as
+        ``viewer_claims`` are assertions from your app about the viewer, such as
         ``{"ageConfirmed": True}``, which the CDN requires before it serves an age-restricted
-        asset. CalmLens does not verify them, and anyone holding the URL can add them: set
+        asset. CalmLens doesn't verify them: set
         ``ageConfirmed`` only where your app has already decided the viewer may see age-restricted
         content."""
         merged = _merge("cdn.getAssetUrl", options, project_id=project_id, asset_id=asset_id,

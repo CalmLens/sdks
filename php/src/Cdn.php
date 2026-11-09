@@ -75,8 +75,8 @@ final class Cdn extends Resource
      *
      * `viewerClaims` takes `region` (an ISO 3166-1 alpha-2 country, such as `DE`) and
      * `ageConfirmed`, and is added as the `viewerClaims` query, leaving out the defaults: a region
-     * only when set, `ageConfirmed` only when true. They are your app's unsigned assertions:
-     * CalmLens does not verify an age confirmation, and anyone holding the URL can add it. The CDN
+     * only when set, `ageConfirmed` only when true. They are assertions from your app; CalmLens
+     * doesn't verify them. The CDN
      * requires `ageConfirmed` before it serves an age-restricted asset, even with a signed URL or an
      * API key.
      *

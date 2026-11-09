@@ -482,7 +482,7 @@ const PUBLIC_ERROR_CODES = {
 	}),
 	UPLOADS_PAUSED: new ErrorCode({
 		id: "usage/uploads-paused",
-		defaultMessage: "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.",
+		defaultMessage: "This upload would pass its organisation's usage limits, so it was refused. See details.reason; an owner can review them in Billing.",
 		status: 402
 	}),
 	UNSUPPORTED_UPLOAD_TYPE: new ErrorCode({

@@ -270,8 +270,7 @@ func (s *CDNService) projectSegment(projectID string) (string, error) {
 // GetAssetURL builds an asset's CDN URL without sending a request: the asset URL, which every
 // resource is a path beneath, or a resource URL when Resource is set, with its lens or transform
 // and the viewer claims. Use it for public assets; private ones need SignAssetURL. Viewer claims
-// are your app's unsigned assertions: CalmLens does not verify an age confirmation, and anyone
-// holding the URL can add it.
+// are assertions from your app; CalmLens doesn't verify them.
 func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 	project, err := s.projectSegment(options.ProjectID)
 	if err != nil {

@@ -1593,7 +1593,7 @@ public final class Models {
     public SignAssetUrlOptions transform(String value) { transform = value; return this; }
     /** @param value structured options, at least one set, serialized as a selector @return these options */
     public SignAssetUrlOptions transform(ImageTransformOptions value) { transform = value; return this; }
-    /** @param value claims appended as the unsigned {@code viewerClaims} query, defaults left out @return these options */
+    /** @param value claims appended as the {@code viewerClaims} query, defaults left out @return these options */
     public SignAssetUrlOptions viewerClaims(ViewerClaims value) { viewerClaims = value; return this; }
     Object transformValue() { return transform; }
     @Override public String toString() { return describe(this); }
@@ -3609,7 +3609,7 @@ public final class Models {
       AssetRendered rendered, AssetPreview preview, AssetHls hls) {}
 
   /**
-   * Your app's assertions about the viewer, added to a CDN URL (public or signed) as its unsigned
+   * Your app's assertions about the viewer, added to a CDN URL (public or signed) as its
    * {@code viewerClaims} query. The defaults, no region and no age confirmation, are left out so
    * default URLs stay cacheable.
    */
@@ -3620,8 +3620,8 @@ public final class Models {
     public ViewerClaims region(String value) { region = value; return this; }
     /**
      * Your platform's confirmation that the viewer passed its age check; defaults to false. Your
-     * platform confirms the viewer's age; CalmLens does not verify this claim, and anyone holding
-     * a URL, signed or not, can add it. To control who loads an age-restricted asset, make it
+     * platform confirms the viewer's age; viewer claims are assertions from your app, and CalmLens
+     * doesn't verify them. To control who loads an age-restricted asset, make it
      * private and sign its URL only for viewers whose age you confirmed.
      *
      * @param value whether your platform confirmed the viewer's age

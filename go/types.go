@@ -1719,14 +1719,14 @@ type FolderPage struct {
 	NextCursor string   `json:"nextCursor"`
 }
 
-// ViewerClaims are optional customer assertions that a CDN URL carries, unsigned, in its
+// ViewerClaims are optional customer assertions that a CDN URL carries in its
 // viewerClaims query. Region is the viewer's country (an ISO 3166-1 alpha-2 code such as "DE");
 // age confirmation defaults to false. The defaults (no region, AgeConfirmed nil or false) are
 // left out of URLs, so default URLs stay cacheable.
 //
 // AgeConfirmed is your platform's confirmation that the viewer passed its age check. Your
-// platform confirms the viewer's age; CalmLens does not verify this claim, and anyone holding a
-// URL, signed or not, can add it. Set it only where your app has already decided the viewer may
+// platform confirms the viewer's age; viewer claims are assertions from your app, and CalmLens
+// doesn't verify them. Set it only where your app has already decided the viewer may
 // see age-restricted content.
 type ViewerClaims struct {
 	Region       string `json:"region,omitempty"`

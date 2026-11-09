@@ -1433,7 +1433,7 @@ pub struct SignAssetUrlOptions {
     /// structured options.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<CdnTransform>,
-    /// The viewer's region and age confirmation, appended to the URL unsigned.
+    /// The viewer's region and age confirmation, appended to the URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub viewer_claims: Option<ViewerClaims>,
 }
@@ -1648,8 +1648,8 @@ pub struct CdnRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<CdnTransform>,
     /// The viewer's region and age confirmation, appended as the `viewerClaims` query, leaving out
-    /// the defaults (no region, age not confirmed). They are your app's unsigned assertions:
-    /// CalmLens doesn't verify them, and anyone holding the URL can add them.
+    /// the defaults (no region, age not confirmed). They are assertions from your app; CalmLens
+    /// doesn't verify them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub viewer_claims: Option<ViewerClaims>,
     /// The HTTP method and headers [`CdnClient::serve`](crate::CdnClient::serve) sends, e.g.
@@ -4624,9 +4624,8 @@ pub struct ViewerClaims {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
     /// Your platform's confirmation that the viewer passed its age check. Defaults to false,
-    /// including authenticated requests. Your platform confirms the viewer's age; CalmLens does
-    /// not verify this claim. Anyone holding an asset URL, public or signed, can add it, so it
-    /// doesn't restrict access: to control who loads an age-restricted asset, make it private and
+    /// including authenticated requests. Your platform confirms the viewer's age; viewer claims are
+    /// assertions from your app, and CalmLens doesn't verify them. To control who loads an age-restricted asset, make it private and
     /// sign its URL only for viewers whose age your platform confirmed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub age_confirmed: Option<bool>,

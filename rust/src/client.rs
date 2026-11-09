@@ -2359,8 +2359,8 @@ impl CdnClient<'_> {
     /// or transform and the viewer claims. Use it for public assets; private ones need
     /// [`sign_asset_url`](Self::sign_asset_url). Only the rendered and preview resources take a
     /// lens or transform; the CDN refuses them on rendered PDFs, video and audio with
-    /// `transform/invalid`. Viewer claims are your app's unsigned assertions: CalmLens doesn't
-    /// verify an age confirmation, and anyone holding the URL can add it.
+    /// `transform/invalid`. Viewer claims are assertions from your app; CalmLens doesn't
+    /// verify them.
     pub fn get_asset_url(&self, options: &CdnRequest) -> Result<String> {
         let project = self.project_segment(options.project_id.as_deref())?;
         let asset = asset_segment(options.asset_id.as_deref(), options.external_id.as_deref())?;

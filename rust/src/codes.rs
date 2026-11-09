@@ -78,7 +78,7 @@ error_codes! {
     ImageTooLarge = "image/too-large", 422;
     /// `usage/free-uploads-exhausted` (HTTP 403): This project's organisation has used its free uploads. Set up billing to continue uploading.
     FreeUploadsExhausted = "usage/free-uploads-exhausted", 403;
-    /// `usage/uploads-paused` (HTTP 402): Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.
+    /// `usage/uploads-paused` (HTTP 402): This upload would pass its organisation's usage limits, so it was refused. See details.reason; an owner can review them in Billing.
     UploadsPaused = "usage/uploads-paused", 402;
     /// `upload/unsupported-type` (HTTP 415): The file type is not accepted. details.source is `calmlens` when CalmLens cannot store and process it (use a concrete MIME type such as image/png, application/pdf or text/plain) or `preset` when the upload preset doesn't allow it (details.contentType and details.allowedContentTypes say what was sent and what it accepts).
     UnsupportedUploadType = "upload/unsupported-type", 415;

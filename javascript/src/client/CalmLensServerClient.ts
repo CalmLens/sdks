@@ -303,8 +303,7 @@ export default class CalmLensServerClient {
        * Builds an asset's CDN URL without a request: the asset URL, which every resource is a path
        * beneath, or a resource URL when `resource` is given, with its lens or transform and the
        * viewer claims. Use it for public assets; private ones need `cdn.signAssetUrl`. Viewer
-       * claims are your app's unsigned assertions: CalmLens does not verify an age confirmation,
-       * and anyone holding the URL can add it.
+       * claims are assertions from your app; CalmLens doesn't verify them.
        */
       getAssetUrl: (urlOptions: CdnAssetUrlOptions): string => {
         const { projectId, ...options } = checked("cdn.getAssetUrl", urlOptions);
@@ -510,8 +509,9 @@ export default class CalmLensServerClient {
         this.submitAsset(checked("assets.create", options), false),
 
       /**
-       * Uploads an asset and waits for its moderation decision. Audio and video still finish
-       * in the background. Retried safely with an `Idempotency-Key`.
+       * Uploads an asset and waits for its moderation decision. Documents, websites, audio, video
+       * and files over 20 MiB sent in parts still finish in the background and return `pending`.
+       * Retried safely with an `Idempotency-Key`.
        */
       classify: async (classifyOptions: SubmitAssetOptions): Promise<Asset> => {
         const options = checked("assets.classify", classifyOptions);

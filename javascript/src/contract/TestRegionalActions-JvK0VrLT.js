@@ -1,4 +1,4 @@
-import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-LWQvqyxL.js";
+import { n as JURISDICTION_SCHEMA } from "./Jurisdiction-CtB_d_2M.js";
 import * as z from "zod";
 // packages/shared/src/Messages.ts
 /**
