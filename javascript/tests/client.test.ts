@@ -268,7 +268,7 @@ describe("deadlines for large transfers", () => {
     }
   });
 
-  test("cdn.serve's deadline ends when headers arrive, so slow bodies still stream", async () => {
+  test("cdn.serve returns writable headers while a slow body streams past the deadline", async () => {
     const server = Bun.serve({
       port: 0,
       fetch: () =>
@@ -281,16 +281,30 @@ describe("deadlines for large transfers", () => {
               controller.close();
             },
           }),
+          { status: 206, headers: { "content-range": "bytes 0-11/12" } },
         ),
     });
     try {
+      let upstream: Response | undefined;
       const client = new CalmLensServerClient({
         apiKey,
         projectId,
         cdnBaseUrl: server.url.toString(),
+        cdnFetch: Object.assign(
+          async (...args: Parameters<typeof fetch>) => {
+            upstream = await fetch(...args);
+            return upstream;
+          },
+          { preconnect: fetch.preconnect },
+        ),
         timeoutMs: 50,
       });
       const response = await client.cdn.serve({ assetId: "a" });
+      expect(response.status).toBe(206);
+      expect(response.headers.get("content-range")).toBe("bytes 0-11/12");
+      response.headers.set("cache-control", "private, no-store");
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+      expect(upstream?.headers.get("cache-control")).toBeNull();
       expect(await response.text()).toBe("first,second");
     } finally {
       server.stop(true);

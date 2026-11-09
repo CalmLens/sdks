@@ -361,8 +361,8 @@ export default class CalmLensServerClient {
 
       /**
        * Fetches asset content or a preview from the CDN with the client's API key, and returns
-       * the `Response` as soon as headers arrive, so the body streams. Non-2xx responses are
-       * returned, not thrown; `timeoutMs` covers only the wait for headers.
+       * a `Response` with writable headers as soon as headers arrive, so the body streams.
+       * Non-2xx responses are returned, not thrown; `timeoutMs` covers only the wait for headers.
        */
       serve: async (options: CdnServeOptions): Promise<Response> => {
         const { init, resource = "rendered", ...urlOptions } = checked("cdn.serve", options);
@@ -379,7 +379,8 @@ export default class CalmLensServerClient {
           },
           { allowHttpErrors: true },
         );
-        return response;
+        // Opaque, network-error and upgrade responses cannot be reconstructed by Fetch.
+        return response.status < 200 ? response : new Response(response.body, response);
       },
     };
   }
