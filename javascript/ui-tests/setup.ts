@@ -2,6 +2,7 @@
 // use this package's copy of each UI library. The SDK itself never installs them (a copy there
 // would be a second React in apps that link the SDK), and Bun doesn't run resolve hooks for bare
 // imports, so the SDK's files are loaded here with their library imports pointed at this package.
+import { resolve } from "node:path";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { plugin } from "bun";
 
@@ -17,6 +18,10 @@ configure({ asyncUtilTimeout: 5000 });
 
 const here = import.meta.dir;
 const { compile } = await import("svelte/compiler");
+
+/** Matches the SDK's own source files with `suffix`, wherever the repository is checked out. */
+const sdkSource = (suffix: string) =>
+  new RegExp(`^${resolve(here, "../src").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/${suffix}$`);
 
 const LIBRARY_IMPORT =
   /(\bfrom\s*|\bimport\s*\(?\s*)(["'])((?:react|react-dom|react-native|vue|svelte)(?:\/[^"']*)?)\2/g;
@@ -39,7 +44,7 @@ const transpilers = {
 plugin({
   name: "calmlens-ui-tests",
   setup(build) {
-    build.onLoad({ filter: /\/sdks\/javascript\/src\/.*\.svelte$/ }, async ({ path }) => {
+    build.onLoad({ filter: sdkSource(".*\\.svelte") }, async ({ path }) => {
       const { js } = compile(await Bun.file(path).text(), {
         filename: path,
         generate: "client",
@@ -47,15 +52,12 @@ plugin({
       });
       return { contents: pinLibraries(js.code), loader: "js" };
     });
-    build.onLoad(
-      { filter: /\/sdks\/javascript\/src\/(?!contract\/).*\.tsx?$/ },
-      async ({ path }) => {
-        const transpiler = path.endsWith(".tsx") ? transpilers.tsx : transpilers.ts;
-        const code = transpiler.transformSync(await Bun.file(path).text());
-        return { contents: pinLibraries(code), loader: "js" };
-      },
-    );
-    build.onLoad({ filter: /\/sdks\/javascript\/src\/svelte\/index\.js$/ }, async ({ path }) => ({
+    build.onLoad({ filter: sdkSource("(?!contract/).*\\.tsx?") }, async ({ path }) => {
+      const transpiler = path.endsWith(".tsx") ? transpilers.tsx : transpilers.ts;
+      const code = transpiler.transformSync(await Bun.file(path).text());
+      return { contents: pinLibraries(code), loader: "js" };
+    });
+    build.onLoad({ filter: sdkSource("svelte/index\\.js") }, async ({ path }) => ({
       contents: pinLibraries(await Bun.file(path).text()),
       loader: "js",
     }));
