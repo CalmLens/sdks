@@ -417,6 +417,13 @@ const MODERATION_QUALIFIER_INFO = {
 		description: msg("Qualifying content clearly attributed to an invented character, fictional story, game, illustration, generated image or reenacted scene."),
 		exclusions: "Unclear fictional context, and a real-world threat or actionable harmful request presented as fiction."
 	},
+	"sexual-artistic": {
+		category: "sexual",
+		kind: "context",
+		displayName: msg("Artwork"),
+		description: msg("Qualifying content that is a work of art presented as art, such as a painting, sculpture, print, poem or stage or film scene, or a critic, guide or lecturer talking about one, and not made to arouse."),
+		exclusions: "Content meant to arouse, whatever it is called; pornography, erotic illustration, hentai and generated images; photographs labelled as art; adult content promotion."
+	},
 	"sexual-support-prevention": {
 		category: "sexual",
 		kind: "context",

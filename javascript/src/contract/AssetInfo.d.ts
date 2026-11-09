@@ -1,5 +1,5 @@
-import "./Classification-Q5zGpR8l.js";
-import "./Asset-TrQ6fPLI.js";
+import "./Classification-CxRedzgH.js";
+import "./Asset-b3Bu-8Yu.js";
 import * as zod from "zod";
 /**
  * What the CDN's `/info` resource returns: an allowlist of the public `Asset`, with its field names

@@ -1,12 +1,12 @@
 import { n as HashListEntry, t as HashList } from "./HashList-B-tYWgXP.js";
-import "./Asset-TrQ6fPLI.js";
+import "./Asset-b3Bu-8Yu.js";
 import "./AssetPayload-BpPkhqVM.js";
-import { r as TypedEvent } from "./Event-BaoZJVi3.js";
+import { r as TypedEvent } from "./Event-DtITlkep.js";
 import { t as Folder } from "./Folder-D1CVstEY.js";
 import { o as EventType } from "./EventCatalog-DlEUh7ot.js";
 import { t as CursorPage } from "./Page-Bwn9Pb4k.js";
 import "./Lens-CLZcyVve.js";
-import { i as PUBLIC_UPLOAD_PRESET_SCHEMA } from "./ProjectConfiguration-_hx5W1q6.js";
+import { i as PUBLIC_UPLOAD_PRESET_SCHEMA } from "./ProjectConfiguration-B-eJ6Lga.js";
 import "./PublicErrorCodes-DW2iVL1b.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{
@@ -167,6 +167,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -333,6 +334,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -495,6 +497,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -662,6 +665,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -828,6 +832,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -990,6 +995,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -1157,6 +1163,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -1323,6 +1330,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -1485,6 +1493,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -1652,6 +1661,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -1818,6 +1828,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -1980,6 +1991,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -2147,6 +2159,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -2313,6 +2326,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -2475,6 +2489,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -2642,6 +2657,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -2808,6 +2824,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -2970,6 +2987,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -3137,6 +3155,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -3303,6 +3322,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -3465,6 +3485,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -3632,6 +3653,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -3798,6 +3820,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";
@@ -3960,6 +3983,7 @@ declare const ASSET_TIMELINE_SEGMENT_SCHEMA: zod.ZodObject<{
         "self-harm-thoughts": "self-harm-thoughts";
         "sexual-activity": "sexual-activity";
         "sexual-adult-promotion": "sexual-adult-promotion";
+        "sexual-artistic": "sexual-artistic";
         "sexual-assault-media": "sexual-assault-media";
         "sexual-discussion": "sexual-discussion";
         "sexual-documentary": "sexual-documentary";

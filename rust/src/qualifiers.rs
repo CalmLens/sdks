@@ -112,6 +112,8 @@ string_enum! {
         SexualDiscussion = "sexual-discussion",
         /// Sexual: Fictional.
         SexualFictional = "sexual-fictional",
+        /// Sexual: Artwork.
+        SexualArtistic = "sexual-artistic",
         /// Sexual: Sexual harm support or prevention.
         SexualSupportPrevention = "sexual-support-prevention",
         /// Violence: Physical attack.

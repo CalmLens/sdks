@@ -4,7 +4,7 @@ import "./Media-B2PMcUf7.js";
 import { a as countModerationContextCharacters, n as MODERATION_CONTEXT_MAX_ITEM_CHARACTERS, r as MODERATION_CONTEXT_USED_CHARACTERS, t as MODERATION_CONTEXT_MAX_CHARACTERS } from "./ModerationContextLimits-BIMUlk2e.js";
 import "./SharedConstants-DxUCZwLZ.js";
 import { t as hmacSha256Hex } from "./CryptoUtils-B_x8lMIx.js";
-import { i as msg, n as MODERATION_QUALIFIERS, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-JvK0VrLT.js";
+import { i as msg, n as MODERATION_QUALIFIERS, t as TEST_REGIONAL_ACTIONS_SCHEMA } from "./TestRegionalActions-DUzwPr1a.js";
 import { n as JURISDICTION_SCHEMA, r as SERVED_JURISDICTIONS_SCHEMA } from "./Jurisdiction-CtB_d_2M.js";
 import { n as GRANTS_SCHEMA, t as ACCESS_ROLE_SCHEMA } from "./Permissions-DPNlE8m-.js";
 import * as zod from "zod";
@@ -805,7 +805,7 @@ const CLASSIFICATION_REPORT_SCHEMA = zod.object({
 			/** How many segments the asset's timeline holds; they are stored beside the asset. */
 			segmentCount: zod.number().int().nonnegative()
 		}).strict().optional(),
-		hashMatches: zod.array(HASH_MATCH_SCHEMA).optional().describe("Entries in the project's hash lists that the image matched, blocking matches first and then the closest. Absent when nothing matched.")
+		hashMatches: zod.array(HASH_MATCH_SCHEMA).optional().describe("Entries in the project's hash lists that the image, or a video's frames or media's cover art, matched, blocking matches first and then the closest. Absent when nothing matched.")
 	}).strict().describe("Detection findings before policy evaluation."),
 	features: PROCESSING_FEATURE_RESULTS_SCHEMA.optional()
 }).strict().refine(hasValidModerationRule, {

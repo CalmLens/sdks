@@ -57,6 +57,7 @@ module CalmLens
     ?"sexual-educational" => qualifier_result,
     ?"sexual-discussion" => qualifier_result,
     ?"sexual-fictional" => qualifier_result,
+    ?"sexual-artistic" => qualifier_result,
     ?"sexual-support-prevention" => qualifier_result,
     ?"violence-attack" => qualifier_result,
     ?"violence-threat" => qualifier_result,

@@ -60,6 +60,7 @@ const (
 	QualifierSexualEducational                    = "sexual-educational"
 	QualifierSexualDiscussion                     = "sexual-discussion"
 	QualifierSexualFictional                      = "sexual-fictional"
+	QualifierSexualArtistic                       = "sexual-artistic"
 	QualifierSexualSupportPrevention              = "sexual-support-prevention"
 	QualifierViolenceAttack                       = "violence-attack"
 	QualifierViolenceThreat                       = "violence-threat"

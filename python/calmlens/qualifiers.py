@@ -59,6 +59,7 @@ ModerationQualifier = Union[Literal[
     "sexual-educational",
     "sexual-discussion",
     "sexual-fictional",
+    "sexual-artistic",
     "sexual-support-prevention",
     "violence-attack",
     "violence-threat",

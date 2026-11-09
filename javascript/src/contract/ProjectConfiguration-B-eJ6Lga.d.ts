@@ -1,5 +1,5 @@
-import "./Classification-Q5zGpR8l.js";
-import "./UploadPreset-nTGY-48g.js";
+import "./Classification-CxRedzgH.js";
+import "./UploadPreset-PUgPsEbR.js";
 import * as zod from "zod";
 declare const PUBLIC_UPLOAD_PRESET_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;

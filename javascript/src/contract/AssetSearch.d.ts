@@ -291,6 +291,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -430,6 +431,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -579,6 +581,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -718,6 +721,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -988,6 +992,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -1154,6 +1159,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -1316,6 +1322,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -1483,6 +1490,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -1649,6 +1657,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -1811,6 +1820,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -1978,6 +1988,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -2144,6 +2155,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -2306,6 +2318,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -2473,6 +2486,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -2639,6 +2653,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -2801,6 +2816,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -2968,6 +2984,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -3134,6 +3151,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -3296,6 +3314,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -3463,6 +3482,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -3629,6 +3649,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -3791,6 +3812,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -3958,6 +3980,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -4124,6 +4147,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -4286,6 +4310,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -4453,6 +4478,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -4619,6 +4645,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
@@ -4781,6 +4808,7 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
                 "self-harm-thoughts": "self-harm-thoughts";
                 "sexual-activity": "sexual-activity";
                 "sexual-adult-promotion": "sexual-adult-promotion";
+                "sexual-artistic": "sexual-artistic";
                 "sexual-assault-media": "sexual-assault-media";
                 "sexual-discussion": "sexual-discussion";
                 "sexual-documentary": "sexual-documentary";
