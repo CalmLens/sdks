@@ -122,6 +122,16 @@ describe("getAssetView", () => {
     expect(
       view({ video: { stream: false } }, info("video", { rendered: { kind: "video" }, hls })),
     ).toMatchObject({ kind: "video", stream: undefined });
+    // A stream still preparing, or not prepared, plays the rendered file.
+    expect(
+      view(
+        {},
+        info("video", {
+          rendered: { kind: "video" },
+          hls: { status: "preparing", reason: null, renditions: [] },
+        }),
+      ),
+    ).toMatchObject({ kind: "video", src: `${SRC}/rendered`, stream: undefined });
     expect(
       view({}, info("audio", { rendered: { kind: "audio", peaks: [0.5, 1] }, preview })),
     ).toEqual({
