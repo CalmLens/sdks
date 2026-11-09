@@ -293,7 +293,7 @@ export const getAssetView = (
         ? { kind: "website", ...still("rendered", rendered), link: pageLink(info.externalUrl) }
         : icon();
     case "media": {
-      const streams = options.video?.stream !== false && Boolean(content.hls);
+      const streams = options.video?.stream !== false && content.hls?.status === "ready";
       if (rendered?.kind === "audio") {
         return {
           kind: "audio",

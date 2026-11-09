@@ -9834,8 +9834,7 @@
           "expect": {
             "result": {
               "content.rendered.kind": "video",
-              "content.hls": null,
-              "content.hlsStatus": null
+              "content.hls": null
             },
             "httpStatus": 200
           }

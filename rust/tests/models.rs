@@ -3,11 +3,14 @@ use calmlens::models::*;
 use serde_json::json;
 
 #[test]
-fn hls_status_reads_its_status_and_reason() {
-    let status: AssetHlsStatus =
-        serde_json::from_value(json!({"status":"unavailable","reason":"allowance-used"})).unwrap();
-    assert_eq!(status.status, "unavailable");
-    assert_eq!(status.reason.as_deref(), Some("allowance-used"));
+fn an_hls_stream_reads_its_status_and_reason() {
+    let hls: AssetHls = serde_json::from_value(
+        json!({"status":"unavailable","reason":"allowance-used","renditions":[]}),
+    )
+    .unwrap();
+    assert_eq!(hls.status, "unavailable");
+    assert_eq!(hls.reason.as_deref(), Some("allowance-used"));
+    assert!(hls.renditions.is_empty());
 }
 
 #[test]

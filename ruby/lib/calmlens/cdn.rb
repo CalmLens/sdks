@@ -53,7 +53,7 @@ module CalmLens
     # @option options [String] :resource `rendered` (the displayable file: an image in the best format the
     #   client accepts, a PDF, or browser-safe video or audio), `original` (the exact upload), `preview` (a
     #   still image for the asset), `hls` (the HLS master playlist of audio or video, at `hls/index.m3u8`,
-    #   once `content.hls` is set), `embed` (an HTML page that shows the asset, a viewer for its type, for an
+    #   once `content.hls.status` is `ready`), `embed` (an HTML page that shows the asset, a viewer for its type, for an
     #   iframe), `placeholder` (a small blurred PNG that the CDN serves publicly for every asset whatever its
     #   visibility or moderation status, without age confirmation) or `info` (the asset's display info, as
     #   {#get_asset_info} reads it). Without it, the URL is the asset URL itself. Lenses and transforms

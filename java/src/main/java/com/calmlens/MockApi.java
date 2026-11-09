@@ -987,7 +987,6 @@ final class MockApi {
   private static void withoutRendering(JsonObject content) {
     content.add("rendered", JsonNull.INSTANCE);
     content.add("hls", JsonNull.INSTANCE);
-    content.add("hlsStatus", JsonNull.INSTANCE);
     content.add("preview", JsonNull.INSTANCE);
   }
 
@@ -1024,7 +1023,6 @@ final class MockApi {
   private static void applyRendering(JsonObject asset, boolean processed) {
     JsonObject content = asset.getAsJsonObject("content");
     content.add("hls", JsonNull.INSTANCE);
-    content.add("hlsStatus", JsonNull.INSTANCE);
     String type = str(asset, "type"), format = str(content, "format");
     String mime = format == null ? "" : format.toLowerCase(Locale.ROOT).split(";", 2)[0].strip();
     boolean browserSafe = BROWSER_SAFE_MEDIA_FORMATS.contains(mime);

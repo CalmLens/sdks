@@ -37,7 +37,7 @@ __all__ = [
     "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
     "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "AssetHlsStatus", "StreamingFeatureOptions", "AssetPreview", "AssetModerationTimeline", "AssetInfo", "AssetInfoContent", "AssetAvailability",
+    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "StreamingFeatureOptions", "AssetPreview", "AssetModerationTimeline", "AssetInfo", "AssetInfoContent", "AssetAvailability",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensType",
     "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions",
@@ -121,7 +121,7 @@ LensType = Literal["image", "video", "audio", "document", "website"]
 #: best format the client accepts, a PDF, or browser-safe video or audio), ``preview`` (a still
 #: image that stands for the asset), ``placeholder`` (a small blurred PNG made from the preview,
 #: served publicly for every asset whatever its visibility or moderation status), ``hls`` (the HLS
-#: master playlist of audio or video at ``hls/index.m3u8``, once ``content.hls`` is set; its
+#: master playlist of audio or video at ``hls/index.m3u8``, once ``content.hls.status`` is ``ready``; its
 #: playlists and segments are the other files beneath ``hls/``), ``embed`` (an HTML page that shows
 #: the asset, for an iframe) or ``info`` (the asset's display info, see :class:`AssetInfo`). Lenses
 #: and transforms apply to ``preview``, and to ``rendered`` when it is an image; the CDN refuses them
@@ -644,17 +644,13 @@ class AssetHlsRendition(TypedDict):
 class AssetHls(TypedDict):
     """Preview. The adaptive stream of audio or video: HLS with fragmented MP4 (CMAF) segments,
     served at the ``hls`` resource (``/hls/index.m3u8``) and played by the ``embed`` resource."""
-    #: Every rendition, video from the largest down, then audio.
-    renditions: list[AssetHlsRendition]
-
-
-class AssetHlsStatus(TypedDict):
-    """Preview. Whether the adaptive stream asked for is ready, or why it isn't."""
-    #: ``preparing`` until the stream is saved, ``ready`` once ``content.hls`` lists it,
+    #: ``preparing`` until the stream is saved, ``ready`` once ``renditions`` lists it,
     #: ``unavailable`` when it won't be prepared: see ``reason``.
     status: Literal["preparing", "ready", "unavailable"]
     #: Why an ``unavailable`` stream isn't prepared; ``None`` otherwise.
     reason: Optional[Literal["allowance-used", "billing-required", "spend-limit", "processing-failed", "content-not-kept"]]
+    #: Every rendition, video from the largest down, then audio; empty until the stream is ready.
+    renditions: list[AssetHlsRendition]
 
 
 class _AssetRenderedRequired(TypedDict):
@@ -931,14 +927,11 @@ class AssetContent(TypedDict):
     #: video or audio. ``None`` when the asset has none, once the content is removed and while the
     #: asset is held.
     rendered: Optional[AssetRendered]
-    #: Preview. The adaptive (HLS) stream of video or audio, once streaming has prepared it from the
-    #: rendered file, served at the ``hls`` resource and played by the ``embed`` page. ``None`` for
-    #: other assets, until a stream is prepared, once the content is removed and while the asset is
-    #: held.
+    #: Preview. The adaptive (HLS) stream of video or audio asked for, served at the ``hls`` resource
+    #: and played by the ``embed`` page once its ``status`` is ``ready``. ``None`` when none was asked
+    #: for, once the content is removed, while the asset is held and while it is blocked with no
+    #: stream prepared.
     hls: Optional[AssetHls]
-    #: Preview. Whether the stream asked for is ready, or why it isn't. ``None`` when none was asked
-    #: for, once the content is removed and while the asset is held.
-    hlsStatus: Optional[AssetHlsStatus]
     #: A still image for the asset, served at the ``preview`` resource (and its blurred placeholder
     #: at ``placeholder``). ``None`` when the asset has none, once the content is removed and while
     #: the asset is held.

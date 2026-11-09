@@ -425,13 +425,11 @@ type AssetContent struct {
 	// Rendered is the displayable file CalmLens serves at ResourceRendered; nil when the asset
 	// has none (yet), once the content is removed and while a safety hold is on.
 	Rendered *AssetRendered `json:"rendered"`
-	// HLS (preview) is the adaptive stream of video or audio CalmLens serves at ResourceHLS and
-	// the embed page plays, once streaming has prepared it from the rendered file; nil for other
-	// assets, until a stream is prepared, once the content is removed and while a safety hold is on.
+	// HLS (preview) is the adaptive stream of video or audio asked for, which CalmLens serves at
+	// ResourceHLS and the embed page plays once its Status is ready. Nil when none was asked for,
+	// once the content is removed, while a hold is on and while the asset is blocked with no stream
+	// prepared.
 	HLS *AssetHls `json:"hls"`
-	// HLSStatus (preview) says whether the stream asked for is ready, or why it isn't; nil when none
-	// was asked for, once the content is removed and while a safety hold is on.
-	HLSStatus *AssetHlsStatus `json:"hlsStatus"`
 	// Preview is the still image CalmLens serves at ResourcePreview; nil when the asset has none
 	// (yet), once the content is removed and while a safety hold is on.
 	Preview *AssetPreview `json:"preview"`
@@ -464,21 +462,18 @@ type AssetRendered struct {
 	Peaks []float64 `json:"peaks,omitempty"`
 }
 
-// AssetHls is the adaptive (HLS) stream of audio or video, with fragmented MP4 (CMAF) segments,
-// served at ResourceHLS.
+// AssetHls is the adaptive (HLS) stream of audio or video asked for, with fragmented MP4 (CMAF)
+// segments, served at ResourceHLS once it is ready.
 type AssetHls struct {
-	// Renditions lists every rendition, video from the largest down, then audio.
-	Renditions []AssetHlsRendition `json:"renditions"`
-}
-
-// AssetHlsStatus says whether the adaptive stream asked for is ready, or why it isn't.
-type AssetHlsStatus struct {
-	// Status is preparing until the stream is saved, ready once Content.HLS lists it, and
+	// Status is preparing until the stream is saved, ready once Renditions lists it, and
 	// unavailable when it won't be prepared: see Reason.
 	Status string `json:"status"`
 	// Reason says why an unavailable stream isn't prepared: allowance-used, billing-required,
 	// spend-limit, processing-failed or content-not-kept. Nil otherwise.
 	Reason *string `json:"reason"`
+	// Renditions lists every rendition, video from the largest down, then audio; empty until the
+	// stream is ready.
+	Renditions []AssetHlsRendition `json:"renditions"`
 }
 
 // AssetHlsRenditionKind is what an AssetHlsRendition carries. It is a string type so kinds added
@@ -1220,7 +1215,7 @@ const (
 	// or an audio waveform. It takes a Lens, Transform or TransformOptions.
 	ResourcePreview = "preview"
 	// ResourceHLS (preview) is the adaptive stream of audio or video, its HLS master playlist at
-	// hls/index.m3u8, once Content.HLS is set; beneath a signed asset URL, its grant covers every
+	// hls/index.m3u8, once Content.HLS.Status is ready; beneath a signed asset URL, its grant covers every
 	// playlist and segment beneath hls/. It takes no Lens, Transform or TransformOptions.
 	ResourceHLS = "hls"
 	// ResourceEmbed (preview) is an HTML page that shows the asset, for an iframe: a player for

@@ -44,8 +44,8 @@ export interface ViewerAsset {
     rendered?: ViewerRendered | null;
     /** The still image the CDN serves at `/preview`, or `null` when the asset has none. */
     preview?: ViewerPreview | null;
-    /** The adaptive (HLS) stream of video or audio, or `null` until one is prepared. */
-    hls?: { renditions?: readonly unknown[] } | null;
+    /** The adaptive (HLS) stream of video or audio asked for: playable once `ready`. */
+    hls?: { status?: string; renditions?: readonly unknown[] } | null;
     /** The text extracted from the content, inline when it is small (API assets only). */
     extractedText?: { type: "string"; content: string } | { type: "document"; id: string } | null;
   } | null;

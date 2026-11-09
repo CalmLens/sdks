@@ -1138,22 +1138,21 @@ const ASSET_HLS_RENDITION_SCHEMA = zod.object({
 	description: "One rendition of the adaptive (HLS) stream",
 	namedType: "AssetHlsRendition"
 })]));
-/** The adaptive stream of audio or video, as the CDN's `/hls` resource serves it. */
-const ASSET_HLS_SCHEMA = zod.object({ renditions: zod.array(ASSET_HLS_RENDITION_SCHEMA).describe("Every rendition, video from the largest down, then audio") }).meta(metaStore([docPropertyInfo({
-	description: "The adaptive stream of audio or video: HLS with fragmented MP4 (CMAF) segments, served at `/hls/index.m3u8`",
-	namedType: "AssetHls"
-})]));
-/** Whether the stream asked for is ready, or why it isn't. */
-const ASSET_HLS_STATUS_SCHEMA = zod.object({
+/**
+* The adaptive stream of audio or video asked for: whether it is ready or why it isn't, and once
+* ready its renditions, as the CDN's `/hls` resource serves them.
+*/
+const ASSET_HLS_SCHEMA = zod.object({
 	status: zod.enum([
 		"preparing",
 		"ready",
 		"unavailable"
-	]).describe("`preparing` until the stream is saved, `ready` once `content.hls` lists it, `unavailable` when it won't be prepared: see `reason`"),
-	reason: ASSET_HLS_UNAVAILABLE_REASON_SCHEMA.nullable().describe("Why an `unavailable` stream isn't prepared: `allowance-used` (this month's free streaming minutes don't have room for it), `billing-required` (it is longer than the free minutes allow, so it needs billing), `spend-limit` (its expected cost would pass a spend limit), `processing-failed` (preparing it failed) or `content-not-kept` (the upload keeps no content to stream). `null` otherwise.")
+	]).describe("`preparing` until the stream is saved, `ready` once `renditions` lists it, `unavailable` when it won't be prepared: see `reason`"),
+	reason: ASSET_HLS_UNAVAILABLE_REASON_SCHEMA.nullable().describe("Why an `unavailable` stream isn't prepared: `allowance-used` (this month's free streaming minutes don't have room for it), `billing-required` (it is longer than the free minutes allow, so it needs billing), `spend-limit` (its expected cost would pass a spend limit), `processing-failed` (preparing it failed) or `content-not-kept` (the upload keeps no content to stream). `null` otherwise."),
+	renditions: zod.array(ASSET_HLS_RENDITION_SCHEMA).describe("Every rendition, video from the largest down, then audio; empty until `ready`")
 }).meta(metaStore([docPropertyInfo({
-	description: "Whether the adaptive stream asked for is ready, or why it isn't",
-	namedType: "AssetHlsStatus"
+	description: "The adaptive stream of audio or video asked for: HLS with fragmented MP4 (CMAF) segments, served at `/hls/index.m3u8`",
+	namedType: "AssetHls"
 })]));
 const ASSET_RENDERED_KIND_SCHEMA = zod.enum([
 	"image",
@@ -1383,8 +1382,7 @@ const ASSET_CONTENT_SCHEMA = zod.object({
 	metadata: FILE_METADATA_SCHEMA.nullable().describe("Metadata embedded in an uploaded image, such as its capture time, camera and software, read before any of it is removed for `storeSensitiveMetadata`. Read-only and separate from the asset's own `metadata`. `null` when the image declares none, for other asset types, once the content is removed and while the asset is held."),
 	extractedText: EXTRACTED_TEXT_SCHEMA.nullable().describe("Text extracted from the content (including image OCR), inline for small content or stored as a document. `null` while the asset is held."),
 	rendered: ASSET_RENDERED_SCHEMA.nullable().describe("The displayable file, served at `/rendered`: an image, a PDF, or browser-safe video or audio. `null` when the asset has none (text, spreadsheets and other files, or media not yet made browser-safe), once the content is removed and while the asset is held."),
-	hls: ASSET_HLS_SCHEMA.nullable().describe("Preview. The adaptive (HLS) stream of video or audio, once streaming has prepared it from the rendered file, served at `/hls/index.m3u8` and played by the embed page at `/embed`. `null` for other assets, until a stream is prepared, once the content is removed and while the asset is held."),
-	hlsStatus: ASSET_HLS_STATUS_SCHEMA.nullable().describe("Preview. Whether the adaptive stream asked for is ready, or why it isn't. `null` when no stream was asked for, once the content is removed, while the asset is held and while it is blocked; with only the project's streaming setting asking, also until the asset's rendered file exists."),
+	hls: ASSET_HLS_SCHEMA.nullable().describe("Preview. The adaptive (HLS) stream of video or audio asked for: `status` says whether it is ready or why it isn't, and `renditions` lists it once ready. Served at `/hls/index.m3u8` and played by the embed page at `/embed`. `null` when no stream was asked for, once the content is removed, while the asset is held and while it is blocked with no stream prepared; with only the project's streaming setting asking, also until the asset's rendered file exists."),
 	preview: ASSET_PREVIEW_SCHEMA.nullable().describe("A still image for the asset, served at `/preview` (and its blurred placeholder at `/placeholder`). `null` when the asset has none (text, spreadsheets and other files, or a document, video or audio whose still isn't made yet), once the content is removed and while the asset is held.")
 }).meta(metaStore([docPropertyInfo({
 	description: "Content state",
@@ -1531,7 +1529,6 @@ STORED_ASSET_SCHEMA.pick({
 				averageColor: null
 			},
 			hls: null,
-			hlsStatus: null,
 			extractedText: null
 		}
 	}

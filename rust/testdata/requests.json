@@ -4388,6 +4388,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -4397,10 +4399,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -4849,6 +4847,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -4858,10 +4858,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -5359,6 +5355,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -5368,10 +5366,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -5859,6 +5853,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -5868,10 +5864,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -6379,6 +6371,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -6388,10 +6382,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -6850,6 +6840,8 @@
                 ]
               },
               "hls": {
+                "status": "preparing",
+                "reason": "allowance-used",
                 "renditions": [
                   {
                     "kind": "video",
@@ -6859,10 +6851,6 @@
                     "codecs": "example"
                   }
                 ]
-              },
-              "hlsStatus": {
-                "status": "preparing",
-                "reason": "allowance-used"
               },
               "preview": {
                 "width": 1,
@@ -7325,6 +7313,8 @@
               ]
             },
             "hls": {
+              "status": "preparing",
+              "reason": "allowance-used",
               "renditions": [
                 {
                   "kind": "video",
@@ -7334,10 +7324,6 @@
                   "codecs": "example"
                 }
               ]
-            },
-            "hlsStatus": {
-              "status": "preparing",
-              "reason": "allowance-used"
             },
             "preview": {
               "width": 1,
@@ -7795,6 +7781,8 @@
               ]
             },
             "hls": {
+              "status": "preparing",
+              "reason": "allowance-used",
               "renditions": [
                 {
                   "kind": "video",
@@ -7804,10 +7792,6 @@
                   "codecs": "example"
                 }
               ]
-            },
-            "hlsStatus": {
-              "status": "preparing",
-              "reason": "allowance-used"
             },
             "preview": {
               "width": 1,
@@ -8265,6 +8249,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -8274,10 +8260,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -8856,6 +8838,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -8865,10 +8849,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -9317,6 +9297,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -9326,10 +9308,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -9783,6 +9761,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -9792,10 +9772,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -10244,6 +10220,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -10253,10 +10231,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -10708,6 +10682,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -10717,10 +10693,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,
@@ -11206,6 +11178,8 @@
           ]
         },
         "hls": {
+          "status": "preparing",
+          "reason": "allowance-used",
           "renditions": [
             {
               "kind": "video",
@@ -11215,10 +11189,6 @@
               "codecs": "example"
             }
           ]
-        },
-        "hlsStatus": {
-          "status": "preparing",
-          "reason": "allowance-used"
         },
         "preview": {
           "width": 1,

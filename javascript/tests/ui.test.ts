@@ -106,7 +106,7 @@ describe("getAssetView", () => {
   });
 
   it("plays video and audio from the rendered file, with the stream, poster or waveform", () => {
-    const hls = { renditions: [] };
+    const hls = { status: "ready", renditions: [] };
     const preview = { width: 640, height: 360, thumbhash: null, averageColor: null };
     expect(
       view(

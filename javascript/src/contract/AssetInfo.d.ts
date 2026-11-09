@@ -1,5 +1,5 @@
 import "./Classification-Q5zGpR8l.js";
-import "./Asset-BUqS1uF-.js";
+import "./Asset-TrQ6fPLI.js";
 import * as zod from "zod";
 /**
  * What the CDN's `/info` resource returns: an allowlist of the public `Asset`, with its field names
@@ -39,6 +39,18 @@ declare const ASSET_INFO_SCHEMA: zod.ZodObject<{
       peaks: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
     }, zod.core.$strip>>;
     hls: zod.ZodNullable<zod.ZodObject<{
+      status: zod.ZodEnum<{
+        preparing: "preparing";
+        ready: "ready";
+        unavailable: "unavailable";
+      }>;
+      reason: zod.ZodNullable<zod.ZodEnum<{
+        "allowance-used": "allowance-used";
+        "billing-required": "billing-required";
+        "content-not-kept": "content-not-kept";
+        "processing-failed": "processing-failed";
+        "spend-limit": "spend-limit";
+      }>>;
       renditions: zod.ZodArray<zod.ZodObject<{
         kind: zod.ZodEnum<{
           audio: "audio";

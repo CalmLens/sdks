@@ -97,7 +97,7 @@ final class MockServerClient
     private const SPREADSHEET_MIME_TYPES = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/vnd.ms-excel.sheet.macroenabled.12', 'application/vnd.ms-excel', 'application/vnd.oasis.opendocument.spreadsheet'];
     /** Removing or withholding content removes its rendered file and preview, as the API does. */
-    private const NO_RENDERING = ['rendered' => null, 'hls' => null, 'hlsStatus' => null, 'preview' => null];
+    private const NO_RENDERING = ['rendered' => null, 'hls' => null, 'preview' => null];
     /** The size of the waveform the API makes as an audio asset's preview. */
     private const WAVEFORM_SIZE = ['width' => 1200, 'height' => 300];
     /** The resources an asset's CDN path names. */
@@ -927,7 +927,7 @@ final class MockServerClient
             return self::NO_RENDERING;
         }
         // The mock prepares no adaptive stream.
-        return ['hls' => null, 'hlsStatus' => null] + match ($type) {
+        return ['hls' => null] + match ($type) {
             'image' => ['rendered' => ['kind' => 'image', 'format' => $format ?? 'image/png'] + $unsized, 'preview' => $preview($unsized)],
             'website' => ['rendered' => ['kind' => 'image', 'format' => 'image/png'] + $unsized, 'preview' => $preview($unsized)],
             'multimedia-document' => in_array($mime, self::SPREADSHEET_MIME_TYPES, true) ? self::NO_RENDERING

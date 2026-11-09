@@ -81,7 +81,7 @@ module CalmLens
       # from its pixels. The `placeholder` resource serves it as a PNG, like the CDN.
       THUMBHASH = '1QcSHQRnh493V4dIh4eXh1h4kJUI'
       # Removing or withholding content removes its rendered file, adaptive stream and preview, as the API does.
-      NO_RENDERING = { 'rendered' => nil, 'hls' => nil, 'hlsStatus' => nil, 'preview' => nil }.freeze
+      NO_RENDERING = { 'rendered' => nil, 'hls' => nil, 'preview' => nil }.freeze
       # The size of the waveform the API makes as an audio asset's preview.
       WAVEFORM_SIZE = { 'width' => 1200, 'height' => 300 }.freeze
       # Audio and video formats browsers play as uploaded, so the API serves them as stored (Asset.ts).
@@ -1190,7 +1190,7 @@ module CalmLens
       # play the upload), audio with a waveform preview and video with no poster; and every preview has
       # its ThumbHash. Text, spreadsheets and other files have neither. The mock decodes nothing, so
       # sizes are unknown, audio has no peaks, and audio and video never get an adaptive stream.
-      def rendering(asset, processed) = { **rendered_file(asset, processed), 'hls' => nil, 'hlsStatus' => nil }
+      def rendering(asset, processed) = { **rendered_file(asset, processed), 'hls' => nil }
 
       # The rendered file and preview of {#rendering}.
       def rendered_file(asset, processed)

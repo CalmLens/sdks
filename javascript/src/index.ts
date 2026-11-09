@@ -146,7 +146,6 @@ export { SDK_VERSION } from "./client/CalmLensVersion";
 export type {
   AssetHls,
   AssetHlsRendition,
-  AssetHlsStatus,
   AssetPreview,
   AssetRendered,
   AssetRenderedKind,

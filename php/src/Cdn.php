@@ -67,7 +67,7 @@ final class Cdn extends Resource
      * displayable file: an image in the best format the client accepts, a PDF, or browser-safe
      * video or audio), `original` (the exact upload), `preview` (a still image for the asset),
      * `placeholder` (a small blurred PNG served publicly for every asset), `hls` (the HLS master
-     * playlist of audio or video, at `hls/index.m3u8`, once `content.hls` is set), `embed` (an HTML
+     * playlist of audio or video, at `hls/index.m3u8`, once `content.hls.status` is `ready`), `embed` (an HTML
      * page that shows the asset, for an iframe) or `info` (the display info `getAssetInfo` reads).
      * Only `rendered` and `preview` take a `lens` or `transform`, applied in one pass, with transform
      * options replacing the lens's same-named options; the CDN refuses them on rendered PDFs, video

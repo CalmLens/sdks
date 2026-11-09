@@ -5085,18 +5085,6 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
         peaks: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
       }, zod.core.$strip>>;
       hls: zod.ZodNullable<zod.ZodObject<{
-        renditions: zod.ZodArray<zod.ZodObject<{
-          kind: zod.ZodEnum<{
-            audio: "audio";
-            video: "video";
-          }>;
-          width: zod.ZodNullable<zod.ZodNumber>;
-          height: zod.ZodNullable<zod.ZodNumber>;
-          bandwidth: zod.ZodNumber;
-          codecs: zod.ZodString;
-        }, zod.core.$strip>>;
-      }, zod.core.$strip>>;
-      hlsStatus: zod.ZodNullable<zod.ZodObject<{
         status: zod.ZodEnum<{
           preparing: "preparing";
           ready: "ready";
@@ -5109,6 +5097,16 @@ declare const ASSET_SEARCH_RESULT_SCHEMA: zod.ZodObject<{
           "processing-failed": "processing-failed";
           "spend-limit": "spend-limit";
         }>>;
+        renditions: zod.ZodArray<zod.ZodObject<{
+          kind: zod.ZodEnum<{
+            audio: "audio";
+            video: "video";
+          }>;
+          width: zod.ZodNullable<zod.ZodNumber>;
+          height: zod.ZodNullable<zod.ZodNumber>;
+          bandwidth: zod.ZodNumber;
+          codecs: zod.ZodString;
+        }, zod.core.$strip>>;
       }, zod.core.$strip>>;
       preview: zod.ZodNullable<zod.ZodObject<{
         width: zod.ZodNullable<zod.ZodNumber>;

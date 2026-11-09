@@ -910,7 +910,6 @@ fn mock_rendering(asset: &Value, processed: bool) -> (Value, Value) {
 fn set_rendering(content: &mut Map<String, Value>, (rendered, preview): (Value, Value)) {
     content.insert("rendered".into(), rendered);
     content.insert("hls".into(), Value::Null);
-    content.insert("hlsStatus".into(), Value::Null);
     content.insert("preview".into(), preview);
 }
 
@@ -2429,7 +2428,7 @@ impl Backend {
                 "perceptualHash": null, "perceptualHashQuality": null, "metadata": null,
                 "extractedText": null,
                 // Like the API, the rendered file and preview come with processing.
-                "rendered": null, "hls": null, "hlsStatus": null, "preview": null,
+                "rendered": null, "hls": null, "preview": null,
             },
             "upload": {
                 "status": if open { "uploading" } else { "completed" }, "updatedAt": now,

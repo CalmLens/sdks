@@ -31,7 +31,7 @@ const info = (kind: "video" | "audio", peaks?: number[], stream = false): Viewer
   content: {
     format: null,
     rendered: { kind, width: null, height: null, peaks },
-    hls: stream ? { renditions: [] } : null,
+    hls: stream ? { status: "ready", renditions: [] } : null,
     preview: { width: 640, height: 360, thumbhash: null, averageColor: null },
   },
 });

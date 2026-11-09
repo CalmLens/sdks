@@ -346,7 +346,7 @@ const mockPlaceholderPng = (thumbhash: string) =>
   );
 
 /** Removing or withholding content removes its rendered file and preview, as the API does. */
-const NO_RENDERING = { rendered: null, preview: null, hls: null, hlsStatus: null } as const;
+const NO_RENDERING = { rendered: null, preview: null, hls: null } as const;
 
 /** The size of the waveform the API makes as an audio asset's preview. */
 const WAVEFORM_SIZE = { width: 1200, height: 300 } as const;
@@ -386,7 +386,7 @@ const isBrowserSafeMediaFormat = (format: string | null) =>
 const mockRendering = (
   asset: Asset,
   processed: boolean,
-): Pick<Asset["content"], "rendered" | "preview" | "hls" | "hlsStatus"> => {
+): Pick<Asset["content"], "rendered" | "preview" | "hls"> => {
   const format = asset.content.format;
   const mimeType = normalizeUploadMimeType(format ?? "");
   const browserSafe = isBrowserSafeMediaFormat(format);
@@ -407,14 +407,12 @@ const mockRendering = (
         rendered: { kind: "image", format: format ?? "image/png", ...unsized },
         preview: preview(unsized),
         hls: null,
-        hlsStatus: null,
       };
     case "website":
       return {
         rendered: { kind: "image", format: "image/png", ...unsized },
         preview: preview(unsized),
         hls: null,
-        hlsStatus: null,
       };
     case "multimedia-document":
       if (SPREADSHEET_MIME_TYPES.includes(mimeType)) return NO_RENDERING;
@@ -422,7 +420,6 @@ const mockRendering = (
         rendered: { kind: "pdf", format: "application/pdf", ...unsized },
         preview: processed ? preview(unsized) : null,
         hls: null,
-        hlsStatus: null,
       };
     case "video":
       return {
@@ -433,7 +430,6 @@ const mockRendering = (
         },
         preview: null,
         hls: null,
-        hlsStatus: null,
       };
     case "audio":
       return {
@@ -445,7 +441,6 @@ const mockRendering = (
         },
         preview: processed ? preview(WAVEFORM_SIZE) : null,
         hls: null,
-        hlsStatus: null,
       };
     default:
       return NO_RENDERING;
@@ -3576,7 +3571,7 @@ export class MockCalmLensApi {
       return noRenderedVersion();
     }
     // The mock never prepares a stream, so it has no playlists or segments to serve.
-    if (isHls && !asset.content.hls) return noRenderedVersion();
+    if (isHls && asset.content.hls?.status !== "ready") return noRenderedVersion();
     const stillImage =
       resource === "preview" || (resource === "rendered" && rendered?.kind === "image");
     if (!stillImage && hasSelector) return invalidTransform();

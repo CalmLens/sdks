@@ -106,22 +106,11 @@ declare const ASSET_HLS_RENDITION_SCHEMA: zod.ZodObject<{
   codecs: zod.ZodString;
 }, zod.core.$strip>;
 type AssetHlsRendition = zod.infer<typeof ASSET_HLS_RENDITION_SCHEMA>;
-/** The adaptive stream of audio or video, as the CDN's `/hls` resource serves it. */
+/**
+ * The adaptive stream of audio or video asked for: whether it is ready or why it isn't, and once
+ * ready its renditions, as the CDN's `/hls` resource serves them.
+ */
 declare const ASSET_HLS_SCHEMA: zod.ZodObject<{
-  renditions: zod.ZodArray<zod.ZodObject<{
-    kind: zod.ZodEnum<{
-      audio: "audio";
-      video: "video";
-    }>;
-    width: zod.ZodNullable<zod.ZodNumber>;
-    height: zod.ZodNullable<zod.ZodNumber>;
-    bandwidth: zod.ZodNumber;
-    codecs: zod.ZodString;
-  }, zod.core.$strip>>;
-}, zod.core.$strip>;
-type AssetHls = zod.infer<typeof ASSET_HLS_SCHEMA>;
-/** Whether the stream asked for is ready, or why it isn't. */
-declare const ASSET_HLS_STATUS_SCHEMA: zod.ZodObject<{
   status: zod.ZodEnum<{
     preparing: "preparing";
     ready: "ready";
@@ -134,8 +123,18 @@ declare const ASSET_HLS_STATUS_SCHEMA: zod.ZodObject<{
     "processing-failed": "processing-failed";
     "spend-limit": "spend-limit";
   }>>;
+  renditions: zod.ZodArray<zod.ZodObject<{
+    kind: zod.ZodEnum<{
+      audio: "audio";
+      video: "video";
+    }>;
+    width: zod.ZodNullable<zod.ZodNumber>;
+    height: zod.ZodNullable<zod.ZodNumber>;
+    bandwidth: zod.ZodNumber;
+    codecs: zod.ZodString;
+  }, zod.core.$strip>>;
 }, zod.core.$strip>;
-type AssetHlsStatus = zod.infer<typeof ASSET_HLS_STATUS_SCHEMA>;
+type AssetHls = zod.infer<typeof ASSET_HLS_SCHEMA>;
 declare const ASSET_RENDERED_KIND_SCHEMA: zod.ZodEnum<{
   audio: "audio";
   image: "image";
@@ -9993,18 +9992,6 @@ declare const ASSET_CONTENT_SCHEMA: zod.ZodObject<{
     peaks: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
   }, zod.core.$strip>>;
   hls: zod.ZodNullable<zod.ZodObject<{
-    renditions: zod.ZodArray<zod.ZodObject<{
-      kind: zod.ZodEnum<{
-        audio: "audio";
-        video: "video";
-      }>;
-      width: zod.ZodNullable<zod.ZodNumber>;
-      height: zod.ZodNullable<zod.ZodNumber>;
-      bandwidth: zod.ZodNumber;
-      codecs: zod.ZodString;
-    }, zod.core.$strip>>;
-  }, zod.core.$strip>>;
-  hlsStatus: zod.ZodNullable<zod.ZodObject<{
     status: zod.ZodEnum<{
       preparing: "preparing";
       ready: "ready";
@@ -10017,6 +10004,16 @@ declare const ASSET_CONTENT_SCHEMA: zod.ZodObject<{
       "processing-failed": "processing-failed";
       "spend-limit": "spend-limit";
     }>>;
+    renditions: zod.ZodArray<zod.ZodObject<{
+      kind: zod.ZodEnum<{
+        audio: "audio";
+        video: "video";
+      }>;
+      width: zod.ZodNullable<zod.ZodNumber>;
+      height: zod.ZodNullable<zod.ZodNumber>;
+      bandwidth: zod.ZodNumber;
+      codecs: zod.ZodString;
+    }, zod.core.$strip>>;
   }, zod.core.$strip>>;
   preview: zod.ZodNullable<zod.ZodObject<{
     width: zod.ZodNullable<zod.ZodNumber>;
@@ -15089,18 +15086,6 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
       peaks: zod.ZodOptional<zod.ZodArray<zod.ZodNumber>>;
     }, zod.core.$strip>>;
     hls: zod.ZodNullable<zod.ZodObject<{
-      renditions: zod.ZodArray<zod.ZodObject<{
-        kind: zod.ZodEnum<{
-          audio: "audio";
-          video: "video";
-        }>;
-        width: zod.ZodNullable<zod.ZodNumber>;
-        height: zod.ZodNullable<zod.ZodNumber>;
-        bandwidth: zod.ZodNumber;
-        codecs: zod.ZodString;
-      }, zod.core.$strip>>;
-    }, zod.core.$strip>>;
-    hlsStatus: zod.ZodNullable<zod.ZodObject<{
       status: zod.ZodEnum<{
         preparing: "preparing";
         ready: "ready";
@@ -15113,6 +15098,16 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
         "processing-failed": "processing-failed";
         "spend-limit": "spend-limit";
       }>>;
+      renditions: zod.ZodArray<zod.ZodObject<{
+        kind: zod.ZodEnum<{
+          audio: "audio";
+          video: "video";
+        }>;
+        width: zod.ZodNullable<zod.ZodNumber>;
+        height: zod.ZodNullable<zod.ZodNumber>;
+        bandwidth: zod.ZodNumber;
+        codecs: zod.ZodString;
+      }, zod.core.$strip>>;
     }, zod.core.$strip>>;
     preview: zod.ZodNullable<zod.ZodObject<{
       width: zod.ZodNullable<zod.ZodNumber>;
@@ -15123,4 +15118,4 @@ declare const ASSET_SCHEMA: zod.ZodObject<{
   }, zod.core.$strip>;
 }, zod.core.$strip>;
 type Asset = zod.infer<typeof ASSET_SCHEMA>;
-export { ProcessingOptions as C, MetadataItem as S, AssetType as _, AssetContentRemovalReason as a, ExtractedText as b, AssetHlsRendition as c, AssetModerationStatus as d, AssetPreview as f, AssetSafetyHoldReason as g, AssetSafetyHold as h, AssetContent as i, AssetHlsStatus as l, AssetRenderedKind as m, AssetClassification as n, AssetContentStatus as o, AssetRendered as p, AssetClassificationStatus as r, AssetHls as s, Asset as t, AssetModeration as u, AssetUpload as v, FileMetadata as x, AssetVisibility as y };
+export { ProcessingOptions as S, AssetUpload as _, AssetContentRemovalReason as a, FileMetadata as b, AssetHlsRendition as c, AssetPreview as d, AssetRendered as f, AssetType as g, AssetSafetyHoldReason as h, AssetContent as i, AssetModeration as l, AssetSafetyHold as m, AssetClassification as n, AssetContentStatus as o, AssetRenderedKind as p, AssetClassificationStatus as r, AssetHls as s, Asset as t, AssetModerationStatus as u, AssetVisibility as v, MetadataItem as x, ExtractedText as y };

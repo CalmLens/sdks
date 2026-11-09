@@ -789,7 +789,7 @@ _MOCK_EMBED_HTML = (b'<!doctype html><html lang="en"><head><meta charset="utf-8"
                     b'<body></body></html>')
 #: Removing or withholding content removes its rendered file, adaptive stream and preview, as the
 #: API does.
-_NO_RENDERING: dict[str, Any] = {"rendered": None, "hls": None, "hlsStatus": None, "preview": None}
+_NO_RENDERING: dict[str, Any] = {"rendered": None, "hls": None, "preview": None}
 #: The size of the waveform the API makes as an audio asset's preview.
 _WAVEFORM_SIZE = {"width": 1200, "height": 300}
 #: Audio and video formats browsers play as uploaded, so the API serves them as stored.
@@ -803,7 +803,7 @@ _SPREADSHEET_MIME_TYPES = ("application/vnd.openxmlformats-officedocument.spread
 def _mock_rendering(asset: Mapping[str, Any], processed: bool) -> dict[str, Any]:
     """The rendered file, adaptive stream (never one: the mock prepares none) and preview the API
     reports for an asset with its content held."""
-    return {**_mock_rendered_file(asset, processed), "hls": None, "hlsStatus": None}
+    return {**_mock_rendered_file(asset, processed), "hls": None}
 
 
 def _mock_rendered_file(asset: Mapping[str, Any], processed: bool) -> dict[str, Any]:
