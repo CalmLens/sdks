@@ -305,7 +305,12 @@ describe("deadlines for large transfers", () => {
       response.headers.set("cache-control", "private, no-store");
       expect(response.headers.get("cache-control")).toBe("private, no-store");
       expect(upstream?.headers.get("cache-control")).toBeNull();
+      expect(response.url).toBe(client.cdn.getAssetUrl({ assetId: "a", resource: "rendered" }));
+      const copy = response.clone();
+      expect(copy.url).toBe(response.url);
+      expect(copy.headers.get("cache-control")).toBe("private, no-store");
       expect(await response.text()).toBe("first,second");
+      expect(await copy.text()).toBe("first,second");
     } finally {
       server.stop(true);
     }

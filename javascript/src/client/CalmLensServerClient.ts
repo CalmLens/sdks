@@ -181,6 +181,26 @@ interface LensCache {
 
 const inspectSymbol = Symbol.for("nodejs.util.inspect.custom");
 
+const writableCdnResponse = (
+  response: Response,
+  metadata: Pick<Response, "url" | "redirected" | "type"> = response,
+): Response => {
+  // Opaque, network-error and upgrade responses cannot be reconstructed by Fetch.
+  if (response.status < 200) return response;
+  const writable = new Response(response.body, response);
+  const { url, redirected, type } = metadata;
+  return Object.defineProperties(writable, {
+    url: { value: url },
+    redirected: { value: redirected },
+    type: { value: type },
+    clone: {
+      value(this: Response) {
+        return writableCdnResponse(Response.prototype.clone.call(this), { url, redirected, type });
+      },
+    },
+  });
+};
+
 /**
  * The CalmLens API client for your server, authenticated with a project API key. Create one per
  * project and reuse it; it holds no connections. Every method takes one options object and
@@ -379,8 +399,7 @@ export default class CalmLensServerClient {
           },
           { allowHttpErrors: true },
         );
-        // Opaque, network-error and upgrade responses cannot be reconstructed by Fetch.
-        return response.status < 200 ? response : new Response(response.body, response);
+        return writableCdnResponse(response);
       },
     };
   }
