@@ -1336,7 +1336,7 @@ const ASSET_MODERATION_SCHEMA = zod.object({
 	}).strict().nullable().describe("Preview. What the policy's link-safety section made of the asset's links. `null` when the policy doesn't act on links and until moderation decides."),
 	raw: zod.object({
 		categories: PUBLIC_CATEGORIES_SCHEMA,
-		hashMatches: CLASSIFICATION_REPORT_SCHEMA.shape.raw.shape.hashMatches.unwrap().describe("Entries in the project's hash lists that the image matched, blocking matches first and then the closest. Empty when nothing matched.")
+		hashMatches: CLASSIFICATION_REPORT_SCHEMA.shape.raw.shape.hashMatches.unwrap().describe("Entries in the project's hash lists that the image, a video's frames or media's cover art matched, blocking matches first and then the closest. Empty when nothing matched.")
 	}).strict().nullable().describe("Detection findings before policy evaluation, `null` until the asset is analysed."),
 	timeline: ASSET_MODERATION_TIMELINE_SCHEMA.nullable().describe("For audio and video: a summary of the findings timeline, which lists findings for each stretch of the media. Page through it with `GET /v1/projects/:projectId/assets/:assetId/timeline`. `null` for other assets, before there are findings and while a safety or copyright hold withholds the asset's content.")
 }).omit({}).refine((moderation) => moderation.source === "mandatory-rule" ? Boolean(moderation.rule) : moderation.rule === null, {
