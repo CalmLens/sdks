@@ -1,5 +1,13 @@
 # @calmlens/sdk-go
 
+## 0.23.1
+
+### Patch Changes
+
+- d47bc14: Apply the decision timeout to in-flight asset lookups and their retries. A zero timeout still checks once.
+
+  Python also reports truncated CDN downloads during streaming reads. PHP returns the original upload error when a stream of unknown size cannot be rewound for a retry.
+
 ## 0.23.0
 
 ### Minor Changes

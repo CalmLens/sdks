@@ -1,3 +1,9 @@
+## 0.23.1
+
+### Patch Changes
+
+- b3330a1: Return CDN responses with writable headers so servers can set their own caching or CORS policy while streaming the asset body.
+
 ## 0.23.0
 
 ### Minor Changes
