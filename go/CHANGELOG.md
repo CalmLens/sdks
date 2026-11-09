@@ -1,5 +1,21 @@
 # @calmlens/sdk-go
 
+## 0.23.0
+
+### Minor Changes
+
+- `Content.HLS` now has `Status`, `Reason` and `Renditions`: it says whether a requested adaptive stream is `preparing` or `ready`, or `unavailable` with a reason (`allowance-used`, `billing-required`, `spend-limit`, `processing-failed` or `content-not-kept`), and lists its renditions once ready. Check `Status` rather than whether `HLS` is nil. The offline mock prepares no stream, so it reports `null`. This replaces the separate HLS status field added in 0.22.0.
+- 314f259: `calmlenstest` now answers as CalmLens does on these points. `FetchCDN` of a private asset without a grant returns `404` `asset/not-found` whatever its state, except its public placeholder; `CDN.Serve` with the API key and public assets are unchanged. Each category in a decision report has `Source` and `Settings`. Uploads naming `UploadPresetID` apply the preset from `UploadPresets.Ensure`: its folder, visibility and processing options, and its `upload-preset/*`, `upload/unsupported-type` and `upload/too-large` refusals, so a test must ensure a preset before uploading through it. `Decision.PendingReview(reason, uncertainCategories...)` leaves a decision waiting for human review, which `mock.Decide` settles and `Assets.Decide` leaves waiting. `TestInputPresets().Germany` now only blocks in Germany, with no findings; `TestInputForSignal("hate.regional-symbol", ...)` keeps the hate finding.
+
+  `Active` on `EnsureLensOptions` and `CreateLensOptions` is now a `*bool`, and a lens without it is active. `Lens` no longer embeds `EnsureLensOptions`; it has the same fields, with `Active` a `bool`.
+
+  `NewServerClient` returns `sdk/invalid-config` for an API key that can't be sent as a header: anything but printable ASCII without spaces. `fmt` no longer prints a dereferenced `ServerClient`'s fields.
+- 928edde: Image transform options list only what the CDN accepts, and any other option fails locally with `sdk/invalid-argument`.
+
+### Patch Changes
+
+- c3bee2b: Adds the `sexual-artistic` qualifier, for sexual content that is art not made to arouse.
+
 ## 0.22.0
 
 ### Minor Changes
