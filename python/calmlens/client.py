@@ -1490,8 +1490,8 @@ class Assets:
         report decisions without polling.
         """
         merged = _merge("assets.waitForDecision", options, asset_id=asset_id, timeout=timeout)
-        asset_id = merged.get("assetId")
-        path = "/assets/" + _id(asset_id, "assetId")
+        requested_id = merged.get("assetId")
+        path = "/assets/" + _id(requested_id, "assetId")
         limit = merged.get("timeout", DEFAULT_DECISION_TIMEOUT)
         if isinstance(limit, bool) or not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit < 0:
             raise _invalid("timeout must be a non-negative number of seconds")
@@ -1516,9 +1516,9 @@ class Assets:
             delay = min(DECISION_POLL_MAX_DELAY, delay * DECISION_POLL_DELAY_FACTOR)
         raise CalmLensError(
             error_codes.SDK_TIMEOUT,
-            f"Asset {asset_id} had no moderation decision after {limit:g}s "
+            f"Asset {requested_id} had no moderation decision after {limit:g}s "
             f"(processing {classification_status}, moderation {moderation_status})",
-            {"assetId": asset_id, "classificationStatus": classification_status,
+            {"assetId": requested_id, "classificationStatus": classification_status,
              "moderationStatus": moderation_status})
 
     def update(self, options: UpdateAssetOptions | None = None, /, *, asset_id: str = _UNSET, name: str = _UNSET,
