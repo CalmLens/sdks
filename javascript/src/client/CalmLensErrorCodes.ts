@@ -291,7 +291,7 @@ export const API_ERROR_DEFINITIONS: Record<ApiErrorCode, ApiErrorDefinition> = {
   },
   "usage/uploads-paused": {
     status: 402,
-    message: "Uploads to this project are paused by its organisation's usage limits. See details.reason; an owner can review them in Billing.",
+    message: "This upload would pass its organisation's usage limits, so it was refused. See details.reason; an owner can review them in Billing.",
   },
   "upload/unsupported-type": {
     status: 415,
