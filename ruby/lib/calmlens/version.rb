@@ -2,5 +2,5 @@
 
 module CalmLens
   # The gem version. The gemspec and the User-Agent header read it from here.
-  VERSION = '0.23.0'
+  VERSION = '0.23.1'
 end
