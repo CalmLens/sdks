@@ -180,6 +180,10 @@ pub(super) fn serve_info(
     let content = &asset["content"];
     let classification = &asset["classification"];
     let status = text(&classification["moderation"]["status"]);
+    let restricted = private || status == "blocked" || status == "purged";
+    if restricted && !authorised {
+        return custom("asset/not-available", 403, "Asset is not available").response();
+    }
     let availability = if !content["safetyHold"].is_null()
         || asset["upload"]["status"] == "uploading"
         || status == "blocked"
@@ -203,12 +207,16 @@ pub(super) fn serve_info(
         },
         "availability": availability,
     });
-    let access = if private { "private" } else { "public" };
+    let cache = if restricted {
+        "private, no-store"
+    } else {
+        "public, no-cache"
+    };
     cdn_response(
         info.to_string().into_bytes(),
         &[
             ("content-type", "application/json".into()),
-            ("cache-control", format!("{access}, max-age=60")),
+            ("cache-control", cache.into()),
             ("cache-tag", format!("asset-{}", text(&asset["id"]))),
         ],
     )

@@ -2775,8 +2775,8 @@ final class MockServerClient
             return $this->json(403, ['code' => ErrorCodes::SIGNED_URL_ORIGINAL_NOT_GRANTED, 'message' => "This signed asset URL doesn't grant the original file"]);
         }
         // Like the CDN, a private asset answers anyone without a grant or the project's API key as an
-        // unknown asset does, whatever its state. Its placeholder is public, and its info has its own rule.
-        if ($asset['visibility'] !== 'public' && $grant === null && !$keyed && !in_array($resource, ['placeholder', 'info'], true)) {
+        // unknown asset does, whatever its state. Its placeholder requires download access, and its info has its own rule.
+        if ($asset['visibility'] !== 'public' && $grant === null && !$keyed && $resource !== 'info') {
             return $notFound();
         }
         // A grant authorises a private asset without the API key; a request without the key has no grants.
@@ -2793,15 +2793,15 @@ final class MockServerClient
             return $notAvailable();
         }
         if ($resource === 'placeholder') {
-            // Like the CDN: the preview's ThumbHash, public whatever the asset's visibility or
-            // moderation status; refused for purged assets and assets without one (not yet
-            // processed, without a preview, or content removed).
+            if ($asset['visibility'] !== 'public' && !$canDownload()) return $notFound();
+            if ($status === 'blocked' && !$canDownload()) return $notAvailable();
+            // A preview requires access for private or blocked assets and disappears with its content.
             $thumbhash = $preview['thumbhash'] ?? null;
             if ($thumbhash === null || $status === 'purged') {
                 return $notAvailable();
             }
             return $this->cdnResponse($method, Placeholder::png($thumbhash), ['Content-Type' => 'image/png',
-                'Cache-Control' => 'public, max-age=3600', 'Cache-Tag' => 'asset-' . $asset['id'],
+                'Cache-Control' => ($asset['visibility'] !== 'public' || $status === 'blocked') ? 'private, no-store' : 'public, no-cache', 'Cache-Tag' => 'asset-' . $asset['id'],
                 'ETag' => '"' . $thumbhash . '"']);
         }
         // Delivery checks come first and refuse everyone, like the CDN.
@@ -2889,6 +2889,10 @@ final class MockServerClient
         }
         $content = $asset['content'];
         $status = $asset['classification']['moderation']['status'];
+        $restricted = $private || in_array($status, ['blocked', 'purged'], true);
+        if ($restricted && !$authorised) {
+            return $this->json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
+        }
         $availability = match (true) {
             ($content['safetyHold'] ?? null) !== null, $asset['upload']['status'] === 'uploading', in_array($status, ['blocked', 'purged'], true),
             $asset['classification']['status'] === 'failed', $content['status'] === 'removed' => Cdn::AVAILABILITY_UNAVAILABLE,
@@ -2901,7 +2905,7 @@ final class MockServerClient
                 'rendered' => $content['rendered'] ?? null, 'preview' => $content['preview'] ?? null, 'hls' => $content['hls'] ?? null],
             'availability' => $availability];
         return $this->cdnResponse($method, json_encode($info, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-            ['Content-Type' => 'application/json', 'Cache-Control' => ($private ? 'private' : 'public') . ', max-age=60', 'Cache-Tag' => 'asset-' . $asset['id']]);
+            ['Content-Type' => 'application/json', 'Cache-Control' => $restricted ? 'private, no-store' : 'public, no-cache', 'Cache-Tag' => 'asset-' . $asset['id']]);
     }
 
     private function cdnResponse(string $method, string $bytes, array $headers): Response

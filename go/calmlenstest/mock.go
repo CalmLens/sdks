@@ -2897,9 +2897,9 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 		return grant != nil || m.canDownload(text(asset["folderId"]), req.Header.Get("X-Api-Key"))
 	}
 	// Like the CDN, a private asset answers anyone without a grant or the project's API key as an
-	// unknown asset does, whatever its state. Its placeholder is public.
+	// unknown asset does, whatever its state. Its placeholder requires download access.
 	if asset["visibility"] != calmlens.VisibilityPublic && req.Header.Get("X-Api-Key") != m.options.APIKey && !canDownload() &&
-		resource != calmlens.ResourcePlaceholder && resource != calmlens.ResourceInfo {
+		resource != calmlens.ResourceInfo {
 		return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
 	}
 	if resource == calmlens.ResourceInfo {
@@ -2914,9 +2914,13 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 		return notAvailable()
 	}
 	if resource == calmlens.ResourcePlaceholder {
-		// Like the CDN's placeholder handler: the preview's ThumbHash, public whatever the asset's
-		// visibility or moderation status; refused for purged assets and assets without one (not
-		// yet processed, without a preview, or content removed).
+		if asset["visibility"] != calmlens.VisibilityPublic && !canDownload() {
+			return errorBody(http.StatusNotFound, calmlens.CodeAssetNotFound, "Asset not found")
+		}
+		if moderation == calmlens.ModerationStatusBlocked && !canDownload() {
+			return notAvailable()
+		}
+		// A preview requires access for private or blocked assets and disappears with its content.
 		thumbhash := text(preview["thumbhash"])
 		if thumbhash == "" || moderation == calmlens.ModerationStatusPurged {
 			return notAvailable()
@@ -2925,7 +2929,10 @@ func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, hea
 		if err != nil {
 			return notAvailable()
 		}
-		header.Set("Cache-Control", "public, max-age=3600")
+		header.Set("Cache-Control", "public, no-cache")
+		if asset["visibility"] != calmlens.VisibilityPublic || moderation == calmlens.ModerationStatusBlocked {
+			header.Set("Cache-Control", "private, no-store")
+		}
 		header.Set("Cache-Tag", tag)
 		header.Set("ETag", strconv.Quote(thumbhash))
 		return http.StatusOK, png, "image/png"
@@ -3063,6 +3070,10 @@ func (m *MockServerClient) serveInfo(req *http.Request, asset calmlens.JSON, aut
 	content := section(asset, "content")
 	classification := section(asset, "classification")
 	moderation := section(classification, "moderation")["status"]
+	restricted := private || moderation == calmlens.ModerationStatusBlocked || moderation == calmlens.ModerationStatusPurged
+	if restricted && !authorised {
+		return errorBody(http.StatusForbidden, "asset/not-available", "Asset is not available")
+	}
 	availability := calmlens.AssetAvailabilityAvailable
 	switch {
 	case content["safetyHold"] != nil, section(asset, "upload")["status"] == "uploading",
@@ -3082,11 +3093,10 @@ func (m *MockServerClient) serveInfo(req *http.Request, asset calmlens.JSON, aut
 		"availability": availability,
 	}
 	data, _ := json.Marshal(info)
-	access := "public"
-	if private {
-		access = "private"
+	header.Set("Cache-Control", "public, no-cache")
+	if restricted {
+		header.Set("Cache-Control", "private, no-store")
 	}
-	header.Set("Cache-Control", access+", max-age=60")
 	header.Set("Cache-Tag", "asset-"+text(asset["id"]))
 	return http.StatusOK, data, "application/json"
 }

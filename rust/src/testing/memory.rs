@@ -2962,12 +2962,12 @@ impl Backend {
                 || self.can_download(text(&asset["folderId"]), header(headers, "x-api-key"))
         };
         // Like the CDN, a private asset answers anyone without a grant or an API key as an unknown
-        // asset does, whatever its state. Its placeholder is public, and its info has this rule of
+        // asset does, whatever its state. Its placeholder requires download access, and its info has this rule of
         // its own.
         if !public
             && grant.is_none()
             && header(headers, "x-api-key").is_empty()
-            && !matches!(resource, "placeholder" | "info")
+            && resource != "info"
         {
             return not_found();
         }
@@ -2981,9 +2981,13 @@ impl Backend {
             return not_available();
         }
         if resource == "placeholder" {
-            // Like the CDN's placeholder handler: the preview's ThumbHash, public whatever the
-            // asset's visibility or moderation; refused for purged assets and assets without one
-            // (not yet processed, without a preview, or content removed).
+            if !public && !can_download() {
+                return not_found();
+            }
+            if status == "blocked" && !can_download() {
+                return not_available();
+            }
+            // A preview requires access for private or blocked assets and disappears with its content.
             let thumbhash = text(&preview["thumbhash"]);
             if thumbhash.is_empty() || status == "purged" {
                 return not_available();
@@ -2995,7 +2999,15 @@ impl Backend {
                 png,
                 &[
                     ("content-type", "image/png".into()),
-                    ("cache-control", "public, max-age=3600".into()),
+                    (
+                        "cache-control",
+                        if !public || status == "blocked" {
+                            "private, no-store"
+                        } else {
+                            "public, no-cache"
+                        }
+                        .into(),
+                    ),
                     ("cache-tag", format!("asset-{id}")),
                     ("etag", format!("\"{thumbhash}\"")),
                 ],

@@ -2670,19 +2670,20 @@ final class MockApi {
     JsonObject rendered = content.get("rendered") instanceof JsonObject value ? value : null;
     JsonObject preview = content.get("preview") instanceof JsonObject value ? value : null;
     // Like the CDN, a private asset answers anyone without a grant or the project's API key as an
-    // unknown asset does, whatever its state. Its placeholder is public.
-    if (!isPublic && grant == null && apiKey == null && !resource.equals("placeholder") && !resource.equals("info")) return error(notFound);
+    // unknown asset does, whatever its state. Its placeholder requires download access.
+    if (!isPublic && grant == null && apiKey == null && !resource.equals("info")) return error(notFound);
     if (resource.equals("info")) return info(request, asset, grant != null || canDownload(str(asset, "folderId"), apiKey));
     // Like the CDN, a safety hold refuses every resource.
     if (held(asset)) return error(notAvailable);
     if (resource.equals("placeholder")) {
-      // Like the CDN's placeholder handler: the preview's ThumbHash, public whatever the asset's
-      // visibility or moderation status; refused for purged assets and assets without one (not yet
-      // processed, without a preview, or content removed).
+      boolean authorised = grant != null || canDownload(str(asset, "folderId"), apiKey);
+      if (!isPublic && !authorised) return error(notFound);
+      if ("blocked".equals(status) && !authorised) return error(notAvailable);
+      // A preview requires access for private or blocked assets and disappears with its content.
       String thumbhash = str(preview, "thumbhash");
       if (thumbhash == null || "purged".equals(status)) return error(notAvailable);
       return served(request, Thumbhash.toPng(Base64.getDecoder().decode(thumbhash)), "image/png", "Cache-Control",
-          "public, max-age=3600", "Cache-Tag", "asset-" + str(asset, "id"), "ETag", "\"" + thumbhash + "\"");
+          !isPublic || "blocked".equals(status) ? "private, no-store" : "public, no-cache", "Cache-Tag", "asset-" + str(asset, "id"), "ETag", "\"" + thumbhash + "\"");
     }
     // Like the CDN, delivery checks come first and refuse everyone: content still uploading,
     // blocked or purged, failed processing or removed content, and an original without its bytes.
@@ -2770,6 +2771,8 @@ final class MockApi {
     }
     String status = str(asset.getAsJsonObject("classification").getAsJsonObject("moderation"), "status");
     JsonObject content = asset.getAsJsonObject("content");
+    boolean restricted = !"public".equals(str(asset, "visibility")) || "blocked".equals(status) || "purged".equals(status);
+    if (restricted && !authorised) return error(new Failure("asset/not-available", 403, "Asset is not available"));
     String availability = held(asset) || "uploading".equals(str(asset.getAsJsonObject("upload"), "status"))
         || "blocked".equals(status) || "purged".equals(status) || "failed".equals(str(asset.getAsJsonObject("classification"), "status"))
         || "removed".equals(str(content, "status")) ? "unavailable"
@@ -2786,7 +2789,7 @@ final class MockApi {
     info.add("content", shown);
     info.addProperty("availability", availability);
     return served(request, Json.write(info).getBytes(StandardCharsets.UTF_8), "application/json",
-        "Cache-Control", ("public".equals(str(asset, "visibility")) ? "public" : "private") + ", max-age=60",
+        "Cache-Control", restricted ? "private, no-store" : "public, no-cache",
         "Cache-Tag", "asset-" + str(asset, "id"));
   }
 

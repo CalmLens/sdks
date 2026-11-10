@@ -9162,7 +9162,7 @@
       ]
     },
     {
-      "name": "an image's placeholder is public whatever its visibility or moderation, and refused once purged or removed",
+      "name": "placeholders enforce private and blocked access, revalidate public previews and refuse removed content",
       "mock": {},
       "steps": [
         {
@@ -9197,7 +9197,7 @@
               "bodyPrefixBase64": "iVBORw0KGgo=",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=3600",
+                "Cache-Control": "public, no-cache",
                 "Cache-Tag": {
                   "$concat": [
                     "asset-",
@@ -9232,11 +9232,40 @@
           },
           "expect": {
             "cdn": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": [
+              {
+                "actions": [
+                  "assets:download"
+                ],
+                "folderId": null,
+                "includeSubfolders": true
+              }
+            ]
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetId": {
+              "$ref": "public.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
               "status": 200,
               "bodyPrefixBase64": "iVBORw0KGgo=",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=3600",
+                "Cache-Control": "private, no-store",
                 "Cache-Tag": {
                   "$concat": [
                     "asset-",
@@ -9250,6 +9279,12 @@
                 "ETag"
               ]
             }
+          }
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": []
           }
         },
         {
@@ -9290,7 +9325,7 @@
               "bodyPrefixBase64": "iVBORw0KGgo=",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=3600",
+                "Cache-Control": "public, no-cache",
                 "Cache-Tag": {
                   "$concat": [
                     "asset-",
@@ -9348,11 +9383,40 @@
           },
           "expect": {
             "cdn": {
+              "status": 404,
+              "code": "asset/not-found"
+            }
+          }
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": [
+              {
+                "actions": [
+                  "assets:download"
+                ],
+                "folderId": null,
+                "includeSubfolders": true
+              }
+            ]
+          }
+        },
+        {
+          "operation": "cdn.serve",
+          "args": {
+            "assetId": {
+              "$ref": "private.id"
+            },
+            "resource": "placeholder"
+          },
+          "expect": {
+            "cdn": {
               "status": 200,
               "bodyPrefixBase64": "iVBORw0KGgo=",
               "headers": {
                 "Content-Type": "image/png",
-                "Cache-Control": "public, max-age=3600",
+                "Cache-Control": "private, no-store",
                 "Cache-Tag": {
                   "$concat": [
                     "asset-",
@@ -9366,6 +9430,12 @@
                 "ETag"
               ]
             }
+          }
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": []
           }
         },
         {
@@ -9458,6 +9528,20 @@
           },
           "expect": {
             "httpStatus": 200
+          }
+        },
+        {
+          "operation": "mock.grant",
+          "args": {
+            "grants": [
+              {
+                "actions": [
+                  "assets:download"
+                ],
+                "folderId": null,
+                "includeSubfolders": true
+              }
+            ]
           }
         },
         {
@@ -13239,6 +13323,32 @@
           "args": {
             "url": {
               "$ref": "url"
+            }
+          },
+          "expect": {
+            "error": {
+              "status": 403,
+              "code": "asset/not-available"
+            }
+          }
+        },
+        {
+          "operation": "cdn.signAssetUrl",
+          "args": {
+            "assetId": {
+              "$ref": "a.id"
+            }
+          },
+          "save": "blockedSigned",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "cdn.getAssetInfo",
+          "args": {
+            "url": {
+              "$ref": "blockedSigned.url"
             }
           },
           "expect": {

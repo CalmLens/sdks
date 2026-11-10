@@ -1782,8 +1782,7 @@ module CalmLens
       # Answers like the CDN (serveAssetResource.ts): `original` is the upload; `rendered` the image,
       # PDF, video or audio file `content.rendered` describes; `preview` the still `content.preview`
       # describes; `hls` the adaptive stream's files, which the mock never prepares; `embed` a small
-      # page standing in for the embed page of any asset; and `placeholder` the preview's ThumbHash as a PNG, public
-      # whatever the asset's visibility or moderation. A safety hold refuses every resource. Other resources pass delivery checks first,
+      # page standing in for the embed page of any asset; and `placeholder` the preview's ThumbHash as a PNG. A safety hold refuses every resource. Other resources pass delivery checks first,
       # which refuse everyone (content still uploading, blocked or purged, failed processing, removed
       # content), then an age-restricted asset needs `viewerClaims.ageConfirmed=true` whatever the key,
       # and a private asset needs an API key with `assets:download` for its folder. The mock converts
@@ -1809,21 +1808,21 @@ module CalmLens
         authorised = !grant.nil? || can_download?(item['folderId'], headers)
         return info(method, item, authorised, params) if resource == 'info'
         return not_available if item['content']['safetyHold']
-        return placeholder(method, item) if resource == 'placeholder'
+        return placeholder(method, item, authorised) if resource == 'placeholder'
 
         deliver(method, item, resource, params, selected ? options || {} : nil, authorised)
       end
 
       # What a grant doesn't cover, or, like the CDN, a private asset for anyone without a grant or the
       # project's API key: it answers as an unknown asset does, whatever its state, except for its
-      # public placeholder and its info, which has its own rule. An error response, or nil.
+      # info, which has its own rule. An error response, or nil.
       def refuse_viewer(item, resource, grant, headers)
         if resource == 'original' && grant && !grant[:original]
           return error(ErrorCodes::SIGNED_URL_ORIGINAL_NOT_GRANTED, "This signed asset URL doesn't grant the original file", status: 403)
         end
         return if grant || item['visibility'] == 'public' || header(headers, 'X-Api-Key') == @api_key
 
-        asset_not_found unless %w[placeholder info].include?(resource)
+        asset_not_found unless resource == 'info'
       end
 
       # Whether the path after the resource selects a lens or transform, and its options; nil when the
@@ -1865,13 +1864,15 @@ module CalmLens
       def info(method, item, authorised, params)
         restricted = item['visibility'] != 'public'
         return asset_not_found if restricted && !authorised
+        restricted ||= %w[blocked purged].include?(item['classification']['moderation']['status'])
+        return not_available if restricted && !authorised
 
         claims = JSON.parse(params.fetch('viewerClaims', '{}'))
         body = { 'id' => item['id'], 'projectId' => item['projectId'], 'type' => item['type'], 'externalUrl' => item['externalUrl'],
                  'content' => item['content'].slice(*%w[format width height durationSeconds pageCount rendered preview hls]),
                  'availability' => availability(item, claims.is_a?(Hash) && claims['ageConfirmed'] == true) }
         cdn_response(method, JSON.generate(body), { 'content-type' => 'application/json',
-                                                    'cache-control' => "#{restricted ? 'private' : 'public'}, max-age=60",
+                                                    'cache-control' => restricted ? 'private, no-store' : 'public, no-cache',
                                                     'cache-tag' => "asset-#{item['id']}" })
       rescue JSON::ParserError
         error(ErrorCodes::INVALID_VIEWER_CLAIMS, 'Invalid viewer claims', status: 400)
@@ -1980,15 +1981,18 @@ module CalmLens
 
       def not_available = error('asset/not-available', 'Asset is not available', status: 403)
 
-      # Like the CDN's placeholder handler: the preview's ThumbHash, public whatever the asset's
-      # visibility or moderation; refused for purged assets and assets without one (not yet
-      # processed, without a preview, or content removed).
-      def placeholder(method, item)
+      # A preview requires access for private or blocked assets and disappears with its content.
+      def placeholder(method, item, authorised)
+        private_asset = item['visibility'] != 'public'
+        blocked = item['classification']['moderation']['status'] == 'blocked'
+        return asset_not_found if private_asset && !authorised
+        return not_available if blocked && !authorised
+
         thumbhash = item.dig('content', 'preview', 'thumbhash')
         return not_available if thumbhash.nil? || item['classification']['moderation']['status'] == 'purged'
 
         cdn_response(method, Placeholder.png(thumbhash),
-                     'content-type' => 'image/png', 'cache-control' => 'public, max-age=3600',
+                     'content-type' => 'image/png', 'cache-control' => private_asset || blocked ? 'private, no-store' : 'public, no-cache',
                      'cache-tag' => "asset-#{item['id']}", 'etag' => "\"#{thumbhash}\"")
       end
 

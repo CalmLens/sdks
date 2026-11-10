@@ -2791,9 +2791,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
             # A grant authorises a private asset without the API key.
             authorised = grant is not None or (with_api_key and self._can_download(asset.get("folderId")))
             # Like the CDN, a private asset answers anyone without a grant or the project's API key
-            # as an unknown asset does, whatever its state. Its placeholder is public.
+            # as an unknown asset does, whatever its state. Its placeholder requires download access.
             if (asset["visibility"] != "public" and grant is None and not with_api_key
-                    and resource not in ("placeholder", "info")):
+                    and resource != "info"):
                 return self._failure_response(_Failure(error_codes.ASSET_NOT_FOUND, "Asset not found", 404))
             if resource == "info":
                 return self._serve_info(method, asset, query, authorised)
@@ -2804,15 +2804,17 @@ class MockCalmLensServerClient(CalmLensServerClient):
             if asset["content"].get("safetyHold"):
                 return self._failure_response(not_available)
             if resource == "placeholder":
-                # Like the CDN's placeholder handler: the preview's ThumbHash, served publicly for
-                # every asset whatever its visibility or moderation status; refused for purged
-                # assets and assets without one (not yet processed, without a preview, or content
-                # removed).
+                if asset["visibility"] != "public" and not authorised:
+                    return self._failure_response(_Failure("asset/not-found", "Asset not found", 404))
+                if status == "blocked" and not authorised:
+                    return self._failure_response(not_available)
+                # A preview requires access for private or blocked assets and disappears with its content.
                 thumbhash = (preview or {}).get("thumbhash")
                 if not thumbhash or status == "purged":
                     return self._failure_response(not_available)
                 return self._cdn_response(method, _thumbhash_png(thumbhash), {
-                    "Content-Type": "image/png", "Cache-Control": "public, max-age=3600",
+                    "Content-Type": "image/png", "Cache-Control": "private, no-store"
+                    if asset["visibility"] != "public" or status == "blocked" else "public, no-cache",
                     "Cache-Tag": f"asset-{asset['id']}", "ETag": f'"{thumbhash}"'})
             # Like the CDN, delivery checks come first and refuse everyone: content still uploading,
             # blocked or purged, failed processing or removed content.
@@ -2900,6 +2902,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
             return self._failure_response(_Failure(error_codes.INVALID_VIEWER_CLAIMS, "Invalid viewer claims", 400))
         content, classification = asset["content"], asset["classification"]
         status = classification["moderation"].get("status")
+        restricted = private or status in ("blocked", "purged")
+        if restricted and not authorised:
+            return self._failure_response(_Failure("asset/not-available", "Asset is not available", 403))
         if (content.get("safetyHold") or asset["upload"]["status"] == "uploading" or status in ("blocked", "purged")
                 or classification["status"] == "failed" or content["status"] == "removed"):
             availability = "unavailable"
@@ -2913,7 +2918,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
                     "format", "width", "height", "durationSeconds", "pageCount", "rendered", "preview", "hls")},
                 "availability": availability}
         return self._cdn_response(method, _json(info).encode("utf-8"), {
-            "Content-Type": "application/json", "Cache-Control": f"{'private' if private else 'public'}, max-age=60",
+            "Content-Type": "application/json", "Cache-Control": "private, no-store" if restricted else "public, no-cache",
             "Cache-Tag": f"asset-{asset['id']}"})
 
     def _cdn_response(self, method: str, content: bytes, headers: dict[str, str]) -> _Response:
