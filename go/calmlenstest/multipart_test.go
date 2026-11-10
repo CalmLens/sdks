@@ -63,9 +63,19 @@ func TestMockResumesAnUploadWithTheSameKeyAfterAPartFails(t *testing.T) {
 	if _, err = c.Assets.Classify(ctx, options); calmlens.ErrorCode(err) != calmlens.CodeSDKTransportError {
 		t.Fatal(err)
 	}
+	before := len(c.Requests())
 	asset, err := c.Assets.Classify(ctx, options)
 	if err != nil || asset.Upload.Status != "completed" || *asset.Content.SizeInBytes != int64(len(file)) {
 		t.Fatal(asset, err)
+	}
+	requests := c.Requests()[before:]
+	if requests[0].Header.Get("Idempotency-Replay-Only") != "true" || len(requests[0].File) != 0 {
+		t.Fatal("resume sent first-part bytes")
+	}
+	for _, request := range requests[1:] {
+		if request.Query.Get("partNumber") == "1" {
+			t.Fatal("resume restarted part one")
+		}
 	}
 	page, err := c.Assets.List(ctx, calmlens.ListAssetsOptions{})
 	if err != nil || len(page.Items) != 1 || page.Items[0].ID != asset.ID {
@@ -74,5 +84,13 @@ func TestMockResumesAnUploadWithTheSameKeyAfterAPartFails(t *testing.T) {
 	stored := c.ImageStorage.Content[asset.ID]
 	if !bytes.Equal(bytes.Join([][]byte{stored.Parts[1], stored.Parts[2], stored.Parts[3]}, nil), file) || moderations != 1 {
 		t.Fatal("stored parts", len(stored.Parts), "moderations", moderations)
+	}
+	options.Name = "changed.pdf"
+	before = len(c.Requests())
+	if _, err := c.Assets.Classify(ctx, options); calmlens.ErrorCode(err) != calmlens.CodeIdempotencyKeyReused {
+		t.Fatal("changed metadata was accepted", err)
+	}
+	if requests := c.Requests()[before:]; len(requests) != 1 || len(requests[0].File) != 0 {
+		t.Fatal("rejected resume sent file bytes")
 	}
 }

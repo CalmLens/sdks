@@ -332,7 +332,7 @@ func (s *AssetsService) submit(ctx context.Context, options SubmitAssetOptions, 
 	}
 	params.Set("contentType", content.Type)
 	if split != nil {
-		return s.submitInParts(ctx, params, fields, content.Type, split, key)
+		return s.submitInParts(ctx, params, fields, content.Type, split, key, options.IdempotencyKey != "")
 	}
 	mode := "content"
 	if size != nil {
@@ -483,8 +483,8 @@ func (r *rewindableForm) Seek(offset int64, whence int) (int64, error) {
 // submitInParts uploads src in parts of Options.PartSizeBytes and returns the final part's
 // asset. Part 1 starts the upload as a form with the upload's fields, its transport query
 // (params) and key; part n after it carries "<key>:part-<n>", so a repeated call with the same
-// key uses the upload progress in the replay response and sends the remaining parts.
-func (s *AssetsService) submitInParts(ctx context.Context, params url.Values, fields uploadFields, contentType string, src *source, key string) (*Asset, error) {
+// explicit key first checks current progress with an empty file part and sends only missing parts.
+func (s *AssetsService) submitInParts(ctx context.Context, params url.Values, fields uploadFields, contentType string, src *source, key string, checkExisting bool) (*Asset, error) {
 	partSize := s.c.options.PartSizeBytes
 	count := int((src.size + partSize - 1) / partSize)
 	first := src.part(1, partSize)
@@ -493,13 +493,28 @@ func (s *AssetsService) submitInParts(ctx context.Context, params url.Values, fi
 	params.Set("partNumber", "1")
 	params.Set("isFinal", "false")
 	params.Set("totalSizeInBytes", strconv.FormatInt(src.size, 10))
-	form, err := newUploadForm(fields, contentType, first, &firstSize)
-	if err != nil {
-		return nil, err
-	}
 	var result Asset
-	if err := s.c.send(ctx, form.call(s.c.project("assets"), params, "part", key), &result); err != nil {
-		return nil, err
+	if checkExisting {
+		zero := int64(0)
+		probe, err := newUploadForm(fields, contentType, bytes.NewReader(nil), &zero)
+		if err != nil {
+			return nil, err
+		}
+		request := probe.call(s.c.project("assets"), params, "part", key)
+		request.headers.Set("Idempotency-Replay-Only", "true")
+		request.binary = false
+		if err := s.c.send(ctx, request, &result); err != nil {
+			return nil, err
+		}
+	}
+	if result.ID == "" {
+		form, err := newUploadForm(fields, contentType, first, &firstSize)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.c.send(ctx, form.call(s.c.project("assets"), params, "part", key), &result); err != nil {
+			return nil, err
+		}
 	}
 	asset, err := uploaded(&result)
 	if err != nil {

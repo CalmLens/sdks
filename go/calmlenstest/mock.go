@@ -816,7 +816,7 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 		compared = string(raw)
 	}
 	if isUploadForm(req.Header) && formErr == nil {
-		compared, contentType, length = formText, "multipart/form-data", len(formFile)
+		compared, contentType, length = formText, "multipart/form-data", 0
 	}
 	fingerprint := strings.Join([]string{req.Method, req.URL.EscapedPath(), req.URL.RawQuery, contentType, req.Header.Get("X-Calmlens-Upload"), strconv.Itoa(length), compared}, "\n")
 	if len(req.Header.Values("Idempotency-Key")) > 0 {
@@ -828,8 +828,20 @@ func (m *MockServerClient) answer(req *http.Request, raw []byte) (*http.Response
 				return m.jsonResponse(req, header, nil, fail(calmlens.CodeIdempotencyKeyReused)), nil
 			}
 			header.Set("Idempotent-Replayed", "true")
+			if req.Header.Get("X-Calmlens-Upload") == "part" && isUploadForm(req.Header) {
+				var original calmlens.JSON
+				if json.Unmarshal(saved.data, &original) == nil {
+					if asset, err := m.asset(text(original["id"])); err == nil {
+						data, _ := json.Marshal(asset)
+						return response(req, saved.status, header, "application/json", data), nil
+					}
+				}
+			}
 			return response(req, saved.status, header, "application/json", saved.data), nil
 		}
+	}
+	if req.Header.Get("Idempotency-Replay-Only") == "true" {
+		return response(req, http.StatusNoContent, header, "", nil), nil
 	}
 	m.status = 0
 	result, err := m.dispatch(req.Method, parts, req.URL.Query(), raw, req.Header)

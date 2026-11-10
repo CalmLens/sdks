@@ -63,13 +63,27 @@ func equal(t *testing.T, name string, got, want []string) {
 	}
 }
 
+// Check the metadata-only lookup before inspecting the actual upload requests.
+func checkAndRemoveResumeProbe(t *testing.T, h *harness) {
+	t.Helper()
+	if h.calls[0].Header.Get("Idempotency-Replay-Only") != "true" {
+		t.Fatal("missing resume probe")
+	}
+	_, _, file := h.form(t, 0)
+	if len(file) != 0 {
+		t.Fatalf("resume probe sent %d file bytes", len(file))
+	}
+	h.calls, h.bodies = h.calls[1:], h.bodies[1:]
+}
+
 func TestContentLargerThanPartSizeIsSentInPartsWithDerivedKeys(t *testing.T) {
-	c, h := splitClient(t, 5*mib, uploadReply("uploading", 1), uploadReply("uploading", 2), uploadReply("completed", nil))
+	c, h := splitClient(t, 5*mib, reply{status: 204}, uploadReply("uploading", 1), uploadReply("uploading", 2), uploadReply("completed", nil))
 	file := fileOf(11 * mib)
 	asset, err := c.Assets.Classify(context.Background(), SubmitAssetOptions{Name: "clip.mp4", Description: Ptr("a clip"), AuthorID: Ptr("user-2"), Context: &ModerationContext{Items: []ModerationContextItem{{Text: "earlier"}}}, Content: &Content{Type: "video/mp4", Bytes: file}, IdempotencyKey: "upload-1"})
 	if err != nil || asset.Upload.Status != "completed" {
 		t.Fatal(asset, err)
 	}
+	checkAndRemoveResumeProbe(t, h)
 	var paths []string
 	for _, call := range h.calls {
 		paths = append(paths, call.URL.EscapedPath())
@@ -100,6 +114,7 @@ type onlySeeker struct{ io.ReadSeeker }
 
 func TestADroppedPartIsRetriedWithItsKeyAndAPartTheAPIHasIsSkipped(t *testing.T) {
 	c, h := splitClient(t, 5*mib,
+		reply{status: 204},
 		uploadReply("uploading", 1),
 		reply{err: errors.New("connection reset")},
 		uploadReply("uploading", 2),
@@ -117,6 +132,7 @@ func TestADroppedPartIsRetriedWithItsKeyAndAPartTheAPIHasIsSkipped(t *testing.T)
 	if err != nil || asset.Upload.Status != "completed" {
 		t.Fatal(asset, err)
 	}
+	checkAndRemoveResumeProbe(t, h)
 	equal(t, "keys", sentKeys(h), []string{"upload-2", "upload-2:part-2", "upload-2:part-2", "upload-2:part-3", "upload-2:part-4"})
 	equal(t, "isFinal", sentQuery(h, "isFinal"), []string{"false", "false", "false", "false", "true"})
 	if !bytes.Equal(h.bodies[1], file[5*mib:10*mib]) || !bytes.Equal(h.bodies[2], h.bodies[1]) || !bytes.Equal(h.bodies[4], file[15*mib:]) {
@@ -134,8 +150,9 @@ func TestMultipartResumeStartsAfterThePartsAlreadyRecorded(t *testing.T) {
 	if err != nil || asset.Upload.Status != "completed" {
 		t.Fatal(asset, err)
 	}
-	equal(t, "part numbers", sentQuery(h, "partNumber"), []string{"1", "4"})
-	if !bytes.Equal(h.bodies[1], file[15*mib:]) {
+	checkAndRemoveResumeProbe(t, h)
+	equal(t, "part numbers", sentQuery(h, "partNumber"), []string{"4"})
+	if !bytes.Equal(h.bodies[0], file[15*mib:]) {
 		t.Fatal("resume sent bytes from the wrong offset")
 	}
 }
@@ -203,4 +220,16 @@ func TestPartSizeAndSplitUploadLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 	equal(t, "partNumber", sentQuery(h, "partNumber"), []string{"1", "2"})
+}
+
+func TestMultipartResumeOfCompletedUploadSendsNoFileBytes(t *testing.T) {
+	c, h := splitClient(t, 5*mib, uploadReply("completed", nil))
+	asset, err := c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "report.pdf", Content: &Content{Type: "application/pdf", Bytes: fileOf(11 * mib)}, IdempotencyKey: "finished"})
+	if err != nil || asset.ID != "asset-1" || asset.Upload.Status != "completed" {
+		t.Fatal(asset, err)
+	}
+	checkAndRemoveResumeProbe(t, h)
+	if len(h.calls) != 0 {
+		t.Fatalf("completed upload sent %d more requests", len(h.calls))
+	}
 }

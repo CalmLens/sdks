@@ -66,6 +66,11 @@ func (s *scriptedTransport) RoundTrip(req *http.Request) (*http.Response, error)
 		body, _ = io.ReadAll(req.Body)
 		req.Body.Close()
 	}
+	// Shared fixtures describe the upload itself. Go's metadata-only resume lookup has
+	// explicit body/progress/error coverage in multipart_test.go; these cases start fresh.
+	if req.Header.Get("Idempotency-Replay-Only") == "true" {
+		return (&scriptedResponse{Status: http.StatusNoContent}).response(req), nil
+	}
 	s.mu.Lock()
 	s.received = append(s.received, recordedRequest{method: req.Method, url: req.URL, header: req.Header.Clone(), body: body})
 	count := len(s.received)

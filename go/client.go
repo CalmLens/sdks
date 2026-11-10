@@ -537,7 +537,7 @@ func (c *ServerClient) attempt(ctx context.Context, method, endpoint string, hea
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return responseError(res, data, c.now())
 	}
-	if out == nil {
+	if out == nil || (res.StatusCode == http.StatusNoContent && headers.Get("Idempotency-Replay-Only") == "true") {
 		return nil
 	}
 	requestID := res.Header.Get("X-Request-Id")
