@@ -433,7 +433,7 @@ export interface IdempotencyOptions {
  * What a resource URL beneath an asset URL serves: the `original` file exactly as uploaded (with a
  * signed URL, only when signed with `original`); the `rendered` file for display (an image in the
  * best format the client accepts, a PDF, or browser-safe video or audio); the `preview` still;
- * the blurred `placeholder` PNG, public for every asset; the `hls` stream of audio or video (its
+ * the blurred `placeholder` PNG (private or blocked assets require a signed URL or download permission); the `hls` stream of audio or video (its
  * master playlist); the `embed` page, which shows the asset in an iframe; or the `info` JSON that
  * `getAssetInfo` reads. Lenses and transforms apply to `preview`, and to `rendered` when it is an
  * image; the other resources take none.

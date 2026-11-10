@@ -56,8 +56,8 @@ use Psr\Http\Message\ResponseInterface;
  *
  * Like the CDN, a private asset requested with neither the API key nor a grant from
  * `cdn->signAssetUrl` answers as an unknown asset does, 404 `asset/not-found`, whatever its state;
- * `fetchCdn` loads a URL without the key, as a browser would. Its placeholder stays public, and
- * its `info` has its own rule. Otherwise a safety hold refuses every resource, the placeholder
+ * `fetchCdn` loads a URL without the key, as a browser would. Its placeholder and
+ * `info` also require a grant or download permission. Otherwise a safety hold refuses every resource, the placeholder
  * included, with 403 `asset/not-available`. Then it checks delivery: blocked, purged and failed
  * assets, and assets whose content was removed or is still uploading, return 403
  * `asset/not-available`. Then access: an age-restricted asset requested without

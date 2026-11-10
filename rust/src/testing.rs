@@ -410,8 +410,8 @@ impl MockServerClient {
     /// blocked and purged assets, age-restricted ones requested without
     /// `ViewerClaims::age_confirmed` set to `true` whatever the key, and private ones unless the
     /// API key has an `assets:download` grant ([`create_mock_api_key`]). Without a grant or an API
-    /// key, a private asset answers `asset/not-found` whatever its state, for every resource but
-    /// its public placeholder. Served content has its stored `content-type` and
+    /// key, a private asset answers `asset/not-found` whatever its state, including
+    /// its placeholder and info. Served content has its stored `content-type` and
     /// the CDN's `cache-control`: `public` only when anyone may see the asset, otherwise
     /// `private`, with `max-age=31536000, immutable` for images and `max-age=3600` otherwise.
     /// Content is never classified or transformed.
@@ -640,7 +640,7 @@ impl MockServerClient {
     /// Fetches a CDN URL as a browser would, with a GET and without the API key: a signed asset
     /// URL from `cdn().sign_asset_url` (with a resource appended), or a public one from
     /// `cdn().get_asset_url`. A private asset's plain URL answers `asset/not-found`, whatever the
-    /// asset's state, for every resource but its placeholder. The request is recorded like any other, and the response is returned
+    /// asset's state, including its placeholder and info. The request is recorded like any other, and the response is returned
     /// whatever its status.
     pub async fn fetch_cdn(&self, url: &str) -> Result<crate::CdnResponse> {
         self.client.cdn().fetch_unauthenticated(url).await

@@ -14,7 +14,7 @@ module CalmLens
     IDEMPOTENCY_KEY = /\A[^\r\n\0]+\z/
     HEADER_VALUE = /\A[^\r\n\0]*\z/
     # The CDN resources that take no lens or transform: the exact upload, the adaptive stream, the embed page,
-    # the public placeholder and the display info.
+    # the placeholder and the display info.
     UNSELECTABLE_CDN_RESOURCES = %w[original hls embed placeholder info].freeze
 
     module_function

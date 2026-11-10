@@ -66,7 +66,7 @@ final class Cdn extends Resource
      * with); `projectId` defaults to the client's project. `resource` is `rendered` (the
      * displayable file: an image in the best format the client accepts, a PDF, or browser-safe
      * video or audio), `original` (the exact upload), `preview` (a still image for the asset),
-     * `placeholder` (a small blurred PNG served publicly for every asset), `hls` (the HLS master
+     * `placeholder` (a small blurred PNG; private or blocked assets require a signed URL or download permission), `hls` (the HLS master
      * playlist of audio or video, at `hls/index.m3u8`, once `content.hls.status` is `ready`), `embed` (an HTML
      * page that shows the asset, for an iframe) or `info` (the display info `getAssetInfo` reads).
      * Only `rendered` and `preview` take a `lens` or `transform`, applied in one pass, with transform

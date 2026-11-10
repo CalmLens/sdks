@@ -54,8 +54,8 @@ module CalmLens
     #   client accepts, a PDF, or browser-safe video or audio), `original` (the exact upload), `preview` (a
     #   still image for the asset), `hls` (the HLS master playlist of audio or video, at `hls/index.m3u8`,
     #   once `content.hls.status` is `ready`), `embed` (an HTML page that shows the asset, a viewer for its type, for an
-    #   iframe), `placeholder` (a small blurred PNG that the CDN serves publicly for every asset whatever its
-    #   visibility or moderation status, without age confirmation) or `info` (the asset's display info, as
+    #   iframe), `placeholder` (a small blurred PNG, without age confirmation; private or blocked assets
+    #   require a signed URL or download permission) or `info` (the asset's display info, as
     #   {#get_asset_info} reads it). Without it, the URL is the asset URL itself. Lenses and transforms
     #   apply to `preview`, and to `rendered` when it is an image; the CDN refuses them on rendered PDFs,
     #   video and audio with `transform/invalid`, and the SDK refuses them on the other resources and

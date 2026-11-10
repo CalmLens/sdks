@@ -28,8 +28,8 @@ module CalmLens
   # `{cdn_base_url}/assets/{project_id}/sig_…`, a readable grant that only the mock's CDN accepts,
   # which serves `original` only when signed with `original: true`. {#fetch_cdn} loads such a URL
   # without the API key, as a browser would; without the key or a grant, a private asset answers
-  # as an unknown one does, `asset/not-found` (404) whatever its state, and only its placeholder is
-  # public. {#decide} applies a reviewer's decision, and {Assets#wait_for_decision} takes no real
+  # as an unknown one does, `asset/not-found` (404) whatever its state, including its placeholder
+  # and display info. {#decide} applies a reviewer's decision, and {Assets#wait_for_decision} takes no real
   # time: a pending asset times out at once.
   # Filters join comparisons with `;` (and), which binds tighter than `,` (or), and group them with
   # `( … )`; list cursors resume after the last item returned. {Assets#search} is the API's keyword
@@ -275,7 +275,7 @@ module CalmLens
     # asset URL from {CDN#sign_asset_url} (with a resource appended), or a public one from
     # {CDN#get_asset_url}. The request is recorded like any other. Error statuses are returned, not
     # raised. A private asset without a grant answers `asset/not-found` (404) whatever its state,
-    # except for its public placeholder.
+    # including its placeholder and display info.
     # @param url [String]
     # @return [Response] with its body read
     def fetch_cdn(url)

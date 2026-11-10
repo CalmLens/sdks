@@ -784,7 +784,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
    * Fetches a URL of the mock's CDN as a browser would, without the API key: a signed asset URL
    * from {@code cdn.signAssetUrl} (with a resource appended), or a public one from {@code
    * cdn.getAssetUrl}. Without a grant, a private asset answers 404 {@code asset/not-found}, whatever
-   * its state, for every resource but its placeholder and {@code info}. The request is recorded like
+   * its state, including its placeholder and {@code info}. The request is recorded like
    * any other, and queued responses answer it first.
    *
    * @param url the CDN URL

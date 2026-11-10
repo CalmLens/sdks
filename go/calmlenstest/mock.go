@@ -2832,8 +2832,8 @@ const mockEmbedHTML = `<!doctype html><html lang="en"><head><meta charset="utf-8
 // the still content.preview describes; and placeholder its ThumbHash as a PNG. The mock converts
 // nothing: an upload stands in for its rendered file, an image for its own preview, and the
 // placeholder PNG for a screenshot, page or waveform. Errors are JSON bodies with 400, 403 or 404;
-// a private asset fetched without a grant or the API key is always 404 asset/not-found, apart from
-// its public placeholder and /info, which has its own rule.
+// a private asset fetched without a grant or download permission is always 404 asset/not-found,
+// including its placeholder and /info.
 func (m *MockServerClient) serve(req *http.Request, parts, escaped []string, header http.Header) (int, []byte, string) {
 	errorBody := func(status int, code, message string) (int, []byte, string) {
 		data, _ := json.Marshal(calmlens.JSON{"code": code, "message": message})

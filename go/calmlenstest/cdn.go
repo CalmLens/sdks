@@ -138,7 +138,7 @@ func escapeComponent(value string) string {
 // FetchCDN fetches a mock CDN URL as a browser would, with a GET and without the API key: a
 // signed asset URL from CDN.SignAssetURL (with a resource appended), or a public one from
 // CDN.GetAssetURL. Without a grant, a private asset answers 404 asset/not-found whatever its state,
-// except its public placeholder. The request is recorded like any other. The caller must close the
+// including its placeholder and info. The request is recorded like any other. The caller must close the
 // body.
 func (m *MockServerClient) FetchCDN(ctx context.Context, url string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
