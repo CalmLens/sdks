@@ -553,10 +553,7 @@ async fn live_upload_sends_folder_metadata_catalogue_id_and_keeps_content() {
             {"id": "campaign", "value": "Spring launch"}
         ])
     );
-    assert_eq!(
-        options["processingOptions"]["retainContent"],
-        json!(true)
-    );
+    assert_eq!(options["processingOptions"]["retainContent"], json!(true));
 }
 
 #[tokio::test]

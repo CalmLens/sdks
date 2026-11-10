@@ -6,10 +6,11 @@
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <exec.mainClass>calmmarket.Main</exec.mainClass>
+    <calmlens.sdk.version>0.23.1</calmlens.sdk.version>
   </properties>
   <dependencies>
     <!-- Installed from ../../java with `mvn install`; see README. -->
-    <dependency><groupId>com.calmlens</groupId><artifactId>calmlens-sdk</artifactId><version>0.23.1</version></dependency>
+    <dependency><groupId>com.calmlens</groupId><artifactId>calmlens-sdk</artifactId><version>${calmlens.sdk.version}</version></dependency>
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.11.4</version><scope>test</scope></dependency>
   </dependencies>
   <build><plugins>

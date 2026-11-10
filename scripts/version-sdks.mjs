@@ -41,7 +41,11 @@ export const companions = {
       /(<artifactId>calmlens-sdk<\/artifactId>\n\s*<version>)[^<]+(<\/version>)/,
       "The Java README's install snippet disagrees with the SDK version",
     ],
-    ["examples/marketplace-listing-java/pom.xml", manifests.java[1]],
+    [
+      "examples/marketplace-listing-java/pom.xml",
+      /(<calmlens\.sdk\.version>)[^<]+(<\/calmlens\.sdk\.version>)/,
+      "The Java example's default dependency disagrees with the SDK version",
+    ],
   ],
 };
 /** Every file the version synchronization reads or rewrites, besides each SDK's package.json. */

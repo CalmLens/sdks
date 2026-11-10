@@ -7,6 +7,7 @@ on:
   workflow_dispatch: {}
 permissions:
   contents: read
+# Test the SDK from this checkout so pull requests catch example breakage before a release.
 jobs:
   python:
     runs-on: ubuntu-latest
@@ -55,10 +56,11 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - run: mvn -B -q install -DskipTests
-        working-directory: java
-      - run: mvn -B verify
-        working-directory: examples/marketplace-listing-java
+      - name: Build and verify against the checkout SDK
+        run: |
+          sdk_version="$(mvn -q -f java/pom.xml help:evaluate -Dexpression=project.version -DforceStdout)"
+          mvn -B -q -f java/pom.xml install -DskipTests
+          mvn -B -f examples/marketplace-listing-java/pom.xml verify "-Dcalmlens.sdk.version=$sdk_version"
   rust-example:
     runs-on: ubuntu-latest
     defaults:
@@ -85,17 +87,18 @@ jobs:
           bun-version: 1.4.3
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run --cwd javascript build
-      - run: bun link
-        working-directory: javascript
       - run: bun install --frozen-lockfile --ignore-scripts
         working-directory: examples/calmgram
-      - run: bun run test
+      - run: bun run check && bun run build && bun run test
         working-directory: examples/calmgram
-      - run: bun run sdk
+      - run: bun run sdk && bun run test
         working-directory: examples/feedback-form-static
       - run: bun install --frozen-lockfile --ignore-scripts
         working-directory: examples/mobile-uploads-expo
-      - run: bun run check
+      - run: |
+          bun run check
+          bun run test
+          bunx --no-install expo export --platform ios --platform android
         working-directory: examples/mobile-uploads-expo
       - run: bun install --frozen-lockfile --ignore-scripts
         working-directory: examples/ui-components
@@ -124,7 +127,7 @@ jobs:
       - run: bun run --cwd javascript build
         working-directory: .
       - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run check
+      - run: bun run check && bun run build
       - run: bunx playwright install --with-deps chromium firefox webkit
       # Every library tab against the mock API and CDN, in Chromium, Firefox and WebKit.
       - run: bun run test:e2e

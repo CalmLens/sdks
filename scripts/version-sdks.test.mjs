@@ -50,7 +50,7 @@ test("version synchronization updates every native SDK without changing dependen
       /<artifactId>calmlens-sdk<\/artifactId>\n {2}<version>1\.2\.3<\/version>/,
     );
     const example = readFileSync(join(root, "examples/marketplace-listing-java/pom.xml"), "utf8");
-    assert.match(example, /<artifactId>calmlens-sdk<\/artifactId><version>1.2.3<\/version>/);
+    assert.match(example, /<calmlens\.sdk\.version>1\.2\.3<\/calmlens\.sdk\.version>/);
     assert.match(
       readFileSync(join(root, "java/pom.xml"), "utf8"),
       /<artifactId>gson<\/artifactId><version>2.11.0<\/version>/,

@@ -44,9 +44,10 @@ your local Maven repository first. The JDK's built-in HTTP server is the only ot
 dependency.
 
 ```sh
+sdk_version="$(mvn -q -f java/pom.xml help:evaluate -Dexpression=project.version -DforceStdout)"
 mvn -q -f java/pom.xml install -DskipTests   # from the repository root
 cd examples/marketplace-listing-java
-CALMLENS_DEMO=1 mvn -q compile exec:java                  # or set credentials, below
+CALMLENS_DEMO=1 mvn -q compile exec:java "-Dcalmlens.sdk.version=$sdk_version"
 ```
 
 Open **http://127.0.0.1:6404**. Use `-Dexec.args="--port 6414"` to change the port.
