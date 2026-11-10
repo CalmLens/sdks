@@ -54,7 +54,7 @@ Act on `asset.classification().moderation().status()`:
 | ---------------- | --------------------------------------------------------------------------------------- |
 | `ALLOWED`        | Show it                                                                                 |
 | `LIMITED`        | Show it, but keep it out of recommendations, trending and notifications                 |
-| `AGE_RESTRICTED` | Show it only behind your own age gate, through signed URLs                              |
+| `AGE_RESTRICTED` | Show it only after your own age check, with `ViewerClaims().ageConfirmed(true)`          |
 | `BLOCKED`        | Don't show it                                                                           |
 | `PURGED`         | Don't show it; the content has been removed                                             |
 | `PENDING`        | Not decided yet: wait for a webhook or `waitForDecision`                                |
