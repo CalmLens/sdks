@@ -1782,7 +1782,8 @@ module CalmLens
       # Answers like the CDN (serveAssetResource.ts): `original` is the upload; `rendered` the image,
       # PDF, video or audio file `content.rendered` describes; `preview` the still `content.preview`
       # describes; `hls` the adaptive stream's files, which the mock never prepares; `embed` a small
-      # page standing in for the embed page of any asset; and `placeholder` the preview's ThumbHash as a PNG. A safety hold refuses every resource. Other resources pass delivery checks first,
+      # page standing in for the embed page of any asset; and `placeholder` the preview's ThumbHash as a PNG.
+      # A safety hold refuses every resource. Other resources pass delivery checks first,
       # which refuse everyone (content still uploading, blocked or purged, failed processing, removed
       # content), then an age-restricted asset needs `viewerClaims.ageConfirmed=true` whatever the key,
       # and a private asset needs an API key with `assets:download` for its folder. The mock converts
@@ -1864,6 +1865,7 @@ module CalmLens
       def info(method, item, authorised, params)
         restricted = item['visibility'] != 'public'
         return asset_not_found if restricted && !authorised
+
         restricted ||= %w[blocked purged].include?(item['classification']['moderation']['status'])
         return not_available if restricted && !authorised
 
