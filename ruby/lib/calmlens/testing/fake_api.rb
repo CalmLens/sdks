@@ -730,7 +730,8 @@ module CalmLens
       end
 
       def show_project_settings
-        settings = { 'retainContent' => true, 'optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true, 'storeSensitiveMetadata' => false,
+        settings = { 'retainContent' => true, 'optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true,
+                     'storeSensitiveMetadata' => false,
                      'streamingEnabled' => false, 'aiMediaSearchEnabled' => false, 'remoteUrlRule' => nil,
                      'websiteSubmissionsPerMinute' => nil }.merge(@project_settings)
         settings['humanReview'] = { 'allowedSamplePercent' => 0, 'restrictedSamplePercent' => 0, 'uncertaintyMarginPercent' => 0,
@@ -947,9 +948,12 @@ module CalmLens
         fail!(ErrorCodes::UPLOAD_PRESET_DISABLED) unless preset['enabled']
         check_preset_fields(preset, fields)
         check_preset_limits(preset, fields, data)
+        retain = fields.dig('processingOptions', 'retainContent')
+        retain = preset.dig('processingOptions', 'retainContent') if retain.nil?
         fields.merge('folderId' => preset['folderId'] || fields['folderId'], 'visibility' => preset['visibility'],
                      'processingOptions' => (fields['processingOptions'] || deep_copy(preset['processingOptions']) || {}).merge(
-                       'retainContent' => fields.dig('processingOptions', 'retainContent').nil? ? preset.dig('processingOptions', 'retainContent') : fields.dig('processingOptions', 'retainContent')))
+                       'retainContent' => retain
+                     ))
       end
 
       def check_preset_fields(preset, fields)

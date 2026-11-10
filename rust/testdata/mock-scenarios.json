@@ -839,7 +839,9 @@
                   "score": 0.3
                 }
               ],
-              "notEvaluated": ["sexual"]
+              "notEvaluated": [
+                "sexual"
+              ]
             },
             "edgy.txt": {
               "status": "limited",
@@ -1006,7 +1008,9 @@
                 "hashMatches": []
               },
               "classification.moderation.automatedStatus": "blocked",
-              "classification.moderation.flaggedCategories": ["violence"],
+              "classification.moderation.flaggedCategories": [
+                "violence"
+              ],
               "classification.moderation.regions": [],
               "classification.moderation.source": "policy",
               "classification.moderation.explanationComplete": true
@@ -1171,7 +1175,9 @@
                 "hashMatches": []
               },
               "classification.moderation.automatedStatus": "limited",
-              "classification.moderation.flaggedCategories": ["profanity"],
+              "classification.moderation.flaggedCategories": [
+                "profanity"
+              ],
               "classification.moderation.regions": [],
               "classification.moderation.source": "policy",
               "classification.moderation.explanationComplete": true
@@ -1345,7 +1351,9 @@
                 "score": 0.9
               }
             ],
-            "notEvaluated": ["violence"]
+            "notEvaluated": [
+              "violence"
+            ]
           },
           "expect": {
             "error": {
@@ -1591,7 +1599,9 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": ["assets:download"],
+            "actions": [
+              "assets:download"
+            ],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -1831,7 +1841,9 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": ["assets:download"],
+            "actions": [
+              "assets:download"
+            ],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -1980,7 +1992,9 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": ["assets:download"],
+            "actions": [
+              "assets:download"
+            ],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -2220,7 +2234,9 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": ["assets:download"],
+            "actions": [
+              "assets:download"
+            ],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -3257,7 +3273,9 @@
               "items.0.name": "General",
               "items.0.preset.id": "general-community",
               "items.0.preset.mode": "live",
-              "items.0.projectIds": ["project-1"],
+              "items.0.projectIds": [
+                "project-1"
+              ],
               "hasMore": false,
               "nextCursor": null
             },
@@ -3612,7 +3630,9 @@
               "id": {
                 "$ref": "kids.id"
               },
-              "projectIds": ["project-1"]
+              "projectIds": [
+                "project-1"
+              ]
             },
             "httpStatus": 200
           }
@@ -3969,7 +3989,9 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 950,
-              "items.0.matchedFields": ["externalId"]
+              "items.0.matchedFields": [
+                "externalId"
+              ]
             },
             "httpStatus": 200
           }
@@ -3986,12 +4008,16 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 750,
-              "items.0.matchedFields": ["externalId"],
+              "items.0.matchedFields": [
+                "externalId"
+              ],
               "items.1.asset.id": {
                 "$ref": "form.id"
               },
               "items.1.score": 700,
-              "items.1.matchedFields": ["name"]
+              "items.1.matchedFields": [
+                "name"
+              ]
             },
             "httpStatus": 200
           }
@@ -4008,7 +4034,9 @@
                 "$ref": "invoice.id"
               },
               "items.0.score": 900,
-              "items.0.matchedFields": ["name"]
+              "items.0.matchedFields": [
+                "name"
+              ]
             },
             "httpStatus": 200
           }
@@ -4025,7 +4053,9 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 600,
-              "items.0.matchedFields": ["name"]
+              "items.0.matchedFields": [
+                "name"
+              ]
             },
             "httpStatus": 200
           }
@@ -4044,7 +4074,9 @@
                 "$ref": "invoice.id"
               },
               "items.0.score": 1000,
-              "items.0.matchedFields": ["id"]
+              "items.0.matchedFields": [
+                "id"
+              ]
             },
             "httpStatus": 200
           }
@@ -4062,7 +4094,9 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 100,
-              "items.0.matchedFields": ["description"]
+              "items.0.matchedFields": [
+                "description"
+              ]
             },
             "httpStatus": 200
           }
@@ -4079,7 +4113,10 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 100,
-              "items.0.matchedFields": ["name", "description"]
+              "items.0.matchedFields": [
+                "name",
+                "description"
+              ]
             },
             "httpStatus": 200
           }
@@ -4120,7 +4157,9 @@
                 "$ref": "invoice.id"
               },
               "items.0.score": 100,
-              "items.0.matchedFields": ["classification.moderation.status"],
+              "items.0.matchedFields": [
+                "classification.moderation.status"
+              ],
               "items.1.asset.id": {
                 "$ref": "beach.id"
               }
@@ -4607,7 +4646,10 @@
             "assetId": {
               "$ref": "home.id"
             },
-            "tags": ["homepage", "sale"]
+            "tags": [
+              "homepage",
+              "sale"
+            ]
           },
           "expect": {
             "httpStatus": 200
@@ -4619,7 +4661,9 @@
             "assetId": {
               "$ref": "archive.id"
             },
-            "tags": ["archive"]
+            "tags": [
+              "archive"
+            ]
           },
           "expect": {
             "httpStatus": 200
@@ -4970,7 +5014,9 @@
               },
               {
                 "key": "uncertain-categories",
-                "value": ["harassment"]
+                "value": [
+                  "harassment"
+                ]
               }
             ]
           },
@@ -5100,14 +5146,20 @@
               "$ref": "a.id"
             },
             "name": "renamed.png",
-            "tags": ["beach", "sunset"]
+            "tags": [
+              "beach",
+              "sunset"
+            ]
           },
           "expect": {
             "result": {
               "name": "renamed.png",
               "description": "first",
               "externalId": "order-1",
-              "tags": ["beach", "sunset"]
+              "tags": [
+                "beach",
+                "sunset"
+              ]
             },
             "httpStatus": 200
           }
@@ -5124,7 +5176,9 @@
                 "$ref": "a.id"
               },
               "items.0.score": 500,
-              "items.0.matchedFields": ["tags"]
+              "items.0.matchedFields": [
+                "tags"
+              ]
             },
             "httpStatus": 200
           }
@@ -6486,7 +6540,9 @@
         {
           "operation": "events.list",
           "args": {
-            "types": ["asset.uploaded"]
+            "types": [
+              "asset.uploaded"
+            ]
           },
           "save": "uploads",
           "expect": {
@@ -6545,7 +6601,9 @@
             "cursor": {
               "$ref": "uploads.nextCursor"
             },
-            "types": ["asset.uploaded"]
+            "types": [
+              "asset.uploaded"
+            ]
           },
           "expect": {
             "result": {
@@ -6601,7 +6659,9 @@
             "cursor": {
               "$ref": "all.nextCursor"
             },
-            "types": ["asset.uploaded"]
+            "types": [
+              "asset.uploaded"
+            ]
           },
           "expect": {
             "error": {
@@ -9071,7 +9131,9 @@
           "args": {
             "grants": [
               {
-                "actions": ["assets:download"],
+                "actions": [
+                  "assets:download"
+                ],
                 "folderId": {
                   "$ref": "parent.id"
                 },
@@ -9134,7 +9196,9 @@
           "args": {
             "grants": [
               {
-                "actions": ["assets:download"],
+                "actions": [
+                  "assets:download"
+                ],
                 "folderId": {
                   "$ref": "parent.id"
                 },
@@ -9182,7 +9246,9 @@
           "args": {
             "grants": [
               {
-                "actions": ["assets:read"],
+                "actions": [
+                  "assets:read"
+                ],
                 "folderId": {
                   "$ref": "parent.id"
                 },
@@ -9211,7 +9277,9 @@
           "args": {
             "grants": [
               {
-                "actions": ["assets:download"],
+                "actions": [
+                  "assets:download"
+                ],
                 "folderId": null,
                 "includeSubfolders": true
               }
@@ -9336,7 +9404,9 @@
                   ]
                 }
               },
-              "headersPresent": ["ETag"]
+              "headersPresent": [
+                "ETag"
+              ]
             }
           }
         },
@@ -9369,7 +9439,9 @@
           "args": {
             "grants": [
               {
-                "actions": ["assets:download"],
+                "actions": [
+                  "assets:download"
+                ],
                 "folderId": null,
                 "includeSubfolders": true
               }
@@ -9400,7 +9472,9 @@
                   ]
                 }
               },
-              "headersPresent": ["ETag"]
+              "headersPresent": [
+                "ETag"
+              ]
             }
           }
         },
@@ -9458,7 +9532,9 @@
                   ]
                 }
               },
-              "headersPresent": ["ETag"]
+              "headersPresent": [
+                "ETag"
+              ]
             }
           }
         },
@@ -9514,7 +9590,9 @@
           "args": {
             "grants": [
               {
-                "actions": ["assets:download"],
+                "actions": [
+                  "assets:download"
+                ],
                 "folderId": null,
                 "includeSubfolders": true
               }
@@ -9545,7 +9623,9 @@
                   ]
                 }
               },
-              "headersPresent": ["ETag"]
+              "headersPresent": [
+                "ETag"
+              ]
             }
           }
         },
@@ -9652,7 +9732,9 @@
           "args": {
             "grants": [
               {
-                "actions": ["assets:download"],
+                "actions": [
+                  "assets:download"
+                ],
                 "folderId": null,
                 "includeSubfolders": true
               }
@@ -10215,7 +10297,11 @@
                 "X-Content-Type-Options": "nosniff",
                 "Content-Security-Policy": "sandbox; default-src 'none'"
               },
-              "headersPresent": ["ETag", "Expires", "Content-Length"]
+              "headersPresent": [
+                "ETag",
+                "Expires",
+                "Content-Length"
+              ]
             }
           }
         },
@@ -10349,7 +10435,9 @@
               "items.1.facts": [
                 {
                   "key": "flagged-categories",
-                  "value": ["hate"]
+                  "value": [
+                    "hate"
+                  ]
                 },
                 {
                   "key": "moderation-status",
@@ -10382,7 +10470,9 @@
               "items.2.facts": [
                 {
                   "key": "flagged-categories",
-                  "value": ["hate"]
+                  "value": [
+                    "hate"
+                  ]
                 },
                 {
                   "key": "asset-type",
@@ -10697,7 +10787,9 @@
                 "hashMatches": []
               },
               "classification.moderation.automatedStatus": "age-restricted",
-              "classification.moderation.flaggedCategories": ["sexual"],
+              "classification.moderation.flaggedCategories": [
+                "sexual"
+              ],
               "classification.moderation.regions": [],
               "classification.moderation.source": "policy",
               "classification.moderation.explanationComplete": true,
@@ -10733,7 +10825,9 @@
               "items.0.type": "asset.classified",
               "items.0.facts.0": {
                 "key": "flagged-categories",
-                "value": ["sexual"]
+                "value": [
+                  "sexual"
+                ]
               },
               "items.1.type": "asset.age-restricted",
               "items.1.actor": {
@@ -10742,7 +10836,9 @@
               },
               "items.1.facts.0": {
                 "key": "flagged-categories",
-                "value": ["sexual"]
+                "value": [
+                  "sexual"
+                ]
               }
             },
             "httpStatus": 200
@@ -11364,7 +11460,9 @@
               "plainText": "hello",
               "type": "text/plain"
             },
-            "metadata": ["source"]
+            "metadata": [
+              "source"
+            ]
           },
           "expect": {
             "error": {
@@ -12129,7 +12227,9 @@
                 "processingOptions": {
                   "retainContent": true
                 },
-                "allowedContentTypes": ["image/*"],
+                "allowedContentTypes": [
+                  "image/*"
+                ],
                 "maxSizeInBytes": 10
               },
               {
@@ -12304,7 +12404,9 @@
               "details": {
                 "source": "preset",
                 "contentType": "text/plain",
-                "allowedContentTypes": ["image/*"]
+                "allowedContentTypes": [
+                  "image/*"
+                ]
               }
             }
           }
@@ -12391,14 +12493,18 @@
               ],
               "pendingReview": {
                 "reason": "uncertain",
-                "uncertainCategories": ["violence"]
+                "uncertainCategories": [
+                  "violence"
+                ]
               }
             },
             "uncertain-api.png": {
               "status": "allowed",
               "pendingReview": {
                 "reason": "uncertain",
-                "uncertainCategories": ["hate"]
+                "uncertainCategories": [
+                  "hate"
+                ]
               }
             }
           }
@@ -12476,7 +12582,9 @@
             "result": {
               "classification.moderation.status": "limited",
               "classification.moderation.pendingReview.reason": "uncertain",
-              "classification.moderation.pendingReview.uncertainCategories": ["violence"]
+              "classification.moderation.pendingReview.uncertainCategories": [
+                "violence"
+              ]
             },
             "httpStatus": 200
           }
@@ -12579,7 +12687,9 @@
             "status": "allowed",
             "pendingReview": {
               "reason": "sampled",
-              "uncertainCategories": ["hate"]
+              "uncertainCategories": [
+                "hate"
+              ]
             }
           },
           "expect": {
@@ -12595,7 +12705,9 @@
             "status": "allowed",
             "pendingReview": {
               "reason": "uncertain",
-              "uncertainCategories": ["not-a-category"]
+              "uncertainCategories": [
+                "not-a-category"
+              ]
             }
           },
           "expect": {

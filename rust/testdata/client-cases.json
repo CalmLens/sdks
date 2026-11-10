@@ -827,7 +827,9 @@
                 "value": "comment"
               }
             ],
-            "tags": ["forum"],
+            "tags": [
+              "forum"
+            ],
             "authorId": "pupil-7",
             "context": {
               "items": [
@@ -872,7 +874,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-1",
             "accept": "application/json",
@@ -894,7 +901,9 @@
                 "value": "comment"
               }
             ],
-            "tags": ["forum"],
+            "tags": [
+              "forum"
+            ],
             "authorId": "pupil-7",
             "context": {
               "items": [
@@ -986,7 +995,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=true",
-          "query": [["wait", "true"]],
+          "query": [
+            [
+              "wait",
+              "true"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -1058,11 +1072,16 @@
               {
                 "id": "source",
                 "value": {
-                  "nested": [1, null]
+                  "nested": [
+                    1,
+                    null
+                  ]
                 }
               }
             ],
-            "tags": ["homework"],
+            "tags": [
+              "homework"
+            ],
             "authorId": "pupil-7",
             "context": {
               "items": [
@@ -1107,7 +1126,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false&contentType=application%2Fpdf&sizeInBytes=19",
-          "query": [["wait", "false"], ["contentType", "application/pdf"], ["sizeInBytes", "19"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "application/pdf"
+            ],
+            [
+              "sizeInBytes",
+              "19"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-2",
             "accept": "application/json",
@@ -1128,11 +1160,16 @@
                 {
                   "id": "source",
                   "value": {
-                    "nested": [1, null]
+                    "nested": [
+                      1,
+                      null
+                    ]
                   }
                 }
               ],
-              "tags": ["homework"],
+              "tags": [
+                "homework"
+              ],
               "authorId": "pupil-7",
               "context": {
                 "items": [
@@ -1227,7 +1264,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false&contentType=image%2Fpng&sizeInBytes=68",
-          "query": [["wait", "false"], ["contentType", "image/png"], ["sizeInBytes", "68"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "image/png"
+            ],
+            [
+              "sizeInBytes",
+              "68"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -1324,7 +1374,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false&contentType=application%2Fpdf&sizeInBytes=19",
-          "query": [["wait", "false"], ["contentType", "application/pdf"], ["sizeInBytes", "19"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "application/pdf"
+            ],
+            [
+              "sizeInBytes",
+              "19"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -1422,7 +1485,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false&contentType=application%2Fpdf&sizeInBytes=19",
-          "query": [["wait", "false"], ["contentType", "application/pdf"], ["sizeInBytes", "19"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "application/pdf"
+            ],
+            [
+              "sizeInBytes",
+              "19"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -1519,7 +1595,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false&contentType=application%2Fpdf",
-          "query": [["wait", "false"], ["contentType", "application/pdf"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "application/pdf"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -1615,7 +1700,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -1682,7 +1772,10 @@
               {
                 "id": "source",
                 "value": {
-                  "nested": [1, null]
+                  "nested": [
+                    1,
+                    null
+                  ]
                 }
               }
             ],
@@ -1721,7 +1814,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": "url-1",
             "accept": "application/json",
@@ -1742,7 +1840,10 @@
               {
                 "id": "source",
                 "value": {
-                  "nested": [1, null]
+                  "nested": [
+                    1,
+                    null
+                  ]
                 }
               }
             ],
@@ -1821,7 +1922,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=true",
-          "query": [["wait", "true"]],
+          "query": [
+            [
+              "wait",
+              "true"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -1920,12 +2026,30 @@
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false&contentType=video%2Fmp4&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=6291456",
           "query": [
-            ["wait", "false"],
-            ["contentType", "video/mp4"],
-            ["sizeInBytes", "5242880"],
-            ["partNumber", "1"],
-            ["isFinal", "false"],
-            ["totalSizeInBytes", "6291456"]
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "video/mp4"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ],
+            [
+              "partNumber",
+              "1"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "totalSizeInBytes",
+              "6291456"
+            ]
           ],
           "headers": {
             "idempotency-key": "part-1",
@@ -2022,11 +2146,26 @@
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=true&contentType=video%2Fmp4&sizeInBytes=22&partNumber=1&isFinal=true",
           "query": [
-            ["wait", "true"],
-            ["contentType", "video/mp4"],
-            ["sizeInBytes", "22"],
-            ["partNumber", "1"],
-            ["isFinal", "true"]
+            [
+              "wait",
+              "true"
+            ],
+            [
+              "contentType",
+              "video/mp4"
+            ],
+            [
+              "sizeInBytes",
+              "22"
+            ],
+            [
+              "partNumber",
+              "1"
+            ],
+            [
+              "isFinal",
+              "true"
+            ]
           ],
           "headers": {
             "idempotency-key": {
@@ -2131,10 +2270,22 @@
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=2&isFinal=false&wait=true&sizeInBytes=5242880",
           "query": [
-            ["partNumber", "2"],
-            ["isFinal", "false"],
-            ["wait", "true"],
-            ["sizeInBytes", "5242880"]
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "wait",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ]
           ],
           "headers": {
             "idempotency-key": "part-2",
@@ -2219,7 +2370,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=3&isFinal=true&sizeInBytes=22",
-          "query": [["partNumber", "3"], ["isFinal", "true"], ["sizeInBytes", "22"]],
+          "query": [
+            [
+              "partNumber",
+              "3"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "22"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -2305,7 +2469,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=2&isFinal=true&sizeInBytes=22",
-          "query": [["partNumber", "2"], ["isFinal", "true"], ["sizeInBytes", "22"]],
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "22"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -2451,12 +2628,30 @@
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=true&contentType=video%2Fmp4&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=11534336",
           "query": [
-            ["wait", "true"],
-            ["contentType", "video/mp4"],
-            ["sizeInBytes", "5242880"],
-            ["partNumber", "1"],
-            ["isFinal", "false"],
-            ["totalSizeInBytes", "11534336"]
+            [
+              "wait",
+              "true"
+            ],
+            [
+              "contentType",
+              "video/mp4"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ],
+            [
+              "partNumber",
+              "1"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "totalSizeInBytes",
+              "11534336"
+            ]
           ],
           "headers": {
             "idempotency-key": "upload-1",
@@ -2482,7 +2677,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=2&isFinal=false&sizeInBytes=5242880",
-          "query": [["partNumber", "2"], ["isFinal", "false"], ["sizeInBytes", "5242880"]],
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-1:part-2",
             "accept": "application/json",
@@ -2496,7 +2704,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=3&isFinal=true&sizeInBytes=1048576",
-          "query": [["partNumber", "3"], ["isFinal", "true"], ["sizeInBytes", "1048576"]],
+          "query": [
+            [
+              "partNumber",
+              "3"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "1048576"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-1:part-3",
             "accept": "application/json",
@@ -2623,12 +2844,30 @@
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false&contentType=video%2Fmp4&sizeInBytes=8388608&partNumber=1&isFinal=false&totalSizeInBytes=9437184",
           "query": [
-            ["wait", "false"],
-            ["contentType", "video/mp4"],
-            ["sizeInBytes", "8388608"],
-            ["partNumber", "1"],
-            ["isFinal", "false"],
-            ["totalSizeInBytes", "9437184"]
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "video/mp4"
+            ],
+            [
+              "sizeInBytes",
+              "8388608"
+            ],
+            [
+              "partNumber",
+              "1"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "totalSizeInBytes",
+              "9437184"
+            ]
           ],
           "headers": {
             "idempotency-key": "upload-2",
@@ -2654,7 +2893,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=2&isFinal=true&sizeInBytes=1048576",
-          "query": [["partNumber", "2"], ["isFinal", "true"], ["sizeInBytes", "1048576"]],
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "1048576"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-2:part-2",
             "accept": "application/json",
@@ -2876,12 +3128,30 @@
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false&contentType=video%2Fmp4&sizeInBytes=13631488&partNumber=1&isFinal=false&totalSizeInBytes=53477376",
           "query": [
-            ["wait", "false"],
-            ["contentType", "video/mp4"],
-            ["sizeInBytes", "13631488"],
-            ["partNumber", "1"],
-            ["isFinal", "false"],
-            ["totalSizeInBytes", "53477376"]
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "video/mp4"
+            ],
+            [
+              "sizeInBytes",
+              "13631488"
+            ],
+            [
+              "partNumber",
+              "1"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "totalSizeInBytes",
+              "53477376"
+            ]
           ],
           "headers": {
             "idempotency-key": "upload-3",
@@ -2907,7 +3177,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=2&isFinal=false&sizeInBytes=13631488",
-          "query": [["partNumber", "2"], ["isFinal", "false"], ["sizeInBytes", "13631488"]],
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "sizeInBytes",
+              "13631488"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-3:part-2",
             "accept": "application/json",
@@ -2921,7 +3204,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=3&isFinal=false&sizeInBytes=13631488",
-          "query": [["partNumber", "3"], ["isFinal", "false"], ["sizeInBytes", "13631488"]],
+          "query": [
+            [
+              "partNumber",
+              "3"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "sizeInBytes",
+              "13631488"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-3:part-3",
             "accept": "application/json",
@@ -2935,7 +3231,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=4&isFinal=true&sizeInBytes=12582912",
-          "query": [["partNumber", "4"], ["isFinal", "true"], ["sizeInBytes", "12582912"]],
+          "query": [
+            [
+              "partNumber",
+              "4"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "12582912"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-3:part-4",
             "accept": "application/json",
@@ -3106,7 +3415,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=true",
-          "query": [["wait", "true"]],
+          "query": [
+            [
+              "wait",
+              "true"
+            ]
+          ],
           "headers": {
             "idempotency-key": "text-1",
             "accept": "application/json",
@@ -3208,7 +3522,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=true",
-          "query": [["wait", "true"]],
+          "query": [
+            [
+              "wait",
+              "true"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -3323,13 +3642,22 @@
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "cursor=opaque%2B%2Fcursor%3D&pageSize=50&filter=classification.moderation.status%3D%3Dblocked%3Bname%3D%3D%22a%20b%22%3BfolderId%3D%3Dfolder-1&sort=-createdAt%2Cid",
           "query": [
-            ["cursor", "opaque+/cursor="],
-            ["pageSize", "50"],
+            [
+              "cursor",
+              "opaque+/cursor="
+            ],
+            [
+              "pageSize",
+              "50"
+            ],
             [
               "filter",
               "classification.moderation.status==blocked;name==\"a b\";folderId==folder-1"
             ],
-            ["sort", "-createdAt,id"]
+            [
+              "sort",
+              "-createdAt,id"
+            ]
           ],
           "headers": {
             "idempotency-key": {
@@ -3388,7 +3716,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/children",
           "rawQuery": "cursor=c1&pageSize=10&sort=-id",
-          "query": [["cursor", "c1"], ["pageSize", "10"], ["sort", "-id"]],
+          "query": [
+            [
+              "cursor",
+              "c1"
+            ],
+            [
+              "pageSize",
+              "10"
+            ],
+            [
+              "sort",
+              "-id"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -3443,7 +3784,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets/search",
           "rawQuery": "query=red%20car",
-          "query": [["query", "red car"]],
+          "query": [
+            [
+              "query",
+              "red car"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -3500,7 +3846,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets/search",
           "rawQuery": "query=red%20car&mode=semantic&pageSize=20",
-          "query": [["query", "red car"], ["mode", "semantic"], ["pageSize", "20"]],
+          "query": [
+            [
+              "query",
+              "red car"
+            ],
+            [
+              "mode",
+              "semantic"
+            ],
+            [
+              "pageSize",
+              "20"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -3527,7 +3886,10 @@
             "items": [],
             "nextCursor": "now-cursor",
             "hasMore": false,
-            "excludedTypes": ["asset.review-requested", "api-key.created"]
+            "excludedTypes": [
+              "asset.review-requested",
+              "api-key.created"
+            ]
           },
           "headers": {
             "x-request-id": "req-1",
@@ -3543,7 +3905,10 @@
               "items": [],
               "nextCursor": "now-cursor",
               "hasMore": false,
-              "excludedTypes": ["asset.review-requested", "api-key.created"]
+              "excludedTypes": [
+                "asset.review-requested",
+                "api-key.created"
+              ]
             }
           }
         }
@@ -3616,11 +3981,26 @@
           "path": "/v1/projects/project-1/folders",
           "rawQuery": "parentId=folder-1&pageSize=10&sort=-createdAt&cursor=opaque%2B%2Fcursor%3D&search=a%26b",
           "query": [
-            ["parentId", "folder-1"],
-            ["pageSize", "10"],
-            ["sort", "-createdAt"],
-            ["cursor", "opaque+/cursor="],
-            ["search", "a&b"]
+            [
+              "parentId",
+              "folder-1"
+            ],
+            [
+              "pageSize",
+              "10"
+            ],
+            [
+              "sort",
+              "-createdAt"
+            ],
+            [
+              "cursor",
+              "opaque+/cursor="
+            ],
+            [
+              "search",
+              "a&b"
+            ]
           ],
           "headers": {
             "idempotency-key": {
@@ -3796,7 +4176,10 @@
                 "value": null
               }
             ],
-            "tags": ["a", "b"],
+            "tags": [
+              "a",
+              "b"
+            ],
             "visibility": "public"
           },
           "expect": {
@@ -3850,7 +4233,10 @@
                 "value": null
               }
             ],
-            "tags": ["a", "b"],
+            "tags": [
+              "a",
+              "b"
+            ],
             "visibility": "public"
           }
         }
@@ -4221,7 +4607,10 @@
         {
           "operation": "assets.batch",
           "args": {
-            "assetIds": ["asset-1", "asset-2"],
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
             "operation": "delete"
           },
           "expect": {
@@ -4251,7 +4640,10 @@
             "content-type": "application/json"
           },
           "body": {
-            "assetIds": ["asset-1", "asset-2"],
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
             "operation": "delete"
           }
         }
@@ -4278,7 +4670,9 @@
         {
           "operation": "assets.batch",
           "args": {
-            "assetIds": ["asset-1"],
+            "assetIds": [
+              "asset-1"
+            ],
             "operation": "remove-content"
           },
           "expect": {
@@ -4308,7 +4702,9 @@
             "content-type": "application/json"
           },
           "body": {
-            "assetIds": ["asset-1"],
+            "assetIds": [
+              "asset-1"
+            ],
             "operation": "remove-content"
           }
         }
@@ -4544,7 +4940,10 @@
           "body": null
         }
       ],
-      "sleepsMs": [0, 0]
+      "sleepsMs": [
+        0,
+        0
+      ]
     },
     {
       "name": "502 and 504 are retried with exponential backoff and jitter",
@@ -4687,7 +5086,16 @@
           "body": null
         }
       ],
-      "sleepsMs": [[250, 500], [500, 1000]]
+      "sleepsMs": [
+        [
+          250,
+          500
+        ],
+        [
+          500,
+          1000
+        ]
+      ]
     },
     {
       "name": "the client retries twice by default, then raises the last error",
@@ -4800,7 +5208,10 @@
           "body": null
         }
       ],
-      "sleepsMs": [0, 0]
+      "sleepsMs": [
+        0,
+        0
+      ]
     },
     {
       "name": "a large upload retries a failed part with its own key and skips parts the API already has",
@@ -4960,12 +5371,30 @@
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false&contentType=application%2Fpdf&sizeInBytes=5242880&partNumber=1&isFinal=false&totalSizeInBytes=16777216",
           "query": [
-            ["wait", "false"],
-            ["contentType", "application/pdf"],
-            ["sizeInBytes", "5242880"],
-            ["partNumber", "1"],
-            ["isFinal", "false"],
-            ["totalSizeInBytes", "16777216"]
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "application/pdf"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ],
+            [
+              "partNumber",
+              "1"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "totalSizeInBytes",
+              "16777216"
+            ]
           ],
           "headers": {
             "idempotency-key": "upload-3",
@@ -4991,7 +5420,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=2&isFinal=false&sizeInBytes=5242880",
-          "query": [["partNumber", "2"], ["isFinal", "false"], ["sizeInBytes", "5242880"]],
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-3:part-2",
             "accept": "application/json",
@@ -5005,7 +5447,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=2&isFinal=false&sizeInBytes=5242880",
-          "query": [["partNumber", "2"], ["isFinal", "false"], ["sizeInBytes", "5242880"]],
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-3:part-2",
             "accept": "application/json",
@@ -5019,7 +5474,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=3&isFinal=false&sizeInBytes=5242880",
-          "query": [["partNumber", "3"], ["isFinal", "false"], ["sizeInBytes", "5242880"]],
+          "query": [
+            [
+              "partNumber",
+              "3"
+            ],
+            [
+              "isFinal",
+              "false"
+            ],
+            [
+              "sizeInBytes",
+              "5242880"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-3:part-3",
             "accept": "application/json",
@@ -5033,7 +5501,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=4&isFinal=true&sizeInBytes=1048576",
-          "query": [["partNumber", "4"], ["isFinal", "true"], ["sizeInBytes", "1048576"]],
+          "query": [
+            [
+              "partNumber",
+              "4"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "1048576"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-3:part-4",
             "accept": "application/json",
@@ -5043,7 +5524,9 @@
           "bodySha256": "8f990ba0b577b51cf009ea049368c16bbda1b21e1b93be07a824758bb253c39b"
         }
       ],
-      "sleepsMs": [0]
+      "sleepsMs": [
+        0
+      ]
     },
     {
       "name": "maxRetries 0 sends one request",
@@ -5221,7 +5704,9 @@
           "body": null
         }
       ],
-      "sleepsMs": [1000]
+      "sleepsMs": [
+        1000
+      ]
     },
     {
       "name": "a Retry-After HTTP date in the past retries at once",
@@ -5342,7 +5827,9 @@
           "body": null
         }
       ],
-      "sleepsMs": [0]
+      "sleepsMs": [
+        0
+      ]
     },
     {
       "name": "a Retry-After over 60 seconds is returned to the caller without retrying",
@@ -5578,7 +6065,12 @@
           "body": null
         }
       ],
-      "sleepsMs": [[250, 500]]
+      "sleepsMs": [
+        [
+          250,
+          500
+        ]
+      ]
     },
     {
       "name": "repeated transport failures raise sdk/transport-error after maxRetries",
@@ -5653,7 +6145,12 @@
           "body": null
         }
       ],
-      "sleepsMs": [[250, 500]]
+      "sleepsMs": [
+        [
+          250,
+          500
+        ]
+      ]
     },
     {
       "name": "a request that times out is retried",
@@ -5764,7 +6261,12 @@
           "body": null
         }
       ],
-      "sleepsMs": [[250, 500]]
+      "sleepsMs": [
+        [
+          250,
+          500
+        ]
+      ]
     },
     {
       "name": "a request that keeps timing out raises sdk/timeout",
@@ -5907,7 +6409,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -5931,7 +6438,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -5951,7 +6463,9 @@
           }
         }
       ],
-      "sleepsMs": [0]
+      "sleepsMs": [
+        0
+      ]
     },
     {
       "name": "a create retried after a 503 reuses the caller's Idempotency-Key",
@@ -6036,7 +6550,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-1",
             "accept": "application/json",
@@ -6058,7 +6577,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-1",
             "accept": "application/json",
@@ -6076,7 +6600,9 @@
           }
         }
       ],
-      "sleepsMs": [0]
+      "sleepsMs": [
+        0
+      ]
     },
     {
       "name": "a URL create is retried with the same Idempotency-Key",
@@ -6151,7 +6677,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -6172,7 +6703,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -6189,7 +6725,12 @@
           }
         }
       ],
-      "sleepsMs": [[250, 500]]
+      "sleepsMs": [
+        [
+          250,
+          500
+        ]
+      ]
     },
     {
       "name": "uploadPart is retried with the same Idempotency-Key",
@@ -6274,7 +6815,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=2&isFinal=true&sizeInBytes=22",
-          "query": [["partNumber", "2"], ["isFinal", "true"], ["sizeInBytes", "22"]],
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "22"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -6291,7 +6845,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/part",
           "rawQuery": "partNumber=2&isFinal=true&sizeInBytes=22",
-          "query": [["partNumber", "2"], ["isFinal", "true"], ["sizeInBytes", "22"]],
+          "query": [
+            [
+              "partNumber",
+              "2"
+            ],
+            [
+              "isFinal",
+              "true"
+            ],
+            [
+              "sizeInBytes",
+              "22"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -6304,7 +6871,9 @@
           "bodyBase64": "AAAAGGZ0eXBtcDQyZmluYWwtcGFydA=="
         }
       ],
-      "sleepsMs": [0]
+      "sleepsMs": [
+        0
+      ]
     },
     {
       "name": "a streamed upload is never retried",
@@ -6352,7 +6921,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false&contentType=application%2Fpdf",
-          "query": [["wait", "false"], ["contentType", "application/pdf"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ],
+            [
+              "contentType",
+              "application/pdf"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -6740,7 +7318,9 @@
         {
           "operation": "assets.batch",
           "args": {
-            "assetIds": ["asset-1"],
+            "assetIds": [
+              "asset-1"
+            ],
             "operation": "delete"
           },
           "expect": {
@@ -6772,7 +7352,9 @@
             "content-type": "application/json"
           },
           "body": {
-            "assetIds": ["asset-1"],
+            "assetIds": [
+              "asset-1"
+            ],
             "operation": "delete"
           }
         }
@@ -7265,7 +7847,9 @@
           "body": null
         }
       ],
-      "sleepsMs": [0]
+      "sleepsMs": [
+        0
+      ]
     },
     {
       "name": "a 501 is not retried",
@@ -7372,7 +7956,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": "upload-1",
             "accept": "application/json",
@@ -7490,7 +8079,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -7910,7 +8504,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "wait=false",
-          "query": [["wait", "false"]],
+          "query": [
+            [
+              "wait",
+              "false"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$uuid": "generated-1"
@@ -8085,7 +8684,9 @@
             "details": {
               "issues": [
                 {
-                  "path": ["sort"],
+                  "path": [
+                    "sort"
+                  ],
                   "message": "Invalid",
                   "code": "validation/invalid-value"
                 }
@@ -8114,7 +8715,9 @@
               "details": {
                 "issues": [
                   {
-                    "path": ["sort"],
+                    "path": [
+                      "sort"
+                    ],
                     "message": "Invalid",
                     "code": "validation/invalid-value"
                   }
@@ -8232,7 +8835,10 @@
         {
           "operation": "assets.batch",
           "args": {
-            "assetIds": ["asset-1", "asset-2"],
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
             "operation": "delete"
           },
           "expect": {
@@ -8264,7 +8870,10 @@
             "content-type": "application/json"
           },
           "body": {
-            "assetIds": ["asset-1", "asset-2"],
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
             "operation": "delete"
           }
         }
@@ -8295,7 +8904,10 @@
         {
           "operation": "assets.batch",
           "args": {
-            "assetIds": ["asset-1", "asset-2"],
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
             "operation": "delete"
           },
           "expect": {
@@ -8327,7 +8939,10 @@
             "content-type": "application/json"
           },
           "body": {
-            "assetIds": ["asset-1", "asset-2"],
+            "assetIds": [
+              "asset-1",
+              "asset-2"
+            ],
             "operation": "delete"
           }
         }
@@ -8788,7 +9403,10 @@
           "body": null
         }
       ],
-      "sleepsMs": [500, 750]
+      "sleepsMs": [
+        500,
+        750
+      ]
     },
     {
       "name": "waitForDecision waits at most waitForDecisionMaxIntervalMs between checks",
@@ -9149,7 +9767,17 @@
           "body": null
         }
       ],
-      "sleepsMs": [500, 750, 1125, [1687, 1688], 2000, 2000]
+      "sleepsMs": [
+        500,
+        750,
+        1125,
+        [
+          1687,
+          1688
+        ],
+        2000,
+        2000
+      ]
     },
     {
       "name": "waitForDecision with timeoutMs 0 checks once and times out with the asset's state",
@@ -9333,7 +9961,9 @@
           "body": null
         }
       ],
-      "sleepsMs": [500]
+      "sleepsMs": [
+        500
+      ]
     },
     {
       "name": "waitForDecision refuses a negative timeout before any request",
@@ -9524,8 +10154,14 @@
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "pageSize=2&filter=classification.moderation.status%3D%3Dallowed%3BfolderId%3D%3Dfolder-1",
           "query": [
-            ["pageSize", "2"],
-            ["filter", "classification.moderation.status==allowed;folderId==folder-1"]
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "filter",
+              "classification.moderation.status==allowed;folderId==folder-1"
+            ]
           ],
           "headers": {
             "idempotency-key": {
@@ -9547,9 +10183,18 @@
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "pageSize=2&filter=classification.moderation.status%3D%3Dallowed%3BfolderId%3D%3Dfolder-1&cursor=cursor-2",
           "query": [
-            ["pageSize", "2"],
-            ["filter", "classification.moderation.status==allowed;folderId==folder-1"],
-            ["cursor", "cursor-2"]
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "filter",
+              "classification.moderation.status==allowed;folderId==folder-1"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
           ],
           "headers": {
             "idempotency-key": {
@@ -9758,7 +10403,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "cursor=cursor-2",
-          "query": [["cursor", "cursor-2"]],
+          "query": [
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -9890,7 +10540,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "pageSize=1",
-          "query": [["pageSize", "1"]],
+          "query": [
+            [
+              "pageSize",
+              "1"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -9910,7 +10565,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
           "rawQuery": "pageSize=1&cursor=cursor-2",
-          "query": [["pageSize", "1"], ["cursor", "cursor-2"]],
+          "query": [
+            [
+              "pageSize",
+              "1"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10092,7 +10756,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/children",
           "rawQuery": "pageSize=2&sort=createdAt",
-          "query": [["pageSize", "2"], ["sort", "createdAt"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "sort",
+              "createdAt"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10112,7 +10785,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/children",
           "rawQuery": "pageSize=2&sort=createdAt&cursor=cursor-2",
-          "query": [["pageSize", "2"], ["sort", "createdAt"], ["cursor", "cursor-2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "sort",
+              "createdAt"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10264,7 +10950,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/assets/asset-1/children",
           "rawQuery": "cursor=cursor-2",
-          "query": [["cursor", "cursor-2"]],
+          "query": [
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10473,7 +11164,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/events",
           "rawQuery": "cursor=cursor-0&pageSize=2",
-          "query": [["cursor", "cursor-0"], ["pageSize", "2"]],
+          "query": [
+            [
+              "cursor",
+              "cursor-0"
+            ],
+            [
+              "pageSize",
+              "2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10493,7 +11193,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/events",
           "rawQuery": "cursor=cursor-2&pageSize=2",
-          "query": [["cursor", "cursor-2"], ["pageSize", "2"]],
+          "query": [
+            [
+              "cursor",
+              "cursor-2"
+            ],
+            [
+              "pageSize",
+              "2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10674,7 +11383,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/events",
           "rawQuery": "cursor=cursor-0",
-          "query": [["cursor", "cursor-0"]],
+          "query": [
+            [
+              "cursor",
+              "cursor-0"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10694,7 +11408,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/events",
           "rawQuery": "cursor=cursor-1",
-          "query": [["cursor", "cursor-1"]],
+          "query": [
+            [
+              "cursor",
+              "cursor-1"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10780,7 +11499,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/folders",
           "rawQuery": "parentId=folder-1&sort=-createdAt&pageSize=2",
-          "query": [["parentId", "folder-1"], ["sort", "-createdAt"], ["pageSize", "2"]],
+          "query": [
+            [
+              "parentId",
+              "folder-1"
+            ],
+            [
+              "sort",
+              "-createdAt"
+            ],
+            [
+              "pageSize",
+              "2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10801,10 +11533,22 @@
           "path": "/v1/projects/project-1/folders",
           "rawQuery": "parentId=folder-1&sort=-createdAt&pageSize=2&cursor=cursor-2",
           "query": [
-            ["parentId", "folder-1"],
-            ["sort", "-createdAt"],
-            ["pageSize", "2"],
-            ["cursor", "cursor-2"]
+            [
+              "parentId",
+              "folder-1"
+            ],
+            [
+              "sort",
+              "-createdAt"
+            ],
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
           ],
           "headers": {
             "idempotency-key": {
@@ -10889,7 +11633,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/hash-lists",
           "rawQuery": "pageSize=2",
-          "query": [["pageSize", "2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10909,7 +11658,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/hash-lists",
           "rawQuery": "pageSize=2&cursor=cursor-2",
-          "query": [["pageSize", "2"], ["cursor", "cursor-2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -10995,7 +11753,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/hash-lists/hl-1/entries",
           "rawQuery": "sort=createdAt&pageSize=2",
-          "query": [["sort", "createdAt"], ["pageSize", "2"]],
+          "query": [
+            [
+              "sort",
+              "createdAt"
+            ],
+            [
+              "pageSize",
+              "2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -11015,7 +11782,20 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/hash-lists/hl-1/entries",
           "rawQuery": "sort=createdAt&pageSize=2&cursor=cursor-2",
-          "query": [["sort", "createdAt"], ["pageSize", "2"], ["cursor", "cursor-2"]],
+          "query": [
+            [
+              "sort",
+              "createdAt"
+            ],
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -11099,7 +11879,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/policies",
           "rawQuery": "pageSize=2",
-          "query": [["pageSize", "2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -11119,7 +11904,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/policies",
           "rawQuery": "pageSize=2&cursor=cursor-2",
-          "query": [["pageSize", "2"], ["cursor", "cursor-2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -11203,7 +11997,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/lenses",
           "rawQuery": "pageSize=2",
-          "query": [["pageSize", "2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -11223,7 +12022,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/lenses",
           "rawQuery": "pageSize=2&cursor=cursor-2",
-          "query": [["pageSize", "2"], ["cursor", "cursor-2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -11307,7 +12115,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/upload-presets",
           "rawQuery": "pageSize=2",
-          "query": [["pageSize", "2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -11327,7 +12140,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/upload-presets",
           "rawQuery": "pageSize=2&cursor=cursor-2",
-          "query": [["pageSize", "2"], ["cursor", "cursor-2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -11430,7 +12252,12 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets/asset-1/timeline",
           "rawQuery": "pageSize=2",
-          "query": [["pageSize", "2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -11450,7 +12277,16 @@
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets/asset-1/timeline",
           "rawQuery": "pageSize=2&cursor=cursor-2",
-          "query": [["pageSize", "2"], ["cursor", "cursor-2"]],
+          "query": [
+            [
+              "pageSize",
+              "2"
+            ],
+            [
+              "cursor",
+              "cursor-2"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -16231,7 +17067,12 @@
           "origin": "https://media.example.test",
           "path": "/v1/assets/project-1/a%2Fb%20c/rendered/@thumb,width=320",
           "rawQuery": "viewerClaims=%7B%22region%22%3A%22GB%22%2C%22ageConfirmed%22%3Atrue%7D",
-          "query": [["viewerClaims", "{\"region\":\"GB\",\"ageConfirmed\":true}"]],
+          "query": [
+            [
+              "viewerClaims",
+              "{\"region\":\"GB\",\"ageConfirmed\":true}"
+            ]
+          ],
           "headers": {
             "idempotency-key": {
               "$absent": true
@@ -16399,7 +17240,9 @@
           "body": null
         }
       ],
-      "sleepsMs": [0]
+      "sleepsMs": [
+        0
+      ]
     },
     {
       "name": "cdn.serve returns the last retryable response once retries run out",
@@ -16492,7 +17335,9 @@
           "body": null
         }
       ],
-      "sleepsMs": [0]
+      "sleepsMs": [
+        0
+      ]
     },
     {
       "name": "cdn.serve returns a response whose Retry-After is over 60 seconds without retrying",
@@ -16638,7 +17483,12 @@
           "body": null
         }
       ],
-      "sleepsMs": [[250, 500]]
+      "sleepsMs": [
+        [
+          250,
+          500
+        ]
+      ]
     },
     {
       "name": "a cancelled call fails with sdk/cancelled and is not retried",
