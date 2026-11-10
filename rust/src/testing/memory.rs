@@ -2401,11 +2401,10 @@ impl Backend {
             .get("processingOptions")
             .cloned()
             .unwrap_or_else(|| json!({}));
-        if processing["keepContentAfterProcessing"].is_null() {
-            processing["keepContentAfterProcessing"] =
-                self.full_settings()["keepContentAfterProcessing"].clone();
+        if processing["retainContent"].is_null() {
+            processing["retainContent"] = self.full_settings()["retainContent"].clone();
         }
-        let keep = processing["keepContentAfterProcessing"] == true;
+        let keep = processing["retainContent"] == true;
         // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
         let context = match options.get("context") {
             None | Some(Value::Null) => Vec::new(),

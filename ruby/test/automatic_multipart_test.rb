@@ -166,7 +166,7 @@ class AutomaticMultipartTest < Minitest::Test
     end)
     file = file_of(12 * MIB)
     options = { name: 'report.pdf', content: { data: file, type: 'application/pdf' },
-                processing_options: { keep_content_after_processing: true }, request_options: { idempotency_key: 'upload-3' } }
+                processing_options: { retain_content: true }, request_options: { idempotency_key: 'upload-3' } }
     client.fail_next_request('transport-error', operation: 'assets.upload_part')
     error = assert_raises(CalmLens::ConnectionError) { client.assets.classify(options) }
     assert_equal CalmLens::SdkErrorCodes::TRANSPORT_ERROR, error.code
@@ -183,7 +183,7 @@ class AutomaticMultipartTest < Minitest::Test
     client = CalmLens::MockServerClient.new(part_size_bytes: 5 * MIB)
     image = file_of(6 * MIB)
     asset = client.assets.create(name: 'photo.png', content: { data: image, type: 'image/png' },
-                                 processing_options: { keep_content_after_processing: true })
+                                 processing_options: { retain_content: true })
     assert_equal 'image', asset['type']
     assert_equal 'completed', asset.dig('upload', 'status')
     assert_equal image, client.state.content[asset['id']]['parts'].sort.map(&:last).join

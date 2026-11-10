@@ -56,7 +56,7 @@ final class Moderation
                 // public asset while it is pending, so Chirp never shows its URL until it is decided.
                 'visibility' => 'public',
                 'metadata' => [['id' => 'chirp.kind', 'value' => 'post-image'], ['id' => 'chirp.username', 'value' => $username]],
-                'processingOptions' => ['keepContentAfterProcessing' => true, 'features' => ['ocr' => ['enabled' => true]]],
+                'processingOptions' => ['retainContent' => true, 'features' => ['ocr' => ['enabled' => true]]],
             ]);
         } finally {
             fclose($file);

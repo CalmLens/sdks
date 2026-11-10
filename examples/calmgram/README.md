@@ -96,7 +96,7 @@ posting them to the Worker. Create the preset with these settings:
 | Allowed sites | Your app's origins, such as `http://localhost:6400` and `https://<your-app>` |
 
 Over the API, the two switches are the preset's `processingOptions`:
-`{ keepContentAfterProcessing: true, features: { ocr: { enabled: true } } }`. The no-JavaScript
+`{ retainContent: true, features: { ocr: { enabled: true } } }`. The no-JavaScript
 form post also uploads through the preset from the server, so both paths follow the same rules. Without `CALMLENS_UPLOAD_PRESET_ID`, every photo is posted to the Worker and
 forwarded to CalmLens, as in demo mode.
 

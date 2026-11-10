@@ -194,13 +194,10 @@ impl Backend {
             .and_then(Value::as_object)
             .cloned()
             .unwrap_or_default();
-        if processing
-            .get("keepContentAfterProcessing")
-            .is_none_or(Value::is_null)
-        {
+        if processing.get("retainContent").is_none_or(Value::is_null) {
             processing.insert(
-                "keepContentAfterProcessing".into(),
-                preset["processingOptions"]["keepContentAfterProcessing"].clone(),
+                "retainContent".into(),
+                preset["processingOptions"]["retainContent"].clone(),
             );
         }
         options.insert("processingOptions".into(), Value::Object(processing));
@@ -304,7 +301,7 @@ impl Backend {
     pub(super) fn full_settings(&self) -> Value {
         let mut settings = json!({
             "optOutJurisdictions": [],
-            "keepContentAfterProcessing": true,
+            "retainContent": true,
             "blockUnmoderatedAssets": true,
             "storeSensitiveMetadata": false,
             "streamingEnabled": false,

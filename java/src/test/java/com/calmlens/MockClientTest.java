@@ -133,7 +133,7 @@ class MockClientTest {
         .enqueue(200, withReport(Fixtures.asset("asset-2", "completed", "allowed"), Map.of("features", Map.of(
             "faceDetection", Map.of("status", "evaluated", "faces",
                 List.of(Map.of("box", box, "confidence", 0.99, "ageRange", Map.of("low", 21, "high", 30))))))));
-    Models.ProcessingOptions options = new Models.ProcessingOptions().keepContentAfterProcessing(false)
+    Models.ProcessingOptions options = new Models.ProcessingOptions().retainContent(false)
         .features(new Models.ProcessingFeatures()
             .ocr(new Models.FeatureOptions().enabled(true))
             .personDetection(new Models.FeatureOptions(true))
@@ -141,7 +141,7 @@ class MockClientTest {
     Models.Asset asset = mock.client.assets.classify(new Models.SubmitAsset("photo.png", Models.Content.bytes(new byte[] {1}, "image/png"))
         .processingOptions(options));
     assertEquals(
-        com.google.gson.JsonParser.parseString("{\"keepContentAfterProcessing\":false,\"features\":{\"ocr\":{\"enabled\":true},"
+        com.google.gson.JsonParser.parseString("{\"retainContent\":false,\"features\":{\"ocr\":{\"enabled\":true},"
             + "\"personDetection\":{\"enabled\":true},\"faceDetection\":{\"enabled\":true,\"ageEstimation\":true}}}"),
         Fixtures.formOptions(mock.requests().get(0)).get("processingOptions"));
 

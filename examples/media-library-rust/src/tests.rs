@@ -554,7 +554,7 @@ async fn live_upload_sends_folder_metadata_catalogue_id_and_keeps_content() {
         ])
     );
     assert_eq!(
-        options["processingOptions"]["keepContentAfterProcessing"],
+        options["processingOptions"]["retainContent"],
         json!(true)
     );
 }

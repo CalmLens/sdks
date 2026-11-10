@@ -146,7 +146,7 @@ export const createCalmLensProvider = (options: {
           { id: "calmgram.username", value: username },
         ],
         processingOptions: {
-          keepContentAfterProcessing: true,
+          retainContent: true,
           // Catch harmful text inside screenshots and memes.
           features: { ocr: { enabled: true } },
         },

@@ -239,7 +239,7 @@ class CalmmarketTest {
       JsonObject sentFields = options(upload);
       JsonObject options = sentFields.getAsJsonObject("processingOptions");
       assertTrue(options.getAsJsonObject("features").getAsJsonObject("ocr").get("enabled").getAsBoolean(), "photo " + (i + 1));
-      assertTrue(options.get("keepContentAfterProcessing").getAsBoolean());
+      assertTrue(options.get("retainContent").getAsBoolean());
       assertEquals("false", upload.query().get("wait"), "photos are classified in the background");
       assertEquals("private", sentFields.get("visibility").getAsString());
       assertEquals(listing.id + ":photo-" + (i + 1), sentFields.get("externalId").getAsString());

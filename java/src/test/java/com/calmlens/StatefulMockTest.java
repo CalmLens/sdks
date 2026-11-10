@@ -23,7 +23,7 @@ class StatefulMockTest {
 
   private static Models.SubmitAsset kept(String name) {
     return new Models.SubmitAsset(name, Models.Content.bytes(PNG, "image/png"))
-        .processingOptions(new Models.ProcessingOptions().keepContentAfterProcessing(true));
+        .processingOptions(new Models.ProcessingOptions().retainContent(true));
   }
 
   @Test void uploadsSendTheirTagsAndTheAssetKeepsThem() {

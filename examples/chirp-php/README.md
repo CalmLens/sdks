@@ -78,7 +78,7 @@ export CALMLENS_CDN_URL='http://localhost:6130/v1'
 The browser loads images straight from `CALMLENS_CDN_URL`, so it must be reachable from the
 browser. No API key is sent to the browser.
 
-Images are uploaded as **public** assets with `keepContentAfterProcessing`, so allowed images
+Images are uploaded as **public** assets with `retainContent`, so allowed images
 can be served from their public CDN URL. The CDN serves a public asset while it is still
 pending, so Chirp never puts an image URL in a page until the image is decided. Images use the
 `chirp-feed` lens (resized WebP), created on first upload with `ensureLens`.

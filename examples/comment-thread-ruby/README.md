@@ -82,7 +82,7 @@ Each field is moderated synchronously, with its content kept for review:
 asset = client.text.classify(
   name: 'Calmthread reply',
   external_id: "#{reply_id}:text",
-  processing_options: { keep_content_after_processing: true },
+  processing_options: { retain_content: true },
   text: text
 )
 ```
@@ -96,7 +96,7 @@ call uses moderation quota.
 Your project's moderation policy decides each field, with its allowances and restrictions. A
 field the policy allows or limits is clean; one it age-restricts, blocks or purges holds the
 reply. Content is removed after processing unless the upload keeps it, so every field is sent
-with `keep_content_after_processing: true`: a reviewer can read a held reply in the portal, and
+with `retain_content: true`: a reviewer can read a held reply in the portal, and
 the app deletes the stored text once a reviewer keeps the reply out. A policy that purges a
 category leaves nothing to review, so use `block` for categories you want reviewers to see. See
 the moderation policies guide in the CalmLens docs.

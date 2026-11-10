@@ -106,11 +106,11 @@ func TestProcessingOptionsEncodeOnlySetFields(t *testing.T) {
 	if sent := h.body(); !reflect.DeepEqual(sent["processingOptions"], want) || sent["uploadPresetId"] != "preset-1" {
 		t.Fatalf("text body %s", h.bodies[len(h.bodies)-1])
 	}
-	if _, err = c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "site", URL: "https://example.com", UploadPresetID: Ptr("preset-2"), ProcessingOptions: &ProcessingOptions{KeepContentAfterProcessing: Ptr(true)}}); err != nil {
+	if _, err = c.Assets.Create(context.Background(), SubmitAssetOptions{Name: "site", URL: "https://example.com", UploadPresetID: Ptr("preset-2"), ProcessingOptions: &ProcessingOptions{RetainContent: Ptr(true)}}); err != nil {
 		t.Fatal(err)
 	}
 	body := h.body()
-	if body["uploadPresetId"] != "preset-2" || !reflect.DeepEqual(body["processingOptions"], map[string]any{"keepContentAfterProcessing": true}) {
+	if body["uploadPresetId"] != "preset-2" || !reflect.DeepEqual(body["processingOptions"], map[string]any{"retainContent": true}) {
 		t.Fatalf("URL body %v", body)
 	}
 }

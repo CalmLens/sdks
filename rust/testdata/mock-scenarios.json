@@ -25,7 +25,7 @@
           "operation": "projectSettings.update",
           "args": {
             "settings": {
-              "keepContentAfterProcessing": false
+              "retainContent": false
             }
           },
           "expect": {
@@ -57,7 +57,7 @@
                 "key": "retain",
                 "name": "Retain",
                 "processingOptions": {
-                  "keepContentAfterProcessing": true
+                  "retainContent": true
                 }
               }
             ]
@@ -105,7 +105,7 @@
               "$ref": "presets.uploadPresets.0.id"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": false
+              "retainContent": false
             }
           },
           "expect": {
@@ -139,7 +139,7 @@
           "operation": "projectSettings.update",
           "args": {
             "settings": {
-              "keepContentAfterProcessing": false
+              "retainContent": false
             }
           },
           "expect": {
@@ -839,9 +839,7 @@
                   "score": 0.3
                 }
               ],
-              "notEvaluated": [
-                "sexual"
-              ]
+              "notEvaluated": ["sexual"]
             },
             "edgy.txt": {
               "status": "limited",
@@ -1008,9 +1006,7 @@
                 "hashMatches": []
               },
               "classification.moderation.automatedStatus": "blocked",
-              "classification.moderation.flaggedCategories": [
-                "violence"
-              ],
+              "classification.moderation.flaggedCategories": ["violence"],
               "classification.moderation.regions": [],
               "classification.moderation.source": "policy",
               "classification.moderation.explanationComplete": true
@@ -1175,9 +1171,7 @@
                 "hashMatches": []
               },
               "classification.moderation.automatedStatus": "limited",
-              "classification.moderation.flaggedCategories": [
-                "profanity"
-              ],
+              "classification.moderation.flaggedCategories": ["profanity"],
               "classification.moderation.regions": [],
               "classification.moderation.source": "policy",
               "classification.moderation.explanationComplete": true
@@ -1351,9 +1345,7 @@
                 "score": 0.9
               }
             ],
-            "notEvaluated": [
-              "violence"
-            ]
+            "notEvaluated": ["violence"]
           },
           "expect": {
             "error": {
@@ -1405,7 +1397,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "reported",
@@ -1545,7 +1537,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "failed",
@@ -1599,9 +1591,7 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": [
-              "assets:download"
-            ],
+            "actions": ["assets:download"],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -1617,7 +1607,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "blocked",
@@ -1640,7 +1630,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "other",
@@ -1841,9 +1831,7 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": [
-              "assets:download"
-            ],
+            "actions": ["assets:download"],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -1862,7 +1850,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "purged",
@@ -1914,7 +1902,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "decided",
@@ -1988,13 +1976,11 @@
       ]
     },
     {
-      "name": "keepContentAfterProcessing keeps content until it is deleted",
+      "name": "retainContent keeps content until it is deleted",
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": [
-              "assets:download"
-            ],
+            "actions": ["assets:download"],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -2005,7 +1991,7 @@
           "operation": "projectSettings.update",
           "args": {
             "settings": {
-              "keepContentAfterProcessing": false
+              "retainContent": false
             }
           },
           "expect": {
@@ -2021,7 +2007,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "kept",
@@ -2127,7 +2113,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "private",
@@ -2162,7 +2148,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -2234,9 +2220,7 @@
       "mock": {
         "apiKeyGrants": [
           {
-            "actions": [
-              "assets:download"
-            ],
+            "actions": ["assets:download"],
             "folderId": null,
             "includeSubfolders": true
           }
@@ -2255,7 +2239,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "private",
@@ -2287,7 +2271,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -2330,7 +2314,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -2388,7 +2372,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "private",
@@ -2433,7 +2417,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -2683,7 +2667,7 @@
           "operation": "projectSettings.update",
           "args": {
             "settings": {
-              "keepContentAfterProcessing": false
+              "retainContent": false
             }
           },
           "expect": {
@@ -2732,7 +2716,7 @@
               ]
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "kept",
@@ -3273,9 +3257,7 @@
               "items.0.name": "General",
               "items.0.preset.id": "general-community",
               "items.0.preset.mode": "live",
-              "items.0.projectIds": [
-                "project-1"
-              ],
+              "items.0.projectIds": ["project-1"],
               "hasMore": false,
               "nextCursor": null
             },
@@ -3630,9 +3612,7 @@
               "id": {
                 "$ref": "kids.id"
               },
-              "projectIds": [
-                "project-1"
-              ]
+              "projectIds": ["project-1"]
             },
             "httpStatus": 200
           }
@@ -3989,9 +3969,7 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 950,
-              "items.0.matchedFields": [
-                "externalId"
-              ]
+              "items.0.matchedFields": ["externalId"]
             },
             "httpStatus": 200
           }
@@ -4008,16 +3986,12 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 750,
-              "items.0.matchedFields": [
-                "externalId"
-              ],
+              "items.0.matchedFields": ["externalId"],
               "items.1.asset.id": {
                 "$ref": "form.id"
               },
               "items.1.score": 700,
-              "items.1.matchedFields": [
-                "name"
-              ]
+              "items.1.matchedFields": ["name"]
             },
             "httpStatus": 200
           }
@@ -4034,9 +4008,7 @@
                 "$ref": "invoice.id"
               },
               "items.0.score": 900,
-              "items.0.matchedFields": [
-                "name"
-              ]
+              "items.0.matchedFields": ["name"]
             },
             "httpStatus": 200
           }
@@ -4053,9 +4025,7 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 600,
-              "items.0.matchedFields": [
-                "name"
-              ]
+              "items.0.matchedFields": ["name"]
             },
             "httpStatus": 200
           }
@@ -4074,9 +4044,7 @@
                 "$ref": "invoice.id"
               },
               "items.0.score": 1000,
-              "items.0.matchedFields": [
-                "id"
-              ]
+              "items.0.matchedFields": ["id"]
             },
             "httpStatus": 200
           }
@@ -4094,9 +4062,7 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 100,
-              "items.0.matchedFields": [
-                "description"
-              ]
+              "items.0.matchedFields": ["description"]
             },
             "httpStatus": 200
           }
@@ -4113,10 +4079,7 @@
                 "$ref": "beach.id"
               },
               "items.0.score": 100,
-              "items.0.matchedFields": [
-                "name",
-                "description"
-              ]
+              "items.0.matchedFields": ["name", "description"]
             },
             "httpStatus": 200
           }
@@ -4157,9 +4120,7 @@
                 "$ref": "invoice.id"
               },
               "items.0.score": 100,
-              "items.0.matchedFields": [
-                "classification.moderation.status"
-              ],
+              "items.0.matchedFields": ["classification.moderation.status"],
               "items.1.asset.id": {
                 "$ref": "beach.id"
               }
@@ -4646,10 +4607,7 @@
             "assetId": {
               "$ref": "home.id"
             },
-            "tags": [
-              "homepage",
-              "sale"
-            ]
+            "tags": ["homepage", "sale"]
           },
           "expect": {
             "httpStatus": 200
@@ -4661,9 +4619,7 @@
             "assetId": {
               "$ref": "archive.id"
             },
-            "tags": [
-              "archive"
-            ]
+            "tags": ["archive"]
           },
           "expect": {
             "httpStatus": 200
@@ -5014,9 +4970,7 @@
               },
               {
                 "key": "uncertain-categories",
-                "value": [
-                  "harassment"
-                ]
+                "value": ["harassment"]
               }
             ]
           },
@@ -5146,20 +5100,14 @@
               "$ref": "a.id"
             },
             "name": "renamed.png",
-            "tags": [
-              "beach",
-              "sunset"
-            ]
+            "tags": ["beach", "sunset"]
           },
           "expect": {
             "result": {
               "name": "renamed.png",
               "description": "first",
               "externalId": "order-1",
-              "tags": [
-                "beach",
-                "sunset"
-              ]
+              "tags": ["beach", "sunset"]
             },
             "httpStatus": 200
           }
@@ -5176,9 +5124,7 @@
                 "$ref": "a.id"
               },
               "items.0.score": 500,
-              "items.0.matchedFields": [
-                "tags"
-              ]
+              "items.0.matchedFields": ["tags"]
             },
             "httpStatus": 200
           }
@@ -5622,7 +5568,7 @@
           "operation": "projectSettings.update",
           "args": {
             "settings": {
-              "keepContentAfterProcessing": false
+              "retainContent": false
             }
           },
           "expect": {
@@ -5848,7 +5794,7 @@
           "operation": "projectSettings.update",
           "args": {
             "settings": {
-              "keepContentAfterProcessing": false
+              "retainContent": false
             }
           },
           "expect": {
@@ -5907,7 +5853,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "kept",
@@ -5949,7 +5895,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "reviewed",
@@ -6049,7 +5995,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "kept",
@@ -6200,7 +6146,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "a",
@@ -6217,7 +6163,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "b",
@@ -6234,7 +6180,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "c",
@@ -6540,9 +6486,7 @@
         {
           "operation": "events.list",
           "args": {
-            "types": [
-              "asset.uploaded"
-            ]
+            "types": ["asset.uploaded"]
           },
           "save": "uploads",
           "expect": {
@@ -6558,7 +6502,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "first",
@@ -6587,7 +6531,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "second",
@@ -6601,9 +6545,7 @@
             "cursor": {
               "$ref": "uploads.nextCursor"
             },
-            "types": [
-              "asset.uploaded"
-            ]
+            "types": ["asset.uploaded"]
           },
           "expect": {
             "result": {
@@ -6659,9 +6601,7 @@
             "cursor": {
               "$ref": "all.nextCursor"
             },
-            "types": [
-              "asset.uploaded"
-            ]
+            "types": ["asset.uploaded"]
           },
           "expect": {
             "error": {
@@ -6699,7 +6639,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "purged",
@@ -6782,7 +6722,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "a",
@@ -6817,7 +6757,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "b",
@@ -8188,7 +8128,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -9078,7 +9018,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "root",
@@ -9095,7 +9035,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "folderId": {
               "$ref": "parent.id"
@@ -9115,7 +9055,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "folderId": {
               "$ref": "child.id"
@@ -9131,9 +9071,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:download"
-                ],
+                "actions": ["assets:download"],
                 "folderId": {
                   "$ref": "parent.id"
                 },
@@ -9196,9 +9134,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:download"
-                ],
+                "actions": ["assets:download"],
                 "folderId": {
                   "$ref": "parent.id"
                 },
@@ -9246,9 +9182,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:read"
-                ],
+                "actions": ["assets:read"],
                 "folderId": {
                   "$ref": "parent.id"
                 },
@@ -9277,9 +9211,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:download"
-                ],
+                "actions": ["assets:download"],
                 "folderId": null,
                 "includeSubfolders": true
               }
@@ -9355,7 +9287,7 @@
           "operation": "projectSettings.update",
           "args": {
             "settings": {
-              "keepContentAfterProcessing": false
+              "retainContent": false
             }
           },
           "expect": {
@@ -9371,7 +9303,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -9404,9 +9336,7 @@
                   ]
                 }
               },
-              "headersPresent": [
-                "ETag"
-              ]
+              "headersPresent": ["ETag"]
             }
           }
         },
@@ -9439,9 +9369,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:download"
-                ],
+                "actions": ["assets:download"],
                 "folderId": null,
                 "includeSubfolders": true
               }
@@ -9472,9 +9400,7 @@
                   ]
                 }
               },
-              "headersPresent": [
-                "ETag"
-              ]
+              "headersPresent": ["ETag"]
             }
           }
         },
@@ -9532,9 +9458,7 @@
                   ]
                 }
               },
-              "headersPresent": [
-                "ETag"
-              ]
+              "headersPresent": ["ETag"]
             }
           }
         },
@@ -9562,7 +9486,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "private",
@@ -9590,9 +9514,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:download"
-                ],
+                "actions": ["assets:download"],
                 "folderId": null,
                 "includeSubfolders": true
               }
@@ -9623,9 +9545,7 @@
                   ]
                 }
               },
-              "headersPresent": [
-                "ETag"
-              ]
+              "headersPresent": ["ETag"]
             }
           }
         },
@@ -9659,7 +9579,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -9692,7 +9612,7 @@
               "type": "text/plain"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -9732,9 +9652,7 @@
           "args": {
             "grants": [
               {
-                "actions": [
-                  "assets:download"
-                ],
+                "actions": ["assets:download"],
                 "folderId": null,
                 "includeSubfolders": true
               }
@@ -9800,7 +9718,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -9861,7 +9779,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -9913,7 +9831,7 @@
               "type": "video/mp4"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -9970,7 +9888,7 @@
               "type": "audio/mpeg"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -9991,7 +9909,7 @@
               "type": "application/pdf"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -10029,7 +9947,7 @@
               "type": "text/plain"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -10102,7 +10020,7 @@
               "type": "video/mp4"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true,
+              "retainContent": true,
               "features": {
                 "streaming": {
                   "enabled": true
@@ -10217,7 +10135,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -10262,7 +10180,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -10297,11 +10215,7 @@
                 "X-Content-Type-Options": "nosniff",
                 "Content-Security-Policy": "sandbox; default-src 'none'"
               },
-              "headersPresent": [
-                "ETag",
-                "Expires",
-                "Content-Length"
-              ]
+              "headersPresent": ["ETag", "Expires", "Content-Length"]
             }
           }
         },
@@ -10314,7 +10228,7 @@
               "type": "text/plain"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -10385,7 +10299,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "flyer",
@@ -10435,9 +10349,7 @@
               "items.1.facts": [
                 {
                   "key": "flagged-categories",
-                  "value": [
-                    "hate"
-                  ]
+                  "value": ["hate"]
                 },
                 {
                   "key": "moderation-status",
@@ -10470,9 +10382,7 @@
               "items.2.facts": [
                 {
                   "key": "flagged-categories",
-                  "value": [
-                    "hate"
-                  ]
+                  "value": ["hate"]
                 },
                 {
                   "key": "asset-type",
@@ -10592,7 +10502,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "queued",
@@ -10787,9 +10697,7 @@
                 "hashMatches": []
               },
               "classification.moderation.automatedStatus": "age-restricted",
-              "classification.moderation.flaggedCategories": [
-                "sexual"
-              ],
+              "classification.moderation.flaggedCategories": ["sexual"],
               "classification.moderation.regions": [],
               "classification.moderation.source": "policy",
               "classification.moderation.explanationComplete": true,
@@ -10825,9 +10733,7 @@
               "items.0.type": "asset.classified",
               "items.0.facts.0": {
                 "key": "flagged-categories",
-                "value": [
-                  "sexual"
-                ]
+                "value": ["sexual"]
               },
               "items.1.type": "asset.age-restricted",
               "items.1.actor": {
@@ -10836,9 +10742,7 @@
               },
               "items.1.facts.0": {
                 "key": "flagged-categories",
-                "value": [
-                  "sexual"
-                ]
+                "value": ["sexual"]
               }
             },
             "httpStatus": 200
@@ -11173,7 +11077,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "a",
@@ -11229,7 +11133,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "a",
@@ -11460,9 +11364,7 @@
               "plainText": "hello",
               "type": "text/plain"
             },
-            "metadata": [
-              "source"
-            ]
+            "metadata": ["source"]
           },
           "expect": {
             "error": {
@@ -11660,7 +11562,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "description": "kept"
           },
@@ -11761,7 +11663,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "private"
           },
@@ -11928,7 +11830,7 @@
           "operation": "projectSettings.update",
           "args": {
             "settings": {
-              "keepContentAfterProcessing": false
+              "retainContent": false
             }
           },
           "expect": {
@@ -11944,7 +11846,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "kept",
@@ -12096,7 +11998,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "restricted",
@@ -12141,7 +12043,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -12225,11 +12127,9 @@
                   "$ref": "folder.id"
                 },
                 "processingOptions": {
-                  "keepContentAfterProcessing": true
+                  "retainContent": true
                 },
-                "allowedContentTypes": [
-                  "image/*"
-                ],
+                "allowedContentTypes": ["image/*"],
                 "maxSizeInBytes": 10
               },
               {
@@ -12307,7 +12207,7 @@
               "$ref": "presets.uploadPresets.0.id"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": false
+              "retainContent": false
             }
           },
           "expect": {
@@ -12404,9 +12304,7 @@
               "details": {
                 "source": "preset",
                 "contentType": "text/plain",
-                "allowedContentTypes": [
-                  "image/*"
-                ]
+                "allowedContentTypes": ["image/*"]
               }
             }
           }
@@ -12493,18 +12391,14 @@
               ],
               "pendingReview": {
                 "reason": "uncertain",
-                "uncertainCategories": [
-                  "violence"
-                ]
+                "uncertainCategories": ["violence"]
               }
             },
             "uncertain-api.png": {
               "status": "allowed",
               "pendingReview": {
                 "reason": "uncertain",
-                "uncertainCategories": [
-                  "hate"
-                ]
+                "uncertainCategories": ["hate"]
               }
             }
           }
@@ -12536,7 +12430,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "sampled",
@@ -12574,7 +12468,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "uncertain",
@@ -12582,9 +12476,7 @@
             "result": {
               "classification.moderation.status": "limited",
               "classification.moderation.pendingReview.reason": "uncertain",
-              "classification.moderation.pendingReview.uncertainCategories": [
-                "violence"
-              ]
+              "classification.moderation.pendingReview.uncertainCategories": ["violence"]
             },
             "httpStatus": 200
           }
@@ -12621,7 +12513,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "viaApi",
@@ -12687,9 +12579,7 @@
             "status": "allowed",
             "pendingReview": {
               "reason": "sampled",
-              "uncertainCategories": [
-                "hate"
-              ]
+              "uncertainCategories": ["hate"]
             }
           },
           "expect": {
@@ -12705,9 +12595,7 @@
             "status": "allowed",
             "pendingReview": {
               "reason": "uncertain",
-              "uncertainCategories": [
-                "not-a-category"
-              ]
+              "uncertainCategories": ["not-a-category"]
             }
           },
           "expect": {
@@ -13123,7 +13011,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             }
           },
           "save": "reported",
@@ -13275,7 +13163,7 @@
                 "key": "avatars",
                 "name": "Avatars",
                 "processingOptions": {
-                  "keepContentAfterProcessing": true,
+                  "retainContent": true,
                   "features": {
                     "personDetection": {
                       "enabled": true
@@ -13313,7 +13201,7 @@
                       "enabled": true
                     }
                   },
-                  "keepContentAfterProcessing": true
+                  "retainContent": true
                 }
               }
             ]
@@ -13340,7 +13228,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public",
             "externalId": "post/1 ✓"
@@ -13441,7 +13329,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },
@@ -13574,7 +13462,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "private"
           },
@@ -13649,7 +13537,7 @@
               "type": "image/png"
             },
             "processingOptions": {
-              "keepContentAfterProcessing": true
+              "retainContent": true
             },
             "visibility": "public"
           },

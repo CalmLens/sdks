@@ -19,7 +19,7 @@ final class MockServerClientTest extends TestCase
         return $mock->client()->assets->create([
             'name' => 'photo.png', 'visibility' => $visibility, 'externalId' => 'post-1',
             'content' => ['data' => 'png-bytes', 'type' => 'image/png'],
-            'processingOptions' => ['keepContentAfterProcessing' => true],
+            'processingOptions' => ['retainContent' => true],
         ]);
     }
 
@@ -75,8 +75,8 @@ final class MockServerClientTest extends TestCase
     {
         $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => str_contains((string) $input->content->text, 'away') ? 'blocked' : 'allowed');
         $client = $mock->client();
-        $kind = $client->text->classify(['name' => 'kind', 'processingOptions' => ['keepContentAfterProcessing' => false], 'text' => 'hello']);
-        $rude = $client->text->classify(['name' => 'rude', 'processingOptions' => ['keepContentAfterProcessing' => false], 'text' => 'go away']);
+        $kind = $client->text->classify(['name' => 'kind', 'processingOptions' => ['retainContent' => false], 'text' => 'hello']);
+        $rude = $client->text->classify(['name' => 'rude', 'processingOptions' => ['retainContent' => false], 'text' => 'go away']);
         self::assertSame('allowed', $kind['classification']['moderation']['status']);
         self::assertSame('blocked', $rude['classification']['moderation']['status']);
         self::assertSame(['removed', 'retention'], [$kind['content']['status'], $kind['content']['removalReason']]);
@@ -164,7 +164,7 @@ final class MockServerClientTest extends TestCase
         $mock = new MockServerClient();
         $client = $mock->client();
         $clip = $client->assets->classify(['name' => 'clip.mp4', 'content' => ['data' => 'mp4-bytes', 'type' => 'video/mp4'],
-            'processingOptions' => ['keepContentAfterProcessing' => true]]);
+            'processingOptions' => ['retainContent' => true]]);
         self::assertSame([null, null], [$clip['classification']['progress'], $clip['classification']['moderation']['timeline']]);
         $mock->assets[$clip['id']]['content']['safetyHold'] = ['placedAt' => 1, 'reason' => 'suspected-illegal-content', 'disposedAt' => null];
         foreach ([101 => ErrorCodes::TOO_BIG, 0 => ErrorCodes::TOO_SMALL] as $size => $issue) {
@@ -183,7 +183,7 @@ final class MockServerClientTest extends TestCase
         $mock = new MockServerClient();
         $client = $mock->client();
         $photo = $client->assets->classify(['name' => 'photo.png', 'visibility' => 'public',
-            'content' => ['data' => 'png-bytes', 'type' => 'image/png'], 'processingOptions' => ['keepContentAfterProcessing' => true]]);
+            'content' => ['data' => 'png-bytes', 'type' => 'image/png'], 'processingOptions' => ['retainContent' => true]]);
         $queued = self::image($mock);
         self::assertSame(['image', MockServerClient::THUMBHASH], [$photo['content']['rendered']['kind'], $photo['content']['preview']['thumbhash']]);
         foreach (['original', 'rendered', 'preview', 'placeholder'] as $resource) {
@@ -209,7 +209,7 @@ final class MockServerClientTest extends TestCase
     {
         $mock = new MockServerClient();
         $client = $mock->client();
-        $keep = ['keepContentAfterProcessing' => true];
+        $keep = ['retainContent' => true];
         $video = $client->assets->classify(['name' => 'clip.mp4', 'visibility' => 'public',
             'content' => ['data' => 'mp4-bytes', 'type' => 'video/mp4'], 'processingOptions' => $keep]);
         self::assertNull($video['content']['hls']);
@@ -428,7 +428,7 @@ final class MockServerClientTest extends TestCase
     {
         $client = (new MockServerClient())->client();
         $asset = $client->assets->classify(['name' => 'photo.png', 'content' => ['data' => 'png-bytes', 'type' => 'image/png'],
-            'processingOptions' => ['keepContentAfterProcessing' => true, 'features' => ['personDetection' => ['enabled' => true]]]]);
+            'processingOptions' => ['retainContent' => true, 'features' => ['personDetection' => ['enabled' => true]]]]);
         $retrieved = $client->assets->retrieve(['assetId' => $asset['id']]);
         self::assertArrayNotHasKey('processingOptions', $asset);
         self::assertArrayNotHasKey('processingOptions', $retrieved);

@@ -19,7 +19,7 @@ fn options() -> MockOptions {
 fn kept(name: &str, bytes: &'static [u8]) -> SubmitAsset {
     SubmitAsset {
         processing_options: Some(ProcessingOptions {
-            keep_content_after_processing: Some(true),
+            retain_content: Some(true),
             ..Default::default()
         }),
         ..SubmitAsset::new(name, Content::bytes(bytes, "image/png"))
@@ -75,7 +75,7 @@ async fn storage_keeps_only_kept_content_and_drops_purged_content() {
         .text()
         .classify(ClassifyText {
             processing_options: Some(ProcessingOptions {
-                keep_content_after_processing: Some(false),
+                retain_content: Some(false),
                 ..Default::default()
             }),
             ..ClassifyText::new("hello")
@@ -181,7 +181,7 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
         .assets()
         .create(SubmitAsset {
             processing_options: Some(ProcessingOptions {
-                keep_content_after_processing: Some(true),
+                retain_content: Some(true),
                 ..Default::default()
             }),
             ..SubmitAsset::new("song.mp3", Content::bytes(&b"mp3"[..], "audio/mpeg"))
@@ -215,7 +215,7 @@ async fn serves_the_embed_page_of_any_asset_and_no_hls_stream_until_it_is_blocke
         .assets()
         .classify(SubmitAsset {
             processing_options: Some(ProcessingOptions {
-                keep_content_after_processing: Some(true),
+                retain_content: Some(true),
                 features: Some(ProcessingFeatures {
                     streaming: Some(FeatureOptions::enabled()),
                     ..Default::default()
@@ -246,7 +246,7 @@ async fn serves_the_embed_page_of_any_asset_and_no_hls_stream_until_it_is_blocke
         .assets()
         .classify(SubmitAsset {
             processing_options: Some(ProcessingOptions {
-                keep_content_after_processing: Some(true),
+                retain_content: Some(true),
                 ..Default::default()
             }),
             visibility: Some(Visibility::Public),

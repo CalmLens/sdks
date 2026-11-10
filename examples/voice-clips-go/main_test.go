@@ -189,7 +189,7 @@ func TestMultipartAboveThreshold(t *testing.T) {
 	// The asset's own fields travel in the first part's options, never in the URL.
 	options := requests[0].Body
 	processing, _ := options["processingOptions"].(map[string]any)
-	if options["visibility"] != "private" || processing["keepContentAfterProcessing"] != true {
+	if options["visibility"] != "private" || processing["retainContent"] != true {
 		t.Fatalf("first part options: %v", options)
 	}
 	for i, r := range requests[1:] {

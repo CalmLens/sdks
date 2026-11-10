@@ -654,9 +654,9 @@ final class MockApi {
       processing = new JsonObject();
 
     }
-    if (!processing.getAsJsonObject().has("keepContentAfterProcessing") || processing.getAsJsonObject().get("keepContentAfterProcessing").isJsonNull())
-      processing.getAsJsonObject().add("keepContentAfterProcessing", toProjectSettings().getAsJsonObject("settings").get("keepContentAfterProcessing"));
-    boolean keep = bool(processing.getAsJsonObject(), "keepContentAfterProcessing");
+    if (!processing.getAsJsonObject().has("retainContent") || processing.getAsJsonObject().get("retainContent").isJsonNull())
+      processing.getAsJsonObject().add("retainContent", toProjectSettings().getAsJsonObject("settings").get("retainContent"));
+    boolean keep = bool(processing.getAsJsonObject(), "retainContent");
 
     // Fields the API returns as null when they are not set.
     JsonObject asset = new JsonObject();
@@ -788,8 +788,8 @@ final class MockApi {
     if ((!fields.has("processingOptions") || fields.get("processingOptions").isJsonNull()) && !preset.get("processingOptions").isJsonNull())
       applied.add("processingOptions", preset.get("processingOptions").deepCopy());
     JsonObject retentionOptions = applied.get("processingOptions") instanceof JsonObject value ? value.deepCopy() : new JsonObject();
-    if ((!retentionOptions.has("keepContentAfterProcessing") || retentionOptions.get("keepContentAfterProcessing").isJsonNull()) && preset.get("processingOptions") instanceof JsonObject defaults)
-      retentionOptions.add("keepContentAfterProcessing", defaults.get("keepContentAfterProcessing"));
+    if ((!retentionOptions.has("retainContent") || retentionOptions.get("retainContent").isJsonNull()) && preset.get("processingOptions") instanceof JsonObject defaults)
+      retentionOptions.add("retainContent", defaults.get("retainContent"));
     applied.add("processingOptions", retentionOptions);
     return applied;
   }
@@ -2155,7 +2155,7 @@ final class MockApi {
   private JsonObject toProjectSettings() {
     JsonObject settings = new JsonObject();
     settings.add("optOutJurisdictions", new JsonArray());
-    settings.addProperty("keepContentAfterProcessing", true);
+    settings.addProperty("retainContent", true);
     settings.addProperty("blockUnmoderatedAssets", true);
     settings.addProperty("storeSensitiveMetadata", false);
     settings.addProperty("streamingEnabled", false);

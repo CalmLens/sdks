@@ -170,7 +170,7 @@ declare const METADATA_ITEM_SCHEMA: zod.ZodObject<{
 }, zod.core.$strip>;
 type MetadataItem = zod.infer<typeof METADATA_ITEM_SCHEMA>;
 declare const PROCESSING_OPTIONS_SCHEMA: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-  keepContentAfterProcessing: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
+  retainContent: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
   storeSensitiveMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
   features: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
     ocr: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{

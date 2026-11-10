@@ -89,7 +89,7 @@ mvn -q compile exec:java
 The demo-mode note and the demo selectors disappear. Each listing makes two
 synchronous text calls and one queued upload per photo, all with an `externalId` of
 `<listing-id>:<field>` (`title`, `description`, `photo-1` ...) and
-`keepContentAfterProcessing: true`, so a reviewer can see held content in the CalmLens
+`retainContent: true`, so a reviewer can see held content in the CalmLens
 portal. The same value is the call's `Idempotency-Key`, so a retried upload never creates a second
 asset. Whenever the app retrieves an asset (polling, previews, events and webhooks), it checks
 that the asset's `externalId` points back to the listing that holds it; an asset that does not is

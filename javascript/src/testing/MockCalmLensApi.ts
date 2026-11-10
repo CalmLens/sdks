@@ -224,7 +224,7 @@ export interface MockUploadPreset {
   /** Defaults to `public`. */
   visibility?: "public" | "private";
   /** Defaults to `true`, so the CDN can serve the upload. */
-  keepContentAfterProcessing?: boolean;
+  retainContent?: boolean;
   folderId?: string | null;
 }
 
@@ -2344,10 +2344,9 @@ export class MockCalmLensApi {
       processingOptions: {
         ...(fields.processingOptions ??
           (preset.processingOptions as UploadFields["processingOptions"])),
-        keepContentAfterProcessing:
-          fields.processingOptions?.keepContentAfterProcessing ??
-          (preset.processingOptions as UploadFields["processingOptions"])
-            ?.keepContentAfterProcessing,
+        retainContent:
+          fields.processingOptions?.retainContent ??
+          (preset.processingOptions as UploadFields["processingOptions"])?.retainContent,
       },
     };
   }
@@ -2403,11 +2402,10 @@ export class MockCalmLensApi {
     const isOpenUpload = part !== undefined && !part.isFinal;
     const processingOptions = {
       ...fields.processingOptions,
-      keepContentAfterProcessing:
-        fields.processingOptions?.keepContentAfterProcessing ??
-        this.toProjectSettings().settings.keepContentAfterProcessing,
+      retainContent:
+        fields.processingOptions?.retainContent ?? this.toProjectSettings().settings.retainContent,
     };
-    const keepContent = processingOptions.keepContentAfterProcessing === true;
+    const keepContent = processingOptions.retainContent === true;
     this.processingOptions.set(id, processingOptions);
     const hasContent = fields.url === undefined;
     const contextItems = selectModerationContextItems(fields.context?.items ?? []);
@@ -2761,7 +2759,7 @@ export class MockCalmLensApi {
   /**
    * Moves an asset to `outcome` like the pipeline would: a decision finishes processing, `purged`
    * deletes the content (with `purgeReason`, `policy` for the pipeline), and finished processing
-   * removes content kept only temporarily (`keepContentAfterProcessing` off). A decided asset gets
+   * removes content kept only temporarily (`retainContent` off). A decided asset gets
    * its rendered file and preview (with a ThumbHash for its placeholder), which go with its content.
    */
   private async applyOutcome(
@@ -2939,7 +2937,7 @@ export class MockCalmLensApi {
         visibility: preset.visibility ?? "public",
         folderId: preset.folderId ?? undefined,
         processingOptions: {
-          keepContentAfterProcessing: preset.keepContentAfterProcessing ?? true,
+          retainContent: preset.retainContent ?? true,
         },
       },
       request.query.get("wait") === "false",
@@ -3246,7 +3244,7 @@ export class MockCalmLensApi {
       projectId: this.projectId,
       revision: this.settingsRevision,
       settings: {
-        keepContentAfterProcessing: true,
+        retainContent: true,
         optOutJurisdictions: [],
         blockUnmoderatedAssets: true,
         storeSensitiveMetadata: false,

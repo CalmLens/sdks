@@ -81,7 +81,7 @@ asset = client.assets.create(
     name="Calmboard link",
     url=url,
     external_id=f"{link_id}:page",
-    processing_options={"keepContentAfterProcessing": False},
+    processing_options={"retainContent": False},
 )
 ```
 

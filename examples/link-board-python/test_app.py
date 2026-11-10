@@ -166,7 +166,7 @@ class DemoFlowTests(unittest.TestCase):
         request = board.moderator.client.requests[-1]
         self.assertEqual((request.method, request.path, request.query["wait"]), ("POST", "/projects/project-1/assets", False))
         self.assertEqual(request.body["url"], "https://example.com/page")
-        self.assertEqual(request.body["processingOptions"], {"keepContentAfterProcessing": False})
+        self.assertEqual(request.body["processingOptions"], {"retainContent": False})
         self.assertEqual(board.moderator.client.database_storage.assets[board.links[0]["asset_id"]]["type"], "website")
 
     def test_external_ids_map_back_to_the_link(self):

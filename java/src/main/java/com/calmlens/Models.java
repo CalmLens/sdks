@@ -556,7 +556,7 @@ public final class Models {
    * @param aiGeneratedDetection (preview) read the AI provenance metadata images carry
    * @param streaming (preview) prepare an adaptive (HLS) stream of audio or video once it is
    *     decided and made browser-safe, served at the {@code hls} resource and played by the
-   *     {@code embed} page; needs {@code keepContentAfterProcessing} and is billed per started minute
+   *     {@code embed} page; needs {@code retainContent} and is billed per started minute
    *     of media. Left null, the project's streaming setting decides; {@code enabled} false turns
    *     it off for this upload
    */
@@ -587,25 +587,25 @@ public final class Models {
   /**
    * Processing options for an asset.
    *
-   * @param keepContentAfterProcessing whether stored content is kept after classification
+   * @param retainContent whether stored content is kept after classification
    * @param storeSensitiveMetadata overrides the project's {@code storeSensitiveMetadata} setting
    *     for this upload: when false, embedded image metadata (EXIF, XMP and IPTC) is removed from
    *     the file before it is stored, and {@code content.metadata} leaves out the creator and
    *     location; when true, the image is stored as uploaded
    * @param features optional analyses to run, such as OCR
    */
-  public record ProcessingOptions(Boolean keepContentAfterProcessing, Boolean storeSensitiveMetadata, ProcessingFeatures features) {
+  public record ProcessingOptions(Boolean retainContent, Boolean storeSensitiveMetadata, ProcessingFeatures features) {
     /** No options set. */
     public ProcessingOptions() { this(null, null, null); }
 
     /** @param value whether to keep content @return a copy with this setting */
-    public ProcessingOptions keepContentAfterProcessing(Boolean value) { return new ProcessingOptions(value, storeSensitiveMetadata, features); }
+    public ProcessingOptions retainContent(Boolean value) { return new ProcessingOptions(value, storeSensitiveMetadata, features); }
 
     /** @param value whether to store embedded image metadata @return a copy with this setting */
-    public ProcessingOptions storeSensitiveMetadata(Boolean value) { return new ProcessingOptions(keepContentAfterProcessing, value, features); }
+    public ProcessingOptions storeSensitiveMetadata(Boolean value) { return new ProcessingOptions(retainContent, value, features); }
 
     /** @param value optional features @return a copy with these features */
-    public ProcessingOptions features(ProcessingFeatures value) { return new ProcessingOptions(keepContentAfterProcessing, storeSensitiveMetadata, value); }
+    public ProcessingOptions features(ProcessingFeatures value) { return new ProcessingOptions(retainContent, storeSensitiveMetadata, value); }
   }
 
   /**
@@ -3177,7 +3177,7 @@ public final class Models {
    * A project's settings, with defaults filled in.
    *
    * @param optOutJurisdictions optional standards the project doesn't serve, such as {@code EU}
-   * @param keepContentAfterProcessing whether new uploads keep their content after processing
+   * @param retainContent whether new uploads keep their content after processing
    * @param blockUnmoderatedAssets whether the CDN refuses to serve assets whose moderation is pending
    * @param storeSensitiveMetadata whether uploaded images keep their embedded metadata
    * @param streamingEnabled whether audio and video uploads that keep their content get an adaptive stream
@@ -3186,7 +3186,7 @@ public final class Models {
    * @param websiteSubmissionsPerMinute how many websites the project can submit per minute, or null for the platform limit
    * @param humanReview which automated decisions are sampled into the human review queue
    */
-  public record ProjectSettings(Boolean keepContentAfterProcessing, List<String> optOutJurisdictions, Boolean blockUnmoderatedAssets, Boolean storeSensitiveMetadata,
+  public record ProjectSettings(Boolean retainContent, List<String> optOutJurisdictions, Boolean blockUnmoderatedAssets, Boolean storeSensitiveMetadata,
       Boolean streamingEnabled, Boolean aiMediaSearchEnabled, RemoteUrlRule remoteUrlRule, Integer websiteSubmissionsPerMinute,
       HumanReviewSettings humanReview) {
     /** Copies collections so the record stays immutable. */
@@ -3204,9 +3204,9 @@ public final class Models {
 
   /** The settings to save with {@code projectSettings.update}. Settings left unset return to their defaults. */
   public static final class ProjectSettingsInput {
-    private Boolean keepContentAfterProcessing;
+    private Boolean retainContent;
     /** @param value whether to retain new uploads (default true) @return these settings */
-    public ProjectSettingsInput keepContentAfterProcessing(Boolean value) { keepContentAfterProcessing = value; return this; }
+    public ProjectSettingsInput retainContent(Boolean value) { retainContent = value; return this; }
     private List<String> optOutJurisdictions;
     private Boolean blockUnmoderatedAssets;
     private Boolean storeSensitiveMetadata;

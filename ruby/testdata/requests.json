@@ -445,7 +445,7 @@
         "type": "text/plain"
       },
       "processingOptions": {
-        "keepContentAfterProcessing": false,
+        "retainContent": false,
         "features": {
           "faceDetection": {
             "enabled": true,
@@ -463,7 +463,7 @@
       "body": {
         "name": "note.txt",
         "processingOptions": {
-          "keepContentAfterProcessing": false,
+          "retainContent": false,
           "features": {
             "faceDetection": {
               "enabled": true,
@@ -578,9 +578,7 @@
             }
           },
           "score": 0.85,
-          "matchedFields": [
-            "visual"
-          ]
+          "matchedFields": ["visual"]
         }
       ],
       "semanticStatus": "ready"
@@ -666,9 +664,7 @@
             }
           },
           "score": 0.85,
-          "matchedFields": [
-            "visual"
-          ]
+          "matchedFields": ["visual"]
         }
       ],
       "semanticStatus": "ready"
@@ -903,36 +899,24 @@
               "action": "block",
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  0,
-                  1
-                ]
+                "indexes": [0, 1]
               },
               "settings": {
                 "action": "purge",
                 "allowances": [
                   {
-                    "when": [
-                      "violence-injury",
-                      "violence-educational"
-                    ],
+                    "when": ["violence-injury", "violence-educational"],
                     "action": "block"
                   },
                   {
-                    "when": [
-                      "violence-historical"
-                    ],
+                    "when": ["violence-historical"],
                     "action": "block"
                   }
                 ],
                 "restrictions": [
                   {
-                    "when": [
-                      "violence-threat"
-                    ],
-                    "unless": [
-                      "violence-documentary"
-                    ],
+                    "when": ["violence-threat"],
+                    "unless": ["violence-documentary"],
                     "action": "purge"
                   }
                 ]
@@ -1338,10 +1322,7 @@
   {
     "operation": "assets.batch",
     "options": {
-      "assetIds": [
-        "asset-1",
-        "a/b?c#d"
-      ],
+      "assetIds": ["asset-1", "a/b?c#d"],
       "operation": "remove-content"
     },
     "request": {
@@ -1349,10 +1330,7 @@
       "path": "/v1/projects/project-1/assets/batch",
       "query": {},
       "body": {
-        "assetIds": [
-          "asset-1",
-          "a/b?c#d"
-        ],
+        "assetIds": ["asset-1", "a/b?c#d"],
         "operation": "remove-content"
       }
     },
@@ -1365,9 +1343,7 @@
   {
     "operation": "assets.batch",
     "options": {
-      "assetIds": [
-        "asset-1"
-      ],
+      "assetIds": ["asset-1"],
       "operation": "delete"
     },
     "request": {
@@ -1375,9 +1351,7 @@
       "path": "/v1/projects/project-1/assets/batch",
       "query": {},
       "body": {
-        "assetIds": [
-          "asset-1"
-        ],
+        "assetIds": ["asset-1"],
         "operation": "delete"
       }
     },
@@ -2088,9 +2062,7 @@
             "latestVersion": 31,
             "mode": "copy"
           },
-          "projectIds": [
-            "project-1"
-          ],
+          "projectIds": ["project-1"],
           "createdAt": 1760000000000,
           "updatedAt": 1760000000000
         }
@@ -2173,9 +2145,7 @@
             "latestVersion": 31,
             "mode": "copy"
           },
-          "projectIds": [
-            "project-1"
-          ],
+          "projectIds": ["project-1"],
           "createdAt": 1760000000000,
           "updatedAt": 1760000000000
         }
@@ -2250,9 +2220,7 @@
         "latestVersion": 31,
         "mode": "copy"
       },
-      "projectIds": [
-        "project-1"
-      ],
+      "projectIds": ["project-1"],
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -2323,9 +2291,7 @@
         "latestVersion": 31,
         "mode": "copy"
       },
-      "projectIds": [
-        "project-1"
-      ],
+      "projectIds": ["project-1"],
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -2393,9 +2359,7 @@
         "latestVersion": 31,
         "mode": "copy"
       },
-      "projectIds": [
-        "project-1"
-      ],
+      "projectIds": ["project-1"],
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -2470,9 +2434,7 @@
         "latestVersion": 31,
         "mode": "copy"
       },
-      "projectIds": [
-        "project-1"
-      ],
+      "projectIds": ["project-1"],
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -2635,9 +2597,7 @@
         "latestVersion": 31,
         "mode": "copy"
       },
-      "projectIds": [
-        "project-1"
-      ],
+      "projectIds": ["project-1"],
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -2801,9 +2761,7 @@
         "latestVersion": 31,
         "mode": "copy"
       },
-      "projectIds": [
-        "project-1"
-      ],
+      "projectIds": ["project-1"],
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -2879,9 +2837,7 @@
         "latestVersion": 31,
         "mode": "copy"
       },
-      "projectIds": [
-        "project-1"
-      ],
+      "projectIds": ["project-1"],
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -2957,9 +2913,7 @@
         "latestVersion": 31,
         "mode": "copy"
       },
-      "projectIds": [
-        "project-1"
-      ],
+      "projectIds": ["project-1"],
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -3037,9 +2991,7 @@
         "latestVersion": 31,
         "mode": "copy"
       },
-      "projectIds": [
-        "project-1"
-      ],
+      "projectIds": ["project-1"],
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -3125,9 +3077,7 @@
         "latestVersion": 31,
         "mode": "copy"
       },
-      "projectIds": [
-        "project-1"
-      ],
+      "projectIds": ["project-1"],
       "createdAt": 1760000000000,
       "updatedAt": 1760000000000
     }
@@ -3152,9 +3102,7 @@
           "name": "Avatars",
           "access": "token",
           "enabled": true,
-          "allowedContentTypes": [
-            "image/*"
-          ],
+          "allowedContentTypes": ["image/*"],
           "maxSizeInBytes": null,
           "folderId": null,
           "policyId": null,
@@ -3199,9 +3147,7 @@
           "name": "Avatars",
           "access": "token",
           "enabled": true,
-          "allowedContentTypes": [
-            "image/*"
-          ],
+          "allowedContentTypes": ["image/*"],
           "maxSizeInBytes": null,
           "folderId": null,
           "policyId": null,
@@ -3226,9 +3172,7 @@
           "key": "avatars",
           "revision": 0,
           "name": "Avatars",
-          "allowedContentTypes": [
-            "image/*"
-          ]
+          "allowedContentTypes": ["image/*"]
         },
         {
           "key": "open-form",
@@ -3237,9 +3181,7 @@
           "access": "anyone",
           "dailyUploadLimit": 20,
           "folderId": null,
-          "allowedOrigins": [
-            "https://example.com"
-          ]
+          "allowedOrigins": ["https://example.com"]
         }
       ]
     },
@@ -3253,9 +3195,7 @@
             "key": "avatars",
             "revision": 0,
             "name": "Avatars",
-            "allowedContentTypes": [
-              "image/*"
-            ]
+            "allowedContentTypes": ["image/*"]
           },
           {
             "key": "open-form",
@@ -3264,9 +3204,7 @@
             "access": "anyone",
             "dailyUploadLimit": 20,
             "folderId": null,
-            "allowedOrigins": [
-              "https://example.com"
-            ]
+            "allowedOrigins": ["https://example.com"]
           }
         ]
       }
@@ -3282,9 +3220,7 @@
           "name": "Avatars",
           "access": "token",
           "enabled": true,
-          "allowedContentTypes": [
-            "image/*"
-          ],
+          "allowedContentTypes": ["image/*"],
           "maxSizeInBytes": null,
           "folderId": null,
           "policyId": null,
@@ -3305,9 +3241,7 @@
           "name": "Avatars",
           "access": "token",
           "enabled": true,
-          "allowedContentTypes": [
-            "image/*"
-          ],
+          "allowedContentTypes": ["image/*"],
           "maxSizeInBytes": null,
           "folderId": null,
           "policyId": null,
@@ -3360,10 +3294,8 @@
       "projectId": "project-1",
       "revision": 5,
       "settings": {
-        "keepContentAfterProcessing": true,
-        "optOutJurisdictions": [
-          "EU"
-        ],
+        "retainContent": true,
+        "optOutJurisdictions": ["EU"],
         "blockUnmoderatedAssets": false,
         "storeSensitiveMetadata": false,
         "streamingEnabled": false,
@@ -3384,9 +3316,7 @@
     "options": {
       "revision": 4,
       "settings": {
-        "optOutJurisdictions": [
-          "EU"
-        ],
+        "optOutJurisdictions": ["EU"],
         "blockUnmoderatedAssets": false,
         "remoteUrlRule": null
       }
@@ -3398,9 +3328,7 @@
       "body": {
         "revision": 4,
         "settings": {
-          "optOutJurisdictions": [
-            "EU"
-          ],
+          "optOutJurisdictions": ["EU"],
           "blockUnmoderatedAssets": false,
           "remoteUrlRule": null
         }
@@ -3410,10 +3338,8 @@
       "projectId": "project-1",
       "revision": 5,
       "settings": {
-        "keepContentAfterProcessing": true,
-        "optOutJurisdictions": [
-          "EU"
-        ],
+        "retainContent": true,
+        "optOutJurisdictions": ["EU"],
         "blockUnmoderatedAssets": false,
         "storeSensitiveMetadata": false,
         "streamingEnabled": false,
@@ -3452,10 +3378,8 @@
       "projectId": "project-1",
       "revision": 5,
       "settings": {
-        "keepContentAfterProcessing": true,
-        "optOutJurisdictions": [
-          "EU"
-        ],
+        "retainContent": true,
+        "optOutJurisdictions": ["EU"],
         "blockUnmoderatedAssets": false,
         "storeSensitiveMetadata": false,
         "streamingEnabled": false,
@@ -3618,10 +3542,7 @@
     "options": {
       "cursor": "123_abc~k1",
       "pageSize": 50,
-      "types": [
-        "asset.blocked",
-        "asset.purged"
-      ],
+      "types": ["asset.blocked", "asset.purged"],
       "assetId": "asset-1"
     },
     "request": {
@@ -3987,9 +3908,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -3998,9 +3917,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -4045,9 +3962,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -4059,34 +3974,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -4108,9 +4015,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -4121,9 +4026,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -4328,9 +4231,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -4386,9 +4287,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -4446,9 +4345,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -4457,9 +4354,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -4504,9 +4399,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -4518,34 +4411,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -4567,9 +4452,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -4580,9 +4463,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -4787,9 +4668,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -4845,9 +4724,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -4954,9 +4831,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -4965,9 +4840,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -5012,9 +4885,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -5026,34 +4897,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -5075,9 +4938,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -5088,9 +4949,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -5295,9 +5154,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -5353,9 +5210,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -5452,9 +5307,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -5463,9 +5316,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -5510,9 +5361,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -5524,34 +5373,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -5573,9 +5414,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -5586,9 +5425,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -5793,9 +5630,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -5851,9 +5686,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -5970,9 +5803,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -5981,9 +5812,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -6028,9 +5857,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -6042,34 +5869,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -6091,9 +5910,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -6104,9 +5921,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -6311,9 +6126,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -6369,9 +6182,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -6439,9 +6250,7 @@
                 }
               ]
             },
-            "parentPages": [
-              1
-            ],
+            "parentPages": [1],
             "metadata": [
               {
                 "id": "example",
@@ -6450,9 +6259,7 @@
                 }
               }
             ],
-            "tags": [
-              "example"
-            ],
+            "tags": ["example"],
             "visibility": "public",
             "upload": {
               "status": "uploading",
@@ -6497,9 +6304,7 @@
                 "pendingReview": {
                   "requestedAt": 1,
                   "reason": "sampled",
-                  "uncertainCategories": [
-                    "sexual"
-                  ]
+                  "uncertainCategories": ["sexual"]
                 },
                 "explanationComplete": true,
                 "categories": {
@@ -6511,34 +6316,26 @@
                       "allowances": [
                         {
                           "name": "example",
-                          "when": [
-                            "sexual-pornographic-media"
-                          ],
+                          "when": ["sexual-pornographic-media"],
                           "action": "allow"
                         }
                       ],
                       "restrictions": [
                         {
                           "name": "example",
-                          "when": [
-                            "sexual-pornographic-media"
-                          ],
+                          "when": ["sexual-pornographic-media"],
                           "action": "allow"
                         }
                       ]
                     },
                     "source": {
                       "kind": "allowance",
-                      "indexes": [
-                        1
-                      ],
+                      "indexes": [1],
                       "conditionScore": 0.5
                     }
                   }
                 },
-                "flaggedCategories": [
-                  "sexual"
-                ],
+                "flaggedCategories": ["sexual"],
                 "regions": [
                   {
                     "region": "DE",
@@ -6560,9 +6357,7 @@
                         {
                           "check": "domain-categories",
                           "status": "checked",
-                          "labels": [
-                            "example"
-                          ]
+                          "labels": ["example"]
                         }
                       ]
                     }
@@ -6573,9 +6368,7 @@
                     },
                     "offPlatformLinks": {
                       "action": "limit",
-                      "allowedDomains": [
-                        "example.com"
-                      ]
+                      "allowedDomains": ["example.com"]
                     }
                   }
                 },
@@ -6780,9 +6573,7 @@
                       {
                         "check": "domain-categories",
                         "status": "checked",
-                        "labels": [
-                          "example"
-                        ]
+                        "labels": ["example"]
                       }
                     ]
                   }
@@ -6838,9 +6629,7 @@
                 "format": "example",
                 "width": 1,
                 "height": 1,
-                "peaks": [
-                  0.5
-                ]
+                "peaks": [0.5]
               },
               "hls": {
                 "status": "preparing",
@@ -6864,9 +6653,7 @@
             }
           },
           "score": 1.5,
-          "matchedFields": [
-            "name"
-          ]
+          "matchedFields": ["name"]
         }
       ],
       "semanticStatus": "disabled"
@@ -6912,9 +6699,7 @@
               }
             ]
           },
-          "parentPages": [
-            1
-          ],
+          "parentPages": [1],
           "metadata": [
             {
               "id": "example",
@@ -6923,9 +6708,7 @@
               }
             }
           ],
-          "tags": [
-            "example"
-          ],
+          "tags": ["example"],
           "visibility": "public",
           "upload": {
             "status": "uploading",
@@ -6970,9 +6753,7 @@
               "pendingReview": {
                 "requestedAt": 1,
                 "reason": "sampled",
-                "uncertainCategories": [
-                  "sexual"
-                ]
+                "uncertainCategories": ["sexual"]
               },
               "explanationComplete": true,
               "categories": {
@@ -6984,34 +6765,26 @@
                     "allowances": [
                       {
                         "name": "example",
-                        "when": [
-                          "sexual-pornographic-media"
-                        ],
+                        "when": ["sexual-pornographic-media"],
                         "action": "allow"
                       }
                     ],
                     "restrictions": [
                       {
                         "name": "example",
-                        "when": [
-                          "sexual-pornographic-media"
-                        ],
+                        "when": ["sexual-pornographic-media"],
                         "action": "allow"
                       }
                     ]
                   },
                   "source": {
                     "kind": "allowance",
-                    "indexes": [
-                      1
-                    ],
+                    "indexes": [1],
                     "conditionScore": 0.5
                   }
                 }
               },
-              "flaggedCategories": [
-                "sexual"
-              ],
+              "flaggedCategories": ["sexual"],
               "regions": [
                 {
                   "region": "DE",
@@ -7033,9 +6806,7 @@
                       {
                         "check": "domain-categories",
                         "status": "checked",
-                        "labels": [
-                          "example"
-                        ]
+                        "labels": ["example"]
                       }
                     ]
                   }
@@ -7046,9 +6817,7 @@
                   },
                   "offPlatformLinks": {
                     "action": "limit",
-                    "allowedDomains": [
-                      "example.com"
-                    ]
+                    "allowedDomains": ["example.com"]
                   }
                 }
               },
@@ -7253,9 +7022,7 @@
                     {
                       "check": "domain-categories",
                       "status": "checked",
-                      "labels": [
-                        "example"
-                      ]
+                      "labels": ["example"]
                     }
                   ]
                 }
@@ -7311,9 +7078,7 @@
               "format": "example",
               "width": 1,
               "height": 1,
-              "peaks": [
-                0.5
-              ]
+              "peaks": [0.5]
             },
             "hls": {
               "status": "preparing",
@@ -7380,9 +7145,7 @@
               }
             ]
           },
-          "parentPages": [
-            1
-          ],
+          "parentPages": [1],
           "metadata": [
             {
               "id": "example",
@@ -7391,9 +7154,7 @@
               }
             }
           ],
-          "tags": [
-            "example"
-          ],
+          "tags": ["example"],
           "visibility": "public",
           "upload": {
             "status": "uploading",
@@ -7438,9 +7199,7 @@
               "pendingReview": {
                 "requestedAt": 1,
                 "reason": "sampled",
-                "uncertainCategories": [
-                  "sexual"
-                ]
+                "uncertainCategories": ["sexual"]
               },
               "explanationComplete": true,
               "categories": {
@@ -7452,34 +7211,26 @@
                     "allowances": [
                       {
                         "name": "example",
-                        "when": [
-                          "sexual-pornographic-media"
-                        ],
+                        "when": ["sexual-pornographic-media"],
                         "action": "allow"
                       }
                     ],
                     "restrictions": [
                       {
                         "name": "example",
-                        "when": [
-                          "sexual-pornographic-media"
-                        ],
+                        "when": ["sexual-pornographic-media"],
                         "action": "allow"
                       }
                     ]
                   },
                   "source": {
                     "kind": "allowance",
-                    "indexes": [
-                      1
-                    ],
+                    "indexes": [1],
                     "conditionScore": 0.5
                   }
                 }
               },
-              "flaggedCategories": [
-                "sexual"
-              ],
+              "flaggedCategories": ["sexual"],
               "regions": [
                 {
                   "region": "DE",
@@ -7501,9 +7252,7 @@
                       {
                         "check": "domain-categories",
                         "status": "checked",
-                        "labels": [
-                          "example"
-                        ]
+                        "labels": ["example"]
                       }
                     ]
                   }
@@ -7514,9 +7263,7 @@
                   },
                   "offPlatformLinks": {
                     "action": "limit",
-                    "allowedDomains": [
-                      "example.com"
-                    ]
+                    "allowedDomains": ["example.com"]
                   }
                 }
               },
@@ -7721,9 +7468,7 @@
                     {
                       "check": "domain-categories",
                       "status": "checked",
-                      "labels": [
-                        "example"
-                      ]
+                      "labels": ["example"]
                     }
                   ]
                 }
@@ -7779,9 +7524,7 @@
               "format": "example",
               "width": 1,
               "height": 1,
-              "peaks": [
-                0.5
-              ]
+              "peaks": [0.5]
             },
             "hls": {
               "status": "preparing",
@@ -7848,9 +7591,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -7859,9 +7600,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -7906,9 +7645,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -7920,34 +7657,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -7969,9 +7698,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -7982,9 +7709,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -8189,9 +7914,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -8247,9 +7970,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -8437,9 +8158,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -8448,9 +8167,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -8495,9 +8212,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -8509,34 +8224,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -8558,9 +8265,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -8571,9 +8276,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -8778,9 +8481,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -8836,9 +8537,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -8896,9 +8595,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -8907,9 +8604,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -8954,9 +8649,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -8968,34 +8661,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -9017,9 +8702,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -9030,9 +8713,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -9237,9 +8918,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -9295,9 +8974,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -9360,9 +9037,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -9371,9 +9046,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -9418,9 +9091,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -9432,34 +9103,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -9481,9 +9144,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -9494,9 +9155,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -9701,9 +9360,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -9759,9 +9416,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -9819,9 +9474,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -9830,9 +9483,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -9877,9 +9528,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -9891,34 +9540,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -9940,9 +9581,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -9953,9 +9592,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -10160,9 +9797,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -10218,9 +9853,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -10281,9 +9914,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -10292,9 +9923,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -10339,9 +9968,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -10353,34 +9980,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -10402,9 +10021,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -10415,9 +10032,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -10622,9 +10237,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -10680,9 +10293,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -10710,10 +10321,7 @@
   {
     "operation": "assets.batch",
     "options": {
-      "assetIds": [
-        "asset-1",
-        "a/b?c#d"
-      ],
+      "assetIds": ["asset-1", "a/b?c#d"],
       "operation": "remove-content"
     },
     "request": {
@@ -10721,10 +10329,7 @@
       "path": "/v1/projects/project-1/assets/batch",
       "query": {},
       "body": {
-        "assetIds": [
-          "asset-1",
-          "a/b?c#d"
-        ],
+        "assetIds": ["asset-1", "a/b?c#d"],
         "operation": "remove-content"
       }
     },
@@ -10777,9 +10382,7 @@
           }
         ]
       },
-      "parentPages": [
-        1
-      ],
+      "parentPages": [1],
       "metadata": [
         {
           "id": "example",
@@ -10788,9 +10391,7 @@
           }
         }
       ],
-      "tags": [
-        "example"
-      ],
+      "tags": ["example"],
       "visibility": "public",
       "upload": {
         "status": "uploading",
@@ -10835,9 +10436,7 @@
           "pendingReview": {
             "requestedAt": 1,
             "reason": "sampled",
-            "uncertainCategories": [
-              "sexual"
-            ]
+            "uncertainCategories": ["sexual"]
           },
           "explanationComplete": true,
           "categories": {
@@ -10849,34 +10448,26 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ]
               },
               "source": {
                 "kind": "allowance",
-                "indexes": [
-                  1
-                ],
+                "indexes": [1],
                 "conditionScore": 0.5
               }
             }
           },
-          "flaggedCategories": [
-            "sexual"
-          ],
+          "flaggedCategories": ["sexual"],
           "regions": [
             {
               "region": "DE",
@@ -10898,9 +10489,7 @@
                   {
                     "check": "domain-categories",
                     "status": "checked",
-                    "labels": [
-                      "example"
-                    ]
+                    "labels": ["example"]
                   }
                 ]
               }
@@ -10911,9 +10500,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -11118,9 +10705,7 @@
                 {
                   "check": "domain-categories",
                   "status": "checked",
-                  "labels": [
-                    "example"
-                  ]
+                  "labels": ["example"]
                 }
               ]
             }
@@ -11176,9 +10761,7 @@
           "format": "example",
           "width": 1,
           "height": 1,
-          "peaks": [
-            0.5
-          ]
+          "peaks": [0.5]
         },
         "hls": {
           "status": "preparing",
@@ -11526,21 +11109,15 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
+                    "when": ["sexual-pornographic-media"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "sexual-pornographic-media"
-                    ],
-                    "unless": [
-                      "sexual-nudity"
-                    ],
+                    "when": ["sexual-pornographic-media"],
+                    "unless": ["sexual-nudity"],
                     "action": "purge"
                   }
                 ],
@@ -11550,21 +11127,15 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "violence-high-impact"
-                    ],
+                    "when": ["violence-high-impact"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "violence-high-impact"
-                    ],
-                    "unless": [
-                      "violence-attack"
-                    ],
+                    "when": ["violence-high-impact"],
+                    "unless": ["violence-attack"],
                     "action": "purge"
                   }
                 ],
@@ -11574,21 +11145,15 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "self-harm-age-restricted"
-                    ],
+                    "when": ["self-harm-age-restricted"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "self-harm-age-restricted"
-                    ],
-                    "unless": [
-                      "self-harm-thoughts"
-                    ],
+                    "when": ["self-harm-age-restricted"],
+                    "unless": ["self-harm-thoughts"],
                     "action": "purge"
                   }
                 ],
@@ -11598,21 +11163,15 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "harassment-abuse"
-                    ],
+                    "when": ["harassment-abuse"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "harassment-abuse"
-                    ],
-                    "unless": [
-                      "harassment-mild"
-                    ],
+                    "when": ["harassment-abuse"],
+                    "unless": ["harassment-mild"],
                     "action": "purge"
                   }
                 ],
@@ -11622,21 +11181,15 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "hate-nazi-symbols-public-display"
-                    ],
+                    "when": ["hate-nazi-symbols-public-display"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "hate-nazi-symbols-public-display"
-                    ],
-                    "unless": [
-                      "hate-nazi-insignia-public-display"
-                    ],
+                    "when": ["hate-nazi-symbols-public-display"],
+                    "unless": ["hate-nazi-insignia-public-display"],
                     "action": "purge"
                   }
                 ],
@@ -11646,21 +11199,15 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "criminal-activity-demonstration"
-                    ],
+                    "when": ["criminal-activity-demonstration"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "criminal-activity-demonstration"
-                    ],
-                    "unless": [
-                      "criminal-activity-preparation"
-                    ],
+                    "when": ["criminal-activity-demonstration"],
+                    "unless": ["criminal-activity-preparation"],
                     "action": "purge"
                   }
                 ],
@@ -11670,21 +11217,15 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "personal-information-contact"
-                    ],
+                    "when": ["personal-information-contact"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "personal-information-contact"
-                    ],
-                    "unless": [
-                      "personal-information-email"
-                    ],
+                    "when": ["personal-information-contact"],
+                    "unless": ["personal-information-email"],
                     "action": "purge"
                   }
                 ],
@@ -11694,21 +11235,15 @@
                 "allowances": [
                   {
                     "name": "example",
-                    "when": [
-                      "profanity-mild"
-                    ],
+                    "when": ["profanity-mild"],
                     "action": "allow"
                   }
                 ],
                 "restrictions": [
                   {
                     "name": "example",
-                    "when": [
-                      "profanity-mild"
-                    ],
-                    "unless": [
-                      "profanity-strong"
-                    ],
+                    "when": ["profanity-mild"],
+                    "unless": ["profanity-strong"],
                     "action": "purge"
                   }
                 ],
@@ -11721,9 +11256,7 @@
               },
               "offPlatformLinks": {
                 "action": "limit",
-                "allowedDomains": [
-                  "example.com"
-                ]
+                "allowedDomains": ["example.com"]
               }
             }
           },
@@ -11734,9 +11267,7 @@
             "latestVersion": 1,
             "mode": "live"
           },
-          "projectIds": [
-            "proj_8fK2mQx7Lp4NvB3tRz9Y"
-          ],
+          "projectIds": ["proj_8fK2mQx7Lp4NvB3tRz9Y"],
           "createdAt": 1767225600000,
           "updatedAt": 1767225900000
         }
@@ -11767,21 +11298,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
+                "when": ["sexual-pornographic-media"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
-                "unless": [
-                  "sexual-nudity"
-                ],
+                "when": ["sexual-pornographic-media"],
+                "unless": ["sexual-nudity"],
                 "action": "purge"
               }
             ],
@@ -11791,21 +11316,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
+                "when": ["violence-high-impact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
-                "unless": [
-                  "violence-attack"
-                ],
+                "when": ["violence-high-impact"],
+                "unless": ["violence-attack"],
                 "action": "purge"
               }
             ],
@@ -11815,21 +11334,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
+                "when": ["self-harm-age-restricted"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
-                "unless": [
-                  "self-harm-thoughts"
-                ],
+                "when": ["self-harm-age-restricted"],
+                "unless": ["self-harm-thoughts"],
                 "action": "purge"
               }
             ],
@@ -11839,21 +11352,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
+                "when": ["harassment-abuse"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
-                "unless": [
-                  "harassment-mild"
-                ],
+                "when": ["harassment-abuse"],
+                "unless": ["harassment-mild"],
                 "action": "purge"
               }
             ],
@@ -11863,21 +11370,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
-                "unless": [
-                  "hate-nazi-insignia-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
+                "unless": ["hate-nazi-insignia-public-display"],
                 "action": "purge"
               }
             ],
@@ -11887,21 +11388,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
+                "when": ["criminal-activity-demonstration"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
-                "unless": [
-                  "criminal-activity-preparation"
-                ],
+                "when": ["criminal-activity-demonstration"],
+                "unless": ["criminal-activity-preparation"],
                 "action": "purge"
               }
             ],
@@ -11911,21 +11406,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
+                "when": ["personal-information-contact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
-                "unless": [
-                  "personal-information-email"
-                ],
+                "when": ["personal-information-contact"],
+                "unless": ["personal-information-email"],
                 "action": "purge"
               }
             ],
@@ -11935,21 +11424,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
+                "when": ["profanity-mild"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
-                "unless": [
-                  "profanity-strong"
-                ],
+                "when": ["profanity-mild"],
+                "unless": ["profanity-strong"],
                 "action": "purge"
               }
             ],
@@ -11962,9 +11445,7 @@
           },
           "offPlatformLinks": {
             "action": "limit",
-            "allowedDomains": [
-              "example.com"
-            ]
+            "allowedDomains": ["example.com"]
           }
         }
       },
@@ -11975,9 +11456,7 @@
         "latestVersion": 1,
         "mode": "live"
       },
-      "projectIds": [
-        "proj_8fK2mQx7Lp4NvB3tRz9Y"
-      ],
+      "projectIds": ["proj_8fK2mQx7Lp4NvB3tRz9Y"],
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -12001,21 +11480,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
+                "when": ["sexual-pornographic-media"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
-                "unless": [
-                  "sexual-nudity"
-                ],
+                "when": ["sexual-pornographic-media"],
+                "unless": ["sexual-nudity"],
                 "action": "purge"
               }
             ],
@@ -12025,21 +11498,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
+                "when": ["violence-high-impact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
-                "unless": [
-                  "violence-attack"
-                ],
+                "when": ["violence-high-impact"],
+                "unless": ["violence-attack"],
                 "action": "purge"
               }
             ],
@@ -12049,21 +11516,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
+                "when": ["self-harm-age-restricted"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
-                "unless": [
-                  "self-harm-thoughts"
-                ],
+                "when": ["self-harm-age-restricted"],
+                "unless": ["self-harm-thoughts"],
                 "action": "purge"
               }
             ],
@@ -12073,21 +11534,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
+                "when": ["harassment-abuse"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
-                "unless": [
-                  "harassment-mild"
-                ],
+                "when": ["harassment-abuse"],
+                "unless": ["harassment-mild"],
                 "action": "purge"
               }
             ],
@@ -12097,21 +11552,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
-                "unless": [
-                  "hate-nazi-insignia-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
+                "unless": ["hate-nazi-insignia-public-display"],
                 "action": "purge"
               }
             ],
@@ -12121,21 +11570,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
+                "when": ["criminal-activity-demonstration"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
-                "unless": [
-                  "criminal-activity-preparation"
-                ],
+                "when": ["criminal-activity-demonstration"],
+                "unless": ["criminal-activity-preparation"],
                 "action": "purge"
               }
             ],
@@ -12145,21 +11588,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
+                "when": ["personal-information-contact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
-                "unless": [
-                  "personal-information-email"
-                ],
+                "when": ["personal-information-contact"],
+                "unless": ["personal-information-email"],
                 "action": "purge"
               }
             ],
@@ -12169,21 +11606,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
+                "when": ["profanity-mild"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
-                "unless": [
-                  "profanity-strong"
-                ],
+                "when": ["profanity-mild"],
+                "unless": ["profanity-strong"],
                 "action": "purge"
               }
             ],
@@ -12196,9 +11627,7 @@
           },
           "offPlatformLinks": {
             "action": "limit",
-            "allowedDomains": [
-              "example.com"
-            ]
+            "allowedDomains": ["example.com"]
           }
         }
       },
@@ -12209,9 +11638,7 @@
         "latestVersion": 1,
         "mode": "live"
       },
-      "projectIds": [
-        "proj_8fK2mQx7Lp4NvB3tRz9Y"
-      ],
+      "projectIds": ["proj_8fK2mQx7Lp4NvB3tRz9Y"],
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -12242,21 +11669,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
+                "when": ["sexual-pornographic-media"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
-                "unless": [
-                  "sexual-nudity"
-                ],
+                "when": ["sexual-pornographic-media"],
+                "unless": ["sexual-nudity"],
                 "action": "purge"
               }
             ],
@@ -12266,21 +11687,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
+                "when": ["violence-high-impact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
-                "unless": [
-                  "violence-attack"
-                ],
+                "when": ["violence-high-impact"],
+                "unless": ["violence-attack"],
                 "action": "purge"
               }
             ],
@@ -12290,21 +11705,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
+                "when": ["self-harm-age-restricted"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
-                "unless": [
-                  "self-harm-thoughts"
-                ],
+                "when": ["self-harm-age-restricted"],
+                "unless": ["self-harm-thoughts"],
                 "action": "purge"
               }
             ],
@@ -12314,21 +11723,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
+                "when": ["harassment-abuse"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
-                "unless": [
-                  "harassment-mild"
-                ],
+                "when": ["harassment-abuse"],
+                "unless": ["harassment-mild"],
                 "action": "purge"
               }
             ],
@@ -12338,21 +11741,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
-                "unless": [
-                  "hate-nazi-insignia-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
+                "unless": ["hate-nazi-insignia-public-display"],
                 "action": "purge"
               }
             ],
@@ -12362,21 +11759,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
+                "when": ["criminal-activity-demonstration"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
-                "unless": [
-                  "criminal-activity-preparation"
-                ],
+                "when": ["criminal-activity-demonstration"],
+                "unless": ["criminal-activity-preparation"],
                 "action": "purge"
               }
             ],
@@ -12386,21 +11777,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
+                "when": ["personal-information-contact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
-                "unless": [
-                  "personal-information-email"
-                ],
+                "when": ["personal-information-contact"],
+                "unless": ["personal-information-email"],
                 "action": "purge"
               }
             ],
@@ -12410,21 +11795,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
+                "when": ["profanity-mild"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
-                "unless": [
-                  "profanity-strong"
-                ],
+                "when": ["profanity-mild"],
+                "unless": ["profanity-strong"],
                 "action": "purge"
               }
             ],
@@ -12437,9 +11816,7 @@
           },
           "offPlatformLinks": {
             "action": "limit",
-            "allowedDomains": [
-              "example.com"
-            ]
+            "allowedDomains": ["example.com"]
           }
         }
       },
@@ -12450,9 +11827,7 @@
         "latestVersion": 1,
         "mode": "live"
       },
-      "projectIds": [
-        "proj_8fK2mQx7Lp4NvB3tRz9Y"
-      ],
+      "projectIds": ["proj_8fK2mQx7Lp4NvB3tRz9Y"],
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -12572,21 +11947,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
+                "when": ["sexual-pornographic-media"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
-                "unless": [
-                  "sexual-nudity"
-                ],
+                "when": ["sexual-pornographic-media"],
+                "unless": ["sexual-nudity"],
                 "action": "purge"
               }
             ],
@@ -12596,21 +11965,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
+                "when": ["violence-high-impact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
-                "unless": [
-                  "violence-attack"
-                ],
+                "when": ["violence-high-impact"],
+                "unless": ["violence-attack"],
                 "action": "purge"
               }
             ],
@@ -12620,21 +11983,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
+                "when": ["self-harm-age-restricted"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
-                "unless": [
-                  "self-harm-thoughts"
-                ],
+                "when": ["self-harm-age-restricted"],
+                "unless": ["self-harm-thoughts"],
                 "action": "purge"
               }
             ],
@@ -12644,21 +12001,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
+                "when": ["harassment-abuse"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
-                "unless": [
-                  "harassment-mild"
-                ],
+                "when": ["harassment-abuse"],
+                "unless": ["harassment-mild"],
                 "action": "purge"
               }
             ],
@@ -12668,21 +12019,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
-                "unless": [
-                  "hate-nazi-insignia-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
+                "unless": ["hate-nazi-insignia-public-display"],
                 "action": "purge"
               }
             ],
@@ -12692,21 +12037,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
+                "when": ["criminal-activity-demonstration"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
-                "unless": [
-                  "criminal-activity-preparation"
-                ],
+                "when": ["criminal-activity-demonstration"],
+                "unless": ["criminal-activity-preparation"],
                 "action": "purge"
               }
             ],
@@ -12716,21 +12055,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
+                "when": ["personal-information-contact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
-                "unless": [
-                  "personal-information-email"
-                ],
+                "when": ["personal-information-contact"],
+                "unless": ["personal-information-email"],
                 "action": "purge"
               }
             ],
@@ -12740,21 +12073,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
+                "when": ["profanity-mild"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
-                "unless": [
-                  "profanity-strong"
-                ],
+                "when": ["profanity-mild"],
+                "unless": ["profanity-strong"],
                 "action": "purge"
               }
             ],
@@ -12767,9 +12094,7 @@
           },
           "offPlatformLinks": {
             "action": "limit",
-            "allowedDomains": [
-              "example.com"
-            ]
+            "allowedDomains": ["example.com"]
           }
         }
       },
@@ -12780,9 +12105,7 @@
         "latestVersion": 1,
         "mode": "live"
       },
-      "projectIds": [
-        "proj_8fK2mQx7Lp4NvB3tRz9Y"
-      ],
+      "projectIds": ["proj_8fK2mQx7Lp4NvB3tRz9Y"],
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -12814,21 +12137,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
+                "when": ["sexual-pornographic-media"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
-                "unless": [
-                  "sexual-nudity"
-                ],
+                "when": ["sexual-pornographic-media"],
+                "unless": ["sexual-nudity"],
                 "action": "purge"
               }
             ],
@@ -12838,21 +12155,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
+                "when": ["violence-high-impact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
-                "unless": [
-                  "violence-attack"
-                ],
+                "when": ["violence-high-impact"],
+                "unless": ["violence-attack"],
                 "action": "purge"
               }
             ],
@@ -12862,21 +12173,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
+                "when": ["self-harm-age-restricted"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
-                "unless": [
-                  "self-harm-thoughts"
-                ],
+                "when": ["self-harm-age-restricted"],
+                "unless": ["self-harm-thoughts"],
                 "action": "purge"
               }
             ],
@@ -12886,21 +12191,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
+                "when": ["harassment-abuse"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
-                "unless": [
-                  "harassment-mild"
-                ],
+                "when": ["harassment-abuse"],
+                "unless": ["harassment-mild"],
                 "action": "purge"
               }
             ],
@@ -12910,21 +12209,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
-                "unless": [
-                  "hate-nazi-insignia-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
+                "unless": ["hate-nazi-insignia-public-display"],
                 "action": "purge"
               }
             ],
@@ -12934,21 +12227,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
+                "when": ["criminal-activity-demonstration"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
-                "unless": [
-                  "criminal-activity-preparation"
-                ],
+                "when": ["criminal-activity-demonstration"],
+                "unless": ["criminal-activity-preparation"],
                 "action": "purge"
               }
             ],
@@ -12958,21 +12245,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
+                "when": ["personal-information-contact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
-                "unless": [
-                  "personal-information-email"
-                ],
+                "when": ["personal-information-contact"],
+                "unless": ["personal-information-email"],
                 "action": "purge"
               }
             ],
@@ -12982,21 +12263,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
+                "when": ["profanity-mild"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
-                "unless": [
-                  "profanity-strong"
-                ],
+                "when": ["profanity-mild"],
+                "unless": ["profanity-strong"],
                 "action": "purge"
               }
             ],
@@ -13009,9 +12284,7 @@
           },
           "offPlatformLinks": {
             "action": "limit",
-            "allowedDomains": [
-              "example.com"
-            ]
+            "allowedDomains": ["example.com"]
           }
         }
       },
@@ -13022,9 +12295,7 @@
         "latestVersion": 1,
         "mode": "live"
       },
-      "projectIds": [
-        "proj_8fK2mQx7Lp4NvB3tRz9Y"
-      ],
+      "projectIds": ["proj_8fK2mQx7Lp4NvB3tRz9Y"],
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -13056,21 +12327,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
+                "when": ["sexual-pornographic-media"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
-                "unless": [
-                  "sexual-nudity"
-                ],
+                "when": ["sexual-pornographic-media"],
+                "unless": ["sexual-nudity"],
                 "action": "purge"
               }
             ],
@@ -13080,21 +12345,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
+                "when": ["violence-high-impact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
-                "unless": [
-                  "violence-attack"
-                ],
+                "when": ["violence-high-impact"],
+                "unless": ["violence-attack"],
                 "action": "purge"
               }
             ],
@@ -13104,21 +12363,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
+                "when": ["self-harm-age-restricted"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
-                "unless": [
-                  "self-harm-thoughts"
-                ],
+                "when": ["self-harm-age-restricted"],
+                "unless": ["self-harm-thoughts"],
                 "action": "purge"
               }
             ],
@@ -13128,21 +12381,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
+                "when": ["harassment-abuse"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
-                "unless": [
-                  "harassment-mild"
-                ],
+                "when": ["harassment-abuse"],
+                "unless": ["harassment-mild"],
                 "action": "purge"
               }
             ],
@@ -13152,21 +12399,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
-                "unless": [
-                  "hate-nazi-insignia-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
+                "unless": ["hate-nazi-insignia-public-display"],
                 "action": "purge"
               }
             ],
@@ -13176,21 +12417,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
+                "when": ["criminal-activity-demonstration"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
-                "unless": [
-                  "criminal-activity-preparation"
-                ],
+                "when": ["criminal-activity-demonstration"],
+                "unless": ["criminal-activity-preparation"],
                 "action": "purge"
               }
             ],
@@ -13200,21 +12435,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
+                "when": ["personal-information-contact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
-                "unless": [
-                  "personal-information-email"
-                ],
+                "when": ["personal-information-contact"],
+                "unless": ["personal-information-email"],
                 "action": "purge"
               }
             ],
@@ -13224,21 +12453,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
+                "when": ["profanity-mild"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
-                "unless": [
-                  "profanity-strong"
-                ],
+                "when": ["profanity-mild"],
+                "unless": ["profanity-strong"],
                 "action": "purge"
               }
             ],
@@ -13251,9 +12474,7 @@
           },
           "offPlatformLinks": {
             "action": "limit",
-            "allowedDomains": [
-              "example.com"
-            ]
+            "allowedDomains": ["example.com"]
           }
         }
       },
@@ -13264,9 +12485,7 @@
         "latestVersion": 1,
         "mode": "live"
       },
-      "projectIds": [
-        "proj_8fK2mQx7Lp4NvB3tRz9Y"
-      ],
+      "projectIds": ["proj_8fK2mQx7Lp4NvB3tRz9Y"],
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -13300,21 +12519,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
+                "when": ["sexual-pornographic-media"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
-                "unless": [
-                  "sexual-nudity"
-                ],
+                "when": ["sexual-pornographic-media"],
+                "unless": ["sexual-nudity"],
                 "action": "purge"
               }
             ],
@@ -13324,21 +12537,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
+                "when": ["violence-high-impact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
-                "unless": [
-                  "violence-attack"
-                ],
+                "when": ["violence-high-impact"],
+                "unless": ["violence-attack"],
                 "action": "purge"
               }
             ],
@@ -13348,21 +12555,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
+                "when": ["self-harm-age-restricted"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
-                "unless": [
-                  "self-harm-thoughts"
-                ],
+                "when": ["self-harm-age-restricted"],
+                "unless": ["self-harm-thoughts"],
                 "action": "purge"
               }
             ],
@@ -13372,21 +12573,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
+                "when": ["harassment-abuse"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
-                "unless": [
-                  "harassment-mild"
-                ],
+                "when": ["harassment-abuse"],
+                "unless": ["harassment-mild"],
                 "action": "purge"
               }
             ],
@@ -13396,21 +12591,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
-                "unless": [
-                  "hate-nazi-insignia-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
+                "unless": ["hate-nazi-insignia-public-display"],
                 "action": "purge"
               }
             ],
@@ -13420,21 +12609,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
+                "when": ["criminal-activity-demonstration"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
-                "unless": [
-                  "criminal-activity-preparation"
-                ],
+                "when": ["criminal-activity-demonstration"],
+                "unless": ["criminal-activity-preparation"],
                 "action": "purge"
               }
             ],
@@ -13444,21 +12627,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
+                "when": ["personal-information-contact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
-                "unless": [
-                  "personal-information-email"
-                ],
+                "when": ["personal-information-contact"],
+                "unless": ["personal-information-email"],
                 "action": "purge"
               }
             ],
@@ -13468,21 +12645,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
+                "when": ["profanity-mild"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
-                "unless": [
-                  "profanity-strong"
-                ],
+                "when": ["profanity-mild"],
+                "unless": ["profanity-strong"],
                 "action": "purge"
               }
             ],
@@ -13495,9 +12666,7 @@
           },
           "offPlatformLinks": {
             "action": "limit",
-            "allowedDomains": [
-              "example.com"
-            ]
+            "allowedDomains": ["example.com"]
           }
         }
       },
@@ -13508,9 +12677,7 @@
         "latestVersion": 1,
         "mode": "live"
       },
-      "projectIds": [
-        "proj_8fK2mQx7Lp4NvB3tRz9Y"
-      ],
+      "projectIds": ["proj_8fK2mQx7Lp4NvB3tRz9Y"],
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -13539,21 +12706,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
+                "when": ["sexual-pornographic-media"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "sexual-pornographic-media"
-                ],
-                "unless": [
-                  "sexual-nudity"
-                ],
+                "when": ["sexual-pornographic-media"],
+                "unless": ["sexual-nudity"],
                 "action": "purge"
               }
             ],
@@ -13563,21 +12724,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
+                "when": ["violence-high-impact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "violence-high-impact"
-                ],
-                "unless": [
-                  "violence-attack"
-                ],
+                "when": ["violence-high-impact"],
+                "unless": ["violence-attack"],
                 "action": "purge"
               }
             ],
@@ -13587,21 +12742,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
+                "when": ["self-harm-age-restricted"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "self-harm-age-restricted"
-                ],
-                "unless": [
-                  "self-harm-thoughts"
-                ],
+                "when": ["self-harm-age-restricted"],
+                "unless": ["self-harm-thoughts"],
                 "action": "purge"
               }
             ],
@@ -13611,21 +12760,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
+                "when": ["harassment-abuse"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "harassment-abuse"
-                ],
-                "unless": [
-                  "harassment-mild"
-                ],
+                "when": ["harassment-abuse"],
+                "unless": ["harassment-mild"],
                 "action": "purge"
               }
             ],
@@ -13635,21 +12778,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "hate-nazi-symbols-public-display"
-                ],
-                "unless": [
-                  "hate-nazi-insignia-public-display"
-                ],
+                "when": ["hate-nazi-symbols-public-display"],
+                "unless": ["hate-nazi-insignia-public-display"],
                 "action": "purge"
               }
             ],
@@ -13659,21 +12796,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
+                "when": ["criminal-activity-demonstration"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "criminal-activity-demonstration"
-                ],
-                "unless": [
-                  "criminal-activity-preparation"
-                ],
+                "when": ["criminal-activity-demonstration"],
+                "unless": ["criminal-activity-preparation"],
                 "action": "purge"
               }
             ],
@@ -13683,21 +12814,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
+                "when": ["personal-information-contact"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "personal-information-contact"
-                ],
-                "unless": [
-                  "personal-information-email"
-                ],
+                "when": ["personal-information-contact"],
+                "unless": ["personal-information-email"],
                 "action": "purge"
               }
             ],
@@ -13707,21 +12832,15 @@
             "allowances": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
+                "when": ["profanity-mild"],
                 "action": "allow"
               }
             ],
             "restrictions": [
               {
                 "name": "example",
-                "when": [
-                  "profanity-mild"
-                ],
-                "unless": [
-                  "profanity-strong"
-                ],
+                "when": ["profanity-mild"],
+                "unless": ["profanity-strong"],
                 "action": "purge"
               }
             ],
@@ -13734,9 +12853,7 @@
           },
           "offPlatformLinks": {
             "action": "limit",
-            "allowedDomains": [
-              "example.com"
-            ]
+            "allowedDomains": ["example.com"]
           }
         }
       },
@@ -13747,9 +12864,7 @@
         "latestVersion": 1,
         "mode": "live"
       },
-      "projectIds": [
-        "proj_8fK2mQx7Lp4NvB3tRz9Y"
-      ],
+      "projectIds": ["proj_8fK2mQx7Lp4NvB3tRz9Y"],
       "createdAt": 1767225600000,
       "updatedAt": 1767225900000
     },
@@ -13775,15 +12890,13 @@
           "name": "example",
           "access": "token",
           "enabled": true,
-          "allowedContentTypes": [
-            "image/png"
-          ],
+          "allowedContentTypes": ["image/png"],
           "maxSizeInBytes": 1,
           "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
           "policyId": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
           "visibility": "public",
           "processingOptions": {
-            "keepContentAfterProcessing": true,
+            "retainContent": true,
             "storeSensitiveMetadata": true,
             "features": {
               "ocr": {
@@ -13806,9 +12919,7 @@
           },
           "revealDecision": true,
           "dailyUploadLimit": 1,
-          "allowedOrigins": [
-            "https://example.com"
-          ],
+          "allowedOrigins": ["https://example.com"],
           "createdAt": 1767225600000,
           "updatedAt": 1767225900000
         }
@@ -13826,9 +12937,7 @@
           "key": "avatars",
           "revision": 0,
           "name": "Avatars",
-          "allowedContentTypes": [
-            "image/*"
-          ]
+          "allowedContentTypes": ["image/*"]
         },
         {
           "key": "open-form",
@@ -13837,9 +12946,7 @@
           "access": "anyone",
           "dailyUploadLimit": 20,
           "folderId": null,
-          "allowedOrigins": [
-            "https://example.com"
-          ]
+          "allowedOrigins": ["https://example.com"]
         }
       ]
     },
@@ -13853,9 +12960,7 @@
             "key": "avatars",
             "revision": 0,
             "name": "Avatars",
-            "allowedContentTypes": [
-              "image/*"
-            ]
+            "allowedContentTypes": ["image/*"]
           },
           {
             "key": "open-form",
@@ -13864,9 +12969,7 @@
             "access": "anyone",
             "dailyUploadLimit": 20,
             "folderId": null,
-            "allowedOrigins": [
-              "https://example.com"
-            ]
+            "allowedOrigins": ["https://example.com"]
           }
         ]
       }
@@ -13882,15 +12985,13 @@
           "name": "example",
           "access": "token",
           "enabled": true,
-          "allowedContentTypes": [
-            "image/png"
-          ],
+          "allowedContentTypes": ["image/png"],
           "maxSizeInBytes": 1,
           "folderId": "fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P",
           "policyId": "pol_2Wk7Rm4Xq9Lt3Vb8Np6C",
           "visibility": "public",
           "processingOptions": {
-            "keepContentAfterProcessing": true,
+            "retainContent": true,
             "storeSensitiveMetadata": true,
             "features": {
               "ocr": {
@@ -13913,9 +13014,7 @@
           },
           "revealDecision": true,
           "dailyUploadLimit": 1,
-          "allowedOrigins": [
-            "https://example.com"
-          ],
+          "allowedOrigins": ["https://example.com"],
           "createdAt": 1767225600000,
           "updatedAt": 1767225900000
         }
@@ -13935,19 +13034,15 @@
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
       "revision": 1,
       "settings": {
-        "keepContentAfterProcessing": true,
-        "optOutJurisdictions": [
-          "EU"
-        ],
+        "retainContent": true,
+        "optOutJurisdictions": ["EU"],
         "blockUnmoderatedAssets": true,
         "storeSensitiveMetadata": true,
         "streamingEnabled": true,
         "aiMediaSearchEnabled": true,
         "remoteUrlRule": {
           "mode": "allow",
-          "domains": [
-            "example.com"
-          ]
+          "domains": ["example.com"]
         },
         "websiteSubmissionsPerMinute": 1,
         "humanReview": {
@@ -13965,9 +13060,7 @@
     "options": {
       "revision": 4,
       "settings": {
-        "optOutJurisdictions": [
-          "EU"
-        ],
+        "optOutJurisdictions": ["EU"],
         "blockUnmoderatedAssets": false,
         "remoteUrlRule": null
       }
@@ -13979,9 +13072,7 @@
       "body": {
         "revision": 4,
         "settings": {
-          "optOutJurisdictions": [
-            "EU"
-          ],
+          "optOutJurisdictions": ["EU"],
           "blockUnmoderatedAssets": false,
           "remoteUrlRule": null
         }
@@ -13991,19 +13082,15 @@
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
       "revision": 1,
       "settings": {
-        "keepContentAfterProcessing": true,
-        "optOutJurisdictions": [
-          "EU"
-        ],
+        "retainContent": true,
+        "optOutJurisdictions": ["EU"],
         "blockUnmoderatedAssets": true,
         "storeSensitiveMetadata": true,
         "streamingEnabled": true,
         "aiMediaSearchEnabled": true,
         "remoteUrlRule": {
           "mode": "allow",
-          "domains": [
-            "example.com"
-          ]
+          "domains": ["example.com"]
         },
         "websiteSubmissionsPerMinute": 1,
         "humanReview": {
@@ -14146,9 +13233,7 @@
       ],
       "nextCursor": "example",
       "hasMore": true,
-      "excludedTypes": [
-        "asset.uploaded"
-      ]
+      "excludedTypes": ["asset.uploaded"]
     },
     "fullModel": true
   },

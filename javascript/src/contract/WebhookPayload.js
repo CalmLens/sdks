@@ -428,7 +428,7 @@ const createFeatureOptionsSchemas = (booleanSchema) => {
 			namedType: "AiGeneratedDetectionFeatureOptions"
 		})])),
 		streaming: zod.object({ enabled: booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to prepare the stream. Left out, the project's streaming setting decides." })])) }).strict().meta(metaStore([docPropertyInfo({
-			description: "Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made browser-safe, served at `/hls/index.m3u8` and played by the embed page at `/embed`. Needs `keepContentAfterProcessing`. Billed per started minute of video; without billing, video uses the organisation's free allowance of 60 started minutes a month, and isn't streamed once it is used. `false` turns it off for an upload in a project that streams by default.",
+			description: "Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made browser-safe, served at `/hls/index.m3u8` and played by the embed page at `/embed`. Needs `retainContent`. Billed per started minute of video; without billing, video uses the organisation's free allowance of 60 started minutes a month, and isn't streamed once it is used. `false` turns it off for an upload in a project that streams by default.",
 			namedType: "StreamingFeatureOptions"
 		})]))
 	};
@@ -1195,7 +1195,7 @@ const METADATA_ITEM_SCHEMA = zod.object({
 	namedType: "MetadataItem"
 })]));
 const PROCESSING_OPTIONS_SCHEMA = zod.object({
-	keepContentAfterProcessing: zod.boolean().nullish().meta(metaStore([docPropertyInfo({ description: "Whether to keep the asset content after processing. Inherits the upload preset, then the project setting when omitted. New projects keep content by default." })])),
+	retainContent: zod.boolean().nullish().meta(metaStore([docPropertyInfo({ description: "Whether to keep the asset content after processing. Inherits the upload preset, then the project setting when omitted. New projects keep content by default." })])),
 	storeSensitiveMetadata: zod.boolean().nullish().meta(metaStore([docPropertyInfo({
 		description: "Override the project's `storeSensitiveMetadata` setting for this upload. When false, embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored, and `fileMetadata` leaves out the creator and location. When true, the image is stored as uploaded.",
 		defaultValue: void 0
@@ -1363,7 +1363,7 @@ const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 })]));
 const ASSET_CONTENT_SCHEMA = zod.object({
 	status: ASSET_CONTENT_STATUS_SCHEMA.describe("Whether CalmLens holds the content (source, preview, extracted text and file metadata): `temporary` until processing finishes, `stored`, or `removed`"),
-	removalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullable().describe("Why the content was removed: your `policy` purged it, `retention` because `keepContentAfterProcessing` was off, `requested` through the API or portal, `parent-removed` with its parent asset's content, or `disposed` after a safety hold. `null` while content is held."),
+	removalReason: ASSET_CONTENT_REMOVAL_REASON_SCHEMA.nullable().describe("Why the content was removed: your `policy` purged it, `retention` because `retainContent` was off, `requested` through the API or portal, `parent-removed` with its parent asset's content, or `disposed` after a safety hold. `null` while content is held."),
 	updatedAt: epoch("When the content status last changed"),
 	safetyHold: ASSET_SAFETY_HOLD_SCHEMA.nullable().describe("Set while CalmLens holds the asset for suspected illegal content: its content isn't delivered and the asset can't be changed or deleted until the hold ends, so such requests return `asset/held`. `null` when there is no hold."),
 	format: zod.string().nullable().describe("MIME type of the uploaded file"),

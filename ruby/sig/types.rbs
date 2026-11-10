@@ -70,12 +70,12 @@ module CalmLens
     ?face_detection: { enabled: bool, ?age_estimation: bool }?,
     ?link_detection: { enabled: bool }?,
     # Preview. Prepares an adaptive stream (HLS) of audio or video, served at the `hls` resource and
-    # played by the `embed` resource; needs `keep_content_after_processing`. Left out, the project's
+    # played by the `embed` resource; needs `retain_content`. Left out, the project's
     # streaming setting decides.
     ?streaming: { enabled: bool }?
   }
   type processing_options_input = {
-    ?keep_content_after_processing: bool?,
+    ?retain_content: bool?,
     # Overrides the project's `storeSensitiveMetadata` setting: false removes embedded EXIF, XMP and
     # IPTC metadata before the image is stored; true stores it as uploaded.
     ?store_sensitive_metadata: bool?,
@@ -658,7 +658,7 @@ module CalmLens
   type upload_preset_access = "token" | "anyone"
   # An upload preset's processing options, as the API returns them.
   type upload_preset_processing_options = {
-    ?"keepContentAfterProcessing" => bool?,
+    ?"retainContent" => bool?,
     ?"storeSensitiveMetadata" => bool?,
     ?"features" => {
       ?"ocr" => { "enabled" => bool }?,
@@ -703,7 +703,7 @@ module CalmLens
   }
   type public_project_settings = {
     "optOutJurisdictions" => Array[String],
-    "keepContentAfterProcessing" => bool,
+    "retainContent" => bool,
     "blockUnmoderatedAssets" => bool,
     "storeSensitiveMetadata" => bool,
     "streamingEnabled" => bool,
@@ -1205,7 +1205,7 @@ module CalmLens
   # The complete settings: those left out return to their defaults.
   type project_settings_input = {
     ?opt_out_jurisdictions: Array[String],
-    ?keep_content_after_processing: bool,
+    ?retain_content: bool,
     ?block_unmoderated_assets: bool,
     ?store_sensitive_metadata: bool,
     ?streaming_enabled: bool,

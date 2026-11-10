@@ -4,7 +4,7 @@ require 'minitest/autorun'
 require 'calmlens/testing'
 
 class MockTest < Minitest::Test
-  KEEP = { keep_content_after_processing: true }.freeze
+  KEEP = { retain_content: true }.freeze
   # A key that may read private content from the CDN; the default key may not.
   DOWNLOAD = CalmLens::MockServerClient.create_api_key([{ actions: ['assets:download'], folder_id: nil, include_subfolders: true }])
 

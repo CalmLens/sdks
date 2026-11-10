@@ -261,7 +261,7 @@ impl Library {
                     description: upload.description,
                     metadata: Some(upload.metadata),
                     processing_options: Some(ProcessingOptions {
-                        keep_content_after_processing: Some(true),
+                        retain_content: Some(true),
                         ..Default::default()
                     }),
                     ..SubmitAsset::new(upload.name, Content::bytes(upload.bytes, upload.mime))

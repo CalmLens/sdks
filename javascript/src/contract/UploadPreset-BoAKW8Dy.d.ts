@@ -1,4 +1,4 @@
-import "./Asset-b3Bu-8Yu.js";
+import "./Asset-C5CJR7RH.js";
 import * as zod from "zod";
 declare const UPLOAD_PRESET_SCHEMA: zod.ZodObject<{
   id: zod.ZodString;
@@ -21,7 +21,7 @@ declare const UPLOAD_PRESET_SCHEMA: zod.ZodObject<{
     public: "public";
   }>;
   processingOptions: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
-    keepContentAfterProcessing: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
+    retainContent: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
     storeSensitiveMetadata: zod.ZodOptional<zod.ZodNullable<zod.ZodBoolean>>;
     features: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{
       ocr: zod.ZodOptional<zod.ZodNullable<zod.ZodObject<{

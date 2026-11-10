@@ -396,7 +396,7 @@ impl MockServerClient {
     /// [`complete_processing`](Self::complete_processing), and the rest are `allowed`). A decided
     /// asset gets a full report, and the events feed records `asset.uploaded`, then
     /// `asset.classified` and the automated `asset.<status>`, or `asset.failed`. Finished
-    /// processing removes the content unless the upload set `keep_content_after_processing`;
+    /// processing removes the content unless the upload set `retain_content`;
     /// `purged` removes it with reason `policy`.
     /// Retrieve, list (RSQL filter, ordering, folder, cursor), children, update, move, delete,
     /// delete content, retry, keyword search, signed URLs, folders, hash lists, lenses, upload

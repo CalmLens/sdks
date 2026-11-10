@@ -116,7 +116,7 @@ describe("multipart binary field names", () => {
         },
         metadata: [{ id: "source", value: "sdk-test" }],
         tags: ["catalogue", "backpacks"],
-        processingOptions: { keepContentAfterProcessing: true },
+        processingOptions: { retainContent: true },
       }),
     ).rejects.toThrow("stop after capturing the request");
 
@@ -136,7 +136,7 @@ describe("multipart binary field names", () => {
       externalId: "external-image",
       metadata: [{ id: "source", value: "sdk-test" }],
       tags: ["catalogue", "backpacks"],
-      processingOptions: { keepContentAfterProcessing: true },
+      processingOptions: { retainContent: true },
     });
     expect(form.file).toEqual({ type: "image/png", bytes: new Uint8Array([1, 2, 3]) });
   });

@@ -9,7 +9,7 @@ moderation:
   app shows the API's error code when a request is refused, such as `folder/not-empty`,
   `folder/parent-cycle` (moving a folder inside its own subfolder) or `folder/duplicate-name`.
 - **Uploads.** Images are uploaded privately into a folder with `assets().create`, with
-  `keep_content_after_processing: Some(true)`, metadata items `photographer`, `licence` and
+  `retain_content: Some(true)`, metadata items `photographer`, `licence` and
   `campaign`, and a catalogue ID. The catalogue ID is stored as the asset's `external_id` with
   the prefix `calmlibrary:` (for example `calmlibrary:CAM-2026-014`). A reused catalogue ID
   shows `asset/duplicate-external-id`.

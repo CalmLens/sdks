@@ -176,7 +176,7 @@ class AutomaticMultipartTest {
         }));
     byte[] file = fileOf(12 * MIB);
     Models.SubmitAsset options = new Models.SubmitAsset("report.pdf", Models.Content.bytes(file, "application/pdf"))
-        .processingOptions(new Models.ProcessingOptions().keepContentAfterProcessing(true));
+        .processingOptions(new Models.ProcessingOptions().retainContent(true));
     RequestOptions key = new RequestOptions().idempotencyKey("upload-3");
     mock.failNextRequest("transport-error", new MockCalmLensServerClient.FailureOptions().operation("assets.uploadPart"));
     assertEquals(ErrorCodes.SDK_TRANSPORT_ERROR, assertThrows(CalmLensException.class, () -> mock.client.assets.classify(options, key)).getCode());

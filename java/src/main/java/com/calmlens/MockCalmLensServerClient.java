@@ -40,7 +40,7 @@ import java.util.function.LongSupplier;
  * #completeProcessing}, and {@code assets.classify} and {@code text.classify} are {@code allowed}.
  * Like the pipeline, a finished upload records {@code asset.uploaded}, then {@code asset.classified}
  * and the automated {@code asset.<status>} (or {@code asset.failed}). Finished processing removes
- * the content unless the upload sets {@code keepContentAfterProcessing}, and {@code purged} always
+ * the content unless the upload sets {@code retainContent}, and {@code purged} always
  * removes it. {@link #decide} changes an asset's status as a reviewer would. Errors use the API's
  * codes, statuses and body, every response has an {@code X-Request-Id}, and idempotency keys replay
  * the first response.

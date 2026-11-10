@@ -8,7 +8,7 @@ require_relative 'app'
 require_relative 'demo'
 
 module TestHelpers
-  HOLD_POLICY = { 'keepContentAfterProcessing' => true }.freeze
+  HOLD_POLICY = { 'retainContent' => true }.freeze
   CURSOR = { 'items' => [], 'nextCursor' => 'c0', 'hasMore' => false }.freeze
 
   def demo_app(**options)

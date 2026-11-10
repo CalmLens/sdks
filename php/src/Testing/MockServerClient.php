@@ -1058,8 +1058,8 @@ final class MockServerClient
         }
         $now = ($this->now)();
         $processing = $options['processingOptions'] ?? [];
-        $processing['keepContentAfterProcessing'] = $processing['keepContentAfterProcessing'] ?? $this->toProjectSettings()['settings']['keepContentAfterProcessing'];
-        $keep = is_array($processing) && ($processing['keepContentAfterProcessing'] ?? false) === true;
+        $processing['retainContent'] = $processing['retainContent'] ?? $this->toProjectSettings()['settings']['retainContent'];
+        $keep = is_array($processing) && ($processing['retainContent'] ?? false) === true;
         // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
         $context = ModerationContext::select($options['context']['items'] ?? []);
         // Fields the API returns as null when they are not set.
@@ -1147,7 +1147,7 @@ final class MockServerClient
         $options['folderId'] = $preset['folderId'] ?? $options['folderId'] ?? null;
         $options['visibility'] = $preset['visibility'];
         $options['processingOptions'] = $options['processingOptions'] ?? $preset['processingOptions'] ?? [];
-        $options['processingOptions']['keepContentAfterProcessing'] = $options['processingOptions']['keepContentAfterProcessing'] ?? $preset['processingOptions']['keepContentAfterProcessing'] ?? null;
+        $options['processingOptions']['retainContent'] = $options['processingOptions']['retainContent'] ?? $preset['processingOptions']['retainContent'] ?? null;
         return $options;
     }
 
@@ -2534,7 +2534,7 @@ final class MockServerClient
     // Configuration: upload presets, project settings and metadata fields, like the API's.
 
     /** The API's defaults for the project settings. */
-    private const DEFAULT_PROJECT_SETTINGS = ['keepContentAfterProcessing' => true, 'optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true, 'storeSensitiveMetadata' => false,
+    private const DEFAULT_PROJECT_SETTINGS = ['retainContent' => true, 'optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true, 'storeSensitiveMetadata' => false,
         'streamingEnabled' => false, 'aiMediaSearchEnabled' => false, 'remoteUrlRule' => null, 'websiteSubmissionsPerMinute' => null];
     private const DEFAULT_HUMAN_REVIEW = ['allowedSamplePercent' => 0, 'restrictedSamplePercent' => 0, 'uncertaintyMarginPercent' => 0,
         'reviewMissingEvidence' => false];

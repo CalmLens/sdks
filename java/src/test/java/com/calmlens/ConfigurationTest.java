@@ -37,7 +37,7 @@ class ConfigurationTest {
 
   @Test void everyPresetSetterReachesTheStoredPreset() {
     MockCalmLensServerClient mock = mock();
-    Models.ProcessingOptions processing = new Models.ProcessingOptions().keepContentAfterProcessing(true);
+    Models.ProcessingOptions processing = new Models.ProcessingOptions().retainContent(true);
     Models.UploadPreset preset = mock.client.uploadPresets.ensure(ensure(new Models.UploadPresetDefinition("form", "Form")
         .revision(0).access("anyone").enabled(false).allowedContentTypes(List.of("image/*", "image/*")).maxSizeInBytes(5_000_000_000L)
         .folderId("fldr_1").policyId("pol_1").visibility(Models.Visibility.PUBLIC).processingOptions(processing)

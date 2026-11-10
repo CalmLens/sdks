@@ -11,7 +11,7 @@ import (
 const mib = 1 << 20
 
 // keep keeps uploaded content after processing, so the test can read what the mock stored.
-var keep = &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+var keep = &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)}
 
 func distinctBytes(length int) []byte {
 	out := make([]byte, length)

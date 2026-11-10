@@ -112,12 +112,12 @@ func (h *harness) transportQuery(t *testing.T, i int) {
 func TestTextAndRawUploads(t *testing.T) {
 	c, h := setup(t)
 	ctx := context.Background()
-	_, err := c.Assets.Classify(ctx, SubmitAssetOptions{Name: "text", Content: &Content{Type: "text/plain", PlainText: Ptr("héllo 🌍")}, Metadata: []MetadataItem{{ID: "x", Value: false}}, Tags: []string{"a b", "c"}, ProcessingOptions: &ProcessingOptions{KeepContentAfterProcessing: Ptr(false)}})
+	_, err := c.Assets.Classify(ctx, SubmitAssetOptions{Name: "text", Content: &Content{Type: "text/plain", PlainText: Ptr("héllo 🌍")}, Metadata: []MetadataItem{{ID: "x", Value: false}}, Tags: []string{"a b", "c"}, ProcessingOptions: &ProcessingOptions{RetainContent: Ptr(false)}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Text goes as JSON with the asset's fields; only wait is in the query.
-	want := JSON{"name": "text", "metadata": []any{map[string]any{"id": "x", "value": false}}, "tags": []any{"a b", "c"}, "processingOptions": map[string]any{"keepContentAfterProcessing": false}, "content": map[string]any{"plainText": "héllo 🌍", "type": "text/plain"}}
+	want := JSON{"name": "text", "metadata": []any{map[string]any{"id": "x", "value": false}}, "tags": []any{"a b", "c"}, "processingOptions": map[string]any{"retainContent": false}, "content": map[string]any{"plainText": "héllo 🌍", "type": "text/plain"}}
 	if !reflect.DeepEqual(h.body(), want) || h.last().Header.Get("X-Api-Key") != "key" || h.last().Header.Get("Content-Type") != "application/json" || h.last().Header.Get("X-CalmLens-Upload") != "" {
 		t.Fatalf("text upload %s %v", h.bodies[0], h.last().Header)
 	}

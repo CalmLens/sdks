@@ -130,7 +130,7 @@ class MockTests(unittest.TestCase):
 
     def test_previews_get_their_thumbhash_at_decision_and_media_renders_as_processing_makes_it(self):
         c = MockCalmLensServerClient()
-        keep = {"keepContentAfterProcessing": True}
+        keep = {"retainContent": True}
         image = c.assets.create(name="a.png", content={"data": b"png", "type": "image/png"}, processing_options=keep)
         self.assertEqual((image["content"]["rendered"], image["content"]["preview"]),
                          ({"kind": "image", "format": "image/png", "width": None, "height": None},
@@ -156,7 +156,7 @@ class MockTests(unittest.TestCase):
     def test_a_safety_hold_withholds_every_resource_and_the_timeline(self):
         c = MockCalmLensServerClient()
         asset = c.assets.classify(name="a.png", content={"data": b"png", "type": "image/png"},
-                                  processing_options={"keepContentAfterProcessing": True}, visibility="public")
+                                  processing_options={"retainContent": True}, visibility="public")
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.list_timeline(asset_id=asset["id"], cursor="anything")
         self.assertEqual(raised.exception.code, error_codes.INVALID_CURSOR)
@@ -171,7 +171,7 @@ class MockTests(unittest.TestCase):
 
     def test_the_mock_prepares_no_hls_stream_and_the_embed_page_takes_no_selector_and_shows_any_asset(self):
         c = MockCalmLensServerClient()
-        keep = {"keepContentAfterProcessing": True}
+        keep = {"retainContent": True}
         video = c.assets.classify(name="clip.mp4", content={"data": b"mp4", "type": "video/mp4"},
                                   processing_options=keep, visibility="public")
         self.assertIsNone(video["content"]["hls"])
@@ -197,7 +197,7 @@ class MockTests(unittest.TestCase):
         clock = [1000]
         c = MockCalmLensServerClient(mock_options={"now": lambda: clock[0]})
         asset = c.assets.classify(name="a.png", content={"data": b"png", "type": "image/png"},
-                                  processing_options={"keepContentAfterProcessing": True}, visibility="private")
+                                  processing_options={"retainContent": True}, visibility="private")
         signed = c.cdn.sign_asset_url(asset_id=asset["id"], expires_in=2, original=True)
         # Every SDK's mock writes the grant as the hex of "{assetId}.{1|0}.{expiresAt}".
         self.assertEqual(signed, {"url": f"{c.cdn_base_url}/assets/{c.project_id}/sig_"
@@ -215,7 +215,7 @@ class MockTests(unittest.TestCase):
     def test_a_held_asset_cannot_be_signed_and_its_info_is_unavailable(self):
         c = MockCalmLensServerClient()
         asset = c.assets.classify(name="a.png", content={"data": b"png", "type": "image/png"},
-                                  processing_options={"keepContentAfterProcessing": True}, visibility="public")
+                                  processing_options={"retainContent": True}, visibility="public")
         c.database_storage.assets[asset["id"]]["content"]["safetyHold"] = {"placedAt": 1, "reason": "suspected-illegal-content"}
         with self.assertRaises(CalmLensAPIError) as raised:
             c.cdn.sign_asset_url(asset_id=asset["id"])
@@ -284,7 +284,7 @@ class MockTests(unittest.TestCase):
         c = MockCalmLensServerClient(mock_options={"now": lambda: 7, "moderate": lambda moderation: (
             "blocked" if moderation.trigger == "upload" else rerun_outcome[0])})
         asset = c.assets.classify(name="a.txt", content={"plainText": "no", "type": "text/plain"},
-                                  processing_options={"keepContentAfterProcessing": True})
+                                  processing_options={"retainContent": True})
         moderation = c.database_storage.assets[asset["id"]]["classification"]["moderation"]
         moderation["explanationComplete"] = False
         explained = c.assets.explain(asset_id=asset["id"])

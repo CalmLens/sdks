@@ -884,7 +884,7 @@ describe("MockCalmLensServerClient", () => {
     const asset = await client.assets.classify({
       name: "image.png",
       content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
-      processingOptions: { keepContentAfterProcessing: true },
+      processingOptions: { retainContent: true },
     });
     const moderation = asset.classification.moderation;
     await databaseStorage.updateAsset({
@@ -930,7 +930,7 @@ describe("MockCalmLensServerClient", () => {
     const asset = await client.assets.classify({
       name: "image.png",
       content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
-      processingOptions: { keepContentAfterProcessing: true },
+      processingOptions: { retainContent: true },
     });
 
     const rerun = await client.assets.explain({ assetId: asset.id, rerun: true });
@@ -944,7 +944,7 @@ describe("MockCalmLensServerClient", () => {
     const asset = await client.assets.classify({
       name: "image.png",
       content: { base64: `data:image/png;base64,${pngBase64}`, type: "image/png" },
-      processingOptions: { keepContentAfterProcessing: true },
+      processingOptions: { retainContent: true },
     });
     expect(asset.content.status).toBe("stored");
     expect((await client.cdn.serve({ assetId: asset.id })).status).toBe(200);

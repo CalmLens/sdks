@@ -175,7 +175,7 @@ class Moderator:
     def check_note(self, link_id: str, note: str, demo_result: str) -> Asset:
         return self.client.text.classify(
             name="Calmboard note", external_id=external_id(link_id, "note"), text=note,
-            processing_options={"keepContentAfterProcessing": False},
+            processing_options={"retainContent": False},
         )
 
     def submit_link(self, link_id: str, url: str, demo_result: str) -> Asset:
@@ -183,7 +183,7 @@ class Moderator:
         # never serves the page, so nothing is retained after processing.
         return self.client.assets.create(
             name="Calmboard link", url=url, external_id=external_id(link_id, "page"),
-            processing_options={"keepContentAfterProcessing": False},
+            processing_options={"retainContent": False},
         )
 
     def retrieve(self, asset_id: str) -> Asset:

@@ -43,7 +43,7 @@ func TestMockLifecycle(t *testing.T) {
 	if _, err = c.Folders.Create(ctx, calmlens.CreateFolderOptions{Name: "Root"}); err == nil {
 		t.Fatal("duplicate allowed")
 	}
-	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	keep := &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)}
 	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
 	if err != nil || a.Classification.Status != calmlens.ClassificationStatusCompleted || a.Classification.Moderation.Status != calmlens.ModerationStatusAllowed || *a.Classification.CompletedAt != 123 ||
 		a.Content.Status != calmlens.ContentStatusStored || *a.Content.Format != "text/plain" || *a.Content.SizeInBytes != 5 || a.CreatedAt != 123 {
@@ -169,7 +169,7 @@ func TestMockSignedAssetURLExpiresAndHeldAssetsAreNotSigned(t *testing.T) {
 	}
 	ctx := context.Background()
 	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "a.png", Visibility: calmlens.VisibilityPrivate,
-		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)},
+		ProcessingOptions: &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)},
 		Content:           &calmlens.Content{Type: "image/png", Bytes: []byte("hello")}})
 	if err != nil {
 		t.Fatal(err)
@@ -392,7 +392,7 @@ func TestMockListHonoursFilterSortAndFolder(t *testing.T) {
 func TestMockRendersEachTypeAtUploadAndAtDecision(t *testing.T) {
 	c, _ := NewServerClient(Options{})
 	ctx := context.Background()
-	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	keep := &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)}
 	submit := func(queued bool, options calmlens.SubmitAssetOptions) *calmlens.Asset {
 		t.Helper()
 		options.ProcessingOptions, options.Visibility = keep, calmlens.VisibilityPublic
@@ -474,7 +474,7 @@ func TestMockServesStandInBytesForRenderedFilesAndPreviews(t *testing.T) {
 	c, _ := NewServerClient(Options{})
 	ctx := context.Background()
 	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "b.wav", Visibility: calmlens.VisibilityPublic,
-		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)},
+		ProcessingOptions: &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)},
 		Content:           &calmlens.Content{Type: "audio/wav", Bytes: []byte("hello")}})
 	if err != nil {
 		t.Fatal(err)
@@ -510,7 +510,7 @@ func TestMockServesTheEmbedPageOfAnyAssetButNoHLSStream(t *testing.T) {
 	ctx := context.Background()
 	// The shared scenarios cover video and images; the embed page also shows other types.
 	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "b.txt", Visibility: calmlens.VisibilityPublic,
-		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)},
+		ProcessingOptions: &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)},
 		Content:           &calmlens.Content{Type: "text/plain", Bytes: []byte("hello")}})
 	if err != nil || a.Content.Rendered != nil {
 		t.Fatal(a, err)
@@ -525,7 +525,7 @@ func TestMockServesTheEmbedPageOfAnyAssetButNoHLSStream(t *testing.T) {
 		t.Fatalf("embed: %d %s %q", res.StatusCode, res.Header.Get("Content-Type"), body)
 	}
 	audio, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "b.wav", Visibility: calmlens.VisibilityPublic,
-		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true),
+		ProcessingOptions: &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true),
 			Features: &calmlens.ProcessingFeatures{Streaming: &calmlens.StreamingFeatureOptions{Enabled: true}}},
 		Content: &calmlens.Content{Type: "audio/wav", Bytes: []byte("hello")}})
 	if err != nil || audio.Content.Rendered == nil || audio.Content.Rendered.Kind != calmlens.AssetRenderedKindAudio || audio.Content.HLS != nil {
@@ -573,7 +573,7 @@ func TestMockSafetyHoldWithholdsEveryResourceAndTheTimeline(t *testing.T) {
 	c, _ := NewServerClient(Options{})
 	ctx := context.Background()
 	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "a.png", Visibility: calmlens.VisibilityPublic,
-		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)},
+		ProcessingOptions: &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)},
 		Content:           &calmlens.Content{Type: "image/png", Bytes: []byte("hello")}})
 	if err != nil || a.Content.Preview == nil || a.Content.Preview.Thumbhash == nil {
 		t.Fatal(a, err)
@@ -706,7 +706,7 @@ func TestMockExplainCompletesEvidenceOrReruns(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	keep := &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)}
 	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
 	if err != nil {
 		t.Fatal(err)
@@ -740,7 +740,7 @@ func TestMockRerunReplacesTheDecisionOnlyWithANewOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	keep := &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)}
 	a, err := c.Assets.Classify(ctx, calmlens.SubmitAssetOptions{Name: "text", ProcessingOptions: keep, Content: &calmlens.Content{Type: "text/plain", PlainText: calmlens.Ptr("hello")}})
 	if err != nil {
 		t.Fatal(err)
@@ -983,7 +983,7 @@ func TestMockStoresUploadTagsAndKeepsProcessingOptionsOutOfTheAsset(t *testing.T
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	keep := &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)}
+	keep := &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)}
 	uploaded, err := c.Assets.Create(ctx, calmlens.SubmitAssetOptions{Name: "photo.png", Content: &calmlens.Content{Type: "image/png", Bytes: []byte{1, 2, 3}}, Tags: []string{"catalogue", "backpacks"}, ProcessingOptions: keep})
 	if err != nil {
 		t.Fatal(err)

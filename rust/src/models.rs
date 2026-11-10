@@ -236,7 +236,7 @@ string_enum! {
     AssetContentRemovalReason {
         /// The moderation policy purged it.
         Policy = "policy",
-        /// `keepContentAfterProcessing` was off, so it was removed after processing.
+        /// `retainContent` was off, so it was removed after processing.
         Retention = "retention",
         /// Removed through the API or portal.
         Requested = "requested",
@@ -607,7 +607,7 @@ string_enum! {
 pub struct ProcessingOptions {
     /// Keep the stored content after classification.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub keep_content_after_processing: Option<bool>,
+    pub retain_content: Option<bool>,
     /// Overrides the project's `storeSensitiveMetadata` setting for this upload. When false,
     /// embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
     /// and `metadata` leaves out the creator and location. When true, the image is stored as
@@ -650,7 +650,7 @@ pub struct ProcessingFeatures {
     pub ai_generated_detection: Option<FeatureOptions>,
     /// Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made
     /// browser-safe, served at [`CdnResource::Hls`] and played by [`CdnResource::Embed`].
-    /// Needs `keep_content_after_processing`, and is billed per started minute of media. Left
+    /// Needs `retain_content`, and is billed per started minute of media. Left
     /// out, the project's streaming setting decides; `enabled: false` turns it off for an upload
     /// in a project that streams by default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -5253,7 +5253,7 @@ pub struct HumanReviewSettings {
 #[non_exhaustive]
 pub struct ProjectSettings {
     /// Whether new uploads retain their content.
-    pub keep_content_after_processing: bool,
+    pub retain_content: bool,
     /// Optional standards this project doesn't serve.
     #[serde(default)]
     pub opt_out_jurisdictions: Vec<OptOutJurisdiction>,
@@ -5315,7 +5315,7 @@ pub struct ProjectSettingsResource {
 pub struct ProjectSettingsDefinition {
     /// Retention default for new uploads.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub keep_content_after_processing: Option<bool>,
+    pub retain_content: Option<bool>,
     /// Optional standards this project doesn't serve. Defaults to none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub opt_out_jurisdictions: Option<Vec<OptOutJurisdiction>>,
@@ -5354,7 +5354,7 @@ impl From<ProjectSettings> for ProjectSettingsDefinition {
     fn from(settings: ProjectSettings) -> Self {
         Self {
             opt_out_jurisdictions: Some(settings.opt_out_jurisdictions),
-            keep_content_after_processing: Some(settings.keep_content_after_processing),
+            retain_content: Some(settings.retain_content),
             block_unmoderated_assets: Some(settings.block_unmoderated_assets),
             store_sensitive_metadata: Some(settings.store_sensitive_metadata),
             streaming_enabled: Some(settings.streaming_enabled),

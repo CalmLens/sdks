@@ -359,7 +359,7 @@ public final class Calmmarket {
 
   /** Upload options for every listing photo: OCR on, content kept for the CDN preview. */
   static ProcessingOptions photoProcessing() {
-    return new ProcessingOptions().keepContentAfterProcessing(true)
+    return new ProcessingOptions().retainContent(true)
         .features(new ProcessingFeatures().ocr(new FeatureOptions(true)));
   }
 
@@ -552,7 +552,7 @@ public final class Calmmarket {
           .name(field.getValue())
           .externalId(externalId)
           // Kept so a reviewer can read a held listing in the CalmLens portal.
-          .processingOptions(new ProcessingOptions().keepContentAfterProcessing(true)),
+          .processingOptions(new ProcessingOptions().retainContent(true)),
           // The listing's own key, so a retried submission never moderates the text twice.
           new RequestOptions().idempotencyKey(externalId));
       if (!Photo.shown(moderationStatus(asset))) {

@@ -257,7 +257,7 @@ class AiGeneratedDetectionFeatureOptions(TypedDict):
 class StreamingFeatureOptions(TypedDict):
     """Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made
     browser-safe, served at the ``hls`` resource and played by the ``embed`` resource. Needs
-    ``keepContentAfterProcessing``. Billed per started minute of media; ``enabled: False`` turns it
+    ``retainContent``. Billed per started minute of media; ``enabled: False`` turns it
     off for an upload in a project that streams by default."""
     #: Whether to prepare the stream. Left out, the project's streaming setting decides.
     enabled: bool
@@ -277,7 +277,7 @@ class ProcessingFeatures(TypedDict, total=False):
 
 class ProcessingOptions(TypedDict, total=False):
     """``processingOptions`` for an upload."""
-    keepContentAfterProcessing: Optional[bool]
+    retainContent: Optional[bool]
     #: Overrides the project's ``storeSensitiveMetadata`` setting for this upload. When false,
     #: embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
     #: and ``content.metadata`` leaves out the creator and location. When true, the image is stored as
@@ -1903,7 +1903,7 @@ class PublicProjectSettings(TypedDict):
     methods."""
     optOutJurisdictions: List[Union[OptOutJurisdiction, str]]
     #: When True, the CDN refuses to serve assets whose moderation is still pending.
-    keepContentAfterProcessing: bool
+    retainContent: bool
     blockUnmoderatedAssets: bool
     #: When True, uploaded images keep their embedded metadata (EXIF, XMP and IPTC).
     storeSensitiveMetadata: bool
@@ -1922,10 +1922,10 @@ class PublicProjectSettings(TypedDict):
 
 class PublicProjectSettingsInput(TypedDict, total=False):
     """The complete settings to save. Settings left out return to their defaults: no opted-out
-    jurisdictions, ``keepContentAfterProcessing`` and ``blockUnmoderatedAssets`` True, the other switches False, and the rest ``None``
+    jurisdictions, ``retainContent`` and ``blockUnmoderatedAssets`` True, the other switches False, and the rest ``None``
     or no human review."""
     optOutJurisdictions: List[OptOutJurisdiction]
-    keepContentAfterProcessing: bool
+    retainContent: bool
     blockUnmoderatedAssets: bool
     storeSensitiveMetadata: bool
     streamingEnabled: bool

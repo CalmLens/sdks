@@ -74,11 +74,11 @@ class ClientTestCase(unittest.TestCase):
 
 class ClientTests(ClientTestCase):
     def test_keyword_arguments_match_options_dicts(self):
-        self.client.assets.classify(name="n", external_id="e1", processing_options={"keep_content_after_processing": False},
+        self.client.assets.classify(name="n", external_id="e1", processing_options={"retain_content": False},
                                     metadata=[{"id": "snake_key", "value": 1}],
                                     content={"plain_text": "hi", "type": "text/plain"})
         self.assertEqual(self.json_body(), {"name": "n", "externalId": "e1",
-                                            "processingOptions": {"keepContentAfterProcessing": False},
+                                            "processingOptions": {"retainContent": False},
                                             "metadata": [{"id": "snake_key", "value": 1}],
                                             "content": {"plainText": "hi", "type": "text/plain"}})
         self.client.text.classify(text="hi", tags=["catalogue", "backpacks"])

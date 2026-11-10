@@ -110,7 +110,7 @@ type Options struct {
 	// and the rest is allowed. A pending decision leaves the asset processing; for a re-run it
 	// keeps the asset's decision until CompleteProcessing, and a failed re-run keeps it. Finished
 	// processing removes content unless the upload set
-	// ProcessingOptions.KeepContentAfterProcessing. Moderate runs while the mock answers a
+	// ProcessingOptions.RetainContent. Moderate runs while the mock answers a
 	// request, so it must not call the mock.
 	Moderate func(ModerationInput) *Decision
 	// CDNBaseURL defaults to https://mock.calmlens.invalid/v1. CDN.SignAssetURL returns asset URLs
@@ -1663,11 +1663,11 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 	if processingOptions == nil {
 		processingOptions = calmlens.JSON{}
 	}
-	if asJSON(processingOptions)["keepContentAfterProcessing"] == nil {
-		asJSON(processingOptions)["keepContentAfterProcessing"] = asJSON(m.projectSettings()["settings"])["keepContentAfterProcessing"]
+	if asJSON(processingOptions)["retainContent"] == nil {
+		asJSON(processingOptions)["retainContent"] = asJSON(m.projectSettings()["settings"])["retainContent"]
 	}
 	contentStatus := calmlens.ContentStatusTemporary
-	if keep, _ := asJSON(processingOptions)["keepContentAfterProcessing"].(bool); keep {
+	if keep, _ := asJSON(processingOptions)["retainContent"].(bool); keep {
 		contentStatus = calmlens.ContentStatusStored
 	}
 	visibility := orNull("visibility")
@@ -2059,7 +2059,7 @@ func setRendering(a calmlens.JSON, processed bool) {
 
 // applyOutcome moves an asset to outcome like the pipeline: a decision finishes processing,
 // OutcomePurged deletes the content (with purgeReason), and finished processing removes content
-// kept only temporarily (keepContentAfterProcessing off). A decided asset gets its rendered file
+// kept only temporarily (retainContent off). A decided asset gets its rendered file
 // and preview (with a ThumbHash for its placeholder), which go with its content and are withheld
 // while a safety hold is on. A report's fields replace the moderation's.
 func (m *MockServerClient) applyOutcome(a calmlens.JSON, outcome, purgeReason string, report calmlens.JSON) {

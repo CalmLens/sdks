@@ -73,7 +73,7 @@ const (
 const (
 	// ContentRemovalReasonPolicy means the project's policy purged the content.
 	ContentRemovalReasonPolicy = "policy"
-	// ContentRemovalReasonRetention means processing finished and keepContentAfterProcessing was off.
+	// ContentRemovalReasonRetention means processing finished and retainContent was off.
 	ContentRemovalReasonRetention = "retention"
 	// ContentRemovalReasonRequested means the content was removed through the API or portal.
 	ContentRemovalReasonRequested = "requested"
@@ -597,8 +597,9 @@ type FileMetadataLocation struct {
 // ProcessingOptions changes how one upload is processed. Unset (nil) fields are omitted
 // from the request and use the project defaults.
 type ProcessingOptions struct {
-	// KeepContentAfterProcessing keeps the content after processing (default false).
-	KeepContentAfterProcessing *bool `json:"keepContentAfterProcessing,omitempty"`
+	// RetainContent overrides whether content is kept after processing.
+	// When nil, it inherits the upload preset or project setting.
+	RetainContent *bool `json:"retainContent,omitempty"`
 	// StoreSensitiveMetadata overrides the project's storeSensitiveMetadata setting for this
 	// upload. When false, embedded image metadata (EXIF, XMP and IPTC) is removed from the file
 	// before it is stored, and Content.Metadata leaves out the creator and location. When true, the
@@ -624,7 +625,7 @@ type ProcessingFeatures struct {
 	LinkDetection *LinkDetectionFeatureOptions `json:"linkDetection,omitempty"`
 	// Streaming (preview) prepares an adaptive (HLS) stream of audio or video once it is decided
 	// and made browser-safe, served at ResourceHLS and played by ResourceEmbed. It needs
-	// KeepContentAfterProcessing and is billed per started minute of media. Left nil, the
+	// RetainContent and is billed per started minute of media. Left nil, the
 	// project's streaming setting decides; Enabled false turns it off for this upload.
 	Streaming *StreamingFeatureOptions `json:"streaming,omitempty"`
 }

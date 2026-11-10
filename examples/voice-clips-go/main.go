@@ -903,7 +903,7 @@ func (a *app) upload(w http.ResponseWriter, r *http.Request) {
 func (a *app) send(ctx context.Context, key, name, contentType string, file io.ReaderAt, size int64) (*calmlens.Asset, int, error) {
 	options := calmlens.SubmitAssetOptions{
 		Name: name, Visibility: calmlens.VisibilityPrivate, ExternalID: &key, IdempotencyKey: key,
-		ProcessingOptions: &calmlens.ProcessingOptions{KeepContentAfterProcessing: calmlens.Ptr(true)},
+		ProcessingOptions: &calmlens.ProcessingOptions{RetainContent: calmlens.Ptr(true)},
 	}
 	section := func(start, length int64) io.Reader { return io.NewSectionReader(file, start, length) }
 	if size <= multipartThreshold {

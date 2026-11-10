@@ -13,7 +13,7 @@ fn file_of(length: usize) -> Vec<u8> {
 fn kept(name: &str, content: Content, key: &str) -> SubmitAsset {
     SubmitAsset {
         processing_options: Some(ProcessingOptions {
-            keep_content_after_processing: Some(true),
+            retain_content: Some(true),
             ..Default::default()
         }),
         idempotency_key: Some(key.into()),

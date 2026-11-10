@@ -52,7 +52,7 @@ type PresetSettings = {
   allowedContentTypes: string[];
   maxSizeInBytes: number;
   visibility: "private" | "public";
-  processingOptions: { keepContentAfterProcessing: boolean };
+  processingOptions: { retainContent: boolean };
   revealDecision: boolean;
   allowedOrigins: string[];
 };
@@ -257,7 +257,7 @@ export const examples: Record<string, Example> = {
       allowedContentTypes: ["audio/*", "video/*"],
       maxSizeInBytes: 50 * 1024 * 1024,
       visibility: "private",
-      processingOptions: { keepContentAfterProcessing: true },
+      processingOptions: { retainContent: true },
       revealDecision: false,
       allowedOrigins: ["http://127.0.0.1:6402"],
     },
@@ -280,7 +280,7 @@ export const examples: Record<string, Example> = {
       allowedContentTypes: ["image/*", "video/*", "audio/*"],
       maxSizeInBytes: 25 * 1024 * 1024,
       visibility: "public",
-      processingOptions: { keepContentAfterProcessing: true },
+      processingOptions: { retainContent: true },
       revealDecision: true,
       allowedOrigins: ["http://localhost:6410"],
     },
@@ -305,7 +305,7 @@ export const examples: Record<string, Example> = {
       allowedContentTypes: ["image/*"],
       maxSizeInBytes: 20 * 1024 * 1024,
       visibility: "private",
-      processingOptions: { keepContentAfterProcessing: false },
+      processingOptions: { retainContent: false },
       revealDecision: true,
       // Mobile apps send no Origin header, so the preset must not list allowed sites.
       allowedOrigins: [],
