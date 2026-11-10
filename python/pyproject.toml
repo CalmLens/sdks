@@ -31,7 +31,7 @@ classifiers = [
 Homepage = "https://calmlens.com"
 Documentation = "https://calmlens.com/docs/sdk/python"
 Repository = "https://github.com/CalmLens/sdks/tree/main/python"
-Changelog = "https://calmlens.com/docs/changelog"
+Changelog = "https://github.com/CalmLens/sdks/blob/main/python/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 include = ["calmlens*"]

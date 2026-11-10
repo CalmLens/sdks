@@ -15,7 +15,7 @@ Gem::Specification.new do |spec|
     'homepage_uri' => 'https://calmlens.com',
     'documentation_uri' => 'https://calmlens.com/docs/sdk/ruby',
     'source_code_uri' => 'https://github.com/CalmLens/sdks/tree/main/ruby',
-    'changelog_uri' => 'https://calmlens.com/docs/changelog',
+    'changelog_uri' => 'https://github.com/CalmLens/sdks/blob/main/ruby/CHANGELOG.md',
     'rubygems_mfa_required' => 'true'
   }
   # Standard library only: net/http, json, openssl, securerandom and uri.
