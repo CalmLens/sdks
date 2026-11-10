@@ -2341,8 +2341,14 @@ export class MockCalmLensApi {
       ...fields,
       folderId: preset.folderId ?? fields.folderId,
       visibility: preset.visibility,
-      processingOptions:
-        fields.processingOptions ?? (preset.processingOptions as UploadFields["processingOptions"]),
+      processingOptions: {
+        ...(fields.processingOptions ??
+          (preset.processingOptions as UploadFields["processingOptions"])),
+        keepContentAfterProcessing:
+          fields.processingOptions?.keepContentAfterProcessing ??
+          (preset.processingOptions as UploadFields["processingOptions"])
+            ?.keepContentAfterProcessing,
+      },
     };
   }
 
@@ -2395,7 +2401,12 @@ export class MockCalmLensApi {
     const id = this.createId("asset");
     const now = this.now();
     const isOpenUpload = part !== undefined && !part.isFinal;
-    const processingOptions = fields.processingOptions ?? { keepContentAfterProcessing: false };
+    const processingOptions = {
+      ...fields.processingOptions,
+      keepContentAfterProcessing:
+        fields.processingOptions?.keepContentAfterProcessing ??
+        this.toProjectSettings().settings.keepContentAfterProcessing,
+    };
     const keepContent = processingOptions.keepContentAfterProcessing === true;
     this.processingOptions.set(id, processingOptions);
     const hasContent = fields.url === undefined;
@@ -3235,6 +3246,7 @@ export class MockCalmLensApi {
       projectId: this.projectId,
       revision: this.settingsRevision,
       settings: {
+        keepContentAfterProcessing: true,
         optOutJurisdictions: [],
         blockUnmoderatedAssets: true,
         storeSensitiveMetadata: false,

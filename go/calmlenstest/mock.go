@@ -1661,7 +1661,10 @@ func (m *MockServerClient) createAsset(headers http.Header, body calmlens.JSON, 
 	}
 	processingOptions := orNull("processingOptions")
 	if processingOptions == nil {
-		processingOptions = calmlens.JSON{"keepContentAfterProcessing": false}
+		processingOptions = calmlens.JSON{}
+	}
+	if asJSON(processingOptions)["keepContentAfterProcessing"] == nil {
+		asJSON(processingOptions)["keepContentAfterProcessing"] = asJSON(m.projectSettings()["settings"])["keepContentAfterProcessing"]
 	}
 	contentStatus := calmlens.ContentStatusTemporary
 	if keep, _ := asJSON(processingOptions)["keepContentAfterProcessing"].(bool); keep {

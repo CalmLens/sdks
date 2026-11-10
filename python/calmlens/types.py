@@ -1903,6 +1903,7 @@ class PublicProjectSettings(TypedDict):
     methods."""
     optOutJurisdictions: List[Union[OptOutJurisdiction, str]]
     #: When True, the CDN refuses to serve assets whose moderation is still pending.
+    keepContentAfterProcessing: bool
     blockUnmoderatedAssets: bool
     #: When True, uploaded images keep their embedded metadata (EXIF, XMP and IPTC).
     storeSensitiveMetadata: bool
@@ -1921,9 +1922,10 @@ class PublicProjectSettings(TypedDict):
 
 class PublicProjectSettingsInput(TypedDict, total=False):
     """The complete settings to save. Settings left out return to their defaults: no opted-out
-    jurisdictions, ``blockUnmoderatedAssets`` True, the other switches False, and the rest ``None``
+    jurisdictions, ``keepContentAfterProcessing`` and ``blockUnmoderatedAssets`` True, the other switches False, and the rest ``None``
     or no human review."""
     optOutJurisdictions: List[OptOutJurisdiction]
+    keepContentAfterProcessing: bool
     blockUnmoderatedAssets: bool
     storeSensitiveMetadata: bool
     streamingEnabled: bool

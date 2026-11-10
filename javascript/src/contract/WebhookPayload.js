@@ -1195,10 +1195,7 @@ const METADATA_ITEM_SCHEMA = zod.object({
 	namedType: "MetadataItem"
 })]));
 const PROCESSING_OPTIONS_SCHEMA = zod.object({
-	keepContentAfterProcessing: zod.boolean().nullish().meta(metaStore([docPropertyInfo({
-		description: "Whether to keep the asset content after processing",
-		defaultValue: false
-	})])),
+	keepContentAfterProcessing: zod.boolean().nullish().meta(metaStore([docPropertyInfo({ description: "Whether to keep the asset content after processing. Inherits the upload preset, then the project setting when omitted. New projects keep content by default." })])),
 	storeSensitiveMetadata: zod.boolean().nullish().meta(metaStore([docPropertyInfo({
 		description: "Override the project's `storeSensitiveMetadata` setting for this upload. When false, embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored, and `fileMetadata` leaves out the creator and location. When true, the image is stored as uploaded.",
 		defaultValue: void 0

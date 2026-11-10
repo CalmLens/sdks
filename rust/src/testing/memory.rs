@@ -2397,10 +2397,14 @@ impl Backend {
         // `wait=false` queues the work; without `wait`, the upload waits for its decision.
         let queue = q.get("wait").is_some_and(|value| value == "false");
         let open = multipart && !is_final;
-        let processing = options
+        let mut processing = options
             .get("processingOptions")
             .cloned()
-            .unwrap_or_else(|| json!({"keepContentAfterProcessing": false}));
+            .unwrap_or_else(|| json!({}));
+        if processing["keepContentAfterProcessing"].is_null() {
+            processing["keepContentAfterProcessing"] =
+                self.full_settings()["keepContentAfterProcessing"].clone();
+        }
         let keep = processing["keepContentAfterProcessing"] == true;
         // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
         let context = match options.get("context") {

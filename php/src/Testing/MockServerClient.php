@@ -38,7 +38,7 @@ use Psr\Http\Message\ResponseInterface;
  * `validation/too-big`, in `details.issues`). It does not classify content: the
  * `moderate` callable decides each asset the mock moderates (see the constructor), and
  * `completeProcessing` finishes a queued one. A decided asset gets the decision's full report.
- * Content is kept only with `keepContentAfterProcessing: true`; otherwise it is removed once
+ * Content retention follows upload, preset and project settings; when disabled, content is removed once
  * classification completes, as in the API. A `purged` decision removes the content with reason
  * `policy`; a reviewer's purge (`decide`) with reason `requested`. Like the API, an asset whose
  * content is held reports its `content.rendered` file and `content.preview` (see `rendering`), a
@@ -1057,7 +1057,8 @@ final class MockServerClient
             }
         }
         $now = ($this->now)();
-        $processing = $options['processingOptions'] ?? ['keepContentAfterProcessing' => false];
+        $processing = $options['processingOptions'] ?? [];
+        $processing['keepContentAfterProcessing'] = $processing['keepContentAfterProcessing'] ?? $this->toProjectSettings()['settings']['keepContentAfterProcessing'];
         $keep = is_array($processing) && ($processing['keepContentAfterProcessing'] ?? false) === true;
         // Like the API, only the posts CalmLens uses are kept, and only while the content is held.
         $context = ModerationContext::select($options['context']['items'] ?? []);
@@ -1145,7 +1146,8 @@ final class MockServerClient
         }
         $options['folderId'] = $preset['folderId'] ?? $options['folderId'] ?? null;
         $options['visibility'] = $preset['visibility'];
-        $options['processingOptions'] = $options['processingOptions'] ?? $preset['processingOptions'];
+        $options['processingOptions'] = $options['processingOptions'] ?? $preset['processingOptions'] ?? [];
+        $options['processingOptions']['keepContentAfterProcessing'] = $options['processingOptions']['keepContentAfterProcessing'] ?? $preset['processingOptions']['keepContentAfterProcessing'] ?? null;
         return $options;
     }
 
@@ -2532,7 +2534,7 @@ final class MockServerClient
     // Configuration: upload presets, project settings and metadata fields, like the API's.
 
     /** The API's defaults for the project settings. */
-    private const DEFAULT_PROJECT_SETTINGS = ['optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true, 'storeSensitiveMetadata' => false,
+    private const DEFAULT_PROJECT_SETTINGS = ['keepContentAfterProcessing' => true, 'optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true, 'storeSensitiveMetadata' => false,
         'streamingEnabled' => false, 'aiMediaSearchEnabled' => false, 'remoteUrlRule' => null, 'websiteSubmissionsPerMinute' => null];
     private const DEFAULT_HUMAN_REVIEW = ['allowedSamplePercent' => 0, 'restrictedSamplePercent' => 0, 'uncertaintyMarginPercent' => 0,
         'reviewMissingEvidence' => false];

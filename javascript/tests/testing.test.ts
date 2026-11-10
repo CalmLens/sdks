@@ -96,7 +96,7 @@ describe("MockCalmLensServerClient", () => {
     expect(asset.type).toBe("image");
     expect(asset.classification.status).toBe("processing");
     expect(asset.classification.moderation.status).toBe("pending");
-    expect(asset.content).toMatchObject({ status: "temporary", format: "image/png" });
+    expect(asset.content).toMatchObject({ status: "stored", format: "image/png" });
     expect(asset.visibility).toBe("public");
     await expect(client.assets.retrieve({ assetId: asset.id })).resolves.toEqual(asset);
     await expect(imageStorage.getContent(asset.id)).resolves.toMatchObject({ type: "image/png" });
@@ -847,7 +847,7 @@ describe("MockCalmLensServerClient", () => {
     });
     expect(asset.classification.status).toBe("failed");
     expect(asset.classification.failureReason).toBe("processing-error");
-    expect(asset.content.status).toBe("temporary");
+    expect(asset.content.status).toBe("stored");
 
     const retried = await client.assets.retry({ assetId: asset.id });
     expect(retried.classification.status).toBe("processing");

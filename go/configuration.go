@@ -232,6 +232,7 @@ type HumanReviewSettings struct {
 // ProjectSettings are a project's settings with defaults filled in. The project's policy and
 // metadata fields have their own endpoints.
 type ProjectSettings struct {
+	KeepContentAfterProcessing bool `json:"keepContentAfterProcessing"`
 	// OptOutJurisdictions are optional standards this project doesn't serve, such as "EU".
 	OptOutJurisdictions []string `json:"optOutJurisdictions"`
 	// BlockUnmoderatedAssets makes the CDN refuse assets whose moderation is still pending.
@@ -262,6 +263,8 @@ type ProjectSettingsResource struct {
 // ProjectSettingsInput is the complete settings an update stores: fields left unset return to
 // their defaults. See ProjectSettings for what each one does.
 type ProjectSettingsInput struct {
+	// KeepContentAfterProcessing defaults to true.
+	KeepContentAfterProcessing *bool `json:"keepContentAfterProcessing"`
 	// OptOutJurisdictions defaults to none.
 	OptOutJurisdictions []string `json:"optOutJurisdictions"`
 	// BlockUnmoderatedAssets defaults to true.
@@ -284,6 +287,9 @@ type ProjectSettingsInput struct {
 // MarshalJSON encodes the settings with only the fields that are set.
 func (s ProjectSettingsInput) MarshalJSON() ([]byte, error) {
 	body := map[string]any{}
+	if s.KeepContentAfterProcessing != nil {
+		body["keepContentAfterProcessing"] = *s.KeepContentAfterProcessing
+	}
 	if s.OptOutJurisdictions != nil {
 		body["optOutJurisdictions"] = s.OptOutJurisdictions
 	}

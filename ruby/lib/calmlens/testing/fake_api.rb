@@ -730,7 +730,7 @@ module CalmLens
       end
 
       def show_project_settings
-        settings = { 'optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true, 'storeSensitiveMetadata' => false,
+        settings = { 'keepContentAfterProcessing' => true, 'optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true, 'storeSensitiveMetadata' => false,
                      'streamingEnabled' => false, 'aiMediaSearchEnabled' => false, 'remoteUrlRule' => nil,
                      'websiteSubmissionsPerMinute' => nil }.merge(@project_settings)
         settings['humanReview'] = { 'allowedSamplePercent' => 0, 'restrictedSamplePercent' => 0, 'uncertaintyMarginPercent' => 0,
@@ -842,7 +842,8 @@ module CalmLens
         end
         now = @now.call
         mime = options['contentType'].to_s
-        processing = options['processingOptions'] || { 'keepContentAfterProcessing' => false }
+        processing = (options['processingOptions'] || {}).dup
+        processing['keepContentAfterProcessing'] = show_project_settings['settings']['keepContentAfterProcessing'] if processing['keepContentAfterProcessing'].nil?
         keep = processing.is_a?(Hash) && processing['keepContentAfterProcessing'] == true
         context = options['context'].is_a?(Hash) ? ModerationContext.select_items(options['context'].fetch('items', [])) : []
         # Fields the API returns as null when they are not set.
@@ -947,7 +948,8 @@ module CalmLens
         check_preset_fields(preset, fields)
         check_preset_limits(preset, fields, data)
         fields.merge('folderId' => preset['folderId'] || fields['folderId'], 'visibility' => preset['visibility'],
-                     'processingOptions' => fields['processingOptions'] || deep_copy(preset['processingOptions']))
+                     'processingOptions' => (fields['processingOptions'] || deep_copy(preset['processingOptions']) || {}).merge(
+                       'keepContentAfterProcessing' => fields.dig('processingOptions', 'keepContentAfterProcessing').nil? ? preset.dig('processingOptions', 'keepContentAfterProcessing') : fields.dig('processingOptions', 'keepContentAfterProcessing')))
       end
 
       def check_preset_fields(preset, fields)

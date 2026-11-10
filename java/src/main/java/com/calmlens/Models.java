@@ -3177,6 +3177,7 @@ public final class Models {
    * A project's settings, with defaults filled in.
    *
    * @param optOutJurisdictions optional standards the project doesn't serve, such as {@code EU}
+   * @param keepContentAfterProcessing whether new uploads keep their content after processing
    * @param blockUnmoderatedAssets whether the CDN refuses to serve assets whose moderation is pending
    * @param storeSensitiveMetadata whether uploaded images keep their embedded metadata
    * @param streamingEnabled whether audio and video uploads that keep their content get an adaptive stream
@@ -3185,7 +3186,7 @@ public final class Models {
    * @param websiteSubmissionsPerMinute how many websites the project can submit per minute, or null for the platform limit
    * @param humanReview which automated decisions are sampled into the human review queue
    */
-  public record ProjectSettings(List<String> optOutJurisdictions, Boolean blockUnmoderatedAssets, Boolean storeSensitiveMetadata,
+  public record ProjectSettings(Boolean keepContentAfterProcessing, List<String> optOutJurisdictions, Boolean blockUnmoderatedAssets, Boolean storeSensitiveMetadata,
       Boolean streamingEnabled, Boolean aiMediaSearchEnabled, RemoteUrlRule remoteUrlRule, Integer websiteSubmissionsPerMinute,
       HumanReviewSettings humanReview) {
     /** Copies collections so the record stays immutable. */
@@ -3203,6 +3204,9 @@ public final class Models {
 
   /** The settings to save with {@code projectSettings.update}. Settings left unset return to their defaults. */
   public static final class ProjectSettingsInput {
+    private Boolean keepContentAfterProcessing;
+    /** @param value whether to retain new uploads (default true) @return these settings */
+    public ProjectSettingsInput keepContentAfterProcessing(Boolean value) { keepContentAfterProcessing = value; return this; }
     private List<String> optOutJurisdictions;
     private Boolean blockUnmoderatedAssets;
     private Boolean storeSensitiveMetadata;

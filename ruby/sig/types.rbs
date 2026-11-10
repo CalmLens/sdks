@@ -703,6 +703,7 @@ module CalmLens
   }
   type public_project_settings = {
     "optOutJurisdictions" => Array[String],
+    "keepContentAfterProcessing" => bool,
     "blockUnmoderatedAssets" => bool,
     "storeSensitiveMetadata" => bool,
     "streamingEnabled" => bool,
@@ -1204,6 +1205,7 @@ module CalmLens
   # The complete settings: those left out return to their defaults.
   type project_settings_input = {
     ?opt_out_jurisdictions: Array[String],
+    ?keep_content_after_processing: bool,
     ?block_unmoderated_assets: bool,
     ?store_sensitive_metadata: bool,
     ?streaming_enabled: bool,

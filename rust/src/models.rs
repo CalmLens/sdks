@@ -5252,6 +5252,8 @@ pub struct HumanReviewSettings {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ProjectSettings {
+    /// Whether new uploads retain their content.
+    pub keep_content_after_processing: bool,
     /// Optional standards this project doesn't serve.
     #[serde(default)]
     pub opt_out_jurisdictions: Vec<OptOutJurisdiction>,
@@ -5311,6 +5313,9 @@ pub struct ProjectSettingsResource {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSettingsDefinition {
+    /// Retention default for new uploads.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keep_content_after_processing: Option<bool>,
     /// Optional standards this project doesn't serve. Defaults to none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub opt_out_jurisdictions: Option<Vec<OptOutJurisdiction>>,
@@ -5349,6 +5354,7 @@ impl From<ProjectSettings> for ProjectSettingsDefinition {
     fn from(settings: ProjectSettings) -> Self {
         Self {
             opt_out_jurisdictions: Some(settings.opt_out_jurisdictions),
+            keep_content_after_processing: Some(settings.keep_content_after_processing),
             block_unmoderated_assets: Some(settings.block_unmoderated_assets),
             store_sensitive_metadata: Some(settings.store_sensitive_metadata),
             streaming_enabled: Some(settings.streaming_enabled),

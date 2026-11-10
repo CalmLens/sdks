@@ -75,8 +75,8 @@ final class MockServerClientTest extends TestCase
     {
         $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => str_contains((string) $input->content->text, 'away') ? 'blocked' : 'allowed');
         $client = $mock->client();
-        $kind = $client->text->classify(['name' => 'kind', 'text' => 'hello']);
-        $rude = $client->text->classify(['name' => 'rude', 'text' => 'go away']);
+        $kind = $client->text->classify(['name' => 'kind', 'processingOptions' => ['keepContentAfterProcessing' => false], 'text' => 'hello']);
+        $rude = $client->text->classify(['name' => 'rude', 'processingOptions' => ['keepContentAfterProcessing' => false], 'text' => 'go away']);
         self::assertSame('allowed', $kind['classification']['moderation']['status']);
         self::assertSame('blocked', $rude['classification']['moderation']['status']);
         self::assertSame(['removed', 'retention'], [$kind['content']['status'], $kind['content']['removalReason']]);

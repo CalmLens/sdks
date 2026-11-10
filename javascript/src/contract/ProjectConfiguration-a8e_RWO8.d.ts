@@ -108,6 +108,7 @@ type EnsureUploadPresetInput = zod.input<typeof ENSURE_UPLOAD_PRESET_SCHEMA>;
  * their own endpoints, so they aren't listed here.
  */
 declare const PUBLIC_PROJECT_SETTINGS_SCHEMA: zod.ZodObject<{
+  keepContentAfterProcessing: zod.ZodDefault<zod.ZodBoolean>;
   optOutJurisdictions: zod.ZodDefault<zod.ZodArray<zod.ZodEnum<{
     EU: "EU";
   }>>>;
@@ -135,6 +136,7 @@ declare const PROJECT_SETTINGS_RESOURCE_SCHEMA: zod.ZodObject<{
   projectId: zod.ZodString;
   revision: zod.ZodNumber;
   settings: zod.ZodObject<{
+    keepContentAfterProcessing: zod.ZodDefault<zod.ZodBoolean>;
     optOutJurisdictions: zod.ZodDefault<zod.ZodArray<zod.ZodEnum<{
       EU: "EU";
     }>>>;
@@ -162,6 +164,7 @@ type ProjectSettingsResource = zod.infer<typeof PROJECT_SETTINGS_RESOURCE_SCHEMA
 declare const PUT_PROJECT_SETTINGS_BODY_SCHEMA: zod.ZodObject<{
   revision: zod.ZodOptional<zod.ZodNumber>;
   settings: zod.ZodObject<{
+    keepContentAfterProcessing: zod.ZodDefault<zod.ZodBoolean>;
     optOutJurisdictions: zod.ZodDefault<zod.ZodArray<zod.ZodEnum<{
       EU: "EU";
     }>>>;

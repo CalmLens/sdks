@@ -17,7 +17,7 @@ module CalmLens
   # callback decides each upload, retry and rerun with a status or a {MockDecision}, and the events
   # feed gets the pipeline's `asset.uploaded`, `asset.classified`, `asset.<status>` and `asset.failed`
   # events. Without it, queued uploads stay `pending` until {#complete_processing} and the rest are
-  # `allowed`. Content is kept only with `keepContentAfterProcessing: true`; otherwise it is removed
+  # `allowed`. Content retention follows upload, preset and project settings; when disabled, content is removed
   # once classification is `completed`, as in the API.
   # A `purged` outcome removes the content with reason `policy`. The CDN answers like the real one:
   # `asset/not-available` (403) for blocked, purged, failed or removed content,

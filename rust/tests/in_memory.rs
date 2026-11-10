@@ -73,7 +73,13 @@ async fn storage_keeps_only_kept_content_and_drops_purged_content() {
     let mock = MockServerClient::in_memory(options()).unwrap();
     let asset = mock
         .text()
-        .classify(ClassifyText::new("hello"))
+        .classify(ClassifyText {
+            processing_options: Some(ProcessingOptions {
+                keep_content_after_processing: Some(false),
+                ..Default::default()
+            }),
+            ..ClassifyText::new("hello")
+        })
         .await
         .unwrap();
     assert_eq!(asset.asset_type, Some(AssetType::PlaintextDocument));

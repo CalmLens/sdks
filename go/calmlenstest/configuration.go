@@ -204,6 +204,14 @@ func (m *MockServerClient) applyUploadPreset(options calmlens.JSON, hasContent b
 	if applied["processingOptions"] == nil && preset["processingOptions"] != nil {
 		applied["processingOptions"] = preset["processingOptions"]
 	}
+	processing := maps.Clone(asJSON(applied["processingOptions"]))
+	if processing == nil {
+		processing = calmlens.JSON{}
+	}
+	if processing["keepContentAfterProcessing"] == nil {
+		processing["keepContentAfterProcessing"] = asJSON(preset["processingOptions"])["keepContentAfterProcessing"]
+	}
+	applied["processingOptions"] = processing
 	return applied, nil
 }
 
@@ -242,7 +250,7 @@ func (m *MockServerClient) uploadPresetRoute(method, id, suffix string) (any, er
 // projectSettings is the settings resource, with defaults filled in.
 func (m *MockServerClient) projectSettings() calmlens.JSON {
 	settings := calmlens.JSON{
-		"optOutJurisdictions": []any{}, "blockUnmoderatedAssets": true, "storeSensitiveMetadata": false,
+		"keepContentAfterProcessing": true, "optOutJurisdictions": []any{}, "blockUnmoderatedAssets": true, "storeSensitiveMetadata": false,
 		"streamingEnabled": false, "aiMediaSearchEnabled": false, "remoteUrlRule": nil, "websiteSubmissionsPerMinute": nil,
 	}
 	for key, value := range m.config.settings {

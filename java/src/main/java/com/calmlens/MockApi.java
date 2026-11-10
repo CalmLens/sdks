@@ -652,8 +652,10 @@ final class MockApi {
     JsonElement processing = o.get("processingOptions");
     if (processing == null || !processing.isJsonObject()) {
       processing = new JsonObject();
-      processing.getAsJsonObject().addProperty("keepContentAfterProcessing", false);
+
     }
+    if (!processing.getAsJsonObject().has("keepContentAfterProcessing") || processing.getAsJsonObject().get("keepContentAfterProcessing").isJsonNull())
+      processing.getAsJsonObject().add("keepContentAfterProcessing", toProjectSettings().getAsJsonObject("settings").get("keepContentAfterProcessing"));
     boolean keep = bool(processing.getAsJsonObject(), "keepContentAfterProcessing");
 
     // Fields the API returns as null when they are not set.
@@ -785,6 +787,10 @@ final class MockApi {
     applied.add("visibility", preset.get("visibility").deepCopy());
     if ((!fields.has("processingOptions") || fields.get("processingOptions").isJsonNull()) && !preset.get("processingOptions").isJsonNull())
       applied.add("processingOptions", preset.get("processingOptions").deepCopy());
+    JsonObject retentionOptions = applied.get("processingOptions") instanceof JsonObject value ? value.deepCopy() : new JsonObject();
+    if ((!retentionOptions.has("keepContentAfterProcessing") || retentionOptions.get("keepContentAfterProcessing").isJsonNull()) && preset.get("processingOptions") instanceof JsonObject defaults)
+      retentionOptions.add("keepContentAfterProcessing", defaults.get("keepContentAfterProcessing"));
+    applied.add("processingOptions", retentionOptions);
     return applied;
   }
 
@@ -2149,6 +2155,7 @@ final class MockApi {
   private JsonObject toProjectSettings() {
     JsonObject settings = new JsonObject();
     settings.add("optOutJurisdictions", new JsonArray());
+    settings.addProperty("keepContentAfterProcessing", true);
     settings.addProperty("blockUnmoderatedAssets", true);
     settings.addProperty("storeSensitiveMetadata", false);
     settings.addProperty("streamingEnabled", false);

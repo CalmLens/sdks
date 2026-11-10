@@ -189,6 +189,21 @@ impl Backend {
                 preset["processingOptions"].clone(),
             );
         }
+        let mut processing = options
+            .get("processingOptions")
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        if processing
+            .get("keepContentAfterProcessing")
+            .is_none_or(Value::is_null)
+        {
+            processing.insert(
+                "keepContentAfterProcessing".into(),
+                preset["processingOptions"]["keepContentAfterProcessing"].clone(),
+            );
+        }
+        options.insert("processingOptions".into(), Value::Object(processing));
         Ok(())
     }
 
@@ -286,9 +301,10 @@ impl Backend {
     }
 
     /// The settings with every default filled in.
-    fn full_settings(&self) -> Value {
+    pub(super) fn full_settings(&self) -> Value {
         let mut settings = json!({
             "optOutJurisdictions": [],
+            "keepContentAfterProcessing": true,
             "blockUnmoderatedAssets": true,
             "storeSensitiveMetadata": false,
             "streamingEnabled": false,

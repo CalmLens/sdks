@@ -1,9 +1,151 @@
 {
   "scenarios": [
     {
+      "name": "retention inherits project then preset and upload overrides without changing old assets",
+      "mock": {},
+      "steps": [
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "default.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "save": "retained",
+          "expect": {
+            "result": {
+              "content.status": "stored"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "projectSettings.update",
+          "args": {
+            "settings": {
+              "keepContentAfterProcessing": false
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "removed.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            }
+          },
+          "expect": {
+            "result": {
+              "content.status": "removed",
+              "content.removalReason": "retention"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "uploadPresets.ensure",
+          "args": {
+            "uploadPresets": [
+              {
+                "key": "retain",
+                "name": "Retain",
+                "processingOptions": {
+                  "keepContentAfterProcessing": true
+                }
+              }
+            ]
+          },
+          "save": "presets",
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "preset.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "uploadPresetId": {
+              "$ref": "presets.uploadPresets.0.id"
+            },
+            "processingOptions": {
+              "features": {
+                "ocr": {
+                  "enabled": true
+                }
+              }
+            }
+          },
+          "expect": {
+            "result": {
+              "content.status": "stored"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.classify",
+          "args": {
+            "name": "override.png",
+            "content": {
+              "base64": "aGVsbG8=",
+              "type": "image/png"
+            },
+            "uploadPresetId": {
+              "$ref": "presets.uploadPresets.0.id"
+            },
+            "processingOptions": {
+              "keepContentAfterProcessing": false
+            }
+          },
+          "expect": {
+            "result": {
+              "content.status": "removed"
+            },
+            "httpStatus": 200
+          }
+        },
+        {
+          "operation": "assets.retrieve",
+          "args": {
+            "assetId": {
+              "$ref": "retained.id"
+            }
+          },
+          "expect": {
+            "result": {
+              "content.status": "stored"
+            },
+            "httpStatus": 200
+          }
+        }
+      ]
+    },
+    {
       "name": "create leaves an asset processing and classify allows it by default",
       "mock": {},
       "steps": [
+        {
+          "operation": "projectSettings.update",
+          "args": {
+            "settings": {
+              "keepContentAfterProcessing": false
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
         {
           "operation": "assets.create",
           "args": {
@@ -1860,6 +2002,17 @@
       },
       "steps": [
         {
+          "operation": "projectSettings.update",
+          "args": {
+            "settings": {
+              "keepContentAfterProcessing": false
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
           "operation": "assets.classify",
           "args": {
             "name": "kept.png",
@@ -2526,6 +2679,17 @@
       "name": "the author and the earlier posts CalmLens uses are kept until the content is removed",
       "mock": {},
       "steps": [
+        {
+          "operation": "projectSettings.update",
+          "args": {
+            "settings": {
+              "keepContentAfterProcessing": false
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
         {
           "operation": "assets.create",
           "args": {
@@ -5455,6 +5619,17 @@
       },
       "steps": [
         {
+          "operation": "projectSettings.update",
+          "args": {
+            "settings": {
+              "keepContentAfterProcessing": false
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
           "operation": "events.list",
           "args": {},
           "save": "feed",
@@ -5669,6 +5844,17 @@
       "name": "explain needs a decision, and rerun moderates again unless reviewed or the content is gone",
       "mock": {},
       "steps": [
+        {
+          "operation": "projectSettings.update",
+          "args": {
+            "settings": {
+              "keepContentAfterProcessing": false
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
         {
           "operation": "assets.create",
           "args": {
@@ -9166,6 +9352,17 @@
       "mock": {},
       "steps": [
         {
+          "operation": "projectSettings.update",
+          "args": {
+            "settings": {
+              "keepContentAfterProcessing": false
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
+        {
           "operation": "assets.classify",
           "args": {
             "name": "public.png",
@@ -11727,6 +11924,17 @@
         }
       },
       "steps": [
+        {
+          "operation": "projectSettings.update",
+          "args": {
+            "settings": {
+              "keepContentAfterProcessing": false
+            }
+          },
+          "expect": {
+            "httpStatus": 200
+          }
+        },
         {
           "operation": "assets.classify",
           "args": {

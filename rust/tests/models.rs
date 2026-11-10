@@ -671,6 +671,7 @@ fn an_over_long_newest_post_is_kept_alone_for_the_api_to_reject() {
 #[test]
 fn settings_read_convert_to_a_definition_holding_every_setting() {
     let read = json!({
+        "keepContentAfterProcessing": true,
         "optOutJurisdictions": ["EU"],
         "blockUnmoderatedAssets": false,
         "storeSensitiveMetadata": true,

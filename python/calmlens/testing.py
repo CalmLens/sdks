@@ -1841,7 +1841,9 @@ class MockCalmLensServerClient(CalmLensServerClient):
         queue = query.get("wait") is False
         processing_options = options.get("processingOptions")
         if not isinstance(processing_options, dict):
-            processing_options = {"keepContentAfterProcessing": False}
+            processing_options = {}
+        if processing_options.get("keepContentAfterProcessing") is None:
+            processing_options = {**processing_options, "keepContentAfterProcessing": self._project_settings_view()["settings"]["keepContentAfterProcessing"]}
         keep = processing_options.get("keepContentAfterProcessing") is True
         context = options.get("context")
         context_items = select_moderation_context_items(
@@ -1924,9 +1926,12 @@ class MockCalmLensServerClient(CalmLensServerClient):
         if limit and size is not None and size > limit:
             raise _Failure(error_codes.UPLOAD_TOO_LARGE, details={"limitBytes": limit, "source": "preset"})
         own = options.get("processingOptions")
+        processing = dict(own if own is not None else preset["processingOptions"] or {})
+        if processing.get("keepContentAfterProcessing") is None:
+            processing["keepContentAfterProcessing"] = (preset["processingOptions"] or {}).get("keepContentAfterProcessing")
         return {**options, "folderId": preset["folderId"] or options.get("folderId"),
                 "visibility": preset["visibility"],
-                "processingOptions": own if own is not None else preset["processingOptions"]}
+                "processingOptions": processing}
 
     @staticmethod
     def _image_size_error(kind: str, size: int) -> str | None:
@@ -2514,7 +2519,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
     def _project_settings_view(self) -> dict[str, Any]:
         stored = self._project_settings_values
         return {"projectId": self.project_id, "revision": self._settings_revision, "settings": {
-            "optOutJurisdictions": [], "blockUnmoderatedAssets": True, "storeSensitiveMetadata": False,
+            "keepContentAfterProcessing": True, "optOutJurisdictions": [], "blockUnmoderatedAssets": True, "storeSensitiveMetadata": False,
             "streamingEnabled": False, "aiMediaSearchEnabled": False, "remoteUrlRule": None,
             "websiteSubmissionsPerMinute": None, **stored,
             "humanReview": {"allowedSamplePercent": 0, "restrictedSamplePercent": 0, "uncertaintyMarginPercent": 0,

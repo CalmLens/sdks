@@ -3360,6 +3360,7 @@
       "projectId": "project-1",
       "revision": 5,
       "settings": {
+        "keepContentAfterProcessing": true,
         "optOutJurisdictions": [
           "EU"
         ],
@@ -3409,6 +3410,7 @@
       "projectId": "project-1",
       "revision": 5,
       "settings": {
+        "keepContentAfterProcessing": true,
         "optOutJurisdictions": [
           "EU"
         ],
@@ -3450,6 +3452,7 @@
       "projectId": "project-1",
       "revision": 5,
       "settings": {
+        "keepContentAfterProcessing": true,
         "optOutJurisdictions": [
           "EU"
         ],
@@ -13932,6 +13935,7 @@
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
       "revision": 1,
       "settings": {
+        "keepContentAfterProcessing": true,
         "optOutJurisdictions": [
           "EU"
         ],
@@ -13987,6 +13991,7 @@
       "projectId": "proj_8fK2mQx7Lp4NvB3tRz9Y",
       "revision": 1,
       "settings": {
+        "keepContentAfterProcessing": true,
         "optOutJurisdictions": [
           "EU"
         ],
