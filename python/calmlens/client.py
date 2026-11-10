@@ -1517,7 +1517,7 @@ class Assets:
         raise CalmLensError(
             error_codes.SDK_TIMEOUT,
             f"Asset {requested_id} had no moderation decision after {limit:g}s "
-            f"(processing {classification_status}, moderation {moderation_status})",
+            f"(classification status: {classification_status}, moderation status: {moderation_status})",
             {"assetId": requested_id, "classificationStatus": classification_status,
              "moderationStatus": moderation_status})
 
