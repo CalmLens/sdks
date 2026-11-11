@@ -825,7 +825,7 @@ class AssetPendingReview(TypedDict):
     uncertainCategories: List[str]
 
 
-class AssetModeration(TypedDict):
+class _AssetModerationRequired(TypedDict):
     manualReviews: List[AssetReview]
     status: AssetModerationStatus
     #: The status automated moderation decided; ``None`` before a decision. Manual reviews can
@@ -846,14 +846,16 @@ class AssetModeration(TypedDict):
     categories: Optional[Dict[str, CategoryPolicyScore]]
     flaggedCategories: List[str]
     regions: List[RegionalDecision]
-    #: Preview. What the policy's link-safety section made of the asset's links; ``None`` when the
-    #: policy doesn't act on links or before a decision.
-    linkSafety: Optional[LinkSafetyDecision]
     #: The scores behind the decision; ``None`` before a decision.
     raw: Optional[ModerationRaw]
     #: For audio and video, a summary of the findings timeline; ``None`` for other assets, before
     #: there are findings and while a safety or copyright hold withholds the content.
     timeline: Optional[AssetModerationTimeline]
+
+
+class AssetModeration(_AssetModerationRequired, total=False):
+    #: Present only when link safety is enabled; ``None`` before a link decision.
+    linkSafety: Optional[LinkSafetyDecision]
 
 
 class ClassificationProgress(TypedDict):
@@ -882,12 +884,11 @@ class _AssetClassificationRequired(TypedDict):
     faceDetection: Optional[FaceDetectionResult]
     #: The QR codes and web links link detection found; ``None`` until it has run or when it is off.
     linkDetection: Optional[LinkDetectionResult]
-    #: Preview. Where each link in the asset leads and its verdict, when the project's policy acts
-    #: on links; otherwise ``None``.
-    linkSafety: Optional[LinkSafetyResult]
 
 
 class AssetClassification(_AssetClassificationRequired, total=False):
+    #: Present only when link safety is enabled; ``None`` when no link check ran.
+    linkSafety: Optional[LinkSafetyResult]
     aiGeneratedDetection: Optional[AiGeneratedDetectionResult]
 
 
