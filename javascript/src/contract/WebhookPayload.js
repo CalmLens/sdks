@@ -762,7 +762,7 @@ const MODERATION_ASSESSMENT_FIELDS_SCHEMA = zod.object({
 	policy: DECISION_POLICY_SCHEMA.optional().describe("The policy that made the decision. Absent from a preview, which no saved policy made."),
 	categories: zod.partialRecord(CLASSIFICATION_CATEGORY_SCHEMA, CATEGORY_ASSESSMENT_SCHEMA).describe("Each assessed category's policy score and action. Unassessed categories are left out."),
 	explanationComplete: zod.boolean().describe("Whether all questions needed for a complete explanation of this decision were answered. False means questions that could not change any action were skipped; the actions are still final."),
-	source: zod.enum(DECISION_SOURCES),
+	source: zod.enum(DECISION_SOURCES.filter((source) => source !== "link-safety")),
 	automatedAction: POLICY_ACTION_SCHEMA.describe("The original automated action. Manual reviews can change the current moderation status without changing this action."),
 	rule: zod.string().regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/).optional(),
 	regions: zod.array(zod.object({
@@ -777,7 +777,7 @@ const MODERATION_ASSESSMENT_FIELDS_SCHEMA = zod.object({
 		links: zod.array(zod.number().int().nonnegative()).describe("Indexes into the link-safety result's `links` of the links that take that action."),
 		settings: LINK_SAFETY_SETTINGS_SCHEMA
 	}).strict().optional().describe("Preview. What the policy's link-safety section made of the asset's links. Absent when the policy doesn't act on links.")
-}).strict().omit({});
+}).strict().omit({ linkSafety: true });
 const hasValidModerationRule = (assessment) => assessment.source === "mandatory-rule" ? Boolean(assessment.rule) : assessment.rule === void 0;
 MODERATION_ASSESSMENT_FIELDS_SCHEMA.refine(hasValidModerationRule, {
 	message: "moderation/rule-required",
@@ -1346,7 +1346,7 @@ const ASSET_MODERATION_SCHEMA = zod.object({
 		hashMatches: CLASSIFICATION_REPORT_SCHEMA.shape.raw.shape.hashMatches.unwrap().describe("Entries in the project's hash lists that the image, a video's frames or media's cover art matched, blocking matches first and then the closest. Empty when nothing matched.")
 	}).strict().nullable().describe("Detection findings before policy evaluation, `null` until the asset is analysed."),
 	timeline: ASSET_MODERATION_TIMELINE_SCHEMA.nullable().describe("For audio and video: a summary of the findings timeline, which lists findings for each stretch of the media. Page through it with `GET /v1/projects/:projectId/assets/:assetId/timeline`. `null` for other assets, before there are findings and while a safety or copyright hold withholds the asset's content.")
-}).omit({}).refine((moderation) => moderation.source === "mandatory-rule" ? Boolean(moderation.rule) : moderation.rule === null, {
+}).omit({ linkSafety: true }).refine((moderation) => moderation.source === "mandatory-rule" ? Boolean(moderation.rule) : moderation.rule === null, {
 	message: "moderation/rule-required",
 	path: ["rule"]
 }).meta(metaStore([docPropertyInfo({
@@ -1367,7 +1367,10 @@ const ASSET_CLASSIFICATION_SCHEMA = zod.object({
 	linkDetection: LINK_DETECTION_RESULT_SCHEMA.nullable().describe("Link detection's result for an image, `null` when it didn't run"),
 	linkSafety: LINK_SAFETY_RESULT_SCHEMA.nullable().describe("Preview. Where each link in the asset leads and its verdict, when the project's policy acts on links; otherwise `null`."),
 	aiGeneratedDetection: AI_GENERATED_DETECTION_RESULT_SCHEMA.nullable().describe("Preview. AI-generated detection's result, `null` when it didn't run")
-}).omit({ aiGeneratedDetection: true }).meta(metaStore([docPropertyInfo({
+}).omit({
+	aiGeneratedDetection: true,
+	linkSafety: true
+}).meta(metaStore([docPropertyInfo({
 	description: "Classification results",
 	namedType: "AssetClassification"
 })]));
@@ -1493,8 +1496,7 @@ STORED_ASSET_SCHEMA.pick({
 				links: []
 			},
 			personDetection: null,
-			faceDetection: null,
-			linkSafety: null
+			faceDetection: null
 		},
 		content: {
 			status: "stored",
@@ -2307,7 +2309,7 @@ const ASSET_LINK_FLAGGED = defineEventType({
 	severity: "high",
 	notify: true,
 	permission: "assets:read",
-	enabled: true,
+	enabled: false,
 	fields: {
 		assetName: assetNameField,
 		assetType: assetTypeField,
