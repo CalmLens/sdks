@@ -976,6 +976,46 @@
   ],
   "parsed": [
     {
+      "name": "completed review confirmation",
+      "body": "{\"id\":\"evt_review\",\"type\":\"asset.review-completed\",\"createdAt\":1700000000000,\"projectId\":\"project-1\",\"assetId\":\"asset-1\",\"assetSequence\":7,\"actor\":{\"type\":\"user\",\"id\":\"reviewer-1\"},\"severity\":\"low\",\"facts\":[{\"key\":\"review-id\",\"value\":\"rev_8Xm3Rk2Lq7Vt9Wb4Np6C\"},{\"key\":\"decision\",\"value\":\"allowed\"},{\"key\":\"applied-to-asset\",\"value\":false},{\"key\":\"note\",\"value\":null}]}",
+      "secret": "key",
+      "timestamp": "1700000000",
+      "signature": "v1=0de83494422d52d4af392bbc16fbd7c02956cdcb520bc7f420cd543927bff9ca",
+      "now": 1700000000,
+      "expected": {
+        "id": "evt_review",
+        "type": "asset.review-completed",
+        "createdAt": 1700000000000,
+        "projectId": "project-1",
+        "assetId": "asset-1",
+        "assetSequence": 7,
+        "actor": {
+          "type": "user",
+          "id": "reviewer-1"
+        },
+        "severity": "low",
+        "facts": [
+          {
+            "key": "review-id",
+            "value": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C"
+          },
+          {
+            "key": "decision",
+            "value": "allowed"
+          },
+          {
+            "key": "applied-to-asset",
+            "value": false
+          },
+          {
+            "key": "note",
+            "value": null
+          }
+        ]
+      },
+      "isTest": false
+    },
+    {
       "name": "a full event",
       "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",

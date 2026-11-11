@@ -453,6 +453,8 @@ string_enum! {
         AssetRerunRequested = "asset.rerun-requested",
         /// `asset.review-requested`.
         AssetReviewRequested = "asset.review-requested",
+        /// A queued review completed, including confirmations.
+        AssetReviewCompleted = "asset.review-completed",
         /// `asset.hash-matched`.
         AssetHashMatched = "asset.hash-matched",
         /// `asset.link-flagged`.

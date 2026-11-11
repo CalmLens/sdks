@@ -2197,6 +2197,51 @@ const ASSET_REVIEW_REQUESTED = defineEventType({
 		uncertainCategories: ["harassment"]
 	}
 });
+const ASSET_REVIEW_COMPLETED = defineEventType({
+	id: "asset.review-completed",
+	name: msg("Review completed"),
+	description: msg("A reviewer completed a queued review, whether confirming or changing the asset's decision."),
+	category: "moderation",
+	severity: "low",
+	notify: false,
+	permission: "reviews:read",
+	enabled: true,
+	fields: {
+		assetName: assetNameField,
+		assetType: assetTypeField,
+		parentAsset: parentAssetField,
+		reviewId: field(idField("rev"), {
+			label: msg("Review"),
+			description: "The completed review's ID.",
+			display: "code"
+		}),
+		decision: field(ASSET_MODERATION_DECISION_SCHEMA, {
+			label: msg("Decision"),
+			description: "The reviewer's decision.",
+			display: "enum",
+			valueLabels: MODERATION_STATUS_LABELS
+		}),
+		appliedToAsset: field(zod.boolean(), {
+			label: msg("Applied to asset"),
+			description: "Whether the review changed the asset's decision.",
+			display: "text"
+		}),
+		reviewerName: reviewerNameField,
+		note: field(zod.string().nullable(), {
+			label: msg("Note"),
+			description: "The reviewer's note, or null.",
+			display: "text"
+		})
+	},
+	example: {
+		assetName: "beach.jpg",
+		assetType: "image",
+		reviewId: EXAMPLE_IDS.rev,
+		decision: "allowed",
+		appliedToAsset: false,
+		note: null
+	}
+});
 const ASSET_HASH_MATCHED = defineEventType({
 	id: "asset.hash-matched",
 	name: msg("Hash list match"),
@@ -2678,6 +2723,7 @@ const EVENT_TYPE_INFO = {
 	"asset.retried": ASSET_RETRIED,
 	"asset.rerun-requested": ASSET_RERUN_REQUESTED,
 	"asset.review-requested": ASSET_REVIEW_REQUESTED,
+	"asset.review-completed": ASSET_REVIEW_COMPLETED,
 	"asset.hash-matched": ASSET_HASH_MATCHED,
 	"asset.link-flagged": ASSET_LINK_FLAGGED,
 	"usage.free-uploads-exhausted": USAGE_FREE_UPLOADS_EXHAUSTED,

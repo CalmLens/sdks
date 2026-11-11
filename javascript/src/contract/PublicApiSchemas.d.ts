@@ -1,9 +1,9 @@
 import { n as HashListEntry, t as HashList } from "./HashList-B-tYWgXP.js";
 import "./Asset-C5CJR7RH.js";
 import "./AssetPayload-BpPkhqVM.js";
-import { r as TypedEvent } from "./Event-DCDvggBw.js";
+import { r as TypedEvent } from "./Event-Znlk3UP0.js";
 import { t as Folder } from "./Folder-D1CVstEY.js";
-import { o as EventType } from "./EventCatalog-DlEUh7ot.js";
+import { o as EventType } from "./EventCatalog-Cg5nIRoY.js";
 import { t as CursorPage } from "./Page-Bwn9Pb4k.js";
 import "./Lens-CLZcyVve.js";
 import { i as PUBLIC_UPLOAD_PRESET_SCHEMA } from "./ProjectConfiguration-BKGIJfHL.js";
@@ -4144,6 +4144,7 @@ declare const GET_EVENTS_QUERY_SCHEMA: zod.ZodObject<{
     "asset.region-restricted": "asset.region-restricted";
     "asset.rerun-requested": "asset.rerun-requested";
     "asset.retried": "asset.retried";
+    "asset.review-completed": "asset.review-completed";
     "asset.review-requested": "asset.review-requested";
     "asset.uploaded": "asset.uploaded";
     "connector.disabled": "connector.disabled";
