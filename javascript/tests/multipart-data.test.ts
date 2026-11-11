@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   AssetContentOptions,
   CreateMultipartUploadPartOptions,
@@ -15,6 +18,43 @@ import { readUploadForm } from "./upload-form";
 const projectId = "proj_8fK2mQx7Lp4NvB3tRz9Y";
 
 describe("multipart binary field names", () => {
+  test("preserves disk-backed BunFile bytes in direct uploads, first parts and retries", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "calmlens-bunfile-"));
+    const path = join(directory, "input.bin");
+    const bytes = Uint8Array.from([0, 255, 1, 128, 13, 10, 42]);
+    await Bun.write(path, bytes);
+    try {
+      for (const multipart of [false, true]) {
+        const received: Uint8Array[] = [];
+        const client = new CalmLensServerClient({
+          apiKey: "test-api-key",
+          projectId,
+          maxRetries: 1,
+          fetch: async (input, init) => {
+            const request = new Request(input, init);
+            const form = readUploadForm(await request.bytes(), request.headers.get("content-type"));
+            received.push(form.file.bytes);
+            return Response.json(
+              { code: "test/captured" },
+              { status: received.length === 1 ? 503 : 400, headers: { "Retry-After": "0" } },
+            );
+          },
+        });
+        const content = { data: Bun.file(path), type: "application/pdf" };
+        await expect(
+          client.assets.create({
+            name: "disk-backed",
+            idempotencyKey: `bunfile-${multipart}`,
+            ...(multipart ? { part: { ...content, isFinal: true } } : { content }),
+          }),
+        ).rejects.toMatchObject({ code: "test/captured", status: 400 });
+        expect(received).toEqual([bytes, bytes]);
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   test("rejects incorrect declared sizes before sending first or later parts", async () => {
     const requests: unknown[] = [];
     const client = new CalmLensServerClient({

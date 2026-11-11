@@ -138,19 +138,20 @@ const textEncoder = new TextEncoder();
 /**
  * An upload form: `multipart/form-data` with the asset's fields as the JSON `options` part, then
  * the bytes as the `file` part. Asset fields never go in the URL, which proxies and servers log.
- * Bytes stay bytes (React Native can't build a Blob from them), a Blob stays a Blob, and a stream
- * is wrapped so the file is still sent as it is read.
+ * Bytes stay bytes (React Native can't build a Blob from them). Read Blob bytes before composing
+ * the form: Bun's Blob constructor drops disk-backed BunFile parts. Automatic multipart uploads
+ * read only the current part. Streams remain streamed, and buffered bodies remain retryable.
  */
-const toUploadForm = (
+const toUploadForm = async (
   options: Record<string, unknown>,
   payload: AssetBinaryPayloadInput & { type: string },
-): { body: BodyInit; contentType: string } => {
+): Promise<{ body: BodyInit; contentType: string }> => {
   const boundary = `calmlens-${randomUuid()}`;
   const head = `--${boundary}\r\nContent-Disposition: form-data; name="options"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(options)}\r\n--${boundary}\r\nContent-Disposition: form-data; name="file"\r\nContent-Type: ${payload.type.replace(/[\r\n]/g, "")}\r\n\r\n`;
   const tail = `\r\n--${boundary}--\r\n`;
   const contentType = `multipart/form-data; boundary=${boundary}`;
-  const data = toUploadData(payload);
-  if (data instanceof Blob) return { body: new Blob([head, data, tail]), contentType };
+  const input = toUploadData(payload);
+  const data = input instanceof Blob ? new Uint8Array(await input.arrayBuffer()) : input;
   const headBytes = textEncoder.encode(head);
   const tailBytes = textEncoder.encode(tail);
   if (data instanceof Uint8Array) {
@@ -518,7 +519,7 @@ export class CalmLensConnection {
    * goes as a JSON body; other content as an upload form, the asset's fields in its options part
    * and the bytes in its file part. Either way the query holds only transport values.
    */
-  submitUpload(
+  async submitUpload(
     uploadsPath: string,
     options: Exclude<SubmitAssetOptions, { url: string }>,
     wait: boolean,
@@ -573,7 +574,7 @@ export class CalmLensConnection {
       setOptionalQueryValue(query, "sizeInBytes", part.sizeInBytes ?? multipartOptions.sizeInBytes);
       setOptionalQueryValue(query, "totalSizeInBytes", multipartOptions.totalSizeInBytes);
     }
-    const form = toUploadForm(fields, payload);
+    const form = await toUploadForm(fields, payload);
     return this.upload(
       this.url(`${uploadsPath}?${query}`),
       form.body,
