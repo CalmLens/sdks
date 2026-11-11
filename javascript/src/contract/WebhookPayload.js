@@ -304,6 +304,16 @@ const PRODUCTS = {
 		type: "subscription",
 		name: "Image Transformed"
 	},
+	linkChecking: {
+		id: "linkChecking",
+		productId: {
+			local: "prod_calmlens_link_checking",
+			dev: "prod_calmlens_link_checking",
+			main: "prod_calmlens_link_checking"
+		},
+		type: "subscription",
+		name: "Link checking"
+	},
 	websiteIngestion: {
 		id: "websiteIngestion",
 		productId: {
@@ -395,7 +405,7 @@ const PRODUCTS = {
 		name: "Stream Encoding"
 	}
 };
-PRODUCTS.imageTransformed, PRODUCTS.websiteIngestion, PRODUCTS.textClassificationTokens, PRODUCTS.imageClassification, PRODUCTS.assetStorageGb, PRODUCTS.assetSearch, PRODUCTS.assetMediaSearchIndexing, PRODUCTS.assetRead, PRODUCTS.ocrClassification, PRODUCTS.personDetection, PRODUCTS.faceDetection, PRODUCTS.streamEncoding;
+PRODUCTS.imageTransformed, PRODUCTS.websiteIngestion, PRODUCTS.linkChecking, PRODUCTS.textClassificationTokens, PRODUCTS.imageClassification, PRODUCTS.assetStorageGb, PRODUCTS.assetSearch, PRODUCTS.assetMediaSearchIndexing, PRODUCTS.assetRead, PRODUCTS.ocrClassification, PRODUCTS.personDetection, PRODUCTS.faceDetection, PRODUCTS.streamEncoding;
 // packages/shared/src/ProcessingFeatures.ts
 const createFeatureOptionsSchemas = (booleanSchema) => {
 	const enabled = booleanSchema.meta(metaStore([docPropertyInfo({ description: "Whether to run the feature. It runs only when this is true." })]));

@@ -2535,7 +2535,7 @@ final class MockServerClient
 
     /** The API's defaults for the project settings. */
     private const DEFAULT_PROJECT_SETTINGS = ['retainContent' => true, 'optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true, 'storeSensitiveMetadata' => false,
-        'streamingEnabled' => false, 'aiMediaSearchEnabled' => false, 'remoteUrlRule' => null, 'websiteSubmissionsPerMinute' => null];
+        'streamingEnabled' => false, 'aiMediaSearchEnabled' => false, 'linkCheckingEnabled' => false, 'remoteUrlRule' => null, 'websiteSubmissionsPerMinute' => null];
     private const DEFAULT_HUMAN_REVIEW = ['allowedSamplePercent' => 0, 'restrictedSamplePercent' => 0, 'uncertaintyMarginPercent' => 0,
         'reviewMissingEvidence' => false];
 

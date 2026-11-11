@@ -305,7 +305,7 @@ impl Backend {
             "blockUnmoderatedAssets": true,
             "storeSensitiveMetadata": false,
             "streamingEnabled": false,
-            "aiMediaSearchEnabled": false,
+            "aiMediaSearchEnabled": false, "linkCheckingEnabled": false,
             "remoteUrlRule": null,
             "websiteSubmissionsPerMinute": null,
             "humanReview": {

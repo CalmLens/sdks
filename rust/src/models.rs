@@ -5272,6 +5272,9 @@ pub struct ProjectSettings {
     /// Whether audio speech and video frames and transcripts are indexed for AI search.
     #[serde(default)]
     pub ai_media_search_enabled: bool,
+    /// Enable paid link checks. Off by default.
+    #[serde(default)]
+    pub link_checking_enabled: bool,
     /// The domains accepted when content is submitted by URL; `None` accepts every public domain.
     #[serde(default)]
     pub remote_url_rule: Option<RemoteUrlRule>,
@@ -5337,6 +5340,9 @@ pub struct ProjectSettingsDefinition {
     /// unit. Defaults to `false`; images are always searchable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_media_search_enabled: Option<bool>,
+    /// Enable paid link checks. Omitted settings use the default, false.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link_checking_enabled: Option<bool>,
     /// The domains accepted when content is submitted by URL. Left out or null accepts every
     /// public domain.
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
@@ -5361,6 +5367,7 @@ impl From<ProjectSettings> for ProjectSettingsDefinition {
             store_sensitive_metadata: Some(settings.store_sensitive_metadata),
             streaming_enabled: Some(settings.streaming_enabled),
             ai_media_search_enabled: Some(settings.ai_media_search_enabled),
+            link_checking_enabled: Some(settings.link_checking_enabled),
             remote_url_rule: settings.remote_url_rule.map_or(Patch::Null, Patch::Value),
             website_submissions_per_minute: settings
                 .website_submissions_per_minute

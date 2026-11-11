@@ -3367,6 +3367,7 @@
         "blockUnmoderatedAssets": false,
         "storeSensitiveMetadata": false,
         "streamingEnabled": false,
+        "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
         "websiteSubmissionsPerMinute": null,
@@ -3388,7 +3389,8 @@
           "EU"
         ],
         "blockUnmoderatedAssets": false,
-        "remoteUrlRule": null
+        "remoteUrlRule": null,
+        "linkCheckingEnabled": true
       }
     },
     "request": {
@@ -3402,7 +3404,8 @@
             "EU"
           ],
           "blockUnmoderatedAssets": false,
-          "remoteUrlRule": null
+          "remoteUrlRule": null,
+          "linkCheckingEnabled": true
         }
       }
     },
@@ -3417,6 +3420,7 @@
         "blockUnmoderatedAssets": false,
         "storeSensitiveMetadata": false,
         "streamingEnabled": false,
+        "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
         "websiteSubmissionsPerMinute": null,
@@ -3459,6 +3463,7 @@
         "blockUnmoderatedAssets": false,
         "storeSensitiveMetadata": false,
         "streamingEnabled": false,
+        "linkCheckingEnabled": false,
         "aiMediaSearchEnabled": false,
         "remoteUrlRule": null,
         "websiteSubmissionsPerMinute": null,
@@ -13941,6 +13946,7 @@
         ],
         "blockUnmoderatedAssets": true,
         "storeSensitiveMetadata": true,
+        "linkCheckingEnabled": true,
         "streamingEnabled": true,
         "aiMediaSearchEnabled": true,
         "remoteUrlRule": {
@@ -13969,7 +13975,8 @@
           "EU"
         ],
         "blockUnmoderatedAssets": false,
-        "remoteUrlRule": null
+        "remoteUrlRule": null,
+        "linkCheckingEnabled": true
       }
     },
     "request": {
@@ -13983,7 +13990,8 @@
             "EU"
           ],
           "blockUnmoderatedAssets": false,
-          "remoteUrlRule": null
+          "remoteUrlRule": null,
+          "linkCheckingEnabled": true
         }
       }
     },
@@ -13997,6 +14005,7 @@
         ],
         "blockUnmoderatedAssets": true,
         "storeSensitiveMetadata": true,
+        "linkCheckingEnabled": true,
         "streamingEnabled": true,
         "aiMediaSearchEnabled": true,
         "remoteUrlRule": {

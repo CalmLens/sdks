@@ -244,6 +244,7 @@ type ProjectSettings struct {
 	StreamingEnabled bool `json:"streamingEnabled"`
 	// AIMediaSearchEnabled indexes audio speech and video frames and transcripts for AI search.
 	AIMediaSearchEnabled bool `json:"aiMediaSearchEnabled"`
+	LinkCheckingEnabled  bool `json:"linkCheckingEnabled"`
 	// RemoteURLRule restricts the domains accepted by URL; nil accepts every public domain.
 	RemoteURLRule *RemoteURLRule `json:"remoteUrlRule"`
 	// WebsiteSubmissionsPerMinute lowers how many websites the project can submit per minute; nil
@@ -276,6 +277,7 @@ type ProjectSettingsInput struct {
 	// AIMediaSearchEnabled defaults to false. Turning it on needs
 	// UpdateProjectSettingsOptions.SearchIndexingBudgetUnits.
 	AIMediaSearchEnabled *bool `json:"aiMediaSearchEnabled"`
+	LinkCheckingEnabled  *bool `json:"linkCheckingEnabled"`
 	// RemoteURLRule defaults to null, which accepts every public domain.
 	RemoteURLRule Patch[RemoteURLRule] `json:"remoteUrlRule"`
 	// WebsiteSubmissionsPerMinute defaults to null, which uses the platform limit.
@@ -301,6 +303,9 @@ func (s ProjectSettingsInput) MarshalJSON() ([]byte, error) {
 	}
 	if s.StreamingEnabled != nil {
 		body["streamingEnabled"] = *s.StreamingEnabled
+	}
+	if s.LinkCheckingEnabled != nil {
+		body["linkCheckingEnabled"] = *s.LinkCheckingEnabled
 	}
 	if s.AIMediaSearchEnabled != nil {
 		body["aiMediaSearchEnabled"] = *s.AIMediaSearchEnabled

@@ -6,7 +6,7 @@ import { t as Folder } from "./Folder-D1CVstEY.js";
 import { o as EventType } from "./EventCatalog-Cg5nIRoY.js";
 import { t as CursorPage } from "./Page-Bwn9Pb4k.js";
 import "./Lens-CLZcyVve.js";
-import { i as PUBLIC_UPLOAD_PRESET_SCHEMA } from "./ProjectConfiguration-BKGIJfHL.js";
+import { i as PUBLIC_UPLOAD_PRESET_SCHEMA } from "./ProjectConfiguration-DHu8U9cK.js";
 import "./PublicErrorCodes-DW2iVL1b.js";
 import * as zod from "zod";
 declare const GET_FOLDERS_QUERY_SCHEMA: zod.ZodObject<{

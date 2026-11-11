@@ -114,6 +114,7 @@ declare const PUBLIC_PROJECT_SETTINGS_SCHEMA: zod.ZodObject<{
   }>>>;
   blockUnmoderatedAssets: zod.ZodDefault<zod.ZodBoolean>;
   storeSensitiveMetadata: zod.ZodDefault<zod.ZodBoolean>;
+  linkCheckingEnabled: zod.ZodDefault<zod.ZodBoolean>;
   streamingEnabled: zod.ZodDefault<zod.ZodBoolean>;
   aiMediaSearchEnabled: zod.ZodDefault<zod.ZodBoolean>;
   remoteUrlRule: zod.ZodDefault<zod.ZodNullable<zod.ZodObject<{
@@ -142,6 +143,7 @@ declare const PROJECT_SETTINGS_RESOURCE_SCHEMA: zod.ZodObject<{
     }>>>;
     blockUnmoderatedAssets: zod.ZodDefault<zod.ZodBoolean>;
     storeSensitiveMetadata: zod.ZodDefault<zod.ZodBoolean>;
+    linkCheckingEnabled: zod.ZodDefault<zod.ZodBoolean>;
     streamingEnabled: zod.ZodDefault<zod.ZodBoolean>;
     aiMediaSearchEnabled: zod.ZodDefault<zod.ZodBoolean>;
     remoteUrlRule: zod.ZodDefault<zod.ZodNullable<zod.ZodObject<{
@@ -170,6 +172,7 @@ declare const PUT_PROJECT_SETTINGS_BODY_SCHEMA: zod.ZodObject<{
     }>>>;
     blockUnmoderatedAssets: zod.ZodDefault<zod.ZodBoolean>;
     storeSensitiveMetadata: zod.ZodDefault<zod.ZodBoolean>;
+    linkCheckingEnabled: zod.ZodDefault<zod.ZodBoolean>;
     streamingEnabled: zod.ZodDefault<zod.ZodBoolean>;
     aiMediaSearchEnabled: zod.ZodDefault<zod.ZodBoolean>;
     remoteUrlRule: zod.ZodDefault<zod.ZodNullable<zod.ZodObject<{

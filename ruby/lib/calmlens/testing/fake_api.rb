@@ -732,7 +732,7 @@ module CalmLens
       def show_project_settings
         settings = { 'retainContent' => true, 'optOutJurisdictions' => [], 'blockUnmoderatedAssets' => true,
                      'storeSensitiveMetadata' => false,
-                     'streamingEnabled' => false, 'aiMediaSearchEnabled' => false, 'remoteUrlRule' => nil,
+                     'streamingEnabled' => false, 'aiMediaSearchEnabled' => false, 'linkCheckingEnabled' => false, 'remoteUrlRule' => nil,
                      'websiteSubmissionsPerMinute' => nil }.merge(@project_settings)
         settings['humanReview'] = { 'allowedSamplePercent' => 0, 'restrictedSamplePercent' => 0, 'uncertaintyMarginPercent' => 0,
                                     'reviewMissingEvidence' => false }.merge(@project_settings['humanReview'] || {})

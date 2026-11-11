@@ -3250,6 +3250,7 @@ export class MockCalmLensApi {
         storeSensitiveMetadata: false,
         streamingEnabled: false,
         aiMediaSearchEnabled: false,
+        linkCheckingEnabled: false,
         remoteUrlRule: null,
         websiteSubmissionsPerMinute: null,
         ...this.projectSettingsValues,

@@ -1913,6 +1913,7 @@ class PublicProjectSettings(TypedDict):
     #: Index audio speech and video frames and transcripts for AI search. Billed per indexed media
     #: unit.
     aiMediaSearchEnabled: bool
+    linkCheckingEnabled: bool
     #: ``None`` accepts every public domain.
     remoteUrlRule: Optional[RemoteUrlRule]
     #: Lowers how many websites the project can submit per minute; ``None`` uses the platform limit.
@@ -1930,6 +1931,7 @@ class PublicProjectSettingsInput(TypedDict, total=False):
     storeSensitiveMetadata: bool
     streamingEnabled: bool
     aiMediaSearchEnabled: bool
+    linkCheckingEnabled: bool
     remoteUrlRule: Optional[RemoteUrlRule]
     websiteSubmissionsPerMinute: Optional[int]
     humanReview: HumanReviewSettingsInput

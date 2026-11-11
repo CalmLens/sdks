@@ -2520,7 +2520,7 @@ class MockCalmLensServerClient(CalmLensServerClient):
         stored = self._project_settings_values
         return {"projectId": self.project_id, "revision": self._settings_revision, "settings": {
             "retainContent": True, "optOutJurisdictions": [], "blockUnmoderatedAssets": True, "storeSensitiveMetadata": False,
-            "streamingEnabled": False, "aiMediaSearchEnabled": False, "remoteUrlRule": None,
+            "streamingEnabled": False, "aiMediaSearchEnabled": False, "linkCheckingEnabled": False, "remoteUrlRule": None,
             "websiteSubmissionsPerMinute": None, **stored,
             "humanReview": {"allowedSamplePercent": 0, "restrictedSamplePercent": 0, "uncertaintyMarginPercent": 0,
                             "reviewMissingEvidence": False, **(stored.get("humanReview") or {})}}}

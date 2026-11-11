@@ -677,6 +677,7 @@ fn settings_read_convert_to_a_definition_holding_every_setting() {
         "storeSensitiveMetadata": true,
         "streamingEnabled": true,
         "aiMediaSearchEnabled": true,
+        "linkCheckingEnabled": true,
         "remoteUrlRule": null,
         "websiteSubmissionsPerMinute": 5,
         "humanReview": {

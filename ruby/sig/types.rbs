@@ -708,6 +708,7 @@ module CalmLens
     "storeSensitiveMetadata" => bool,
     "streamingEnabled" => bool,
     "aiMediaSearchEnabled" => bool,
+    "linkCheckingEnabled" => bool,
     "remoteUrlRule" => remote_url_rule?,
     "websiteSubmissionsPerMinute" => Integer?,
     "humanReview" => human_review_settings

@@ -251,7 +251,7 @@ func (m *MockServerClient) uploadPresetRoute(method, id, suffix string) (any, er
 func (m *MockServerClient) projectSettings() calmlens.JSON {
 	settings := calmlens.JSON{
 		"retainContent": true, "optOutJurisdictions": []any{}, "blockUnmoderatedAssets": true, "storeSensitiveMetadata": false,
-		"streamingEnabled": false, "aiMediaSearchEnabled": false, "remoteUrlRule": nil, "websiteSubmissionsPerMinute": nil,
+		"streamingEnabled": false, "aiMediaSearchEnabled": false, "linkCheckingEnabled": false, "remoteUrlRule": nil, "websiteSubmissionsPerMinute": nil,
 	}
 	for key, value := range m.config.settings {
 		settings[key] = value

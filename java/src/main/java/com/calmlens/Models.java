@@ -3181,13 +3181,14 @@ public final class Models {
    * @param blockUnmoderatedAssets whether the CDN refuses to serve assets whose moderation is pending
    * @param storeSensitiveMetadata whether uploaded images keep their embedded metadata
    * @param streamingEnabled whether audio and video uploads that keep their content get an adaptive stream
+   * @param linkCheckingEnabled whether paid link checks are enabled
    * @param aiMediaSearchEnabled whether audio and video are indexed for AI search
    * @param remoteUrlRule the domains accepted when content is submitted by URL, or null for every public domain
    * @param websiteSubmissionsPerMinute how many websites the project can submit per minute, or null for the platform limit
    * @param humanReview which automated decisions are sampled into the human review queue
    */
   public record ProjectSettings(Boolean retainContent, List<String> optOutJurisdictions, Boolean blockUnmoderatedAssets, Boolean storeSensitiveMetadata,
-      Boolean streamingEnabled, Boolean aiMediaSearchEnabled, RemoteUrlRule remoteUrlRule, Integer websiteSubmissionsPerMinute,
+      Boolean streamingEnabled, Boolean aiMediaSearchEnabled, Boolean linkCheckingEnabled, RemoteUrlRule remoteUrlRule, Integer websiteSubmissionsPerMinute,
       HumanReviewSettings humanReview) {
     /** Copies collections so the record stays immutable. */
     public ProjectSettings { optOutJurisdictions = list(optOutJurisdictions); }
@@ -3212,6 +3213,7 @@ public final class Models {
     private Boolean storeSensitiveMetadata;
     private Boolean streamingEnabled;
     private Boolean aiMediaSearchEnabled;
+    private Boolean linkCheckingEnabled;
     private Patch<RemoteUrlRule> remoteUrlRule;
     private Patch<Integer> websiteSubmissionsPerMinute;
     private HumanReviewSettings humanReview;
@@ -3225,6 +3227,8 @@ public final class Models {
     /** @param value whether audio and video uploads that keep their content get an adaptive stream (default false) @return these settings */
     public ProjectSettingsInput streamingEnabled(Boolean value) { streamingEnabled = value; return this; }
     /** @param value whether audio and video are indexed for AI search (default false) @return these settings */
+    /** @param value whether to enable paid link checks @return these settings */
+    public ProjectSettingsInput linkCheckingEnabled(Boolean value) { linkCheckingEnabled = value; return this; }
     public ProjectSettingsInput aiMediaSearchEnabled(Boolean value) { aiMediaSearchEnabled = value; return this; }
     /** @param value the domains accepted when content is submitted by URL; null accepts every public domain @return these settings */
     public ProjectSettingsInput remoteUrlRule(RemoteUrlRule value) { remoteUrlRule = patch(value); return this; }
