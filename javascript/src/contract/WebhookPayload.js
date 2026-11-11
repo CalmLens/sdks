@@ -1478,7 +1478,6 @@ STORED_ASSET_SCHEMA.pick({
 				} },
 				flaggedCategories: [],
 				regions: [],
-				linkSafety: null,
 				raw: {
 					categories: Object.fromEntries(CLASSIFICATION_CATEGORIES.map((category) => [category, {
 						status: "evaluated",
