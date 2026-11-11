@@ -1,3 +1,9 @@
+## 0.25.0
+
+### Minor Changes
+
+- d836147: Support the `asset.review-completed` event for both confirmed and changed review decisions. Its facts identify the review, decision, reviewer and whether the decision was applied to the asset.
+
 ## 0.24.0
 
 ### Minor Changes
@@ -24,6 +30,7 @@
 - 9447a44: The mock matches CalmLens in more places. A private asset fetched with `fetchCdn`, without a grant or the API key, returns `404 asset/not-found` whatever its state. Each result in `classification.moderation.categories` includes `settings` and `source`. API-key uploads naming `uploadPresetId` take the preset's visibility, folder and processing options, keep to its type and size limits, and are refused for an unknown or paused preset or a visibility or folder that differs from the preset's. `mockDecision(status).pendingReview(reason, uncertainCategories?)` leaves a decision waiting for human review; `decide` clears it and `assets.decide` leaves it.
 
   `active` is optional in `ensureLens`, `ensureLenses` and `lenses.create`, and defaults to true. The `germany` test input preset has no category instances and an explicit block in Germany, as the testing guide describes; the `hate.regional-symbol` signal still sends a hate-symbol instance. An API key that can't be sent in a header, one with spaces or line breaks, now fails with `sdk/invalid-config` when the client is created.
+
 - 928edde: Image transform options list only what the CDN accepts, and any other option fails locally with `sdk/invalid-argument`.
 
 ### Patch Changes
@@ -44,6 +51,7 @@
   `MockCalmLensServerClient`'s `assets.waitForDecision` accepts `signal`, as the real client does, and stops with `sdk/cancelled` when it aborts. `withRequestOptions` on a mock client keeps answering from the in-memory API.
 
   `json-schema-to-ts` is no longer installed with the package; it was only used to build it.
+
 - 1d9a0d0: Uploads no longer put asset fields in the URL. Text is sent as a JSON body, and files and first multipart parts as a `multipart/form-data` upload form: the name, description, metadata, tags, author, conversation context, external IDs, folder, upload preset and processing options go in its `options` part and the bytes in its `file` part, so none of them appear in proxy, CDN or server logs. The query string holds only `wait`, `contentType`, sizes and part numbers. The offline mock reads uploads the same way and refuses asset fields in a query string with `upload/options-in-query`, as the API does.
 
 ### Patch Changes
@@ -57,6 +65,7 @@
 - b6cd3f9: `API_ERROR_CODES.ASSET_CHILD_NOT_DELETABLE` (`asset/child-not-deletable`, HTTP 409) is returned when `assets.delete` or an `assets.batch` deletion names an asset extracted from another (one with a `parentId`): delete the asset it was extracted from instead, which deletes it too.
 
   `assets.explain` with `rerun: true` now returns the asset unchanged and records an `asset.rerun-requested` event, whose `moderation-status` fact is the asset's current status. The asset keeps its decision until the re-run's `asset.classified` and `asset.<status>` events report the new one, and a failed re-run keeps it. The mock client does the same: a `pending` re-run decision keeps the asset's decision until `completeProcessing` decides it.
+
 - febbe1f: One URL per asset, and `CalmLensAsset`, which shows any asset from it.
   - `cdn.getAssetUrl({ projectId?, assetId | externalId, resource?, lens?, transform?, viewerClaims? })` builds an asset's CDN URL without a request, on the server client and on `CalmLensAppClient` (which takes `projectId` and `cdnBaseUrl` options for it). Without `resource` it returns the asset URL, which every resource is a path beneath; with one, that resource's URL. `externalId` names the asset by the ID it was uploaded with (`ext:` in the URL). A lens or transform needs a resource that takes one (`rendered` or `preview`). Viewer claims are a query, left out when they are the defaults. The new `info` resource is the asset's display info.
   - `cdn.signAssetUrl({ assetId | externalId, expiresIn?, original?, resource?, lens?, transform?, viewerClaims?, projectId? })` signs a private asset's URL on your server and returns `{ url, expiresAt }`: every resource is a path beneath it, `/original` only with `original: true`. Resources, lenses, transforms and viewer claims are appended as `getAssetUrl` appends them and aren't part of the signature. It replaces `assets.createSignedUrl`, which is removed with the standalone `getAssetUrl` export, `SIGNED_CDN_RESOURCES` and the `SignedUrl`, `SignedCdnResource`, `CreateAssetSignedUrlOptions` and `GetAssetUrlOptions` types.
@@ -150,6 +159,7 @@
 - d2278ac: The events list response includes `excludedTypes` in every SDK: the event types the API key lacks the permission to receive (`ExcludedTypes` in Go, `excluded_types` in Rust, `excludedTypes()` in Java). Each SDK's offline mock returns an empty list, because its key holds every permission.
 
   `CalmLensServerClient` and `CalmLensAppClient` in the JavaScript SDK refuse an option a method doesn't take, such as a misspelt `externalId`, with `sdk/invalid-argument` naming the key before sending anything, as the Ruby, PHP and Python SDKs do. The app client also refuses options its upload preset sets, such as `folderId`.
+
 - ce8ff47: `events.list` returns `excludedTypes`, the event types the API key lacks the permission to receive. `calmlens listen` warns about them when it starts, instead of printing "Event types: all" and leaving them out silently.
 - df1539e: Breaking: a transform is now one set of image options, applied in one pass. Pass the options themselves, such as `{ width: 1024, format: "png" }`, where you passed `{ type: "imageTransform", options: { ... } }` or a list of steps; lenses take `transform` options in place of a `transforms` list. CDN URLs put a lens and its extra options in one path segment, such as `/rendered/@thumbnail,width=64`, and options in the URL replace the lens's own. Selector strings containing `/` or starting with `@` are refused with `sdk/invalid-argument`.
 - 230efd9: The PHP SDK works with Guzzle 7 and Guzzle 8 (with Guzzle PSR-7 2 or 3 and Guzzle Promises 2 or 3), so it installs in Laravel 13 applications.
@@ -159,6 +169,7 @@
   Every SDK refuses one-request content whose size it knows and that is over the upload limit with `upload/file-too-large` before sending it: images over 10 MiB, audio and video over 50 MiB and other files over 5,000 MiB. Every SDK's error codes include `image/invalid-input`, `image/unsupported-format` and `image/input-limit`.
 
   The JavaScript SDK's main, `/server` and `/app` entry points load no other package at runtime, so `calmlens/app` works from an import map without a bundler.
+
 - a70206c: Generate signed test inputs in every SDK: text codes for a scenario, preset or category, and audio and video test phrases, from a project's test input key. Python `calmlens.testing.generate_test_text_code` and `generate_media_test_code`; Go `calmlenstest.GenerateTestTextCode` and `GenerateMediaTestCode`; Rust `calmlens::testing::generate_test_text_code` and `generate_media_test_code`; Ruby `CalmLens::TestInputs.generate_text_code` and `generate_media_code`; Java `TestInputs.generateTestTextCode` and `generateMediaTestCode`; PHP `CalmLens\Testing\TestInputs::generateTestTextCode` and `generateMediaTestCode`. Each SDK produces the same codes as the JavaScript SDK's `calmlens/test-inputs` and rejects invalid scenarios with `sdk/invalid-argument`.
 
 ### Patch Changes
@@ -200,10 +211,12 @@ No changes in this release.
   Uploads take `processingOptions.storeSensitiveMetadata`, which overrides the project's `storeSensitiveMetadata` setting. It is off by default: embedded image metadata (EXIF, XMP and IPTC) is removed before the image is stored, `checksums` and `sizeInBytes` describe the stored file, and `fileMetadata` leaves out `creator` and `location`. When it is on, the image is stored as uploaded and `fileMetadata` includes them.
 
   The in-memory mocks give assets `fileMetadata: null`. The SDKs export `FileMetadata` and `FileMetadataLocation` types (Go, Java, Rust and Python; JavaScript exports `FileMetadata`), and the typed processing options gain `storeSensitiveMetadata`.
+
 - e460921: Breaking: an asset's picture is one field, `content.image`, with `width`, `height`, `thumbhash`, `averageColor` and `perceptualHash`. It replaces `content.image` (size and perceptual hash) and `content.previewImage`. For images, the width and height are the original upload's. For documents and websites, they are the page image's. The JavaScript SDK exports the `AssetImage` type, which replaces `ImageData` and `PreviewImage`. `CalmLensMedia` sizes itself and shows its placeholder colour from `content.image`.
 - 11d0d81: CDN URL builders take a `placeholder` resource: a small blurred PNG of the asset that the CDN serves publicly for every asset, private ones included, whatever its moderation status, for example in place of an age-restricted image. It takes no lens, transform or `ageConfirmed`, and passing one is rejected with `sdk/invalid-argument`, as is an unknown resource.
 
   The JavaScript SDK exports `getAssetUrl` from `@calmlens/sdk/app` and `@calmlens/sdk`. It builds the same CDN URLs as the server client's `cdn.getAssetUrl` from a project ID, with no API key and no request, so it works in browsers.
+
 - 22bbbba: Breaking: the UI components no longer add their stylesheet to the page at runtime. The React components render it with them, and React places it in the page's head once, including when rendering on the server, so React 19 or later is required. With Vue, Svelte or the web components, import `@calmlens/sdk/styles.css` once. `injectCalmLensStyles` is removed, and `unstyled` is now a React-only prop.
 - 33e0087: Read `automatedAction`, `source`, `rule`, `flaggedCategories`, `regions` and policy-adjusted `categories` directly from `classification.moderation`. Detection findings move into `moderation.raw`, and `explanationComplete` replaces `policy.evidence`. Allowed automated actions are explicitly `allow`. The `policy` and `decision` wrappers and aggregate moderation scores are removed. Offline mock responses use the same structure. Go preserves the moderation response's complete JSON in `Extra`, reserving `Raw` for detection findings.
 - 8cc1cae: Add `client.assets.batch({ assetIds, operation })`, which deletes up to 500 assets (`"delete"`) or removes their stored content (`"remove-content"`) in one request and resolves with `{ queued: true }`. It sends `POST /projects/:projectId/assets/batch`. Every asset must exist in the project and the API key needs `assets:delete` for its folder, or the request fails (`asset/not-found`, `auth/permission-denied`) and nothing is queued; once queued, the work runs in the background and records `asset.deleted` or `asset.content-removed` for each asset. The method refuses an empty list, more than 500 IDs, an empty ID or an unknown operation with `sdk/invalid-argument` before sending, and is not retried. The new `auth/permission-denied` error code is available as a constant. The `AssetBatchOperation`, `BatchAssetsOptions` and `BatchAssetsResponse` types are exported. `MockCalmLensServerClient` validates the batch like the API and applies it at once.
@@ -247,6 +260,7 @@ No changes in this release.
   Waiting for a decision returns once the status is no longer `pending`. Mock clients take the new statuses as outcomes, and `purged` removes the content.
 
   CDN URL builders take an `ageConfirmed` option that adds `ageConfirmed=true`, so a public age-restricted asset can be served from its public URL where your app has already decided the viewer may see it. Without it, age-restricted assets need a signed URL or an API key.
+
 - dd08099: CalmLens IDs now name the kind of object they identify: a prefix, an underscore and 20 letters and digits, such as `proj_8fK2mQx7Lp4NvB3tRz9Y` for a project, `asset_5Gm2Rk8XqT3wLp9VbN4c` for an asset and `fldr_7Nc4Wq2Lm8Xt5Rk9Bv3P` for a folder. The in-memory mocks mint IDs the same way, and their ID option (`createId`, `create_id` or `CreateID`) now receives the prefix of the object it names (`asset`, `fldr`, `hl`, `hle`, `lens`, `evt` or `rev`). The mocks' `assets.batch` refuses an ID that is not an asset ID with `validation/invalid-format`, as the API does.
 - 3c4817f: `@calmlens/sdk/react-native` has `CalmLensUploader`, `CalmLensMedia` and `useCalmLensUpload` for React Native and Expo apps, built on the same upload queue, messages and media states as the web components and with no native modules. The uploader takes a `pick` function that opens your app's picker, such as `expo-image-picker`, and a `theme` for its colours and corner radius. The media component loads the width in `widths` that covers its measured size, and hands video and audio to your player through `renderPlayer`.
 
@@ -255,6 +269,7 @@ No changes in this release.
   `resolveTheme` and `CALMLENS_THEME` hold the components' default colours, and `pickMediaSource` picks an image width for a measured box, for building your own components.
 
   `retry` checks an upload again, with the token it was uploaded with, when the upload finished but its status check failed, instead of uploading the file again as a new asset. It also checks a finished upload that is still `pending` again.
+
 - af0bb68: Uploads no longer take `processingOptions.flaggedContentPolicy`: the project's moderation policy decides every asset, with its allowances and restrictions. The typed processing options drop it (Go, Java, Python, Ruby and Rust remove the `FlaggedContentPolicy` type), and `classification.moderation.source` no longer reports `asset-override` (Go drops `DecisionSourceAssetOverride`). JavaScript exports the policy action type as `PolicyAction` instead of `FlaggedContentAction`.
 - 64e9180: Asset reviews no longer include `reviewerUserId`, and hash lists and hash list entries no longer include `createdByUserId`.
 - adc7d6a: Use one authenticated test-input format for presets and custom combinations of category instances, qualifiers, confidence scores and missing evidence. `generateTestTextCode` and `paintTestImage` accept the same input object; image generation returns compact square RGBA pixels with their dimensions. Regenerate older fixed-category samples. Normal project policy and jurisdiction rules determine every outcome.
@@ -265,6 +280,7 @@ No changes in this release.
   `CalmLensUploader` uploads through an upload preset or your own `upload` function, shows byte progress, waits for the moderation decision and shows a message for each outcome and error code. `CalmLensMedia` serves an asset's rendered image from the CDN, in the format the browser accepts, with `srcset` widths and a blurred placeholder, takes either an asset from the API or its project and ID, keeps age-restricted assets behind the placeholder and a reveal button until `ageConfirmed` is set, and shows an unavailable notice for blocked and purged assets. The stylesheet is also published as `@calmlens/sdk/styles.css`.
 
   `@calmlens/sdk/testing` adds `MockCalmLensAppClient`, which applies upload preset rules and stores uploads in a `MockCalmLensServerClient`. The mock server client's `queuedOutcome` and `analyzedOutcome` accept a function of the asset, and its `cdn.serve` refuses blocked assets and serves placeholders whatever the moderation status, as the CDN does.
+
 - d815f4c: The upload widget shows a file-type icon, coloured by kind of file and labelled with its extension, for files without an image preview. The icons are also available on their own from `@calmlens/sdk/file-icons` (`getFileIcon`, `renderFileIconSvg` and the families' colours and paths), so apps can show files the same way elsewhere. `UploadItemView.extension` is replaced by `fileIcon`, the icon's SVG markup. The focus ring is themeable with `--calmlens-focus-ring`, `--calmlens-focus-width` and `--calmlens-focus-offset`, and outlined buttons tint with the accent colour on hover.
 - 4521e35: The upload widget can wait to upload: with `autoUpload: false` (the `no-auto-upload` attribute on the web component), picked files stay in a new `selected` stage until you call `start()` on the upload controller, for example when a form is submitted. Pass `controller` (from `useCalmLensUpload` or `createUploadController`) to show a queue your app owns, so it can read the picked files and start or clear them; the upload options then come from that controller. An uploader that takes one file now replaces its drop zone with the picked file and a "Choose another" button. The drop zone has a new look with an outlined picker button, and the new messages are `chooseFile`, `chooseAnother` and `selected`. The default `dropzoneTitle` and `chooseFiles` text changed.
 - 17cdb9b: CDN methods, signed URL creation and media widgets accept optional `viewerClaims` containing `region` and `ageConfirmed`. These replace the separate region and age options. The CDN defaults to the connecting country and no age confirmation, including authenticated requests. Customers determine the assertions; CalmLens applies content restrictions without independently verifying them.
@@ -277,6 +293,7 @@ No changes in this release.
 - 92bf5db: Timeouts are retried like network failures: reads, and creates and uploads with an `Idempotency-Key`, are sent again after `sdk/timeout`, up to `maxRetries`. `error.isRetryable()` is now true for `sdk/timeout`, including `waitForDecision`'s deadline, and stays false for `sdk/cancelled`.
 
   `MockCalmLensServerClient` now behaves more like the API: `assets.search` runs the API's keyword search, with every word matched against the name, ID, external ID, description, tags, type, content format or extension and moderation status, and returns the API's scores and `matchedFields`; `assets.list` filters accept parentheses; and assets created in a row get increasing `createdAt` values.
+
 - e4e9894: `CalmLensMedia` shows the CDN placeholder for private assets and signed URLs too, since the CDN serves every asset's placeholder publicly. It sends only viewer claims that differ from the defaults (a `region`, or `ageConfirmed: true`), so `ageConfirmed: false` no longer makes the CDN's responses private and uncacheable, and placeholder URLs carry only the region. The mock clients serve private assets' placeholders without `assets:download`, as the CDN does.
 - 01ce2c7: `CalmLensMedia` shows its unavailable notice, without requesting anything from the CDN, for an `asset` whose `content.status` is `removed`. Set `contentRemoved` to do the same without passing an asset.
 - 4dc28f3: `CalmLensMedia` no longer requests a `rendered` poster or a CDN placeholder for video and audio, which the CDN doesn't render. Videos play their original file without a poster, and the CDN placeholder is used only for images.

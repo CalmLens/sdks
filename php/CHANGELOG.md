@@ -1,5 +1,11 @@
 # @calmlens/sdk-php
 
+## 0.25.0
+
+### Minor Changes
+
+- d836147: Support the `asset.review-completed` event for both confirmed and changed review decisions. Its facts identify the review, decision, reviewer and whether the decision was applied to the asset.
+
 ## 0.24.0
 
 ### Minor Changes
@@ -30,6 +36,7 @@
   `TestInputs::PRESETS['germany']` is now `['regionalActions' => [['region' => 'DE', 'action' => 'block']], 'instances' => []]`. The `hate.regional-symbol` signal still stands for the hate instance with qualifiers `hate-symbol` and `hate-nazi-symbols-public-display`.
 
   Test input keys no longer appear in stack traces: `TestInputs::generateTestTextCode`, `paintTestImage` and `generateMediaTestCode` mark them with `#[\SensitiveParameter]`.
+
 - 928edde: Image transform options list only what the CDN accepts, and any other option fails locally with `sdk/invalid-argument`.
 
 ### Patch Changes
@@ -47,6 +54,7 @@
 - 52cfb90: Exceptions raised by the SDK itself, with no HTTP response, report `isLocal()` as `true`. That covers invalid arguments and options, content checked before it is sent (such as `upload/unsupported-type` for an unsupported type), timeouts and connection failures. They carry the code the API would use, with `status` and `requestId` null, so branch on `errorCode`.
 
   The Packagist page shows the PHP SDK's own README.
+
 - 1d9a0d0: Uploads no longer put asset fields in the URL. Text is sent as a JSON body, and files and first multipart parts as a `multipart/form-data` upload form: the name, description, metadata, tags, author, conversation context, external IDs, folder, upload preset and processing options go in its `options` part and the bytes in its `file` part, so none of them appear in proxy, CDN or server logs. The query string holds only `wait`, `contentType`, sizes and part numbers. The offline mock reads uploads the same way and refuses asset fields in a query string with `upload/options-in-query`, as the API does.
 
 ### Patch Changes
@@ -60,6 +68,7 @@
 - b6cd3f9: `ErrorCodes::ASSET_CHILD_NOT_DELETABLE` (`asset/child-not-deletable`, HTTP 409) is thrown when `assets->delete()` or an `assets->batch()` deletion names an asset extracted from another (one with a `parentId`): delete the asset it was extracted from instead, which deletes it too.
 
   `assets->explain()` with `'rerun' => true` now returns the asset unchanged and records an `asset.rerun-requested` event, whose `moderation-status` fact is the asset's current status. The asset keeps its decision until the re-run's `asset.classified` and `asset.<status>` events report the new one, and a failed re-run keeps it. `MockServerClient` does the same: a `pending` re-run decision keeps the asset's decision until `completeProcessing` decides it.
+
 - f74988a: One URL per asset: every CDN resource is a path beneath it, signed or not.
   - `$client->cdn->getAssetUrl([...])` returns the asset URL itself, `{cdnBaseUrl}/assets/{projectId}/{asset}`, when no `resource` is given, and a resource URL beneath it otherwise. Name the asset by exactly one of `assetId` and `externalId` (the external ID it was uploaded with, written `ext:` and the URL-encoded ID); `projectId` defaults to the client's project. `assetIdentifier` is removed, and a `lens` or `transform` without a resource fails with `sdk/invalid-argument`. Viewer claims leave out their defaults: a `region` only when set, which must be a country code, and `ageConfirmed` only when true.
   - `$client->cdn->signAssetUrl([...])` replaces `$client->assets->createSignedUrl`. It signs a private asset's URL (by `assetId` or `externalId`, with an optional `projectId`) for `expiresIn` seconds, from 1 to `Cdn::MAX_SIGNED_URL_EXPIRES_IN` (24 hours; `Cdn::DEFAULT_SIGNED_URL_EXPIRES_IN`, 15 minutes, when omitted), and returns `['url' => ..., 'expiresAt' => ...]`. Every resource is served beneath the signed URL; the original only when signed with `'original' => true`. `resource`, `lens`, `transform` and `viewerClaims` aren't signed: they are appended as `getAssetUrl` appends them. `Assets::MAX_SIGNED_URL_SECONDS` and `Assets::DEFAULT_SIGNED_URL_SECONDS` are removed.
@@ -102,6 +111,7 @@
   `MockServerClient` serves the timeline at the project path (always empty, refusing any cursor with `validation/invalid-cursor`, and a safety-held asset with `asset/safety-held`), gives mock assets a `null` progress and moderation timeline, and reports each asset type's rendered file and preview as the API does, at upload and once decided. Removing or purging content clears `rendered`, `preview`, `extractedText` and `metadata`; a safety hold withholds the rendered file and preview and makes every CDN resource, the placeholder included, return 403 `asset/not-available`. Its CDN serves the upload as the rendered file (with the rendered format as `Content-Type`) and as an image's preview, refuses a resource the asset doesn't have with 404 `asset/no-rendered-version`, and refuses a signed URL for any other resource with `validation/invalid-value`.
 
   Audio and video can be up to 2 GiB when sent in parts, whether `assets->create` and `assets->classify` split a large file or you use the multipart part API; one request still takes up to 50 MiB. Before billing is set up, the API keeps every audio and video upload to 50 MiB and answers `upload/file-too-large`.
+
 - 401e477: `MockServerClient` filters assets like the API: only the documented asset fields and the `==`, `!=`, `>`, `>=`, `<`, `<=`, `=in=` and `=out=` operators, with any other field or operator, such as `=like=` or `=gt=`, refused with `validation/invalid-filter` (HTTP 400). `*` wildcards ignore case, a number field needs a number, and a comparison never matches a missing value. Ordering by a field other than `createdAt` or `id` is refused with `validation/invalid-value`. `assets->list()` includes child assets, as the API does.
 - 4bcaf59: `MockServerClient` filters `tags` like the API: only `=in=`, an asset with any of the tags, and `=out=`, an asset with none of them, including one without tags. Any other operator on `tags`, such as `tags==homepage`, is refused with `validation/invalid-filter` (HTTP 400).
 - 1b0605f: Moderation outcomes are reported as statuses, reviews no longer carry personal data, and uploads take tags.
@@ -122,6 +132,7 @@
   `content.hls` describes the stream once one is prepared (its `renditions`, each with `kind`, `width`, `height`, `bandwidth` and `codecs`), and is `null` for other assets, until then, once the content is removed and while the asset is held. `processingOptions.features.streaming` (`['enabled' => bool]`) turns streaming on or off for an upload; left out, the project's setting decides.
 
   `MockServerClient` prepares no stream, so `content.hls` is `null` and it answers 404 `asset/no-rendered-version` for the `hls` resource; it serves an embed page (`text/html`) for every asset it may deliver.
+
 - f5c796b: Test scenarios can declare person and face detection results: `detections['people']` and `detections['faces']` list boxes (`[left, top, width, height]` in basis points of the image, 0 to 10000) with an optional `confidence` (0 to 100), each face optionally with an `age` (`'adult'`, `'minor'` or `['low' => …, 'high' => …]`), or `'unavailable'` to report the feature as not evaluated. A list holds at most 32 entries, and `TestInputs` throws `InvalidArgumentException` (`sdk/invalid-argument`) for anything else. `TestInputs::PRESETS` adds `oneFace`, `noFace`, `adultFace`, `minorFace` and `group`, and `Classification` adds `TEST_DETECTIONS_MAX`, `TEST_DETECTION_BOX_MAX`, `TEST_FACE_AGE_MAX` and `TEST_FACE_AGE_PRESETS`. Assets and event snapshots carry `classification.testInput`, and `MockServerClient` reports the person and face detection an image upload turned on, finding nobody, and never marks an asset as a test input.
 - d9b5400: Text codes and test images from `TestInputs::generateTestTextCode` and `paintTestImage` now use the current signed format, which CalmLens requires. CalmLens recognises a text code only as the whole submitted text, and a test image only as the whole upload, in projects with "Recognise test inputs" turned on. Codes and images made by earlier versions are no longer recognised.
 
@@ -136,6 +147,7 @@
   An option given as `null` (`None` in Python, `nil` in Ruby) is left out of the request, as if omitted, unless the API takes `null` for it, such as `description` to clear it or `folderId` for the project root. Passing `viewer_claims=None` to `create_signed_url` now works. In Java and Rust, `UpdateAsset`'s name is a plain optional string, since a name can't be cleared.
 
   The mock clients answer more like the API: they refuse `metadata` that isn't a list of `{ id, value }` items and `null` for fields the API refuses it for with the same `validation/...` error, refuse the same upload types, and their CDN refuses a transform it can't read (`asset/invalid-transform`) or whose options are invalid (`asset/invalid-transform-options`).
+
 - 244ef8e: The `moderate` callable's `MockModerationInput` holds the stored content in `content`, a `CalmLens\Testing\MockModerationContent` with `bytes` and `text`, in place of its own `bytes` and `text` properties. `MockTransport::client()` uses `project-1` by default, as `MockServerClient` does. `failNextRequest` throws `sdk/invalid-argument` for `details` or `retryAfter` with a transport error, a timeout or an exception, which they don't apply to, and for an `operation` the client doesn't have.
 
 ## 0.19.0
@@ -146,6 +158,7 @@
 - d2278ac: The events list response includes `excludedTypes` in every SDK: the event types the API key lacks the permission to receive (`ExcludedTypes` in Go, `excluded_types` in Rust, `excludedTypes()` in Java). Each SDK's offline mock returns an empty list, because its key holds every permission.
 
   `CalmLensServerClient` and `CalmLensAppClient` in the JavaScript SDK refuse an option a method doesn't take, such as a misspelt `externalId`, with `sdk/invalid-argument` naming the key before sending anything, as the Ruby, PHP and Python SDKs do. The app client also refuses options its upload preset sets, such as `folderId`.
+
 - df1539e: Breaking: a transform is now one set of image options, applied in one pass. Pass the options themselves, such as `{ width: 1024, format: "png" }`, where you passed `{ type: "imageTransform", options: { ... } }` or a list of steps; lenses take `transform` options in place of a `transforms` list. CDN URLs put a lens and its extra options in one path segment, such as `/rendered/@thumbnail,width=64`, and options in the URL replace the lens's own. Selector strings containing `/` or starting with `@` are refused with `sdk/invalid-argument`.
 - 230efd9: The PHP SDK works with Guzzle 7 and Guzzle 8 (with Guzzle PSR-7 2 or 3 and Guzzle Promises 2 or 3), so it installs in Laravel 13 applications.
 
@@ -154,6 +167,7 @@
   Every SDK refuses one-request content whose size it knows and that is over the upload limit with `upload/file-too-large` before sending it: images over 10 MiB, audio and video over 50 MiB and other files over 5,000 MiB. Every SDK's error codes include `image/invalid-input`, `image/unsupported-format` and `image/input-limit`.
 
   The JavaScript SDK's main, `/server` and `/app` entry points load no other package at runtime, so `calmlens/app` works from an import map without a bundler.
+
 - 9abfeaa: Paint signed test images in every SDK: a scenario, preset or signal becomes a test image that survives JPEG, WebP and resizing, returned as PNG bytes ready to upload together with its RGBA pixels. Python `calmlens.testing.paint_test_image`; Go `calmlenstest.PaintTestImage`; Rust `calmlens::testing::paint_test_image`; Ruby `CalmLens::TestInputs.paint_image`; Java `TestInputs.paintTestImage`; PHP `CalmLens\Testing\TestInputs::paintTestImage`. Each SDK paints the same pixels as the JavaScript SDK's `paintTestImage` and rejects a scenario too large for a test image with `sdk/invalid-argument`.
 - a70206c: Generate signed test inputs in every SDK: text codes for a scenario, preset or category, and audio and video test phrases, from a project's test input key. Python `calmlens.testing.generate_test_text_code` and `generate_media_test_code`; Go `calmlenstest.GenerateTestTextCode` and `GenerateMediaTestCode`; Rust `calmlens::testing::generate_test_text_code` and `generate_media_test_code`; Ruby `CalmLens::TestInputs.generate_text_code` and `generate_media_code`; Java `TestInputs.generateTestTextCode` and `generateMediaTestCode`; PHP `CalmLens\Testing\TestInputs::generateTestTextCode` and `generateMediaTestCode`. Each SDK produces the same codes as the JavaScript SDK's `calmlens/test-inputs` and rejects invalid scenarios with `sdk/invalid-argument`.
 
@@ -197,6 +211,7 @@ No changes in this release.
   Uploads take `processingOptions.storeSensitiveMetadata`, which overrides the project's `storeSensitiveMetadata` setting. It is off by default: embedded image metadata (EXIF, XMP and IPTC) is removed before the image is stored, `checksums` and `sizeInBytes` describe the stored file, and `fileMetadata` leaves out `creator` and `location`. When it is on, the image is stored as uploaded and `fileMetadata` includes them.
 
   The in-memory mocks give assets `fileMetadata: null`. The SDKs export `FileMetadata` and `FileMetadataLocation` types (Go, Java, Rust and Python; JavaScript exports `FileMetadata`), and the typed processing options gain `storeSensitiveMetadata`.
+
 - 33e0087: Read `automatedAction`, `source`, `rule`, `flaggedCategories`, `regions` and policy-adjusted `categories` directly from `classification.moderation`. Detection findings move into `moderation.raw`, and `explanationComplete` replaces `policy.evidence`. Allowed automated actions are explicitly `allow`. The `policy` and `decision` wrappers and aggregate moderation scores are removed. Offline mock responses use the same structure. Go preserves the moderation response's complete JSON in `Extra`, reserving `Raw` for detection findings.
 - 7fa8620: `Lens` no longer includes `userId`.
 - 8cc1cae: Add `$client->assets->batch(['assetIds' => [...], 'operation' => ...])`, which deletes up to 500 assets (`Assets::BATCH_DELETE`) or removes their stored content (`Assets::BATCH_REMOVE_CONTENT`) in one request and returns `['queued' => true]`. It sends `POST /projects/:projectId/assets/batch`. Every asset must exist in the project and the API key needs `assets:delete` for its folder, or the request fails (`asset/not-found`, `auth/permission-denied`) and nothing is queued; once queued, the work runs in the background and records `asset.deleted` or `asset.content-removed` for each asset. The method refuses an empty list, more than 500 IDs, an empty ID or an unknown operation with `sdk/invalid-argument` before sending, and is not retried. The new `auth/permission-denied` error code is available as a constant. `MockServerClient` validates the batch like the API and applies it at once.
@@ -209,6 +224,7 @@ No changes in this release.
   Webhooks gain `Webhooks::createHeaders` and `Webhooks::toPayload` for testing receivers, `SIGNATURE_TOLERANCE_SECONDS`, and a `headers` argument to `verify` and `parseEvent` that reads the signature and timestamp from request headers or `$_SERVER`.
 
   `MockServerClient` now emulates folders, search, child listings, multipart uploads, idempotency keys and RSQL filters with `,`, wildcards and value lists. `failNextRequest` simulates connection failures, timeouts and API errors, `createApiKey` builds keys whose grants decide CDN downloads, `maxRetries` enables retries, and waits advance a virtual clock instead of sleeping.
+
 - c4c3a79: `ServerClient` takes `maxResponseBytes` (32 MiB by default) and `uploadTimeout` (seconds per binary upload attempt; none by default), also accepted in `requestOptions`, and its defaults are constants on `ServerClient`. A response whose declared `Content-Length` exceeds `maxResponseBytes` fails with `sdk/response-too-large` before its body is read. Retries now wait half the exponential backoff plus a random part of the other half; `Retry-After: 0` retries at once, `cdn->serve` retries like other reads and returns the last response, and timeouts are retried. A redirect fails with `sdk/http-error`, its status and request ID, `cdn->serve` included, and is never followed or retried. Transport errors no longer carry `details['network']`, and API errors carry only the API's details and `traceId`. Uploads answered with something other than an asset fail with `sdk/invalid-response`. A non-seekable file stream may leave out `sizeInBytes`. The API, not the client, now checks idempotency key characters, so those failures carry the API's code and status; like every HTTP request, a key is sent without surrounding whitespace. `assets->each`, `eachChild` and `events->eachPage` stop at an empty asset page and fail with `sdk/invalid-response` (with `details['cursor']`) without yielding a page that repeats a cursor already sent. `waitForDecision` polls with the client's usual retries and request deadline. Webhook helpers join repeated signature headers with `,`, and `parseEvent` checks the types of known `data` fields. The User-Agent now names the PHP runtime. `MockServerClient` adds `setApiKeyGrants`, `signUploadToken` for exact tokens at a fixed clock and nonce, and `failNextRequest` with an API error code and a client method to target; it records `asset.deleted`, `asset.content-removed` and `asset.retried` events, serves a ThumbHash placeholder PNG for classified images, sets the CDN's `Cache-Tag`, protection headers, `ETag` and `Expires`, returns `null` for unset fields, checks multipart parts in the API's order, scopes list cursors to their query, and refuses out-of-range page sizes, search limits and event limits with `validation/*` codes and `details['path']`. A reviewer's purge removes the content with reason `requested`.
 - d15b170: Follows the CalmLens API v1 contract:
   - `assets->list` and `assets->each` request `GET /v1/projects/{projectId}/assets`.

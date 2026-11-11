@@ -12,21 +12,14 @@
 
 import { execFileSync } from "node:child_process";
 import { releaseCheckState } from "./release-checks.mjs";
+import { releaseSource } from "./release-source.mjs";
 
 const [sdk, prefix, workflow, ...flags] = process.argv.slice(2);
 const afterChecks = flags.includes("--after-checks");
 if (!sdk || !prefix || !workflow) throw new Error("Pass the SDK, tag prefix and workflow file.");
 const run = (command, args) => execFileSync(command, args, { encoding: "utf8" }).trim();
 const git = (...args) => run("git", args);
-const source = git(
-  "log",
-  "-1",
-  "--first-parent",
-  "--format=%H",
-  "HEAD",
-  "--",
-  ".changeset/release.json",
-);
+const source = releaseSource();
 const { releases } = JSON.parse(git("show", `${source}:.changeset/release.json`));
 const release = releases.find((entry) => entry.sdk === sdk);
 const state = release && afterChecks ? releaseCheckState(source) : "passed";

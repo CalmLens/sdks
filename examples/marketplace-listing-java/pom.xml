@@ -6,7 +6,7 @@
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <exec.mainClass>calmmarket.Main</exec.mainClass>
-    <calmlens.sdk.version>0.24.0</calmlens.sdk.version>
+    <calmlens.sdk.version>0.25.0</calmlens.sdk.version>
   </properties>
   <dependencies>
     <!-- Installed from ../../java with `mvn install`; see README. -->
