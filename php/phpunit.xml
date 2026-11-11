@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache" failOnWarning="true" failOnRisky="true" displayDetailsOnSkippedTests="true">
+  <!-- Large multipart fixtures hold both encoded requests and decoded parts during assertions. -->
+  <php><ini name="memory_limit" value="512M"/></php>
   <testsuites><testsuite name="PHP SDK"><directory>tests</directory></testsuite></testsuites>
 </phpunit>
