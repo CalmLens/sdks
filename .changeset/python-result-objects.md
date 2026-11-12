@@ -6,8 +6,8 @@ Results are now typed objects read through snake_case attributes, such as
 `asset.classification.moderation.decision` and `page.next_cursor`, instead of dicts with the API's
 camelCase keys. `asset["externalId"]` still reads a field by its API name, `"externalId" in asset`
 tells whether the API sent it, fields added in newer API versions stay readable, and `to_dict()`
-returns the API's JSON. Every result has `last_response` with the response's `status`, `headers` and
-`request_id`.
+returns the API's JSON. Every result has `last_response` with the response's `status`, `headers`,
+`request_id` and the request's `idempotency_key`.
 
 Methods take keyword arguments only: pass `client.assets.retrieve(asset_id=...)` rather than an
 options dict, and use snake_case keys in dict options too, such as

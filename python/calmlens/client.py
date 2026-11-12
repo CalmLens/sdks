@@ -132,7 +132,7 @@ class AppInfo(_AppInfoRequired, total=False):
 class RequestAttempt:
     """One attempt at a request, as the client's ``on_attempt`` hook receives it. It never holds the
     API key, bodies, upload tokens or signed URLs."""
-    #: The SDK operation, such as ``assets.retrieve``, or ``request`` for :meth:`CalmLensServerClient.request`.
+    #: The SDK operation, such as ``assets.retrieve``, or ``None`` for :meth:`CalmLensServerClient.request`.
     operation: str | None
     method: str
     #: The URL path, without the query.
@@ -146,6 +146,9 @@ class RequestAttempt:
     request_id: str | None
     #: Seconds the attempt took.
     duration: float
+    #: The error code the attempt failed with, such as ``sdk/http-error`` or
+    #: ``sdk/transport-error``, or ``None`` when it succeeded.
+    error_code: str | None = None
 
 
 #: The operation the current call runs and its :class:`RequestOptions`.
@@ -201,7 +204,7 @@ def _in_context(context: contextvars.Context, iterator: Iterator[_Item]) -> Iter
         yield item
 
 
-def _operation(operation: str) -> Callable[[_Function], _Function]:
+def _operation(operation: str | None) -> Callable[[_Function], _Function]:
     """Run a public method as ``operation`` with its ``options`` keyword: every request it sends,
     now or as its iterator is consumed, uses them. A call made inside another keeps the outer
     call's operation and options unless it is given its own."""
@@ -1436,11 +1439,12 @@ class CalmLensServerClient:
         return headers
 
     def _attempted(self, operation: str | None, method: str, url: str, attempt: int, delay: float | None,
-                   status: int | None, request_id: str | None, started: float) -> None:
+                   status: int | None, request_id: str | None, started: float,
+                   error_code: str | None = None) -> None:
         """Report one attempt to the ``on_attempt`` hook and the logger, without the API key, the
         query, bodies or signed URLs."""
         event = RequestAttempt(operation, method, urlsplit(url).path, attempt, delay, status, request_id,
-                               time.monotonic() - started)
+                               time.monotonic() - started, error_code)
         if self.logger.isEnabledFor(logging.DEBUG if delay is not None else logging.INFO):
             outcome = f"HTTP {status}" if status is not None else "no response"
             self.logger.log(logging.DEBUG if delay is not None else logging.INFO,
@@ -1509,7 +1513,7 @@ class CalmLensServerClient:
             except _TRANSPORT_ERRORS as cause:
                 failure = _transport_error(cause)
                 delay = _retry_delay(attempt) if can_retry else None
-                self._attempted(operation, method, url, attempt + 1, delay, None, None, started)
+                self._attempted(operation, method, url, attempt + 1, delay, None, None, started, failure.code)
                 _check_cancelled()
                 remaining()
                 if delay is None:
@@ -1524,7 +1528,7 @@ class CalmLensServerClient:
                 elif 200 <= status < 300:
                     self._attempted(operation, method, url, attempt + 1, None, status, request_id, started)
                     remaining()
-                    _LAST_RESPONSE.set(CalmLensResponse(status, response_headers, request_id))
+                    _LAST_RESPONSE.set(CalmLensResponse(status, response_headers, request_id, idempotency_key))
                     if not content and (status == 204 or method == "DELETE"):
                         return None
                     try:
@@ -1536,7 +1540,8 @@ class CalmLensServerClient:
                     error = self._api_error(status, response_headers, content)
             wait = error.retry_after if error.retry_after is not None else _retry_delay(attempt)
             retry = can_retry and error.is_retryable and wait <= _MAX_RETRY_AFTER_SECONDS
-            self._attempted(operation, method, url, attempt + 1, wait if retry else None, status, request_id, started)
+            self._attempted(operation, method, url, attempt + 1, wait if retry else None, status, request_id, started,
+                            error.code)
             _check_cancelled()
             remaining()
             if not retry:
@@ -1544,7 +1549,7 @@ class CalmLensServerClient:
             pause(wait)
             attempt += 1
 
-    @_operation("request")
+    @_operation(None)
     def request(self, method: str, path: str, *, query: Mapping[str, Any] | None = None, body: Any = None,
                 headers: Mapping[str, str] | None = None, options: RequestOptions | None = None) -> Any:
         """Send a request the SDK has no method for, such as an endpoint newer than this version,

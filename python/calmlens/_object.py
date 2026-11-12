@@ -82,6 +82,8 @@ class CalmLensResponse:
     headers: Mapping[str, str]
     #: The ``X-Request-Id`` header; quote it to support.
     request_id: str | None
+    #: The ``Idempotency-Key`` the request was sent with, or ``None``.
+    idempotency_key: str | None = None
 
 
 class _Undeclared:

@@ -17,6 +17,9 @@ import importlib
 import inspect
 import io
 import json
+import unittest.mock
+import os
+import logging
 import re
 import struct
 import threading
@@ -125,9 +128,10 @@ class _ReadCDNResponse:
         pass
 
 
-def _await(value: Any) -> Any:
+def _await(value: Any, stop_after: int | None = None) -> Any:
     """An async client's result as the sync client returns it: awaited, an async iterator
-    collected (raising ``_Partial`` with the items before a failure), a CDN body read."""
+    collected (raising ``_Partial`` with the items before a failure; at most ``stop_after`` items),
+    a CDN body read."""
     async def resolve() -> Any:
         if inspect.isawaitable(value):
             result = await value
@@ -139,6 +143,8 @@ def _await(value: Any) -> Any:
         try:
             async for item in value:
                 items.append(item)
+                if stop_after is not None and len(items) == stop_after:
+                    break
         except CalmLensError as error:
             raise _Partial(items, error) from error
         return items
@@ -146,7 +152,8 @@ def _await(value: Any) -> Any:
 
 
 def _invoke(client: CalmLensServerClient, operation: str, args: Any, as_keywords: bool = True,
-            use_async: bool = False) -> Any:
+            use_async: bool = False, request_options: dict[str, Any] | None = None,
+            stop_after: int | None = None) -> Any:
     """Run a JavaScript client operation with JavaScript option names on the Python client, as the
     snake_case keyword arguments callers write, such as ``viewer_claims=None``; with ``use_async``
     through an :class:`AsyncCalmLensServerClient` running the same client."""
@@ -158,7 +165,7 @@ def _invoke(client: CalmLensServerClient, operation: str, args: Any, as_keywords
 
     def call(method: Any, given: dict[str, Any], **keywords: Any) -> Any:
         result = method(**_python_options(given), **keywords)
-        return _await(result) if use_async and (inspect.isawaitable(result) or hasattr(result, "__aiter__")) \
+        return _await(result, stop_after) if use_async and (inspect.isawaitable(result) or hasattr(result, "__aiter__")) \
             else result
     if operation in _ITERATORS:
         if use_async:
@@ -167,21 +174,33 @@ def _invoke(client: CalmLensServerClient, operation: str, args: Any, as_keywords
         try:
             for item in call(_resolve_name(client, _ITERATORS[operation]), args):
                 items.append(item)
+                # A step's ``stopAfter`` stops iterating, so only the pages read are fetched.
+                if stop_after is not None and len(items) == stop_after:
+                    break
         except CalmLensError as error:
             raise _Partial(items, error) from error
         return items
     if operation == "assets.waitForDecision" and "timeoutMs" in args:
         args["timeout"] = args.pop("timeoutMs") / 1000
-    keywords = {}
+    keywords: dict[str, Any] = {}
+    options = _request_options(request_options or {})
     if "idempotencyKey" in args:
-        keywords["options"] = {"idempotency_key": args.pop("idempotencyKey")}
+        options["idempotency_key"] = args.pop("idempotencyKey")
+    if options:
+        keywords["options"] = options
+    if operation == "request":
+        # The raw request takes the API's JSON as it is: its query and body aren't Python options.
+        result = root.request(args["method"], args["path"], query=args.get("query"), body=args.get("body"),
+                              headers=args.get("headers"), **keywords)
+        return _await(result) if use_async else result
     return call(_resolve_name(root, _snake(operation)), args, **keywords)
 
 
 def _client_options(options: dict[str, Any]) -> dict[str, Any]:
     """JavaScript client options to Python's keyword arguments (milliseconds become seconds)."""
     names = {"apiKey": "api_key", "projectId": "project_id", "baseUrl": "base_url", "cdnBaseUrl": "cdn_base_url",
-             "maxRetries": "max_retries", "maxResponseBytes": "max_response_bytes", "partSizeBytes": "part_size_bytes"}
+             "maxRetries": "max_retries", "maxResponseBytes": "max_response_bytes", "partSizeBytes": "part_size_bytes",
+             "appInfo": "app_info"}
     converted = {}
     for key, value in options.items():
         if key == "timeoutMs":
@@ -189,6 +208,14 @@ def _client_options(options: dict[str, Any]) -> dict[str, Any]:
         else:
             converted[names[key]] = value
     return converted
+
+
+def _request_options(options: dict[str, Any]) -> dict[str, Any]:
+    """A step's JavaScript request options as Python's ``options`` (milliseconds become seconds)."""
+    names = {"maxRetries": "max_retries", "idempotencyKey": "idempotency_key", "headers": "headers",
+             "extraQuery": "extra_query", "extraBody": "extra_body"}
+    return {("timeout" if key == "timeoutMs" else names[key]): (value / 1000 if key == "timeoutMs" else value)
+            for key, value in options.items()}
 
 
 def _resolve_name(root: Any, path: str) -> Any:
@@ -592,6 +619,17 @@ def _cancel_after(client: CalmLensServerClient, operation: str, args: dict[str, 
     return result
 
 
+class _Records(logging.Handler):
+    """A log handler that keeps every record, for a case's ``logs``."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
 class _Scripted:
     """A transport answering each request with the case's next scripted response."""
 
@@ -663,11 +701,22 @@ class ClientCaseTests(unittest.TestCase):
     def _run_case(self, case: dict[str, Any], use_async: bool = False) -> None:
         transport = _Scripted(case)
         sleeps: list[float] = []
+        attempts: list[Any] = []
         client: CalmLensServerClient | None = None
         construction_error: BaseException | None = None
+        options = {**CLIENT_CASES["client"], **(case.get("client") or {})}
+        if case.get("clientFromEnv"):
+            # The client reads its key, project and base URL from the environment.
+            options = {key: value for key, value in options.items() if key not in ("apiKey", "projectId", "baseUrl")}
+        logger = logging.getLogger(f"calmlens.contract.{id(case)}")
+        logger.propagate, records = False, _Records()
+        logger.handlers, logger.level = [records], getattr(logging, (case.get("logs") or {}).get("level", "info").upper())
+        environment = {name: value for name, value in os.environ.items() if not name.startswith("CALMLENS_")}
         try:
-            client = CalmLensServerClient(**_client_options({**CLIENT_CASES["client"], **(case.get("client") or {})}),
-                                          transport=transport)
+            with unittest.mock.patch.dict(os.environ, {**environment, **case["env"]} if "env" in case else {},
+                                          clear="env" in case):
+                client = CalmLensServerClient(**_client_options(options), transport=transport, logger=logger,
+                                              on_attempt=attempts.append)
             client._sleep = sleeps.append
         except CalmLensError as error:
             construction_error = error
@@ -685,7 +734,8 @@ class ClientCaseTests(unittest.TestCase):
                                                transport, case["cancelAfterRequests"])
                     else:
                         result = _invoke(client, step["operation"], _decode_args(step.get("args") or {}),
-                                         use_async=use_async)
+                                         use_async=use_async, request_options=step.get("requestOptions"),
+                                         stop_after=step.get("stopAfter"))
                 except _Partial as failure:
                     error, partial = failure.error, _json(failure.items)
                 except CalmLensError as failure:
@@ -715,8 +765,24 @@ class ClientCaseTests(unittest.TestCase):
                                       "bodyBase64": base64.b64encode(response.read()).decode()},
                                      expected["cdn"], label)
             else:
-                self.assertEqual(_json(result), expected.get("result"), label)
+                if "result" in expected or "lastResponse" not in expected:
+                    self.assertEqual(_json(result), expected.get("result"), label)
+                if "lastResponse" in expected:
+                    last = result.last_response
+                    self.assertEqual({"status": last.status, "requestId": last.request_id,
+                                      "idempotencyKey": last.idempotency_key}, expected["lastResponse"], label)
 
+        if "attempts" in case:
+            self.assertEqual([{"operation": attempt.operation, "method": attempt.method, "path": attempt.path,
+                               "attempt": attempt.attempt,
+                               "delayMs": None if attempt.delay is None else attempt.delay * 1000,
+                               "status": attempt.status, "requestId": attempt.request_id,
+                               "errorCode": attempt.error_code} for attempt in attempts], case["attempts"], "attempts")
+        if "logs" in case:
+            lines = [record.getMessage() for record in records.records]
+            self.assertTrue(lines, "log lines")
+            for secret in case["logs"]["mustNotContain"]:
+                self.assertFalse([line for line in lines if secret in line], f"a log line holds {secret!r}")
         self.assertEqual(len(transport.received), len(case["requests"]), "requests sent")
         uuids: dict[str, str] = {}
         for index, (got, want) in enumerate(zip(transport.received, case["requests"]), 1):
@@ -727,7 +793,10 @@ class ClientCaseTests(unittest.TestCase):
             # Queries compare decoded, as the API's parser reads them; pair order is free.
             self.assertEqual(sorted(parse_qsl(url.query, keep_blank_values=True)),
                              sorted(tuple(pair) for pair in want["query"]), f"{label}: query")
-            for name, value in {**CLIENT_CASES["everyRequest"]["headers"], **want["headers"]}.items():
+            every = dict(CLIENT_CASES["everyRequest"]["headers"])
+            if (case.get("client") or {}).get("apiKey"):
+                every["x-api-key"] = case["client"]["apiKey"]
+            for name, value in {**every, **want["headers"]}.items():
                 self._check_header(f"{label}: {name}", got["headers"].get(name.lower()), value, uuids)
             if "form" in want:
                 form = read_upload_form(got["body"], got["headers"].get("content-type"))
@@ -839,6 +908,24 @@ def _present(capability: dict[str, Any]) -> bool:
     raise AssertionError(f"Unknown capability kind {kind}")
 
 
+#: The client's resource classes, whose public methods the stale-method check lists.
+_RESOURCE_CLASSES = {"Assets", "Folders", "HashLists", "UploadTokens", "Policies", "Lenses", "UploadPresets",
+                     "ProjectSettings", "MetadataFields", "Text", "Events", "CDN"}
+
+#: Public client methods that no ``method`` capability names, with the reason each is kept.
+_UNNAMED_METHODS = {
+    "close": "closes the client's connection pool: plumbing, not an API capability",
+    "with_options": "builds a client sharing this one's connections with other settings: plumbing",
+    "verify_webhook_signature": "the module function, also on the client for convenience; surface names "
+                                "it as a function",
+    "parse_webhook_event": "the module function, also on the client for convenience; surface names it "
+                           "as a function",
+    "request": "the raw request of the shared client design, which surface.json doesn't list as a method yet",
+    "events.iter_pages": "the events feed page by page (mock-scenarios.json's events.pages), which "
+                         "surface.json doesn't list as a method",
+}
+
+
 class SurfaceTests(unittest.TestCase):
     def test_offers_every_capability(self) -> None:
         for capability in SURFACE["capabilities"]:
@@ -854,6 +941,25 @@ class SurfaceTests(unittest.TestCase):
         self.assertEqual(list(_mock_classification.CATEGORIES), classification["categories"])
         self.assertEqual({category: list(qualifiers) for category, qualifiers in _mock_classification.QUALIFIERS.items()},
                          classification["qualifiers"])
+
+    def test_no_public_method_without_a_capability(self) -> None:
+        """Every public method on the client and its resources is named by a ``method`` capability,
+        apart from the plumbing in ``_UNNAMED_METHODS``, so the SDK keeps no method the API dropped."""
+        named = {capability["names"]["python"] for capability in SURFACE["capabilities"]
+                 if capability["kind"] == "method" and capability["names"].get("python")}
+        client = CalmLensServerClient(api_key="key", project_id="project-1")
+        public = [name for name, value in inspect.getmembers(client)
+                  if not name.startswith("_") and callable(value) and not inspect.isclass(value)
+                  and type(value).__module__ != "calmlens.client"]
+        for attribute, resource in inspect.getmembers(client):
+            # Resources are the client's namespaces (``client.assets``); its transport is plumbing.
+            if not attribute.startswith("_") and type(resource).__module__ == "calmlens.client" \
+                    and type(resource).__name__ in _RESOURCE_CLASSES:
+                public += [f"{attribute}.{name}" for name, value in inspect.getmembers(resource)
+                           if not name.startswith("_") and callable(value)]
+        self.assertEqual(sorted(name for name in public if name not in named and name not in _UNNAMED_METHODS), [])
+        self.assertEqual(sorted(name for name in _UNNAMED_METHODS if name not in public), [],
+                         "allowlisted methods the client no longer has")
 
     def test_retryable_errors(self) -> None:
         """Each code and status raises its kind of error, which says whether it is retryable and
@@ -1237,7 +1343,10 @@ class MockScenarioTests(unittest.TestCase):
                     wanted_details = want.pop("details", {})
                     if "retryAfter" in want:
                         self.assertEqual(error.retry_after, want.pop("retryAfter"), f"{label}: retryAfter")
+                    kind = want.pop("kind", None)
                     self.assertEqual({"code": error.code, "status": error.status}, want, label)
+                    if kind is not None:
+                        self.assertEqual(_kind_problems(error, kind), [], f"{label}: kind")
                     # ``details`` lists only the keys to compare, and objects in them (such as each
                     # of a validation error's ``issues``) only the fields to compare.
                     for key, value in wanted_details.items():
