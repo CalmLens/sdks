@@ -377,9 +377,18 @@ describe("shared mock scenarios", () => {
           }
           if (step.expect?.error) {
             expect(error, label).toBeInstanceOf(CalmLensError);
-            const { code, status, details, retryAfter } = error as CalmLensError;
-            const { details: wantDetails, retryAfter: wantRetryAfter, ...want } = step.expect.error;
-            expect({ code, status: status ?? null }, label).toEqual(want);
+            const { code, status, details, retryAfter, kind } = error as CalmLensError;
+            const {
+              details: wantDetails,
+              retryAfter: wantRetryAfter,
+              kind: wantKind,
+              ...want
+            } = step.expect.error;
+            expect({ code, status: status ?? null, kind }, label).toEqual({
+              ...want,
+              kind: wantKind ?? kind,
+            });
+            if (typeof wantKind === "string") expectErrorKind(error, wantKind, server, label);
             if (wantRetryAfter !== undefined) {
               expect(retryAfter, `${label}: retryAfter`).toBe(wantRetryAfter);
             }
@@ -574,6 +583,50 @@ describe("SDK surface", () => {
       expect(await present(capability)).toBe(true);
     });
   }
+});
+
+/**
+ * Public members of the server client that no `method` capability names, with the reason each
+ * is kept. Anything else public must be an API capability, so a dropped endpoint can't linger.
+ */
+const NOT_CAPABILITIES: Record<string, string> = {
+  toJSON: "serializes the client without its API key, for JSON.stringify",
+  request: "the raw-request escape hatch for endpoints the SDK doesn't cover yet",
+};
+
+describe("stale public methods", () => {
+  test("every public method of the client and its resources is a capability", () => {
+    const named = new Set(
+      surface.capabilities
+        .filter((capability) => capability.kind === "method")
+        .map((capability) => capability.names.javascript),
+    );
+    const prototype = Object.getPrototypeOf(client) as object;
+    const publicMethods: string[] = [];
+    // The class's own members, not inherited ones; # members aren't keys at all.
+    for (const key of Object.getOwnPropertyNames(prototype)) {
+      if (key === "constructor" || key.startsWith("_")) continue;
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, key)!;
+      if (typeof descriptor.value === "function") publicMethods.push(key);
+      else if (descriptor.get) {
+        // A getter is a resource: each of its methods is public too.
+        const resource = (client as unknown as Record<string, unknown>)[key];
+        if (!resource || typeof resource !== "object") {
+          publicMethods.push(key);
+          continue;
+        }
+        for (const [name, member] of Object.entries(resource)) {
+          if (typeof member === "function" && !name.startsWith("_")) {
+            publicMethods.push(`${key}.${name}`);
+          }
+        }
+      }
+    }
+    expect(publicMethods.length).toBeGreaterThan(40);
+    expect(publicMethods.filter((name) => !named.has(name) && !(name in NOT_CAPABILITIES))).toEqual(
+      [],
+    );
+  });
 });
 
 describe("retryable errors", () => {

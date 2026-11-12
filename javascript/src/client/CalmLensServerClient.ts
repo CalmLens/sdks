@@ -303,12 +303,12 @@ export default class CalmLensServerClient {
     return { projectId, baseUrl, cdnBaseUrl };
   }
 
-  private get projectPath() {
+  get #projectPath() {
     return `/projects/${encodeURIComponent(this.#settings.projectId)}`;
   }
 
   /** Sends one of `operation`'s requests with its request options. */
-  private async send<T>(
+  async #send<T>(
     operation: string,
     requestOptions: RequestOptions | undefined,
     method: TransportRequest["method"],
@@ -349,7 +349,7 @@ export default class CalmLensServerClient {
       throw invalidArgument('path must start with "/", such as "/assets/asset_123"');
     }
     const { headers: callHeaders, ...rest } = requestOptions ?? {};
-    return this.send<T>(
+    return this.#send<T>(
       // Raw requests have no client method name.
       undefined as unknown as string,
       { ...rest, ...((callHeaders || headers) && { headers: { ...callHeaders, ...headers } }) },
@@ -363,10 +363,7 @@ export default class CalmLensServerClient {
    * A list call: each page sends `options`, checked as `operation` takes them, with the cursor of
    * the page it fetches.
    */
-  private paginate<
-    Options extends { cursor?: string | null },
-    Page extends CursorPageData<unknown>,
-  >(
+  #paginate<Options extends { cursor?: string | null }, Page extends CursorPageData<unknown>>(
     operation: string,
     options: Options,
     requestOptions: RequestOptions | undefined,
@@ -383,7 +380,7 @@ export default class CalmLensServerClient {
     );
   }
 
-  private async submitAsset(
+  async #submitAsset(
     operation: string,
     options: SubmitAssetOptions,
     wait: boolean,
@@ -394,13 +391,13 @@ export default class CalmLensServerClient {
       deferUploadChecks: connection.deferUploadChecks,
       partSizeBytes: connection.partSizeBytes,
     });
-    const uploadsPath = `${this.projectPath}/assets`;
+    const uploadsPath = `${this.#projectPath}/assets`;
     if ("content" in body && splitsIntoParts(body.content, connection.partSizeBytes)) {
       const { idempotencyKey: _key, extraBody: _body, ...readOptions } = requestOptions ?? {};
       return expectAsset(
         await connection.submitInParts(uploadsPath, body, wait, {
           partPath: (assetId) => `/assets/${encodeURIComponent(assetId)}/part`,
-          retrieve: (assetId) => this.buildAssets().retrieve({ assetId }, readOptions),
+          retrieve: (assetId) => this.#buildAssets().retrieve({ assetId }, readOptions),
         }),
       );
     }
@@ -448,7 +445,7 @@ export default class CalmLensServerClient {
         validateSignAssetUrlOptions(options);
         const { projectId, assetId, externalId, expiresIn, original, ...location } = options;
         const project = requireId(projectId ?? this.#settings.projectId, "Project ID");
-        const signed = await this.send<SignAssetUrlResponse>(
+        const signed = await this.#send<SignAssetUrlResponse>(
           "cdn.signAssetUrl",
           requestOptions,
           "POST",
@@ -530,7 +527,7 @@ export default class CalmLensServerClient {
         options: ClassifyTextOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Asset>> =>
-        this.submitAsset(
+        this.#submitAsset(
           "text.classify",
           checkedTextContent(toTextAssetOptions(checked("text.classify", options))),
           true,
@@ -541,7 +538,7 @@ export default class CalmLensServerClient {
 
   /** Assets: uploads, moderation and management. */
   get assets() {
-    return this.buildAssets();
+    return this.#buildAssets();
   }
 
   /**
@@ -564,14 +561,14 @@ export default class CalmLensServerClient {
     };
   }
 
-  private buildAssets() {
+  #buildAssets() {
     return {
       /** Searches accessible assets by keyword or a natural-language description. */
       search: async (
         options: Partial<AssetSearchQuery> & { query: string },
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<AssetSearchResponse>> =>
-        this.send("assets.search", requestOptions, "GET", `${this.projectPath}/assets/search`, {
+        this.#send("assets.search", requestOptions, "GET", `${this.#projectPath}/assets/search`, {
           query: checked("assets.search", options),
         }),
 
@@ -583,8 +580,10 @@ export default class CalmLensServerClient {
         options: ListAssetsOptions = {},
         requestOptions?: RequestOptions,
       ): ListPromise<AssetPage> =>
-        this.paginate("assets.list", options, requestOptions, (query) =>
-          this.send("assets.list", requestOptions, "GET", `${this.projectPath}/assets`, { query }),
+        this.#paginate("assets.list", options, requestOptions, (query) =>
+          this.#send("assets.list", requestOptions, "GET", `${this.#projectPath}/assets`, {
+            query,
+          }),
         ),
 
       /** Retrieves an asset with its status and classification results. */
@@ -593,7 +592,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Asset>> => {
         const { assetId } = checked("assets.retrieve", options);
-        return this.send(
+        return this.#send(
           "assets.retrieve",
           requestOptions,
           "GET",
@@ -607,7 +606,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Asset>> => {
         const { assetId, ...body } = checked("assets.update", options);
-        return this.send(
+        return this.#send(
           "assets.update",
           requestOptions,
           "PATCH",
@@ -625,12 +624,12 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): ListPromise<AssetChildrenPage> =>
         // Untyped callers may leave the options out; the asset ID check then refuses the call.
-        this.paginate(
+        this.#paginate(
           "assets.listChildren",
           options ?? ({} as ListAssetChildrenOptions),
           requestOptions,
           ({ assetId, ...query }) =>
-            this.send(
+            this.#send(
               "assets.listChildren",
               requestOptions,
               "GET",
@@ -648,9 +647,9 @@ export default class CalmLensServerClient {
         options: ListAssetTimelineOptions,
         requestOptions?: RequestOptions,
       ): ListPromise<AssetTimelinePage> =>
-        this.paginate("assets.listTimeline", options, requestOptions, ({ assetId, ...query }) => {
-          const assetPath = `${this.projectPath}/assets/${requireId(assetId, "Asset ID")}`;
-          return this.send("assets.listTimeline", requestOptions, "GET", `${assetPath}/timeline`, {
+        this.#paginate("assets.listTimeline", options, requestOptions, ({ assetId, ...query }) => {
+          const assetPath = `${this.#projectPath}/assets/${requireId(assetId, "Asset ID")}`;
+          return this.#send("assets.listTimeline", requestOptions, "GET", `${assetPath}/timeline`, {
             query,
           });
         }),
@@ -663,7 +662,12 @@ export default class CalmLensServerClient {
         options: SubmitAssetOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Asset>> =>
-        this.submitAsset("assets.create", checked("assets.create", options), false, requestOptions),
+        this.#submitAsset(
+          "assets.create",
+          checked("assets.create", options),
+          false,
+          requestOptions,
+        ),
 
       /**
        * Uploads an asset and waits for its moderation decision. Documents, websites, audio, video
@@ -674,7 +678,7 @@ export default class CalmLensServerClient {
         options: SubmitAssetOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Asset>> =>
-        this.submitAsset(
+        this.#submitAsset(
           "assets.classify",
           checkedTextContent(checked("assets.classify", options)),
           true,
@@ -701,7 +705,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Asset>> => {
         const { assetId, folderId } = checked("assets.move", options);
-        return this.send(
+        return this.#send(
           "assets.move",
           requestOptions,
           "POST",
@@ -722,7 +726,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Asset>> => {
         const { assetId } = checked("assets.retry", options);
-        return this.send(
+        return this.#send(
           "assets.retry",
           requestOptions,
           "POST",
@@ -741,7 +745,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Asset>> => {
         const { assetId, ...body } = checked("assets.decide", options);
-        return this.send(
+        return this.#send(
           "assets.decide",
           requestOptions,
           "POST",
@@ -765,7 +769,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Asset>> => {
         const { assetId, rerun } = checked("assets.explain", options);
-        return this.send(
+        return this.#send(
           "assets.explain",
           requestOptions,
           "POST",
@@ -798,7 +802,7 @@ export default class CalmLensServerClient {
         const checkOptions = { ...requestOptions, ...(signal && { signal }) };
         return pollForDecision<CalmLensResponse<Asset>>(
           () =>
-            this.send(
+            this.#send(
               "assets.waitForDecision",
               checkOptions,
               "GET",
@@ -820,7 +824,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Asset>> => {
         const { assetId } = checked("assets.removeContent", options);
-        return this.send(
+        return this.#send(
           "assets.removeContent",
           requestOptions,
           "DELETE",
@@ -837,7 +841,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<void> => {
         const { assetId } = checked("assets.delete", options);
-        await this.send(
+        await this.#send(
           "assets.delete",
           requestOptions,
           "DELETE",
@@ -861,11 +865,11 @@ export default class CalmLensServerClient {
       ): Promise<CalmLensResponse<BatchAssetsResponse>> => {
         const { assetIds, operation } = checked("assets.batch", options);
         validateBatchAssetsOptions({ assetIds, operation });
-        return this.send(
+        return this.#send(
           "assets.batch",
           requestOptions,
           "POST",
-          `${this.projectPath}/assets/batch`,
+          `${this.#projectPath}/assets/batch`,
           {
             body: { assetIds, operation },
           },
@@ -888,8 +892,8 @@ export default class CalmLensServerClient {
         options: ListEventsOptions = {},
         requestOptions?: RequestOptions,
       ): ListPromise<GetEventsResponse> =>
-        this.paginate("events.list", options, requestOptions, ({ types, ...query }) =>
-          this.send("events.list", requestOptions, "GET", `${this.projectPath}/events`, {
+        this.#paginate("events.list", options, requestOptions, ({ types, ...query }) =>
+          this.#send("events.list", requestOptions, "GET", `${this.#projectPath}/events`, {
             // The API takes the types as one comma-separated value.
             query: { ...query, types: types?.length ? types.join(",") : undefined },
           }),
@@ -908,8 +912,8 @@ export default class CalmLensServerClient {
         options: ListFoldersOptions = {},
         requestOptions?: RequestOptions,
       ): ListPromise<FolderPage> =>
-        this.paginate("folders.list", options, requestOptions, (query) =>
-          this.send("folders.list", requestOptions, "GET", `${this.projectPath}/folders`, {
+        this.#paginate("folders.list", options, requestOptions, (query) =>
+          this.#send("folders.list", requestOptions, "GET", `${this.#projectPath}/folders`, {
             query,
           }),
         ),
@@ -919,7 +923,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Folder>> => {
         const { folderId } = checked("folders.retrieve", options);
-        return this.send(
+        return this.#send(
           "folders.retrieve",
           requestOptions,
           "GET",
@@ -932,7 +936,7 @@ export default class CalmLensServerClient {
         options: CreateFolderOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Folder>> =>
-        this.send("folders.create", requestOptions, "POST", `${this.projectPath}/folders`, {
+        this.#send("folders.create", requestOptions, "POST", `${this.#projectPath}/folders`, {
           body: checked("folders.create", options),
         }),
 
@@ -941,7 +945,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Folder>> => {
         const { folderId, ...body } = checked("folders.update", options);
-        return this.send(
+        return this.#send(
           "folders.update",
           requestOptions,
           "PATCH",
@@ -953,7 +957,7 @@ export default class CalmLensServerClient {
       /** Deletes an empty folder; throws `folder/not-empty` otherwise. */
       delete: async (options: FolderIdOptions, requestOptions?: RequestOptions): Promise<void> => {
         const { folderId } = checked("folders.delete", options);
-        await this.send(
+        await this.#send(
           "folders.delete",
           requestOptions,
           "DELETE",
@@ -967,7 +971,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Folder>> => {
         const { folderId, parentId } = checked("folders.move", options);
-        return this.send(
+        return this.#send(
           "folders.move",
           requestOptions,
           "POST",
@@ -991,8 +995,8 @@ export default class CalmLensServerClient {
         options: ListHashListsOptions = {},
         requestOptions?: RequestOptions,
       ): ListPromise<HashListPage> =>
-        this.paginate("hashLists.list", options, requestOptions, (query) =>
-          this.send("hashLists.list", requestOptions, "GET", `${this.projectPath}/hash-lists`, {
+        this.#paginate("hashLists.list", options, requestOptions, (query) =>
+          this.#send("hashLists.list", requestOptions, "GET", `${this.#projectPath}/hash-lists`, {
             query,
           }),
         ),
@@ -1002,7 +1006,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<HashList>> => {
         const { hashListId } = checked("hashLists.retrieve", options);
-        return this.send(
+        return this.#send(
           "hashLists.retrieve",
           requestOptions,
           "GET",
@@ -1014,7 +1018,7 @@ export default class CalmLensServerClient {
         options: CreateHashListOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<HashList>> =>
-        this.send("hashLists.create", requestOptions, "POST", `${this.projectPath}/hash-lists`, {
+        this.#send("hashLists.create", requestOptions, "POST", `${this.#projectPath}/hash-lists`, {
           body: checked("hashLists.create", options),
         }),
 
@@ -1024,7 +1028,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<HashList>> => {
         const { hashListId, ...body } = checked("hashLists.update", options);
-        return this.send(
+        return this.#send(
           "hashLists.update",
           requestOptions,
           "PATCH",
@@ -1041,7 +1045,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<void> => {
         const { hashListId } = checked("hashLists.delete", options);
-        await this.send(
+        await this.#send(
           "hashLists.delete",
           requestOptions,
           "DELETE",
@@ -1054,12 +1058,12 @@ export default class CalmLensServerClient {
         options: ListHashListEntriesOptions,
         requestOptions?: RequestOptions,
       ): ListPromise<HashListEntryPage> =>
-        this.paginate(
+        this.#paginate(
           "hashLists.listEntries",
           options,
           requestOptions,
           ({ hashListId, ...query }) =>
-            this.send(
+            this.#send(
               "hashLists.listEntries",
               requestOptions,
               "GET",
@@ -1076,7 +1080,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<HashListEntry>> => {
         const { hashListId, ...body } = checked("hashLists.addEntry", options);
-        return this.send(
+        return this.#send(
           "hashLists.addEntry",
           requestOptions,
           "POST",
@@ -1090,7 +1094,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<void> => {
         const { entryId } = checked("hashLists.removeEntry", options);
-        await this.send(
+        await this.#send(
           "hashLists.removeEntry",
           requestOptions,
           "DELETE",
@@ -1113,15 +1117,15 @@ export default class CalmLensServerClient {
         options: ListPoliciesOptions = {},
         requestOptions?: RequestOptions,
       ): ListPromise<PolicyPage> =>
-        this.paginate("policies.list", options, requestOptions, (query) =>
-          this.send("policies.list", requestOptions, "GET", "/policies", { query }),
+        this.#paginate("policies.list", options, requestOptions, (query) =>
+          this.#send("policies.list", requestOptions, "GET", "/policies", { query }),
         ),
 
       retrieve: async (
         options: PolicyIdOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Policy>> =>
-        this.send(
+        this.#send(
           "policies.retrieve",
           requestOptions,
           "GET",
@@ -1133,7 +1137,7 @@ export default class CalmLensServerClient {
         options: CreatePolicyOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Policy>> =>
-        this.send("policies.create", requestOptions, "POST", "/policies", {
+        this.#send("policies.create", requestOptions, "POST", "/policies", {
           body: checked("policies.create", options),
         }),
 
@@ -1143,7 +1147,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Policy>> => {
         const { policyId, ...body } = checked("policies.update", options);
-        return this.send("policies.update", requestOptions, "PATCH", policyPath(policyId), {
+        return this.#send("policies.update", requestOptions, "PATCH", policyPath(policyId), {
           body,
         });
       },
@@ -1154,7 +1158,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Policy>> => {
         const { policyId, ...body } = checked("policies.reset", options);
-        return this.send(
+        return this.#send(
           "policies.reset",
           requestOptions,
           "POST",
@@ -1169,7 +1173,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Policy>> => {
         const { policyId, ...body } = checked("policies.upgrade", options);
-        return this.send(
+        return this.#send(
           "policies.upgrade",
           requestOptions,
           "POST",
@@ -1184,7 +1188,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Policy>> => {
         const { policyId, ...body } = checked("policies.setAutomaticUpdates", options);
-        return this.send(
+        return this.#send(
           "policies.setAutomaticUpdates",
           requestOptions,
           "PUT",
@@ -1195,7 +1199,7 @@ export default class CalmLensServerClient {
 
       /** Deletes a policy that no project or upload preset uses. */
       delete: async (options: PolicyIdOptions, requestOptions?: RequestOptions): Promise<void> => {
-        await this.send(
+        await this.#send(
           "policies.delete",
           requestOptions,
           "DELETE",
@@ -1207,14 +1211,19 @@ export default class CalmLensServerClient {
       retrieveAssigned: async (
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Policy>> =>
-        this.send("policies.retrieveAssigned", requestOptions, "GET", `${this.projectPath}/policy`),
+        this.#send(
+          "policies.retrieveAssigned",
+          requestOptions,
+          "GET",
+          `${this.#projectPath}/policy`,
+        ),
 
       /** Chooses the policy the project moderates with. */
       assign: async (
         options: AssignPolicyOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Policy>> =>
-        this.send("policies.assign", requestOptions, "PUT", `${this.projectPath}/policy`, {
+        this.#send("policies.assign", requestOptions, "PUT", `${this.#projectPath}/policy`, {
           body: checked("policies.assign", options),
         }),
     };
@@ -1232,12 +1241,12 @@ export default class CalmLensServerClient {
         options: ListUploadPresetsOptions = {},
         requestOptions?: RequestOptions,
       ): ListPromise<UploadPresetPage> =>
-        this.paginate("uploadPresets.list", options, requestOptions, (query) =>
-          this.send(
+        this.#paginate("uploadPresets.list", options, requestOptions, (query) =>
+          this.#send(
             "uploadPresets.list",
             requestOptions,
             "GET",
-            `${this.projectPath}/upload-presets`,
+            `${this.#projectPath}/upload-presets`,
             { query },
           ),
         ),
@@ -1250,11 +1259,11 @@ export default class CalmLensServerClient {
         options: EnsureUploadPresetsOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<EnsureUploadPresetsResponse>> =>
-        this.send(
+        this.#send(
           "uploadPresets.ensure",
           requestOptions,
           "PUT",
-          `${this.projectPath}/upload-presets`,
+          `${this.#projectPath}/upload-presets`,
           {
             body: checked("uploadPresets.ensure", options),
           },
@@ -1266,7 +1275,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<void> => {
         const { uploadPresetId } = checked("uploadPresets.delete", options);
-        await this.send(
+        await this.#send(
           "uploadPresets.delete",
           requestOptions,
           "DELETE",
@@ -1285,15 +1294,21 @@ export default class CalmLensServerClient {
       get: async (
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<ProjectSettingsResource>> =>
-        this.send("projectSettings.get", requestOptions, "GET", `${this.projectPath}/settings`),
+        this.#send("projectSettings.get", requestOptions, "GET", `${this.#projectPath}/settings`),
 
       update: async (
         options: UpdateProjectSettingsOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<ProjectSettingsResource>> =>
-        this.send("projectSettings.update", requestOptions, "PUT", `${this.projectPath}/settings`, {
-          body: checked("projectSettings.update", options),
-        }),
+        this.#send(
+          "projectSettings.update",
+          requestOptions,
+          "PUT",
+          `${this.#projectPath}/settings`,
+          {
+            body: checked("projectSettings.update", options),
+          },
+        ),
     };
   }
 
@@ -1306,22 +1321,22 @@ export default class CalmLensServerClient {
       list: async (
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<MetadataFieldsResource>> =>
-        this.send(
+        this.#send(
           "metadataFields.list",
           requestOptions,
           "GET",
-          `${this.projectPath}/metadata-fields`,
+          `${this.#projectPath}/metadata-fields`,
         ),
 
       ensure: async (
         options: EnsureMetadataFieldsOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<MetadataFieldsResource>> =>
-        this.send(
+        this.#send(
           "metadataFields.ensure",
           requestOptions,
           "PUT",
-          `${this.projectPath}/metadata-fields`,
+          `${this.#projectPath}/metadata-fields`,
           {
             body: checked("metadataFields.ensure", options),
           },
@@ -1333,11 +1348,11 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<void> => {
         const { fieldId, ...query } = checked("metadataFields.delete", options);
-        await this.send(
+        await this.#send(
           "metadataFields.delete",
           requestOptions,
           "DELETE",
-          `${this.projectPath}/metadata-fields/${requireId(fieldId, "Metadata field ID")}`,
+          `${this.#projectPath}/metadata-fields/${requireId(fieldId, "Metadata field ID")}`,
           { query },
         );
       },
@@ -1362,8 +1377,10 @@ export default class CalmLensServerClient {
         options: ListLensesOptions = {},
         requestOptions?: RequestOptions,
       ): ListPromise<LensPage> =>
-        this.paginate("lenses.list", options, requestOptions, (query) =>
-          this.send("lenses.list", requestOptions, "GET", `${this.projectPath}/lenses`, { query }),
+        this.#paginate("lenses.list", options, requestOptions, (query) =>
+          this.#send("lenses.list", requestOptions, "GET", `${this.#projectPath}/lenses`, {
+            query,
+          }),
         ),
 
       /** Creates a lens; its identifier must be new to the project. */
@@ -1371,11 +1388,11 @@ export default class CalmLensServerClient {
         options: CreateLensOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Lens>> => {
-        const lens = await this.send<Lens>(
+        const lens = await this.#send<Lens>(
           "lenses.create",
           requestOptions,
           "POST",
-          `${this.projectPath}/lenses`,
+          `${this.#projectPath}/lenses`,
           {
             body: checked("lenses.create", options),
           },
@@ -1388,7 +1405,7 @@ export default class CalmLensServerClient {
         options: LensIdOptions,
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Lens>> =>
-        this.send(
+        this.#send(
           "lenses.retrieve",
           requestOptions,
           "GET",
@@ -1401,7 +1418,7 @@ export default class CalmLensServerClient {
         requestOptions?: RequestOptions,
       ): Promise<CalmLensResponse<Lens>> => {
         const { lensId, ...body } = checked("lenses.update", options);
-        const lens = await this.send<Lens>(
+        const lens = await this.#send<Lens>(
           "lenses.update",
           requestOptions,
           "PATCH",
@@ -1415,7 +1432,7 @@ export default class CalmLensServerClient {
       /** Deletes a lens; URLs that select it stop being served. */
       delete: async (options: LensIdOptions, requestOptions?: RequestOptions): Promise<void> => {
         const { lensId } = checked("lenses.delete", options);
-        await this.send("lenses.delete", requestOptions, "DELETE", lensPath(lensId));
+        await this.#send("lenses.delete", requestOptions, "DELETE", lensPath(lensId));
         forget((cached) => cached.id === lensId);
       },
     };
@@ -1467,7 +1484,7 @@ export default class CalmLensServerClient {
       let pending = pendingEnsureLenses.get(batchCacheKey);
       if (!pending) {
         // A call that joins one already sending shares its request, and its request options.
-        pending = this.submitEnsureLenses(missingOptions, requestOptions);
+        pending = this.#submitEnsureLenses(missingOptions, requestOptions);
         pendingEnsureLenses.set(batchCacheKey, pending);
         void pending.then(
           () => pendingEnsureLenses.delete(batchCacheKey),
@@ -1489,28 +1506,28 @@ export default class CalmLensServerClient {
     });
   }
 
-  private async submitEnsureLenses(
+  async #submitEnsureLenses(
     options: EnsureLensOptions[],
     requestOptions: RequestOptions | undefined,
   ): Promise<void> {
     // Chunks are sent in order; each chunk is cached before the next is sent.
     for (let start = 0; start < options.length; start += ENSURE_LENSES_MAX_PER_REQUEST) {
-      await this.submitEnsureLensesChunk(
+      await this.#submitEnsureLensesChunk(
         options.slice(start, start + ENSURE_LENSES_MAX_PER_REQUEST),
         requestOptions,
       );
     }
   }
 
-  private async submitEnsureLensesChunk(
+  async #submitEnsureLensesChunk(
     options: EnsureLensOptions[],
     requestOptions: RequestOptions | undefined,
   ): Promise<void> {
-    const result = await this.send<{ lenses?: Lens[] }>(
+    const result = await this.#send<{ lenses?: Lens[] }>(
       "ensureLenses",
       requestOptions,
       "PUT",
-      `${this.projectPath}/lenses`,
+      `${this.#projectPath}/lenses`,
       { body: { lenses: options } },
     );
     const returned = Array.isArray(result?.lenses) ? result.lenses : [];
