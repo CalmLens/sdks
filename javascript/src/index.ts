@@ -12,6 +12,15 @@ export type {
 export { CALMLENS_ERROR_CODES, CalmLensError } from "./client/CalmLensError";
 export type { ApiErrorCode } from "./client/CalmLensErrorCodes";
 export type {
+  AutoPaging,
+  AutoPagingToArrayOptions,
+  CalmLensLastResponse,
+  CalmLensResponse,
+  ListPage,
+  ListPromise,
+} from "./client/CalmLensPagination";
+export { AUTO_PAGING_TO_ARRAY_MAX } from "./client/CalmLensPagination";
+export type {
   AddHashListEntryOptions,
   Asset,
   AssetAvailability,
@@ -76,15 +85,6 @@ export type {
   HashListPage,
   IdempotencyOptions,
   ImageTransformOptions,
-  IterateAssetChildrenOptions,
-  IterateAssetsOptions,
-  IterateAssetTimelineOptions,
-  IterateFoldersOptions,
-  IterateHashListEntriesOptions,
-  IterateHashListsOptions,
-  IterateLensesOptions,
-  IteratePoliciesOptions,
-  IterateUploadPresetsOptions,
   Lens,
   LensIdOptions,
   LensPage,

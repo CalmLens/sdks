@@ -86,7 +86,7 @@ describe("MockCalmLensServerClient listing", () => {
     const client = createClient();
     for (const name of ["a", "b", "c"]) await client.assets.create(text(name));
     const names: string[] = [];
-    for await (const asset of client.assets.iterate({
+    for await (const asset of client.assets.list({
       pageSize: 2,
       sort: "createdAt",
     })) {
@@ -124,8 +124,8 @@ describe("MockCalmLensServerClient events", () => {
     expect(rest.hasMore).toBe(false);
 
     const seen: string[] = [];
-    for await (const eventPage of client.events.pages({ cursor: start, pageSize: 1 })) {
-      seen.push(...eventPage.items.map((event) => event.id));
+    for await (const event of client.events.list({ cursor: start, pageSize: 1 })) {
+      seen.push(event.id);
     }
     expect(seen).toEqual([first.id, second.id]);
     // A webhook delivers the event in the shape events.list returns it.

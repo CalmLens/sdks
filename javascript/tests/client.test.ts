@@ -161,28 +161,35 @@ describe("responses", () => {
   });
 });
 
-describe("pagination", () => {
-  test("assets.iterate and iterateChildren fetch every page", async () => {
-    const pages = [["a", "b"], ["c", "d"], ["e"]];
-    const { fetchImpl, requests } = recordingFetch((request) => {
-      const pageIndex = [null, "next-a", "next-b"].indexOf(
-        new URL(request.url).searchParams.get("cursor"),
-      );
-      const items = pages[pageIndex]!.map((id) => ({
-        id,
-        classification: { moderation: { status: "allowed" } },
-      }));
-      return Response.json({
+const pagedFetch = () => {
+  const pages = [["a", "b"], ["c", "d"], ["e"]];
+  return recordingFetch((request) => {
+    const pageIndex = [null, "next-a", "next-b"].indexOf(
+      new URL(request.url).searchParams.get("cursor"),
+    );
+    const items = pages[pageIndex]!.map((id) => ({
+      id,
+      classification: { moderation: { status: "allowed" } },
+    }));
+    return Response.json(
+      {
         items,
         hasMore: pageIndex < pages.length - 1,
         nextCursor: ["next-a", "next-b", null][pageIndex],
         pageSize: 2,
-      });
-    });
+      },
+      { headers: { "x-request-id": `req-page-${pageIndex}` } },
+    );
+  });
+};
+
+describe("pagination", () => {
+  test("for await over assets.list and listChildren fetches every page", async () => {
+    const { fetchImpl, requests } = pagedFetch();
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
 
     const ids: string[] = [];
-    for await (const asset of client.assets.iterate({
+    for await (const asset of client.assets.list({
       pageSize: 2,
       filter: "classification.moderation.status==allowed",
     })) {
@@ -202,14 +209,80 @@ describe("pagination", () => {
     ).toBe(true);
 
     const children: string[] = [];
-    for await (const child of client.assets.iterateChildren({ assetId: "parent" })) {
+    for await (const child of client.assets.listChildren({ assetId: "parent" })) {
       children.push(child.id);
     }
     expect(children).toEqual(["a", "b", "c", "d", "e"]);
     expect(new URL(requests[3]!.url).pathname).toBe("/v1/assets/parent/children");
   });
 
-  test("events.pages follows the cursor until no more events are waiting", async () => {
+  test("an awaited page navigates with hasNextPage and getNextPage", async () => {
+    const { fetchImpl, requests } = pagedFetch();
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
+
+    const first = await client.assets.list({ pageSize: 2 });
+    expect(first.items.map((asset) => asset.id)).toEqual(["a", "b"]);
+    expect(requests).toHaveLength(1);
+    expect(first.hasNextPage()).toBe(true);
+    const second = await first.getNextPage();
+    expect(second.items.map((asset) => asset.id)).toEqual(["c", "d"]);
+    expect(new URL(requests[1]!.url).searchParams.get("cursor")).toBe("next-a");
+    const last = await second.getNextPage();
+    expect(last.items.map((asset) => asset.id)).toEqual(["e"]);
+    expect(last.hasNextPage()).toBe(false);
+    expect(await last.getNextPage().catch((error) => error)).toMatchObject({
+      code: "sdk/invalid-argument",
+    });
+    expect(requests).toHaveLength(3);
+
+    // Iterating a page yields its items and every item after them.
+    const fromSecond: string[] = [];
+    for await (const asset of second) fromSecond.push(asset.id);
+    expect(fromSecond).toEqual(["c", "d", "e"]);
+  });
+
+  test("autoPagingToArray stops fetching once it has limit items", async () => {
+    const { fetchImpl, requests } = pagedFetch();
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
+
+    const assets = await client.assets.list({ pageSize: 2 }).autoPagingToArray({ limit: 3 });
+    expect(assets.map((asset) => asset.id)).toEqual(["a", "b", "c"]);
+    expect(requests).toHaveLength(2);
+
+    for (const limit of [0, 10_001, 1.5, undefined]) {
+      expect(
+        await client.assets
+          .list()
+          .autoPagingToArray({ limit } as never)
+          .catch((error) => error),
+      ).toMatchObject({ code: "sdk/invalid-argument" });
+    }
+  });
+
+  test("a list's options are checked before anything is sent", async () => {
+    const { fetchImpl, requests } = pagedFetch();
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
+    const failure = await client.assets.listChildren({} as never).catch((error) => error);
+    expect(failure).toMatchObject({ code: "sdk/invalid-argument" });
+    expect(requests).toHaveLength(0);
+  });
+
+  test("iteration stops with sdk/invalid-response when a cursor repeats", async () => {
+    const { fetchImpl, requests } = recordingFetch(() =>
+      Response.json({ items: [{ id: "a" }], hasMore: true, nextCursor: "same" }),
+    );
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
+    const seen: string[] = [];
+    const failure = await (async () => {
+      for await (const folder of client.folders.list()) seen.push(folder.id);
+    })().catch((error) => error);
+    expect(failure).toMatchObject({ code: "sdk/invalid-response" });
+    // The page that repeats the cursor is refused, not yielded.
+    expect(seen).toEqual(["a"]);
+    expect(requests).toHaveLength(2);
+  });
+
+  test("events.list follows the cursor until no more events are waiting", async () => {
     const feed: Record<string, { items: { id: string }[]; nextCursor: string; hasMore: boolean }> =
       {
         start: { items: [{ id: "e1" }], nextCursor: "c1", hasMore: true },
@@ -220,13 +293,68 @@ describe("pagination", () => {
     );
     const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
     const seen: string[] = [];
-    let cursor = "start";
-    for await (const page of client.events.pages({ cursor: "start", pageSize: 100 })) {
-      seen.push(...page.items.map((event) => event.id));
-      cursor = page.nextCursor;
+    for await (const event of client.events.list({ cursor: "start", pageSize: 100 })) {
+      seen.push(event.id);
     }
     expect(seen).toEqual(["e1", "e2"]);
-    expect(cursor).toBe("c2");
+
+    let page = await client.events.list({ cursor: "start", pageSize: 100 });
+    while (page.hasNextPage()) page = await page.getNextPage();
+    expect(page.nextCursor).toBe("c2");
+  });
+});
+
+describe("lastResponse", () => {
+  test("results carry the response's status, request ID and headers, unenumerated", async () => {
+    const { fetchImpl } = recordingFetch(() =>
+      Response.json(
+        { id: "fldr_1", name: "Uploads" },
+        { status: 201, headers: { "x-request-id": "req_123", "x-extra": "yes" } },
+      ),
+    );
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
+    const folder = await client.folders.create({ name: "Uploads" });
+    expect(folder.lastResponse.status).toBe(201);
+    expect(folder.lastResponse.requestId).toBe("req_123");
+    expect(folder.lastResponse.headers.get("x-extra")).toBe("yes");
+    expect(Object.keys(folder)).toEqual(["id", "name"]);
+    expect(JSON.parse(JSON.stringify(folder))).toEqual({ id: "fldr_1", name: "Uploads" });
+  });
+
+  test("each page carries its own response", async () => {
+    const { fetchImpl } = pagedFetch();
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
+    const first = await client.assets.list({ pageSize: 2 });
+    expect(first.lastResponse.requestId).toBe("req-page-0");
+    expect((await first.getNextPage()).lastResponse.requestId).toBe("req-page-1");
+  });
+
+  test("an asset upload's result names the idempotency key it was sent with", async () => {
+    const { fetchImpl, requests } = recordingFetch(() =>
+      Response.json({
+        id: "asset_1",
+        upload: { status: "completed" },
+        classification: { status: "queued", moderation: { status: "pending" } },
+      }),
+    );
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
+    const asset = await client.assets.create({ name: "a.png", url: "https://example.com/a.png" });
+    expect(asset.lastResponse.idempotencyKey).toBe(
+      requests[0]!.headers.get("idempotency-key") ?? undefined,
+    );
+    expect(asset.lastResponse.idempotencyKey).toMatch(/.+/);
+  });
+
+  test("signAssetUrl keeps the signing response", async () => {
+    const { fetchImpl } = recordingFetch(() =>
+      Response.json(
+        { url: "https://cdn.example/a", expiresAt: 1 },
+        { headers: { "x-request-id": "req_sign" } },
+      ),
+    );
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl });
+    const signed = await client.cdn.signAssetUrl({ assetId: "asset_1" });
+    expect(signed.lastResponse.requestId).toBe("req_sign");
   });
 });
 

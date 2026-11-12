@@ -17,7 +17,7 @@ The package has two clients, each with its own import:
 | `calmlens/server` | `CalmLensServerClient` | On your server: Node.js 22 or later, Bun, Deno, Cloudflare Workers | A project API key                                                |
 | `calmlens/app`    | `CalmLensAppClient`    | In browsers and React Native apps                                  | An upload preset, with an optional upload token from your server |
 
-API keys are secret, so `CalmLensServerClient` refuses to start in a web page or app. Upload from browsers and apps with `CalmLensAppClient`, and serve private content to them with signed URLs. The package ships ES modules and CommonJS with type declarations. The main, `/server` and `/app` entry points load no other packages at runtime. The package depends on `zod`, which its type declarations and testing helpers use, and on `pdfjs-dist` and `hls.js`, which the UI viewers load only when they show a document or a stream.
+API keys are secret, so `CalmLensServerClient` refuses to start in a web page or app. Upload from browsers and apps with `CalmLensAppClient`, and serve private content to them with signed URLs. The package ships ES modules and CommonJS with type declarations. The main, `/server` and `/app` entry points load no other packages at runtime. The package depends only on `zod`, which its type declarations and testing helpers use. The browser UI also needs `hls.js` and `pdfjs-dist` (`npm install calmlens hls.js pdfjs-dist`), optional peer dependencies it loads only when it plays a stream or shows a document, so a server install leaves them out.
 
 Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
 

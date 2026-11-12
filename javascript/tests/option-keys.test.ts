@@ -50,12 +50,12 @@ describe("unknown option keys", () => {
         "assetID",
         () => client.assets.retrieve({ assetId: "a", assetID: "b" } as never),
       ],
-      "assets.iterate": ["filters", () => client.assets.iterate({ filters: "name==a" } as never)],
+      "assets.list": ["filters", () => client.assets.list({ filters: "name==a" } as never)],
       "assets.waitForDecision": [
         "timeout",
         () => client.assets.waitForDecision({ assetId: "a", timeout: 5 } as never),
       ],
-      "events.pages": ["page_size", () => client.events.pages({ page_size: 5 } as never)],
+      "events.list": ["page_size", () => client.events.list({ page_size: 5 } as never)],
       "cdn.getAssetUrl": [
         "lenz",
         () => client.cdn.getAssetUrl({ assetId: "a", lenz: "x" } as never),

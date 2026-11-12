@@ -527,8 +527,6 @@ export interface EnsureLensesOptions {
 
 /** `lenses.list` options: a page of the project's lenses, newest first unless `sort` says otherwise. */
 export type ListLensesOptions = Partial<GetLensesQuery>;
-/** `lenses.iterate` options: the sort and page size; pages are fetched as needed. */
-export type IterateLensesOptions = Omit<ListLensesOptions, "cursor">;
 export type LensPage = CursorPage<Lens>;
 /** A new lens: its identifier must be new to the project. */
 export type CreateLensOptions = EnsureLensOptions;
@@ -543,8 +541,6 @@ export type UpdateLensOptions = PatchLensBody & LensIdOptions;
  * `folderId==fldr_…`.
  */
 export type ListAssetsOptions = Partial<GetAssetsPageQuery>;
-/** `assets.iterate` options: list filters and page size; pages are fetched as needed. */
-export type IterateAssetsOptions = Omit<ListAssetsOptions, "cursor">;
 
 export type ListEventsOptions = GetEventsQuery;
 
@@ -613,8 +609,6 @@ export interface MoveFolderOptions extends FolderIdOptions {
 export type { HashList, HashListEntry };
 /** `hashLists.list` options: a page of the project's hash lists, newest first unless `sort` says otherwise. */
 export type ListHashListsOptions = Partial<GetHashListsQuery>;
-/** `hashLists.iterate` options. */
-export type IterateHashListsOptions = Omit<ListHashListsOptions, "cursor">;
 export type HashListPage = GetHashListsResponse;
 export type CreateHashListOptions = PostHashListBody;
 export type UpdateHashListOptions = PatchHashListBody & { hashListId: string };
@@ -622,8 +616,6 @@ export interface HashListIdOptions {
   hashListId: string;
 }
 export type ListHashListEntriesOptions = Partial<GetHashListEntriesQuery> & HashListIdOptions;
-/** `hashLists.iterateEntries` options. */
-export type IterateHashListEntriesOptions = Omit<ListHashListEntriesOptions, "cursor">;
 export type HashListEntryPage = GetHashListEntriesResponse;
 /** Send `hash` (and `quality` when you know it) or `assetId`, an image asset in the project. */
 export type AddHashListEntryOptions = PostHashListEntryBody & HashListIdOptions;
@@ -633,8 +625,6 @@ export interface HashListEntryIdOptions {
 export type { Policy };
 /** `policies.list` options: a page of the organisation's policies, oldest first unless `sort` says otherwise. */
 export type ListPoliciesOptions = Partial<GetPoliciesQuery>;
-/** `policies.iterate` options. */
-export type IteratePoliciesOptions = Omit<ListPoliciesOptions, "cursor">;
 export type PolicyPage = GetPoliciesResponse;
 /** Send `settings` and a `name`, or `presetId` to copy the latest release of a built-in preset. */
 export type CreatePolicyOptions = PostPolicyBody;
@@ -653,8 +643,6 @@ export type AssignPolicyOptions = PutProjectPolicyBody;
 export type { UploadPreset };
 /** `uploadPresets.list` options: a page of the project's upload presets, oldest first unless `sort` says otherwise. */
 export type ListUploadPresetsOptions = Partial<GetUploadPresetsQuery>;
-/** `uploadPresets.iterate` options. */
-export type IterateUploadPresetsOptions = Omit<ListUploadPresetsOptions, "cursor">;
 export type UploadPresetPage = GetUploadPresetsResponse;
 /**
  * One preset's whole definition, by `key`; fields left out take their defaults. Send the
@@ -690,15 +678,11 @@ export interface MoveAssetOptions {
 export type ListAssetChildrenOptions = Partial<GetAssetChildrenQuery> & {
   assetId: string;
 };
-/** `assets.iterateChildren` options. */
-export type IterateAssetChildrenOptions = Omit<ListAssetChildrenOptions, "cursor">;
 
 /** `assets.listTimeline` options. */
 export type ListAssetTimelineOptions = Partial<GetAssetTimelineQuery> & {
   assetId: string;
 };
-/** `assets.iterateTimeline` options. */
-export type IterateAssetTimelineOptions = Omit<ListAssetTimelineOptions, "cursor">;
 
 export type AssetContentOptions = AssetBinaryPayloadInput & {
   type: string;
@@ -819,6 +803,4 @@ export interface ClassifyTextOptions extends Omit<SubmitAssetCommonOptions, "nam
 
 /** `folders.list` options. `sort` is `name` (the default) or `createdAt`, descending when prefixed with `-`. */
 export type ListFoldersOptions = GetFoldersQuery;
-/** `folders.iterate` options. */
-export type IterateFoldersOptions = Omit<ListFoldersOptions, "cursor">;
 export type FolderPage = GetFoldersResponse;

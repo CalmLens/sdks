@@ -186,8 +186,17 @@ type FieldMismatches<D, E, P extends string, Depth extends unknown[]> =
         : `${P}.${K}: missing`;
     }[keyof E & string]
   | {
-      [K in keyof D & string]: K extends keyof E ? never : `${P}.${K}: not in the API`;
+      [K in keyof D & string]: K extends keyof E
+        ? never
+        : K extends SdkOnlyKey
+          ? never
+          : D[K] extends (...args: never[]) => unknown
+            ? never // Page navigation, such as getNextPage: methods are never API fields.
+            : `${P}.${K}: not in the API`;
     }[keyof D & string];
+
+/** Keys the SDK adds to results: the response a result came from (`CalmLensResponse`). */
+type SdkOnlyKey = "lastResponse";
 
 type UnionToIntersection<U> = (U extends unknown ? (value: U) => void : never) extends (
   value: infer I,

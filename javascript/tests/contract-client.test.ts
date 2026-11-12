@@ -25,7 +25,7 @@ import {
 } from "../src/client/CalmLensUtils";
 import { UPLOAD_TOKEN_DEFAULT_TTL_SECONDS } from "../src/contract/UploadToken.js";
 import { CalmLensError, CalmLensServerClient } from "../src/server";
-import { testdata } from "./testdata";
+import { eventPages, testdata } from "./testdata";
 import { readUploadForm } from "./upload-form";
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
@@ -43,7 +43,7 @@ const invoke = async (client: CalmLensServerClient, operation: string, args: unk
   const anyArgs = args as never;
   switch (operation) {
     case "events.iterate":
-      return collect(client.events.pages(anyArgs));
+      return collect(eventPages(client.events.list(anyArgs), (args as { cursor?: string }).cursor));
     case "ensureLens":
       return client.ensureLens(anyArgs);
     case "ensureLenses":
@@ -51,7 +51,9 @@ const invoke = async (client: CalmLensServerClient, operation: string, args: unk
   }
   const [resource, method] = operation.split(".") as [string, string];
   // Every list's iterator yields its items in order.
-  if (method.startsWith("iterate")) return collect((client as any)[resource][method](anyArgs));
+  // Iterating a list (`assets.iterate` iterates `assets.list`) yields its items in order.
+  if (method.startsWith("iterate"))
+    return collect((client as any)[resource][method.replace(/^iterate/, "list")](anyArgs));
   return (client as any)[resource][method](args);
 };
 

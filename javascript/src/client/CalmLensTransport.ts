@@ -1,4 +1,5 @@
 import { CalmLensError, SDK_ERROR_CODES } from "./CalmLensError";
+import { withLastResponse } from "./CalmLensPagination";
 import { getUserAgent, isBrowserRuntime } from "./CalmLensVersion";
 
 /** Retry delays grow from this base, doubling per attempt, with jitter. */
@@ -364,7 +365,10 @@ export class CalmLensTransport {
     }
   }
 
-  /** Sends a request and parses its JSON response body. */
+  /**
+   * Sends a request and parses its JSON response body. An object or array result carries the
+   * response's status, request ID and headers as its non-enumerable `lastResponse`.
+   */
   async json<T>(request: TransportRequest): Promise<T> {
     const { response, attempt } = await this.send(request);
     try {
@@ -372,8 +376,9 @@ export class CalmLensTransport {
       if (bytes.byteLength === 0 && (response.status === 204 || request.method === "DELETE")) {
         return undefined as T;
       }
+      let data: T;
       try {
-        return JSON.parse(new TextDecoder().decode(bytes)) as T;
+        data = JSON.parse(new TextDecoder().decode(bytes)) as T;
       } catch (cause) {
         throw new CalmLensError(SDK_ERROR_CODES.INVALID_RESPONSE, {
           message: `Invalid JSON response (HTTP ${response.status})`,
@@ -381,6 +386,12 @@ export class CalmLensTransport {
           cause,
         });
       }
+      return withLastResponse(data, {
+        status: response.status,
+        requestId: response.headers.get("x-request-id") ?? undefined,
+        headers: response.headers,
+        idempotencyKey: request.idempotencyKey,
+      });
     } catch (cause) {
       throw toFailure(cause, attempt);
     } finally {

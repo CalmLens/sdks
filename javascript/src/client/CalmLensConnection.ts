@@ -15,6 +15,7 @@ import {
 } from "../contract/SharedConstants.js";
 import { CalmLensError, invalidArgument, SDK_ERROR_CODES } from "./CalmLensError";
 import { API_ERROR_CODES } from "./CalmLensErrorCodes";
+import type { CalmLensResponse } from "./CalmLensPagination";
 import { CalmLensTransport, sleep, type TransportRequest } from "./CalmLensTransport";
 import type {
   Asset,
@@ -399,14 +400,14 @@ export const expectUploadedAsset = (data: unknown): UploadedAsset => {
   return data;
 };
 
-export const expectAsset = (data: unknown): Asset => {
+export const expectAsset = (data: unknown): CalmLensResponse<Asset> => {
   if (!isAsset(data)) {
     throw new CalmLensError(SDK_ERROR_CODES.INVALID_RESPONSE, {
       message: "Expected an asset response",
       status: 200,
     });
   }
-  return data;
+  return data as CalmLensResponse<Asset>;
 };
 
 export type ResolvedConnectionOptions = Omit<ConnectionOptions, "baseUrl"> & { baseUrl: string };

@@ -9,7 +9,7 @@ import * as server from "../src/server";
 import { CalmLensError, parseWebhookEvent } from "../src/server";
 import * as testing from "../src/testing";
 import { createMockApiKey, MockCalmLensServerClient } from "../src/testing";
-import { testdata } from "./testdata";
+import { eventPages, testdata } from "./testdata";
 
 describe("webhook parsing", () => {
   const { parsing } = testdata("webhooks.json") as {
@@ -267,17 +267,23 @@ const runScenarioStep = async (
         : undefined;
       return { status: response.status, code, bytes, headers: response.headers };
     }
-    // Iterators yield every item (or, for events, every page) in order.
+    // Iterating events yields every page in order, as every SDK's event iterator does.
     case "events.pages":
-      return JSON.parse(JSON.stringify(await collect(client.events.pages(args))));
+    case "events.iterate":
+      return JSON.parse(
+        JSON.stringify(
+          await collect(eventPages(client.events.list(args), (args as { cursor?: string }).cursor)),
+        ),
+      );
   }
   // `assets.create` calls client.assets.create; `ensureLens` calls client.ensureLens.
   const path = operation.split(".");
   const owner = path
     .slice(0, -1)
     .reduce<any>((target, key) => target[key], client as unknown as Record<string, unknown>);
-  const method = owner[path.at(-1)!] as (options: unknown) => unknown;
-  // Every list's iterator yields its items in order.
+  // Iterating a list (`assets.iterate` iterates `assets.list`) yields its items in order.
+  const name = path.at(-1)!.replace(/^iterate/, "list");
+  const method = owner[name] as (options: unknown) => unknown;
   if (path.at(-1)!.startsWith("iterate"))
     return JSON.parse(
       JSON.stringify(await collect(method.call(owner, args) as AsyncIterable<unknown>)),

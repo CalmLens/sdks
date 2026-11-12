@@ -130,11 +130,11 @@ export const readConfigurationState = async (
   const [policies, assignedPolicy, uploadPresets, lenses, metadataFields, settings] =
     await Promise.all([
       config.policies || config.policy !== undefined || presetsNamePolicies
-        ? collect(client.policies.iterate())
+        ? collect(client.policies.list())
         : [],
       config.policy !== undefined ? client.policies.retrieveAssigned() : undefined,
-      config.uploadPresets ? collect(client.uploadPresets.iterate()) : [],
-      config.lenses ? collect(client.lenses.iterate()) : [],
+      config.uploadPresets ? collect(client.uploadPresets.list()) : [],
+      config.lenses ? collect(client.lenses.list()) : [],
       config.metadataFields ? client.metadataFields.list() : undefined,
       config.settings ? client.projectSettings.get() : undefined,
     ]);

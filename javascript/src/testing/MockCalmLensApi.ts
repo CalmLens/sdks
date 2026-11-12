@@ -85,15 +85,12 @@ const REVIEW_DECISIONS: readonly MockReviewDecision[] = [
  */
 const MOCK_OPERATIONS = [
   "assets.list",
-  "assets.iterate",
   "assets.search",
   "assets.retrieve",
   "assets.waitForDecision",
   "assets.update",
   "assets.listChildren",
-  "assets.iterateChildren",
   "assets.listTimeline",
-  "assets.iterateTimeline",
   "assets.create",
   "assets.classify",
   "assets.uploadPart",
@@ -109,26 +106,21 @@ const MOCK_OPERATIONS = [
   "cdn.getAssetInfo",
   "cdn.signAssetUrl",
   "events.list",
-  "events.pages",
   "folders.list",
-  "folders.iterate",
   "folders.retrieve",
   "folders.create",
   "folders.update",
   "folders.delete",
   "folders.move",
   "hashLists.list",
-  "hashLists.iterate",
   "hashLists.retrieve",
   "hashLists.create",
   "hashLists.update",
   "hashLists.delete",
   "hashLists.listEntries",
-  "hashLists.iterateEntries",
   "hashLists.addEntry",
   "hashLists.removeEntry",
   "policies.list",
-  "policies.iterate",
   "policies.retrieve",
   "policies.create",
   "policies.update",
@@ -139,7 +131,6 @@ const MOCK_OPERATIONS = [
   "policies.retrieveAssigned",
   "policies.assign",
   "lenses.list",
-  "lenses.iterate",
   "lenses.create",
   "lenses.retrieve",
   "lenses.update",
@@ -147,7 +138,6 @@ const MOCK_OPERATIONS = [
   "ensureLens",
   "ensureLenses",
   "uploadPresets.list",
-  "uploadPresets.iterate",
   "uploadPresets.ensure",
   "uploadPresets.delete",
   "projectSettings.get",
@@ -163,7 +153,7 @@ export type MockCalmLensOperation = (typeof MOCK_OPERATIONS)[number];
  * One request a mock client sent, as the in-memory API received it. `operation` is the client
  * method that sends it; requests several methods send are recorded under the first: `text.classify`
  * as `assets.classify`, `ensureLens` as `ensureLenses`, `assets.waitForDecision` polls as
- * `assets.retrieve`, `assets.iterate` pages as `assets.list`, and so on. `callsTo` matches all of
+ * `assets.retrieve`, and so on. `callsTo` matches all of
  * them. Methods that send nothing, such as `uploadTokens.sign` or a cached `ensureLens`, are not
  * recorded.
  */
@@ -715,23 +705,21 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
     const route = segments.slice(2).join("/");
     switch (route) {
       case "events":
-        return ["events.list", "events.pages"];
+        return ["events.list"];
       case "lenses":
         return method === "GET"
-          ? ["lenses.list", "lenses.iterate"]
+          ? ["lenses.list"]
           : method === "POST"
             ? ["lenses.create"]
             : ["ensureLenses", "ensureLens"];
       case "folders":
-        return method === "GET" ? ["folders.list", "folders.iterate"] : ["folders.create"];
+        return method === "GET" ? ["folders.list"] : ["folders.create"];
       case "hash-lists":
-        return method === "GET" ? ["hashLists.list", "hashLists.iterate"] : ["hashLists.create"];
+        return method === "GET" ? ["hashLists.list"] : ["hashLists.create"];
       case "policy":
         return method === "GET" ? ["policies.retrieveAssigned"] : ["policies.assign"];
       case "upload-presets":
-        return method === "GET"
-          ? ["uploadPresets.list", "uploadPresets.iterate"]
-          : ["uploadPresets.ensure"];
+        return method === "GET" ? ["uploadPresets.list"] : ["uploadPresets.ensure"];
       case "settings":
         return method === "GET" ? ["projectSettings.get"] : ["projectSettings.update"];
       case "metadata-fields":
@@ -743,12 +731,12 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
       case "signed-asset-urls":
         return ["cdn.signAssetUrl"];
       case "assets":
-        if (method === "GET") return ["assets.list", "assets.iterate"];
+        if (method === "GET") return ["assets.list"];
         if (query.get("wait") === "false") return ["assets.create"];
         return isTextUpload(request) ? ["assets.classify", "text.classify"] : ["assets.classify"];
     }
     if (segments[2] === "assets" && segments[4] === "timeline" && segments.length === 5) {
-      return ["assets.listTimeline", "assets.iterateTimeline"];
+      return ["assets.listTimeline"];
     }
     if (segments[2] === "metadata-fields" && segments.length === 4)
       return ["metadataFields.delete"];
@@ -756,8 +744,7 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
   }
   if (root === "policies") {
     const [, policyId, policyAction] = segments;
-    if (policyId === undefined)
-      return method === "GET" ? ["policies.list", "policies.iterate"] : ["policies.create"];
+    if (policyId === undefined) return method === "GET" ? ["policies.list"] : ["policies.create"];
     if (policyAction === "reset") return ["policies.reset"];
     if (policyAction === "upgrade") return ["policies.upgrade"];
     if (policyAction === "automatic-updates") return ["policies.setAutomaticUpdates"];
@@ -794,9 +781,7 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
   }
   if (root === "hash-lists" && id !== undefined) {
     if (action === "entries") {
-      return method === "GET"
-        ? ["hashLists.listEntries", "hashLists.iterateEntries"]
-        : ["hashLists.addEntry"];
+      return method === "GET" ? ["hashLists.listEntries"] : ["hashLists.addEntry"];
     }
     return method === "GET"
       ? ["hashLists.retrieve"]
@@ -816,7 +801,7 @@ const operationsOf = (request: MockRequest): MockCalmLensOperation[] => {
     case "content":
       return ["assets.removeContent"];
     case "children":
-      return ["assets.listChildren", "assets.iterateChildren"];
+      return ["assets.listChildren"];
     case "part":
       return ["assets.uploadPart"];
     case "move":

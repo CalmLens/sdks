@@ -510,15 +510,15 @@ export const DEFAULT_DECISION_TIMEOUT_MS = 60_000;
  * 1.5 times longer
  * each time, up to 2s. Rejects with `sdk/timeout` once `timeoutMs` passes without one.
  */
-export const pollForDecision = async (
-  retrieve: () => Promise<Asset>,
+export const pollForDecision = async <A extends Asset = Asset>(
+  retrieve: () => Promise<A>,
   {
     timeoutMs = DEFAULT_DECISION_TIMEOUT_MS,
     signal,
   }: Pick<WaitForAssetDecisionOptions, "timeoutMs" | "signal">,
   sleep: (ms: number, signal: AbortSignal | undefined) => Promise<void>,
   now: () => number = Date.now,
-): Promise<Asset> => {
+): Promise<A> => {
   if (!Number.isFinite(timeoutMs) || timeoutMs < 0) {
     throw invalidArgument("timeoutMs must be a non-negative number");
   }
