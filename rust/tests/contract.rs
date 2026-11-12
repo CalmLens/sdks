@@ -1,10 +1,12 @@
 //! Replays the shared SDK contract fixtures in `testdata/` (packages/sdk-contract/README.md):
 //! requests, paths, webhooks, upload tokens, transform options, mock behaviour scenarios, the
-//! capability surface (its capabilities, errorResponse and retryable errors) and refused requests.
-//! `client_cases.rs` replays the client cases, errors and surface defaults; each fixture is replayed
+//! capability surface (its capabilities, errorResponse and retryable errors), refused requests and
+//! declared types (`contract/declared_types.rs`). `client_cases.rs` replays the client cases, errors and surface defaults; each fixture is replayed
 //! in one of the two, read through `common::fixture`. Each fixture case runs on its own and a
 //! failure names the case.
 mod common;
+#[path = "contract/declared_types.rs"]
+mod declared_types;
 use calmlens::models::*;
 use calmlens::testing::{
     self, MockDecision, MockModerationInput, MockModerationTrigger, MockOptions, MockOutcome,
@@ -1271,7 +1273,7 @@ fn recording_moderate(
             "bytesBase64": input.content.bytes.as_ref()
                 .map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes)),
         }));
-        let by_name = name.as_deref().and_then(|name| spec["byName"].get(name));
+        let by_name = spec["byName"].get(name.as_str());
         let by_queue = (input.trigger == MockModerationTrigger::Upload)
             .then(|| spec.get(if input.queued { "queued" } else { "analyzed" }))
             .flatten();

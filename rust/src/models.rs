@@ -101,6 +101,51 @@ pub mod strict {
     }
 }
 
+/// Describes a struct or serde enum for the declared-type contract test; see [`describe`].
+#[cfg(feature = "strict-contract")]
+macro_rules! described {
+    ($(#[$meta:meta])* $vis:vis struct $name:ident {
+        $($(#[$fmeta:meta])* $fvis:vis $field:ident : $ty:ty),* $(,)?
+    }) => {
+        impl crate::models::describe::Described for $name {
+            fn shape() -> crate::models::describe::Shape {
+                crate::models::describe::Shape::Struct {
+                    name: stringify!($name),
+                    attrs: &[$(stringify!($meta)),*],
+                    fields: || vec![$(crate::models::describe::Field {
+                        name: stringify!($field),
+                        attrs: &[$(stringify!($fmeta)),*],
+                        shape: <$ty as crate::models::describe::Described>::shape,
+                    }),*],
+                }
+            }
+        }
+    };
+    ($(#[$meta:meta])* $vis:vis enum $name:ident {
+        $($(#[$vmeta:meta])* $variant:ident $(($ty:ty))?),* $(,)?
+    }) => {
+        impl crate::models::describe::Described for $name {
+            fn shape() -> crate::models::describe::Shape {
+                crate::models::describe::Shape::Union {
+                    name: stringify!($name),
+                    attrs: &[$(stringify!($meta)),*],
+                    variants: || vec![$(crate::models::describe::Field {
+                        name: stringify!($variant),
+                        attrs: &[$(stringify!($vmeta)),*],
+                        shape: described!(@payload $($ty)?),
+                    }),*],
+                }
+            }
+        }
+    };
+    (@payload) => { <() as crate::models::describe::Described>::shape };
+    (@payload $ty:ty) => { <$ty as crate::models::describe::Described>::shape };
+}
+
+#[cfg(feature = "strict-contract")]
+#[doc(hidden)]
+pub mod describe;
+
 macro_rules! string_enum {
     ($(#[$meta:meta])* $name:ident { $( $(#[$vmeta:meta])* $variant:ident = $value:literal ),* $(,)? }) => {
         $(#[$meta])*
@@ -117,6 +162,21 @@ macro_rules! string_enum {
                 match self {
                     $(Self::$variant => $value,)*
                     Self::Unknown(value) => value,
+                }
+            }
+        }
+        #[cfg(feature = "strict-contract")]
+        impl $name {
+            /// Contract-test support: the wire values of the known variants.
+            #[doc(hidden)]
+            pub const VALUES: &'static [&'static str] = &[$($value),*];
+        }
+        #[cfg(feature = "strict-contract")]
+        impl crate::models::describe::Described for $name {
+            fn shape() -> crate::models::describe::Shape {
+                crate::models::describe::Shape::Enum {
+                    name: stringify!($name),
+                    values: Self::VALUES,
                 }
             }
         }
@@ -604,6 +664,10 @@ string_enum! {
 }
 
 /// Processing options for an asset.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessingOptions {
@@ -627,6 +691,10 @@ pub struct ProcessingOptions {
 
 /// Optional analyses to run on an asset, keyed by feature. The API rejects unknown features.
 /// Results of person and face detection are in [`AssetClassification::face_detection`].
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessingFeatures {
@@ -663,6 +731,10 @@ pub struct ProcessingFeatures {
 }
 
 /// Options for a feature that only needs turning on.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeatureOptions {
@@ -683,6 +755,10 @@ impl FeatureOptions {
 }
 
 /// Face detection options.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FaceDetectionOptions {
@@ -940,6 +1016,10 @@ impl<'de> Deserialize<'de> for Content {
 /// Options for [`AssetsClient::create`](crate::AssetsClient::create) and
 /// [`classify`](crate::AssetsClient::classify). Supply exactly one of `content`, `part` (the
 /// first part of a multipart upload) or `url`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SubmitAsset {
@@ -1039,6 +1119,10 @@ pub const MODERATION_CONTEXT_USED_CHARACTERS: usize = 2_000;
 
 /// Earlier posts in a conversation, oldest first, that CalmLens reads to understand the content
 /// it moderates.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModerationContext {
@@ -1055,6 +1139,10 @@ impl ModerationContext {
 }
 
 /// An earlier post in the conversation.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModerationContextItem {
@@ -1103,6 +1191,10 @@ pub fn select_moderation_context_items(
 }
 
 /// A metadata item.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MetadataItem {
@@ -1122,6 +1214,10 @@ impl MetadataItem {
 }
 
 /// Identifies an asset.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetId {
@@ -1138,6 +1234,10 @@ impl AssetId {
 }
 
 /// Options for [`AssetsClient::wait_for_decision`](crate::AssetsClient::wait_for_decision).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default)]
 pub struct WaitForDecision {
     /// The asset ID.
@@ -1161,6 +1261,10 @@ impl WaitForDecision {
 }
 
 /// Identifies a folder.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderId {
@@ -1177,6 +1281,10 @@ impl FolderId {
 }
 
 /// Options for listing assets.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListAssets {
@@ -1197,6 +1305,10 @@ pub struct ListAssets {
 }
 
 /// Options for listing an asset's children.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListChildren {
@@ -1208,9 +1320,6 @@ pub struct ListChildren {
     /// Items per page, 1 to 100.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
-    /// A filter such as `classification.moderation.status==allowed`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub filter: Option<String>,
     /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
     /// such as `-createdAt,id`. Newest first by default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1218,6 +1327,10 @@ pub struct ListChildren {
 }
 
 /// Options for listing an audio or video asset's findings timeline.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTimeline {
@@ -1232,6 +1345,10 @@ pub struct ListTimeline {
 }
 
 /// Changes to an asset. [`Patch::Missing`] fields are left unchanged.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateAsset {
@@ -1250,9 +1367,6 @@ pub struct UpdateAsset {
     /// The metadata items.
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub metadata: Patch<Vec<MetadataItem>>,
-    /// The folder.
-    #[serde(default, skip_serializing_if = "Patch::is_missing")]
-    pub folder_id: Patch<String>,
     /// Your ID for the asset.
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub external_id: Patch<String>,
@@ -1265,6 +1379,10 @@ pub struct UpdateAsset {
 }
 
 /// Options for [`AssetsClient::explain`](crate::AssetsClient::explain).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExplainAsset {
@@ -1278,6 +1396,10 @@ pub struct ExplainAsset {
 }
 
 /// A reviewer's decision for [`AssetsClient::decide`](crate::AssetsClient::decide).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DecideAsset {
@@ -1310,6 +1432,10 @@ impl DecideAsset {
 }
 
 /// Moves an asset to a folder, or to the project root with `folder_id: None`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveAsset {
@@ -1321,6 +1447,10 @@ pub struct MoveAsset {
 }
 
 /// What [`crate::AssetsClient::batch`] does to every asset.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum AssetBatchOperation {
@@ -1345,6 +1475,10 @@ impl fmt::Display for AssetBatchOperation {
 }
 
 /// Deletes up to 500 assets, or removes their stored content, in one request.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchAssets {
@@ -1365,6 +1499,10 @@ string_enum! {
 /// The response of [`crate::AssetsClient::batch`]: the operation is queued. Follow it in the
 /// events feed: each `asset.deleted` or `asset.content-removed` event it records carries a
 /// `batch-id` fact naming `batch_id`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1381,6 +1519,10 @@ pub struct BatchAssetsResponse {
 }
 
 /// A later part of a multipart upload.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadPart {
@@ -1404,6 +1546,10 @@ pub struct UploadPart {
 /// `resource`, `lens`, `transform` and `viewer_claims` aren't part of the grant: they are appended
 /// to the signed URL exactly as [`CdnClient::get_asset_url`](crate::CdnClient::get_asset_url)
 /// appends them, and can be changed later without signing again.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignAssetUrlOptions {
@@ -1441,6 +1587,10 @@ pub struct SignAssetUrlOptions {
 }
 
 /// Options for [`CdnClient::get_asset_info`](crate::CdnClient::get_asset_info).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetAssetInfoOptions {
@@ -1450,6 +1600,10 @@ pub struct GetAssetInfoOptions {
 }
 
 /// Options for creating a folder.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateFolder {
@@ -1461,6 +1615,10 @@ pub struct CreateFolder {
 }
 
 /// Changes to a folder.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateFolder {
@@ -1468,11 +1626,15 @@ pub struct UpdateFolder {
     #[serde(skip_serializing)]
     pub folder_id: String,
     /// The new name.
-    #[serde(default, skip_serializing_if = "Patch::is_missing")]
-    pub name: Patch<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 }
 
 /// Moves a folder under another, or to the project root with `parent_id: None`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveFolder {
@@ -1486,6 +1648,10 @@ pub struct MoveFolder {
 /// Options for one page of the events feed. A cursor belongs to the filters it was issued with,
 /// so pass the same `types` and `asset_id` with each `cursor`; other filters fail with
 /// `cursor/invalid`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListEvents {
@@ -1506,6 +1672,10 @@ pub struct ListEvents {
 
 /// A named lens definition, for [`ServerClient::ensure_lenses`](crate::ServerClient::ensure_lenses)
 /// and [`LensesClient::create`](crate::LensesClient::create).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LensDefinition {
@@ -1528,6 +1698,10 @@ pub struct LensDefinition {
 }
 
 /// Options for one page of the project's lenses.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListLenses {
@@ -1544,6 +1718,10 @@ pub struct ListLenses {
 }
 
 /// Identifies a lens.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LensId {
@@ -1561,6 +1739,10 @@ impl LensId {
 
 /// Changes to a lens; `None` and [`Patch::Missing`] fields are left unchanged. Its identifier
 /// can't change.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateLens {
@@ -1594,6 +1776,10 @@ impl UpdateLens {
 }
 
 /// A page of the project's lenses.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1606,13 +1792,17 @@ pub struct LensPage {
     pub next_cursor: Option<String>,
     /// Whether another page follows.
     #[serde(default)]
-    pub has_more: Option<bool>,
+    pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<LensPage, _>")]
     pub extra: HashMap<String, Value>,
 }
 
 /// Options for [`ServerClient::ensure_lenses`](crate::ServerClient::ensure_lenses).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnsureLenses {
@@ -1628,6 +1818,10 @@ pub struct EnsureLenses {
 /// Without a `resource`, `get_asset_url` returns the asset URL itself, which takes no lens or
 /// transform; `serve` fetches the rendered resource. Only the rendered and preview resources take
 /// a `lens` or `transform`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CdnRequest {
@@ -1682,6 +1876,10 @@ impl CdnRequest {
 }
 
 /// HTTP method and headers for a CDN request. The SDK always sends its own API key.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpOptions {
@@ -1694,6 +1892,10 @@ pub struct HttpOptions {
 }
 
 /// An asset.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1704,7 +1906,7 @@ pub struct Asset {
     pub id: String,
     /// The owning project.
     #[serde(default)]
-    pub project_id: Option<String>,
+    pub project_id: String,
     /// The parent asset, for child assets CalmLens extracts during processing.
     #[serde(default)]
     pub parent_id: Option<String>,
@@ -1720,16 +1922,16 @@ pub struct Asset {
     pub upload_preset_id: Option<String>,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
-    pub created_at: Option<u64>,
+    pub created_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
     pub updated_at: Option<u64>,
     /// The asset type (`type` on the wire).
     #[serde(default, rename = "type")]
-    pub asset_type: Option<AssetType>,
+    pub asset_type: AssetType,
     /// The name.
     #[serde(default)]
-    pub name: Option<String>,
+    pub name: String,
     /// The description.
     #[serde(default)]
     pub description: Option<String>,
@@ -1803,14 +2005,28 @@ impl Asset {
     }
 }
 
+string_enum! {
+    /// Whether an asset's content has been received.
+    AssetUploadStatus {
+        /// Parts of a multipart upload are still being received.
+        Uploading = "uploading",
+        /// All content was received.
+        Completed = "completed",
+    }
+}
+
 /// Source upload progress.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AssetUpload {
     /// Classification or upload progress.
     #[serde(default)]
-    pub status: String,
+    pub status: AssetUploadStatus,
     /// When the state last changed, in milliseconds since the Unix epoch.
     #[serde(default)]
     pub updated_at: Option<u64>,
@@ -1823,6 +2039,10 @@ pub struct AssetUpload {
 }
 
 /// Classification progress and capability results.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1876,6 +2096,10 @@ pub struct AssetClassification {
 }
 
 /// How far the analysis of a long audio or video asset, done in sections, has got.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1895,6 +2119,10 @@ pub struct AssetClassificationProgress {
 }
 
 /// One reviewer decision in an asset's review history.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1926,6 +2154,10 @@ string_enum! {
 }
 
 /// Who made a reviewer's decision on an asset: a person, or an API key through the API.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1939,6 +2171,10 @@ pub struct ReviewActor {
 }
 
 /// The policy that made a decision: its ID, its revision then and the preset release it used.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1955,19 +2191,37 @@ pub struct DecisionPolicy {
 }
 
 /// The built-in preset release a decision's policy used.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DecisionPolicyPreset {
     /// The preset's ID.
     #[serde(default)]
-    pub id: String,
+    pub id: PolicyPresetId,
     /// The preset release.
     #[serde(default)]
     pub version: u64,
 }
 
+string_enum! {
+    /// Why an asset is waiting for human review.
+    PendingReviewReason {
+        /// The decision was sampled for review.
+        Sampled = "sampled",
+        /// The classification was uncertain.
+        Uncertain = "uncertain",
+    }
+}
+
 /// A review the human review queue is waiting for.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1977,13 +2231,31 @@ pub struct AssetPendingReview {
     pub requested_at: i64,
     /// `sampled` or `uncertain`.
     #[serde(default)]
-    pub reason: String,
+    pub reason: PendingReviewReason,
     /// The categories that made the decision uncertain; empty for a sampled decision.
     #[serde(default)]
     pub uncertain_categories: Vec<ClassificationCategory>,
 }
 
+string_enum! {
+    /// What determined an asset's automated moderation status.
+    ModerationSource {
+        /// The moderation policy.
+        Policy = "policy",
+        /// The rules for content involving children.
+        Children = "children",
+        /// A hash list match.
+        HashList = "hash-list",
+        /// A rule every policy applies.
+        MandatoryRule = "mandatory-rule",
+    }
+}
+
 /// Content-safety findings and decision.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2010,7 +2282,7 @@ pub struct AssetModeration {
     pub pending_review: Option<AssetPendingReview>,
     /// What determined the automated status.
     #[serde(default)]
-    pub source: Option<String>,
+    pub source: Option<ModerationSource>,
     /// Mandatory rule that determined the automated status.
     #[serde(default)]
     pub rule: Option<String>,
@@ -2044,6 +2316,10 @@ pub struct AssetModeration {
 }
 
 /// Whether CalmLens holds an asset's content, and the content's details.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2126,6 +2402,10 @@ pub struct AssetContent {
 }
 
 /// Summary of an audio or video asset's findings timeline.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2142,6 +2422,10 @@ pub struct AssetModerationTimeline {
 }
 
 /// Detection findings before policy evaluation.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2155,6 +2439,10 @@ pub struct ModerationRaw {
 }
 
 /// How strongly a category meets the policy, from 0 to 1, and what the policy does with it.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2164,7 +2452,7 @@ pub struct CategoryPolicyScore {
     pub score: f64,
     /// `allow`, `limit`, `age-restrict`, `block` or `purge`.
     #[serde(default)]
-    pub action: String,
+    pub action: FlaggedContentAction,
     /// The rule that decided the category, or that its policy score stayed below 50%.
     #[serde(default)]
     pub source: Option<CategoryPolicySource>,
@@ -2173,14 +2461,32 @@ pub struct CategoryPolicyScore {
     pub settings: Option<CategoryPolicySettingsSnapshot>,
 }
 
+string_enum! {
+    /// What set a category's action.
+    CategoryPolicySourceKind {
+        /// The category's default action.
+        Default = "default",
+        /// The score was below the category's threshold.
+        BelowThreshold = "below-threshold",
+        /// An allowance rule.
+        Allowance = "allowance",
+        /// A restriction rule.
+        Restriction = "restriction",
+    }
+}
+
 /// The rule that decided the outcome, or that the policy score stayed below 50%.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CategoryPolicySource {
     /// `allowance`, `restriction`, `default` or `below-threshold`.
     #[serde(default)]
-    pub kind: String,
+    pub kind: CategoryPolicySourceKind,
     /// For an allowance or restriction, the indexes of the deciding rules, the decisive rule
     /// first; `None` for `default` and `below-threshold`.
     #[serde(default)]
@@ -2194,6 +2500,10 @@ pub struct CategoryPolicySource {
 }
 
 /// A named rule in force when the asset was decided.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2203,23 +2513,27 @@ pub struct PolicyRuleSnapshot {
     pub name: Option<String>,
     /// Saved when.
     #[serde(default)]
-    pub when: Vec<String>,
+    pub when: Vec<ModerationQualifier>,
     /// Same-instance exclusions.
     #[serde(default)]
-    pub unless: Option<Vec<String>>,
+    pub unless: Option<Vec<ModerationQualifier>>,
     /// Saved action.
     #[serde(default)]
-    pub action: String,
+    pub action: FlaggedContentAction,
 }
 
 /// Historical category settings for explaining the decision.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CategoryPolicySettingsSnapshot {
     /// Saved default action.
     #[serde(default)]
-    pub action: String,
+    pub action: FlaggedContentAction,
     /// Saved allowances.
     #[serde(default)]
     pub allowances: Vec<PolicyRuleSnapshot>,
@@ -2228,16 +2542,54 @@ pub struct CategoryPolicySettingsSnapshot {
     pub restrictions: Vec<PolicyRuleSnapshot>,
 }
 
+string_enum! {
+    /// A region with its own moderation rules.
+    ModerationRegion {
+        /// Germany.
+        De = "DE",
+        /// Austria.
+        At = "AT",
+        /// France.
+        Fr = "FR",
+        /// The United Kingdom.
+        Gb = "GB",
+        /// The European Union.
+        Eu = "EU",
+        /// Australia.
+        Au = "AU",
+        /// Brazil.
+        Br = "BR",
+    }
+}
+
+string_enum! {
+    /// The moderation status a regional rule sets for viewers in its region.
+    RegionalDecisionStatus {
+        /// Delivered, marked so your app can reduce its reach.
+        Limited = "limited",
+        /// Delivered only through signed URLs or with an API key.
+        AgeRestricted = "age-restricted",
+        /// Not delivered; the content is kept.
+        Blocked = "blocked",
+        /// Not delivered, and the stored content is deleted.
+        Purged = "purged",
+    }
+}
+
 /// A stricter delivery decision in one jurisdiction the project serves.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct RegionalDecision {
     /// Viewer country or rule jurisdiction.
-    pub region: String,
+    pub region: ModerationRegion,
     /// The status in force in the region, stricter than the asset's moderation status:
     /// `limited`, `age-restricted`, `blocked` or `purged`.
-    pub status: AssetModerationDecision,
+    pub status: RegionalDecisionStatus,
     /// Stable mandatory rule key.
     pub rule: String,
     /// The category whose findings the rule acted on, when it acts on one.
@@ -2246,13 +2598,17 @@ pub struct RegionalDecision {
 }
 
 /// One category's result.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CategoryResult {
     /// Whether the category was assessed.
     #[serde(default)]
-    pub status: Option<EvaluationStatus>,
+    pub status: EvaluationStatus,
     /// The score from 0 to 1, unless `status` is `NotEvaluated`.
     #[serde(default)]
     pub score: Option<f64>,
@@ -2270,7 +2626,21 @@ pub struct CategoryResult {
     pub extra: HashMap<String, Value>,
 }
 
+string_enum! {
+    /// Whether a moderation qualifier was assessed.
+    QualifierEvaluationStatus {
+        /// Assessed.
+        Evaluated = "evaluated",
+        /// Not assessed; `reason` says why.
+        NotEvaluated = "not-evaluated",
+    }
+}
+
 /// A qualifier's result.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2279,8 +2649,8 @@ pub struct QualifierResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub all_score: Option<f64>,
     /// Whether the qualifier was assessed.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<EvaluationStatus>,
+    #[serde(default)]
+    pub status: QualifierEvaluationStatus,
     /// Confidence that some of the content is this qualifier, from 0 to 1, when evaluated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub some_score: Option<f64>,
@@ -2319,6 +2689,10 @@ string_enum! {
 }
 
 /// Results of the features requested in [`ProcessingOptions::features`], keyed by feature.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2339,13 +2713,17 @@ pub struct ProcessingFeatureResults {
 
 /// Person detection's result. `people` is present when `status` is `Evaluated`, and `reason`
 /// when it is `NotEvaluated`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct PersonDetectionResult {
     /// Whether the feature ran.
     #[serde(default)]
-    pub status: Option<FeatureResultStatus>,
+    pub status: FeatureResultStatus,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<FeatureNotEvaluatedReason>,
@@ -2359,13 +2737,17 @@ pub struct PersonDetectionResult {
 
 /// Face detection's result. `faces` is present when `status` is `Evaluated`, and `reason`
 /// when it is `NotEvaluated`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct FaceDetectionResult {
     /// Whether the feature ran.
     #[serde(default)]
-    pub status: Option<FeatureResultStatus>,
+    pub status: FeatureResultStatus,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<FeatureNotEvaluatedReason>,
@@ -2379,13 +2761,17 @@ pub struct FaceDetectionResult {
 
 /// Link detection's result. `qr_codes` and `links` are present when `status` is `Evaluated`,
 /// and `reason` when it is `NotEvaluated`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct LinkDetectionResult {
     /// Whether the feature ran.
     #[serde(default)]
-    pub status: Option<FeatureResultStatus>,
+    pub status: FeatureResultStatus,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<FeatureNotEvaluatedReason>,
@@ -2401,6 +2787,10 @@ pub struct LinkDetectionResult {
 }
 
 /// A detected QR code.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2427,6 +2817,10 @@ string_enum! {
 }
 
 /// A detected link.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2444,6 +2838,10 @@ pub struct DetectedLink {
 
 /// Preview. Link safety's result. `links` is present when `status` is `Evaluated`, and `reason`
 /// when it is `NotEvaluated`. Link checks never change a moderation category's score.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2518,6 +2916,10 @@ string_enum! {
 }
 
 /// Preview. A link in the asset and what its destination is.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2548,6 +2950,10 @@ pub struct CheckedLink {
 
 /// Preview. One reputation check of a link, every address it redirects through and its
 /// destination.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2568,6 +2974,10 @@ pub struct LinkSafetyEvidence {
 }
 
 /// Preview. What a policy's link-safety section made of an asset's links.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2588,6 +2998,10 @@ pub struct LinkSafetyDecision {
 
 /// Preview. What happens to assets that link to unsafe destinations. Link checks never change a
 /// moderation category's score.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2606,6 +3020,10 @@ pub struct LinkSafetySettings {
 }
 
 /// Preview. The action for links that lead outside the allowed domains.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2648,6 +3066,10 @@ string_enum! {
 
 /// AI-generation detection's result. `provenance` and `signals` are present when `status` is
 /// `Evaluated`, and `reason` when it is `NotEvaluated`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2673,6 +3095,10 @@ pub struct AiGeneratedDetectionResult {
 }
 
 /// One piece of provenance metadata.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2689,6 +3115,10 @@ pub struct AiGeneratedSignal {
 }
 
 /// What OCR found in an image. Its text is in `content.extracted_text`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2709,6 +3139,10 @@ pub struct OcrResult {
 }
 
 /// A region of text found in an image.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2724,14 +3158,26 @@ pub struct TextRegion {
     pub extra: HashMap<String, Value>,
 }
 
+string_enum! {
+    /// Where a hash match came from.
+    HashMatchSource {
+        /// A hash list.
+        HashList = "hash-list",
+    }
+}
+
 /// A hash list entry an image matched.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct HashMatch {
     /// Where the match came from: `hash-list`.
     #[serde(default)]
-    pub source: String,
+    pub source: HashMatchSource,
     /// The hash list.
     #[serde(default)]
     pub hash_list_id: String,
@@ -2750,6 +3196,10 @@ pub struct HashMatch {
 }
 
 /// A detected person.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2766,6 +3216,10 @@ pub struct DetectedPerson {
 }
 
 /// A detected face.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2786,6 +3240,10 @@ pub struct DetectedFace {
 
 /// Position and size as fractions of the image width and height, from 0 to 1. `left` and
 /// `top` can be slightly negative when the subject extends past the edge.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2808,6 +3266,10 @@ pub struct BoundingBox {
 }
 
 /// An estimated age range in years. Estimates can be off by several years.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2824,6 +3286,10 @@ pub struct AgeRange {
 }
 
 /// A time segment's results.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2849,6 +3315,10 @@ pub struct MediaClassificationSegment {
 }
 
 /// A page of assets.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2861,7 +3331,7 @@ pub struct AssetPage {
     pub next_cursor: Option<String>,
     /// Whether another page follows.
     #[serde(default)]
-    pub has_more: Option<bool>,
+    pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetPage, _>")]
     pub extra: HashMap<String, Value>,
@@ -2871,13 +3341,17 @@ impl AssetPage {
     pub fn new(items: Vec<Asset>, has_more: bool) -> Self {
         Self {
             items,
-            has_more: Some(has_more),
+            has_more,
             ..Self::default()
         }
     }
 }
 
 /// A page of an audio or video asset's findings timeline, in time order.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2890,13 +3364,17 @@ pub struct AssetTimelinePage {
     pub next_cursor: Option<String>,
     /// Whether another page follows.
     #[serde(default)]
-    pub has_more: Option<bool>,
+    pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetTimelinePage, _>")]
     pub extra: HashMap<String, Value>,
 }
 
 /// A folder.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2905,16 +3383,16 @@ pub struct Folder {
     pub id: String,
     /// The name.
     #[serde(default)]
-    pub name: Option<String>,
+    pub name: String,
     /// The parent folder, or `None` at the project root.
     #[serde(default)]
     pub parent_id: Option<String>,
     /// The owning project.
     #[serde(default)]
-    pub project_id: Option<String>,
+    pub project_id: String,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
-    pub created_at: Option<u64>,
+    pub created_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
     pub updated_at: Option<u64>,
@@ -2927,19 +3405,145 @@ impl Folder {
     pub fn new(id: impl Into<String>, name: impl Into<String>, parent_id: Option<String>) -> Self {
         Self {
             id: id.into(),
-            name: Some(name.into()),
+            name: name.into(),
             parent_id,
             ..Self::default()
         }
     }
 }
 
+string_enum! {
+    /// The key of an event fact, registered for its event type.
+    EventFactKey {
+        /// The `asset-name` fact.
+        AssetName = "asset-name",
+        /// The `asset-type` fact.
+        AssetType = "asset-type",
+        /// The `file-format` fact.
+        FileFormat = "file-format",
+        /// The `test` fact.
+        Test = "test",
+        /// The `parent-asset` fact.
+        ParentAsset = "parent-asset",
+        /// The `flagged-categories` fact.
+        FlaggedCategories = "flagged-categories",
+        /// The `moderation-status` fact.
+        ModerationStatus = "moderation-status",
+        /// The `automated-status` fact.
+        AutomatedStatus = "automated-status",
+        /// The `region` fact.
+        Region = "region",
+        /// The `rule` fact.
+        Rule = "rule",
+        /// The `status` fact.
+        Status = "status",
+        /// The `reviewer-name` fact.
+        ReviewerName = "reviewer-name",
+        /// The `note` fact.
+        Note = "note",
+        /// The `child-asset` fact.
+        ChildAsset = "child-asset",
+        /// The `child-status` fact.
+        ChildStatus = "child-status",
+        /// The `previous-status` fact.
+        PreviousStatus = "previous-status",
+        /// The `failure-reason` fact.
+        FailureReason = "failure-reason",
+        /// The `completed-sections` fact.
+        CompletedSections = "completed-sections",
+        /// The `total-sections` fact.
+        TotalSections = "total-sections",
+        /// The `batch-id` fact.
+        BatchId = "batch-id",
+        /// The `review-reason` fact.
+        ReviewReason = "review-reason",
+        /// The `uncertain-categories` fact.
+        UncertainCategories = "uncertain-categories",
+        /// The `review-id` fact.
+        ReviewId = "review-id",
+        /// The `decision` fact.
+        Decision = "decision",
+        /// The `applied-to-asset` fact.
+        AppliedToAsset = "applied-to-asset",
+        /// The `hash-list-id` fact.
+        HashListId = "hash-list-id",
+        /// The `hash-list-name` fact.
+        HashListName = "hash-list-name",
+        /// The `distance` fact.
+        Distance = "distance",
+        /// The `match-action` fact.
+        MatchAction = "match-action",
+        /// The `limit` fact.
+        Limit = "limit",
+        /// The `used` fact.
+        Used = "used",
+        /// The `organisation-id` fact.
+        OrganisationId = "organisation-id",
+        /// The `reason` fact.
+        Reason = "reason",
+        /// The `resumes-at` fact.
+        ResumesAt = "resumes-at",
+        /// The `preset-id` fact.
+        PresetId = "preset-id",
+        /// The `preset-name` fact.
+        PresetName = "preset-name",
+        /// The `daily-limit` fact.
+        DailyLimit = "daily-limit",
+        /// The `member-user-id` fact.
+        MemberUserId = "member-user-id",
+        /// The `member-name` fact.
+        MemberName = "member-name",
+        /// The `role` fact.
+        Role = "role",
+        /// The `previous-role` fact.
+        PreviousRole = "previous-role",
+        /// The `invitee-email` fact.
+        InviteeEmail = "invitee-email",
+        /// The `previous-organisation-id` fact.
+        PreviousOrganisationId = "previous-organisation-id",
+        /// The `previous-organisation-name` fact.
+        PreviousOrganisationName = "previous-organisation-name",
+        /// The `organisation-name` fact.
+        OrganisationName = "organisation-name",
+        /// The `method` fact.
+        Method = "method",
+        /// The `api-keys-revoked` fact.
+        ApiKeysRevoked = "api-keys-revoked",
+        /// The `connectors-paused` fact.
+        ConnectorsPaused = "connectors-paused",
+        /// The `key-id` fact.
+        KeyId = "key-id",
+        /// The `key-name` fact.
+        KeyName = "key-name",
+        /// The `created-by-name` fact.
+        CreatedByName = "created-by-name",
+        /// The `revoked-by-name` fact.
+        RevokedByName = "revoked-by-name",
+        /// The `deleted-by-name` fact.
+        DeletedByName = "deleted-by-name",
+        /// The `connector-id` fact.
+        ConnectorId = "connector-id",
+        /// The `connector-name` fact.
+        ConnectorName = "connector-name",
+        /// The `connector-type` fact.
+        ConnectorType = "connector-type",
+        /// The `consecutive-failures` fact.
+        ConsecutiveFailures = "consecutive-failures",
+        /// The `last-error` fact.
+        LastError = "last-error",
+    }
+}
+
 /// An event fact registered for the event type.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EventFact {
     /// The registered fact key, e.g. `reviewer`.
-    pub key: String,
+    pub key: EventFactKey,
     /// The value.
     pub value: Value,
     /// A link for the fact.
@@ -2966,6 +3570,10 @@ string_enum! {
 
 /// Who caused an event: a `user` (or an assistant acting for one), an `api-key`, `automated`
 /// moderation or CalmLens itself (`system`).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -2989,6 +3597,10 @@ impl Actor {
 }
 
 /// An event from the events feed.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3013,10 +3625,10 @@ pub struct Event {
     pub actor: Actor,
     /// The severity.
     #[serde(default)]
-    pub severity: Option<EventSeverity>,
+    pub severity: EventSeverity,
     /// The title.
     #[serde(default)]
-    pub title: Option<String>,
+    pub title: String,
     /// The description.
     #[serde(default)]
     pub description: Option<String>,
@@ -3053,6 +3665,10 @@ impl Event {
 /// events feed. Read it with [`crate::construct_webhook_event`], which checks the fields' types
 /// first; [`json`](Self::json) returns the body as received, including fields this SDK version
 /// does not model.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3107,8 +3723,9 @@ impl WebhookEventPayload {
             project_id: event.project_id.clone(),
             // An event built without an actor, e.g. for a mock, is delivered without one.
             actor: (event.actor != Actor::default()).then(|| event.actor.clone()),
-            severity: event.severity.clone(),
-            title: event.title.clone(),
+            // Likewise an event built without a severity or title, which the API always sets.
+            severity: (event.severity != EventSeverity::default()).then(|| event.severity.clone()),
+            title: (!event.title.is_empty()).then(|| event.title.clone()),
             description: event.description.clone(),
             asset_id: event.asset_id.clone(),
             asset_sequence: event.asset_sequence,
@@ -3229,6 +3846,10 @@ impl EventAsset {
 }
 
 /// A page of the events feed.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3266,31 +3887,35 @@ impl EventsPage {
 
 /// A named image transform the CDN applies to an asset's rendered or preview image, selected
 /// with `/@<identifier>`. The CDN serves files made with its current definition.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct Lens {
     /// The lens ID.
     #[serde(default)]
-    pub id: Option<String>,
+    pub id: String,
     /// The identifier, used in CDN URLs as `@identifier`.
     #[serde(default)]
     pub identifier: String,
     /// The display name.
     #[serde(default)]
-    pub name: Option<String>,
+    pub name: String,
     /// The asset type the lens applies to (`type` on the wire).
     #[serde(default, rename = "type")]
-    pub lens_type: Option<LensType>,
+    pub lens_type: LensType,
     /// Whether the CDN serves the lens.
     #[serde(default)]
-    pub active: Option<bool>,
+    pub active: bool,
     /// The owning project; `None` for built-in lenses.
     #[serde(default)]
     pub project_id: Option<String>,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
-    pub created_at: Option<u64>,
+    pub created_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
     pub updated_at: Option<u64>,
@@ -3307,6 +3932,10 @@ pub struct Lens {
 
 /// A signed asset URL, or a resource URL beneath it, from
 /// [`CdnClient::sign_asset_url`](crate::CdnClient::sign_asset_url).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3336,6 +3965,10 @@ string_enum! {
 /// An asset's display info, the CDN's info resource: the public asset fields a viewer needs, with
 /// the same names as on [`Asset`], and whether this viewer can see it now. It never holds
 /// moderation results, metadata, names, tags or extracted text.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3362,6 +3995,10 @@ pub struct AssetInfo {
 }
 
 /// The part of [`AssetContent`] that [`AssetInfo`] carries.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3410,6 +4047,10 @@ string_enum! {
 }
 
 /// The one displayable file of an asset, as the CDN's rendered resource serves it.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3437,8 +4078,40 @@ pub struct AssetRendered {
     pub extra: HashMap<String, Value>,
 }
 
+string_enum! {
+    /// Whether an asset's adaptive stream can be played.
+    AssetHlsStatus {
+        /// Being prepared.
+        Preparing = "preparing",
+        /// Ready to play.
+        Ready = "ready",
+        /// Not available; `reason` says why.
+        Unavailable = "unavailable",
+    }
+}
+
+string_enum! {
+    /// Why an asset's adaptive stream is unavailable.
+    AssetHlsUnavailableReason {
+        /// The plan's streaming allowance is used up.
+        AllowanceUsed = "allowance-used",
+        /// Streaming needs billing to be set up.
+        BillingRequired = "billing-required",
+        /// The project's spend limit was reached.
+        SpendLimit = "spend-limit",
+        /// Preparing the stream failed.
+        ProcessingFailed = "processing-failed",
+        /// The content is not retained.
+        ContentNotKept = "content-not-kept",
+    }
+}
+
 /// The adaptive (HLS) stream of audio or video asked for, with fragmented MP4 (CMAF) segments,
 /// as the CDN's hls resource serves it once it is ready.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3446,11 +4119,11 @@ pub struct AssetHls {
     /// `preparing` until the stream is saved, `ready` once `renditions` lists it, `unavailable`
     /// when it won't be prepared: see `reason`.
     #[serde(default)]
-    pub status: String,
+    pub status: AssetHlsStatus,
     /// Why an `unavailable` stream isn't prepared: `allowance-used`, `billing-required`,
     /// `spend-limit`, `processing-failed` or `content-not-kept`. `None` otherwise.
     #[serde(default)]
-    pub reason: Option<String>,
+    pub reason: Option<AssetHlsUnavailableReason>,
     /// Every rendition, video from the largest down, then audio; empty until the stream is ready.
     #[serde(default)]
     pub renditions: Vec<AssetHlsRendition>,
@@ -3470,6 +4143,10 @@ string_enum! {
 }
 
 /// One rendition of the adaptive stream, as the HLS master playlist lists it.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3497,6 +4174,10 @@ pub struct AssetHlsRendition {
 /// A still image for an asset, as the CDN's preview resource serves it: the image itself, a
 /// document's first page or slide, a website's first screen, a video's poster frame or an audio
 /// waveform.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3521,6 +4202,10 @@ pub struct AssetPreview {
 }
 
 /// Digests of an asset's uploaded content.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3546,16 +4231,20 @@ pub struct Checksums {
 }
 
 /// A safety hold.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct SafetyHold {
     /// Why the asset is held.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reason: Option<SafetyHoldReason>,
+    #[serde(default)]
+    pub reason: SafetyHoldReason,
     /// Milliseconds since the Unix epoch.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub placed_at: Option<u64>,
+    #[serde(default)]
+    pub placed_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disposed_at: Option<u64>,
@@ -3565,6 +4254,10 @@ pub struct SafetyHold {
 }
 
 /// Extracted text.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3585,6 +4278,10 @@ pub struct ExtractedText {
 
 /// Descriptive metadata embedded in an uploaded image. Each text field is `None` when the file
 /// doesn't record it.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3632,6 +4329,10 @@ pub struct FileMetadata {
 }
 
 /// A GPS position in decimal degrees.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -3654,6 +4355,10 @@ pub struct FileMetadataLocation {
 /// Structured options serialize to a selector such as `fit=cover,width=640`: option keys
 /// sorted, nested objects as dotted keys (`border.color`), hex colours without `#` and values
 /// percent-encoded, so equal transforms share a URL.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum CdnTransform {
     /// Comma-separated options, such as `fit=cover,width=1024`.
@@ -3852,6 +4557,10 @@ fn js_number(value: &serde_json::Number) -> String {
 }
 
 /// An image quality: a number from 1 to 100 or a level.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ImageQuality {
@@ -3872,6 +4581,10 @@ impl From<ImageQualityLevel> for ImageQuality {
 }
 
 /// Where to crop from: a named position or a point.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Gravity {
@@ -3887,6 +4600,10 @@ impl From<GravityPosition> for Gravity {
 }
 
 /// A crop gravity point.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GravityPoint {
@@ -3901,6 +4618,10 @@ pub struct GravityPoint {
 }
 
 /// A border drawn around the image.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImageBorder {
@@ -3921,6 +4642,10 @@ string_enum! {
 }
 
 /// What to trim from the image edges.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Trim {
@@ -3941,6 +4666,10 @@ impl From<TrimEdges> for Trim {
 }
 
 /// Pixels to trim from each edge.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrimEdges {
@@ -3968,6 +4697,10 @@ pub struct TrimEdges {
 }
 
 /// Whether and how to trim a uniform border.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TrimBorder {
@@ -3978,6 +4711,10 @@ pub enum TrimBorder {
 }
 
 /// How to detect and keep a uniform border.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrimBorderOptions {
@@ -4163,6 +4900,10 @@ pub struct ImageTransformOptions {
 // </generated: image-transform-options>
 
 /// Options for [`TextClient::classify`](crate::TextClient::classify).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClassifyText {
@@ -4221,6 +4962,10 @@ impl ClassifyText {
 }
 
 /// Options for [`UploadTokensClient::sign`](crate::UploadTokensClient::sign).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignUploadToken {
@@ -4244,6 +4989,10 @@ impl SignUploadToken {
 }
 
 /// A signed upload token.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignedUploadToken {
@@ -4254,6 +5003,10 @@ pub struct SignedUploadToken {
 }
 
 /// Options for asset search.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchAssets {
@@ -4268,6 +5021,10 @@ pub struct SearchAssets {
 }
 
 /// One search result.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4286,6 +5043,10 @@ pub struct AssetSearchMatch {
 }
 
 /// Search results.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4305,6 +5066,10 @@ pub struct AssetSearchResponse {
 }
 
 /// One page of child folders, with the folders above them.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4320,13 +5085,17 @@ pub struct FolderPage {
     pub next_cursor: Option<String>,
     /// Whether another page follows.
     #[serde(default)]
-    pub has_more: Option<bool>,
+    pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<FolderPage, _>")]
     pub extra: HashMap<String, Value>,
 }
 
 /// Options for browsing folders.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListFolders {
@@ -4359,6 +5128,10 @@ string_enum! {
 }
 
 /// A hash list: PDQ hashes of images the project never wants again.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4400,6 +5173,10 @@ impl HashList {
 }
 
 /// One hash in a hash list.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4433,6 +5210,10 @@ pub struct HashListEntry {
 }
 
 /// A page of a project's hash lists, newest first.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4445,13 +5226,17 @@ pub struct HashListPage {
     pub next_cursor: Option<String>,
     /// Whether another page follows.
     #[serde(default)]
-    pub has_more: Option<bool>,
+    pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<HashListPage, _>")]
     pub extra: HashMap<String, Value>,
 }
 
 /// Options for one page of a project's hash lists.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListHashLists {
@@ -4468,6 +5253,10 @@ pub struct ListHashLists {
 }
 
 /// A page of hash list entries, newest first.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4480,13 +5269,17 @@ pub struct HashListEntryPage {
     pub next_cursor: Option<String>,
     /// Whether another page follows.
     #[serde(default)]
-    pub has_more: Option<bool>,
+    pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<HashListEntryPage, _>")]
     pub extra: HashMap<String, Value>,
 }
 
 /// Identifies a hash list.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HashListId {
@@ -4503,6 +5296,10 @@ impl HashListId {
 }
 
 /// Identifies a hash list entry.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HashListEntryId {
@@ -4519,6 +5316,10 @@ impl HashListEntryId {
 }
 
 /// Options for creating a hash list.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateHashList {
@@ -4532,6 +5333,10 @@ pub struct CreateHashList {
 }
 
 /// Changes to a hash list. The new action applies to later uploads.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateHashList {
@@ -4539,17 +5344,21 @@ pub struct UpdateHashList {
     #[serde(skip_serializing)]
     pub hash_list_id: String,
     /// The new name.
-    #[serde(default, skip_serializing_if = "Patch::is_missing")]
-    pub name: Patch<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     /// The new description; `Patch::Null` clears it.
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub description: Patch<String>,
     /// The new action.
-    #[serde(default, skip_serializing_if = "Patch::is_missing")]
-    pub action: Patch<HashListAction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<HashListAction>,
 }
 
 /// Options for one page of a hash list's entries.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListHashListEntries {
@@ -4569,6 +5378,10 @@ pub struct ListHashListEntries {
 
 /// Adds a hash to a hash list: set `hash` (and optionally `quality`), or `asset_id` to use an
 /// image asset's perceptual hash.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddHashListEntry {
@@ -4590,6 +5403,10 @@ pub struct AddHashListEntry {
 }
 
 /// Optional customer assertions for CDN delivery. Neither assertion is verified by CalmLens.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewerClaims {
@@ -4636,6 +5453,10 @@ string_enum! {
 /// project moderates with one, and an upload preset can name another for its own uploads.
 /// `revision` counts saved changes and guards every change, separately from the preset release in
 /// `preset.version`.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4666,13 +5487,17 @@ pub struct Policy {
     pub created_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
-    pub updated_at: u64,
+    pub updated_at: Option<u64>,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<Policy, _>")]
     pub extra: HashMap<String, Value>,
 }
 
 /// The built-in preset a policy started from.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4697,6 +5522,10 @@ pub struct PolicyPresetOrigin {
 
 /// What a policy does with each moderation category. Settings you send must define every
 /// category.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4724,6 +5553,10 @@ impl PolicySettings {
 }
 
 /// One category's action, allowances and restrictions.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4758,6 +5591,10 @@ impl CategoryPolicySettings {
 
 /// An allowance or restriction: its `when` qualifiers apply to the same instance, excluding
 /// instances that also have an `unless` qualifier (restrictions only).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4790,6 +5627,10 @@ impl PolicyRule {
 }
 
 /// A page of the organisation's policies.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -4802,13 +5643,17 @@ pub struct PolicyPage {
     pub next_cursor: Option<String>,
     /// Whether another page follows.
     #[serde(default)]
-    pub has_more: Option<bool>,
+    pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<PolicyPage, _>")]
     pub extra: HashMap<String, Value>,
 }
 
 /// Options for one page of the organisation's policies.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListPolicies {
@@ -4825,6 +5670,10 @@ pub struct ListPolicies {
 }
 
 /// Identifies a policy.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PolicyId {
@@ -4842,6 +5691,10 @@ impl PolicyId {
 
 /// Creates a policy from `settings` with a `name`, or a copy of the latest release of a built-in
 /// preset with `preset_id` (whose name defaults to the preset's).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreatePolicy {
@@ -4877,6 +5730,10 @@ impl CreatePolicy {
 }
 
 /// Changes to a policy's name, description or settings; `None` fields are unchanged.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePolicy {
@@ -4908,6 +5765,10 @@ impl UpdatePolicy {
 
 /// Restores the settings of the preset release a `Pinned` or `Copy` policy is pinned to,
 /// discarding its edits.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResetPolicy {
@@ -4922,6 +5783,10 @@ pub struct ResetPolicy {
 
 /// Moves a `Pinned` or `Copy` policy whose settings are unchanged from its preset release to the
 /// latest release of the preset.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpgradePolicy {
@@ -4937,6 +5802,10 @@ pub struct UpgradePolicy {
 /// Switches automatic updates for the organisation's own preset policy. `enabled` turns a
 /// `Pinned` policy `Live`, replacing its settings with the latest preset's; `false` pins a `Live`
 /// policy at its current preset release.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetPolicyAutomaticUpdates {
@@ -4952,6 +5821,10 @@ pub struct SetPolicyAutomaticUpdates {
 }
 
 /// Chooses the policy the project moderates with.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssignPolicy {
@@ -4979,6 +5852,10 @@ string_enum! {
 
 /// The rules for uploads from browsers and apps, addressed by its `key` in deploys that declare
 /// presets in code.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -5046,6 +5923,10 @@ pub struct UploadPreset {
 }
 
 /// A page of the project's upload presets.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -5058,13 +5939,17 @@ pub struct UploadPresetPage {
     pub next_cursor: Option<String>,
     /// Whether another page follows.
     #[serde(default)]
-    pub has_more: Option<bool>,
+    pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<UploadPresetPage, _>")]
     pub extra: HashMap<String, Value>,
 }
 
 /// Options for one page of the project's upload presets.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListUploadPresets {
@@ -5084,6 +5969,10 @@ pub struct ListUploadPresets {
 /// [`UploadPresetsClient::ensure`](crate::UploadPresetsClient::ensure). The definition replaces
 /// the stored preset, so a field left out (`None` or [`Patch::Missing`]) takes its default rather
 /// than keeping its stored value.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadPresetDefinition {
@@ -5147,6 +6036,10 @@ impl UploadPresetDefinition {
 }
 
 /// Options for [`UploadPresetsClient::ensure`](crate::UploadPresetsClient::ensure).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnsureUploadPresets {
@@ -5155,6 +6048,10 @@ pub struct EnsureUploadPresets {
 }
 
 /// The stored presets from [`UploadPresetsClient::ensure`](crate::UploadPresetsClient::ensure).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -5171,6 +6068,10 @@ pub struct EnsureUploadPresetsResponse {
 }
 
 /// Identifies an upload preset.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadPresetId {
@@ -5206,6 +6107,10 @@ string_enum! {
 }
 
 /// Restricts the domains a project accepts when content is submitted by URL, including websites.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteUrlRule {
@@ -5231,6 +6136,10 @@ impl RemoteUrlRule {
 }
 
 /// Which automated decisions are sampled into the human review queue. The default samples none.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HumanReviewSettings {
@@ -5252,7 +6161,46 @@ pub struct HumanReviewSettings {
     pub extra: HashMap<String, Value>,
 }
 
+/// Changes to which automated decisions are sampled into the human review queue. Fields left
+/// `None` keep their current values.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HumanReviewDefinition {
+    /// The percentage of allowed decisions to sample.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allowed_sample_percent: Option<f64>,
+    /// The percentage of restricted decisions to sample.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restricted_sample_percent: Option<f64>,
+    /// Queues decisions whose policy score lies less than this many percentage points from the
+    /// policy threshold; 0 turns it off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uncertainty_margin_percent: Option<f64>,
+    /// Queues decisions whose report has evidence moderation couldn't assess.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_missing_evidence: Option<bool>,
+}
+impl From<HumanReviewSettings> for HumanReviewDefinition {
+    /// Every current setting, e.g. to send a project's settings back with changes.
+    fn from(settings: HumanReviewSettings) -> Self {
+        Self {
+            allowed_sample_percent: Some(settings.allowed_sample_percent),
+            restricted_sample_percent: Some(settings.restricted_sample_percent),
+            uncertainty_margin_percent: Some(settings.uncertainty_margin_percent),
+            review_missing_evidence: Some(settings.review_missing_evidence),
+        }
+    }
+}
+
 /// A project's settings, with every default filled in.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -5293,6 +6241,10 @@ pub struct ProjectSettings {
 }
 
 /// A project's settings and the revision to send back with a change.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -5318,6 +6270,10 @@ pub struct ProjectSettingsResource {
 /// [`ProjectSettingsClient::update`](crate::ProjectSettingsClient::update). They replace the
 /// stored settings, so a setting left out (`None` or [`Patch::Missing`]) returns to its default.
 /// To change one setting, convert the [`ProjectSettings`] you read with `From` and change it.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSettingsDefinition {
@@ -5356,7 +6312,7 @@ pub struct ProjectSettingsDefinition {
     pub website_submissions_per_minute: Patch<u32>,
     /// Which automated decisions are sampled into the human review queue. Defaults to none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub human_review: Option<HumanReviewSettings>,
+    pub human_review: Option<HumanReviewDefinition>,
     /// Settings this SDK version does not know, kept when settings you read are sent back.
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
@@ -5375,13 +6331,17 @@ impl From<ProjectSettings> for ProjectSettingsDefinition {
             website_submissions_per_minute: settings
                 .website_submissions_per_minute
                 .map_or(Patch::Null, Patch::Value),
-            human_review: Some(settings.human_review),
+            human_review: Some(settings.human_review.into()),
             extra: settings.extra,
         }
     }
 }
 
 /// Options for [`ProjectSettingsClient::update`](crate::ProjectSettingsClient::update).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateProjectSettings {
@@ -5444,6 +6404,10 @@ string_enum! {
 }
 
 /// A metadata field the portal shows and filters by.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MetadataField {
@@ -5490,6 +6454,10 @@ impl MetadataField {
 }
 
 /// A project's metadata fields and the revision to send back with a change.
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -5512,6 +6480,10 @@ pub struct MetadataFieldsResource {
 }
 
 /// Options for [`MetadataFieldsClient::ensure`](crate::MetadataFieldsClient::ensure).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnsureMetadataFields {
@@ -5524,6 +6496,10 @@ pub struct EnsureMetadataFields {
 }
 
 /// Options for [`MetadataFieldsClient::delete`](crate::MetadataFieldsClient::delete).
+#[cfg_attr(
+    feature = "strict-contract",
+    macro_rules_attribute::macro_rules_derive(described)
+)]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteMetadataField {

@@ -82,7 +82,7 @@ async fn storage_keeps_only_kept_content_and_drops_purged_content() {
         })
         .await
         .unwrap();
-    assert_eq!(asset.asset_type, Some(AssetType::PlaintextDocument));
+    assert_eq!(asset.asset_type, AssetType::PlaintextDocument);
     assert!(!mock.with_storage(|storage| storage.content.contains_key(&asset.id)));
 
     let stored = mock.assets().classify(kept("b.png", b"png")).await.unwrap();
@@ -530,7 +530,7 @@ async fn list_filters_orders_and_pages_with_cursors() {
         first.items.iter().map(|a| a.id.clone()).collect::<Vec<_>>(),
         ids[..2]
     );
-    assert_eq!(first.has_more, Some(true));
+    assert!(first.has_more);
     let second = mock
         .assets()
         .list(ListAssets {
@@ -549,7 +549,7 @@ async fn list_filters_orders_and_pages_with_cursors() {
             .collect::<Vec<_>>(),
         ids[2..]
     );
-    assert_eq!(second.has_more, Some(false));
+    assert!(!second.has_more);
 
     let either = mock
         .assets()
@@ -603,7 +603,7 @@ async fn update_patches_and_search_matches_keywords() {
         .await
         .unwrap();
     assert_eq!(updated.description, None);
-    assert_eq!(updated.name.as_deref(), Some("holiday photo"));
+    assert_eq!(updated.name, "holiday photo");
     assert_eq!(updated.tags, vec!["beach".to_string()]);
 
     let results = mock
@@ -856,7 +856,7 @@ async fn hash_list_entries_come_from_assets_and_go_with_their_list() {
         .await
         .unwrap();
     assert_eq!(first.items[0].id, newest.id);
-    assert_eq!(first.has_more, Some(true));
+    assert!(first.has_more);
     let second = lists
         .list_entries(ListHashListEntries {
             hash_list_id: list.id.clone(),
@@ -867,7 +867,7 @@ async fn hash_list_entries_come_from_assets_and_go_with_their_list() {
         .await
         .unwrap();
     assert_eq!(second.items[0].id, entry.id);
-    assert_eq!(second.has_more, Some(false));
+    assert!(!second.has_more);
 
     lists.delete(HashListId::new(&list.id)).await.unwrap();
     let removed = lists
@@ -1021,8 +1021,8 @@ async fn updating_settings_replaces_them_and_only_a_real_change_moves_the_revisi
                 RemoteUrlRuleMode::Allow,
                 vec!["example.com".into()],
             )),
-            human_review: Some(HumanReviewSettings {
-                allowed_sample_percent: 2.5,
+            human_review: Some(HumanReviewDefinition {
+                allowed_sample_percent: Some(2.5),
                 ..Default::default()
             }),
             ..Default::default()

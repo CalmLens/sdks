@@ -399,11 +399,11 @@ fn report_feature_results_decode() {
     .unwrap();
     let features = report;
     let people = features.person_detection.unwrap();
-    assert_eq!(people.status, Some(FeatureResultStatus::NotEvaluated));
+    assert_eq!(people.status, FeatureResultStatus::NotEvaluated);
     assert_eq!(people.reason, Some(FeatureNotEvaluatedReason::NotSupported));
     assert_eq!(people.people, None);
     let faces = features.face_detection.unwrap();
-    assert_eq!(faces.status, Some(FeatureResultStatus::Evaluated));
+    assert_eq!(faces.status, FeatureResultStatus::Evaluated);
     let faces = faces.faces.unwrap();
     assert_eq!(faces[0].bounding_box.left, -0.02);
     assert_eq!(faces[0].bounding_box.height, 0.4);
@@ -473,7 +473,7 @@ async fn concurrent_ensure_lenses_send_a_definition_once() {
         })
     };
     let (first, second) = tokio::join!(ensure(), ensure());
-    assert_eq!(first.unwrap()[0].id.as_deref(), Some("lens-thumb"));
-    assert_eq!(second.unwrap()[0].id.as_deref(), Some("lens-thumb"));
+    assert_eq!(first.unwrap()[0].id, "lens-thumb");
+    assert_eq!(second.unwrap()[0].id, "lens-thumb");
     assert_eq!(worker.join().unwrap(), 1);
 }

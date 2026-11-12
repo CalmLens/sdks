@@ -9,7 +9,7 @@ fn an_hls_stream_reads_its_status_and_reason() {
     )
     .unwrap();
     assert_eq!(hls.status, "unavailable");
-    assert_eq!(hls.reason.as_deref(), Some("allowance-used"));
+    assert_eq!(hls.reason, Some(AssetHlsUnavailableReason::AllowanceUsed));
     assert!(hls.renditions.is_empty());
 }
 
@@ -47,7 +47,7 @@ fn asset_nested_fields_decode_into_typed_models() {
     let wire = json!({"id":"asset-1","type":"image","content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"width":10,"height":20,"durationSeconds":null,"pageCount":null,"perceptualHash":"ph","perceptualHashQuality":87,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","cameraModel":null,"lensModel":null,"software":null,"creator":null,"copyright":null,"digitalSourceType":null,"containsLocation":true,"location":null},"rendered":{"kind":"image","format":"image/webp","width":10,"height":20},"preview":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000"},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":7,"applied":true}],"status":"age-restricted","automatedStatus":"limited","flaggedCategories":[],"regions":[{"region":"DE","status":"blocked","rule":"de-jmstv","category":"sexual"}],"timeline":{"segmentCount":3},"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"gambling","evidence":[]}],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"ocr":{"status":"evaluated","textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}]}}});
     let asset: Asset = serde_json::from_value(wire).unwrap();
 
-    assert_eq!(asset.asset_type, Some(AssetType::Image));
+    assert_eq!(asset.asset_type, AssetType::Image);
     assert_eq!(
         (
             &asset.classification.status,
@@ -96,7 +96,7 @@ fn asset_nested_fields_decode_into_typed_models() {
         ),
         (
             "DE",
-            &AssetModerationDecision::Blocked,
+            &RegionalDecisionStatus::Blocked,
             "de-jmstv",
             &Some(ClassificationCategory::Sexual)
         )
@@ -156,7 +156,7 @@ fn asset_nested_fields_decode_into_typed_models() {
     );
     assert_eq!(
         content.safety_hold.as_ref().unwrap().reason,
-        Some(SafetyHoldReason::SuspectedIllegalContent)
+        SafetyHoldReason::SuspectedIllegalContent
     );
     let text = content.extracted_text.as_ref().unwrap();
     assert_eq!(
@@ -166,7 +166,7 @@ fn asset_nested_fields_decode_into_typed_models() {
 
     let report = asset.classification.moderation.raw.as_ref().unwrap();
     let sexual = &report.categories[&ClassificationCategory::Sexual];
-    assert_eq!(sexual.status, Some(EvaluationStatus::Evaluated));
+    assert_eq!(sexual.status, EvaluationStatus::Evaluated);
     assert_eq!(sexual.likelihood, Some(Likelihood::Likely));
     let qualifiers = sexual.qualifiers.as_ref().unwrap();
     assert_eq!(
@@ -285,7 +285,7 @@ fn asset_nested_fields_decode_into_typed_models() {
     assert_eq!(segment.source, MediaSegmentSource::FrameText);
     assert_eq!(
         segment.categories[&ClassificationCategory::Hate].status,
-        Some(EvaluationStatus::Partial)
+        EvaluationStatus::Partial
     );
 }
 
@@ -293,10 +293,7 @@ fn asset_nested_fields_decode_into_typed_models() {
 fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
     let wire = json!({"id":"asset-1","type":"hologram","content":{"status":"archived","removalReason":"expired"},"upload":{"status":"completed"},"classification":{"status":"paused","moderation":{"manualReviews":[{"id":"review-1","decision":"deferred","note":null,"decidedBy":{"type":"assistant","id":null},"reviewedAt":7,"applied":true}],"status":"escalated","flaggedCategories":[],"regions":[],"raw":{"categories":{"spam":{"status":"skipped","likelihood":"certain","qualifiers":{"bots":{"status":"evaluated"}}}}}}}});
     let asset: Asset = serde_json::from_value(wire.clone()).unwrap();
-    assert_eq!(
-        asset.asset_type,
-        Some(AssetType::Unknown("hologram".into()))
-    );
+    assert_eq!(asset.asset_type, AssetType::Unknown("hologram".into()));
     assert_eq!(
         (
             &asset.classification.status,
@@ -329,10 +326,7 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
         .as_ref()
         .unwrap()
         .categories[&ClassificationCategory::Unknown("spam".into())];
-    assert_eq!(
-        spam.status,
-        Some(EvaluationStatus::Unknown("skipped".into()))
-    );
+    assert_eq!(spam.status, EvaluationStatus::Unknown("skipped".into()));
     assert!(spam
         .qualifiers
         .as_ref()
@@ -408,7 +402,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
     .unwrap();
     let blocked = &page.items[0];
     assert_eq!(blocked.event_type, EventType::AssetBlocked);
-    assert_eq!(blocked.severity, Some(EventSeverity::High));
+    assert_eq!(blocked.severity, EventSeverity::High);
     let asset = blocked.asset.as_ref().unwrap();
     assert_eq!(
         (
@@ -433,10 +427,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
         future.event_type,
         EventType::Unknown("billing.charged".into())
     );
-    assert_eq!(
-        future.severity,
-        Some(EventSeverity::Unknown("critical".into()))
-    );
+    assert_eq!(future.severity, EventSeverity::Unknown("critical".into()));
 
     let payload = WebhookEventPayload::from_event(blocked);
     assert_eq!(payload.event_type, EventType::AssetBlocked);
@@ -457,7 +448,7 @@ fn lens_transform_decodes_typed_image_options() {
         }
     }))
     .unwrap();
-    assert_eq!(lens.lens_type, Some(LensType::Image));
+    assert_eq!(lens.lens_type, LensType::Image);
     let options = lens.transform.unwrap();
     assert_eq!(options.format, Some(ImageFormat::Webp));
     assert_eq!(options.fit, Some(ImageFit::Cover));
@@ -639,14 +630,14 @@ fn report_policy_snapshot_decodes_into_typed_models() {
     );
     assert_eq!(
         settings.restrictions[0].unless.as_deref(),
-        Some(["violence-documentary".to_string()].as_slice())
+        Some([ModerationQualifier::from("violence-documentary")].as_slice())
     );
     assert_eq!(
         category.source.as_ref().unwrap().indexes.as_deref(),
         Some([0, 1].as_slice())
     );
     let decision = &policy;
-    assert_eq!(decision.source.as_deref(), Some("hash-list"));
+    assert_eq!(decision.source, Some(ModerationSource::HashList));
     assert_eq!(
         decision.automated_status,
         Some(AssetModerationDecision::Purged)

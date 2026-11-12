@@ -986,7 +986,6 @@ impl ServerClient {
         let mut query = Query::default();
         query.opt("cursor", options.cursor.as_deref());
         query.opt("pageSize", options.page_size);
-        query.opt("filter", options.filter.as_ref());
         query.opt("sort", options.sort.as_ref());
         self.call(self.prepare(Method::GET, &path, &query.0)?).await
     }
@@ -1500,12 +1499,8 @@ impl AssetsClient<'_> {
 }
 
 /// The cursor of the page after a page of `items`, or `None` when the iteration ends there.
-fn next_cursor<T>(
-    items: &[T],
-    has_more: Option<bool>,
-    next_cursor: &Option<String>,
-) -> Option<String> {
-    let more = has_more.unwrap_or(false) && !items.is_empty();
+fn next_cursor<T>(items: &[T], has_more: bool, next_cursor: &Option<String>) -> Option<String> {
+    let more = has_more && !items.is_empty();
     next_cursor.clone().filter(|_| more)
 }
 
@@ -2072,7 +2067,7 @@ impl LensesClient<'_> {
         let path = Self::path(&options.lens_id)?;
         let request = self.0.prepare(Method::PATCH, &path, &[])?.json(&options)?;
         let lens: Lens = self.0.call(request).await?;
-        self.forget(|cached| cached.id.is_some() && cached.id == lens.id);
+        self.forget(|cached| !cached.id.is_empty() && cached.id == lens.id);
         Ok(lens)
     }
     /// Deletes a lens. URLs that select it stop being served; files the CDN already delivered may
@@ -2082,7 +2077,7 @@ impl LensesClient<'_> {
         self.0
             .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
             .await?;
-        self.forget(|cached| cached.id.as_deref() == Some(options.lens_id.as_str()));
+        self.forget(|cached| cached.id == options.lens_id);
         Ok(())
     }
 }

@@ -244,8 +244,8 @@ pub fn get_event_fact<'a>(event: &'a impl EventFacts, key: &str) -> Option<&'a V
 pub fn get_event_facts(event: &impl EventFacts) -> Map<String, Value> {
     let mut values = Map::new();
     for fact in event.event_facts() {
-        if !values.contains_key(&fact.key) {
-            values.insert(fact.key.clone(), fact.value.clone());
+        if !values.contains_key(fact.key.as_str()) {
+            values.insert(fact.key.to_string(), fact.value.clone());
         }
     }
     values
