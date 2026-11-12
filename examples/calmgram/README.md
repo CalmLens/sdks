@@ -164,7 +164,7 @@ which checks the caption and forwards the photo with `client.assets.create`. The
 CalmLens's **moderation policy** (set in the portal) turns each report into a moderation status,
 and a reviewer can change it later. The app only needs one field:
 
-| `classification.moderation.status` | Calmgram does |
+| `classification.moderation.decision` | Calmgram does |
 | --- | --- |
 | `allowed` | Publish |
 | `limited` | Publish, like `allowed`. The CDN serves it on the plain URL; the status only marks it so an app can reduce its reach, for example by keeping it out of recommendations |

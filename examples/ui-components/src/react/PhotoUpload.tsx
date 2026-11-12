@@ -29,7 +29,7 @@ async function uploadPhoto(file: File, onStage: (stage: string) => void): Promis
     content: { data: file, type: file.type },
   });
   onStage("checking");
-  const status = () => asset.classification.moderation?.status ?? "pending";
+  const status = () => asset.classification.moderation?.decision ?? "pending";
   for (let delay = 1000; status() === "pending" && delay <= 8000; delay *= 2) {
     await new Promise((resolve) => setTimeout(resolve, delay));
     asset = await client.assets.retrieve({ assetId: asset.id });

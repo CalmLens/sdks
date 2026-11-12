@@ -111,7 +111,7 @@ const answer = (response: ServerResponse, status: number, upload: UploadedAsset)
           classification: {
             ...upload.classification,
             status: "processing",
-            moderation: { status: "pending" },
+            moderation: { decision: null },
           },
         }
       : upload,

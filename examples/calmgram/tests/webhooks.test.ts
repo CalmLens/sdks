@@ -17,7 +17,7 @@ const deliveryBody = (type: string, facts: { key: string; value: unknown }[] = [
         externalId: null,
         content: { status: "stored" },
         upload: { status: "completed" },
-        classification: { status: "completed", moderation: { status: "allowed" } },
+        classification: { status: "completed", moderation: { decision: "allowed" } },
       },
       facts,
       createdAt: 1760000000000,

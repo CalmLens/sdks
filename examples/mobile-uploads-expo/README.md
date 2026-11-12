@@ -15,7 +15,7 @@ never holds an API key: a tiny token server signs a single-use upload token for 
  2. POST /upload-token  ───────────►  client.uploadTokens.sign({ uploadPresetId, externalId })
                         ◄───────────  { token, expiresAt }   (signed locally, no CalmLens request)
  3. Upload  ── Authorization: Bearer <token> ──►  CalmLens
-            ◄── { id, classification: { status: "queued", moderation: { status: "pending" } } }
+            ◄── { id, classification: { status: "queued", moderation: { decision: null } } }
  4. Check the upload with the same token until the moderation status is no longer "pending"
 ```
 

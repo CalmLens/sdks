@@ -5,9 +5,9 @@ import { DEMO_TEST_INPUT_KEY, testTextCode } from "../src/testInputs";
 
 test("preserves pending and failed decisions without inventing safe scores", () => {
   const cases = [
-    { processing: "pending", moderation: "pending", expected: "pending" },
-    { processing: "processing", moderation: "pending", expected: "pending" },
-    { processing: "failed", moderation: "pending", expected: "error" },
+    { processing: "pending", moderation: null, expected: "pending" },
+    { processing: "processing", moderation: null, expected: "pending" },
+    { processing: "failed", moderation: null, expected: "error" },
     { processing: "completed", moderation: "allowed", expected: "allowed" },
     { processing: "completed", moderation: "limited", expected: "limited" },
     { processing: "completed", moderation: "age-restricted", expected: "age-restricted" },
@@ -24,7 +24,7 @@ test("preserves pending and failed decisions without inventing safe scores", () 
       classification: {
         status: processing,
         moderation: {
-          status: moderation,
+          decision: moderation,
           raw: {
             categories: {
               violence: { status: "not-evaluated" },
@@ -63,7 +63,7 @@ test("waits for CalmLens's decision, and reports a post still pending when none 
         classification: {
           status: decided ? "completed" : "processing",
           moderation: {
-            status,
+            decision: decided ? status : null,
             raw: { categories: decided ? { violence: { status: "evaluated", score: 0.9 } } : {} },
           },
         },

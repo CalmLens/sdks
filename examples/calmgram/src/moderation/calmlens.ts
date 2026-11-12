@@ -37,8 +37,9 @@ const DECIDED: ReadonlySet<string> = new Set<ModerationStatus>([
 
 const toStatus = (asset: Asset): ModerationStatus => {
   if (asset.classification.status === "failed") return "error";
-  const status = asset.classification.moderation.status;
-  return DECIDED.has(status) ? (status as ModerationStatus) : "pending";
+  // `null` until moderation decides the asset.
+  const decision = asset.classification.moderation.decision;
+  return decision !== null && DECIDED.has(decision) ? (decision as ModerationStatus) : "pending";
 };
 
 export const toOutcome = (asset: Asset): ModerationOutcome => {

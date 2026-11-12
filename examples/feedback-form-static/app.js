@@ -64,11 +64,11 @@ const controller = createUploadController({
       content: { data: file, type: file.type },
     });
     // The decision is only returned when the preset shows decisions to the uploader.
-    return { assetId: asset.id, status: asset.classification.moderation?.status };
+    return { assetId: asset.id, status: asset.classification.moderation?.decision };
   },
   // Checks a pending upload until CalmLens decides, for up to 15 seconds.
   checkStatus: async (assetId) =>
-    (await statusClient.assets.retrieve({ assetId })).classification.moderation?.status,
+    (await statusClient.assets.retrieve({ assetId })).classification.moderation?.decision,
 });
 
 const form = document.querySelector("#feedback-form");
