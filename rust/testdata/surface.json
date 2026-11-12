@@ -18,7 +18,7 @@
         "python": "folders.list",
         "go": "Folders.List",
         "rust": "folders().list",
-        "java": "folders.list",
+        "java": "folders().list",
         "ruby": "folders.list",
         "php": "folders->list"
       }
@@ -32,7 +32,7 @@
         "python": "folders.retrieve",
         "go": "Folders.Retrieve",
         "rust": "folders().retrieve",
-        "java": "folders.retrieve",
+        "java": "folders().retrieve",
         "ruby": "folders.retrieve",
         "php": "folders->retrieve"
       }
@@ -46,7 +46,7 @@
         "python": "folders.create",
         "go": "Folders.Create",
         "rust": "folders().create",
-        "java": "folders.create",
+        "java": "folders().create",
         "ruby": "folders.create",
         "php": "folders->create"
       }
@@ -60,7 +60,7 @@
         "python": "folders.update",
         "go": "Folders.Update",
         "rust": "folders().update",
-        "java": "folders.update",
+        "java": "folders().update",
         "ruby": "folders.update",
         "php": "folders->update"
       }
@@ -74,7 +74,7 @@
         "python": "folders.delete",
         "go": "Folders.Delete",
         "rust": "folders().delete",
-        "java": "folders.delete",
+        "java": "folders().delete",
         "ruby": "folders.delete",
         "php": "folders->delete"
       }
@@ -88,7 +88,7 @@
         "python": "folders.move",
         "go": "Folders.Move",
         "rust": "folders().move_folder",
-        "java": "folders.move",
+        "java": "folders().move",
         "ruby": "folders.move",
         "php": "folders->move"
       }
@@ -102,7 +102,7 @@
         "python": "assets.create",
         "go": "Assets.Create",
         "rust": "assets().create",
-        "java": "assets.create",
+        "java": "assets().create",
         "ruby": "assets.create",
         "php": "assets->create"
       }
@@ -116,7 +116,7 @@
         "python": "assets.upload_part",
         "go": "Assets.UploadPart",
         "rust": "assets().upload_part",
-        "java": "assets.uploadPart",
+        "java": "assets().uploadPart",
         "ruby": "assets.upload_part",
         "php": "assets->uploadPart"
       }
@@ -130,7 +130,7 @@
         "python": "assets.list",
         "go": "Assets.List",
         "rust": "assets().list",
-        "java": "assets.list",
+        "java": "assets().list",
         "ruby": "assets.list",
         "php": "assets->list"
       }
@@ -144,7 +144,7 @@
         "python": "assets.search",
         "go": "Assets.Search",
         "rust": "assets().search",
-        "java": "assets.search",
+        "java": "assets().search",
         "ruby": "assets.search",
         "php": "assets->search"
       }
@@ -158,7 +158,7 @@
         "python": "assets.retrieve",
         "go": "Assets.Retrieve",
         "rust": "assets().retrieve",
-        "java": "assets.retrieve",
+        "java": "assets().retrieve",
         "ruby": "assets.retrieve",
         "php": "assets->retrieve"
       }
@@ -172,7 +172,7 @@
         "python": "assets.list_children",
         "go": "Assets.ListChildren",
         "rust": "assets().list_children",
-        "java": "assets.listChildren",
+        "java": "assets().listChildren",
         "ruby": "assets.list_children",
         "php": "assets->listChildren"
       }
@@ -186,7 +186,7 @@
         "python": "assets.list_timeline",
         "go": "Assets.ListTimeline",
         "rust": "assets().list_timeline",
-        "java": "assets.listTimeline",
+        "java": "assets().listTimeline",
         "ruby": "assets.list_timeline",
         "php": "assets->listTimeline"
       }
@@ -200,7 +200,7 @@
         "python": "assets.update",
         "go": "Assets.Update",
         "rust": "assets().update",
-        "java": "assets.update",
+        "java": "assets().update",
         "ruby": "assets.update",
         "php": "assets->update"
       }
@@ -214,7 +214,7 @@
         "python": "assets.remove_content",
         "go": "Assets.RemoveContent",
         "rust": "assets().remove_content",
-        "java": "assets.removeContent",
+        "java": "assets().removeContent",
         "ruby": "assets.remove_content",
         "php": "assets->removeContent"
       }
@@ -228,7 +228,7 @@
         "python": "assets.delete",
         "go": "Assets.Delete",
         "rust": "assets().delete",
-        "java": "assets.delete",
+        "java": "assets().delete",
         "ruby": "assets.delete",
         "php": "assets->delete"
       }
@@ -242,7 +242,7 @@
         "python": "assets.move",
         "go": "Assets.Move",
         "rust": "assets().move_asset",
-        "java": "assets.move",
+        "java": "assets().move",
         "ruby": "assets.move",
         "php": "assets->move"
       }
@@ -256,7 +256,7 @@
         "python": "assets.retry",
         "go": "Assets.Retry",
         "rust": "assets().retry",
-        "java": "assets.retry",
+        "java": "assets().retry",
         "ruby": "assets.retry",
         "php": "assets->retry"
       }
@@ -270,7 +270,7 @@
         "python": "assets.explain",
         "go": "Assets.Explain",
         "rust": "assets().explain",
-        "java": "assets.explain",
+        "java": "assets().explain",
         "ruby": "assets.explain",
         "php": "assets->explain"
       }
@@ -284,7 +284,7 @@
         "python": "assets.decide",
         "go": "Assets.Decide",
         "rust": "assets().decide",
-        "java": "assets.decide",
+        "java": "assets().decide",
         "ruby": "assets.decide",
         "php": "assets->decide"
       }
@@ -298,7 +298,7 @@
         "python": "assets.batch",
         "go": "Assets.Batch",
         "rust": "assets().batch",
-        "java": "assets.batch",
+        "java": "assets().batch",
         "ruby": "assets.batch",
         "php": "assets->batch"
       }
@@ -312,7 +312,7 @@
         "python": "cdn.sign_asset_url",
         "go": "CDN.SignAssetURL",
         "rust": "cdn().sign_asset_url",
-        "java": "cdn.signAssetUrl",
+        "java": "cdn().signAssetUrl",
         "ruby": "cdn.sign_asset_url",
         "php": "cdn->signAssetUrl"
       }
@@ -340,7 +340,7 @@
         "python": "lenses.list",
         "go": "Lenses.List",
         "rust": "lenses().list",
-        "java": "lenses.list",
+        "java": "lenses().list",
         "ruby": "lenses.list",
         "php": "lenses->list"
       }
@@ -354,7 +354,7 @@
         "python": "lenses.create",
         "go": "Lenses.Create",
         "rust": "lenses().create",
-        "java": "lenses.create",
+        "java": "lenses().create",
         "ruby": "lenses.create",
         "php": "lenses->create"
       }
@@ -368,7 +368,7 @@
         "python": "lenses.retrieve",
         "go": "Lenses.Retrieve",
         "rust": "lenses().retrieve",
-        "java": "lenses.retrieve",
+        "java": "lenses().retrieve",
         "ruby": "lenses.retrieve",
         "php": "lenses->retrieve"
       }
@@ -382,7 +382,7 @@
         "python": "lenses.update",
         "go": "Lenses.Update",
         "rust": "lenses().update",
-        "java": "lenses.update",
+        "java": "lenses().update",
         "ruby": "lenses.update",
         "php": "lenses->update"
       }
@@ -396,7 +396,7 @@
         "python": "lenses.delete",
         "go": "Lenses.Delete",
         "rust": "lenses().delete",
-        "java": "lenses.delete",
+        "java": "lenses().delete",
         "ruby": "lenses.delete",
         "php": "lenses->delete"
       }
@@ -410,7 +410,7 @@
         "python": "events.list",
         "go": "Events.List",
         "rust": "events().list",
-        "java": "events.list",
+        "java": "events().list",
         "ruby": "events.list",
         "php": "events->list"
       }
@@ -424,7 +424,7 @@
         "python": "hash_lists.list",
         "go": "HashLists.List",
         "rust": "hash_lists().list",
-        "java": "hashLists.list",
+        "java": "hashLists().list",
         "ruby": "hash_lists.list",
         "php": "hashLists->list"
       }
@@ -438,7 +438,7 @@
         "python": "hash_lists.retrieve",
         "go": "HashLists.Retrieve",
         "rust": "hash_lists().retrieve",
-        "java": "hashLists.retrieve",
+        "java": "hashLists().retrieve",
         "ruby": "hash_lists.retrieve",
         "php": "hashLists->retrieve"
       }
@@ -452,7 +452,7 @@
         "python": "hash_lists.create",
         "go": "HashLists.Create",
         "rust": "hash_lists().create",
-        "java": "hashLists.create",
+        "java": "hashLists().create",
         "ruby": "hash_lists.create",
         "php": "hashLists->create"
       }
@@ -466,7 +466,7 @@
         "python": "hash_lists.update",
         "go": "HashLists.Update",
         "rust": "hash_lists().update",
-        "java": "hashLists.update",
+        "java": "hashLists().update",
         "ruby": "hash_lists.update",
         "php": "hashLists->update"
       }
@@ -480,7 +480,7 @@
         "python": "hash_lists.delete",
         "go": "HashLists.Delete",
         "rust": "hash_lists().delete",
-        "java": "hashLists.delete",
+        "java": "hashLists().delete",
         "ruby": "hash_lists.delete",
         "php": "hashLists->delete"
       }
@@ -494,7 +494,7 @@
         "python": "hash_lists.list_entries",
         "go": "HashLists.ListEntries",
         "rust": "hash_lists().list_entries",
-        "java": "hashLists.listEntries",
+        "java": "hashLists().listEntries",
         "ruby": "hash_lists.list_entries",
         "php": "hashLists->listEntries"
       }
@@ -508,7 +508,7 @@
         "python": "hash_lists.add_entry",
         "go": "HashLists.AddEntry",
         "rust": "hash_lists().add_entry",
-        "java": "hashLists.addEntry",
+        "java": "hashLists().addEntry",
         "ruby": "hash_lists.add_entry",
         "php": "hashLists->addEntry"
       }
@@ -522,7 +522,7 @@
         "python": "hash_lists.remove_entry",
         "go": "HashLists.RemoveEntry",
         "rust": "hash_lists().remove_entry",
-        "java": "hashLists.removeEntry",
+        "java": "hashLists().removeEntry",
         "ruby": "hash_lists.remove_entry",
         "php": "hashLists->removeEntry"
       }
@@ -536,7 +536,7 @@
         "python": "policies.list",
         "go": "Policies.List",
         "rust": "policies().list",
-        "java": "policies.list",
+        "java": "policies().list",
         "ruby": "policies.list",
         "php": "policies->list"
       }
@@ -550,7 +550,7 @@
         "python": "policies.retrieve",
         "go": "Policies.Retrieve",
         "rust": "policies().retrieve",
-        "java": "policies.retrieve",
+        "java": "policies().retrieve",
         "ruby": "policies.retrieve",
         "php": "policies->retrieve"
       }
@@ -564,7 +564,7 @@
         "python": "policies.create",
         "go": "Policies.Create",
         "rust": "policies().create",
-        "java": "policies.create",
+        "java": "policies().create",
         "ruby": "policies.create",
         "php": "policies->create"
       }
@@ -578,7 +578,7 @@
         "python": "policies.update",
         "go": "Policies.Update",
         "rust": "policies().update",
-        "java": "policies.update",
+        "java": "policies().update",
         "ruby": "policies.update",
         "php": "policies->update"
       }
@@ -592,7 +592,7 @@
         "python": "policies.reset",
         "go": "Policies.Reset",
         "rust": "policies().reset",
-        "java": "policies.reset",
+        "java": "policies().reset",
         "ruby": "policies.reset",
         "php": "policies->reset"
       }
@@ -606,7 +606,7 @@
         "python": "policies.upgrade",
         "go": "Policies.Upgrade",
         "rust": "policies().upgrade",
-        "java": "policies.upgrade",
+        "java": "policies().upgrade",
         "ruby": "policies.upgrade",
         "php": "policies->upgrade"
       }
@@ -620,7 +620,7 @@
         "python": "policies.set_automatic_updates",
         "go": "Policies.SetAutomaticUpdates",
         "rust": "policies().set_automatic_updates",
-        "java": "policies.setAutomaticUpdates",
+        "java": "policies().setAutomaticUpdates",
         "ruby": "policies.set_automatic_updates",
         "php": "policies->setAutomaticUpdates"
       }
@@ -634,7 +634,7 @@
         "python": "policies.delete",
         "go": "Policies.Delete",
         "rust": "policies().delete",
-        "java": "policies.delete",
+        "java": "policies().delete",
         "ruby": "policies.delete",
         "php": "policies->delete"
       }
@@ -648,7 +648,7 @@
         "python": "policies.retrieve_assigned",
         "go": "Policies.RetrieveAssigned",
         "rust": "policies().retrieve_assigned",
-        "java": "policies.retrieveAssigned",
+        "java": "policies().retrieveAssigned",
         "ruby": "policies.retrieve_assigned",
         "php": "policies->retrieveAssigned"
       }
@@ -662,7 +662,7 @@
         "python": "policies.assign",
         "go": "Policies.Assign",
         "rust": "policies().assign",
-        "java": "policies.assign",
+        "java": "policies().assign",
         "ruby": "policies.assign",
         "php": "policies->assign"
       }
@@ -676,7 +676,7 @@
         "python": "upload_presets.list",
         "go": "UploadPresets.List",
         "rust": "upload_presets().list",
-        "java": "uploadPresets.list",
+        "java": "uploadPresets().list",
         "ruby": "upload_presets.list",
         "php": "uploadPresets->list"
       }
@@ -690,7 +690,7 @@
         "python": "upload_presets.ensure",
         "go": "UploadPresets.Ensure",
         "rust": "upload_presets().ensure",
-        "java": "uploadPresets.ensure",
+        "java": "uploadPresets().ensure",
         "ruby": "upload_presets.ensure",
         "php": "uploadPresets->ensure"
       }
@@ -704,7 +704,7 @@
         "python": "upload_presets.delete",
         "go": "UploadPresets.Delete",
         "rust": "upload_presets().delete",
-        "java": "uploadPresets.delete",
+        "java": "uploadPresets().delete",
         "ruby": "upload_presets.delete",
         "php": "uploadPresets->delete"
       }
@@ -718,7 +718,7 @@
         "python": "project_settings.get",
         "go": "ProjectSettings.Get",
         "rust": "project_settings().get",
-        "java": "projectSettings.get",
+        "java": "projectSettings().get",
         "ruby": "project_settings.get",
         "php": "projectSettings->get"
       }
@@ -732,7 +732,7 @@
         "python": "project_settings.update",
         "go": "ProjectSettings.Update",
         "rust": "project_settings().update",
-        "java": "projectSettings.update",
+        "java": "projectSettings().update",
         "ruby": "project_settings.update",
         "php": "projectSettings->update"
       }
@@ -746,7 +746,7 @@
         "python": "metadata_fields.list",
         "go": "MetadataFields.List",
         "rust": "metadata_fields().list",
-        "java": "metadataFields.list",
+        "java": "metadataFields().list",
         "ruby": "metadata_fields.list",
         "php": "metadataFields->list"
       }
@@ -760,7 +760,7 @@
         "python": "metadata_fields.ensure",
         "go": "MetadataFields.Ensure",
         "rust": "metadata_fields().ensure",
-        "java": "metadataFields.ensure",
+        "java": "metadataFields().ensure",
         "ruby": "metadata_fields.ensure",
         "php": "metadataFields->ensure"
       }
@@ -774,7 +774,7 @@
         "python": "metadata_fields.delete",
         "go": "MetadataFields.Delete",
         "rust": "metadata_fields().delete",
-        "java": "metadataFields.delete",
+        "java": "metadataFields().delete",
         "ruby": "metadata_fields.delete",
         "php": "metadataFields->delete"
       }
@@ -788,7 +788,7 @@
         "python": "text.classify",
         "go": "Text.Classify",
         "rust": "text().classify",
-        "java": "text.classify",
+        "java": "text().classify",
         "ruby": "text.classify",
         "php": "text->classify"
       }
@@ -802,7 +802,7 @@
         "python": "assets.classify",
         "go": "Assets.Classify",
         "rust": "assets().classify",
-        "java": "assets.classify",
+        "java": "assets().classify",
         "ruby": "assets.classify",
         "php": "assets->classify"
       }
@@ -816,7 +816,7 @@
         "python": "assets.wait_for_decision",
         "go": "Assets.WaitForDecision",
         "rust": "assets().wait_for_decision",
-        "java": "assets.waitForDecision",
+        "java": "assets().waitForDecision",
         "ruby": "assets.wait_for_decision",
         "php": "assets->waitForDecision"
       }
@@ -826,11 +826,11 @@
       "kind": "method",
       "description": "Iterates every asset across pages.",
       "names": {
-        "javascript": "assets.iterate",
+        "javascript": "assets.list",
         "python": "assets.iter",
         "go": "Assets.ListAll",
         "rust": "assets().iterate",
-        "java": "assets.iterate",
+        "java": "assets().iterate",
         "ruby": "assets.each",
         "php": "assets->each"
       }
@@ -840,11 +840,11 @@
       "kind": "method",
       "description": "Iterates every child asset across pages.",
       "names": {
-        "javascript": "assets.iterateChildren",
+        "javascript": "assets.listChildren",
         "python": "assets.iter_children",
         "go": "Assets.ListChildrenAll",
         "rust": "assets().iterate_children",
-        "java": "assets.iterateChildren",
+        "java": "assets().iterateChildren",
         "ruby": "assets.each_child",
         "php": "assets->eachChild"
       }
@@ -854,11 +854,11 @@
       "kind": "method",
       "description": "Iterates every segment of an asset's findings timeline across pages.",
       "names": {
-        "javascript": "assets.iterateTimeline",
+        "javascript": "assets.listTimeline",
         "python": "assets.iter_timeline",
         "go": "Assets.ListTimelineAll",
         "rust": "assets().iterate_timeline",
-        "java": "assets.iterateTimeline",
+        "java": "assets().iterateTimeline",
         "ruby": "assets.each_timeline_segment",
         "php": "assets->eachTimelineSegment"
       }
@@ -868,11 +868,11 @@
       "kind": "method",
       "description": "Iterates every child folder across pages.",
       "names": {
-        "javascript": "folders.iterate",
+        "javascript": "folders.list",
         "python": "folders.iter",
         "go": "Folders.ListAll",
         "rust": "folders().iterate",
-        "java": "folders.iterate",
+        "java": "folders().iterate",
         "ruby": "folders.each",
         "php": "folders->each"
       }
@@ -882,11 +882,11 @@
       "kind": "method",
       "description": "Iterates every hash list across pages.",
       "names": {
-        "javascript": "hashLists.iterate",
+        "javascript": "hashLists.list",
         "python": "hash_lists.iter",
         "go": "HashLists.ListAll",
         "rust": "hash_lists().iterate",
-        "java": "hashLists.iterate",
+        "java": "hashLists().iterate",
         "ruby": "hash_lists.each",
         "php": "hashLists->each"
       }
@@ -896,11 +896,11 @@
       "kind": "method",
       "description": "Iterates every entry of a hash list across pages.",
       "names": {
-        "javascript": "hashLists.iterateEntries",
+        "javascript": "hashLists.listEntries",
         "python": "hash_lists.iter_entries",
         "go": "HashLists.ListEntriesAll",
         "rust": "hash_lists().iterate_entries",
-        "java": "hashLists.iterateEntries",
+        "java": "hashLists().iterateEntries",
         "ruby": "hash_lists.each_entry",
         "php": "hashLists->eachEntry"
       }
@@ -910,11 +910,11 @@
       "kind": "method",
       "description": "Iterates every policy of the organisation across pages.",
       "names": {
-        "javascript": "policies.iterate",
+        "javascript": "policies.list",
         "python": "policies.iter",
         "go": "Policies.ListAll",
         "rust": "policies().iterate",
-        "java": "policies.iterate",
+        "java": "policies().iterate",
         "ruby": "policies.each",
         "php": "policies->each"
       }
@@ -924,11 +924,11 @@
       "kind": "method",
       "description": "Iterates every lens of the project across pages.",
       "names": {
-        "javascript": "lenses.iterate",
+        "javascript": "lenses.list",
         "python": "lenses.iter",
         "go": "Lenses.ListAll",
         "rust": "lenses().iterate",
-        "java": "lenses.iterate",
+        "java": "lenses().iterate",
         "ruby": "lenses.each",
         "php": "lenses->each"
       }
@@ -938,11 +938,11 @@
       "kind": "method",
       "description": "Iterates every upload preset of the project across pages.",
       "names": {
-        "javascript": "uploadPresets.iterate",
+        "javascript": "uploadPresets.list",
         "python": "upload_presets.iter",
         "go": "UploadPresets.ListAll",
         "rust": "upload_presets().iterate",
-        "java": "uploadPresets.iterate",
+        "java": "uploadPresets().iterate",
         "ruby": "upload_presets.each",
         "php": "uploadPresets->each"
       }
@@ -952,11 +952,11 @@
       "kind": "method",
       "description": "Iterates events after a cursor across pages.",
       "names": {
-        "javascript": "events.pages",
+        "javascript": "events.list",
         "python": "events.iter_pages",
         "go": "Events.ListAll",
         "rust": "events().pages",
-        "java": "events.pages",
+        "java": "events().pages",
         "ruby": "events.each_page",
         "php": "events->eachPage"
       }
@@ -984,7 +984,7 @@
         "python": "upload_tokens.sign",
         "go": "UploadTokens.Sign",
         "rust": "upload_tokens().sign",
-        "java": "uploadTokens.sign",
+        "java": "uploadTokens().sign",
         "ruby": "upload_tokens.sign",
         "php": "uploadTokens->sign"
       }
@@ -998,7 +998,7 @@
         "python": "cdn.get_asset_url",
         "go": "CDN.GetAssetURL",
         "rust": "cdn().get_asset_url",
-        "java": "cdn.getAssetUrl",
+        "java": "cdn().getAssetUrl",
         "ruby": "cdn.get_asset_url",
         "php": "cdn->getAssetUrl"
       }
@@ -1012,7 +1012,7 @@
         "python": "cdn.get_asset_info",
         "go": "CDN.GetAssetInfo",
         "rust": "cdn().get_asset_info",
-        "java": "cdn.getAssetInfo",
+        "java": "cdn().getAssetInfo",
         "ruby": "cdn.get_asset_info",
         "php": "cdn->getAssetInfo"
       }
@@ -1026,7 +1026,7 @@
         "python": "cdn.serve",
         "go": "CDN.Serve",
         "rust": "cdn().serve",
-        "java": "cdn.serve",
+        "java": "cdn().serve",
         "ruby": "cdn.serve",
         "php": "cdn->serve"
       }
