@@ -116,9 +116,9 @@ pub(crate) const ASSET_FILTER_FIELDS: &[(&str, &str, bool, &[&str])] = &[
         &["==", "!=", ">", ">=", "<", "<=", "=in=", "=out="],
     ),
     (
-        "classification.moderation.status",
+        "classification.moderation.decision",
         "text",
-        false,
+        true,
         &["==", "!=", ">", ">=", "<", "<=", "=in=", "=out="],
     ),
     (

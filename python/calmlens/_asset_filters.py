@@ -28,7 +28,7 @@ ASSET_FILTER_FIELDS: Dict[str, Tuple[str, bool, Tuple[str, ...]]] = {
     "classification.status": ("text", False, ("==", "!=", ">", ">=", "<", "<=", "=in=", "=out=")),
     "classification.updatedAt": ("number", True, ("==", "!=", ">", ">=", "<", "<=", "=in=", "=out=")),
     "classification.completedAt": ("number", True, ("==", "!=", ">", ">=", "<", "<=", "=in=", "=out=")),
-    "classification.moderation.status": ("text", False, ("==", "!=", ">", ">=", "<", "<=", "=in=", "=out=")),
+    "classification.moderation.decision": ("text", True, ("==", "!=", ">", ">=", "<", "<=", "=in=", "=out=")),
     "content.status": ("text", False, ("==", "!=", ">", ">=", "<", "<=", "=in=", "=out=")),
     "content.removalReason": ("text", True, ("==", "!=", ">", ">=", "<", "<=", "=in=", "=out=")),
     "content.updatedAt": ("number", True, ("==", "!=", ">", ">=", "<", "<=", "=in=", "=out=")),

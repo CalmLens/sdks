@@ -278,7 +278,7 @@
     {
       "id": "assets.decide",
       "kind": "method",
-      "description": "Record a reviewer's decision on an asset, replacing the policy's. The asset's `classification.moderation.status` becomes the decision, the matching `asset.<status>` event is sent with the request's `actor` (the API key, or the person an assistant's key acts for), and the decision and note are added to its review history. An asset still pending moderation can only be blocked or purged. Purging also needs `assets:delete` and permanently deletes the stored content.",
+      "description": "Record a reviewer's decision on an asset, replacing the policy's. The asset's `classification.moderation.decision` becomes the decision, the matching `asset.<status>` event is sent with the request's `actor` (the API key, or the person an assistant's key acts for), and the decision and note are added to its review history. An asset still pending moderation can only be blocked or purged. Purging also needs `assets:delete` and permanently deletes the stored content.",
       "names": {
         "javascript": "assets.decide",
         "python": "assets.decide",

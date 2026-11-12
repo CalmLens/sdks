@@ -27,7 +27,7 @@ module CalmLens
       'classification.status' => { kind: 'text', nullable: false, operators: ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out='].freeze }.freeze,
       'classification.updatedAt' => { kind: 'number', nullable: true, operators: ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out='].freeze }.freeze,
       'classification.completedAt' => { kind: 'number', nullable: true, operators: ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out='].freeze }.freeze,
-      'classification.moderation.status' => { kind: 'text', nullable: false, operators: ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out='].freeze }.freeze,
+      'classification.moderation.decision' => { kind: 'text', nullable: true, operators: ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out='].freeze }.freeze,
       'content.status' => { kind: 'text', nullable: false, operators: ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out='].freeze }.freeze,
       'content.removalReason' => { kind: 'text', nullable: true, operators: ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out='].freeze }.freeze,
       'content.updatedAt' => { kind: 'number', nullable: true, operators: ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out='].freeze }.freeze,

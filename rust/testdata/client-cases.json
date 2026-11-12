@@ -34,7 +34,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -66,7 +66,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -177,7 +177,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -209,7 +209,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -795,7 +795,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -859,7 +859,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -944,7 +944,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -980,7 +980,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -1040,7 +1040,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -1111,7 +1111,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -1213,7 +1213,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -1249,7 +1249,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -1321,7 +1321,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -1359,7 +1359,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -1431,7 +1431,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -1470,7 +1470,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -1542,7 +1542,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -1580,7 +1580,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -1648,7 +1648,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -1685,7 +1685,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -1745,7 +1745,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -1799,7 +1799,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -1874,7 +1874,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -1907,7 +1907,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -1964,7 +1964,7 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -2010,7 +2010,7 @@
               "classification": {
                 "status": "pending",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -2093,7 +2093,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -2130,7 +2130,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -2210,7 +2210,7 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -2254,7 +2254,7 @@
               "classification": {
                 "status": "pending",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -2316,7 +2316,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -2355,7 +2355,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -2416,7 +2416,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -2454,7 +2454,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -2518,7 +2518,7 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -2544,7 +2544,7 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -2570,7 +2570,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -2612,7 +2612,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -2747,7 +2747,7 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -2786,7 +2786,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -2828,7 +2828,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -2992,7 +2992,7 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -3018,7 +3018,7 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -3044,7 +3044,7 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -3070,7 +3070,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -3112,7 +3112,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -3349,7 +3349,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -3400,7 +3400,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -3475,7 +3475,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -3507,7 +3507,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -3623,7 +3623,7 @@
           "args": {
             "cursor": "opaque+/cursor=",
             "pageSize": 50,
-            "filter": "classification.moderation.status==blocked;name==\"a b\";folderId==folder-1",
+            "filter": "classification.moderation.decision==blocked;name==\"a b\";folderId==folder-1",
             "sort": "-createdAt,id"
           },
           "expect": {
@@ -3640,7 +3640,7 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "cursor=opaque%2B%2Fcursor%3D&pageSize=50&filter=classification.moderation.status%3D%3Dblocked%3Bname%3D%3D%22a%20b%22%3BfolderId%3D%3Dfolder-1&sort=-createdAt%2Cid",
+          "rawQuery": "cursor=opaque%2B%2Fcursor%3D&pageSize=50&filter=classification.moderation.decision%3D%3Dblocked%3Bname%3D%3D%22a%20b%22%3BfolderId%3D%3Dfolder-1&sort=-createdAt%2Cid",
           "query": [
             [
               "cursor",
@@ -3652,7 +3652,7 @@
             ],
             [
               "filter",
-              "classification.moderation.status==blocked;name==\"a b\";folderId==folder-1"
+              "classification.moderation.decision==blocked;name==\"a b\";folderId==folder-1"
             ],
             [
               "sort",
@@ -4149,7 +4149,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -4196,7 +4196,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -4261,7 +4261,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -4294,7 +4294,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -4523,7 +4523,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -4556,7 +4556,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -4837,7 +4837,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -4869,7 +4869,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -4983,7 +4983,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -5015,7 +5015,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -5236,7 +5236,7 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -5271,7 +5271,7 @@
             "classification": {
               "status": "pending",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -5313,7 +5313,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -5355,7 +5355,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -5621,7 +5621,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -5653,7 +5653,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -5744,7 +5744,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -5776,7 +5776,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -5982,7 +5982,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -6014,7 +6014,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -6178,7 +6178,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -6210,7 +6210,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -6358,7 +6358,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -6394,7 +6394,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -6498,7 +6498,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -6535,7 +6535,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -6629,7 +6629,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -6662,7 +6662,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -6763,7 +6763,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -6800,7 +6800,7 @@
               "classification": {
                 "status": "processing",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -7764,7 +7764,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -7796,7 +7796,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -8185,7 +8185,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9081,7 +9081,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "blocked",
+                "decision": "blocked",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9113,7 +9113,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "blocked",
+                  "decision": "blocked",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -9164,7 +9164,7 @@
             "classification": {
               "status": "failed",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9196,7 +9196,7 @@
               "classification": {
                 "status": "failed",
                 "moderation": {
-                  "status": "pending",
+                  "decision": null,
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -9247,7 +9247,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9273,7 +9273,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9299,7 +9299,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9332,7 +9332,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -9427,7 +9427,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9453,7 +9453,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9479,7 +9479,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9505,7 +9505,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9531,7 +9531,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9557,7 +9557,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9583,7 +9583,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9616,7 +9616,7 @@
               "classification": {
                 "status": "completed",
                 "moderation": {
-                  "status": "allowed",
+                  "decision": "allowed",
                   "flaggedCategories": [],
                   "regions": []
                 }
@@ -9798,7 +9798,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -9826,7 +9826,7 @@
               "details": {
                 "assetId": "asset-1",
                 "classificationStatus": "processing",
-                "moderationStatus": "pending"
+                "moderationDecision": null
               }
             }
           }
@@ -9877,7 +9877,7 @@
             "classification": {
               "status": "processing",
               "moderation": {
-                "status": "pending",
+                "decision": null,
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -10010,7 +10010,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10029,7 +10029,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10061,7 +10061,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10082,7 +10082,7 @@
           "operation": "assets.iterate",
           "args": {
             "pageSize": 2,
-            "filter": "classification.moderation.status==allowed;folderId==folder-1"
+            "filter": "classification.moderation.decision==allowed;folderId==folder-1"
           },
           "expect": {
             "result": [
@@ -10099,7 +10099,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10118,7 +10118,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10137,7 +10137,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10152,7 +10152,7 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "pageSize=2&filter=classification.moderation.status%3D%3Dallowed%3BfolderId%3D%3Dfolder-1",
+          "rawQuery": "pageSize=2&filter=classification.moderation.decision%3D%3Dallowed%3BfolderId%3D%3Dfolder-1",
           "query": [
             [
               "pageSize",
@@ -10160,7 +10160,7 @@
             ],
             [
               "filter",
-              "classification.moderation.status==allowed;folderId==folder-1"
+              "classification.moderation.decision==allowed;folderId==folder-1"
             ]
           ],
           "headers": {
@@ -10181,7 +10181,7 @@
           "method": "GET",
           "origin": "https://api.calmlens.com",
           "path": "/v1/projects/project-1/assets",
-          "rawQuery": "pageSize=2&filter=classification.moderation.status%3D%3Dallowed%3BfolderId%3D%3Dfolder-1&cursor=cursor-2",
+          "rawQuery": "pageSize=2&filter=classification.moderation.decision%3D%3Dallowed%3BfolderId%3D%3Dfolder-1&cursor=cursor-2",
           "query": [
             [
               "pageSize",
@@ -10189,7 +10189,7 @@
             ],
             [
               "filter",
-              "classification.moderation.status==allowed;folderId==folder-1"
+              "classification.moderation.decision==allowed;folderId==folder-1"
             ],
             [
               "cursor",
@@ -10233,7 +10233,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10267,7 +10267,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10321,7 +10321,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10367,7 +10367,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10446,7 +10446,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10478,7 +10478,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10524,7 +10524,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10612,7 +10612,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10631,7 +10631,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10663,7 +10663,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10702,7 +10702,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10721,7 +10721,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10740,7 +10740,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10836,7 +10836,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10868,7 +10868,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10914,7 +10914,7 @@
                 "classification": {
                   "status": "completed",
                   "moderation": {
-                    "status": "allowed",
+                    "decision": "allowed",
                     "flaggedCategories": [],
                     "regions": []
                   }
@@ -10973,7 +10973,7 @@
       ]
     },
     {
-      "name": "events.iterate yields pages until hasMore is false",
+      "name": "events.iterate yields every event across pages until hasMore is false",
       "area": "pagination",
       "responses": [
         {
@@ -11078,81 +11078,67 @@
           "expect": {
             "result": [
               {
-                "items": [
+                "id": "event-1",
+                "projectId": "project-1",
+                "type": "asset.allowed",
+                "severity": "low",
+                "title": "Asset allowed",
+                "description": null,
+                "assetId": "asset-1",
+                "asset": null,
+                "actor": {
+                  "type": "automated",
+                  "id": null
+                },
+                "facts": [
                   {
-                    "id": "event-1",
-                    "projectId": "project-1",
-                    "type": "asset.allowed",
-                    "severity": "low",
-                    "title": "Asset allowed",
-                    "description": null,
-                    "assetId": "asset-1",
-                    "asset": null,
-                    "actor": {
-                      "type": "automated",
-                      "id": null
-                    },
-                    "facts": [
-                      {
-                        "key": "flagged-categories",
-                        "value": []
-                      }
-                    ],
-                    "createdAt": 1760000000000
-                  },
-                  {
-                    "id": "event-2",
-                    "projectId": "project-1",
-                    "type": "asset.allowed",
-                    "severity": "low",
-                    "title": "Asset allowed",
-                    "description": null,
-                    "assetId": "asset-2",
-                    "asset": null,
-                    "actor": {
-                      "type": "automated",
-                      "id": null
-                    },
-                    "facts": [
-                      {
-                        "key": "flagged-categories",
-                        "value": []
-                      }
-                    ],
-                    "createdAt": 1760000000001
+                    "key": "flagged-categories",
+                    "value": []
                   }
                 ],
-                "nextCursor": "cursor-2",
-                "hasMore": true,
-                "excludedTypes": []
+                "createdAt": 1760000000000
               },
               {
-                "items": [
+                "id": "event-2",
+                "projectId": "project-1",
+                "type": "asset.allowed",
+                "severity": "low",
+                "title": "Asset allowed",
+                "description": null,
+                "assetId": "asset-2",
+                "asset": null,
+                "actor": {
+                  "type": "automated",
+                  "id": null
+                },
+                "facts": [
                   {
-                    "id": "event-3",
-                    "projectId": "project-1",
-                    "type": "asset.allowed",
-                    "severity": "low",
-                    "title": "Asset allowed",
-                    "description": null,
-                    "assetId": "asset-1",
-                    "asset": null,
-                    "actor": {
-                      "type": "automated",
-                      "id": null
-                    },
-                    "facts": [
-                      {
-                        "key": "flagged-categories",
-                        "value": []
-                      }
-                    ],
-                    "createdAt": 1760000000000
+                    "key": "flagged-categories",
+                    "value": []
                   }
                 ],
-                "nextCursor": "cursor-3",
-                "hasMore": false,
-                "excludedTypes": []
+                "createdAt": 1760000000001
+              },
+              {
+                "id": "event-3",
+                "projectId": "project-1",
+                "type": "asset.allowed",
+                "severity": "low",
+                "title": "Asset allowed",
+                "description": null,
+                "assetId": "asset-1",
+                "asset": null,
+                "actor": {
+                  "type": "automated",
+                  "id": null
+                },
+                "facts": [
+                  {
+                    "key": "flagged-categories",
+                    "value": []
+                  }
+                ],
+                "createdAt": 1760000000000
               }
             ]
           }
@@ -11220,7 +11206,7 @@
       ]
     },
     {
-      "name": "events.iterate without a cursor yields the one empty page for now",
+      "name": "events.iterate without a cursor yields no events from the one empty page for now",
       "area": "pagination",
       "responses": [
         {
@@ -11241,14 +11227,7 @@
         {
           "operation": "events.iterate",
           "expect": {
-            "result": [
-              {
-                "items": [],
-                "nextCursor": "now-cursor",
-                "hasMore": false,
-                "excludedTypes": []
-              }
-            ]
+            "result": []
           }
         }
       ],
@@ -11346,32 +11325,25 @@
             },
             "partialResult": [
               {
-                "items": [
+                "id": "event-1",
+                "projectId": "project-1",
+                "type": "asset.allowed",
+                "severity": "low",
+                "title": "Asset allowed",
+                "description": null,
+                "assetId": "asset-1",
+                "asset": null,
+                "actor": {
+                  "type": "automated",
+                  "id": null
+                },
+                "facts": [
                   {
-                    "id": "event-1",
-                    "projectId": "project-1",
-                    "type": "asset.allowed",
-                    "severity": "low",
-                    "title": "Asset allowed",
-                    "description": null,
-                    "assetId": "asset-1",
-                    "asset": null,
-                    "actor": {
-                      "type": "automated",
-                      "id": null
-                    },
-                    "facts": [
-                      {
-                        "key": "flagged-categories",
-                        "value": []
-                      }
-                    ],
-                    "createdAt": 1760000000000
+                    "key": "flagged-categories",
+                    "value": []
                   }
                 ],
-                "nextCursor": "cursor-1",
-                "hasMore": true,
-                "excludedTypes": []
+                "createdAt": 1760000000000
               }
             ]
           }

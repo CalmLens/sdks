@@ -160,7 +160,7 @@
             "result": {
               "upload.status": "completed",
               "classification.status": "processing",
-              "classification.moderation.status": "pending",
+              "classification.moderation.decision": null,
               "content.status": "temporary"
             },
             "httpStatus": 200
@@ -178,7 +178,7 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "allowed",
+              "classification.moderation.decision": "allowed",
               "content.status": "removed",
               "content.removalReason": "retention"
             },
@@ -197,7 +197,7 @@
               "id": {
                 "$ref": "queued.id"
               },
-              "classification.moderation.status": "pending"
+              "classification.moderation.decision": null
             },
             "httpStatus": 200
           }
@@ -239,7 +239,7 @@
           "save": "people",
           "expect": {
             "result": {
-              "classification.moderation.status": "allowed",
+              "classification.moderation.decision": "allowed",
               "classification.testInput": false,
               "classification.personDetection": {
                 "status": "evaluated",
@@ -338,7 +338,7 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "blocked",
+              "classification.moderation.decision": "blocked",
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0,
@@ -499,7 +499,7 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "blocked",
+              "classification.moderation.decision": "blocked",
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0,
@@ -664,7 +664,7 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "allowed",
+              "classification.moderation.decision": "allowed",
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0,
@@ -869,7 +869,7 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "blocked",
+              "classification.moderation.decision": "blocked",
               "classification.moderation.categories": {
                 "violence": {
                   "score": 0.92,
@@ -1030,7 +1030,7 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "limited",
+              "classification.moderation.decision": "limited",
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0,
@@ -1198,7 +1198,7 @@
           "expect": {
             "result": {
               "classification.status": "processing",
-              "classification.moderation.status": "pending"
+              "classification.moderation.decision": null
             },
             "httpStatus": 200
           }
@@ -1411,7 +1411,7 @@
           "save": "reported",
           "expect": {
             "result": {
-              "classification.moderation.status": "allowed"
+              "classification.moderation.decision": "allowed"
             },
             "httpStatus": 200
           }
@@ -1438,7 +1438,7 @@
               "id": {
                 "$ref": "reported.id"
               },
-              "classification.moderation.status": "blocked",
+              "classification.moderation.decision": "blocked",
               "classification.moderation.manualReviews.length": 1,
               "classification.moderation.manualReviews.0.decision": "blocked",
               "classification.moderation.manualReviews.0.note": "Spam",
@@ -1552,7 +1552,7 @@
           "expect": {
             "result": {
               "classification.status": "failed",
-              "classification.moderation.status": "pending"
+              "classification.moderation.decision": null
             },
             "httpStatus": 200
           }
@@ -1585,7 +1585,7 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "purged",
+              "classification.moderation.decision": "purged",
               "content.status": "removed",
               "content.removalReason": "requested"
             },
@@ -1626,7 +1626,7 @@
               "id": {
                 "$id": "asset"
               },
-              "classification.moderation.status": "allowed"
+              "classification.moderation.decision": "allowed"
             },
             "httpStatus": 200
           }
@@ -1675,7 +1675,7 @@
                 "$ref": "blocked.id"
               },
               "classification.status": "completed",
-              "classification.moderation.status": "blocked",
+              "classification.moderation.decision": "blocked",
               "classification.moderation.manualReviews.length": 1,
               "classification.moderation.manualReviews.0.id": {
                 "$id": "rev"
@@ -1697,7 +1697,7 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "blocked",
+              "classification.moderation.decision": "blocked",
               "classification.moderation.manualReviews": {
                 "$ref": "decision.classification.moderation.manualReviews"
               }
@@ -1708,7 +1708,7 @@
         {
           "operation": "assets.list",
           "args": {
-            "filter": "classification.moderation.status==blocked"
+            "filter": "classification.moderation.decision==blocked"
           },
           "expect": {
             "result": {
@@ -1723,7 +1723,7 @@
         {
           "operation": "assets.list",
           "args": {
-            "filter": "classification.moderation.status==allowed"
+            "filter": "classification.moderation.decision==allowed"
           },
           "expect": {
             "result": {
@@ -1809,7 +1809,7 @@
               "items.0.assetId": {
                 "$ref": "blocked.id"
               },
-              "items.0.asset.classification.moderation.status": "blocked",
+              "items.0.asset.classification.moderation.decision": "blocked",
               "items.0.actor.type": "user",
               "hasMore": false
             },
@@ -1868,7 +1868,7 @@
           "save": "purged",
           "expect": {
             "result": {
-              "classification.moderation.status": "purged",
+              "classification.moderation.decision": "purged",
               "content.status": "removed",
               "content.removalReason": "policy"
             },
@@ -1950,7 +1950,7 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "purged",
+              "classification.moderation.decision": "purged",
               "content.status": "removed",
               "content.removalReason": "requested"
             }
@@ -2092,7 +2092,7 @@
             "result": {
               "content.status": "removed",
               "content.removalReason": "requested",
-              "classification.moderation.status": "allowed"
+              "classification.moderation.decision": "allowed"
             },
             "httpStatus": 200
           }
@@ -2337,7 +2337,7 @@
           "save": "public",
           "expect": {
             "result": {
-              "classification.moderation.status": "age-restricted"
+              "classification.moderation.decision": "age-restricted"
             },
             "httpStatus": 200
           }
@@ -2440,7 +2440,7 @@
           "save": "public",
           "expect": {
             "result": {
-              "classification.moderation.status": "limited"
+              "classification.moderation.decision": "limited"
             },
             "httpStatus": 200
           }
@@ -2467,7 +2467,7 @@
         {
           "operation": "assets.list",
           "args": {
-            "filter": "classification.moderation.status==limited"
+            "filter": "classification.moderation.decision==limited"
           },
           "expect": {
             "result": {
@@ -2554,7 +2554,7 @@
               "items.1.assetId": {
                 "$ref": "public.id"
               },
-              "items.1.asset.classification.moderation.status": "limited",
+              "items.1.asset.classification.moderation.decision": "limited",
               "items.1.actor.type": "user"
             },
             "httpStatus": 200
@@ -2845,7 +2845,7 @@
               "id": {
                 "$ref": "queued.id"
               },
-              "classification.moderation.status": "allowed"
+              "classification.moderation.decision": "allowed"
             },
             "httpStatus": 200
           }
@@ -4158,7 +4158,7 @@
               },
               "items.0.score": 100,
               "items.0.matchedFields": [
-                "classification.moderation.status"
+                "classification.moderation.decision"
               ],
               "items.1.asset.id": {
                 "$ref": "beach.id"
@@ -4276,7 +4276,7 @@
         {
           "operation": "assets.list",
           "args": {
-            "filter": "(name==a.png,name==c.png);classification.moderation.status==blocked"
+            "filter": "(name==a.png,name==c.png);classification.moderation.decision==blocked"
           },
           "expect": {
             "result": {
@@ -4291,7 +4291,7 @@
         {
           "operation": "assets.list",
           "args": {
-            "filter": "name==a.png,name==c.png;classification.moderation.status==blocked"
+            "filter": "name==a.png,name==c.png;classification.moderation.decision==blocked"
           },
           "expect": {
             "result": {
@@ -4309,7 +4309,7 @@
         {
           "operation": "assets.list",
           "args": {
-            "filter": "((name==a.png);(classification.moderation.status==allowed)),name==b.png"
+            "filter": "((name==a.png);(classification.moderation.decision==allowed)),name==b.png"
           },
           "expect": {
             "result": {
@@ -5028,7 +5028,7 @@
               "asset.id": {
                 "$ref": "queued.id"
               },
-              "asset.classification.moderation.status": "pending"
+              "asset.classification.moderation.decision": null
             }
           }
         },
@@ -5075,7 +5075,7 @@
               "asset.id": {
                 "$ref": "queued.id"
               },
-              "asset.classification.moderation.status": "blocked"
+              "asset.classification.moderation.decision": "blocked"
             }
           }
         },
@@ -5088,7 +5088,7 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "pending"
+              "classification.moderation.decision": null
             },
             "httpStatus": 200
           }
@@ -5651,7 +5651,7 @@
             "result": {
               "classification.status": "failed",
               "classification.failureReason": "processing-error",
-              "classification.moderation.status": "pending",
+              "classification.moderation.decision": null,
               "content.status": "temporary"
             },
             "httpStatus": 200
@@ -5687,7 +5687,7 @@
               "classification.status": "processing",
               "classification.failureReason": null,
               "classification.completedAt": null,
-              "classification.moderation.status": "pending"
+              "classification.moderation.decision": null
             },
             "httpStatus": 200
           }
@@ -6077,7 +6077,7 @@
             "result": {
               "content.status": "removed",
               "content.removalReason": "requested",
-              "classification.moderation.status": "allowed"
+              "classification.moderation.decision": "allowed"
             },
             "httpStatus": 200
           }
@@ -6355,7 +6355,7 @@
             "result": {
               "content.status": "removed",
               "content.removalReason": "requested",
-              "classification.moderation.status": "allowed"
+              "classification.moderation.decision": "allowed"
             },
             "httpStatus": 200
           }
@@ -7483,7 +7483,7 @@
                   "$ref": "queued.id"
                 },
                 "classificationStatus": "processing",
-                "moderationStatus": "pending"
+                "moderationDecision": null
               }
             }
           }
@@ -7549,7 +7549,7 @@
               "upload.status": "uploading",
               "upload.partsReceived": 1,
               "classification.status": "queued",
-              "classification.moderation.status": "pending",
+              "classification.moderation.decision": null,
               "content.sizeInBytes": 5242880
             },
             "httpStatus": 200
@@ -7614,7 +7614,7 @@
               "upload.status": "completed",
               "upload.partsReceived": null,
               "classification.status": "completed",
-              "classification.moderation.status": "blocked",
+              "classification.moderation.decision": "blocked",
               "content.sizeInBytes": 5242885
             },
             "httpStatus": 200
@@ -7674,7 +7674,7 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "allowed"
+              "classification.moderation.decision": "allowed"
             },
             "httpStatus": 200
           }
@@ -7715,7 +7715,7 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "allowed"
+              "classification.moderation.decision": "allowed"
             },
             "httpStatus": 200
           }
@@ -10462,7 +10462,7 @@
               ],
               "items.2.type": "asset.blocked",
               "items.2.severity": "high",
-              "items.2.asset.classification.moderation.status": "blocked",
+              "items.2.asset.classification.moderation.decision": "blocked",
               "items.2.actor": {
                 "type": "automated",
                 "id": null
@@ -10527,7 +10527,7 @@
             "result": {
               "classification.status": "failed",
               "classification.failureReason": "processing-error",
-              "classification.moderation.status": "pending"
+              "classification.moderation.decision": null
             },
             "httpStatus": 200
           }
@@ -10642,7 +10642,7 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "age-restricted",
+              "classification.moderation.decision": "age-restricted",
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0.8,
@@ -10807,7 +10807,7 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "age-restricted"
+              "classification.moderation.decision": "age-restricted"
             },
             "httpStatus": 200
           }
@@ -10869,7 +10869,7 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "age-restricted"
+              "classification.moderation.decision": "age-restricted"
             },
             "httpStatus": 200
           }
@@ -10883,7 +10883,7 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "age-restricted"
+              "classification.moderation.decision": "age-restricted"
             },
             "httpStatus": 200
           }
@@ -10898,7 +10898,7 @@
           "expect": {
             "result": {
               "classification.status": "completed",
-              "classification.moderation.status": "allowed",
+              "classification.moderation.decision": "allowed",
               "classification.moderation.categories": {
                 "sexual": {
                   "score": 0,
@@ -12542,7 +12542,7 @@
           "save": "sampled",
           "expect": {
             "result": {
-              "classification.moderation.status": "allowed",
+              "classification.moderation.decision": "allowed",
               "classification.moderation.pendingReview.reason": "sampled",
               "classification.moderation.pendingReview.uncertainCategories": []
             },
@@ -12580,7 +12580,7 @@
           "save": "uncertain",
           "expect": {
             "result": {
-              "classification.moderation.status": "limited",
+              "classification.moderation.decision": "limited",
               "classification.moderation.pendingReview.reason": "uncertain",
               "classification.moderation.pendingReview.uncertainCategories": [
                 "violence"
@@ -13176,7 +13176,7 @@
           },
           "expect": {
             "result": {
-              "classification.moderation.status": "blocked"
+              "classification.moderation.decision": "blocked"
             },
             "httpStatus": 200
           }

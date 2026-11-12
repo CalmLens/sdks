@@ -25,7 +25,7 @@ import {
 } from "../src/client/CalmLensUtils";
 import { UPLOAD_TOKEN_DEFAULT_TTL_SECONDS } from "../src/contract/UploadToken.js";
 import { CalmLensError, CalmLensServerClient } from "../src/server";
-import { eventPages, testdata } from "./testdata";
+import { testdata } from "./testdata";
 import { readUploadForm } from "./upload-form";
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
@@ -43,7 +43,7 @@ const invoke = async (client: CalmLensServerClient, operation: string, args: unk
   const anyArgs = args as never;
   switch (operation) {
     case "events.iterate":
-      return collect(eventPages(client.events.list(anyArgs), (args as { cursor?: string }).cursor));
+      return collect(client.events.list(anyArgs));
     case "ensureLens":
       return client.ensureLens(anyArgs);
     case "ensureLenses":

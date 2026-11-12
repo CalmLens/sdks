@@ -20,8 +20,8 @@
     {
       "secret": "whsec_test",
       "timestamp": "1760000000",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"assetSequence\":null,\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"uploadPresetId\":\"preset-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"status\":\"blocked\"}}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1760000000000}",
-      "signature": "v1=9f0dedbbb705f95816ddc7eaf4471b78b901a76f85a261a40049027d6df953a8"
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"assetSequence\":null,\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"uploadPresetId\":\"preset-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"blocked\"}}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1760000000000}",
+      "signature": "v1=32c680636e5c0f1e0c184233aa410af88acedd1d6033d5d288d4b7155feb45b4"
     }
   ],
   "verification": [
@@ -38,8 +38,8 @@
       "name": "payload",
       "secret": "whsec_test",
       "timestamp": "1760000000",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"assetSequence\":null,\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"uploadPresetId\":\"preset-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"status\":\"blocked\"}}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1760000000000}",
-      "signature": "v1=9f0dedbbb705f95816ddc7eaf4471b78b901a76f85a261a40049027d6df953a8",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"assetSequence\":null,\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"uploadPresetId\":\"preset-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"blocked\"}}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1760000000000}",
+      "signature": "v1=32c680636e5c0f1e0c184233aa410af88acedd1d6033d5d288d4b7155feb45b4",
       "now": 1760000000,
       "valid": true
     },
@@ -334,7 +334,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "blocked"
+              "decision": "blocked"
             }
           }
         },
@@ -378,7 +378,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "blocked"
+              "decision": "blocked"
             }
           }
         },
@@ -1680,7 +1680,7 @@
             "status": "completed",
             "testInput": false,
             "moderation": {
-              "status": "blocked"
+              "decision": "blocked"
             }
           },
           "content": {
@@ -1733,7 +1733,7 @@
             "status": "completed",
             "testInput": false,
             "moderation": {
-              "status": "blocked"
+              "decision": "blocked"
             }
           },
           "content": {
@@ -1762,7 +1762,7 @@
         ],
         "createdAt": 1700000000000
       },
-      "body": "{\"id\":\"event-test-send\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"status\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-test-send\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"beach.jpg blocked\",\"description\":\"No longer delivered. Its content is kept. Possible violations: sexual.\",\"assetId\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"assetSequence\":1,\"asset\":{\"id\":\"asset_5Gm2Rk8XqT3wLp9VbN4c\",\"externalId\":\"post-123\",\"uploadPresetId\":null,\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"testInput\":false,\"moderation\":{\"decision\":\"blocked\"}},\"content\":{\"status\":\"stored\"}},\"facts\":[{\"key\":\"asset-name\",\"value\":\"beach.jpg\"},{\"key\":\"asset-type\",\"value\":\"image\"},{\"key\":\"flagged-categories\",\"value\":[\"sexual\"]},{\"key\":\"test\",\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "deliveryId": "delivery-test",
       "timestampSeconds": 1700000000,
@@ -1770,7 +1770,7 @@
         "content-type": "application/json",
         "x-calmlens-delivery": "delivery-test",
         "x-calmlens-timestamp": "1700000000",
-        "x-calmlens-signature": "v1=863061705c0a2776f576b0beaeb4493927593b414a58596d3b87c45e4bad7a6c"
+        "x-calmlens-signature": "v1=4e60dff5cdb0829e148e2ad9d1340834122d6263a68bfbc8c14b054ba3f2f4d0"
       },
       "isTest": true
     }

@@ -774,7 +774,7 @@ describe("MockCalmLensServerClient", () => {
       client.assets.waitForDecision({ assetId: pending.id, timeoutMs: 0 }),
     ).rejects.toMatchObject({
       code: "sdk/timeout",
-      details: { classificationStatus: "processing", moderationStatus: null },
+      details: { classificationStatus: "processing", moderationDecision: null },
     });
 
     const decidedClient = createClient({

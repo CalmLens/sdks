@@ -514,7 +514,7 @@ describe("assets.waitForDecision", () => {
       details: {
         assetId: "asset-1",
         classificationStatus: "processing",
-        moderationStatus: null,
+        moderationDecision: null,
       },
     });
   });

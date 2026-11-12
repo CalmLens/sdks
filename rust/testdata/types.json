@@ -1436,7 +1436,7 @@
                       "type",
                       "content.format",
                       "content.extension",
-                      "classification.moderation.status",
+                      "classification.moderation.decision",
                       "visual",
                       "transcript"
                     ]
@@ -4021,7 +4021,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -4197,7 +4197,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -4220,7 +4220,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.48"
+                            "$ref": "#/definitions/shared.49"
                           },
                           {
                             "type": "object",
@@ -4428,7 +4428,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -4676,7 +4676,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -4699,7 +4699,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.48"
+                            "$ref": "#/definitions/shared.49"
                           },
                           {
                             "type": "object",
@@ -4768,7 +4768,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.49"
+                            "$ref": "#/definitions/shared.50"
                           },
                           {
                             "type": "object",
@@ -4921,7 +4921,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -4944,7 +4944,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.48"
+                            "$ref": "#/definitions/shared.49"
                           },
                           {
                             "type": "object",
@@ -5013,7 +5013,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.49"
+                            "$ref": "#/definitions/shared.50"
                           },
                           {
                             "type": "object",
@@ -5166,7 +5166,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -5189,7 +5189,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.48"
+                            "$ref": "#/definitions/shared.49"
                           },
                           {
                             "type": "object",
@@ -5258,7 +5258,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.49"
+                            "$ref": "#/definitions/shared.50"
                           },
                           {
                             "type": "object",
@@ -5411,7 +5411,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -5434,7 +5434,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.48"
+                            "$ref": "#/definitions/shared.49"
                           },
                           {
                             "type": "object",
@@ -5503,7 +5503,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.49"
+                            "$ref": "#/definitions/shared.50"
                           },
                           {
                             "type": "object",
@@ -5656,7 +5656,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -5679,7 +5679,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.48"
+                            "$ref": "#/definitions/shared.49"
                           },
                           {
                             "type": "object",
@@ -5748,7 +5748,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.49"
+                            "$ref": "#/definitions/shared.50"
                           },
                           {
                             "type": "object",
@@ -5901,7 +5901,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -6141,7 +6141,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -6334,7 +6334,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -6507,7 +6507,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -6680,7 +6680,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -6833,7 +6833,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -7013,7 +7013,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -7269,7 +7269,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -7555,7 +7555,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.47"
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -8386,7 +8386,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.50"
+                            "$ref": "#/definitions/shared.51"
                           },
                           {
                             "type": "object",
@@ -8559,7 +8559,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.50"
+                            "$ref": "#/definitions/shared.51"
                           },
                           {
                             "type": "object",
@@ -8732,7 +8732,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.50"
+                            "$ref": "#/definitions/shared.51"
                           },
                           {
                             "type": "object",
@@ -8933,7 +8933,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.50"
+                            "$ref": "#/definitions/shared.51"
                           },
                           {
                             "type": "object",
@@ -9083,7 +9083,7 @@
                             "additionalProperties": false
                           },
                           {
-                            "$ref": "#/definitions/shared.50"
+                            "$ref": "#/definitions/shared.51"
                           },
                           {
                             "type": "object",
@@ -10336,7 +10336,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/definitions/shared.51"
+              "$ref": "#/definitions/shared.52"
             }
           },
           "nextCursor": {
@@ -10384,7 +10384,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.51"
+        "$ref": "#/definitions/shared.52"
       }
     },
     {
@@ -10434,7 +10434,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.51"
+        "$ref": "#/definitions/shared.52"
       }
     },
     {
@@ -10489,7 +10489,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.51"
+        "$ref": "#/definitions/shared.52"
       }
     },
     {
@@ -10570,7 +10570,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/definitions/shared.52"
+              "$ref": "#/definitions/shared.53"
             }
           },
           "nextCursor": {
@@ -10652,7 +10652,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.52"
+        "$ref": "#/definitions/shared.53"
       }
     },
     {
@@ -10725,7 +10725,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/definitions/shared.53"
+              "$ref": "#/definitions/shared.54"
             }
           },
           "nextCursor": {
@@ -10773,7 +10773,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.53"
+        "$ref": "#/definitions/shared.54"
       }
     },
     {
@@ -10805,7 +10805,7 @@
           "settings": {
             "location": "body",
             "schema": {
-              "$ref": "#/definitions/shared.54"
+              "$ref": "#/definitions/shared.55"
             }
           },
           "presetId": {
@@ -10825,7 +10825,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.53"
+        "$ref": "#/definitions/shared.54"
       }
     },
     {
@@ -10869,7 +10869,7 @@
           "settings": {
             "location": "body",
             "schema": {
-              "$ref": "#/definitions/shared.54"
+              "$ref": "#/definitions/shared.55"
             }
           }
         },
@@ -10880,7 +10880,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.53"
+        "$ref": "#/definitions/shared.54"
       }
     },
     {
@@ -10924,7 +10924,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.53"
+        "$ref": "#/definitions/shared.54"
       }
     },
     {
@@ -10968,7 +10968,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.53"
+        "$ref": "#/definitions/shared.54"
       }
     },
     {
@@ -11019,7 +11019,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.53"
+        "$ref": "#/definitions/shared.54"
       }
     },
     {
@@ -11068,7 +11068,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.53"
+        "$ref": "#/definitions/shared.54"
       }
     },
     {
@@ -11098,7 +11098,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.53"
+        "$ref": "#/definitions/shared.54"
       }
     },
     {
@@ -11143,7 +11143,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/definitions/shared.58"
+              "$ref": "#/definitions/shared.59"
             }
           },
           "nextCursor": {
@@ -11257,7 +11257,7 @@
                   "processingOptions": {
                     "anyOf": [
                       {
-                        "$ref": "#/definitions/shared.59"
+                        "$ref": "#/definitions/shared.60"
                       },
                       {
                         "type": "null"
@@ -11311,7 +11311,7 @@
           "uploadPresets": {
             "type": "array",
             "items": {
-              "$ref": "#/definitions/shared.58"
+              "$ref": "#/definitions/shared.59"
             }
           }
         },
@@ -11367,7 +11367,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.61"
+        "$ref": "#/definitions/shared.62"
       }
     },
     {
@@ -11496,7 +11496,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.61"
+        "$ref": "#/definitions/shared.62"
       }
     },
     {
@@ -11517,7 +11517,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.64"
+        "$ref": "#/definitions/shared.65"
       }
     },
     {
@@ -11599,7 +11599,7 @@
         "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.64"
+        "$ref": "#/definitions/shared.65"
       }
     },
     {
@@ -13318,15 +13318,21 @@
     "shared.5": {
       "type": "object",
       "properties": {
-        "status": {
-          "type": "string",
-          "enum": [
-            "pending",
-            "allowed",
-            "limited",
-            "age-restricted",
-            "blocked",
-            "purged"
+        "decision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "allowed",
+                "limited",
+                "age-restricted",
+                "blocked",
+                "purged"
+              ]
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "manualReviews": {
@@ -13471,7 +13477,7 @@
         }
       },
       "required": [
-        "status",
+        "decision",
         "manualReviews",
         "automatedStatus",
         "source",
@@ -14574,6 +14580,32 @@
       ],
       "additionalProperties": false
     },
+    "shared.47": {
+      "type": "object",
+      "properties": {
+        "decision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "allowed",
+                "limited",
+                "age-restricted",
+                "blocked",
+                "purged"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "decision"
+      ],
+      "additionalProperties": false
+    },
     "shared.46": {
       "type": "object",
       "properties": {
@@ -14590,24 +14622,7 @@
           "type": "boolean"
         },
         "moderation": {
-          "type": "object",
-          "properties": {
-            "status": {
-              "type": "string",
-              "enum": [
-                "pending",
-                "allowed",
-                "limited",
-                "age-restricted",
-                "blocked",
-                "purged"
-              ]
-            }
-          },
-          "required": [
-            "status"
-          ],
-          "additionalProperties": false
+          "$ref": "#/definitions/shared.47"
         }
       },
       "required": [
@@ -14680,7 +14695,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.47": {
+    "shared.48": {
       "type": "object",
       "properties": {
         "key": {
@@ -14716,7 +14731,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.48": {
+    "shared.49": {
       "type": "object",
       "properties": {
         "key": {
@@ -14749,7 +14764,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.49": {
+    "shared.50": {
       "type": "object",
       "properties": {
         "key": {
@@ -14776,7 +14791,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.50": {
+    "shared.51": {
       "type": "object",
       "properties": {
         "key": {
@@ -14804,7 +14819,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.51": {
+    "shared.52": {
       "type": "object",
       "properties": {
         "id": {
@@ -14845,7 +14860,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.52": {
+    "shared.53": {
       "type": "object",
       "properties": {
         "id": {
@@ -14900,7 +14915,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.56": {
+    "shared.57": {
       "type": "object",
       "properties": {
         "allowances": {
@@ -14933,32 +14948,32 @@
       ],
       "additionalProperties": false
     },
-    "shared.55": {
+    "shared.56": {
       "type": "object",
       "properties": {
         "sexual": {
-          "$ref": "#/definitions/shared.56"
+          "$ref": "#/definitions/shared.57"
         },
         "violence": {
-          "$ref": "#/definitions/shared.56"
+          "$ref": "#/definitions/shared.57"
         },
         "self-harm": {
-          "$ref": "#/definitions/shared.56"
+          "$ref": "#/definitions/shared.57"
         },
         "harassment": {
-          "$ref": "#/definitions/shared.56"
+          "$ref": "#/definitions/shared.57"
         },
         "hate": {
-          "$ref": "#/definitions/shared.56"
+          "$ref": "#/definitions/shared.57"
         },
         "criminal-activity": {
-          "$ref": "#/definitions/shared.56"
+          "$ref": "#/definitions/shared.57"
         },
         "personal-information": {
-          "$ref": "#/definitions/shared.56"
+          "$ref": "#/definitions/shared.57"
         },
         "profanity": {
-          "$ref": "#/definitions/shared.56"
+          "$ref": "#/definitions/shared.57"
         }
       },
       "required": [
@@ -14973,11 +14988,11 @@
       ],
       "additionalProperties": false
     },
-    "shared.54": {
+    "shared.55": {
       "type": "object",
       "properties": {
         "categorySettings": {
-          "$ref": "#/definitions/shared.55"
+          "$ref": "#/definitions/shared.56"
         }
       },
       "required": [
@@ -14985,7 +15000,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.57": {
+    "shared.58": {
       "type": "object",
       "properties": {
         "id": {
@@ -15020,7 +15035,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.53": {
+    "shared.54": {
       "type": "object",
       "properties": {
         "id": {
@@ -15033,7 +15048,7 @@
           "type": "string"
         },
         "settings": {
-          "$ref": "#/definitions/shared.54"
+          "$ref": "#/definitions/shared.55"
         },
         "revision": {
           "type": "integer"
@@ -15041,7 +15056,7 @@
         "preset": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.57"
+              "$ref": "#/definitions/shared.58"
             },
             {
               "type": "null"
@@ -15073,7 +15088,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.60": {
+    "shared.61": {
       "type": "object",
       "properties": {
         "ocr": {
@@ -15177,7 +15192,7 @@
       },
       "additionalProperties": false
     },
-    "shared.59": {
+    "shared.60": {
       "type": "object",
       "properties": {
         "retainContent": {
@@ -15195,7 +15210,7 @@
         "features": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.60"
+              "$ref": "#/definitions/shared.61"
             },
             {
               "type": "null"
@@ -15205,7 +15220,7 @@
       },
       "additionalProperties": false
     },
-    "shared.58": {
+    "shared.59": {
       "type": "object",
       "properties": {
         "id": {
@@ -15296,7 +15311,7 @@
         "processingOptions": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.59"
+              "$ref": "#/definitions/shared.60"
             },
             {
               "type": "null"
@@ -15350,7 +15365,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.63": {
+    "shared.64": {
       "type": "object",
       "properties": {
         "allowedSamplePercent": {
@@ -15374,7 +15389,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.62": {
+    "shared.63": {
       "type": "object",
       "properties": {
         "retainContent": {
@@ -15445,7 +15460,7 @@
           ]
         },
         "humanReview": {
-          "$ref": "#/definitions/shared.63"
+          "$ref": "#/definitions/shared.64"
         }
       },
       "required": [
@@ -15462,7 +15477,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.61": {
+    "shared.62": {
       "type": "object",
       "properties": {
         "projectId": {
@@ -15472,7 +15487,7 @@
           "type": "integer"
         },
         "settings": {
-          "$ref": "#/definitions/shared.62"
+          "$ref": "#/definitions/shared.63"
         }
       },
       "required": [
@@ -15482,7 +15497,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.65": {
+    "shared.66": {
       "type": "object",
       "properties": {
         "id": {
@@ -15529,7 +15544,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.64": {
+    "shared.65": {
       "type": "object",
       "properties": {
         "projectId": {
@@ -15541,7 +15556,7 @@
         "fields": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.65"
+            "$ref": "#/definitions/shared.66"
           }
         }
       },

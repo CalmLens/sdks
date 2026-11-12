@@ -22,7 +22,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -100,7 +100,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -191,7 +191,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -260,7 +260,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -349,7 +349,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -429,7 +429,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -489,7 +489,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -531,7 +531,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -571,7 +571,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -590,14 +590,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -615,7 +615,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -659,7 +659,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -679,7 +679,7 @@
     "options": {
       "cursor": "opaque+/cursor=",
       "sort": "-createdAt,id",
-      "filter": "classification.moderation.status==allowed,name==\"a&b #1\""
+      "filter": "classification.moderation.decision==allowed,name==\"a&b #1\""
     },
     "request": {
       "method": "GET",
@@ -687,7 +687,7 @@
       "query": {
         "cursor": "opaque+/cursor=",
         "sort": "-createdAt,id",
-        "filter": "classification.moderation.status==allowed,name==\"a&b #1\""
+        "filter": "classification.moderation.decision==allowed,name==\"a&b #1\""
       },
       "body": null
     },
@@ -705,7 +705,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -744,7 +744,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -778,7 +778,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -808,7 +808,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -843,7 +843,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -894,7 +894,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": [],
           "categories": {
@@ -983,7 +983,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -1018,7 +1018,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -1117,7 +1117,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -1147,7 +1147,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -1180,7 +1180,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -1215,7 +1215,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -1252,7 +1252,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -1282,7 +1282,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -1328,7 +1328,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -1518,7 +1518,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -1588,7 +1588,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -1629,7 +1629,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -4023,7 +4023,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -4429,7 +4429,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -4835,7 +4835,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -5241,7 +5241,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -5647,7 +5647,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -6053,7 +6053,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -6459,7 +6459,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -6865,7 +6865,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -7271,7 +7271,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -7677,7 +7677,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -8083,7 +8083,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -8489,7 +8489,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -8895,7 +8895,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -9350,7 +9350,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -9776,7 +9776,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -10202,7 +10202,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -10628,7 +10628,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -11054,7 +11054,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -11480,7 +11480,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -11906,7 +11906,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -12332,7 +12332,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -12758,7 +12758,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -13184,7 +13184,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -13610,7 +13610,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -14036,7 +14036,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -14481,7 +14481,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -14926,7 +14926,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -15371,7 +15371,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -15816,7 +15816,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -16261,7 +16261,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -16706,7 +16706,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -17151,7 +17151,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -17596,7 +17596,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -18041,7 +18041,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -18486,7 +18486,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -18931,7 +18931,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -19376,7 +19376,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -19841,7 +19841,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -20306,7 +20306,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -20771,7 +20771,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -21236,7 +21236,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -21701,7 +21701,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -22166,7 +22166,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -22631,7 +22631,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -23096,7 +23096,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -23561,7 +23561,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -24026,7 +24026,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -24491,7 +24491,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -24956,7 +24956,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -25372,7 +25372,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "pending",
+                "decision": "allowed",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -25796,7 +25796,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "allowed",
+                "decision": "limited",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -26220,7 +26220,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "limited",
+                "decision": "age-restricted",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -26644,7 +26644,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "age-restricted",
+                "decision": "blocked",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -27068,7 +27068,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "blocked",
+                "decision": "purged",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -27492,7 +27492,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "purged",
+                "decision": "allowed",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -27916,7 +27916,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "pending",
+                "decision": "limited",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -28340,7 +28340,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "allowed",
+                "decision": "age-restricted",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -28764,7 +28764,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "limited",
+                "decision": "blocked",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -29106,7 +29106,7 @@
           },
           "score": 1.5,
           "matchedFields": [
-            "classification.moderation.status"
+            "classification.moderation.decision"
           ]
         }
       ],
@@ -29188,7 +29188,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "age-restricted",
+                "decision": "purged",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -29612,7 +29612,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "blocked",
+                "decision": "allowed",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -30036,7 +30036,7 @@
               },
               "testInput": true,
               "moderation": {
-                "status": "purged",
+                "decision": "limited",
                 "manualReviews": [
                   {
                     "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -30390,14 +30390,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -30456,7 +30456,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "pending",
+              "decision": "allowed",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -30806,14 +30806,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -30872,7 +30872,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "allowed",
+              "decision": "limited",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -31222,14 +31222,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -31288,7 +31288,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "limited",
+              "decision": "age-restricted",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -31638,14 +31638,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -31704,7 +31704,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "age-restricted",
+              "decision": "blocked",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -32054,14 +32054,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -32120,7 +32120,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "blocked",
+              "decision": "purged",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -32470,14 +32470,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -32536,7 +32536,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "purged",
+              "decision": "allowed",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -32886,14 +32886,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -32952,7 +32952,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "pending",
+              "decision": "limited",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -33302,14 +33302,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -33368,7 +33368,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "allowed",
+              "decision": "age-restricted",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -33718,14 +33718,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -33784,7 +33784,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "limited",
+              "decision": "blocked",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -34134,14 +34134,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -34200,7 +34200,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "age-restricted",
+              "decision": "purged",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -34550,14 +34550,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -34616,7 +34616,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "blocked",
+              "decision": "allowed",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -34966,14 +34966,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -35032,7 +35032,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "purged",
+              "decision": "limited",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -35447,7 +35447,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "pending",
+              "decision": "allowed",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -35862,7 +35862,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "allowed",
+              "decision": "limited",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -36277,7 +36277,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "limited",
+              "decision": "age-restricted",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -36692,7 +36692,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "age-restricted",
+              "decision": "blocked",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -37107,7 +37107,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "blocked",
+              "decision": "purged",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -37522,7 +37522,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "purged",
+              "decision": "allowed",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -37937,7 +37937,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "pending",
+              "decision": "limited",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -38352,7 +38352,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "allowed",
+              "decision": "age-restricted",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -38767,7 +38767,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "limited",
+              "decision": "blocked",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -39182,7 +39182,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "age-restricted",
+              "decision": "purged",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -39597,7 +39597,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "blocked",
+              "decision": "allowed",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -40012,7 +40012,7 @@
             },
             "testInput": true,
             "moderation": {
-              "status": "purged",
+              "decision": "limited",
               "manualReviews": [
                 {
                   "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -40427,7 +40427,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -40838,7 +40838,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -41249,7 +41249,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -41660,7 +41660,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -42071,7 +42071,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -42482,7 +42482,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -42893,7 +42893,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -43304,7 +43304,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -43715,7 +43715,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -44126,7 +44126,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -44537,7 +44537,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -44948,7 +44948,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -46004,7 +46004,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -46410,7 +46410,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -46816,7 +46816,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -47222,7 +47222,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -47628,7 +47628,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -48034,7 +48034,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -48440,7 +48440,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -48846,7 +48846,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -49252,7 +49252,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -49658,7 +49658,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -50064,7 +50064,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -50470,7 +50470,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -50876,7 +50876,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -51282,7 +51282,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -51688,7 +51688,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -52094,7 +52094,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -52500,7 +52500,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -52906,7 +52906,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -53312,7 +53312,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -53718,7 +53718,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -54124,7 +54124,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -54530,7 +54530,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -54936,7 +54936,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -55342,7 +55342,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -55753,7 +55753,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -56164,7 +56164,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -56575,7 +56575,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -56986,7 +56986,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -57397,7 +57397,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -57808,7 +57808,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -58219,7 +58219,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -58630,7 +58630,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -59041,7 +59041,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -59452,7 +59452,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -59863,7 +59863,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -60274,7 +60274,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -60680,7 +60680,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -61086,7 +61086,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -61492,7 +61492,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -61898,7 +61898,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -62304,7 +62304,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -62710,7 +62710,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -63116,7 +63116,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -63522,7 +63522,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -63928,7 +63928,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -64334,7 +64334,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -64740,7 +64740,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -65146,7 +65146,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -65555,7 +65555,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -65964,7 +65964,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -66373,7 +66373,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -66782,7 +66782,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -67191,7 +67191,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -67600,7 +67600,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -68009,7 +68009,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -68418,7 +68418,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -68827,7 +68827,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -69236,7 +69236,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -69645,7 +69645,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -70054,7 +70054,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -70497,7 +70497,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -70912,7 +70912,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -71327,7 +71327,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -71742,7 +71742,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -72157,7 +72157,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -72572,7 +72572,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -72987,7 +72987,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "pending",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -73402,7 +73402,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "allowed",
+          "decision": "age-restricted",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -73817,7 +73817,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "limited",
+          "decision": "blocked",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -74232,7 +74232,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "age-restricted",
+          "decision": "purged",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -74647,7 +74647,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "blocked",
+          "decision": "allowed",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -75062,7 +75062,7 @@
         },
         "testInput": true,
         "moderation": {
-          "status": "purged",
+          "decision": "limited",
           "manualReviews": [
             {
               "id": "rev_8Xm3Rk2Lq7Vt9Wb4Np6C",
@@ -87630,7 +87630,7 @@
               "status": "queued",
               "testInput": true,
               "moderation": {
-                "status": "pending"
+                "decision": "allowed"
               }
             },
             "content": {
@@ -87695,7 +87695,7 @@
               "status": "processing",
               "testInput": true,
               "moderation": {
-                "status": "allowed"
+                "decision": "limited"
               }
             },
             "content": {
@@ -87760,7 +87760,7 @@
               "status": "completed",
               "testInput": true,
               "moderation": {
-                "status": "limited"
+                "decision": "age-restricted"
               }
             },
             "content": {
@@ -87825,7 +87825,7 @@
               "status": "failed",
               "testInput": true,
               "moderation": {
-                "status": "age-restricted"
+                "decision": "blocked"
               }
             },
             "content": {
@@ -87890,7 +87890,7 @@
               "status": "queued",
               "testInput": true,
               "moderation": {
-                "status": "blocked"
+                "decision": "purged"
               }
             },
             "content": {
@@ -87955,7 +87955,7 @@
               "status": "processing",
               "testInput": true,
               "moderation": {
-                "status": "purged"
+                "decision": "allowed"
               }
             },
             "content": {
@@ -88020,7 +88020,7 @@
               "status": "completed",
               "testInput": true,
               "moderation": {
-                "status": "pending"
+                "decision": "limited"
               }
             },
             "content": {
@@ -88085,7 +88085,7 @@
               "status": "failed",
               "testInput": true,
               "moderation": {
-                "status": "allowed"
+                "decision": "age-restricted"
               }
             },
             "content": {
@@ -88150,7 +88150,7 @@
               "status": "queued",
               "testInput": true,
               "moderation": {
-                "status": "limited"
+                "decision": "blocked"
               }
             },
             "content": {
@@ -88215,7 +88215,7 @@
               "status": "processing",
               "testInput": true,
               "moderation": {
-                "status": "age-restricted"
+                "decision": "purged"
               }
             },
             "content": {
@@ -88280,7 +88280,7 @@
               "status": "completed",
               "testInput": true,
               "moderation": {
-                "status": "blocked"
+                "decision": "allowed"
               }
             },
             "content": {
@@ -88345,7 +88345,7 @@
               "status": "failed",
               "testInput": true,
               "moderation": {
-                "status": "purged"
+                "decision": "limited"
               }
             },
             "content": {
@@ -88410,7 +88410,7 @@
               "status": "queued",
               "testInput": true,
               "moderation": {
-                "status": "pending"
+                "decision": "age-restricted"
               }
             },
             "content": {
@@ -88475,7 +88475,7 @@
               "status": "processing",
               "testInput": true,
               "moderation": {
-                "status": "allowed"
+                "decision": "blocked"
               }
             },
             "content": {
@@ -88540,7 +88540,7 @@
               "status": "completed",
               "testInput": true,
               "moderation": {
-                "status": "limited"
+                "decision": "purged"
               }
             },
             "content": {
@@ -88605,7 +88605,7 @@
               "status": "failed",
               "testInput": true,
               "moderation": {
-                "status": "age-restricted"
+                "decision": "allowed"
               }
             },
             "content": {
@@ -88670,7 +88670,7 @@
               "status": "queued",
               "testInput": true,
               "moderation": {
-                "status": "blocked"
+                "decision": "limited"
               }
             },
             "content": {
@@ -88735,7 +88735,7 @@
               "status": "processing",
               "testInput": true,
               "moderation": {
-                "status": "purged"
+                "decision": "age-restricted"
               }
             },
             "content": {
@@ -88800,7 +88800,7 @@
               "status": "completed",
               "testInput": true,
               "moderation": {
-                "status": "pending"
+                "decision": "blocked"
               }
             },
             "content": {
@@ -88865,7 +88865,7 @@
               "status": "failed",
               "testInput": true,
               "moderation": {
-                "status": "allowed"
+                "decision": "purged"
               }
             },
             "content": {
@@ -88930,7 +88930,7 @@
               "status": "queued",
               "testInput": true,
               "moderation": {
-                "status": "limited"
+                "decision": "allowed"
               }
             },
             "content": {
@@ -88995,7 +88995,7 @@
               "status": "processing",
               "testInput": true,
               "moderation": {
-                "status": "age-restricted"
+                "decision": "limited"
               }
             },
             "content": {
@@ -89060,7 +89060,7 @@
               "status": "completed",
               "testInput": true,
               "moderation": {
-                "status": "blocked"
+                "decision": "age-restricted"
               }
             },
             "content": {
@@ -89125,7 +89125,7 @@
               "status": "failed",
               "testInput": true,
               "moderation": {
-                "status": "purged"
+                "decision": "blocked"
               }
             },
             "content": {
@@ -89190,7 +89190,7 @@
               "status": "queued",
               "testInput": true,
               "moderation": {
-                "status": "pending"
+                "decision": "purged"
               }
             },
             "content": {
@@ -89255,7 +89255,7 @@
               "status": "processing",
               "testInput": true,
               "moderation": {
-                "status": "allowed"
+                "decision": "allowed"
               }
             },
             "content": {
@@ -89320,7 +89320,7 @@
               "status": "completed",
               "testInput": true,
               "moderation": {
-                "status": "limited"
+                "decision": "limited"
               }
             },
             "content": {
@@ -89385,7 +89385,7 @@
               "status": "failed",
               "testInput": true,
               "moderation": {
-                "status": "age-restricted"
+                "decision": "age-restricted"
               }
             },
             "content": {
@@ -89450,7 +89450,7 @@
               "status": "queued",
               "testInput": true,
               "moderation": {
-                "status": "blocked"
+                "decision": "blocked"
               }
             },
             "content": {
@@ -89515,7 +89515,7 @@
               "status": "processing",
               "testInput": true,
               "moderation": {
-                "status": "purged"
+                "decision": "purged"
               }
             },
             "content": {
@@ -90187,7 +90187,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90223,7 +90223,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90427,7 +90427,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90485,7 +90485,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90540,7 +90540,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90596,7 +90596,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90652,7 +90652,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90708,7 +90708,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90766,7 +90766,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90826,7 +90826,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90882,7 +90882,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90938,7 +90938,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -90994,7 +90994,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91064,7 +91064,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91120,7 +91120,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91218,7 +91218,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91264,7 +91264,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91341,7 +91341,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91414,7 +91414,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91489,7 +91489,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91564,7 +91564,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91639,7 +91639,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91728,7 +91728,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91807,7 +91807,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91882,7 +91882,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -91957,7 +91957,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92030,7 +92030,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92094,7 +92094,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92169,7 +92169,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92286,7 +92286,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92326,7 +92326,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92423,7 +92423,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92516,7 +92516,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92611,7 +92611,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92706,7 +92706,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92801,7 +92801,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -92910,7 +92910,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -93009,7 +93009,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -93104,7 +93104,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -93199,7 +93199,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -93292,7 +93292,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -93350,7 +93350,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -93445,7 +93445,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -93582,7 +93582,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -93622,7 +93622,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -93676,7 +93676,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -93728,7 +93728,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -93780,7 +93780,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -93832,7 +93832,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -93884,7 +93884,7 @@
             "classification": {
               "status": "completed",
               "moderation": {
-                "status": "allowed",
+                "decision": "allowed",
                 "flaggedCategories": [],
                 "regions": []
               }
@@ -93926,7 +93926,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -93945,7 +93945,7 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1",
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1",
       "cursor": "example"
     },
     "request": {
@@ -93953,7 +93953,7 @@
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1",
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1",
         "cursor": "example"
       },
       "body": null
@@ -93972,7 +93972,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -93991,14 +93991,14 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 1,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1"
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1"
     },
     "request": {
       "method": "GET",
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "1",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1"
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1"
       },
       "body": null
     },
@@ -94016,7 +94016,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -94035,7 +94035,7 @@
     "operation": "assets.list",
     "options": {
       "pageSize": 20,
-      "filter": "classification.moderation.status==allowed;folderId==folder-1",
+      "filter": "classification.moderation.decision==allowed;folderId==folder-1",
       "sort": "createdAt"
     },
     "request": {
@@ -94043,7 +94043,7 @@
       "path": "/v1/projects/project-1/assets",
       "query": {
         "pageSize": "20",
-        "filter": "classification.moderation.status==allowed;folderId==folder-1",
+        "filter": "classification.moderation.decision==allowed;folderId==folder-1",
         "sort": "createdAt"
       },
       "body": null
@@ -94062,7 +94062,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -94106,7 +94106,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -94146,7 +94146,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -94191,7 +94191,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -94236,7 +94236,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -94281,7 +94281,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -94324,7 +94324,7 @@
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "allowed",
+              "decision": "allowed",
               "flaggedCategories": [],
               "regions": []
             }
@@ -94406,7 +94406,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -94447,7 +94447,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -94488,7 +94488,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -94527,7 +94527,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -94568,7 +94568,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -94609,7 +94609,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -94664,7 +94664,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -94707,7 +94707,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -94748,7 +94748,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -94789,7 +94789,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -94967,7 +94967,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95003,7 +95003,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95037,7 +95037,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95073,7 +95073,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95110,7 +95110,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95149,7 +95149,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95192,7 +95192,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95233,7 +95233,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95272,7 +95272,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95313,7 +95313,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95347,7 +95347,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95383,7 +95383,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95456,7 +95456,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95496,7 +95496,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95533,7 +95533,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95701,7 +95701,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }
@@ -95746,7 +95746,7 @@
       "classification": {
         "status": "completed",
         "moderation": {
-          "status": "allowed",
+          "decision": "allowed",
           "flaggedCategories": [],
           "regions": []
         }

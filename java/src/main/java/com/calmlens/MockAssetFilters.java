@@ -39,7 +39,7 @@ final class MockAssetFilters {
           Map.entry("classification.status", new Field("text", false, List.of("==", "!=", ">", ">=", "<", "<=", "=in=", "=out="))),
           Map.entry("classification.updatedAt", new Field("number", true, List.of("==", "!=", ">", ">=", "<", "<=", "=in=", "=out="))),
           Map.entry("classification.completedAt", new Field("number", true, List.of("==", "!=", ">", ">=", "<", "<=", "=in=", "=out="))),
-          Map.entry("classification.moderation.status", new Field("text", false, List.of("==", "!=", ">", ">=", "<", "<=", "=in=", "=out="))),
+          Map.entry("classification.moderation.decision", new Field("text", true, List.of("==", "!=", ">", ">=", "<", "<=", "=in=", "=out="))),
           Map.entry("content.status", new Field("text", false, List.of("==", "!=", ">", ">=", "<", "<=", "=in=", "=out="))),
           Map.entry("content.removalReason", new Field("text", true, List.of("==", "!=", ">", ">=", "<", "<=", "=in=", "=out="))),
           Map.entry("content.updatedAt", new Field("number", true, List.of("==", "!=", ">", ">=", "<", "<=", "=in=", "=out="))),

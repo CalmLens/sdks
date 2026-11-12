@@ -60,9 +60,9 @@ fn public_signatures(client: &ServerClient) {
     check(|options| async move { client.assets().search(options).await }, r###"{"query":"a red car at night","mode":"keyword","pageSize":10}"###, |options| { let _ = &options.mode; });
     check(|options| async move { client.assets().search(options).await }, r###"{"query":"a red car at night","mode":"semantic","pageSize":10}"###, |options| { let _ = &options.mode; });
     check(|options| async move { client.assets().search(options).await }, r###"{"query":"a red car at night","mode":"hybrid","pageSize":10}"###, |options| { let _ = &options.mode; });
-    check(|options| async move { client.assets().list(options).await }, r###"{"pageSize":20,"filter":"classification.moderation.status==allowed;folderId==folder-1","cursor":"example"}"###, |options| { let _ = &options.cursor; });
-    check(|options| async move { client.assets().list(options).await }, r###"{"pageSize":1,"filter":"classification.moderation.status==allowed;folderId==folder-1"}"###, |options| { let _ = &options.page_size; });
-    check(|options| async move { client.assets().list(options).await }, r###"{"pageSize":20,"filter":"classification.moderation.status==allowed;folderId==folder-1","sort":"createdAt"}"###, |options| { let _ = &options.sort; });
+    check(|options| async move { client.assets().list(options).await }, r###"{"pageSize":20,"filter":"classification.moderation.decision==allowed;folderId==folder-1","cursor":"example"}"###, |options| { let _ = &options.cursor; });
+    check(|options| async move { client.assets().list(options).await }, r###"{"pageSize":1,"filter":"classification.moderation.decision==allowed;folderId==folder-1"}"###, |options| { let _ = &options.page_size; });
+    check(|options| async move { client.assets().list(options).await }, r###"{"pageSize":20,"filter":"classification.moderation.decision==allowed;folderId==folder-1","sort":"createdAt"}"###, |options| { let _ = &options.sort; });
     check(|options| async move { client.assets().list(options).await }, r###"{"pageSize":20,"filter":"example"}"###, |options| { let _ = &options.filter; });
     check(|options| async move { client.assets().list_children(options).await }, r###"{"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c","sort":"createdAt"}"###, |options| { let _ = &options.asset_id; });
     check(|options| async move { client.assets().list_children(options).await }, r###"{"assetId":"asset_5Gm2Rk8XqT3wLp9VbN4c","sort":"createdAt","cursor":"example"}"###, |options| { let _ = &options.cursor; });
