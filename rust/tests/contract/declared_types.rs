@@ -3,7 +3,9 @@
 //! under `strict-contract`, alongside the API's JSON Schema and fails with every mismatch.
 //!
 //! Rust conventions the walk applies:
-//! - Options: a field is optional when it is `Option<T>` or `Patch<T>`, or is left out of the
+//! - Options: outside a PATCH an option may be non-nullable where the API allows `null`, which
+//!   means the same as leaving it out; a PATCH's options must match nullability exactly. A field is
+//!   optional when it is `Option<T>` or `Patch<T>`, or is left out of the
 //!   request by `skip_serializing_if`; it can send `null` when it is `Patch<T>`, or an `Option<T>`
 //!   always serialized. Options types without a serde `Serialize` derive build their request by
 //!   hand and never send `null` for an `Option<T>`.
@@ -72,50 +74,16 @@ const SWITCHED_VALUES: &[(&str, &str, &str)] = &[
     ("EventType", "appeal.submitted", "ENABLE_APPEALS"),
     ("EventType", "appeal.resolved", "ENABLE_APPEALS"),
     ("EventType", "asset.link-flagged", "ENABLE_LINK_SAFETY"),
+    ("ModerationSource", "link-safety", "ENABLE_LINK_SAFETY"),
 ];
 
 /// SDK types the walk does not compare with the schema, as `(type, reason)`.
-const NATIVE_TYPES: &[(&str, &str)] = &[
-    (
-        "ImageTransformOptions",
-        "The API stores a lens's transform as an open record; the SDK types it from the CDN's \
-         transform schema, which `transform-options.json` checks.",
-    ),
-    (
-        "EventAsset",
-        "An event's asset snapshot is kept as the JSON it was delivered with, read through typed \
+const NATIVE_TYPES: &[(&str, &str)] = &[(
+    "EventAsset",
+    "An event's asset snapshot is kept as the JSON it was delivered with, read through typed \
          accessors, because `webhooks.json` requires a delivery to round-trip exactly, including \
          the fields a snapshot leaves out and values this SDK version does not know.",
-    ),
-];
-
-/// Optional options whose schema also allows `null`, declared `Option<T>` and left out when
-/// `None`, as `(type, field)`. The API reads `null` there as left out (zod `nullish`): creating
-/// with `null` sets nothing, so the SDK has no separate way to send it. Where `null` differs from
-/// leaving a field out, such as a new asset's `folderId`, the field is a `Patch<T>`.
-const NULLISH_OPTIONS: &[(&str, &str)] = &[
-    ("SubmitAsset", "author_id"),
-    ("SubmitAsset", "context"),
-    ("SubmitAsset", "description"),
-    ("SubmitAsset", "external_id"),
-    ("SubmitAsset", "external_url"),
-    ("SubmitAsset", "metadata"),
-    ("SubmitAsset", "processing_options"),
-    ("SubmitAsset", "tags"),
-    ("SubmitAsset", "upload_preset_id"),
-    ("SubmitAsset", "visibility"),
-    ("ProcessingOptions", "retain_content"),
-    ("ProcessingOptions", "store_sensitive_metadata"),
-    ("ProcessingOptions", "features"),
-    ("ProcessingFeatures", "ocr"),
-    ("ProcessingFeatures", "person_detection"),
-    ("ProcessingFeatures", "face_detection"),
-    ("ProcessingFeatures", "link_detection"),
-    ("ProcessingFeatures", "streaming"),
-    ("CreateHashList", "description"),
-    ("AddHashListEntry", "quality"),
-    ("AddHashListEntry", "label"),
-];
+)];
 
 /// Operations whose Rust method returns a model although `types.json` has no result for it, as
 /// `(operation, reason)`.
@@ -378,6 +346,8 @@ struct Walk<'a> {
     definitions: &'a Map<String, Value>,
     operation: &'a str,
     part: &'static str,
+    /// Whether the operation is a PATCH, where an option's nullability must match exactly.
+    patch: bool,
     problems: Vec<String>,
     refs: Vec<String>,
     /// The operation's `clientOptions`: the SDK's own options, which the schema leaves out.
@@ -685,6 +655,13 @@ impl Walk<'_> {
         match (kind, shape) {
             (_, Shape::Json) => {}
             (_, Shape::Native(name)) if NATIVE_TYPES.iter().any(|(listed, _)| listed == name) => {}
+            // A record of open values accepts any declared object.
+            (Some("object"), Shape::Struct { .. } | Shape::Native(_))
+                if schema.get("additionalProperties") == Some(&serde_json::json!({}))
+                    && schema
+                        .get("properties")
+                        .and_then(Value::as_object)
+                        .is_none_or(Map::is_empty) => {}
             (None, _) if values.is_none() => self.problem(
                 path,
                 format!("an open value is declared as {}", describe(shape)),
@@ -868,10 +845,7 @@ impl Walk<'_> {
                 (Shape::Option(_), false) => (true, true),
                 (Shape::Option(_), true) => {
                     let sends_null = !field.skippable && !builds_request;
-                    let nullish = NULLISH_OPTIONS
-                        .iter()
-                        .any(|(owner, rust)| *owner == name && *rust == field.rust);
-                    (!sends_null, sends_null || nullish)
+                    (!sends_null, sends_null)
                 }
                 (_, true) => (field.skippable, false),
                 (_, false) => (false, false),
@@ -896,9 +870,11 @@ impl Walk<'_> {
                         ),
                     );
                 }
-                // A query or path parameter has no `null` on the wire.
+                // Outside a PATCH, null means the same as leaving the option out, so an option
+                // may be non-nullable where the API allows null. A query or path parameter has
+                // no `null` on the wire.
                 let in_url = matches!(location, Some("query" | "params"));
-                if nullable && !can_be_null && !in_url {
+                if nullable && !can_be_null && !in_url && self.patch {
                     self.problem(
                         &at,
                         format!(
@@ -1017,6 +993,7 @@ fn declared_types_match_the_api_schema() {
             definitions,
             operation: id,
             part,
+            patch: operation["method"] == "PATCH",
             problems: Vec::new(),
             refs: Vec::new(),
             client_options: schema_strings(&operation["options"]["clientOptions"]),

@@ -2248,6 +2248,8 @@ string_enum! {
         HashList = "hash-list",
         /// A rule every policy applies.
         MandatoryRule = "mandatory-rule",
+        /// Preview. The links in the asset.
+        LinkSafety = "link-safety",
     }
 }
 
