@@ -29,6 +29,14 @@ type Iterator[T any] struct {
 	sent map[string]bool
 }
 
+// cursorOf is a page's next cursor, or "" on the last page.
+func cursorOf(cursor *string) string {
+	if cursor == nil {
+		return ""
+	}
+	return *cursor
+}
+
 // newIterator starts at cursor; fetch returns a page's items, NextCursor and HasMore.
 func newIterator[T any](cursor string, fetch func(context.Context, string) ([]T, string, bool, error)) *Iterator[T] {
 	return &Iterator[T]{cursor: cursor, fetch: fetch}
@@ -108,7 +116,7 @@ func newAssetIterator(cursor string, list func(context.Context, string) (*AssetP
 			return nil, "", false, err
 		}
 		it.page = page
-		return page.Items, page.NextCursor, page.HasMore, nil
+		return page.Items, cursorOf(page.NextCursor), page.HasMore, nil
 	}}
 	return it
 }
@@ -138,7 +146,7 @@ func (s *AssetsService) ListTimelineAll(options ListAssetTimelineOptions) *Itera
 		if err != nil {
 			return nil, "", false, err
 		}
-		return page.Items, page.NextCursor, page.HasMore, nil
+		return page.Items, cursorOf(page.NextCursor), page.HasMore, nil
 	})
 }
 
@@ -151,7 +159,7 @@ func (s *FoldersService) ListAll(options ListFoldersOptions) *Iterator[Folder] {
 		if err != nil {
 			return nil, "", false, err
 		}
-		return page.Items, page.NextCursor, page.HasMore, nil
+		return page.Items, cursorOf(page.NextCursor), page.HasMore, nil
 	})
 }
 
@@ -163,7 +171,7 @@ func (s *HashListsService) ListAll(options ListHashListsOptions) *Iterator[HashL
 		if err != nil {
 			return nil, "", false, err
 		}
-		return page.Items, page.NextCursor, page.HasMore, nil
+		return page.Items, cursorOf(page.NextCursor), page.HasMore, nil
 	})
 }
 
@@ -175,7 +183,7 @@ func (s *HashListsService) ListEntriesAll(options ListHashListEntriesOptions) *I
 		if err != nil {
 			return nil, "", false, err
 		}
-		return page.Items, page.NextCursor, page.HasMore, nil
+		return page.Items, cursorOf(page.NextCursor), page.HasMore, nil
 	})
 }
 
@@ -187,7 +195,7 @@ func (s *LensesService) ListAll(options ListLensesOptions) *Iterator[Lens] {
 		if err != nil {
 			return nil, "", false, err
 		}
-		return page.Items, page.NextCursor, page.HasMore, nil
+		return page.Items, cursorOf(page.NextCursor), page.HasMore, nil
 	})
 }
 

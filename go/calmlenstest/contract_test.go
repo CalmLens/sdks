@@ -500,8 +500,7 @@ func resolve(value any, saved map[string]any) any {
 }
 
 // normalize turns a typed result into plain JSON values with the API's field names. Assets and
-// events are their Raw JSON; pages report "no next page" as an empty NextCursor, which the API
-// sends as null.
+// events are their Raw JSON.
 func normalize(t *testing.T, value any) any {
 	t.Helper()
 	data, err := json.Marshal(value)
@@ -539,9 +538,6 @@ func normalize(t *testing.T, value any) any {
 			pages = append(pages, normalize(t, &typed[i]))
 		}
 		return pages
-	}
-	if page, ok := out.(map[string]any); ok && page["nextCursor"] == "" {
-		page["nextCursor"] = nil
 	}
 	return out
 }

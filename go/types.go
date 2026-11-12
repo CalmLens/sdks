@@ -203,11 +203,11 @@ type AssetClassification struct {
 	Moderation AssetModeration `json:"moderation"`
 	// OCR holds where OCR found text, and personal information within it, in an image. Nil until
 	// OCR has run, and when it wasn't requested. Each feature result below is nil in the same way.
-	OCR             *OCRResult             `json:"ocr,omitempty"`
-	PersonDetection *PersonDetectionResult `json:"personDetection,omitempty"`
-	FaceDetection   *FaceDetectionResult   `json:"faceDetection,omitempty"`
+	OCR             *OCRResult             `json:"ocr"`
+	PersonDetection *PersonDetectionResult `json:"personDetection"`
+	FaceDetection   *FaceDetectionResult   `json:"faceDetection"`
 	// LinkDetection holds QR codes and web links found in the image.
-	LinkDetection *LinkDetectionResult `json:"linkDetection,omitempty"`
+	LinkDetection *LinkDetectionResult `json:"linkDetection"`
 	// LinkSafety (preview) holds every link found in the asset, where it leads and its verdict.
 	// It runs when the project's policy acts on links, not through ProcessingFeatures.
 	LinkSafety *LinkSafetyResult `json:"linkSafety,omitempty"`
@@ -971,9 +971,9 @@ type CategoryResult struct {
 	// Score is nil when coverage is unknown; never treat absence as a safe zero.
 	Score *float64 `json:"score"`
 	// Likelihood is one of the Likelihood constants; empty when not evaluated.
-	Likelihood string `json:"likelihood"`
+	Likelihood string `json:"likelihood,omitempty"`
 	// Reason explains a ResultNotEvaluated result: ReasonNotSupported or ReasonUnavailable.
-	Reason string `json:"reason"`
+	Reason string `json:"reason,omitempty"`
 	// Qualifiers holds results for the category's qualifiers, keyed by a Qualifier constant.
 	Qualifiers map[string]QualifierResult `json:"qualifiers"`
 	// Raw contains the entire category result.
@@ -1009,11 +1009,11 @@ type ListAssetsOptions struct {
 	Filter   *string `json:"filter,omitempty"`
 }
 
-// AssetPage is one page of assets. NextCursor is empty on the last page.
+// AssetPage is one page of assets. NextCursor is nil on the last page.
 type AssetPage struct {
 	Items      []Asset `json:"items"`
 	HasMore    bool    `json:"hasMore"`
-	NextCursor string  `json:"nextCursor"`
+	NextCursor *string `json:"nextCursor"`
 }
 
 // AssetIDOptions identifies an asset.
@@ -1067,7 +1067,7 @@ type ListAssetTimelineOptions struct {
 type AssetTimelinePage struct {
 	Items      []MediaClassificationSegment `json:"items"`
 	HasMore    bool                         `json:"hasMore"`
-	NextCursor string                       `json:"nextCursor"`
+	NextCursor *string                      `json:"nextCursor"`
 }
 
 // Content accepts exactly one representation. Use pointer strings to distinguish empty text/base64.
@@ -1305,14 +1305,14 @@ type HashListEntry struct {
 type HashListPage struct {
 	Items      []HashList `json:"items"`
 	HasMore    bool       `json:"hasMore"`
-	NextCursor string     `json:"nextCursor"`
+	NextCursor *string    `json:"nextCursor"`
 }
 
 // HashListEntryPage is one page of a hash list's entries.
 type HashListEntryPage struct {
 	Items      []HashListEntry `json:"items"`
 	HasMore    bool            `json:"hasMore"`
-	NextCursor string          `json:"nextCursor"`
+	NextCursor *string         `json:"nextCursor"`
 }
 
 // ListHashListsOptions selects a page of a project's hash lists. Cursor is the previous page's
@@ -1462,9 +1462,9 @@ type ListLensesOptions struct {
 // LensPage is one page of the project's lenses. The built-in lenses are always available and
 // aren't listed.
 type LensPage struct {
-	Items      []Lens `json:"items"`
-	HasMore    bool   `json:"hasMore"`
-	NextCursor string `json:"nextCursor"`
+	Items      []Lens  `json:"items"`
+	HasMore    bool    `json:"hasMore"`
+	NextCursor *string `json:"nextCursor"`
 }
 
 // CreateLensOptions is a new lens; its Identifier must be new to the project. Fields work as in
@@ -1713,7 +1713,7 @@ type FolderPage struct {
 	Items      []Folder `json:"items"`
 	Ancestors  []Folder `json:"ancestors"`
 	HasMore    bool     `json:"hasMore"`
-	NextCursor string   `json:"nextCursor"`
+	NextCursor *string  `json:"nextCursor"`
 }
 
 // ViewerClaims are optional customer assertions that a CDN URL carries in its

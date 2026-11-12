@@ -49,7 +49,8 @@ type UploadPreset struct {
 	// AllowedOrigins are the sites allowed to upload from the browser; nil allows any site.
 	AllowedOrigins []string `json:"allowedOrigins"`
 	CreatedAt      int64    `json:"createdAt"`
-	UpdatedAt      int64    `json:"updatedAt"`
+	// UpdatedAt is when it last changed; nil when the API leaves it out.
+	UpdatedAt *int64 `json:"updatedAt,omitempty"`
 }
 
 // ListUploadPresetsOptions selects a page of the project's upload presets. Cursor is the previous
@@ -65,7 +66,7 @@ type ListUploadPresetsOptions struct {
 type UploadPresetPage struct {
 	Items      []UploadPreset `json:"items"`
 	HasMore    bool           `json:"hasMore"`
-	NextCursor string         `json:"nextCursor"`
+	NextCursor *string        `json:"nextCursor"`
 }
 
 // UploadPresetDefinition is one preset's whole definition, addressed by Key. Key and Name are
@@ -183,7 +184,7 @@ func (s *UploadPresetsService) ListAll(options ListUploadPresetsOptions) *Iterat
 		if err != nil {
 			return nil, "", false, err
 		}
-		return page.Items, page.NextCursor, page.HasMore, nil
+		return page.Items, cursorOf(page.NextCursor), page.HasMore, nil
 	})
 }
 
@@ -227,6 +228,15 @@ type HumanReviewSettings struct {
 	UncertaintyMarginPercent float64 `json:"uncertaintyMarginPercent"`
 	// ReviewMissingEvidence queues decisions with evidence that couldn't be assessed.
 	ReviewMissingEvidence bool `json:"reviewMissingEvidence"`
+}
+
+// HumanReviewSettingsInput is the human review sampling an update stores: fields left nil return
+// to their defaults (0 and false, sampling nothing). See HumanReviewSettings for each field.
+type HumanReviewSettingsInput struct {
+	AllowedSamplePercent     *float64 `json:"allowedSamplePercent,omitempty"`
+	RestrictedSamplePercent  *float64 `json:"restrictedSamplePercent,omitempty"`
+	UncertaintyMarginPercent *float64 `json:"uncertaintyMarginPercent,omitempty"`
+	ReviewMissingEvidence    *bool    `json:"reviewMissingEvidence,omitempty"`
 }
 
 // ProjectSettings are a project's settings with defaults filled in. The project's policy and
@@ -283,7 +293,7 @@ type ProjectSettingsInput struct {
 	// WebsiteSubmissionsPerMinute defaults to null, which uses the platform limit.
 	WebsiteSubmissionsPerMinute Patch[int] `json:"websiteSubmissionsPerMinute"`
 	// HumanReview defaults to sampling nothing.
-	HumanReview *HumanReviewSettings `json:"humanReview"`
+	HumanReview *HumanReviewSettingsInput `json:"humanReview"`
 }
 
 // MarshalJSON encodes the settings with only the fields that are set.

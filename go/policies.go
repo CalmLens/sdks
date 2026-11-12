@@ -50,7 +50,8 @@ type Policy struct {
 	// upload presets.
 	ProjectIDs []string `json:"projectIds"`
 	CreatedAt  int64    `json:"createdAt"`
-	UpdatedAt  int64    `json:"updatedAt"`
+	// UpdatedAt is when it last changed; nil when the API leaves it out.
+	UpdatedAt *int64 `json:"updatedAt,omitempty"`
 }
 
 // PolicyPresetOrigin is the built-in preset a policy started from.
@@ -132,7 +133,7 @@ type ListPoliciesOptions struct {
 type PolicyPage struct {
 	Items      []Policy `json:"items"`
 	HasMore    bool     `json:"hasMore"`
-	NextCursor string   `json:"nextCursor"`
+	NextCursor *string  `json:"nextCursor"`
 }
 
 // PolicyIDOptions identifies a policy.
@@ -216,7 +217,7 @@ func (s *PoliciesService) ListAll(options ListPoliciesOptions) *Iterator[Policy]
 		if err != nil {
 			return nil, "", false, err
 		}
-		return page.Items, page.NextCursor, page.HasMore, nil
+		return page.Items, cursorOf(page.NextCursor), page.HasMore, nil
 	})
 }
 

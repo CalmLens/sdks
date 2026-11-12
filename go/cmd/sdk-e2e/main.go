@@ -139,24 +139,12 @@ type assetURLCommand struct {
 	transformOption
 }
 
-// A page as the API and the other SDKs report it: the SDK's empty NextCursor (no next page) is
-// null on the wire.
+// pageOutput returns a page, or nil with the error, so a failed call carries no typed nil.
 func pageOutput[Page any](result *Page, err error) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	encoded, err := json.Marshal(result)
-	if err != nil {
-		return nil, err
-	}
-	var output map[string]any
-	if err := json.Unmarshal(encoded, &output); err != nil {
-		return nil, err
-	}
-	if output["nextCursor"] == "" {
-		output["nextCursor"] = nil
-	}
-	return output, nil
+	return result, nil
 }
 
 func main() {

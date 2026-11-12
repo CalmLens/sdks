@@ -814,7 +814,7 @@ func TestMockHashListEntriesFromAssetsPagesAndCascade(t *testing.T) {
 		if !page.HasMore {
 			break
 		}
-		cursor = page.NextCursor
+		cursor = *page.NextCursor
 	}
 	if len(ids) != 2 || !slices.Contains(ids, fromAsset.ID) || !slices.Contains(ids, second.ID) {
 		t.Fatalf("paged entries %v, want %s and %s", ids, fromAsset.ID, second.ID)
