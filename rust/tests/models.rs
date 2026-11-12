@@ -1,5 +1,7 @@
 //! Typed decoding and encoding of nested response and request models.
+mod common;
 use calmlens::models::*;
+use common::complete;
 use serde_json::json;
 
 #[test]
@@ -15,7 +17,7 @@ fn an_hls_stream_reads_its_status_and_reason() {
 
 #[test]
 fn an_hls_stream_decodes_into_typed_renditions() {
-    let hls: AssetHls = serde_json::from_value(json!({"renditions":[{"kind":"video","width":1280,"height":720,"bandwidth":2500000,"codecs":"avc1.64001f"},{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]})).unwrap();
+    let hls: AssetHls = serde_json::from_value(complete::<AssetHls>(json!({"renditions":[{"kind":"video","width":1280,"height":720,"bandwidth":2500000,"codecs":"avc1.64001f"},{"kind":"audio","width":null,"height":null,"bandwidth":128000,"codecs":"mp4a.40.2"}]}))).unwrap();
     let summary: Vec<_> = hls
         .renditions
         .iter()
@@ -44,8 +46,8 @@ fn an_hls_stream_decodes_into_typed_renditions() {
 
 #[test]
 fn asset_nested_fields_decode_into_typed_models() {
-    let wire = json!({"id":"asset-1","type":"image","content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"width":10,"height":20,"durationSeconds":null,"pageCount":null,"perceptualHash":"ph","perceptualHashQuality":87,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","cameraModel":null,"lensModel":null,"software":null,"creator":null,"copyright":null,"digitalSourceType":null,"containsLocation":true,"location":null},"rendered":{"kind":"image","format":"image/webp","width":10,"height":20},"preview":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000"},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":7,"applied":true}],"status":"age-restricted","automatedStatus":"limited","flaggedCategories":[],"regions":[{"region":"DE","status":"blocked","rule":"de-jmstv","category":"sexual"}],"timeline":{"segmentCount":3},"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"gambling","evidence":[]}],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"ocr":{"status":"evaluated","textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}]}}});
-    let asset: Asset = serde_json::from_value(wire).unwrap();
+    let wire = json!({"id":"asset-1","type":"image","content":{"status":"removed","removalReason":"parent-removed","updatedAt":6,"format":"image/png","extension":"png","sizeInBytes":42,"checksums":{"sha256":"abc","md5":null},"width":10,"height":20,"durationSeconds":null,"pageCount":null,"perceptualHash":"ph","perceptualHashQuality":87,"metadata":{"capturedAt":"2026-05-01T12:30:00","cameraMake":"Canon","cameraModel":null,"lensModel":null,"software":null,"creator":null,"copyright":null,"digitalSourceType":null,"containsLocation":true,"location":null},"rendered":{"kind":"image","format":"image/webp","width":10,"height":20},"preview":{"width":10,"height":20,"thumbhash":"th","averageColor":"#000"},"safetyHold":{"placedAt":1,"reason":"suspected-illegal-content","disposedAt":null},"extractedText":{"type":"document","id":"doc-1"}},"upload":{"status":"completed","updatedAt":5,"partsReceived":3},"classification":{"status":"completed","updatedAt":5,"moderation":{"manualReviews":[{"id":"review-1","decision":"age-restricted","note":"confirmed","decidedBy":{"type":"user","id":"user-1"},"reviewedAt":7,"applied":true}],"decision":"age-restricted","automatedStatus":"limited","flaggedCategories":[],"regions":[{"region":"DE","status":"blocked","rule":"de-jmstv","category":"sexual"}],"timeline":{"segmentCount":3},"raw":{"categories":{"sexual":{"status":"evaluated","likelihood":"likely","score":0.9,"qualifiers":{"sexual-nudity":{"status":"evaluated","score":0.8,"likelihood":"possible"},"sexual-fictional":{"status":"not-evaluated","reason":"unavailable"}}},"violence":{"status":"not-evaluated","reason":"not-supported"}},"hashMatches":[{"source":"hash-list","hashListId":"list-1","hashListEntryId":"entry-1","distance":4,"action":"block"}]},"linkSafety":{"action":"age-restrict","links":[{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"gambling","evidence":[]}],"settings":{"verdictActions":{"gambling":"age-restrict","phishing":"block"},"offPlatformLinks":{"action":"limit","allowedDomains":["example.com"]}}}},"completedAt":8,"linkDetection":{"status":"evaluated","qrCodes":[{"value":"https://example.com","box":{"left":0.1,"top":0.2,"width":0.3,"height":0.4}}],"links":[{"url":"https://example.com","source":"qr-code"}]},"linkSafety":{"status":"evaluated","links":[{"url":"https://example.com","finalUrl":"https://example.com/","redirects":0,"source":"qr-code","verdict":"safe","evidence":[]},{"url":"https://bit.example/x","finalUrl":null,"redirects":2,"source":"text","verdict":"unresolved","evidence":[{"check":"threat-lists","status":"failed","labels":[]},{"check":"domain-categories","status":"checked","labels":["gambling"]}]}]},"aiGeneratedDetection":{"status":"evaluated","provenance":"ai-edited","signals":[{"kind":"c2pa","value":"trainedAlgorithmicMedia"}]},"ocr":{"status":"evaluated","textRegions":[{"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"personalInformation":true}]}}});
+    let asset: Asset = serde_json::from_value(complete::<Asset>(wire)).unwrap();
 
     assert_eq!(asset.asset_type, AssetType::Image);
     assert_eq!(
@@ -59,14 +61,14 @@ fn asset_nested_fields_decode_into_typed_models() {
     let moderation = &asset.classification.moderation;
     assert_eq!(
         (
-            &moderation.status,
+            &moderation.decision,
             &moderation.manual_reviews[0].decision,
             moderation.manual_reviews[0].note.as_deref(),
             Some(moderation.manual_reviews[0].reviewed_at),
             asset.classification.completed_at
         ),
         (
-            &AssetModerationStatus::AgeRestricted,
+            &Some(AssetModerationDecision::AgeRestricted),
             &AssetModerationDecision::AgeRestricted,
             Some("confirmed"),
             Some(7),
@@ -291,30 +293,31 @@ fn asset_nested_fields_decode_into_typed_models() {
 
 #[test]
 fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
-    let wire = json!({"id":"asset-1","type":"hologram","content":{"status":"archived","removalReason":"expired"},"upload":{"status":"completed"},"classification":{"status":"paused","moderation":{"manualReviews":[{"id":"review-1","decision":"deferred","note":null,"decidedBy":{"type":"assistant","id":null},"reviewedAt":7,"applied":true}],"status":"escalated","flaggedCategories":[],"regions":[],"raw":{"categories":{"spam":{"status":"skipped","likelihood":"certain","qualifiers":{"bots":{"status":"evaluated"}}}}}}}});
+    let wire = json!({"id":"asset-1","type":"hologram","content":{"status":"archived","removalReason":"expired"},"upload":{"status":"completed"},"classification":{"status":"paused","moderation":{"manualReviews":[{"id":"review-1","decision":"deferred","note":null,"decidedBy":{"type":"assistant","id":null},"reviewedAt":7,"applied":true}],"decision":"escalated","flaggedCategories":[],"regions":[],"raw":{"categories":{"spam":{"status":"skipped","likelihood":"certain","qualifiers":{"bots":{"status":"evaluated"}}}}}}}});
+    let wire = complete::<Asset>(wire);
     let asset: Asset = serde_json::from_value(wire.clone()).unwrap();
-    assert_eq!(asset.asset_type, AssetType::Unknown("hologram".into()));
+    assert_eq!(asset.asset_type, AssetType::from("hologram"));
     assert_eq!(
         (
             &asset.classification.status,
-            &asset.classification.moderation.status,
+            &asset.classification.moderation.decision,
             &asset.classification.moderation.manual_reviews[0].decision,
             &asset.content.status,
             &asset.content.removal_reason
         ),
         (
-            &AssetClassificationStatus::Unknown("paused".into()),
-            &AssetModerationStatus::Unknown("escalated".into()),
-            &AssetModerationDecision::Unknown("deferred".into()),
-            &AssetContentStatus::Unknown("archived".into()),
-            &Some(AssetContentRemovalReason::Unknown("expired".into()))
+            &AssetClassificationStatus::from("paused"),
+            &Some(AssetModerationDecision::from("escalated")),
+            &AssetModerationDecision::from("deferred"),
+            &AssetContentStatus::from("archived"),
+            &Some(AssetContentRemovalReason::from("expired"))
         )
     );
     assert_eq!(
         asset.classification.moderation.manual_reviews[0]
             .decided_by
             .actor_type,
-        ReviewActorType::Unknown("assistant".into())
+        ReviewActorType::from("assistant")
     );
     // Only `completed` and `failed` settle an asset, so a classification status this SDK version
     // does not know is still waiting, whatever the moderation status says.
@@ -325,17 +328,17 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
         .raw
         .as_ref()
         .unwrap()
-        .categories[&ClassificationCategory::Unknown("spam".into())];
-    assert_eq!(spam.status, EvaluationStatus::Unknown("skipped".into()));
+        .categories[&ClassificationCategory::from("spam")];
+    assert_eq!(spam.status, EvaluationStatus::from("skipped"));
     assert!(spam
         .qualifiers
         .as_ref()
         .unwrap()
-        .contains_key(&ModerationQualifier::Unknown("bots".into())));
+        .contains_key(&ModerationQualifier::from("bots")));
     let reencoded = serde_json::to_value(&asset).unwrap();
     assert_eq!(reencoded["type"], "hologram");
     assert_eq!(
-        reencoded["classification"]["moderation"]["status"],
+        reencoded["classification"]["moderation"]["decision"],
         "escalated"
     );
     assert_eq!(reencoded["content"]["removalReason"], "expired");
@@ -351,7 +354,7 @@ fn unknown_enum_values_and_keys_still_decode_and_round_trip() {
 
 #[test]
 fn events_decode_typed_type_severity_and_asset_snapshot() {
-    let page: EventsPage = serde_json::from_value(json!({
+    let mut wire = json!({
       "items": [
         {
           "id": "e1",
@@ -373,7 +376,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
               "status": "completed",
               "testInput": true,
               "moderation": {
-                "status": "blocked"
+                "decision": "blocked"
               }
             }
           },
@@ -398,8 +401,11 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
       ],
       "nextCursor": "c",
       "hasMore": false
-    }))
-    .unwrap();
+    });
+    for item in wire["items"].as_array_mut().unwrap() {
+        *item = complete::<Event>(item.take());
+    }
+    let page: EventsPage = serde_json::from_value(wire).unwrap();
     let blocked = &page.items[0];
     assert_eq!(blocked.event_type, EventType::AssetBlocked);
     assert_eq!(blocked.severity, EventSeverity::High);
@@ -410,7 +416,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
             asset.external_id(),
             asset.classification_status(),
             asset.test_input(),
-            asset.moderation_status(),
+            asset.moderation_decision(),
             asset.content_status()
         ),
         (
@@ -418,16 +424,13 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
             Some("x1"),
             Some(AssetClassificationStatus::Completed),
             Some(true),
-            Some(AssetModerationStatus::Blocked),
+            Some(AssetModerationDecision::Blocked),
             Some(AssetContentStatus::Removed)
         )
     );
     let future = &page.items[1];
-    assert_eq!(
-        future.event_type,
-        EventType::Unknown("billing.charged".into())
-    );
-    assert_eq!(future.severity, EventSeverity::Unknown("critical".into()));
+    assert_eq!(future.event_type, EventType::from("billing.charged"));
+    assert_eq!(future.severity, EventSeverity::from("critical"));
 
     let payload = WebhookEventPayload::from_event(blocked);
     assert_eq!(payload.event_type, EventType::AssetBlocked);
@@ -436,7 +439,7 @@ fn events_decode_typed_type_severity_and_asset_snapshot() {
 
 #[test]
 fn lens_transform_decodes_typed_image_options() {
-    let lens: Lens = serde_json::from_value(json!({
+    let lens: Lens = serde_json::from_value(complete::<Lens>(json!({
         "identifier": "card",
         "type": "image",
         "transform": {
@@ -446,7 +449,7 @@ fn lens_transform_decodes_typed_image_options() {
             "trim": { "top": 4, "border": { "tolerance": 0.2 } },
             "fps": 12
         }
-    }))
+    })))
     .unwrap();
     assert_eq!(lens.lens_type, LensType::Image);
     let options = lens.transform.unwrap();
@@ -463,11 +466,9 @@ fn lens_transform_decodes_typed_image_options() {
     );
     assert_eq!(
         options.gravity,
-        Some(Gravity::Point(GravityPoint {
-            mode: GravityMode::BoxCenter,
-            x: Some(0.5),
-            y: None
-        }))
+        Some(Gravity::Point(
+            GravityPoint::new(GravityMode::BoxCenter).x(0.5)
+        ))
     );
     let Some(Trim::Edges(edges)) = &options.trim else {
         panic!("expected trim edges, got {:?}", options.trim);
@@ -475,10 +476,7 @@ fn lens_transform_decodes_typed_image_options() {
     assert_eq!(edges.top, Some(4.0));
     assert_eq!(
         edges.border,
-        Some(TrimBorder::Options(TrimBorderOptions {
-            tolerance: Some(0.2),
-            ..Default::default()
-        }))
+        Some(TrimBorder::Options(TrimBorderOptions::new().tolerance(0.2)))
     );
     // An option this SDK version does not know is kept as received.
     assert_eq!(options.extra.get("fps"), Some(&json!(12)));
@@ -494,11 +492,9 @@ fn typed_image_transform_serializes_to_wire_options_and_selector() {
     let options = ImageTransformOptions {
         format: Some(ImageFormat::Avif),
         gravity: Some(GravityPosition::Entropy.into()),
-        trim: Some(Trim::Edges(TrimEdges {
-            left: Some(3.0),
-            border: Some(TrimBorder::Enabled(true)),
-            ..Default::default()
-        })),
+        trim: Some(Trim::Edges(
+            TrimEdges::new().left(3.0).border(TrimBorder::Enabled(true)),
+        )),
         ..Default::default()
     };
     assert_eq!(
@@ -537,7 +533,7 @@ fn typed_image_transform_serializes_to_wire_options_and_selector() {
 fn search_models_use_typed_mode_status_and_fields() {
     let response: AssetSearchResponse = serde_json::from_value(json!({
         "query": "beach",
-        "items": [{ "asset": { "id": "a1" }, "score": 1, "matchedFields": ["externalId", "visual", "audio"] }],
+        "items": [{ "asset": complete::<Asset>(json!({ "id": "a1" })), "score": 1, "matchedFields": ["externalId", "visual", "audio"] }],
         "semanticStatus": "indexing"
     }))
     .unwrap();
@@ -547,14 +543,10 @@ fn search_models_use_typed_mode_status_and_fields() {
         vec![
             SearchMatchField::ExternalId,
             SearchMatchField::Visual,
-            SearchMatchField::Unknown("audio".into())
+            SearchMatchField::from("audio")
         ]
     );
-    let request = SearchAssets {
-        query: "beach".into(),
-        mode: Some(SearchMode::Semantic),
-        page_size: None,
-    };
+    let request = SearchAssets::new("beach").mode(SearchMode::Semantic);
     assert_eq!(
         serde_json::to_value(request).unwrap(),
         json!({ "query": "beach", "mode": "semantic" })
@@ -592,7 +584,7 @@ fn newer_event_types_decode_to_their_own_variants() {
     assert_eq!(decode("api-key.deleted"), EventType::ApiKeyDeleted);
     assert_eq!(
         decode("usage.spend-limit-reached"),
-        EventType::Unknown("usage.spend-limit-reached".into())
+        EventType::from("usage.spend-limit-reached")
     );
     assert_eq!(
         decode("upload-preset.daily-limit-reached"),
@@ -614,7 +606,7 @@ fn newer_event_types_decode_to_their_own_variants() {
     assert_eq!(decode("api-key.revoked").as_str(), "api-key.revoked");
     assert_eq!(
         decode("api-key.rotated"),
-        EventType::Unknown("api-key.rotated".into())
+        EventType::from("api-key.rotated")
     );
 }
 

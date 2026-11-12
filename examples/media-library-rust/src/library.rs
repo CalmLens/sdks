@@ -126,16 +126,16 @@ impl Library {
                     loop {
                         let page = client
                             .folders()
-                            .list(ListFolders {
-                                parent_id: parent_id.clone(),
-                                cursor,
-                                page_size: Some(100),
-                                ..Default::default()
+                            .list({
+                                let mut options = ListFolders::new().page_size(100);
+                                options.parent_id = parent_id.clone();
+                                options.cursor = cursor;
+                                options
                             })
                             .await?;
                         parents.extend(page.items.iter().map(|folder| Some(folder.id.clone())));
                         folders.extend(page.items);
-                        cursor = page.next_cursor.filter(|_| page.has_more == Some(true));
+                        cursor = page.next_cursor.filter(|_| page.has_more);
                         if cursor.is_none() {
                             break;
                         }
@@ -151,9 +151,10 @@ impl Library {
         match self {
             Library::Live(client) => Ok(client
                 .folders()
-                .create(CreateFolder {
-                    name: name.into(),
-                    parent_id: parent.map_or(Patch::Missing, |id| Patch::Value(id.into())),
+                .create({
+                    let mut options = CreateFolder::new(name);
+                    options.parent_id = parent.map_or(Patch::Missing, |id| Patch::Value(id.into()));
+                    options
                 })
                 .await?),
             Library::Demo(store) => {
@@ -166,10 +167,7 @@ impl Library {
         match self {
             Library::Live(client) => Ok(client
                 .folders()
-                .update(UpdateFolder {
-                    folder_id: id.into(),
-                    name: Patch::Value(name.into()),
-                })
+                .update(UpdateFolder::new(id).name(name))
                 .await?),
             Library::Demo(store) => Self::with_store(store, |store| store.rename_folder(id, name)),
         }
@@ -179,9 +177,10 @@ impl Library {
         match self {
             Library::Live(client) => Ok(client
                 .folders()
-                .move_folder(MoveFolder {
-                    folder_id: id.into(),
-                    parent_id: parent.map(str::to_string),
+                .move_folder({
+                    let mut options = MoveFolder::new(id);
+                    options.parent_id = parent.map(str::to_string);
+                    options
                 })
                 .await?),
             Library::Demo(store) => Self::with_store(store, |store| store.move_folder(id, parent)),
@@ -208,11 +207,12 @@ impl Library {
         match self {
             Library::Live(client) => Ok(client
                 .assets()
-                .list(ListAssets {
-                    cursor: cursor.map(str::to_string),
-                    page_size: Some(page_size),
-                    filter: Some(list_filter(folder, status)),
-                    ..Default::default()
+                .list({
+                    let mut options = ListAssets::new()
+                        .page_size(page_size)
+                        .filter(list_filter(folder, status));
+                    options.cursor = cursor.map(str::to_string);
+                    options
                 })
                 .await?),
             Library::Demo(store) => Ok(Self::with_store(store, |store| {
@@ -230,11 +230,7 @@ impl Library {
         match self {
             Library::Live(client) => Ok(client
                 .assets()
-                .search(SearchAssets {
-                    query: query.into(),
-                    mode: Some(mode.into()),
-                    page_size: Some(page_size),
-                })
+                .search(SearchAssets::new(query).mode(mode).page_size(page_size))
                 .await?),
             Library::Demo(store) => Ok(Self::with_store(store, |store| {
                 store.search(query, mode, page_size as usize)
@@ -254,17 +250,16 @@ impl Library {
     pub async fn upload(&self, upload: NewUpload) -> Result<Asset, Failure> {
         match self {
             Library::Live(client) => {
-                let options = SubmitAsset {
-                    visibility: Some(Visibility::Private),
-                    folder_id: upload.folder.map_or(Patch::Missing, Patch::Value),
-                    external_id: Some(upload.external_id),
-                    description: upload.description,
-                    metadata: Some(upload.metadata),
-                    processing_options: Some(ProcessingOptions {
-                        retain_content: Some(true),
-                        ..Default::default()
-                    }),
-                    ..SubmitAsset::new(upload.name, Content::bytes(upload.bytes, upload.mime))
+                let options = {
+                    let mut options =
+                        SubmitAsset::new(upload.name, Content::bytes(upload.bytes, upload.mime))
+                            .visibility(Visibility::Private)
+                            .external_id(upload.external_id)
+                            .metadata(upload.metadata)
+                            .processing_options(ProcessingOptions::new().retain_content(true));
+                    options.folder_id = upload.folder.map_or(Patch::Missing, Patch::Value);
+                    options.description = upload.description;
+                    options
                 };
                 Ok(client.assets().create(options).await?)
             }
@@ -282,12 +277,10 @@ impl Library {
         match self {
             Library::Live(client) => Ok(client
                 .assets()
-                .update(UpdateAsset {
-                    asset_id: id.into(),
-                    description: description.map_or(Patch::Null, Patch::Value),
-                    tags: Patch::Value(tags),
-                    metadata: Patch::Value(metadata),
-                    ..Default::default()
+                .update({
+                    let mut options = UpdateAsset::new(id).tags(tags).metadata(metadata);
+                    options.description = description.map_or(Patch::Null, Patch::Value);
+                    options
                 })
                 .await?),
             Library::Demo(store) => {
@@ -300,9 +293,10 @@ impl Library {
         match self {
             Library::Live(client) => Ok(client
                 .assets()
-                .move_asset(MoveAsset {
-                    asset_id: id.into(),
-                    folder_id: folder.map(str::to_string),
+                .move_asset({
+                    let mut options = MoveAsset::new(id);
+                    options.folder_id = folder.map(str::to_string);
+                    options
                 })
                 .await?),
             Library::Demo(store) => Self::with_store(store, |store| store.move_asset(id, folder)),
@@ -339,13 +333,13 @@ impl Library {
                 }
                 let signed = client
                     .cdn()
-                    .sign_asset_url(SignAssetUrlOptions {
-                        asset_id: Some(asset.id.clone()),
-                        resource: Some(CdnResource::Rendered),
-                        lens: Some(lens.into()),
-                        expires_in: Some(SIGNED_URL_SECONDS),
-                        ..Default::default()
-                    })
+                    .sign_asset_url(
+                        SignAssetUrlOptions::new()
+                            .asset_id(asset.id.clone())
+                            .resource(CdnResource::Rendered)
+                            .lens(lens)
+                            .expires_in(SIGNED_URL_SECONDS),
+                    )
                     .await?;
                 Ok(Delivery::Redirect(signed.url))
             }
@@ -377,12 +371,12 @@ pub fn list_filter(folder: Option<&str>, status: &str) -> String {
         None => "parentId==null".into(),
     };
     let status = match status {
-        "allowed" => "classification.moderation.status==allowed",
-        "limited" => "classification.moderation.status==limited",
-        "age-restricted" => "classification.moderation.status==age-restricted",
-        "blocked" => "classification.moderation.status==blocked",
-        "purged" => "classification.moderation.status==purged",
-        "pending" => "classification.moderation.status==pending;classification.status!=failed",
+        "allowed" => "classification.moderation.decision==allowed",
+        "limited" => "classification.moderation.decision==limited",
+        "age-restricted" => "classification.moderation.decision==age-restricted",
+        "blocked" => "classification.moderation.decision==blocked",
+        "purged" => "classification.moderation.decision==purged",
+        "pending" => "classification.moderation.decision==pending;classification.status!=failed",
         "failed" => "classification.status==failed",
         _ => return scope,
     };
@@ -390,21 +384,17 @@ pub fn list_filter(folder: Option<&str>, status: &str) -> String {
 }
 
 pub fn lens_definitions() -> Vec<LensDefinition> {
-    let lens =
-        |identifier: &str, name: &str, fit: &str, width: u32, height: Option<u32>| LensDefinition {
-            identifier: identifier.into(),
-            name: name.into(),
-            lens_type: "image".into(),
-            active: Some(true),
-            description: Patch::Missing,
-            transform: Patch::Value(ImageTransformOptions {
+    let lens = |identifier: &str, name: &str, fit: &str, width: u32, height: Option<u32>| {
+        LensDefinition::new(identifier, name, "image")
+            .active(true)
+            .transform(ImageTransformOptions {
                 fit: Some(fit.into()),
                 width: Some(width),
                 height,
                 format: Some("webp".into()),
                 ..Default::default()
-            }),
-        };
+            })
+    };
     vec![
         lens(THUMB_LENS, "Calmlibrary thumbnail", "cover", 320, Some(320)),
         lens(WEB_LENS, "Calmlibrary web size", "scale-down", 1600, None),

@@ -41,6 +41,9 @@ pub(crate) enum Deadline {
 }
 
 pub(crate) struct Prepared {
+    /// The operation, such as `assets.retrieve`, for the attempt hook and logs; `None` for a raw
+    /// request.
+    pub operation: Option<&'static str>,
     pub method: Method,
     pub url: reqwest::Url,
     pub headers: HeaderMap,
@@ -51,6 +54,7 @@ pub(crate) struct Prepared {
 impl Prepared {
     pub fn new(method: Method, url: reqwest::Url) -> Self {
         Self {
+            operation: None,
             method,
             url,
             headers: HeaderMap::new(),
@@ -73,6 +77,30 @@ impl Prepared {
         );
         self.body = RequestBody::Bytes(bytes.into());
         Ok(self)
+    }
+    /// Sets top-level properties of the JSON object body, or makes one from them when there is
+    /// no body. A body that isn't a JSON object (an upload form) refuses them.
+    pub fn merge_json(self, fields: &Map<String, Value>) -> Result<Self> {
+        let mut object = match &self.body {
+            RequestBody::Empty => Map::new(),
+            RequestBody::Bytes(bytes) => match serde_json::from_slice::<Value>(bytes) {
+                Ok(Value::Object(object)) => object,
+                _ => {
+                    return Err(invalid_argument(
+                        "extra_body needs a JSON object request body",
+                    ))
+                }
+            },
+            RequestBody::Stream(..) => {
+                return Err(invalid_argument(
+                    "extra_body needs a JSON object request body",
+                ))
+            }
+        };
+        for (key, value) in fields {
+            object.insert(key.clone(), value.clone());
+        }
+        self.json(&Value::Object(object))
     }
     /// GET and HEAD, and POSTs carrying an `Idempotency-Key`, can be repeated safely.
     fn retryable(&self) -> bool {
@@ -279,6 +307,7 @@ pub(crate) async fn execute(
     mut request: Prepared,
     options: CallOptions,
     api_errors: bool,
+    observer: &crate::observe::Observer,
 ) -> Result<Exchange> {
     let max_retries = if request.retryable() {
         options.max_retries
@@ -290,11 +319,38 @@ pub(crate) async fn execute(
         Deadline::Upload => options.upload_timeout,
     });
     let mut retry = 0;
+    let path = crate::observe::redacted_path(request.url.path());
     loop {
         let can_retry = retry < max_retries;
+        let started = transport.now();
         let result = transport
             .exchange(request.attempt(), timeout, request.deadline)
             .await;
+        let duration = transport.now().saturating_duration_since(started);
+        let (status, request_id) = match &result {
+            Ok(exchange) => (
+                http::StatusCode::from_u16(exchange.status).ok(),
+                exchange
+                    .headers
+                    .get("x-request-id")
+                    .and_then(|value| value.to_str().ok())
+                    .map(str::to_owned),
+            ),
+            Err(_) => (None, None),
+        };
+        let report = |retry_delay: Option<Duration>, error: Option<&Error>| {
+            observer.attempt(crate::observe::AttemptEvent {
+                operation: request.operation,
+                method: request.method.clone(),
+                path: path.clone(),
+                attempt: retry + 1,
+                retry_delay,
+                status,
+                request_id: request_id.clone(),
+                error_code: error.map(|error| error.code().clone()),
+                duration,
+            });
+        };
         let failure = match result {
             Err(error) => error,
             Ok(exchange) if (300..400).contains(&exchange.status) => with_response(
@@ -305,15 +361,20 @@ pub(crate) async fn execute(
                 exchange.status,
                 &exchange.headers,
             ),
-            Ok(exchange) if (200..300).contains(&exchange.status) => return Ok(exchange),
+            Ok(exchange) if (200..300).contains(&exchange.status) => {
+                report(None, None);
+                return Ok(exchange);
+            }
             Ok(exchange) if !api_errors => {
                 let delay = retry_after(&exchange.headers).unwrap_or_else(|| backoff(retry));
                 if !can_retry
                     || !RETRYABLE_STATUSES.contains(&exchange.status)
                     || delay > RETRY_AFTER_MAX
                 {
+                    report(None, None);
                     return Ok(exchange);
                 }
+                report(Some(delay), None);
                 transport.sleep(delay).await;
                 retry += 1;
                 continue;
@@ -329,8 +390,10 @@ pub(crate) async fn execute(
         };
         let delay = failure.retry_after().unwrap_or_else(|| backoff(retry));
         if !can_retry || delay > RETRY_AFTER_MAX || !failure.is_retryable() {
+            report(None, Some(&failure));
             return Err(failure);
         }
+        report(Some(delay), Some(&failure));
         transport.sleep(delay).await;
         retry += 1;
     }
@@ -468,7 +531,7 @@ fn parse_http_date(value: &str) -> Option<std::time::SystemTime> {
 
 /// Adds the response's status, request ID, `Retry-After` and headers to `error`.
 pub(crate) fn with_response(mut error: Error, status: u16, headers: &HeaderMap) -> Error {
-    error = error.with_status(status).with_headers(headers.clone());
+    error = error.with_http_status(status).with_headers(headers.clone());
     if let Some(id) = headers.get("x-request-id").and_then(|v| v.to_str().ok()) {
         error = error.with_request_id(id);
     }
@@ -516,7 +579,7 @@ pub(crate) fn api_error(status: u16, headers: &HeaderMap, body: &[u8]) -> Error 
             }
         }
     };
-    with_response(error, status, headers)
+    with_response(error.with_raw_body(body), status, headers)
 }
 
 /// Decodes a successful JSON response.
@@ -536,6 +599,23 @@ pub(crate) fn decode<T: serde::de::DeserializeOwned>(
             headers,
         )
     })
+}
+
+/// The [`LastResponse`](crate::models::LastResponse) of a response.
+pub(crate) fn last_response(
+    status: u16,
+    headers: &HeaderMap,
+    idempotency_key: Option<String>,
+) -> crate::models::LastResponse {
+    crate::models::LastResponse {
+        idempotency_key,
+        status: http::StatusCode::from_u16(status).unwrap_or(http::StatusCode::OK),
+        request_id: headers
+            .get("x-request-id")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned),
+        headers: headers.clone(),
+    }
 }
 
 pub(crate) fn transport_error(error: reqwest::Error) -> Error {

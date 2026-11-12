@@ -179,7 +179,7 @@ pub(super) fn serve_info(
     };
     let content = &asset["content"];
     let classification = &asset["classification"];
-    let status = text(&classification["moderation"]["status"]);
+    let status = text(&classification["moderation"]["decision"]);
     let restricted = private || status == "blocked" || status == "purged";
     if restricted && !authorised {
         return custom("asset/not-available", 403, "Asset is not available").response();

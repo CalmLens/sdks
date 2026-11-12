@@ -71,7 +71,33 @@ pub struct ServerClientBuilder {
     max_retries: u32,
     max_response_bytes: usize,
     part_size_bytes: u64,
-    http_client: Option<reqwest::Client>,
+    proxy: Option<String>,
+    root_certificates: Vec<Vec<u8>>,
+    app_info: Option<AppInfo>,
+    on_attempt: Option<crate::observe::AttemptHook>,
+}
+
+/// Your application's name, version and URL, appended to the SDK's `User-Agent` by
+/// [`ServerClientBuilder::app_info`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AppInfo {
+    name: String,
+    version: Option<String>,
+    url: Option<String>,
+}
+impl AppInfo {
+    /// ` name/version (url)`, as appended to the user agent.
+    fn suffix(&self) -> String {
+        let mut suffix = format!(" {}", self.name);
+        if let Some(version) = &self.version {
+            suffix.push('/');
+            suffix.push_str(version);
+        }
+        if let Some(url) = &self.url {
+            suffix.push_str(&format!(" ({url})"));
+        }
+        suffix
+    }
 }
 
 impl fmt::Debug for ServerClientBuilder {
@@ -88,7 +114,10 @@ impl fmt::Debug for ServerClientBuilder {
             .field("max_retries", &self.max_retries)
             .field("max_response_bytes", &self.max_response_bytes)
             .field("part_size_bytes", &self.part_size_bytes)
-            .field("http_client", &self.http_client.is_some())
+            .field("proxy", &self.proxy.as_ref().map(|_| "[set]"))
+            .field("root_certificates", &self.root_certificates.len())
+            .field("app_info", &self.app_info)
+            .field("on_attempt", &self.on_attempt.is_some())
             .finish()
     }
 }
@@ -107,8 +136,28 @@ impl ServerClientBuilder {
             max_retries: DEFAULT_MAX_RETRIES,
             max_response_bytes: DEFAULT_MAX_RESPONSE_BYTES,
             part_size_bytes: DEFAULT_PART_SIZE_BYTES,
-            http_client: None,
+            proxy: None,
+            root_certificates: Vec::new(),
+            app_info: None,
+            on_attempt: None,
         }
+    }
+    /// A builder from the environment: `CALMLENS_API_KEY` and `CALMLENS_PROJECT_ID` (both
+    /// required, else `sdk/invalid-config`) and `CALMLENS_BASE_URL` when it is set.
+    pub fn from_env() -> Result<Self> {
+        let var = |name: &str| std::env::var(name).ok().filter(|value| !value.is_empty());
+        let (Some(api_key), Some(project_id)) =
+            (var("CALMLENS_API_KEY"), var("CALMLENS_PROJECT_ID"))
+        else {
+            return Err(invalid_config(
+                "Set CALMLENS_API_KEY and CALMLENS_PROJECT_ID, or pass the API key and project ID",
+            ));
+        };
+        let mut builder = Self::new(api_key, project_id);
+        if let Some(base_url) = var("CALMLENS_BASE_URL") {
+            builder.base_url = base_url;
+        }
+        Ok(builder)
     }
     /// The API base URL, e.g. `http://localhost:6110/v1` for a local CalmLens.
     pub fn base_url(mut self, value: impl Into<String>) -> Self {
@@ -174,28 +223,77 @@ impl ServerClientBuilder {
         self.max_retries = value;
         self
     }
-    /// Sends requests through your own reqwest client, e.g. for a proxy, custom root
-    /// certificates or a shared connection pool. Its own timeouts and redirect policy apply
-    /// instead of `connect_timeout` and `read_timeout`; disable redirects on it.
-    pub fn http_client(mut self, client: reqwest::Client) -> Self {
-        self.http_client = Some(client);
+    /// Sends every request through this HTTP(S) or SOCKS proxy URL, such as
+    /// `http://proxy.internal:3128`. Credentials may be given in the URL.
+    pub fn proxy(mut self, url: impl Into<String>) -> Self {
+        self.proxy = Some(url.into());
+        self
+    }
+    /// Also trusts the PEM certificates in `pem` (one or more), e.g. a corporate proxy's root.
+    /// The operating system's (rustls) or platform library's (native-tls) roots still apply.
+    pub fn add_root_certificate(mut self, pem: impl Into<Vec<u8>>) -> Self {
+        self.root_certificates.push(pem.into());
+        self
+    }
+    /// Names your application in the `User-Agent` the SDK sends, as ` name/version (url)`
+    /// after the SDK's own entry, so CalmLens support can tell integrations apart.
+    pub fn app_info(
+        mut self,
+        name: impl Into<String>,
+        version: Option<&str>,
+        url: Option<&str>,
+    ) -> Self {
+        self.app_info = Some(AppInfo {
+            name: name.into(),
+            version: version.map(str::to_owned),
+            url: url.map(str::to_owned),
+        });
+        self
+    }
+    /// Calls `hook` after every HTTP attempt, retries included, with its operation, method,
+    /// path, attempt number, the delay before it, status, request ID and duration, e.g. to
+    /// record metrics. The event never holds the API key, tokens, signed URL grants or bodies.
+    /// `CALMLENS_LOG=info` (failures and retries) or `debug` (every attempt) also writes these
+    /// to standard error, and the `tracing` feature emits them as `tracing` events with the
+    /// target `calmlens`.
+    pub fn on_attempt(
+        mut self,
+        hook: impl Fn(&crate::AttemptEvent) + Send + Sync + 'static,
+    ) -> Self {
+        self.on_attempt = Some(Arc::new(hook));
         self
     }
     /// Validates the options and creates the client. Fails with `sdk/invalid-config`.
     pub fn build(self) -> Result<ServerClient> {
         let config = self.validate()?;
-        let http = match self.http_client {
-            Some(client) => client,
-            None => reqwest::Client::builder()
-                .redirect(reqwest::redirect::Policy::none())
-                .connect_timeout(self.connect_timeout)
-                .read_timeout(self.read_timeout)
-                .build()
-                .map_err(|cause| {
-                    invalid_config(format!("Could not create the HTTP client: {cause}"))
-                        .with_source(cause)
-                })?,
-        };
+        // Redirects are never followed: a redirected API call would resend the API key.
+        let mut http = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .connect_timeout(self.connect_timeout)
+            .read_timeout(self.read_timeout)
+            .no_proxy();
+        if let Some(url) = &self.proxy {
+            let proxy = reqwest::Proxy::all(url.as_str()).map_err(|cause| {
+                invalid_config("proxy must be an HTTP(S) or SOCKS proxy URL").with_source(cause)
+            })?;
+            http = http.proxy(proxy);
+        }
+        for pem in &self.root_certificates {
+            let certificates = reqwest::Certificate::from_pem_bundle(pem).map_err(|cause| {
+                invalid_config("add_root_certificate needs PEM certificates").with_source(cause)
+            })?;
+            if certificates.is_empty() {
+                return Err(invalid_config(
+                    "add_root_certificate needs PEM certificates",
+                ));
+            }
+            for certificate in certificates {
+                http = http.add_root_certificate(certificate);
+            }
+        }
+        let http = http.build().map_err(|cause| {
+            invalid_config(format!("Could not create the HTTP client: {cause}")).with_source(cause)
+        })?;
         Ok(ServerClient::from_parts(config, Transport::Http(http)))
     }
     /// The API and CDN base URLs, for the mock's recorded request paths.
@@ -260,7 +358,22 @@ impl ServerClientBuilder {
             }
             urls.push(url.trim_end_matches('/').to_owned());
         }
+        let user_agent = format!(
+            "{}{}",
+            crate::user_agent(),
+            self.app_info
+                .as_ref()
+                .map(AppInfo::suffix)
+                .unwrap_or_default()
+        );
+        let user_agent = HeaderValue::from_str(&user_agent)
+            .map_err(|_| invalid_config("app_info must be printable ASCII"))?;
         Ok(Config {
+            observer: crate::observe::Observer {
+                hook: self.on_attempt.clone(),
+                log: crate::observe::LogLevel::from_env(),
+            },
+            user_agent,
             api_key,
             project_id: self.project_id.clone(),
             cdn_base_url: urls.pop().unwrap_or_default(),
@@ -275,6 +388,8 @@ impl ServerClientBuilder {
 }
 
 struct Config {
+    observer: crate::observe::Observer,
+    user_agent: HeaderValue,
     api_key: HeaderValue,
     project_id: String,
     base_url: String,
@@ -306,6 +421,69 @@ pub struct ServerClient {
     inner: Arc<Inner>,
     timeout: Option<Duration>,
     max_retries: Option<u32>,
+    request_options: Option<Arc<RequestOptions>>,
+}
+
+/// Options for the calls made through a [`ServerClient::with_options`] handle, such as
+/// `client.with_options(RequestOptions::new().header("X-Trace", "1")).assets().retrieve(id)`.
+#[derive(Clone, Debug, Default, PartialEq)]
+#[non_exhaustive]
+pub struct RequestOptions {
+    /// The timeout of each attempt, replacing the client's `timeout` (and `upload_timeout`).
+    pub timeout: Option<Duration>,
+    /// How many times to retry a repeatable request, replacing the client's `max_retries`.
+    pub max_retries: Option<u32>,
+    /// The `Idempotency-Key` of POST requests that have none of their own, which also makes them
+    /// retryable. Uploads use their `idempotency_key` option first.
+    pub idempotency_key: Option<String>,
+    /// Extra request headers. The SDK's `X-Api-Key`, `User-Agent` and `Authorization` can't be
+    /// replaced.
+    pub headers: Vec<(String, String)>,
+    /// Extra query parameters, added after the SDK's own.
+    pub extra_query: Vec<(String, String)>,
+    /// Extra top-level properties for a JSON request body, e.g. an option this SDK version does
+    /// not have yet. They replace properties of the same name.
+    pub extra_body: serde_json::Map<String, serde_json::Value>,
+}
+impl RequestOptions {
+    /// Options with nothing set.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Sets the per-attempt timeout.
+    pub fn timeout(mut self, value: Duration) -> Self {
+        self.timeout = Some(value);
+        self
+    }
+    /// Sets the retry limit.
+    pub fn max_retries(mut self, value: u32) -> Self {
+        self.max_retries = Some(value);
+        self
+    }
+    /// Sets the `Idempotency-Key`.
+    pub fn idempotency_key(mut self, value: impl Into<String>) -> Self {
+        self.idempotency_key = Some(value.into());
+        self
+    }
+    /// Adds a request header.
+    pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.push((name.into(), value.into()));
+        self
+    }
+    /// Adds a query parameter.
+    pub fn query(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.extra_query.push((name.into(), value.into()));
+        self
+    }
+    /// Adds a top-level JSON body property.
+    pub fn body_field(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<serde_json::Value>,
+    ) -> Self {
+        self.extra_body.insert(name.into(), value.into());
+        self
+    }
 }
 
 impl fmt::Debug for ServerClient {
@@ -330,7 +508,11 @@ impl ServerClient {
     pub fn new(api_key: impl Into<String>, project_id: impl Into<String>) -> Result<Self> {
         Self::builder(api_key, project_id).build()
     }
-    /// A builder for a client with custom URLs, timeouts, retries or HTTP client.
+    /// A client from the environment; see [`ServerClientBuilder::from_env`].
+    pub fn from_env() -> Result<Self> {
+        ServerClientBuilder::from_env()?.build()
+    }
+    /// A builder for a client with custom URLs, timeouts, retries, proxy or certificates.
     pub fn builder(
         api_key: impl Into<String>,
         project_id: impl Into<String>,
@@ -338,8 +520,7 @@ impl ServerClient {
         ServerClientBuilder::new(api_key.into(), project_id.into())
     }
     fn from_parts(config: Config, transport: Transport) -> Self {
-        let user_agent = HeaderValue::from_str(&crate::user_agent())
-            .unwrap_or_else(|_| HeaderValue::from_static("calmlens-rust"));
+        let user_agent = config.user_agent.clone();
         Self {
             inner: Arc::new(Inner {
                 config,
@@ -350,6 +531,7 @@ impl ServerClient {
             }),
             timeout: None,
             max_retries: None,
+            request_options: None,
         }
     }
     /// A handle whose calls, including uploads and CDN downloads, time out after `timeout`.
@@ -359,6 +541,40 @@ impl ServerClient {
             timeout: Some(timeout),
             ..self.clone()
         }
+    }
+    /// A handle whose API calls use `options`: a timeout, retry limit, idempotency key, extra
+    /// headers, query parameters and body properties. It shares this client's connections. The
+    /// timeout and retry limit also apply to CDN downloads.
+    pub fn with_options(&self, options: RequestOptions) -> Self {
+        Self {
+            timeout: options.timeout.or(self.timeout),
+            max_retries: options.max_retries.or(self.max_retries),
+            request_options: Some(Arc::new(options)),
+            ..self.clone()
+        }
+    }
+    /// Sends any API request with the client's API key, retries and error mapping, for an
+    /// endpoint this SDK version has no method for. `path` is relative to the base URL, such
+    /// as `/projects/{project_id}/assets`, and may carry a query. The response body is returned
+    /// as JSON (`null` when empty).
+    pub async fn request(
+        &self,
+        method: Method,
+        path: &str,
+        body: Option<&serde_json::Value>,
+    ) -> Result<serde_json::Value> {
+        if !path.starts_with('/') || path.starts_with("//") {
+            return Err(invalid_argument("path must start with a single /"));
+        }
+        let mut request = self.prepare(method, path, &[])?;
+        if let Some(body) = body {
+            request = request.json(body)?;
+        }
+        let (status, headers, body) = self.send(request).await?;
+        if body.is_empty() {
+            return Ok(serde_json::Value::Null);
+        }
+        decode(status, &headers, &body)
     }
     /// A handle that retries repeatable requests up to `max_retries` times.
     pub fn with_max_retries(&self, max_retries: u32) -> Self {
@@ -476,8 +692,14 @@ impl ServerClient {
         struct Response {
             lenses: Vec<Lens>,
         }
+        impl crate::models::Responded for Response {}
         for chunk in missing.chunks(ENSURE_LENSES_MAX_PER_REQUEST) {
-            let request = self.prepare(Method::PUT, &self.project_path("lenses")?, &[])?;
+            let request = self.prepare_for(
+                "ensureLenses",
+                Method::PUT,
+                &self.project_path("lenses")?,
+                &[],
+            )?;
             let request = request.json(&Body {
                 lenses: chunk.iter().map(|(_, lens)| *lens).collect(),
             })?;
@@ -527,6 +749,68 @@ impl ServerClient {
             id(&self.inner.config.project_id)?
         ))
     }
+    /// An API request for `operation`, which accepts JSON.
+    fn prepare_for(
+        &self,
+        operation: &'static str,
+        method: Method,
+        path: &str,
+        query: &[(String, String)],
+    ) -> Result<Prepared> {
+        let mut request = self.prepare(method, path, query)?;
+        request.operation = Some(operation);
+        Ok(request)
+    }
+    fn prepare_url_for(
+        &self,
+        operation: &'static str,
+        method: Method,
+        url: &str,
+        query: &[(String, String)],
+    ) -> Result<Prepared> {
+        let mut request = self.prepare_url(method, url, query)?;
+        request.operation = Some(operation);
+        Ok(request)
+    }
+    /// The handle's [`RequestOptions::idempotency_key`], for uploads without their own.
+    fn call_idempotency_key(&self) -> Option<String> {
+        self.request_options
+            .as_ref()
+            .and_then(|options| options.idempotency_key.clone())
+    }
+    /// Adds the handle's [`RequestOptions`] to an API request.
+    fn with_request_options(&self, mut request: Prepared) -> Result<Prepared> {
+        let Some(options) = &self.request_options else {
+            return Ok(request);
+        };
+        for (name, value) in &options.headers {
+            let name = http::HeaderName::from_bytes(name.as_bytes())
+                .map_err(|_| invalid_argument(format!("Invalid header name {name:?}")))?;
+            if [http::header::USER_AGENT, http::header::AUTHORIZATION].contains(&name)
+                || name == "x-api-key"
+            {
+                continue;
+            }
+            let value = HeaderValue::from_str(value)
+                .map_err(|_| invalid_argument(format!("Invalid {name} header value")))?;
+            request.headers.append(name, value);
+        }
+        if !options.extra_query.is_empty() {
+            request
+                .url
+                .query_pairs_mut()
+                .extend_pairs(&options.extra_query);
+        }
+        if let Some(key) = &options.idempotency_key {
+            if request.method == Method::POST && !request.headers.contains_key("idempotency-key") {
+                request = request.header("idempotency-key", key)?;
+            }
+        }
+        if !options.extra_body.is_empty() {
+            request = request.merge_json(&options.extra_body)?;
+        }
+        Ok(request)
+    }
     /// An API request, which accepts JSON.
     fn prepare(&self, method: Method, path: &str, query: &[(String, String)]) -> Result<Prepared> {
         let url = format!("{}{path}", self.inner.config.base_url);
@@ -559,41 +843,75 @@ impl ServerClient {
         Ok(request)
     }
     async fn send(&self, request: Prepared) -> Result<(u16, HeaderMap, Bytes)> {
+        self.send_keyed(request)
+            .await
+            .map(|(status, headers, body, _)| (status, headers, body))
+    }
+    /// [`send`](Self::send), with the `Idempotency-Key` the request carried.
+    async fn send_keyed(
+        &self,
+        request: Prepared,
+    ) -> Result<(u16, HeaderMap, Bytes, Option<String>)> {
         let options = self.options();
-        let exchange = execute(&self.inner.transport, request, options, true).await?;
+        let request = self.with_request_options(request)?;
+        let key = request
+            .headers
+            .get("idempotency-key")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned);
+        let exchange = execute(
+            &self.inner.transport,
+            request,
+            options,
+            true,
+            &self.inner.config.observer,
+        )
+        .await?;
         let (status, headers) = (exchange.status, exchange.headers.clone());
         let body = exchange.read(options.max_response_bytes).await?;
-        Ok((status, headers, body))
+        Ok((status, headers, body, key))
     }
-    async fn call<T: serde::de::DeserializeOwned>(&self, request: Prepared) -> Result<T> {
-        let (status, headers, body) = self.send(request).await?;
-        decode(status, &headers, &body)
+    async fn call<T: serde::de::DeserializeOwned + crate::models::Responded>(
+        &self,
+        request: Prepared,
+    ) -> Result<T> {
+        let (status, headers, body, key) = self.send_keyed(request).await?;
+        let mut value: T = decode(status, &headers, &body)?;
+        value.set_last_response(crate::transport::last_response(status, &headers, key));
+        Ok(value)
     }
     async fn call_empty(&self, request: Prepared) -> Result<()> {
         self.send(request).await.map(|_| ())
     }
     /// An upload's response, which must be an asset with an ID.
     async fn call_upload(&self, request: Prepared) -> Result<Asset> {
-        let (status, headers, body) = self.send(request).await?;
+        let (status, headers, body, key) = self.send_keyed(request).await?;
         let value: serde_json::Value = decode(status, &headers, &body)?;
         if value["id"].as_str().is_none_or(|id| id.is_empty()) {
             return Err(Error::new(
                 ErrorCode::InvalidResponse,
                 "Expected an uploaded asset response",
             )
-            .with_status(status));
+            .with_http_status(status));
         }
-        serde_json::from_value(value).map_err(|cause| {
+        let mut asset: Asset = serde_json::from_value(value).map_err(|cause| {
             Error::new(
                 ErrorCode::InvalidResponse,
                 format!("Invalid asset response: {cause}"),
             )
-            .with_status(status)
+            .with_http_status(status)
             .with_source(cause)
-        })
+        })?;
+        asset.set_last_response(crate::transport::last_response(status, &headers, key));
+        Ok(asset)
     }
 
     async fn submit(&self, options: SubmitAsset, wait: bool) -> Result<Asset> {
+        let operation = if wait {
+            "assets.classify"
+        } else {
+            "assets.create"
+        };
         if options.name.is_empty() {
             return Err(invalid_payload("Asset name is required"));
         }
@@ -607,7 +925,11 @@ impl ServerClient {
                 "Supply exactly one of content, part, or url; isFinal belongs in part",
             ));
         }
-        let idempotency_key = options.idempotency_key.clone().unwrap_or_else(uuid);
+        let idempotency_key = options
+            .idempotency_key
+            .clone()
+            .or_else(|| self.call_idempotency_key())
+            .unwrap_or_else(uuid);
         // Only the posts CalmLens uses are sent.
         let context = options
             .context
@@ -669,7 +991,8 @@ impl ServerClient {
                 upload_preset_id: Option<&'a String>,
             }
             let request = self
-                .prepare(
+                .prepare_for(
+                    operation,
                     Method::POST,
                     &self.project_path("assets")?,
                     &[("wait".into(), wait.to_string())],
@@ -768,6 +1091,7 @@ impl ServerClient {
             }
             return self
                 .submit_in_parts(
+                    operation,
                     (query, &fields),
                     &content.mime_type,
                     (source, total),
@@ -809,7 +1133,12 @@ impl ServerClient {
                 body.insert("content".into(), text.into());
             }
             let mut request = self
-                .prepare(Method::POST, &self.project_path("assets")?, &query.0)?
+                .prepare_for(
+                    operation,
+                    Method::POST,
+                    &self.project_path("assets")?,
+                    &query.0,
+                )?
                 .header("idempotency-key", &idempotency_key)?
                 .json(&body)?;
             request.deadline = deadline;
@@ -824,7 +1153,12 @@ impl ServerClient {
         }
         let (form_type, body) = upload_form(&fields, &content.mime_type, body)?;
         let mut request = self
-            .prepare(Method::POST, &self.project_path("assets")?, &query.0)?
+            .prepare_for(
+                operation,
+                Method::POST,
+                &self.project_path("assets")?,
+                &query.0,
+            )?
             .header("content-type", &form_type)?
             .header(
                 "x-calmlens-upload",
@@ -851,7 +1185,10 @@ impl ServerClient {
         if !self.inner.transport.defers_upload_checks() {
             check_part_size(size, is_final)?;
         }
-        let idempotency_key = options.idempotency_key.unwrap_or_else(uuid);
+        let idempotency_key = options
+            .idempotency_key
+            .or_else(|| self.call_idempotency_key())
+            .unwrap_or_else(uuid);
         self.send_part(
             &path,
             (part_number, is_final),
@@ -880,7 +1217,7 @@ impl ServerClient {
         query.opt("sizeInBytes", size);
         // Later parts carry no Content-Type: the API reads the upload's saved type.
         let mut request = self
-            .prepare(Method::POST, path, &query.0)?
+            .prepare_for("assets.uploadPart", Method::POST, path, &query.0)?
             .header("x-calmlens-upload", "part")?
             .header("idempotency-key", idempotency_key)?;
         request.body = body;
@@ -896,6 +1233,7 @@ impl ServerClient {
     /// already has is skipped, and a final part that finds the upload completed reads it back.
     async fn submit_in_parts(
         &self,
+        operation: &'static str,
         (mut query, fields): (Query, &serde_json::Map<String, serde_json::Value>),
         mime_type: &str,
         (source, total): (PartSource, u64),
@@ -917,7 +1255,12 @@ impl ServerClient {
         query.push("totalSizeInBytes", total);
         let (form_type, body) = upload_form(fields, mime_type, RequestBody::Bytes(first))?;
         let mut request = self
-            .prepare(Method::POST, &self.project_path("assets")?, &query.0)?
+            .prepare_for(
+                operation,
+                Method::POST,
+                &self.project_path("assets")?,
+                &query.0,
+            )?
             .header("content-type", &form_type)?
             .header("x-calmlens-upload", "part")?
             .header("idempotency-key", &key)?;
@@ -978,8 +1321,13 @@ impl ServerClient {
         query.opt("pageSize", options.page_size);
         query.opt("filter", options.filter.as_ref());
         query.opt("sort", options.sort.as_ref());
-        self.call(self.prepare(Method::GET, &self.project_path("assets")?, &query.0)?)
-            .await
+        self.call(self.prepare_for(
+            "assets.list",
+            Method::GET,
+            &self.project_path("assets")?,
+            &query.0,
+        )?)
+        .await
     }
     async fn children_page(&self, options: &ListChildren) -> Result<AssetPage> {
         let path = format!("/assets/{}/children", id(&options.asset_id)?);
@@ -987,14 +1335,16 @@ impl ServerClient {
         query.opt("cursor", options.cursor.as_deref());
         query.opt("pageSize", options.page_size);
         query.opt("sort", options.sort.as_ref());
-        self.call(self.prepare(Method::GET, &path, &query.0)?).await
+        self.call(self.prepare_for("assets.listChildren", Method::GET, &path, &query.0)?)
+            .await
     }
     async fn timeline_page(&self, options: &ListTimeline) -> Result<AssetTimelinePage> {
         let path = self.project_path(&format!("assets/{}/timeline", id(&options.asset_id)?))?;
         let mut query = Query::default();
         query.opt("cursor", options.cursor.as_deref());
         query.opt("pageSize", options.page_size);
-        self.call(self.prepare(Method::GET, &path, &query.0)?).await
+        self.call(self.prepare_for("assets.listTimeline", Method::GET, &path, &query.0)?)
+            .await
     }
     async fn events_page(&self, options: &ListEvents) -> Result<EventsPage> {
         let mut query = Query::default();
@@ -1006,8 +1356,13 @@ impl ServerClient {
             query.push("types", types.join(","));
         }
         query.opt("assetId", options.asset_id.as_ref());
-        self.call(self.prepare(Method::GET, &self.project_path("events")?, &query.0)?)
-            .await
+        self.call(self.prepare_for(
+            "events.list",
+            Method::GET,
+            &self.project_path("events")?,
+            &query.0,
+        )?)
+        .await
     }
 }
 
@@ -1255,7 +1610,8 @@ impl AssetsClient<'_> {
         query.opt("mode", options.mode.as_ref());
         query.opt("pageSize", options.page_size);
         self.0
-            .call(self.0.prepare(
+            .call(self.0.prepare_for(
+                "assets.search",
                 Method::GET,
                 &self.0.project_path("assets/search")?,
                 &query.0,
@@ -1355,15 +1711,18 @@ impl AssetsClient<'_> {
         let path = format!("/assets/{}", id(&options.asset_id)?);
         let query = Query::default();
         self.0
-            .call(self.0.prepare(Method::GET, &path, &query.0)?)
+            .call(
+                self.0
+                    .prepare_for("assets.retrieve", Method::GET, &path, &query.0)?,
+            )
             .await
     }
     /// Retrieves the asset until it is settled ([`Asset::is_decided`]: classification status
-    /// `completed`, with its decision in `classification.moderation.status`, or `failed`) and
+    /// `completed`, with its decision in `classification.moderation.decision`, or `failed`) and
     /// returns it. A `queued` or `processing` asset is still waiting, even when a reviewer has
     /// already decided it. It checks again after 0.5 seconds, waiting 1.5 times longer each time
     /// up to 2 seconds, and fails with `sdk/timeout` and details
-    /// `{assetId, classificationStatus, moderationStatus}` when `options.timeout` (60 seconds by
+    /// `{assetId, classificationStatus, moderationDecision}` when `options.timeout` (60 seconds by
     /// default) passes before it is settled. Drop the future to stop waiting. Webhooks report
     /// decisions without polling.
     pub async fn wait_for_decision(&self, options: WaitForDecision) -> Result<Asset> {
@@ -1377,7 +1736,7 @@ impl AssetsClient<'_> {
         let mut details = serde_json::Map::new();
         details.insert("assetId".into(), options_asset_id.into());
         details.insert("classificationStatus".into(), serde_json::Value::Null);
-        details.insert("moderationStatus".into(), serde_json::Value::Null);
+        details.insert("moderationDecision".into(), serde_json::Value::Null);
         let remaining =
             || deadline.map(|deadline| deadline.saturating_duration_since(transport.now()));
         loop {
@@ -1404,8 +1763,8 @@ impl AssetsClient<'_> {
                 asset.classification.status.as_str().into(),
             );
             details.insert(
-                "moderationStatus".into(),
-                asset.classification.moderation.status.as_str().into(),
+                "moderationDecision".into(),
+                serde_json::json!(asset.classification.moderation.decision),
             );
             if remaining == Some(Duration::ZERO) {
                 break;
@@ -1426,13 +1785,21 @@ impl AssetsClient<'_> {
     /// Updates an asset; [`Patch::Missing`] fields are left unchanged.
     pub async fn update(&self, options: UpdateAsset) -> Result<Asset> {
         let path = format!("/assets/{}", id(&options.asset_id)?);
-        let request = self.0.prepare(Method::PATCH, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("assets.update", Method::PATCH, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Classifies an asset whose processing failed (status `error`) again.
     pub async fn retry(&self, options: AssetId) -> Result<Asset> {
         let path = format!("/assets/{}/retry", id(&options.asset_id)?);
-        self.0.call(self.0.prepare(Method::POST, &path, &[])?).await
+        self.0
+            .call(
+                self.0
+                    .prepare_for("assets.retry", Method::POST, &path, &[])?,
+            )
+            .await
     }
     /// Records a reviewer's decision, replacing the policy's: the asset's moderation status
     /// becomes `options.decision`, the note joins its review history and the matching
@@ -1441,7 +1808,10 @@ impl AssetsClient<'_> {
     /// `assets:delete` permission, and permanently deletes the stored content.
     pub async fn decide(&self, options: DecideAsset) -> Result<Asset> {
         let path = format!("/assets/{}/decision", id(&options.asset_id)?);
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("assets.decide", Method::POST, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Completes the policy evidence behind a decided asset's moderation decision: the report's
@@ -1454,7 +1824,10 @@ impl AssetsClient<'_> {
     /// `asset/content-unavailable`.
     pub async fn explain(&self, options: ExplainAsset) -> Result<Asset> {
         let path = format!("/assets/{}/explain", id(&options.asset_id)?);
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("assets.explain", Method::POST, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Removes the stored content (`DELETE /assets/:assetId/content`), including the content
@@ -1464,7 +1837,10 @@ impl AssetsClient<'_> {
     pub async fn remove_content(&self, options: AssetId) -> Result<Asset> {
         let path = format!("/assets/{}/content", id(&options.asset_id)?);
         self.0
-            .call(self.0.prepare(Method::DELETE, &path, &[])?)
+            .call(
+                self.0
+                    .prepare_for("assets.removeContent", Method::DELETE, &path, &[])?,
+            )
             .await
     }
     /// Deletes the asset record and its stored content (`DELETE /assets/:assetId`). An asset
@@ -1473,7 +1849,10 @@ impl AssetsClient<'_> {
     pub async fn delete(&self, options: AssetId) -> Result<()> {
         let path = format!("/assets/{}", id(&options.asset_id)?);
         self.0
-            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .call_empty(
+                self.0
+                    .prepare_for("assets.delete", Method::DELETE, &path, &[])?,
+            )
             .await
     }
     /// Deletes up to 500 assets ([`AssetBatchOperation::Delete`]) or removes their stored content
@@ -1487,13 +1866,19 @@ impl AssetsClient<'_> {
     pub async fn batch(&self, options: BatchAssets) -> Result<BatchAssetsResponse> {
         validate_batch(&options)?;
         let path = self.0.project_path("assets/batch")?;
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("assets.batch", Method::POST, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Moves an asset to a folder, or to the project root.
     pub async fn move_asset(&self, options: MoveAsset) -> Result<Asset> {
         let path = format!("/assets/{}/move", id(&options.asset_id)?);
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("assets.move", Method::POST, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
 }
@@ -1581,9 +1966,12 @@ impl FoldersClient<'_> {
         query.opt("sort", options.sort.as_ref());
         query.opt("cursor", options.cursor.as_ref());
         query.opt("search", options.search.as_ref());
-        let request = self
-            .0
-            .prepare(Method::GET, &self.0.project_path("folders")?, &query.0)?;
+        let request = self.0.prepare_for(
+            "folders.list",
+            Method::GET,
+            &self.0.project_path("folders")?,
+            &query.0,
+        )?;
         self.0.call(request).await
     }
     /// Every child folder of `options.parent_id` (or the project root) from `options.cursor` on,
@@ -1613,32 +2001,51 @@ impl FoldersClient<'_> {
     pub async fn create(&self, options: CreateFolder) -> Result<Folder> {
         let request = self
             .0
-            .prepare(Method::POST, &self.0.project_path("folders")?, &[])?
+            .prepare_for(
+                "folders.create",
+                Method::POST,
+                &self.0.project_path("folders")?,
+                &[],
+            )?
             .json(&options)?;
         self.0.call(request).await
     }
     /// Retrieves a folder.
     pub async fn retrieve(&self, options: FolderId) -> Result<Folder> {
         let path = format!("/folders/{}", id(&options.folder_id)?);
-        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+        self.0
+            .call(
+                self.0
+                    .prepare_for("folders.retrieve", Method::GET, &path, &[])?,
+            )
+            .await
     }
     /// Renames a folder.
     pub async fn update(&self, options: UpdateFolder) -> Result<Folder> {
         let path = format!("/folders/{}", id(&options.folder_id)?);
-        let request = self.0.prepare(Method::PATCH, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("folders.update", Method::PATCH, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Moves a folder under another folder, or to the project root.
     pub async fn move_folder(&self, options: MoveFolder) -> Result<Folder> {
         let path = format!("/folders/{}/move", id(&options.folder_id)?);
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("folders.move", Method::POST, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Deletes an empty folder.
     pub async fn delete(&self, options: FolderId) -> Result<()> {
         let path = format!("/folders/{}", id(&options.folder_id)?);
         self.0
-            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .call_empty(
+                self.0
+                    .prepare_for("folders.delete", Method::DELETE, &path, &[])?,
+            )
             .await
     }
 }
@@ -1657,9 +2064,12 @@ impl HashListsClient<'_> {
         query.opt("cursor", options.cursor.as_ref());
         query.opt("pageSize", options.page_size);
         query.opt("sort", options.sort.as_ref());
-        let request = self
-            .0
-            .prepare(Method::GET, &self.0.project_path("hash-lists")?, &query.0)?;
+        let request = self.0.prepare_for(
+            "hashLists.list",
+            Method::GET,
+            &self.0.project_path("hash-lists")?,
+            &query.0,
+        )?;
         self.0.call(request).await
     }
     /// Every hash list from `options.cursor` on, ending and failing like
@@ -1688,13 +2098,23 @@ impl HashListsClient<'_> {
     /// Retrieves a hash list.
     pub async fn retrieve(&self, options: HashListId) -> Result<HashList> {
         let path = format!("/hash-lists/{}", id(&options.hash_list_id)?);
-        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+        self.0
+            .call(
+                self.0
+                    .prepare_for("hashLists.retrieve", Method::GET, &path, &[])?,
+            )
+            .await
     }
     /// Creates a hash list.
     pub async fn create(&self, options: CreateHashList) -> Result<HashList> {
         let request = self
             .0
-            .prepare(Method::POST, &self.0.project_path("hash-lists")?, &[])?
+            .prepare_for(
+                "hashLists.create",
+                Method::POST,
+                &self.0.project_path("hash-lists")?,
+                &[],
+            )?
             .json(&options)?;
         self.0.call(request).await
     }
@@ -1702,14 +2122,20 @@ impl HashListsClient<'_> {
     /// uploads.
     pub async fn update(&self, options: UpdateHashList) -> Result<HashList> {
         let path = format!("/hash-lists/{}", id(&options.hash_list_id)?);
-        let request = self.0.prepare(Method::PATCH, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("hashLists.update", Method::PATCH, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Deletes a hash list and every entry in it.
     pub async fn delete(&self, options: HashListId) -> Result<()> {
         let path = format!("/hash-lists/{}", id(&options.hash_list_id)?);
         self.0
-            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .call_empty(
+                self.0
+                    .prepare_for("hashLists.delete", Method::DELETE, &path, &[])?,
+            )
             .await
     }
     /// One page of a hash list's entries, newest first unless `sort` says otherwise.
@@ -1720,7 +2146,10 @@ impl HashListsClient<'_> {
         query.opt("pageSize", options.page_size);
         query.opt("sort", options.sort.as_ref());
         self.0
-            .call(self.0.prepare(Method::GET, &path, &query.0)?)
+            .call(
+                self.0
+                    .prepare_for("hashLists.listEntries", Method::GET, &path, &query.0)?,
+            )
             .await
     }
     /// Every entry of a hash list from `options.cursor` on, ending and failing like
@@ -1753,14 +2182,20 @@ impl HashListsClient<'_> {
     /// already holds returns its existing entry.
     pub async fn add_entry(&self, options: AddHashListEntry) -> Result<HashListEntry> {
         let path = format!("/hash-lists/{}/entries", id(&options.hash_list_id)?);
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("hashLists.addEntry", Method::POST, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Removes a hash from its hash list.
     pub async fn remove_entry(&self, options: HashListEntryId) -> Result<()> {
         let path = format!("/hash-list-entries/{}", id(&options.entry_id)?);
         self.0
-            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .call_empty(
+                self.0
+                    .prepare_for("hashLists.removeEntry", Method::DELETE, &path, &[])?,
+            )
             .await
     }
 }
@@ -1784,7 +2219,10 @@ impl PoliciesClient<'_> {
         query.opt("pageSize", options.page_size);
         query.opt("sort", options.sort.as_ref());
         self.0
-            .call(self.0.prepare(Method::GET, "/policies", &query.0)?)
+            .call(
+                self.0
+                    .prepare_for("policies.list", Method::GET, "/policies", &query.0)?,
+            )
             .await
     }
     /// Every policy of the organisation from `options.cursor` on, ending and failing like
@@ -1813,14 +2251,19 @@ impl PoliciesClient<'_> {
     /// Retrieves a policy.
     pub async fn retrieve(&self, options: PolicyId) -> Result<Policy> {
         let path = Self::path(&options.policy_id, "")?;
-        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+        self.0
+            .call(
+                self.0
+                    .prepare_for("policies.retrieve", Method::GET, &path, &[])?,
+            )
+            .await
     }
     /// Creates a policy from settings, or a copy of a built-in preset. It moderates nothing until
     /// you assign it to a project or name it on an upload preset.
     pub async fn create(&self, options: CreatePolicy) -> Result<Policy> {
         let request = self
             .0
-            .prepare(Method::POST, "/policies", &[])?
+            .prepare_for("policies.create", Method::POST, "/policies", &[])?
             .json(&options)?;
         self.0.call(request).await
     }
@@ -1828,21 +2271,30 @@ impl PoliciesClient<'_> {
     /// `live` policy pins it as a copy under the same ID.
     pub async fn update(&self, options: UpdatePolicy) -> Result<Policy> {
         let path = Self::path(&options.policy_id, "")?;
-        let request = self.0.prepare(Method::PATCH, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("policies.update", Method::PATCH, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Restores the settings of the preset release a `pinned` or `copy` policy is pinned to,
     /// discarding its edits.
     pub async fn reset(&self, options: ResetPolicy) -> Result<Policy> {
         let path = Self::path(&options.policy_id, "/reset")?;
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("policies.reset", Method::POST, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Moves a `pinned` or `copy` policy whose settings are unchanged from its preset release to
     /// the latest release of the preset.
     pub async fn upgrade(&self, options: UpgradePolicy) -> Result<Policy> {
         let path = Self::path(&options.policy_id, "/upgrade")?;
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("policies.upgrade", Method::POST, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Switches automatic updates on (`live`) or off (`pinned`) for the organisation's own
@@ -1852,26 +2304,40 @@ impl PoliciesClient<'_> {
         options: SetPolicyAutomaticUpdates,
     ) -> Result<Policy> {
         let path = Self::path(&options.policy_id, "/automatic-updates")?;
-        let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("policies.setAutomaticUpdates", Method::PUT, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Deletes a policy that no project or upload preset uses.
     pub async fn delete(&self, options: PolicyId) -> Result<()> {
         let path = Self::path(&options.policy_id, "")?;
         self.0
-            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .call_empty(
+                self.0
+                    .prepare_for("policies.delete", Method::DELETE, &path, &[])?,
+            )
             .await
     }
     /// The policy the project moderates with. Uploads through an upload preset that names its
     /// own policy use that one instead.
     pub async fn retrieve_assigned(&self) -> Result<Policy> {
         let path = self.0.project_path("policy")?;
-        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+        self.0
+            .call(
+                self.0
+                    .prepare_for("policies.retrieveAssigned", Method::GET, &path, &[])?,
+            )
+            .await
     }
     /// Chooses the policy the project moderates with.
     pub async fn assign(&self, options: AssignPolicy) -> Result<Policy> {
         let path = self.0.project_path("policy")?;
-        let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("policies.assign", Method::PUT, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
 }
@@ -1892,7 +2358,10 @@ impl UploadPresetsClient<'_> {
         query.opt("sort", options.sort.as_ref());
         let path = self.0.project_path("upload-presets")?;
         self.0
-            .call(self.0.prepare(Method::GET, &path, &query.0)?)
+            .call(
+                self.0
+                    .prepare_for("uploadPresets.list", Method::GET, &path, &query.0)?,
+            )
             .await
     }
     /// Every upload preset of the project from `options.cursor` on, ending and failing like
@@ -1926,7 +2395,10 @@ impl UploadPresetsClient<'_> {
         options: EnsureUploadPresets,
     ) -> Result<EnsureUploadPresetsResponse> {
         let path = self.0.project_path("upload-presets")?;
-        let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("uploadPresets.ensure", Method::PUT, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Deletes an upload preset. Browsers can no longer upload through it; assets already
@@ -1934,7 +2406,10 @@ impl UploadPresetsClient<'_> {
     pub async fn delete(&self, options: UploadPresetId) -> Result<()> {
         let path = format!("/upload-presets/{}", id(&options.upload_preset_id)?);
         self.0
-            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .call_empty(
+                self.0
+                    .prepare_for("uploadPresets.delete", Method::DELETE, &path, &[])?,
+            )
             .await
     }
 }
@@ -1947,13 +2422,21 @@ impl ProjectSettingsClient<'_> {
     /// a change.
     pub async fn get(&self) -> Result<ProjectSettingsResource> {
         let path = self.0.project_path("settings")?;
-        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+        self.0
+            .call(
+                self.0
+                    .prepare_for("projectSettings.get", Method::GET, &path, &[])?,
+            )
+            .await
     }
     /// Replaces the project's settings: settings left out return to their defaults. Unchanged
     /// settings keep their revision. Send the `revision` you read to refuse a change made since.
     pub async fn update(&self, options: UpdateProjectSettings) -> Result<ProjectSettingsResource> {
         let path = self.0.project_path("settings")?;
-        let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("projectSettings.update", Method::PUT, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
 }
@@ -1967,13 +2450,21 @@ impl MetadataFieldsClient<'_> {
     /// change.
     pub async fn list(&self) -> Result<MetadataFieldsResource> {
         let path = self.0.project_path("metadata-fields")?;
-        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+        self.0
+            .call(
+                self.0
+                    .prepare_for("metadataFields.list", Method::GET, &path, &[])?,
+            )
+            .await
     }
     /// Creates each field, or replaces it with the definition sent, by ID. Other fields are kept,
     /// and new ones are added at the end. Unchanged fields keep their revision.
     pub async fn ensure(&self, options: EnsureMetadataFields) -> Result<MetadataFieldsResource> {
         let path = self.0.project_path("metadata-fields")?;
-        let request = self.0.prepare(Method::PUT, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("metadataFields.ensure", Method::PUT, &path, &[])?
+            .json(&options)?;
         self.0.call(request).await
     }
     /// Deletes a metadata field definition. Assets keep the metadata values they hold.
@@ -1984,7 +2475,12 @@ impl MetadataFieldsClient<'_> {
         let mut query = Query::default();
         query.opt("revision", options.revision);
         self.0
-            .call_empty(self.0.prepare(Method::DELETE, &path, &query.0)?)
+            .call_empty(self.0.prepare_for(
+                "metadataFields.delete",
+                Method::DELETE,
+                &path,
+                &query.0,
+            )?)
             .await
     }
 }
@@ -2017,9 +2513,12 @@ impl LensesClient<'_> {
         query.opt("cursor", options.cursor.as_ref());
         query.opt("pageSize", options.page_size);
         query.opt("sort", options.sort.as_ref());
-        let request = self
-            .0
-            .prepare(Method::GET, &self.0.project_path("lenses")?, &query.0)?;
+        let request = self.0.prepare_for(
+            "lenses.list",
+            Method::GET,
+            &self.0.project_path("lenses")?,
+            &query.0,
+        )?;
         self.0.call(request).await
     }
     /// Every lens of the project from `options.cursor` on, ending and failing like
@@ -2050,7 +2549,12 @@ impl LensesClient<'_> {
         id(&options.identifier)?;
         let request = self
             .0
-            .prepare(Method::POST, &self.0.project_path("lenses")?, &[])?
+            .prepare_for(
+                "lenses.create",
+                Method::POST,
+                &self.0.project_path("lenses")?,
+                &[],
+            )?
             .json(&options)?;
         let lens: Lens = self.0.call(request).await?;
         self.forget(|cached| cached.identifier == lens.identifier);
@@ -2059,13 +2563,21 @@ impl LensesClient<'_> {
     /// Retrieves one of the project's lenses by ID.
     pub async fn retrieve(&self, options: LensId) -> Result<Lens> {
         let path = Self::path(&options.lens_id)?;
-        self.0.call(self.0.prepare(Method::GET, &path, &[])?).await
+        self.0
+            .call(
+                self.0
+                    .prepare_for("lenses.retrieve", Method::GET, &path, &[])?,
+            )
+            .await
     }
     /// Changes a lens's name, description, type, transform or whether the CDN serves it. The CDN
     /// serves the new transform from then on.
     pub async fn update(&self, options: UpdateLens) -> Result<Lens> {
         let path = Self::path(&options.lens_id)?;
-        let request = self.0.prepare(Method::PATCH, &path, &[])?.json(&options)?;
+        let request = self
+            .0
+            .prepare_for("lenses.update", Method::PATCH, &path, &[])?
+            .json(&options)?;
         let lens: Lens = self.0.call(request).await?;
         self.forget(|cached| !cached.id.is_empty() && cached.id == lens.id);
         Ok(lens)
@@ -2075,7 +2587,10 @@ impl LensesClient<'_> {
     pub async fn delete(&self, options: LensId) -> Result<()> {
         let path = Self::path(&options.lens_id)?;
         self.0
-            .call_empty(self.0.prepare(Method::DELETE, &path, &[])?)
+            .call_empty(
+                self.0
+                    .prepare_for("lenses.delete", Method::DELETE, &path, &[])?,
+            )
             .await?;
         self.forget(|cached| cached.id == options.lens_id);
         Ok(())
@@ -2097,6 +2612,16 @@ impl EventsClient<'_> {
     /// has `has_more: false`. Store the last page's `next_cursor` and continue from it later. A page
     /// with more to follow that hands back a cursor already sent fails with
     /// `sdk/invalid-response` (`details.cursor`) and is not yielded.
+    /// Yields every event from `options.cursor` on, fetching each page as its first event is
+    /// read, until a page has `has_more: false`; see [`pages`](Self::pages) to read the pages and
+    /// their cursors.
+    pub fn iterate(&self, options: ListEvents) -> BoxStream<'static, Result<Event>> {
+        self.pages(options)
+            .map_ok(|page| futures_util::stream::iter(page.items.into_iter().map(Ok)))
+            .try_flatten()
+            .boxed()
+    }
+    /// Yields each page of the events feed from `options.cursor` on.
     pub fn pages(&self, options: ListEvents) -> BoxStream<'static, Result<EventsPage>> {
         let client = self.0.clone();
         pages(
@@ -2227,7 +2752,7 @@ impl TextClient<'_> {
                 folder_id: options.folder_id,
                 upload_preset_id: options.upload_preset_id,
                 idempotency_key: options.idempotency_key,
-                ..Default::default()
+                ..SubmitAsset::blank()
             })
             .await
     }
@@ -2429,7 +2954,10 @@ impl CdnClient<'_> {
         );
         body.insert("original".into(), options.original.unwrap_or(false).into());
         let path = format!("/projects/{project}/signed-asset-urls");
-        let request = self.0.prepare(Method::POST, &path, &[])?.json(&body)?;
+        let request = self
+            .0
+            .prepare_for("cdn.signAssetUrl", Method::POST, &path, &[])?
+            .json(&body)?;
         let signed: SignedAssetUrl = self.0.call(request).await?;
         if signed.url.is_empty() {
             return Err(Error::new(
@@ -2475,24 +3003,31 @@ impl CdnClient<'_> {
             base.trim_end_matches('/'),
             viewer_claims_query(claims.as_ref())?
         );
-        let mut request = self.0.prepare_url(Method::GET, &info_url, &[])?;
+        let mut request =
+            self.0
+                .prepare_url_for("cdn.getAssetInfo", Method::GET, &info_url, &[])?;
         request.headers.remove("x-api-key");
         request.headers.insert(
             http::header::ACCEPT,
             HeaderValue::from_static("application/json"),
         );
         let options = self.0.options();
-        let exchange = execute(&self.0.inner.transport, request, options, true).await?;
+        let exchange = execute(
+            &self.0.inner.transport,
+            request,
+            options,
+            true,
+            &self.0.inner.config.observer,
+        )
+        .await?;
         let (status, headers) = (exchange.status, exchange.headers.clone());
         let body = exchange.read(options.max_response_bytes).await?;
-        let info: AssetInfo = decode(status, &headers, &body)?;
-        if info.id.is_empty()
-            || info.project_id.is_empty()
-            || matches!(info.availability, AssetAvailability::Unknown(_))
-        {
+        let mut info: AssetInfo = decode(status, &headers, &body)?;
+        info.set_last_response(crate::transport::last_response(status, &headers, None));
+        if info.id.is_empty() || info.project_id.is_empty() || !info.availability.is_known() {
             return Err(
                 Error::new(ErrorCode::InvalidResponse, "The CDN returned no asset info")
-                    .with_status(status),
+                    .with_http_status(status),
             );
         }
         Ok(info)
@@ -2509,7 +3044,7 @@ impl CdnClient<'_> {
         let init = options.init.unwrap_or_default();
         let method = Method::from_bytes(init.method.as_deref().unwrap_or("GET").as_bytes())
             .map_err(|_| invalid_argument("Invalid HTTP method"))?;
-        let mut request = self.0.prepare_url(method, &url, &[])?;
+        let mut request = self.0.prepare_url_for("cdn.serve", method, &url, &[])?;
         for (name, value) in &init.headers {
             if name.eq_ignore_ascii_case("x-api-key") {
                 continue;
@@ -2525,14 +3060,22 @@ impl CdnClient<'_> {
     /// Fetches a CDN URL with a GET and without the API key, as a browser would.
     #[cfg(feature = "testing")]
     pub(crate) async fn fetch_unauthenticated(&self, url: &str) -> Result<CdnResponse> {
-        let mut request = self.0.prepare_url(Method::GET, url, &[])?;
+        let mut request =
+            self.0
+                .prepare_url_for("cdn.fetchUnauthenticated", Method::GET, url, &[])?;
         request.headers.remove("x-api-key");
         self.fetch(request).await
     }
     async fn fetch(&self, mut request: Prepared) -> Result<CdnResponse> {
         request.deadline = Deadline::Headers;
-        let exchange: Exchange =
-            execute(&self.0.inner.transport, request, self.0.options(), false).await?;
+        let exchange: Exchange = execute(
+            &self.0.inner.transport,
+            request,
+            self.0.options(),
+            false,
+            &self.0.inner.config.observer,
+        )
+        .await?;
         Ok(CdnResponse {
             status: StatusCode::from_u16(exchange.status)
                 .map_err(|_| Error::new(ErrorCode::InvalidResponse, "Invalid status"))?,

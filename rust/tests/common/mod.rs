@@ -62,9 +62,8 @@ pub fn iterator(
         "uploadPresets.iterate" => {
             stream(input(options).map(|o| values(client.upload_presets().iterate(o))))
         }
-        "events.iterate" | "events.pages" => {
-            stream(input(options).map(|o| values(client.events().pages(o))))
-        }
+        "events.iterate" => stream(input(options).map(|o| values(client.events().iterate(o)))),
+        "events.pages" => stream(input(options).map(|o| values(client.events().pages(o)))),
         _ => None,
     }
 }
@@ -253,7 +252,7 @@ fn is_default(value: &Value) -> bool {
 pub fn error_json(error: &calmlens::Error) -> Value {
     serde_json::json!({
         "code": error.code().as_str(),
-        "status": error.status(),
+        "status": error.status().map(|status| status.as_u16()),
         "requestId": error.request_id(),
         "retryAfter": error.retry_after().map(|delay| delay.as_secs()),
         // API responses' errors carry the body's `details` object; errors raised before sending
@@ -351,4 +350,134 @@ pub fn upload_form(request: &calmlens::testing::Request) -> (Value, FormPart) {
     let file = parts.pop().unwrap();
     let options = serde_json::from_slice(&parts[0].body).expect("the options part is JSON");
     (options, file)
+}
+
+/// Every [`calmlens::ErrorKind`], to resolve `surface.json`'s `errorKinds` names.
+pub const ERROR_KINDS: &[calmlens::ErrorKind] = {
+    use calmlens::ErrorKind::*;
+    &[
+        Api,
+        BadRequest,
+        Authentication,
+        PermissionDenied,
+        NotFound,
+        Conflict,
+        PayloadTooLarge,
+        UnprocessableEntity,
+        RateLimit,
+        Server,
+        Connection,
+        Timeout,
+        Cancelled,
+        InvalidArgument,
+        Configuration,
+        InvalidResponse,
+        WebhookVerification,
+    ]
+};
+
+/// The kind `surface.json`'s `errorKinds` names `id`, by its Rust name (`ErrorKind::NotFound`);
+/// `None` for the root kind, `error`, which every error is.
+pub fn error_kind(id: &str) -> Option<calmlens::ErrorKind> {
+    let surface = fixture("surface");
+    let entry = surface["errorKinds"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|kind| kind["id"] == id)
+        .unwrap_or_else(|| panic!("unknown error kind {id}"));
+    let name = entry["names"]["rust"].as_str().unwrap();
+    let name = name.strip_prefix("ErrorKind::")?;
+    Some(
+        *ERROR_KINDS
+            .iter()
+            .find(|kind| format!("{kind:?}") == name)
+            .unwrap_or_else(|| panic!("no ErrorKind named {name}")),
+    )
+}
+
+/// Checks that `error` is kind `id` exactly, and every kind above it in `surface.json`.
+pub fn check_kind(error: &calmlens::Error, id: &str, label: &str) {
+    let surface = fixture("surface");
+    let kinds = surface["errorKinds"].as_array().unwrap();
+    if let Some(kind) = error_kind(id) {
+        assert_eq!(error.kind(), kind, "{label}: kind");
+    }
+    let mut current = Some(id.to_owned());
+    while let Some(id) = current {
+        if let Some(kind) = error_kind(&id) {
+            assert!(error.is(kind), "{label}: is {id}");
+        }
+        current = kinds
+            .iter()
+            .find(|kind| kind["id"] == id.as_str())
+            .and_then(|kind| kind["parent"].as_str())
+            .map(str::to_owned);
+    }
+}
+
+/// `fields` laid over the JSON of `T::default()`, so a test spells out only the fields it checks
+/// and the rest of the model is present, as a real response's required fields are. Objects are
+/// merged deeply; arrays and other values replace the default.
+pub fn complete<T: Default + Serialize>(fields: Value) -> Value {
+    fn merge(base: &mut Value, over: Value) {
+        match (base, over) {
+            (Value::Object(base), Value::Object(over)) => {
+                for (key, value) in over {
+                    match base.get_mut(&key) {
+                        Some(slot) => merge(slot, value),
+                        None => {
+                            base.insert(key, value);
+                        }
+                    }
+                }
+            }
+            (slot, value) => *slot = value,
+        }
+    }
+    let mut base = serde_json::to_value(T::default()).expect("serializable SDK model");
+    merge(&mut base, fields);
+    base
+}
+
+/// A `tracing` subscriber that keeps every event at or above `level` as a line of text, for
+/// checking what the SDK logs.
+pub struct CapturedLogs {
+    level: tracing::Level,
+    pub lines: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+}
+impl CapturedLogs {
+    pub fn new(level: tracing::Level) -> Self {
+        Self {
+            level,
+            lines: Default::default(),
+        }
+    }
+}
+impl tracing::Subscriber for CapturedLogs {
+    fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
+        *metadata.level() <= self.level
+    }
+    fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+        tracing::span::Id::from_u64(1)
+    }
+    fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+    fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+    fn event(&self, event: &tracing::Event<'_>) {
+        struct Line(String);
+        impl tracing::field::Visit for Line {
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+                self.0.push_str(&format!(" {}={value:?}", field.name()));
+            }
+        }
+        let mut line = Line(format!(
+            "{} {}",
+            event.metadata().level(),
+            event.metadata().target()
+        ));
+        event.record(&mut line);
+        self.lines.lock().unwrap().push(line.0);
+    }
+    fn enter(&self, _: &tracing::span::Id) {}
+    fn exit(&self, _: &tracing::span::Id) {}
 }

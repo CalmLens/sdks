@@ -22,9 +22,9 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{middleware, Form, Router};
 use calmlens::models::{
-    Actor, ActorType, Asset, AssetClassificationStatus, AssetContentStatus, AssetModerationStatus,
-    AssetPage, AssetReview, AssetSearchResponse, ClassificationCategory, EventFact, Folder,
-    MetadataItem, WebhookEventPayload,
+    Actor, ActorType, Asset, AssetClassificationStatus, AssetContentStatus,
+    AssetModerationDecision, AssetPage, AssetReview, AssetSearchResponse, ClassificationCategory,
+    EventFact, Folder, MetadataItem, WebhookEventPayload,
 };
 use calmlens::ErrorCode;
 use serde::de::DeserializeOwned;
@@ -428,7 +428,7 @@ impl AppState {
                         },
                         error
                             .status()
-                            .and_then(|status| StatusCode::from_u16(status).ok())
+                            .and_then(|status| StatusCode::from_u16(status.as_u16()).ok())
                             .unwrap_or(StatusCode::CONFLICT),
                     ),
                     None => (NoticeText::plain(GENERIC_FAILURE), StatusCode::BAD_GATEWAY),
@@ -587,7 +587,7 @@ impl AppState {
             }
             Ok(asset) => format!(
                 "{label}: {} is now {}{}.",
-                asset.name.as_deref().unwrap_or(asset_id),
+                asset.name.as_str(),
                 decision(&asset).as_str(),
                 if deliverable(&asset) {
                     ""
@@ -615,11 +615,7 @@ impl AppState {
     /// Whether an asset is one of this library's records: it belongs to this project and its
     /// external ID is a catalogue ID this app issued.
     fn owns(&self, asset: &Asset) -> bool {
-        asset
-            .project_id
-            .as_deref()
-            .is_none_or(|project| project == self.library.project_id())
-            && catalogue_id(asset).is_some()
+        asset.project_id == self.library.project_id() && catalogue_id(asset).is_some()
     }
 
     /// Demo only: a simulated reviewer blocking an asset, applied through the same code as a
@@ -921,10 +917,7 @@ async fn remove_file(
             let asset = state.library.remove_content(&id).await?;
             state.record(
                 "lifecycle",
-                format!(
-                    "Removed the file of {}.",
-                    asset.name.as_deref().unwrap_or(&id)
-                ),
+                format!("Removed the file of {}.", asset.name.as_str()),
                 Vec::new(),
             );
             Ok(location(
@@ -1249,12 +1242,12 @@ pub fn decision(asset: &Asset) -> Decision {
     if asset.classification.status == AssetClassificationStatus::Failed {
         return Decision::Failed;
     }
-    match asset.classification.moderation.status {
-        AssetModerationStatus::Allowed => Decision::Allowed,
-        AssetModerationStatus::Limited => Decision::Limited,
-        AssetModerationStatus::AgeRestricted => Decision::AgeRestricted,
-        AssetModerationStatus::Blocked => Decision::Blocked,
-        AssetModerationStatus::Purged => Decision::Purged,
+    match &asset.classification.moderation.decision {
+        Some(AssetModerationDecision::Allowed) => Decision::Allowed,
+        Some(AssetModerationDecision::Limited) => Decision::Limited,
+        Some(AssetModerationDecision::AgeRestricted) => Decision::AgeRestricted,
+        Some(AssetModerationDecision::Blocked) => Decision::Blocked,
+        Some(AssetModerationDecision::Purged) => Decision::Purged,
         _ => Decision::Pending,
     }
 }
@@ -1430,7 +1423,7 @@ pub(crate) fn display_facts(payload: &WebhookEventPayload) -> Vec<FactRow> {
             url: None,
         });
     let facts = payload.facts.iter().filter_map(|fact| {
-        let label = FACT_LABELS.iter().find(|(key, _)| *key == fact.key)?.1;
+        let label = FACT_LABELS.iter().find(|(key, _)| fact.key == *key)?.1;
         let value = match &fact.value {
             Value::Null => return None,
             Value::String(value) => value.clone(),

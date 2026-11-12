@@ -8,6 +8,7 @@ use crate::messages::Notice;
 use axum::body::Body;
 use axum::http::{header, HeaderMap, Request, StatusCode};
 use axum::Router;
+use calmlens::models::{Asset, Folder, Lens};
 use calmlens::testing::MockServerClient;
 use calmlens::ErrorCode;
 use http_body_util::BodyExt;
@@ -263,16 +264,54 @@ fn writes(mock: &MockServerClient) -> Vec<calmlens::testing::Request> {
 /// status `status` (`allowed`, `limited`, `age-restricted`, `blocked` or `pending`), or `failed`
 /// processing.
 fn asset(id: &str, status: &str) -> Value {
-    let (processing, moderation) = match status {
-        "failed" => ("failed", "pending"),
-        "pending" => ("queued", "pending"),
-        decided => ("completed", decided),
+    let (processing, decision) = match status {
+        "failed" => ("failed", Value::Null),
+        "pending" => ("queued", Value::Null),
+        decided => ("completed", json!(decided)),
     };
-    json!({"id": id, "name": format!("{id}.png"), "folderId": "folder-1",
-           "projectId": "project-1", "externalId": format!("calmlibrary:{id}"),
+    complete::<Asset>(
+        json!({"id": id, "name": format!("{id}.png"), "folderId": "folder-1",
+           "projectId": "project-1", "type": "image", "externalId": format!("calmlibrary:{id}"),
            "upload": {"status": "completed"},
-           "classification": {"status": processing, "moderation": {"status": moderation}},
-           "content": {"status": "stored"}})
+           "classification": {"status": processing, "moderation": {"decision": decision}},
+           "content": {"status": "stored"}}),
+    )
+}
+
+/// `fields` over the JSON of `T::default()`, so a reply holds every field the API always
+/// sends and a test spells out only the ones it checks.
+fn complete<T: Default + serde::Serialize>(fields: Value) -> Value {
+    fn merge(base: &mut Value, over: Value) {
+        match (base, over) {
+            (Value::Object(base), Value::Object(over)) => {
+                for (key, value) in over {
+                    match base.get_mut(&key) {
+                        Some(slot) => merge(slot, value),
+                        None => {
+                            base.insert(key, value);
+                        }
+                    }
+                }
+            }
+            (slot, value) => *slot = value,
+        }
+    }
+    let mut base = serde_json::to_value(T::default()).unwrap();
+    merge(&mut base, fields);
+    base
+}
+
+fn folder(id: &str, name: &str, parent: Option<&str>) -> Value {
+    complete::<Folder>(
+        json!({"id": id, "name": name, "parentId": parent, "projectId": "project-1"}),
+    )
+}
+
+fn lens(identifier: &str) -> Value {
+    complete::<Lens>(
+        json!({"id": format!("lens-{identifier}"), "identifier": identifier,
+                            "name": identifier, "type": "image"}),
+    )
 }
 
 fn now() -> String {
@@ -288,7 +327,7 @@ fn event(id: &str, event_type: &str, asset_id: &str, facts: Value) -> String {
         "id": id, "projectId": "project-1", "type": event_type, "severity": "high", "title": "t",
         "description": null, "assetId": asset_id,
         "asset": {"id": asset_id, "upload": {"status": "completed"},
-                  "classification": {"status": "completed", "moderation": {"status": "allowed"}},
+                  "classification": {"status": "completed", "moderation": {"decision": "allowed"}},
                   "content": {"status": "stored"}},
         "facts": facts, "createdAt": 1_760_000_000_000u64
     })
@@ -419,10 +458,7 @@ async fn demo_folder_errors_surface_their_codes() {
 async fn live_folder_calls_use_the_folders_api_and_surface_error_codes() {
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
-    mock.enqueue(
-        200,
-        json!({"id": "folder-2", "name": "Events", "parentId": "folder-1"}),
-    );
+    mock.enqueue(200, folder("folder-2", "Events", Some("folder-1")));
     let created = app.post("/folders", "name=Events&parent=folder-1").await;
     assert_eq!(created.param("folder").as_deref(), Some("folder-2"));
     let request = mock.last_request().unwrap();
@@ -610,7 +646,7 @@ async fn live_listing_paginates_and_filters_the_folder() {
     let app = live(&mock, "");
     mock.enqueue(
         200,
-        json!({"items": [{"id": "folder-1", "name": "Photos"}], "ancestors": [], "nextCursor": null, "hasMore": false}),
+        json!({"items": [folder("folder-1", "Photos", None)], "ancestors": [], "nextCursor": null, "hasMore": false}),
     );
     // The folder tree is walked, so Photos is asked for its children too.
     mock.enqueue(
@@ -632,7 +668,7 @@ async fn live_listing_paginates_and_filters_the_folder() {
     assert_eq!(list.query_param("pageSize"), Some("12"));
     assert_eq!(
         list.query_param("filter"),
-        Some("parentId==null;folderId==folder-1;classification.moderation.status==allowed")
+        Some("parentId==null;folderId==folder-1;classification.moderation.decision==allowed")
     );
     let page = response.html();
     assert!(page.contains(r#"href="/?cursor=next-token&amp;folder=folder-1&amp;status=allowed""#));
@@ -645,7 +681,7 @@ async fn listing_filters_only_accept_known_statuses() {
     assert_eq!(list_filter(None, ""), "parentId==null");
     assert_eq!(
         list_filter(None, "limited"),
-        "parentId==null;classification.moderation.status==limited"
+        "parentId==null;classification.moderation.decision==limited"
     );
     // A failed upload has no decision, so it is listed under "failed", never "pending".
     assert_eq!(
@@ -654,7 +690,7 @@ async fn listing_filters_only_accept_known_statuses() {
     );
     assert_eq!(
         list_filter(None, "pending"),
-        "parentId==null;classification.moderation.status==pending;classification.status!=failed"
+        "parentId==null;classification.moderation.decision==pending;classification.status!=failed"
     );
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
@@ -662,7 +698,10 @@ async fn listing_filters_only_accept_known_statuses() {
         200,
         json!({"items": [], "ancestors": [], "nextCursor": null, "hasMore": false}),
     );
-    mock.enqueue(200, json!({"items": [], "total": 0}));
+    mock.enqueue(
+        200,
+        json!({"items": [], "nextCursor": null, "hasMore": false}),
+    );
     app.get("/?status=allowed,status==blocked").await;
     assert_eq!(
         mock.requests()[1].query_param("filter"),
@@ -778,7 +817,7 @@ async fn demo_thumbnails_appear_only_for_allowed_images() {
 async fn live_delivery_uses_lenses_and_short_lived_signed_urls() {
     let mock = MockServerClient::new().unwrap();
     let app = live(&mock, "");
-    let lens_reply = |identifier: &str| json!({"lenses": [{"identifier": identifier}]});
+    let lens_reply = |identifier: &str| json!({"lenses": [lens(identifier)]});
     mock.enqueue(200, asset("asset-1", "allowed"));
     mock.enqueue(200, lens_reply(THUMB_LENS));
     mock.enqueue(
@@ -848,12 +887,12 @@ async fn demo_purge_deletes_the_file_and_keeps_the_record() {
     let record = app.state.library.retrieve(&purged).await.unwrap();
     assert_eq!(
         (
-            &record.classification.moderation.status,
+            &record.classification.moderation.decision,
             &record.content.status,
             &record.content.removal_reason
         ),
         (
-            &calmlens::models::AssetModerationStatus::Purged,
+            &Some(calmlens::models::AssetModerationDecision::Purged),
             &calmlens::models::AssetContentStatus::Removed,
             &Some(calmlens::models::AssetContentRemovalReason::Policy)
         )
@@ -888,8 +927,8 @@ async fn undelivered_statuses_or_unsafe_delivery_never_sign() {
     assert_eq!(mock.requests().len(), 1);
 
     mock.enqueue(200, asset("asset-1", "allowed"));
-    mock.enqueue(200, json!({"lenses": [{"identifier": THUMB_LENS}]}));
-    mock.enqueue(200, json!({"url": "javascript:alert(1)"}));
+    mock.enqueue(200, json!({"lenses": [lens(THUMB_LENS)]}));
+    mock.enqueue(200, json!({"url": "javascript:alert(1)", "expiresAt": 1}));
     let unsafe_url = app.get("/assets/asset-1/thumb").await;
     assert_eq!(unsafe_url.status, StatusCode::BAD_GATEWAY);
     assert_eq!(unsafe_url.header("location"), None);
@@ -981,8 +1020,8 @@ async fn removing_the_file_stops_thumbnails_and_keeps_the_record() {
         calmlens::models::AssetContentStatus::Removed
     );
     assert_eq!(
-        record.classification.moderation.status,
-        calmlens::models::AssetModerationStatus::Allowed
+        record.classification.moderation.decision,
+        Some(calmlens::models::AssetModerationDecision::Allowed)
     );
     assert_eq!(
         crate::app::metadata_value(&record, "photographer"),
@@ -1239,7 +1278,7 @@ async fn webhooks_for_assets_the_library_did_not_upload_are_ignored() {
     // An asset in the project without this library's catalogue ID.
     mock.enqueue(
         200,
-        json!({
+        complete::<Asset>(json!({
           "id": "asset-2",
           "projectId": "project-1",
           "externalId": "crm-4411",
@@ -1249,10 +1288,10 @@ async fn webhooks_for_assets_the_library_did_not_upload_are_ignored() {
           "classification": {
             "status": "completed",
             "moderation": {
-              "status": "blocked"
+              "decision": "blocked"
             }
           }
-        }),
+        })),
     );
     let body = event("event-1", "asset.blocked", "asset-2", json!([]));
     assert_eq!(

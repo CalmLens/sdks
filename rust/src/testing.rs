@@ -12,7 +12,7 @@
 //!
 //! ```toml
 //! [dev-dependencies]
-//! calmlens = { version = "0.1", features = ["testing"] }
+//! calmlens = { version = "0.26", features = ["testing"] }
 //! ```
 // Generated (packages/sdk-contract/mockAssetFilters.ts).
 mod asset_filters;
@@ -146,7 +146,7 @@ impl MockResponse {
     /// `requestId` is the `x-request-id` header the mock adds.
     pub fn api_error(code: impl Into<ErrorCode>, message: impl Into<String>) -> Self {
         let code = code.into();
-        let status = code.http_status().unwrap_or(400);
+        let status = code.http_status().map_or(400, |status| status.as_u16());
         Self::api_error_body(status, code.as_str(), message.into(), serde_json::json!({}))
     }
     /// An API error response with `status` and the body `{code, message, requestId, details}`.
@@ -268,7 +268,7 @@ impl MockTransport {
                     )),
                     MockFailure::Api(code) => {
                         let message = format!("Injected {code} failure");
-                        let status = code.http_status().unwrap_or(400);
+                        let status = code.http_status().map_or(400, |status| status.as_u16());
                         let details = Value::Object(queued.options.details.unwrap_or_default());
                         let mut response =
                             MockResponse::api_error_body(status, code.as_str(), message, details);
@@ -356,7 +356,7 @@ impl MockTransport {
 /// let mock = MockServerClient::new()?;
 /// mock.enqueue(
 ///     200,
-///     Asset::new("asset-1", AssetClassificationStatus::Completed, AssetModerationStatus::Allowed),
+///     Asset::new("asset-1", AssetClassificationStatus::Completed, Some(AssetModerationDecision::Allowed)),
 /// );
 /// let asset = mock.assets().classify(SubmitAsset::text("hello")).await?;
 /// assert_eq!(asset.id, "asset-1");
@@ -421,10 +421,10 @@ impl MockServerClient {
     /// use calmlens::{models::*, testing::*};
     /// let mock = MockServerClient::in_memory(MockOptions::new())?;
     /// let asset = mock.assets().create(SubmitAsset::text("hello")).await?;
-    /// assert_eq!(asset.classification.moderation.status, AssetModerationStatus::Pending);
+    /// assert_eq!(asset.classification.moderation.decision, None);
     /// mock.complete_processing(&asset.id, Some(MockOutcome::Blocked.into()))?;
     /// let asset = mock.assets().retrieve(AssetId::new(&asset.id)).await?;
-    /// assert_eq!(asset.classification.moderation.status, AssetModerationStatus::Blocked);
+    /// assert_eq!(asset.classification.moderation.decision, Some(AssetModerationDecision::Blocked));
     /// # Ok(()) }
     /// ```
     pub fn in_memory(options: MockOptions) -> Result<Self> {
@@ -483,7 +483,7 @@ impl MockServerClient {
     ///
     /// When the mock was not created with [`MockServerClient::in_memory`].
     pub fn decide(&self, asset_id: &str, decision: AssetModerationDecision) -> Result<Asset> {
-        if matches!(decision, AssetModerationDecision::Unknown(_)) {
+        if !decision.is_known() {
             return Err(Error::new(
                 ErrorCode::InvalidArgument,
                 "decision must be one of allowed, limited, age-restricted, blocked, purged",
@@ -492,7 +492,7 @@ impl MockServerClient {
         let asset = self
             .backend(|backend| backend.decide(asset_id, decision.as_str()))
             .ok_or_else(|| {
-                Error::new(ErrorCode::AssetNotFound, "Asset not found").with_status(404)
+                Error::new(ErrorCode::AssetNotFound, "Asset not found").with_http_status(404)
             })?;
         decode_asset(asset)
     }
@@ -591,7 +591,7 @@ impl MockServerClient {
                 event.created_at = backend.now();
             }
             // The mock's API key, which has no ID, unless the event names someone else.
-            if event.actor.actor_type == ActorType::Unknown(String::new()) {
+            if event.actor.actor_type.as_str().is_empty() {
                 event.actor = Actor::new(ActorType::ApiKey, None);
             }
             event.asset_sequence = event
@@ -608,7 +608,7 @@ impl MockServerClient {
                     stored["asset"] = memory::snapshot(asset);
                     // An `asset.<status>` event carries the moderation status it announces.
                     if let Some(status) = memory::announced_status(&stored["type"]) {
-                        stored["asset"]["classification"]["moderation"]["status"] = status.into();
+                        stored["asset"]["classification"]["moderation"]["decision"] = status.into();
                     }
                     event.asset = serde_json::from_value(stored["asset"].clone()).ok();
                 }

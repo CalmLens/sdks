@@ -47,6 +47,10 @@ impl Drop for Runtime {
 #[derive(Clone, Debug)]
 pub struct ServerClientBuilder(crate::ServerClientBuilder);
 impl ServerClientBuilder {
+    /// A builder from the environment. See [`crate::ServerClientBuilder::from_env`].
+    pub fn from_env() -> Result<Self> {
+        crate::ServerClientBuilder::from_env().map(Self)
+    }
     /// The API base URL.
     pub fn base_url(self, value: impl Into<String>) -> Self {
         Self(self.0.base_url(value))
@@ -81,9 +85,23 @@ impl ServerClientBuilder {
     pub fn max_retries(self, value: u32) -> Self {
         Self(self.0.max_retries(value))
     }
-    /// Sends requests through your own async reqwest client.
-    pub fn http_client(self, client: reqwest::Client) -> Self {
-        Self(self.0.http_client(client))
+    /// Sends every request through a proxy. See [`crate::ServerClientBuilder::proxy`].
+    pub fn proxy(self, url: impl Into<String>) -> Self {
+        Self(self.0.proxy(url))
+    }
+    /// Also trusts PEM root certificates. See
+    /// [`crate::ServerClientBuilder::add_root_certificate`].
+    pub fn add_root_certificate(self, pem: impl Into<Vec<u8>>) -> Self {
+        Self(self.0.add_root_certificate(pem))
+    }
+    /// Names your application in the `User-Agent`. See [`crate::ServerClientBuilder::app_info`].
+    pub fn app_info(
+        self,
+        name: impl Into<String>,
+        version: Option<&str>,
+        url: Option<&str>,
+    ) -> Self {
+        Self(self.0.app_info(name, version, url))
     }
     /// Validates the options and creates the client.
     pub fn build(self) -> Result<ServerClient> {
@@ -110,7 +128,11 @@ impl ServerClient {
     pub fn new(api_key: impl Into<String>, project_id: impl Into<String>) -> Result<Self> {
         Self::builder(api_key, project_id).build()
     }
-    /// A builder for a client with custom URLs, timeouts, retries or HTTP client.
+    /// A client from the environment. See [`crate::ServerClientBuilder::from_env`].
+    pub fn from_env() -> Result<Self> {
+        ServerClientBuilder::from_env()?.build()
+    }
+    /// A builder for a client with custom URLs, timeouts, retries, proxy or certificates.
     pub fn builder(
         api_key: impl Into<String>,
         project_id: impl Into<String>,
@@ -467,6 +489,10 @@ blocking_methods!(EventsClient => events {
     fn list(options: ListEvents) -> Result<EventsPage>;
 });
 impl EventsClient<'_> {
+    /// See [`crate::EventsClient::iterate`].
+    pub fn iterate(&self, options: ListEvents) -> Iter<Result<Event>> {
+        self.0.iter(self.0.client.events().iterate(options))
+    }
     /// See [`crate::EventsClient::pages`].
     pub fn pages(&self, options: ListEvents) -> Iter<Result<EventsPage>> {
         self.0.iter(self.0.client.events().pages(options))

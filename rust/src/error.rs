@@ -7,10 +7,10 @@ macro_rules! error_codes {
         /// A CalmLens error code, such as `asset/not-found` or `sdk/timeout`.
         ///
         /// API codes are generated from the CalmLens API's public error list. Codes this SDK
-        /// version does not know arrive as [`ErrorCode::Other`], so new API codes never fail
-        /// decoding. Compare with a string through `PartialEq<&str>`, or match variants. Codes
-        /// compare, hash and map to HTTP statuses by their string form, so
-        /// `ErrorCode::Other("server/internal-error".into())` equals `ErrorCode::InternalError`.
+        /// version does not know arrive as `Unknown`, so new API codes never fail decoding.
+        /// Match variants, or compare with a string through `PartialEq<&str>`; to act on a code
+        /// this version doesn't list, compare [`as_str`](Self::as_str) in a `_` arm rather than
+        /// matching `Unknown`. Codes compare and hash by their string form.
         #[derive(Debug, Clone)]
         #[non_exhaustive]
         pub enum ErrorCode {
@@ -36,7 +36,10 @@ macro_rules! error_codes {
             /// `sdk/invalid-webhook-signature`: a webhook signature is missing, wrong or stale.
             InvalidWebhookSignature,
             /// A code this SDK version does not know.
-            Other(String),
+            #[deprecated(
+                note = "match `as_str()` in a `_` arm: a code a later version lists stops arriving as `Unknown`"
+            )]
+            Unknown(crate::UnknownValue),
         }
 
         impl ErrorCode {
@@ -44,6 +47,7 @@ macro_rules! error_codes {
             pub const API_CODES: &'static [(&'static str, u16)] = &[$(($id, $status),)*];
 
             /// The code's string form, e.g. `asset/not-found`.
+            #[allow(deprecated)]
             pub fn as_str(&self) -> &str {
                 match self {
                     $(Self::$variant => $id,)*
@@ -56,24 +60,20 @@ macro_rules! error_codes {
                     Self::ResponseTooLarge => "sdk/response-too-large",
                     Self::InvalidWebhookPayload => "sdk/invalid-webhook-payload",
                     Self::InvalidWebhookSignature => "sdk/invalid-webhook-signature",
-                    Self::Other(code) => code,
+                    Self::Unknown(code) => code.as_str(),
                 }
             }
 
             /// The HTTP status the API returns with this code, or `None` for SDK and unknown codes.
-            pub fn http_status(&self) -> Option<u16> {
+            pub fn http_status(&self) -> Option<http::StatusCode> {
                 match self {
-                    $(Self::$variant => Some($status),)*
-                    // A known code spelled as `Other` has the same status as its variant.
-                    Self::Other(code) => match Self::parse(code) {
-                        Self::Other(_) => None,
-                        known => known.http_status(),
-                    },
+                    $(Self::$variant => http::StatusCode::from_u16($status).ok(),)*
                     _ => None,
                 }
             }
 
-            /// Parses a code string; unknown codes become [`ErrorCode::Other`].
+            /// Parses a code string; codes this version does not know become `Unknown`.
+            #[allow(deprecated)]
             pub fn parse(code: &str) -> Self {
                 match code {
                     $($id => Self::$variant,)*
@@ -86,7 +86,7 @@ macro_rules! error_codes {
                     "sdk/response-too-large" => Self::ResponseTooLarge,
                     "sdk/invalid-webhook-payload" => Self::InvalidWebhookPayload,
                     "sdk/invalid-webhook-signature" => Self::InvalidWebhookSignature,
-                    other => Self::Other(other.to_owned()),
+                    other => Self::Unknown(crate::UnknownValue::new(other)),
                 }
             }
         }
@@ -156,11 +156,104 @@ struct Inner {
     code: ErrorCode,
     message: String,
     details: Map<String, Value>,
-    status: Option<u16>,
+    status: Option<http::StatusCode>,
     request_id: Option<String>,
     retry_after: Option<Duration>,
     headers: Option<http::HeaderMap>,
+    raw_body: Option<String>,
     source: Option<Box<dyn StdError + Send + Sync>>,
+}
+
+/// The largest error response body [`Error::raw_body`] keeps, in bytes.
+pub const RAW_BODY_MAX_BYTES: usize = 16 * 1024;
+
+/// What kind of failure an [`Error`] is, for handling a class of failures rather than each
+/// [`ErrorCode`]. Kinds form a tree: [`parent`](Self::parent) names the broader kind, and
+/// [`Error::is`] answers whether an error is a kind or any kind beneath it, so
+/// `error.is(ErrorKind::Api)` holds for every non-2xx response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ErrorKind {
+    /// The API, or a proxy in front of it, answered with a non-2xx status.
+    Api,
+    /// HTTP 400: the request was invalid.
+    BadRequest,
+    /// HTTP 401: the API key is missing or invalid.
+    Authentication,
+    /// HTTP 403: the API key lacks a grant.
+    PermissionDenied,
+    /// HTTP 404: the resource doesn't exist.
+    NotFound,
+    /// HTTP 409: the request conflicts with the resource's state.
+    Conflict,
+    /// HTTP 413: the content is over a size limit.
+    PayloadTooLarge,
+    /// HTTP 422: the content can't be processed.
+    UnprocessableEntity,
+    /// HTTP 429: too many requests.
+    RateLimit,
+    /// HTTP 500 or above: the API failed.
+    Server,
+    /// No complete response: the connection failed or was cut.
+    Connection,
+    /// A request took longer than its timeout, or a wait reached its deadline.
+    Timeout,
+    /// The caller cancelled the call. Dropping a future cancels it without an error, so the
+    /// SDK returns this kind only where a cancellation has to be reported.
+    Cancelled,
+    /// The SDK refused the call before sending anything.
+    InvalidArgument,
+    /// The client's configuration is invalid.
+    Configuration,
+    /// A response wasn't what the operation returns.
+    InvalidResponse,
+    /// A webhook delivery couldn't be verified or parsed.
+    WebhookVerification,
+}
+
+impl ErrorKind {
+    /// The broader kind this one belongs to, or `None` for a top-level kind.
+    pub fn parent(self) -> Option<Self> {
+        match self {
+            Self::BadRequest
+            | Self::Authentication
+            | Self::PermissionDenied
+            | Self::NotFound
+            | Self::Conflict
+            | Self::PayloadTooLarge
+            | Self::UnprocessableEntity
+            | Self::RateLimit
+            | Self::Server => Some(Self::Api),
+            Self::Configuration => Some(Self::InvalidArgument),
+            _ => None,
+        }
+    }
+    /// Whether this kind is `kind` or beneath it.
+    pub fn is(self, kind: Self) -> bool {
+        let mut current = Some(self);
+        while let Some(this) = current {
+            if this == kind {
+                return true;
+            }
+            current = this.parent();
+        }
+        false
+    }
+    /// The kind of an API response with `status`.
+    fn of_status(status: u16) -> Self {
+        match status {
+            400 => Self::BadRequest,
+            401 => Self::Authentication,
+            403 => Self::PermissionDenied,
+            404 => Self::NotFound,
+            409 => Self::Conflict,
+            413 => Self::PayloadTooLarge,
+            422 => Self::UnprocessableEntity,
+            429 => Self::RateLimit,
+            500.. => Self::Server,
+            _ => Self::Api,
+        }
+    }
 }
 
 impl Error {
@@ -176,14 +269,66 @@ impl Error {
                 request_id: None,
                 retry_after: None,
                 headers: None,
+                raw_body: None,
                 source: None,
             }),
         }
     }
     /// Sets the HTTP status.
-    pub fn with_status(mut self, status: u16) -> Self {
+    pub fn with_status(mut self, status: http::StatusCode) -> Self {
         self.inner.status = Some(status);
         self
+    }
+    /// Sets the HTTP status from its number, ignoring one outside 100–999.
+    #[cfg_attr(not(feature = "async"), allow(dead_code))]
+    pub(crate) fn with_http_status(mut self, status: u16) -> Self {
+        self.inner.status = http::StatusCode::from_u16(status).ok();
+        self
+    }
+    /// Keeps the response body, at most [`RAW_BODY_MAX_BYTES`] of it, as text.
+    #[cfg_attr(not(feature = "async"), allow(dead_code))]
+    pub(crate) fn with_raw_body(mut self, body: &[u8]) -> Self {
+        let mut end = body.len().min(RAW_BODY_MAX_BYTES);
+        while end > 0 && std::str::from_utf8(&body[..end]).is_err() {
+            end -= 1;
+        }
+        self.inner.raw_body = Some(String::from_utf8_lossy(&body[..end]).into_owned());
+        self
+    }
+    /// The kind of failure. An error from a response follows its HTTP status, and an SDK
+    /// error its code; an API code the SDK raised before sending anything, such as
+    /// `upload/unsupported-type`, is [`ErrorKind::InvalidArgument`].
+    pub fn kind(&self) -> ErrorKind {
+        match self.inner.code.as_str() {
+            "sdk/transport-error" => ErrorKind::Connection,
+            "sdk/timeout" => ErrorKind::Timeout,
+            "sdk/cancelled" => ErrorKind::Cancelled,
+            "sdk/invalid-argument" => ErrorKind::InvalidArgument,
+            "sdk/invalid-config" => ErrorKind::Configuration,
+            "sdk/invalid-response" | "sdk/response-too-large" => ErrorKind::InvalidResponse,
+            "sdk/invalid-webhook-payload" | "sdk/invalid-webhook-signature" => {
+                ErrorKind::WebhookVerification
+            }
+            // A response without a CalmLens error body, such as a proxy's page or a redirect.
+            "sdk/http-error" => self.inner.status.map_or(ErrorKind::Api, |status| {
+                ErrorKind::of_status(status.as_u16())
+            }),
+            _ => self
+                .inner
+                .status
+                .map_or(ErrorKind::InvalidArgument, |status| {
+                    ErrorKind::of_status(status.as_u16())
+                }),
+        }
+    }
+    /// Whether the error is `kind` or a kind beneath it, e.g. `error.is(ErrorKind::Api)`.
+    pub fn is(&self, kind: ErrorKind) -> bool {
+        self.kind().is(kind)
+    }
+    /// An API error response's body as text, at most [`RAW_BODY_MAX_BYTES`] of it, e.g. a
+    /// proxy's HTML page.
+    pub fn raw_body(&self) -> Option<&str> {
+        self.inner.raw_body.as_deref()
     }
     /// Sets the details object.
     pub fn with_details(mut self, details: Map<String, Value>) -> Self {
@@ -224,7 +369,7 @@ impl Error {
         &self.inner.details
     }
     /// The HTTP status of an API error response.
-    pub fn status(&self) -> Option<u16> {
+    pub fn status(&self) -> Option<http::StatusCode> {
         self.inner.status
     }
     /// The request ID of the response that failed: its `X-Request-Id` header, or the error
@@ -251,7 +396,8 @@ impl Error {
     }
     /// Whether the resource was not found: a `404` status or a `*/not-found` code.
     pub fn is_not_found(&self) -> bool {
-        self.inner.status == Some(404) || self.inner.code.as_str().ends_with("/not-found")
+        self.inner.status == Some(http::StatusCode::NOT_FOUND)
+            || self.inner.code.as_str().ends_with("/not-found")
     }
     /// Whether a timeout elapsed.
     pub fn is_timeout(&self) -> bool {
@@ -267,7 +413,10 @@ impl Error {
             ErrorCode::IdempotentRequestInProgress,
         ]
         .contains(&self.inner.code)
-            || matches!(self.inner.status, Some(429 | 500 | 502 | 503 | 504))
+            || self
+                .inner
+                .status
+                .is_some_and(|status| matches!(status.as_u16(), 429 | 500 | 502 | 503 | 504))
     }
 }
 

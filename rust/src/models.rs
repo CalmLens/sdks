@@ -10,6 +10,51 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, fmt};
 
+/// The HTTP response a result came from, for [`Asset::last_response`] and the other results'
+/// `last_response()`: quote its `request_id` to support.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct LastResponse {
+    /// The HTTP status.
+    pub status: http::StatusCode,
+    /// The `X-Request-Id` header.
+    pub request_id: Option<String>,
+    /// The `Idempotency-Key` the request carried, such as an upload's.
+    pub idempotency_key: Option<String>,
+    /// The response headers.
+    pub headers: http::HeaderMap,
+}
+
+/// Where a result keeps its [`LastResponse`]. It never affects equality or the JSON form.
+#[derive(Clone, Default)]
+pub(crate) struct ResponseSlot(Option<std::sync::Arc<LastResponse>>);
+impl PartialEq for ResponseSlot {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+impl fmt::Debug for ResponseSlot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(if self.0.is_some() { "Some(..)" } else { "None" })
+    }
+}
+#[cfg(feature = "strict-contract")]
+impl describe::Described for ResponseSlot {
+    fn shape() -> describe::Shape {
+        describe::Shape::Native("ResponseSlot")
+    }
+}
+
+/// A result that can keep the HTTP response it came from.
+#[cfg_attr(not(feature = "async"), allow(dead_code))]
+pub(crate) trait Responded {
+    /// Keeps `response`; results without a `last_response` ignore it.
+    fn set_last_response(&mut self, _response: LastResponse) {}
+}
+impl Responded for () {}
+impl Responded for Value {}
+impl<T> Responded for Vec<T> {}
+
 /// A field in an update: leave it unchanged, clear it, or set it.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(untagged)]
@@ -149,20 +194,48 @@ pub mod describe;
 macro_rules! string_enum {
     ($(#[$meta:meta])* $name:ident { $( $(#[$vmeta:meta])* $variant:ident = $value:literal ),* $(,)? }) => {
         $(#[$meta])*
-        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        ///
+        /// Values this SDK version does not list arrive as `Unknown`. To act on such a value,
+        /// compare [`as_str`](Self::as_str) in a `_` arm rather than matching `Unknown`, which
+        /// stops matching once a later version lists the value. Enums compare and hash by their
+        /// wire value.
+        #[derive(Debug, Clone)]
         #[non_exhaustive]
         pub enum $name {
             $( $(#[$vmeta])* $variant, )*
             /// A value this SDK version does not know.
-            Unknown(String),
+            #[deprecated(
+                note = "match `as_str()` in a `_` arm: a value a later version lists stops arriving as `Unknown`"
+            )]
+            Unknown(crate::UnknownValue),
         }
         impl $name {
             /// The wire value.
+            #[allow(deprecated)]
             pub fn as_str(&self) -> &str {
                 match self {
                     $(Self::$variant => $value,)*
-                    Self::Unknown(value) => value,
+                    Self::Unknown(value) => value.as_str(),
                 }
+            }
+        }
+        #[allow(dead_code)]
+        impl $name {
+            /// Whether this is a value this SDK version lists.
+            #[allow(deprecated)]
+            pub(crate) fn is_known(&self) -> bool {
+                !matches!(self, Self::Unknown(_))
+            }
+        }
+        impl PartialEq for $name {
+            fn eq(&self, other: &Self) -> bool {
+                self.as_str() == other.as_str()
+            }
+        }
+        impl Eq for $name {}
+        impl std::hash::Hash for $name {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                self.as_str().hash(state);
             }
         }
         #[cfg(feature = "strict-contract")]
@@ -181,17 +254,19 @@ macro_rules! string_enum {
             }
         }
         impl From<&str> for $name {
+            #[allow(deprecated)]
             fn from(value: &str) -> Self {
                 match value {
                     $($value => Self::$variant,)*
-                    other => Self::Unknown(other.to_owned()),
+                    other => Self::Unknown(crate::UnknownValue::new(other)),
                 }
             }
         }
         impl Default for $name {
-            /// An empty `Unknown` value, used only when the API omits a required field.
+            /// An empty value, for a model built with `Default`; decoding never produces it.
+            #[allow(deprecated)]
             fn default() -> Self {
-                Self::Unknown(String::new())
+                Self::Unknown(crate::UnknownValue::default())
             }
         }
         impl From<String> for $name {
@@ -218,8 +293,9 @@ macro_rules! string_enum {
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
                 let value = Self::from(String::deserialize(deserializer)?.as_str());
                 #[cfg(feature = "strict-contract")]
+                #[allow(deprecated)]
                 if let Self::Unknown(unknown) = &value {
-                    strict::record(stringify!($name), strict::Finding::Value(unknown.clone()));
+                    strict::record(stringify!($name), strict::Finding::Value(unknown.as_str().to_owned()));
                 }
                 Ok(value)
             }
@@ -243,11 +319,10 @@ string_enum! {
 }
 
 string_enum! {
-    /// The moderation decision in force, which also decides delivery: `pending` until
-    /// classification decides, then a reviewer's decision when there is one, else the policy's.
-    AssetModerationStatus {
-        /// Waiting for classification or review; not delivered.
-        Pending = "pending",
+    /// A moderation decision, which decides delivery: the decision in force
+    /// ([`AssetModeration::decision`], `None` until there is one, and a reviewer's when there
+    /// is one), an automated decision or a reviewer's.
+    AssetModerationDecision {
         /// Delivered according to the asset's visibility.
         Allowed = "allowed",
         /// Delivered like `allowed`, but marked so your app can reduce its reach, such as
@@ -259,22 +334,6 @@ string_enum! {
         /// Not delivered; the content is kept.
         Blocked = "blocked",
         /// Not delivered, and the stored content is deleted.
-        Purged = "purged",
-    }
-}
-
-string_enum! {
-    /// A reviewer's decision on an asset.
-    AssetModerationDecision {
-        /// Deliver the asset according to its visibility.
-        Allowed = "allowed",
-        /// Deliver the asset like `allowed`, marked so your app can reduce its reach.
-        Limited = "limited",
-        /// Deliver the asset only through signed URLs or with an API key.
-        AgeRestricted = "age-restricted",
-        /// Stop delivering the asset and keep its content.
-        Blocked = "blocked",
-        /// Stop delivering the asset and delete its stored content.
         Purged = "purged",
     }
 }
@@ -624,7 +683,7 @@ string_enum! {
         /// The content's file extension.
         ContentExtension = "content.extension",
         /// The moderation status.
-        ModerationStatus = "classification.moderation.status",
+        ModerationStatus = "classification.moderation.decision",
         /// The visual content.
         Visual = "visual",
         /// The audio transcript.
@@ -670,6 +729,7 @@ string_enum! {
 )]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ProcessingOptions {
     /// Keep the stored content after classification.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -688,6 +748,31 @@ pub struct ProcessingOptions {
     #[serde(flatten, deserialize_with = "extra_fields::<ProcessingOptions, _>")]
     pub extra: HashMap<String, Value>,
 }
+impl ProcessingOptions {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Keep the stored content after classification.
+    pub fn retain_content(mut self, value: bool) -> Self {
+        self.retain_content = Some(value);
+        self
+    }
+    /// Overrides the project's `storeSensitiveMetadata` setting for this upload. When false,
+    /// embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
+    /// and `metadata` leaves out the creator and location. When true, the image is stored as
+    /// uploaded.
+    pub fn store_sensitive_metadata(mut self, value: bool) -> Self {
+        self.store_sensitive_metadata = Some(value);
+        self
+    }
+    /// Optional analyses to run, keyed by feature. Link detection runs unless turned off; every
+    /// other feature is off unless enabled.
+    pub fn features(mut self, value: impl Into<ProcessingFeatures>) -> Self {
+        self.features = Some(value.into());
+        self
+    }
+}
 
 /// Optional analyses to run on an asset, keyed by feature. The API rejects unknown features.
 /// Results of person and face detection are in [`AssetClassification::face_detection`].
@@ -697,6 +782,7 @@ pub struct ProcessingOptions {
 )]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ProcessingFeatures {
     /// Extract image text onto the image asset and add a text moderation pass to its report.
     /// Applies to images, including those extracted from documents and websites.
@@ -729,14 +815,60 @@ pub struct ProcessingFeatures {
     #[serde(flatten, deserialize_with = "extra_fields::<ProcessingFeatures, _>")]
     pub extra: HashMap<String, Value>,
 }
+impl ProcessingFeatures {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Extract image text onto the image asset and add a text moderation pass to its report.
+    /// Applies to images, including those extracted from documents and websites.
+    pub fn ocr(mut self, value: impl Into<FeatureOptions>) -> Self {
+        self.ocr = Some(value.into());
+        self
+    }
+    /// Preview. Locate people in images, including people whose faces are not visible. Results
+    /// are informational and never change the moderation decision.
+    pub fn person_detection(mut self, value: impl Into<FeatureOptions>) -> Self {
+        self.person_detection = Some(value.into());
+        self
+    }
+    /// Preview. Locate faces in images and optionally estimate an age range for each. Faces are
+    /// not identified. Results are informational and never change the moderation decision.
+    pub fn face_detection(mut self, value: impl Into<FaceDetectionOptions>) -> Self {
+        self.face_detection = Some(value.into());
+        self
+    }
+    /// Find QR codes and web links in images, and moderate QR code text with the image. Runs
+    /// unless `enabled` is false. With OCR on, links in the extracted text are listed too.
+    pub fn link_detection(mut self, value: impl Into<FeatureOptions>) -> Self {
+        self.link_detection = Some(value.into());
+        self
+    }
+    /// Preview. Read provenance metadata, such as C2PA, that marks an image as AI-generated or
+    /// AI-edited. Results are informational and never change the moderation decision.
+    pub fn ai_generated_detection(mut self, value: impl Into<FeatureOptions>) -> Self {
+        self.ai_generated_detection = Some(value.into());
+        self
+    }
+    /// Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made
+    /// browser-safe, served at [`CdnResource::Hls`] and played by [`CdnResource::Embed`].
+    /// Needs `retain_content`, and is billed per started minute of media. Left
+    /// out, the project's streaming setting decides; `enabled: false` turns it off for an upload
+    /// in a project that streams by default.
+    pub fn streaming(mut self, value: impl Into<FeatureOptions>) -> Self {
+        self.streaming = Some(value.into());
+        self
+    }
+}
 
 /// Options for a feature that only needs turning on.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct FeatureOptions {
     /// Whether to run the feature.
     pub enabled: bool,
@@ -745,11 +877,30 @@ pub struct FeatureOptions {
     pub extra: HashMap<String, Value>,
 }
 impl FeatureOptions {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            enabled: Default::default(),
+            extra: Default::default(),
+        }
+    }
+}
+impl FeatureOptions {
+    /// Options with `enabled`; set the rest with the methods below.
+    pub fn new(enabled: bool) -> Self {
+        Self {
+            enabled,
+            extra: HashMap::new(),
+        }
+    }
+}
+impl FeatureOptions {
     /// Options that turn the feature on.
     pub fn enabled() -> Self {
         Self {
             enabled: true,
-            ..Self::default()
+            ..Self::blank()
         }
     }
 }
@@ -759,8 +910,9 @@ impl FeatureOptions {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct FaceDetectionOptions {
     /// Whether to run face detection.
     pub enabled: bool,
@@ -772,11 +924,37 @@ pub struct FaceDetectionOptions {
     pub extra: HashMap<String, Value>,
 }
 impl FaceDetectionOptions {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            enabled: Default::default(),
+            age_estimation: Default::default(),
+            extra: Default::default(),
+        }
+    }
+}
+impl FaceDetectionOptions {
+    /// Options with `enabled`; set the rest with the methods below.
+    pub fn new(enabled: bool) -> Self {
+        Self {
+            enabled,
+            age_estimation: Default::default(),
+            extra: HashMap::new(),
+        }
+    }
+    /// Also estimate an age range for each face. Defaults to `false`.
+    pub fn age_estimation(mut self, value: bool) -> Self {
+        self.age_estimation = Some(value);
+        self
+    }
+}
+impl FaceDetectionOptions {
     /// Options that turn face detection on, without age estimation.
     pub fn enabled() -> Self {
         Self {
             enabled: true,
-            ..Self::default()
+            ..Self::blank()
         }
     }
 }
@@ -1020,8 +1198,9 @@ impl<'de> Deserialize<'de> for Content {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct SubmitAsset {
     /// The asset name, such as a file name.
     pub name: String,
@@ -1079,6 +1258,123 @@ pub struct SubmitAsset {
     #[serde(default)]
     pub idempotency_key: Option<String>,
 }
+impl SubmitAsset {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            name: Default::default(),
+            content: Default::default(),
+            part: Default::default(),
+            url: Default::default(),
+            description: Default::default(),
+            processing_options: Default::default(),
+            visibility: Default::default(),
+            metadata: Default::default(),
+            tags: Default::default(),
+            author_id: Default::default(),
+            context: Default::default(),
+            external_id: Default::default(),
+            external_url: Default::default(),
+            folder_id: Default::default(),
+            upload_preset_id: Default::default(),
+            total_size_in_bytes: Default::default(),
+            idempotency_key: Default::default(),
+        }
+    }
+}
+impl SubmitAsset {
+    /// The whole file.
+    pub fn content(mut self, value: impl Into<Content>) -> Self {
+        self.content = Some(value.into());
+        self
+    }
+    /// The first part of a multipart upload; continue with `upload_part`.
+    pub fn part(mut self, value: impl Into<Content>) -> Self {
+        self.part = Some(value.into());
+        self
+    }
+    /// A URL CalmLens downloads the file from.
+    pub fn url(mut self, value: impl Into<String>) -> Self {
+        self.url = Some(value.into());
+        self
+    }
+    /// A description.
+    pub fn description(mut self, value: impl Into<String>) -> Self {
+        self.description = Some(value.into());
+        self
+    }
+    /// Processing options.
+    pub fn processing_options(mut self, value: impl Into<ProcessingOptions>) -> Self {
+        self.processing_options = Some(value.into());
+        self
+    }
+    /// CDN visibility.
+    pub fn visibility(mut self, value: impl Into<Visibility>) -> Self {
+        self.visibility = Some(value.into());
+        self
+    }
+    /// Metadata items.
+    pub fn metadata(mut self, value: impl Into<Vec<MetadataItem>>) -> Self {
+        self.metadata = Some(value.into());
+        self
+    }
+    /// Tags for the asset, such as `["catalogue", "backpacks"]`, which it keeps in `tags`.
+    /// Uploads through an upload preset can't set them.
+    pub fn tags(mut self, value: impl Into<Vec<String>>) -> Self {
+        self.tags = Some(value.into());
+        self
+    }
+    /// Your identifier for who wrote the content. CalmLens only compares it with the author IDs
+    /// in `context`, to tell which posts share a speaker.
+    pub fn author_id(mut self, value: impl Into<String>) -> Self {
+        self.author_id = Some(value.into());
+        self
+    }
+    /// Earlier posts in the conversation, oldest first. The SDK sends only the posts CalmLens
+    /// uses; see [`select_moderation_context_items`].
+    pub fn context(mut self, value: impl Into<ModerationContext>) -> Self {
+        self.context = Some(value.into());
+        self
+    }
+    /// Your ID for the asset, unique within the project.
+    pub fn external_id(mut self, value: impl Into<String>) -> Self {
+        self.external_id = Some(value.into());
+        self
+    }
+    /// A link to the asset in your system.
+    pub fn external_url(mut self, value: impl Into<String>) -> Self {
+        self.external_url = Some(value.into());
+        self
+    }
+    /// The folder to put the asset in.
+    pub fn folder_id(mut self, value: impl Into<String>) -> Self {
+        self.folder_id = Patch::Value(value.into());
+        self
+    }
+    /// Clears `folder_id`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_folder_id(mut self) -> Self {
+        self.folder_id = Patch::Null;
+        self
+    }
+    /// The upload preset to apply: its folder, visibility, file types, size limit, moderation
+    /// policy and processing options. `processing_options`, when set, replace the preset's.
+    pub fn upload_preset_id(mut self, value: impl Into<String>) -> Self {
+        self.upload_preset_id = Some(value.into());
+        self
+    }
+    /// For a multipart upload, the size of the whole file; CalmLens then refuses an upload
+    /// that could never finish, and parts that overshoot or fall short.
+    pub fn total_size_in_bytes(mut self, value: u64) -> Self {
+        self.total_size_in_bytes = Some(value);
+        self
+    }
+    /// The `Idempotency-Key` for this upload. The SDK generates one when it is `None`.
+    pub fn idempotency_key(mut self, value: impl Into<String>) -> Self {
+        self.idempotency_key = Some(value.into());
+        self
+    }
+}
 
 impl SubmitAsset {
     /// Text named `text`.
@@ -1090,7 +1386,7 @@ impl SubmitAsset {
         Self {
             name: name.into(),
             content: Some(content),
-            ..Self::default()
+            ..Self::blank()
         }
     }
     /// An asset CalmLens downloads from `url`.
@@ -1098,7 +1394,7 @@ impl SubmitAsset {
         Self {
             name: name.into(),
             url: Some(url.into()),
-            ..Self::default()
+            ..Self::blank()
         }
     }
     /// The first part of a multipart upload of the file `name`.
@@ -1106,7 +1402,7 @@ impl SubmitAsset {
         Self {
             name: name.into(),
             part: Some(part),
-            ..Self::default()
+            ..Self::blank()
         }
     }
 }
@@ -1123,12 +1419,23 @@ pub const MODERATION_CONTEXT_USED_CHARACTERS: usize = 2_000;
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ModerationContext {
     /// The posts, oldest first.
     pub items: Vec<ModerationContextItem>,
 }
+impl ModerationContext {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            items: Default::default(),
+        }
+    }
+}
+impl ModerationContext {}
 impl ModerationContext {
     /// Context of `items`, oldest first.
     pub fn new(items: impl IntoIterator<Item = ModerationContextItem>) -> Self {
@@ -1143,8 +1450,9 @@ impl ModerationContext {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ModerationContextItem {
     /// The post's text.
     pub text: String,
@@ -1152,6 +1460,17 @@ pub struct ModerationContextItem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author_id: Option<String>,
 }
+impl ModerationContextItem {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            text: Default::default(),
+            author_id: Default::default(),
+        }
+    }
+}
+impl ModerationContextItem {}
 impl ModerationContextItem {
     /// A post with `text` and no author.
     pub fn new(text: impl Into<String>) -> Self {
@@ -1195,14 +1514,26 @@ pub fn select_moderation_context_items(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct MetadataItem {
     /// The metadata field ID.
     pub id: String,
     /// The value.
     pub value: Value,
 }
+impl MetadataItem {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            id: Default::default(),
+            value: Default::default(),
+        }
+    }
+}
+impl MetadataItem {}
 impl MetadataItem {
     /// A metadata item.
     pub fn new(id: impl Into<String>, value: impl Into<Value>) -> Self {
@@ -1218,11 +1549,37 @@ impl MetadataItem {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct AssetId {
     /// The asset ID.
     pub asset_id: String,
+}
+impl AssetId {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            asset_id: Default::default(),
+        }
+    }
+}
+impl AssetId {}
+impl From<&str> for AssetId {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+impl From<String> for AssetId {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+impl From<&String> for AssetId {
+    fn from(value: &String) -> Self {
+        Self::new(value)
+    }
 }
 impl AssetId {
     /// Identifies asset `asset_id`.
@@ -1238,13 +1595,25 @@ impl AssetId {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct WaitForDecision {
     /// The asset ID.
     pub asset_id: String,
     /// How long to wait for a decision; 60 seconds when `None`.
     pub timeout: Option<std::time::Duration>,
 }
+impl WaitForDecision {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            asset_id: Default::default(),
+            timeout: Default::default(),
+        }
+    }
+}
+impl WaitForDecision {}
 impl WaitForDecision {
     /// Waits for asset `asset_id` with the default 60-second timeout.
     pub fn new(asset_id: impl Into<String>) -> Self {
@@ -1265,11 +1634,37 @@ impl WaitForDecision {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct FolderId {
     /// The folder ID.
     pub folder_id: String,
+}
+impl FolderId {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            folder_id: Default::default(),
+        }
+    }
+}
+impl FolderId {}
+impl From<&str> for FolderId {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+impl From<String> for FolderId {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+impl From<&String> for FolderId {
+    fn from(value: &String) -> Self {
+        Self::new(value)
+    }
 }
 impl FolderId {
     /// Identifies folder `folder_id`.
@@ -1287,6 +1682,7 @@ impl FolderId {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListAssets {
     /// The cursor returned by the previous page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1294,7 +1690,7 @@ pub struct ListAssets {
     /// Items per page, 1 to 100.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
-    /// A filter such as `classification.moderation.status==allowed`, or `folderId==fldr_…`
+    /// A filter such as `classification.moderation.decision==allowed`, or `folderId==fldr_…`
     /// (`folderId==null` for the project root) for the assets directly in one folder.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter: Option<String>,
@@ -1303,14 +1699,43 @@ pub struct ListAssets {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<String>,
 }
+impl ListAssets {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The cursor returned by the previous page.
+    pub fn cursor(mut self, value: impl Into<String>) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    /// Items per page, 1 to 100.
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
+    /// A filter such as `classification.moderation.decision==allowed`, or `folderId==fldr_…`
+    /// (`folderId==null` for the project root) for the assets directly in one folder.
+    pub fn filter(mut self, value: impl Into<String>) -> Self {
+        self.filter = Some(value.into());
+        self
+    }
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt,id`. Newest first by default.
+    pub fn sort(mut self, value: impl Into<String>) -> Self {
+        self.sort = Some(value.into());
+        self
+    }
+}
 
 /// Options for listing an asset's children.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListChildren {
     /// The parent asset ID.
     pub asset_id: String,
@@ -1325,14 +1750,54 @@ pub struct ListChildren {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<String>,
 }
+impl ListChildren {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            asset_id: Default::default(),
+            cursor: Default::default(),
+            page_size: Default::default(),
+            sort: Default::default(),
+        }
+    }
+}
+impl ListChildren {
+    /// Options with `asset_id`; set the rest with the methods below.
+    pub fn new(asset_id: impl Into<String>) -> Self {
+        Self {
+            asset_id: asset_id.into(),
+            cursor: Default::default(),
+            page_size: Default::default(),
+            sort: Default::default(),
+        }
+    }
+    /// The cursor returned by the previous page.
+    pub fn cursor(mut self, value: impl Into<String>) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    /// Items per page, 1 to 100.
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt,id`. Newest first by default.
+    pub fn sort(mut self, value: impl Into<String>) -> Self {
+        self.sort = Some(value.into());
+        self
+    }
+}
 
 /// Options for listing an audio or video asset's findings timeline.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListTimeline {
     /// The asset ID.
     pub asset_id: String,
@@ -1343,14 +1808,46 @@ pub struct ListTimeline {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
 }
+impl ListTimeline {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            asset_id: Default::default(),
+            cursor: Default::default(),
+            page_size: Default::default(),
+        }
+    }
+}
+impl ListTimeline {
+    /// Options with `asset_id`; set the rest with the methods below.
+    pub fn new(asset_id: impl Into<String>) -> Self {
+        Self {
+            asset_id: asset_id.into(),
+            cursor: Default::default(),
+            page_size: Default::default(),
+        }
+    }
+    /// The cursor returned by the previous page.
+    pub fn cursor(mut self, value: impl Into<String>) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    /// Items per page, 1 to 100.
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
+}
 
 /// Changes to an asset. [`Patch::Missing`] fields are left unchanged.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UpdateAsset {
     /// The asset ID.
     #[serde(skip_serializing)]
@@ -1377,14 +1874,111 @@ pub struct UpdateAsset {
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub visibility: Patch<Visibility>,
 }
+impl UpdateAsset {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            asset_id: Default::default(),
+            name: Default::default(),
+            description: Default::default(),
+            tags: Default::default(),
+            metadata: Default::default(),
+            external_id: Default::default(),
+            external_url: Default::default(),
+            visibility: Default::default(),
+        }
+    }
+}
+impl UpdateAsset {
+    /// Options with `asset_id`; set the rest with the methods below.
+    pub fn new(asset_id: impl Into<String>) -> Self {
+        Self {
+            asset_id: asset_id.into(),
+            name: Default::default(),
+            description: Default::default(),
+            tags: Default::default(),
+            metadata: Default::default(),
+            external_id: Default::default(),
+            external_url: Default::default(),
+            visibility: Default::default(),
+        }
+    }
+    /// The new name. An asset always has a name, so it can't be cleared.
+    pub fn name(mut self, value: impl Into<String>) -> Self {
+        self.name = Some(value.into());
+        self
+    }
+    /// The description.
+    pub fn description(mut self, value: impl Into<String>) -> Self {
+        self.description = Patch::Value(value.into());
+        self
+    }
+    /// Clears `description`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_description(mut self) -> Self {
+        self.description = Patch::Null;
+        self
+    }
+    /// The tags.
+    pub fn tags(mut self, value: impl Into<Vec<String>>) -> Self {
+        self.tags = Patch::Value(value.into());
+        self
+    }
+    /// Clears `tags`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_tags(mut self) -> Self {
+        self.tags = Patch::Null;
+        self
+    }
+    /// The metadata items.
+    pub fn metadata(mut self, value: impl Into<Vec<MetadataItem>>) -> Self {
+        self.metadata = Patch::Value(value.into());
+        self
+    }
+    /// Clears `metadata`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_metadata(mut self) -> Self {
+        self.metadata = Patch::Null;
+        self
+    }
+    /// Your ID for the asset.
+    pub fn external_id(mut self, value: impl Into<String>) -> Self {
+        self.external_id = Patch::Value(value.into());
+        self
+    }
+    /// Clears `external_id`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_external_id(mut self) -> Self {
+        self.external_id = Patch::Null;
+        self
+    }
+    /// A link to the asset in your system.
+    pub fn external_url(mut self, value: impl Into<String>) -> Self {
+        self.external_url = Patch::Value(value.into());
+        self
+    }
+    /// Clears `external_url`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_external_url(mut self) -> Self {
+        self.external_url = Patch::Null;
+        self
+    }
+    /// CDN visibility.
+    pub fn visibility(mut self, value: impl Into<Visibility>) -> Self {
+        self.visibility = Patch::Value(value.into());
+        self
+    }
+    /// Clears `visibility`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_visibility(mut self) -> Self {
+        self.visibility = Patch::Null;
+        self
+    }
+}
 
 /// Options for [`AssetsClient::explain`](crate::AssetsClient::explain).
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ExplainAsset {
     /// The asset ID.
     #[serde(skip_serializing)]
@@ -1394,14 +1988,40 @@ pub struct ExplainAsset {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub rerun: bool,
 }
+impl ExplainAsset {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            asset_id: Default::default(),
+            rerun: Default::default(),
+        }
+    }
+}
+impl ExplainAsset {
+    /// Options with `asset_id`; set the rest with the methods below.
+    pub fn new(asset_id: impl Into<String>) -> Self {
+        Self {
+            asset_id: asset_id.into(),
+            rerun: Default::default(),
+        }
+    }
+    /// Moderates the asset again with the project's current policy instead of explaining the
+    /// decision as made.
+    pub fn rerun(mut self, value: bool) -> Self {
+        self.rerun = value;
+        self
+    }
+}
 
 /// A reviewer's decision for [`AssetsClient::decide`](crate::AssetsClient::decide).
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct DecideAsset {
     /// The asset ID.
     #[serde(skip_serializing)]
@@ -1416,15 +2036,34 @@ pub struct DecideAsset {
     pub confirm_purge: bool,
 }
 impl DecideAsset {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            asset_id: Default::default(),
+            decision: Default::default(),
+            note: Default::default(),
+            confirm_purge: Default::default(),
+        }
+    }
+}
+impl DecideAsset {
+    /// Must be `true` to purge: purging permanently deletes the stored content.
+    pub fn confirm_purge(mut self, value: bool) -> Self {
+        self.confirm_purge = value;
+        self
+    }
+}
+impl DecideAsset {
     /// Records `decision` on asset `asset_id` with `note`. To purge, also set `confirm_purge`.
     pub fn new(
         asset_id: impl Into<String>,
-        decision: AssetModerationDecision,
+        decision: impl Into<AssetModerationDecision>,
         note: impl Into<String>,
     ) -> Self {
         Self {
             asset_id: asset_id.into(),
-            decision,
+            decision: decision.into(),
             note: note.into(),
             confirm_purge: false,
         }
@@ -1436,14 +2075,39 @@ impl DecideAsset {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct MoveAsset {
     /// The asset ID.
     #[serde(skip_serializing)]
     pub asset_id: String,
     /// The destination folder.
     pub folder_id: Option<String>,
+}
+impl MoveAsset {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            asset_id: Default::default(),
+            folder_id: Default::default(),
+        }
+    }
+}
+impl MoveAsset {
+    /// Options with `asset_id`; set the rest with the methods below.
+    pub fn new(asset_id: impl Into<String>) -> Self {
+        Self {
+            asset_id: asset_id.into(),
+            folder_id: Default::default(),
+        }
+    }
+    /// The destination folder.
+    pub fn folder_id(mut self, value: impl Into<String>) -> Self {
+        self.folder_id = Some(value.into());
+        self
+    }
 }
 
 /// What [`crate::AssetsClient::batch`] does to every asset.
@@ -1481,11 +2145,24 @@ impl fmt::Display for AssetBatchOperation {
 )]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct BatchAssets {
     /// IDs of 1 to 500 assets in the project.
     pub asset_ids: Vec<String>,
     /// What to do to every asset.
     pub operation: AssetBatchOperation,
+}
+impl BatchAssets {
+    /// Options with `asset_ids`, `operation`; set the rest with the methods below.
+    pub fn new(
+        asset_ids: impl Into<Vec<String>>,
+        operation: impl Into<AssetBatchOperation>,
+    ) -> Self {
+        Self {
+            asset_ids: asset_ids.into(),
+            operation: operation.into(),
+        }
+    }
 }
 
 string_enum! {
@@ -1516,6 +2193,21 @@ pub struct BatchAssetsResponse {
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<BatchAssetsResponse, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl BatchAssetsResponse {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for BatchAssetsResponse {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// A later part of a multipart upload.
@@ -1523,8 +2215,9 @@ pub struct BatchAssetsResponse {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UploadPart {
     /// The asset returned when the upload started.
     pub asset_id: String,
@@ -1539,6 +2232,41 @@ pub struct UploadPart {
     #[serde(default)]
     pub idempotency_key: Option<String>,
 }
+impl UploadPart {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            asset_id: Default::default(),
+            part: Default::default(),
+            wait: Default::default(),
+            idempotency_key: Default::default(),
+        }
+    }
+}
+impl UploadPart {
+    /// Options with `asset_id`, `part`; set the rest with the methods below.
+    pub fn new(asset_id: impl Into<String>, part: impl Into<Content>) -> Self {
+        Self {
+            asset_id: asset_id.into(),
+            part: part.into(),
+            wait: Default::default(),
+            idempotency_key: Default::default(),
+        }
+    }
+    /// Whether the final part waits for the decision (`true`) or returns with the asset
+    /// `queued` (`false`), overriding the choice saved when the upload started (`classify`
+    /// waits, `create` doesn't).
+    pub fn wait(mut self, value: bool) -> Self {
+        self.wait = Some(value);
+        self
+    }
+    /// The `Idempotency-Key` for this part. The SDK generates one when it is `None`.
+    pub fn idempotency_key(mut self, value: impl Into<String>) -> Self {
+        self.idempotency_key = Some(value.into());
+        self
+    }
+}
 
 /// Options for [`CdnClient::sign_asset_url`](crate::CdnClient::sign_asset_url). Name the asset by
 /// exactly one of `asset_id` and `external_id`.
@@ -1552,6 +2280,7 @@ pub struct UploadPart {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct SignAssetUrlOptions {
     /// The project; defaults to the client's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1585,6 +2314,61 @@ pub struct SignAssetUrlOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub viewer_claims: Option<ViewerClaims>,
 }
+impl SignAssetUrlOptions {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The project; defaults to the client's.
+    pub fn project_id(mut self, value: impl Into<String>) -> Self {
+        self.project_id = Some(value.into());
+        self
+    }
+    /// The asset ID.
+    pub fn asset_id(mut self, value: impl Into<String>) -> Self {
+        self.asset_id = Some(value.into());
+        self
+    }
+    /// The external ID the asset was uploaded with.
+    pub fn external_id(mut self, value: impl Into<String>) -> Self {
+        self.external_id = Some(value.into());
+        self
+    }
+    /// The lifetime in whole seconds, from 1 to
+    /// [`MAX_SIGNED_URL_EXPIRES_IN`](crate::MAX_SIGNED_URL_EXPIRES_IN); defaults to
+    /// [`DEFAULT_SIGNED_URL_EXPIRES_IN`](crate::DEFAULT_SIGNED_URL_EXPIRES_IN).
+    pub fn expires_in(mut self, value: u64) -> Self {
+        self.expires_in = Some(value);
+        self
+    }
+    /// Grants the original resource, the exact upload, which the URL refuses otherwise with
+    /// `signed-url/original-not-granted`. Defaults to false.
+    pub fn original(mut self, value: bool) -> Self {
+        self.original = Some(value);
+        self
+    }
+    /// A resource to return the URL of, beneath the signed asset URL.
+    pub fn resource(mut self, value: impl Into<CdnResource>) -> Self {
+        self.resource = Some(value.into());
+        self
+    }
+    /// A lens identifier, for the rendered or preview resource.
+    pub fn lens(mut self, value: impl Into<String>) -> Self {
+        self.lens = Some(value.into());
+        self
+    }
+    /// A transform, for the rendered or preview resource: a selector such as `width=320` or
+    /// structured options.
+    pub fn transform(mut self, value: impl Into<CdnTransform>) -> Self {
+        self.transform = Some(value.into());
+        self
+    }
+    /// The viewer's region and age confirmation, appended to the URL.
+    pub fn viewer_claims(mut self, value: impl Into<ViewerClaims>) -> Self {
+        self.viewer_claims = Some(value.into());
+        self
+    }
+}
 
 /// Options for [`CdnClient::get_asset_info`](crate::CdnClient::get_asset_info).
 #[cfg_attr(
@@ -1593,10 +2377,22 @@ pub struct SignAssetUrlOptions {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct GetAssetInfoOptions {
     /// The viewer claims to read the info for; `None` keeps those the URL carries.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub viewer_claims: Option<ViewerClaims>,
+}
+impl GetAssetInfoOptions {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The viewer claims to read the info for; `None` keeps those the URL carries.
+    pub fn viewer_claims(mut self, value: impl Into<ViewerClaims>) -> Self {
+        self.viewer_claims = Some(value.into());
+        self
+    }
 }
 
 /// Options for creating a folder.
@@ -1604,8 +2400,9 @@ pub struct GetAssetInfoOptions {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct CreateFolder {
     /// The name, unique among folders with the same parent.
     pub name: String,
@@ -1613,14 +2410,44 @@ pub struct CreateFolder {
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub parent_id: Patch<String>,
 }
+impl CreateFolder {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            name: Default::default(),
+            parent_id: Default::default(),
+        }
+    }
+}
+impl CreateFolder {
+    /// Options with `name`; set the rest with the methods below.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            parent_id: Default::default(),
+        }
+    }
+    /// The parent folder, or the project root when missing or null.
+    pub fn parent_id(mut self, value: impl Into<String>) -> Self {
+        self.parent_id = Patch::Value(value.into());
+        self
+    }
+    /// Clears `parent_id`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_parent_id(mut self) -> Self {
+        self.parent_id = Patch::Null;
+        self
+    }
+}
 
 /// Changes to a folder.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UpdateFolder {
     /// The folder ID.
     #[serde(skip_serializing)]
@@ -1629,20 +2456,69 @@ pub struct UpdateFolder {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
+impl UpdateFolder {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            folder_id: Default::default(),
+            name: Default::default(),
+        }
+    }
+}
+impl UpdateFolder {
+    /// Options with `folder_id`; set the rest with the methods below.
+    pub fn new(folder_id: impl Into<String>) -> Self {
+        Self {
+            folder_id: folder_id.into(),
+            name: Default::default(),
+        }
+    }
+    /// The new name.
+    pub fn name(mut self, value: impl Into<String>) -> Self {
+        self.name = Some(value.into());
+        self
+    }
+}
 
 /// Moves a folder under another, or to the project root with `parent_id: None`.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct MoveFolder {
     /// The folder ID.
     #[serde(skip_serializing)]
     pub folder_id: String,
     /// The new parent.
     pub parent_id: Option<String>,
+}
+impl MoveFolder {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            folder_id: Default::default(),
+            parent_id: Default::default(),
+        }
+    }
+}
+impl MoveFolder {
+    /// Options with `folder_id`; set the rest with the methods below.
+    pub fn new(folder_id: impl Into<String>) -> Self {
+        Self {
+            folder_id: folder_id.into(),
+            parent_id: Default::default(),
+        }
+    }
+    /// The new parent.
+    pub fn parent_id(mut self, value: impl Into<String>) -> Self {
+        self.parent_id = Some(value.into());
+        self
+    }
 }
 
 /// Options for one page of the events feed. A cursor belongs to the filters it was issued with,
@@ -1654,6 +2530,7 @@ pub struct MoveFolder {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListEvents {
     /// A previous page's `next_cursor`. Without it, the page is empty and its `next_cursor`
     /// marks now.
@@ -1669,6 +2546,33 @@ pub struct ListEvents {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset_id: Option<String>,
 }
+impl ListEvents {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// A previous page's `next_cursor`. Without it, the page is empty and its `next_cursor`
+    /// marks now.
+    pub fn cursor(mut self, value: impl Into<String>) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    /// Events per page, 1 to 100 (the API's default is 50).
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
+    /// Only events of these types. Sent as one comma-separated value; an empty list sends none.
+    pub fn types(mut self, value: impl Into<Vec<EventType>>) -> Self {
+        self.types = Some(value.into());
+        self
+    }
+    /// Only events about this asset.
+    pub fn asset_id(mut self, value: impl Into<String>) -> Self {
+        self.asset_id = Some(value.into());
+        self
+    }
+}
 
 /// A named lens definition, for [`ServerClient::ensure_lenses`](crate::ServerClient::ensure_lenses)
 /// and [`LensesClient::create`](crate::LensesClient::create).
@@ -1676,8 +2580,9 @@ pub struct ListEvents {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct LensDefinition {
     /// The lens identifier used in CDN URLs as `@identifier`.
     pub identifier: String,
@@ -1696,6 +2601,62 @@ pub struct LensDefinition {
     #[serde(default, skip_serializing_if = "Patch::is_missing")]
     pub transform: Patch<ImageTransformOptions>,
 }
+impl LensDefinition {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            identifier: Default::default(),
+            name: Default::default(),
+            description: Default::default(),
+            lens_type: Default::default(),
+            active: Default::default(),
+            transform: Default::default(),
+        }
+    }
+}
+impl LensDefinition {
+    /// Options with `identifier`, `name`, `lens_type`; set the rest with the methods below.
+    pub fn new(
+        identifier: impl Into<String>,
+        name: impl Into<String>,
+        lens_type: impl Into<LensType>,
+    ) -> Self {
+        Self {
+            identifier: identifier.into(),
+            name: name.into(),
+            lens_type: lens_type.into(),
+            description: Default::default(),
+            active: Default::default(),
+            transform: Default::default(),
+        }
+    }
+    /// A description.
+    pub fn description(mut self, value: impl Into<String>) -> Self {
+        self.description = Patch::Value(value.into());
+        self
+    }
+    /// Clears `description`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_description(mut self) -> Self {
+        self.description = Patch::Null;
+        self
+    }
+    /// Whether the CDN serves the lens. Defaults to `true`.
+    pub fn active(mut self, value: bool) -> Self {
+        self.active = Some(value);
+        self
+    }
+    /// The image transform options the lens applies.
+    pub fn transform(mut self, value: impl Into<ImageTransformOptions>) -> Self {
+        self.transform = Patch::Value(value.into());
+        self
+    }
+    /// Clears `transform`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_transform(mut self) -> Self {
+        self.transform = Patch::Null;
+        self
+    }
+}
 
 /// Options for one page of the project's lenses.
 #[cfg_attr(
@@ -1704,6 +2665,7 @@ pub struct LensDefinition {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListLenses {
     /// The previous page's `next_cursor`; omit for the first page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1716,17 +2678,65 @@ pub struct ListLenses {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<String>,
 }
+impl ListLenses {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The previous page's `next_cursor`; omit for the first page.
+    pub fn cursor(mut self, value: impl Into<String>) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    /// Lenses per page, 1 to 100 (the API's default is 50).
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `createdAt`. Newest first by default.
+    pub fn sort(mut self, value: impl Into<String>) -> Self {
+        self.sort = Some(value.into());
+        self
+    }
+}
 
 /// Identifies a lens.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct LensId {
     /// The lens ID.
     pub lens_id: String,
+}
+impl LensId {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            lens_id: Default::default(),
+        }
+    }
+}
+impl LensId {}
+impl From<&str> for LensId {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+impl From<String> for LensId {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+impl From<&String> for LensId {
+    fn from(value: &String) -> Self {
+        Self::new(value)
+    }
 }
 impl LensId {
     /// Identifies lens `lens_id`.
@@ -1743,8 +2753,9 @@ impl LensId {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UpdateLens {
     /// The lens ID.
     #[serde(skip_serializing)]
@@ -1766,11 +2777,62 @@ pub struct UpdateLens {
     pub transform: Patch<ImageTransformOptions>,
 }
 impl UpdateLens {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            lens_id: Default::default(),
+            name: Default::default(),
+            description: Default::default(),
+            lens_type: Default::default(),
+            active: Default::default(),
+            transform: Default::default(),
+        }
+    }
+}
+impl UpdateLens {
+    /// The new display name.
+    pub fn name(mut self, value: impl Into<String>) -> Self {
+        self.name = Some(value.into());
+        self
+    }
+    /// The description.
+    pub fn description(mut self, value: impl Into<String>) -> Self {
+        self.description = Patch::Value(value.into());
+        self
+    }
+    /// Clears `description`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_description(mut self) -> Self {
+        self.description = Patch::Null;
+        self
+    }
+    /// The asset type the lens applies to.
+    pub fn lens_type(mut self, value: impl Into<LensType>) -> Self {
+        self.lens_type = Some(value.into());
+        self
+    }
+    /// Whether the CDN serves the lens.
+    pub fn active(mut self, value: bool) -> Self {
+        self.active = Some(value);
+        self
+    }
+    /// The image transform options; the CDN serves the new transform from then on.
+    pub fn transform(mut self, value: impl Into<ImageTransformOptions>) -> Self {
+        self.transform = Patch::Value(value.into());
+        self
+    }
+    /// Clears `transform`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_transform(mut self) -> Self {
+        self.transform = Patch::Null;
+        self
+    }
+}
+impl UpdateLens {
     /// Changes nothing yet to lens `lens_id`.
     pub fn new(lens_id: impl Into<String>) -> Self {
         Self {
             lens_id: lens_id.into(),
-            ..Self::default()
+            ..Self::blank()
         }
     }
 }
@@ -1791,11 +2853,25 @@ pub struct LensPage {
     #[serde(default)]
     pub next_cursor: Option<String>,
     /// Whether another page follows.
-    #[serde(default)]
     pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<LensPage, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl LensPage {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for LensPage {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// Options for [`ServerClient::ensure_lenses`](crate::ServerClient::ensure_lenses).
@@ -1803,11 +2879,29 @@ pub struct LensPage {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct EnsureLenses {
     /// The lenses, returned in the same order.
     pub lenses: Vec<LensDefinition>,
+}
+impl EnsureLenses {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            lenses: Default::default(),
+        }
+    }
+}
+impl EnsureLenses {
+    /// Options with `lenses`; set the rest with the methods below.
+    pub fn new(lenses: impl Into<Vec<LensDefinition>>) -> Self {
+        Self {
+            lenses: lenses.into(),
+        }
+    }
 }
 
 /// An asset URL, or a resource beneath it, for
@@ -1824,6 +2918,7 @@ pub struct EnsureLenses {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct CdnRequest {
     /// The project; defaults to the client's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1854,6 +2949,50 @@ pub struct CdnRequest {
     pub init: Option<HttpOptions>,
 }
 impl CdnRequest {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The project; defaults to the client's.
+    pub fn project_id(mut self, value: impl Into<String>) -> Self {
+        self.project_id = Some(value.into());
+        self
+    }
+    /// The asset ID.
+    pub fn asset_id(mut self, value: impl Into<String>) -> Self {
+        self.asset_id = Some(value.into());
+        self
+    }
+    /// The external ID the asset was uploaded with, sent as `ext:` and the URL-encoded ID.
+    pub fn external_id(mut self, value: impl Into<String>) -> Self {
+        self.external_id = Some(value.into());
+        self
+    }
+    /// A lens identifier.
+    pub fn lens(mut self, value: impl Into<String>) -> Self {
+        self.lens = Some(value.into());
+        self
+    }
+    /// A transform: a selector such as `width=320` or structured options.
+    pub fn transform(mut self, value: impl Into<CdnTransform>) -> Self {
+        self.transform = Some(value.into());
+        self
+    }
+    /// The viewer's region and age confirmation, appended as the `viewerClaims` query, leaving out
+    /// the defaults (no region, age not confirmed). They are assertions from your app; CalmLens
+    /// doesn't verify them.
+    pub fn viewer_claims(mut self, value: impl Into<ViewerClaims>) -> Self {
+        self.viewer_claims = Some(value.into());
+        self
+    }
+    /// The HTTP method and headers [`CdnClient::serve`](crate::CdnClient::serve) sends, e.g.
+    /// `HEAD` or a `Range` header.
+    pub fn init(mut self, value: impl Into<HttpOptions>) -> Self {
+        self.init = Some(value.into());
+        self
+    }
+}
+impl CdnRequest {
     /// A request for the asset with this ID.
     pub fn asset(asset_id: impl Into<String>) -> Self {
         Self {
@@ -1869,8 +3008,8 @@ impl CdnRequest {
         }
     }
     /// This request for `resource`.
-    pub fn resource(mut self, resource: CdnResource) -> Self {
-        self.resource = Some(resource);
+    pub fn resource(mut self, resource: impl Into<CdnResource>) -> Self {
+        self.resource = Some(resource.into());
         self
     }
 }
@@ -1882,6 +3021,7 @@ impl CdnRequest {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct HttpOptions {
     /// The method; defaults to `GET`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1889,6 +3029,22 @@ pub struct HttpOptions {
     /// Extra request headers.
     #[serde(default)]
     pub headers: HashMap<String, String>,
+}
+impl HttpOptions {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The method; defaults to `GET`.
+    pub fn method(mut self, value: impl Into<String>) -> Self {
+        self.method = Some(value.into());
+        self
+    }
+    /// Extra request headers.
+    pub fn headers(mut self, value: impl Into<HashMap<String, String>>) -> Self {
+        self.headers = value.into();
+        self
+    }
 }
 
 /// An asset.
@@ -1905,7 +3061,6 @@ pub struct Asset {
     /// The asset ID.
     pub id: String,
     /// The owning project.
-    #[serde(default)]
     pub project_id: String,
     /// The parent asset, for child assets CalmLens extracts during processing.
     #[serde(default)]
@@ -1921,16 +3076,14 @@ pub struct Asset {
     #[serde(default)]
     pub upload_preset_id: Option<String>,
     /// Milliseconds since the Unix epoch.
-    #[serde(default)]
     pub created_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
     pub updated_at: Option<u64>,
     /// The asset type (`type` on the wire).
-    #[serde(default, rename = "type")]
+    #[serde(rename = "type")]
     pub asset_type: AssetType,
     /// The name.
-    #[serde(default)]
     pub name: String,
     /// The description.
     #[serde(default)]
@@ -1954,20 +3107,31 @@ pub struct Asset {
     #[serde(default)]
     pub tags: Vec<String>,
     /// CDN visibility.
-    #[serde(default)]
     pub visibility: Visibility,
     /// Where the asset is in the pipeline.
-    #[serde(default)]
     pub upload: AssetUpload,
     /// Classification progress, the moderation status and report.
-    #[serde(default)]
     pub classification: AssetClassification,
     /// Whether CalmLens holds the content, and its details.
-    #[serde(default)]
     pub content: AssetContent,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<Asset, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl Asset {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for Asset {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 impl Asset {
     /// An asset with `id`, classification status `processing` and moderation status `moderation`,
@@ -1975,7 +3139,7 @@ impl Asset {
     pub fn new(
         id: impl Into<String>,
         processing: AssetClassificationStatus,
-        moderation: AssetModerationStatus,
+        moderation: Option<AssetModerationDecision>,
     ) -> Self {
         Self {
             id: id.into(),
@@ -1986,7 +3150,7 @@ impl Asset {
             classification: AssetClassification {
                 status: processing,
                 moderation: AssetModeration {
-                    status: moderation,
+                    decision: moderation,
                     ..AssetModeration::default()
                 },
                 ..AssetClassification::default()
@@ -2025,7 +3189,6 @@ string_enum! {
 #[non_exhaustive]
 pub struct AssetUpload {
     /// Classification or upload progress.
-    #[serde(default)]
     pub status: AssetUploadStatus,
     /// When the state last changed, in milliseconds since the Unix epoch.
     #[serde(default)]
@@ -2048,7 +3211,6 @@ pub struct AssetUpload {
 #[non_exhaustive]
 pub struct AssetClassification {
     /// Classification or upload progress.
-    #[serde(default)]
     pub status: AssetClassificationStatus,
     /// Why processing failed, while `status` is `failed`; otherwise `None`.
     #[serde(default)]
@@ -2065,10 +3227,8 @@ pub struct AssetClassification {
     pub progress: Option<AssetClassificationProgress>,
     /// Whether the results came from one of the project's test inputs rather than analysing the
     /// content. Never use test results, such as age ranges, for real decisions.
-    #[serde(default)]
     pub test_input: bool,
     /// Content-safety findings and the decision in force.
-    #[serde(default)]
     pub moderation: AssetModeration,
     /// Person detections when requested; `None` until the feature has run.
     #[serde(default)]
@@ -2105,10 +3265,8 @@ pub struct AssetClassification {
 #[non_exhaustive]
 pub struct AssetClassificationProgress {
     /// The sections analysed so far.
-    #[serde(default)]
     pub completed_sections: u32,
     /// The sections in all.
-    #[serde(default)]
     pub total_sections: u32,
     /// Fields this SDK version does not know.
     #[serde(
@@ -2134,7 +3292,6 @@ pub struct AssetReview {
     /// The reviewer’s explanation; required for an override.
     pub note: Option<String>,
     /// Who made the decision.
-    #[serde(default)]
     pub decided_by: ReviewActor,
     /// Review time in milliseconds since the Unix epoch.
     pub reviewed_at: u64,
@@ -2163,7 +3320,7 @@ string_enum! {
 #[non_exhaustive]
 pub struct ReviewActor {
     /// A `user` (or an assistant acting for one) or an `api-key`.
-    #[serde(default, rename = "type")]
+    #[serde(rename = "type")]
     pub actor_type: ReviewActorType,
     /// The user's or API key's ID; `None` when it was not recorded.
     #[serde(default)]
@@ -2180,10 +3337,8 @@ pub struct ReviewActor {
 #[non_exhaustive]
 pub struct DecisionPolicy {
     /// The policy's ID.
-    #[serde(default)]
     pub id: String,
     /// The policy's revision when it made the decision.
-    #[serde(default)]
     pub revision: u64,
     /// The preset release the policy used; `None` for a policy not made from a preset.
     #[serde(default)]
@@ -2200,10 +3355,8 @@ pub struct DecisionPolicy {
 #[non_exhaustive]
 pub struct DecisionPolicyPreset {
     /// The preset's ID.
-    #[serde(default)]
     pub id: PolicyPresetId,
     /// The preset release.
-    #[serde(default)]
     pub version: u64,
 }
 
@@ -2227,10 +3380,8 @@ string_enum! {
 #[non_exhaustive]
 pub struct AssetPendingReview {
     /// When the asset joined the queue, in Unix milliseconds.
-    #[serde(default)]
     pub requested_at: i64,
     /// `sampled` or `uncertain`.
-    #[serde(default)]
     pub reason: PendingReviewReason,
     /// The categories that made the decision uncertain; empty for a sampled decision.
     #[serde(default)]
@@ -2268,7 +3419,7 @@ pub struct AssetModeration {
     /// The moderation decision in force, which also decides delivery, with reviewer decisions
     /// taking precedence.
     #[serde(default)]
-    pub status: AssetModerationStatus,
+    pub decision: Option<AssetModerationDecision>,
     /// The status automated moderation decided; `None` before a decision. Manual reviews can
     /// change `status` without changing this, so the two differ when a reviewer overrode the
     /// automated decision.
@@ -2327,7 +3478,6 @@ pub struct AssetModeration {
 #[non_exhaustive]
 pub struct AssetContent {
     /// `temporary` until processing finishes, `stored`, or `removed`.
-    #[serde(default)]
     pub status: AssetContentStatus,
     /// Why the content was removed; `None` while it is held.
     #[serde(default)]
@@ -2413,7 +3563,6 @@ pub struct AssetContent {
 #[non_exhaustive]
 pub struct AssetModerationTimeline {
     /// How many segments the asset's findings timeline holds.
-    #[serde(default)]
     pub segment_count: u32,
     /// Fields this SDK version does not know.
     #[serde(
@@ -2450,10 +3599,8 @@ pub struct ModerationRaw {
 #[non_exhaustive]
 pub struct CategoryPolicyScore {
     /// The policy score.
-    #[serde(default)]
     pub score: f64,
     /// `allow`, `limit`, `age-restrict`, `block` or `purge`.
-    #[serde(default)]
     pub action: FlaggedContentAction,
     /// The rule that decided the category, or that its policy score stayed below 50%.
     #[serde(default)]
@@ -2487,7 +3634,6 @@ string_enum! {
 #[non_exhaustive]
 pub struct CategoryPolicySource {
     /// `allowance`, `restriction`, `default` or `below-threshold`.
-    #[serde(default)]
     pub kind: CategoryPolicySourceKind,
     /// For an allowance or restriction, the indexes of the deciding rules, the decisive rule
     /// first; `None` for `default` and `below-threshold`.
@@ -2520,7 +3666,6 @@ pub struct PolicyRuleSnapshot {
     #[serde(default)]
     pub unless: Option<Vec<ModerationQualifier>>,
     /// Saved action.
-    #[serde(default)]
     pub action: FlaggedContentAction,
 }
 
@@ -2534,7 +3679,6 @@ pub struct PolicyRuleSnapshot {
 #[non_exhaustive]
 pub struct CategoryPolicySettingsSnapshot {
     /// Saved default action.
-    #[serde(default)]
     pub action: FlaggedContentAction,
     /// Saved allowances.
     #[serde(default)]
@@ -2609,7 +3753,6 @@ pub struct RegionalDecision {
 #[non_exhaustive]
 pub struct CategoryResult {
     /// Whether the category was assessed.
-    #[serde(default)]
     pub status: EvaluationStatus,
     /// The score from 0 to 1, unless `status` is `NotEvaluated`.
     #[serde(default)]
@@ -2651,7 +3794,6 @@ pub struct QualifierResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub all_score: Option<f64>,
     /// Whether the qualifier was assessed.
-    #[serde(default)]
     pub status: QualifierEvaluationStatus,
     /// Confidence that some of the content is this qualifier, from 0 to 1, when evaluated.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2724,7 +3866,6 @@ pub struct ProcessingFeatureResults {
 #[non_exhaustive]
 pub struct PersonDetectionResult {
     /// Whether the feature ran.
-    #[serde(default)]
     pub status: FeatureResultStatus,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2748,7 +3889,6 @@ pub struct PersonDetectionResult {
 #[non_exhaustive]
 pub struct FaceDetectionResult {
     /// Whether the feature ran.
-    #[serde(default)]
     pub status: FeatureResultStatus,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2772,7 +3912,6 @@ pub struct FaceDetectionResult {
 #[non_exhaustive]
 pub struct LinkDetectionResult {
     /// Whether the feature ran.
-    #[serde(default)]
     pub status: FeatureResultStatus,
     /// Why the feature did not run.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2798,10 +3937,9 @@ pub struct LinkDetectionResult {
 #[non_exhaustive]
 pub struct DetectedQrCode {
     /// The decoded value.
-    #[serde(default)]
     pub value: String,
     /// Where the QR code is (`box` on the wire).
-    #[serde(default, rename = "box")]
+    #[serde(rename = "box")]
     pub bounding_box: BoundingBox,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<DetectedQrCode, _>")]
@@ -2828,10 +3966,8 @@ string_enum! {
 #[non_exhaustive]
 pub struct DetectedLink {
     /// The URL.
-    #[serde(default)]
     pub url: String,
     /// Where it was found.
-    #[serde(default)]
     pub source: LinkSource,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<DetectedLink, _>")]
@@ -3126,7 +4262,6 @@ pub struct AiGeneratedSignal {
 #[non_exhaustive]
 pub struct OcrResult {
     /// Whether OCR ran.
-    #[serde(default)]
     pub status: FeatureResultStatus,
     /// Why OCR has no findings, when `status` is `NotEvaluated`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -3150,10 +4285,9 @@ pub struct OcrResult {
 #[non_exhaustive]
 pub struct TextRegion {
     /// Where the text is (`box` on the wire).
-    #[serde(default, rename = "box")]
+    #[serde(rename = "box")]
     pub bounding_box: BoundingBox,
     /// Whether the text holds personal information.
-    #[serde(default)]
     pub personal_information: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<TextRegion, _>")]
@@ -3178,19 +4312,14 @@ string_enum! {
 #[non_exhaustive]
 pub struct HashMatch {
     /// Where the match came from: `hash-list`.
-    #[serde(default)]
     pub source: HashMatchSource,
     /// The hash list.
-    #[serde(default)]
     pub hash_list_id: String,
     /// The matched entry.
-    #[serde(default)]
     pub hash_list_entry_id: String,
     /// The Hamming distance between the hashes; lower is closer.
-    #[serde(default)]
     pub distance: f64,
     /// What the list does with matches.
-    #[serde(default)]
     pub action: HashListAction,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<HashMatch, _>")]
@@ -3207,10 +4336,9 @@ pub struct HashMatch {
 #[non_exhaustive]
 pub struct DetectedPerson {
     /// Where the person is (`box` on the wire).
-    #[serde(default, rename = "box")]
+    #[serde(rename = "box")]
     pub bounding_box: BoundingBox,
     /// Detection confidence from 0 to 1.
-    #[serde(default)]
     pub confidence: f64,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<DetectedPerson, _>")]
@@ -3227,10 +4355,9 @@ pub struct DetectedPerson {
 #[non_exhaustive]
 pub struct DetectedFace {
     /// Where the face is (`box` on the wire).
-    #[serde(default, rename = "box")]
+    #[serde(rename = "box")]
     pub bounding_box: BoundingBox,
     /// Detection confidence from 0 to 1.
-    #[serde(default)]
     pub confidence: f64,
     /// The estimated age range, when age estimation was requested.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -3251,16 +4378,12 @@ pub struct DetectedFace {
 #[non_exhaustive]
 pub struct BoundingBox {
     /// The left edge.
-    #[serde(default)]
     pub left: f64,
     /// The top edge.
-    #[serde(default)]
     pub top: f64,
     /// The width.
-    #[serde(default)]
     pub width: f64,
     /// The height.
-    #[serde(default)]
     pub height: f64,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<BoundingBox, _>")]
@@ -3277,10 +4400,8 @@ pub struct BoundingBox {
 #[non_exhaustive]
 pub struct AgeRange {
     /// The lowest estimated age.
-    #[serde(default)]
     pub low: u32,
     /// The highest estimated age.
-    #[serde(default)]
     pub high: u32,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AgeRange, _>")]
@@ -3297,13 +4418,10 @@ pub struct AgeRange {
 #[non_exhaustive]
 pub struct MediaClassificationSegment {
     /// What the scores come from.
-    #[serde(default)]
     pub source: MediaSegmentSource,
     /// The segment start.
-    #[serde(default)]
     pub start_seconds: f64,
     /// The segment end.
-    #[serde(default)]
     pub end_seconds: f64,
     /// Results by category.
     #[serde(default)]
@@ -3332,11 +4450,25 @@ pub struct AssetPage {
     #[serde(default)]
     pub next_cursor: Option<String>,
     /// Whether another page follows.
-    #[serde(default)]
     pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetPage, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl AssetPage {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for AssetPage {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 impl AssetPage {
     /// A page of `items`, with `has_more`, e.g. for a mock response.
@@ -3365,11 +4497,25 @@ pub struct AssetTimelinePage {
     #[serde(default)]
     pub next_cursor: Option<String>,
     /// Whether another page follows.
-    #[serde(default)]
     pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetTimelinePage, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl AssetTimelinePage {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for AssetTimelinePage {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// A folder.
@@ -3384,16 +4530,13 @@ pub struct Folder {
     /// The folder ID.
     pub id: String,
     /// The name.
-    #[serde(default)]
     pub name: String,
     /// The parent folder, or `None` at the project root.
     #[serde(default)]
     pub parent_id: Option<String>,
     /// The owning project.
-    #[serde(default)]
     pub project_id: String,
     /// Milliseconds since the Unix epoch.
-    #[serde(default)]
     pub created_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
@@ -3401,6 +4544,21 @@ pub struct Folder {
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<Folder, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl Folder {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for Folder {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 impl Folder {
     /// A folder with `id`, `name` and `parent_id`, e.g. for a mock response.
@@ -3581,7 +4739,7 @@ string_enum! {
 #[non_exhaustive]
 pub struct Actor {
     /// What kind of actor it is (`type` on the wire).
-    #[serde(default, rename = "type")]
+    #[serde(rename = "type")]
     pub actor_type: ActorType,
     /// The user's or API key's ID. `None` for `automated` and `system`, and when the ID was not
     /// recorded.
@@ -3615,21 +4773,16 @@ pub struct Event {
     pub event_type: EventType,
     /// Milliseconds since the Unix epoch. The API always sends it; `0` only in an event built
     /// for a mock, which fills it in.
-    #[serde(default)]
     pub created_at: u64,
     /// The owning project. The API always sends it; empty only in an event built for a mock,
     /// which fills it in.
-    #[serde(default)]
     pub project_id: String,
     /// Who caused the event. The API always sends it; the default (an empty actor type) only in
     /// an event built for a mock, which fills it in.
-    #[serde(default)]
     pub actor: Actor,
     /// The severity.
-    #[serde(default)]
     pub severity: EventSeverity,
     /// The title.
-    #[serde(default)]
     pub title: String,
     /// The description.
     #[serde(default)]
@@ -3769,7 +4922,7 @@ impl EventAsset {
     pub fn new(
         id: impl Into<String>,
         processing: AssetClassificationStatus,
-        moderation: AssetModerationStatus,
+        moderation: Option<AssetModerationDecision>,
         content: AssetContentStatus,
     ) -> Self {
         let value = serde_json::json!({
@@ -3778,7 +4931,7 @@ impl EventAsset {
             "classification": {
                 "status": processing,
                 "testInput": false,
-                "moderation": {"status": moderation},
+                "moderation": {"decision": moderation},
             },
             "content": {"status": content},
         });
@@ -3821,8 +4974,8 @@ impl EventAsset {
             .as_bool()
     }
     /// The moderation status when the event was created, which also decides delivery.
-    pub fn moderation_status(&self) -> Option<AssetModerationStatus> {
-        self.text(&["classification", "moderation", "status"])
+    pub fn moderation_decision(&self) -> Option<AssetModerationDecision> {
+        self.text(&["classification", "moderation", "decision"])
             .map(Into::into)
     }
     /// Whether CalmLens held the content when the event was created.
@@ -3861,10 +5014,8 @@ pub struct EventsPage {
     pub items: Vec<Event>,
     /// Pass as `cursor` to continue. Unlike other pages it is always set: store it between
     /// polls to receive later events.
-    #[serde(default)]
     pub next_cursor: String,
     /// Whether more events are available now.
-    #[serde(default)]
     pub has_more: bool,
     /// Event types this feed never includes, because the API key lacks the permission to see
     /// them. Give the key that permission to receive them.
@@ -3873,6 +5024,21 @@ pub struct EventsPage {
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<EventsPage, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl EventsPage {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for EventsPage {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 impl EventsPage {
     /// A page of `items`, e.g. for a mock response.
@@ -3883,6 +5049,7 @@ impl EventsPage {
             has_more,
             excluded_types: Vec::new(),
             extra: HashMap::new(),
+            last_response: ResponseSlot::default(),
         }
     }
 }
@@ -3898,25 +5065,20 @@ impl EventsPage {
 #[non_exhaustive]
 pub struct Lens {
     /// The lens ID.
-    #[serde(default)]
     pub id: String,
     /// The identifier, used in CDN URLs as `@identifier`.
-    #[serde(default)]
     pub identifier: String,
     /// The display name.
-    #[serde(default)]
     pub name: String,
     /// The asset type the lens applies to (`type` on the wire).
-    #[serde(default, rename = "type")]
+    #[serde(rename = "type")]
     pub lens_type: LensType,
     /// Whether the CDN serves the lens.
-    #[serde(default)]
     pub active: bool,
     /// The owning project; `None` for built-in lenses.
     #[serde(default)]
     pub project_id: Option<String>,
     /// Milliseconds since the Unix epoch.
-    #[serde(default)]
     pub created_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
@@ -3930,6 +5092,21 @@ pub struct Lens {
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<Lens, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl Lens {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for Lens {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// A signed asset URL, or a resource URL beneath it, from
@@ -3949,6 +5126,21 @@ pub struct SignedAssetUrl {
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<SignedAssetUrl, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl SignedAssetUrl {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for SignedAssetUrl {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 string_enum! {
@@ -3994,6 +5186,21 @@ pub struct AssetInfo {
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetInfo, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl AssetInfo {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for AssetInfo {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// The part of [`AssetContent`] that [`AssetInfo`] carries.
@@ -4058,11 +5265,9 @@ string_enum! {
 #[non_exhaustive]
 pub struct AssetRendered {
     /// What the rendered resource serves.
-    #[serde(default)]
     pub kind: AssetRenderedKind,
     /// The MIME type of the rendered file. An image is served in the best format the client
     /// accepts, such as AVIF or WebP, unless a transform sets one.
-    #[serde(default)]
     pub format: String,
     /// The width in pixels of the full view, for images and video, before any transform; `None`
     /// when unknown or for PDFs and audio.
@@ -4120,7 +5325,6 @@ string_enum! {
 pub struct AssetHls {
     /// `preparing` until the stream is saved, `ready` once `renditions` lists it, `unavailable`
     /// when it won't be prepared: see `reason`.
-    #[serde(default)]
     pub status: AssetHlsStatus,
     /// Why an `unavailable` stream isn't prepared: `allowance-used`, `billing-required`,
     /// `spend-limit`, `processing-failed` or `content-not-kept`. `None` otherwise.
@@ -4154,7 +5358,6 @@ string_enum! {
 #[non_exhaustive]
 pub struct AssetHlsRendition {
     /// Whether it is a picture size or the audio.
-    #[serde(default)]
     pub kind: AssetHlsRenditionKind,
     /// The picture width in pixels; `None` for audio.
     #[serde(default)]
@@ -4163,10 +5366,8 @@ pub struct AssetHlsRendition {
     #[serde(default)]
     pub height: Option<u32>,
     /// The peak bit rate in bits per second, counting the audio a video rendition plays with.
-    #[serde(default)]
     pub bandwidth: u64,
     /// The rendition's codecs as RFC 6381 names, such as `avc1.64001f`.
-    #[serde(default)]
     pub codecs: String,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetHlsRendition, _>")]
@@ -4242,10 +5443,8 @@ pub struct Checksums {
 #[non_exhaustive]
 pub struct SafetyHold {
     /// Why the asset is held.
-    #[serde(default)]
     pub reason: SafetyHoldReason,
     /// Milliseconds since the Unix epoch.
-    #[serde(default)]
     pub placed_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -4265,7 +5464,7 @@ pub struct SafetyHold {
 #[non_exhaustive]
 pub struct ExtractedText {
     /// `String` (inline `content`) or `Document` (stored separately under `id`).
-    #[serde(default, rename = "type")]
+    #[serde(rename = "type")]
     pub extraction_type: ExtractedTextType,
     /// The text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -4319,7 +5518,6 @@ pub struct FileMetadata {
     pub digital_source_type: Option<String>,
     /// Whether the uploaded file embedded GPS coordinates, whatever `store_sensitive_metadata` is
     /// set to.
-    #[serde(default)]
     pub contains_location: bool,
     /// Where the picture was taken, from its GPS coordinates. Sensitive: recorded only when
     /// `store_sensitive_metadata` is on.
@@ -4340,10 +5538,8 @@ pub struct FileMetadata {
 #[non_exhaustive]
 pub struct FileMetadataLocation {
     /// The latitude, from -90 to 90.
-    #[serde(default)]
     pub latitude: f64,
     /// The longitude, from -180 to 180.
-    #[serde(default)]
     pub longitude: f64,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<FileMetadataLocation, _>")]
@@ -4606,8 +5802,9 @@ impl From<GravityPosition> for Gravity {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct GravityPoint {
     /// How `x` and `y` are interpreted.
     pub mode: GravityMode,
@@ -4618,6 +5815,37 @@ pub struct GravityPoint {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub y: Option<f64>,
 }
+impl GravityPoint {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            mode: Default::default(),
+            x: Default::default(),
+            y: Default::default(),
+        }
+    }
+}
+impl GravityPoint {
+    /// Options with `mode`; set the rest with the methods below.
+    pub fn new(mode: impl Into<GravityMode>) -> Self {
+        Self {
+            mode: mode.into(),
+            x: Default::default(),
+            y: Default::default(),
+        }
+    }
+    /// The horizontal position from 0 to 1.
+    pub fn x(mut self, value: f64) -> Self {
+        self.x = Some(value);
+        self
+    }
+    /// The vertical position from 0 to 1.
+    pub fn y(mut self, value: f64) -> Self {
+        self.y = Some(value);
+        self
+    }
+}
 
 /// A border drawn around the image.
 #[cfg_attr(
@@ -4626,6 +5854,7 @@ pub struct GravityPoint {
 )]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ImageBorder {
     /// The colour, e.g. `#fff`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -4633,6 +5862,22 @@ pub struct ImageBorder {
     /// The width in pixels.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub width: Option<f64>,
+}
+impl ImageBorder {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The colour, e.g. `#fff`.
+    pub fn color(mut self, value: impl Into<String>) -> Self {
+        self.color = Some(value.into());
+        self
+    }
+    /// The width in pixels.
+    pub fn width(mut self, value: f64) -> Self {
+        self.width = Some(value);
+        self
+    }
 }
 
 string_enum! {
@@ -4674,6 +5919,7 @@ impl From<TrimEdges> for Trim {
 )]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct TrimEdges {
     /// Pixels from the top.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -4697,6 +5943,47 @@ pub struct TrimEdges {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub border: Option<TrimBorder>,
 }
+impl TrimEdges {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Pixels from the top.
+    pub fn top(mut self, value: f64) -> Self {
+        self.top = Some(value);
+        self
+    }
+    /// Pixels from the bottom.
+    pub fn bottom(mut self, value: f64) -> Self {
+        self.bottom = Some(value);
+        self
+    }
+    /// Pixels from the left.
+    pub fn left(mut self, value: f64) -> Self {
+        self.left = Some(value);
+        self
+    }
+    /// Pixels from the right.
+    pub fn right(mut self, value: f64) -> Self {
+        self.right = Some(value);
+        self
+    }
+    /// The width to trim to.
+    pub fn width(mut self, value: f64) -> Self {
+        self.width = Some(value);
+        self
+    }
+    /// The height to trim to.
+    pub fn height(mut self, value: f64) -> Self {
+        self.height = Some(value);
+        self
+    }
+    /// Also trim a uniform border.
+    pub fn border(mut self, value: impl Into<TrimBorder>) -> Self {
+        self.border = Some(value.into());
+        self
+    }
+}
 
 /// Whether and how to trim a uniform border.
 #[cfg_attr(
@@ -4719,6 +6006,7 @@ pub enum TrimBorder {
 )]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct TrimBorderOptions {
     /// The border colour; detected when unset.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -4729,6 +6017,27 @@ pub struct TrimBorderOptions {
     /// Pixels of border to keep.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub keep: Option<f64>,
+}
+impl TrimBorderOptions {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The border colour; detected when unset.
+    pub fn color(mut self, value: impl Into<String>) -> Self {
+        self.color = Some(value.into());
+        self
+    }
+    /// How far colours may differ from it.
+    pub fn tolerance(mut self, value: f64) -> Self {
+        self.tolerance = Some(value);
+        self
+    }
+    /// Pixels of border to keep.
+    pub fn keep(mut self, value: f64) -> Self {
+        self.keep = Some(value);
+        self
+    }
 }
 
 // <generated: image-transform-options>
@@ -4906,8 +6215,9 @@ pub struct ImageTransformOptions {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ClassifyText {
     /// The text; must not be blank.
     pub text: String,
@@ -4954,11 +6264,107 @@ pub struct ClassifyText {
     pub idempotency_key: Option<String>,
 }
 impl ClassifyText {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            text: Default::default(),
+            name: Default::default(),
+            description: Default::default(),
+            visibility: Default::default(),
+            processing_options: Default::default(),
+            metadata: Default::default(),
+            tags: Default::default(),
+            author_id: Default::default(),
+            context: Default::default(),
+            external_id: Default::default(),
+            external_url: Default::default(),
+            folder_id: Default::default(),
+            upload_preset_id: Default::default(),
+            idempotency_key: Default::default(),
+        }
+    }
+}
+impl ClassifyText {
+    /// The asset name; defaults to `text`.
+    pub fn name(mut self, value: impl Into<String>) -> Self {
+        self.name = Some(value.into());
+        self
+    }
+    /// A description.
+    pub fn description(mut self, value: impl Into<String>) -> Self {
+        self.description = Some(value.into());
+        self
+    }
+    /// CDN visibility, as for an asset upload.
+    pub fn visibility(mut self, value: impl Into<Visibility>) -> Self {
+        self.visibility = Some(value.into());
+        self
+    }
+    /// Processing options.
+    pub fn processing_options(mut self, value: impl Into<ProcessingOptions>) -> Self {
+        self.processing_options = Some(value.into());
+        self
+    }
+    /// Metadata items.
+    pub fn metadata(mut self, value: impl Into<Vec<MetadataItem>>) -> Self {
+        self.metadata = Some(value.into());
+        self
+    }
+    /// Tags for the asset, such as `["catalogue", "backpacks"]`.
+    pub fn tags(mut self, value: impl Into<Vec<String>>) -> Self {
+        self.tags = Some(value.into());
+        self
+    }
+    /// Your identifier for who wrote the text. CalmLens only compares it with the author IDs in
+    /// `context`, to tell which posts share a speaker.
+    pub fn author_id(mut self, value: impl Into<String>) -> Self {
+        self.author_id = Some(value.into());
+        self
+    }
+    /// Earlier posts in the conversation, oldest first. The SDK sends only the posts CalmLens
+    /// uses; see [`select_moderation_context_items`].
+    pub fn context(mut self, value: impl Into<ModerationContext>) -> Self {
+        self.context = Some(value.into());
+        self
+    }
+    /// Your ID for the asset.
+    pub fn external_id(mut self, value: impl Into<String>) -> Self {
+        self.external_id = Some(value.into());
+        self
+    }
+    /// A link to the asset in your system.
+    pub fn external_url(mut self, value: impl Into<String>) -> Self {
+        self.external_url = Some(value.into());
+        self
+    }
+    /// The folder.
+    pub fn folder_id(mut self, value: impl Into<String>) -> Self {
+        self.folder_id = Patch::Value(value.into());
+        self
+    }
+    /// Clears `folder_id`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_folder_id(mut self) -> Self {
+        self.folder_id = Patch::Null;
+        self
+    }
+    /// The upload preset to apply.
+    pub fn upload_preset_id(mut self, value: impl Into<String>) -> Self {
+        self.upload_preset_id = Some(value.into());
+        self
+    }
+    /// The `Idempotency-Key`. The SDK generates one when it is `None`.
+    pub fn idempotency_key(mut self, value: impl Into<String>) -> Self {
+        self.idempotency_key = Some(value.into());
+        self
+    }
+}
+impl ClassifyText {
     /// Moderates `text`.
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
-            ..Self::default()
+            ..Self::blank()
         }
     }
 }
@@ -4968,8 +6374,9 @@ impl ClassifyText {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct SignUploadToken {
     /// The upload preset the token may upload through.
     pub upload_preset_id: String,
@@ -4981,11 +6388,34 @@ pub struct SignUploadToken {
     pub expires_in: Option<u32>,
 }
 impl SignUploadToken {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            upload_preset_id: Default::default(),
+            external_id: Default::default(),
+            expires_in: Default::default(),
+        }
+    }
+}
+impl SignUploadToken {
+    /// The external ID the uploaded asset gets. Must not be empty.
+    pub fn external_id(mut self, value: impl Into<String>) -> Self {
+        self.external_id = Some(value.into());
+        self
+    }
+    /// The token's lifetime in seconds, from 1 to 3600. Defaults to 600.
+    pub fn expires_in(mut self, value: u32) -> Self {
+        self.expires_in = Some(value);
+        self
+    }
+}
+impl SignUploadToken {
     /// A token for `upload_preset_id` with the default lifetime.
     pub fn new(upload_preset_id: impl Into<String>) -> Self {
         Self {
             upload_preset_id: upload_preset_id.into(),
-            ..Self::default()
+            ..Self::blank()
         }
     }
 }
@@ -5009,8 +6439,9 @@ pub struct SignedUploadToken {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct SearchAssets {
     /// The natural-language query.
     pub query: String,
@@ -5020,6 +6451,37 @@ pub struct SearchAssets {
     /// How many of the best matches to return, 1 to 20 (the API's default is 10).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page_size: Option<u32>,
+}
+impl SearchAssets {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            query: Default::default(),
+            mode: Default::default(),
+            page_size: Default::default(),
+        }
+    }
+}
+impl SearchAssets {
+    /// Options with `query`; set the rest with the methods below.
+    pub fn new(query: impl Into<String>) -> Self {
+        Self {
+            query: query.into(),
+            mode: Default::default(),
+            page_size: Default::default(),
+        }
+    }
+    /// How to match; defaults to `Hybrid`.
+    pub fn mode(mut self, value: impl Into<SearchMode>) -> Self {
+        self.mode = Some(value.into());
+        self
+    }
+    /// How many of the best matches to return, 1 to 20 (the API's default is 10).
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
 }
 
 /// One search result.
@@ -5034,7 +6496,6 @@ pub struct AssetSearchMatch {
     /// The asset.
     pub asset: Asset,
     /// The relevance score.
-    #[serde(default)]
     pub score: f64,
     /// The fields that matched.
     #[serde(default)]
@@ -5054,17 +6515,30 @@ pub struct AssetSearchMatch {
 #[non_exhaustive]
 pub struct AssetSearchResponse {
     /// The query.
-    #[serde(default)]
     pub query: String,
     /// The results.
     #[serde(default)]
     pub items: Vec<AssetSearchMatch>,
     /// Whether semantic search is available.
-    #[serde(default)]
     pub semantic_status: SemanticStatus,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<AssetSearchResponse, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl AssetSearchResponse {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for AssetSearchResponse {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// One page of child folders, with the folders above them.
@@ -5086,11 +6560,25 @@ pub struct FolderPage {
     #[serde(default)]
     pub next_cursor: Option<String>,
     /// Whether another page follows.
-    #[serde(default)]
     pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<FolderPage, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl FolderPage {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for FolderPage {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// Options for browsing folders.
@@ -5100,6 +6588,7 @@ pub struct FolderPage {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListFolders {
     /// Lists immediate children of this folder; omit for project root.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -5117,6 +6606,38 @@ pub struct ListFolders {
     /// Literal folder-name substring.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search: Option<String>,
+}
+impl ListFolders {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Lists immediate children of this folder; omit for project root.
+    pub fn parent_id(mut self, value: impl Into<String>) -> Self {
+        self.parent_id = Some(value.into());
+        self
+    }
+    /// The previous page's `next_cursor`; omit for the first page.
+    pub fn cursor(mut self, value: impl Into<String>) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    /// Page size from 1 to 100 (the API's default is 50).
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
+    /// The sort: one field, `name` (the default) or `createdAt`, descending when prefixed with
+    /// `-`, such as `-createdAt`.
+    pub fn sort(mut self, value: impl Into<String>) -> Self {
+        self.sort = Some(value.into());
+        self
+    }
+    /// Literal folder-name substring.
+    pub fn search(mut self, value: impl Into<String>) -> Self {
+        self.search = Some(value.into());
+        self
+    }
 }
 
 string_enum! {
@@ -5141,19 +6662,15 @@ pub struct HashList {
     /// The hash list ID.
     pub id: String,
     /// The owning project.
-    #[serde(default)]
     pub project_id: String,
     /// The name.
-    #[serde(default)]
     pub name: String,
     /// The description.
     #[serde(default)]
     pub description: Option<String>,
     /// What matches do.
-    #[serde(default)]
     pub action: HashListAction,
     /// Milliseconds since the Unix epoch.
-    #[serde(default)]
     pub created_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
@@ -5161,6 +6678,21 @@ pub struct HashList {
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<HashList, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl HashList {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for HashList {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 impl HashList {
     /// A hash list with `id`, `name` and `action`, e.g. for a mock response.
@@ -5186,13 +6718,10 @@ pub struct HashListEntry {
     /// The entry ID.
     pub id: String,
     /// The owning project.
-    #[serde(default)]
     pub project_id: String,
     /// The hash list.
-    #[serde(default)]
     pub hash_list_id: String,
     /// The PDQ hash: 64 hexadecimal characters.
-    #[serde(default)]
     pub hash: String,
     /// The hash's quality from 0 to 100, when known.
     #[serde(default)]
@@ -5204,11 +6733,25 @@ pub struct HashListEntry {
     #[serde(default)]
     pub asset_id: Option<String>,
     /// Milliseconds since the Unix epoch.
-    #[serde(default)]
     pub created_at: u64,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<HashListEntry, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl HashListEntry {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for HashListEntry {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// A page of a project's hash lists, newest first.
@@ -5227,11 +6770,25 @@ pub struct HashListPage {
     #[serde(default)]
     pub next_cursor: Option<String>,
     /// Whether another page follows.
-    #[serde(default)]
     pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<HashListPage, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl HashListPage {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for HashListPage {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// Options for one page of a project's hash lists.
@@ -5241,6 +6798,7 @@ pub struct HashListPage {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListHashLists {
     /// The previous page's `next_cursor`; omit for the first page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -5252,6 +6810,28 @@ pub struct ListHashLists {
     /// such as `-createdAt,id`. Newest first by default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<String>,
+}
+impl ListHashLists {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The previous page's `next_cursor`; omit for the first page.
+    pub fn cursor(mut self, value: impl Into<String>) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    /// Hash lists per page, 1 to 100 (the API's default is 50).
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt,id`. Newest first by default.
+    pub fn sort(mut self, value: impl Into<String>) -> Self {
+        self.sort = Some(value.into());
+        self
+    }
 }
 
 /// A page of hash list entries, newest first.
@@ -5270,11 +6850,25 @@ pub struct HashListEntryPage {
     #[serde(default)]
     pub next_cursor: Option<String>,
     /// Whether another page follows.
-    #[serde(default)]
     pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<HashListEntryPage, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl HashListEntryPage {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for HashListEntryPage {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// Identifies a hash list.
@@ -5282,11 +6876,37 @@ pub struct HashListEntryPage {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct HashListId {
     /// The hash list ID.
     pub hash_list_id: String,
+}
+impl HashListId {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            hash_list_id: Default::default(),
+        }
+    }
+}
+impl HashListId {}
+impl From<&str> for HashListId {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+impl From<String> for HashListId {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+impl From<&String> for HashListId {
+    fn from(value: &String) -> Self {
+        Self::new(value)
+    }
 }
 impl HashListId {
     /// Identifies hash list `hash_list_id`.
@@ -5302,11 +6922,37 @@ impl HashListId {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct HashListEntryId {
     /// The entry ID.
     pub entry_id: String,
+}
+impl HashListEntryId {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            entry_id: Default::default(),
+        }
+    }
+}
+impl HashListEntryId {}
+impl From<&str> for HashListEntryId {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+impl From<String> for HashListEntryId {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+impl From<&String> for HashListEntryId {
+    fn from(value: &String) -> Self {
+        Self::new(value)
+    }
 }
 impl HashListEntryId {
     /// Identifies entry `entry_id`.
@@ -5322,8 +6968,9 @@ impl HashListEntryId {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct CreateHashList {
     /// The name.
     pub name: String,
@@ -5333,14 +6980,41 @@ pub struct CreateHashList {
     /// What matches do: `Flag` records them, `Block` also blocks close matches.
     pub action: HashListAction,
 }
+impl CreateHashList {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            name: Default::default(),
+            description: Default::default(),
+            action: Default::default(),
+        }
+    }
+}
+impl CreateHashList {
+    /// Options with `name`, `action`; set the rest with the methods below.
+    pub fn new(name: impl Into<String>, action: impl Into<HashListAction>) -> Self {
+        Self {
+            name: name.into(),
+            action: action.into(),
+            description: Default::default(),
+        }
+    }
+    /// A description.
+    pub fn description(mut self, value: impl Into<String>) -> Self {
+        self.description = Some(value.into());
+        self
+    }
+}
 
 /// Changes to a hash list. The new action applies to later uploads.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UpdateHashList {
     /// The hash list ID.
     #[serde(skip_serializing)]
@@ -5355,14 +7029,58 @@ pub struct UpdateHashList {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action: Option<HashListAction>,
 }
+impl UpdateHashList {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            hash_list_id: Default::default(),
+            name: Default::default(),
+            description: Default::default(),
+            action: Default::default(),
+        }
+    }
+}
+impl UpdateHashList {
+    /// Options with `hash_list_id`; set the rest with the methods below.
+    pub fn new(hash_list_id: impl Into<String>) -> Self {
+        Self {
+            hash_list_id: hash_list_id.into(),
+            name: Default::default(),
+            description: Default::default(),
+            action: Default::default(),
+        }
+    }
+    /// The new name.
+    pub fn name(mut self, value: impl Into<String>) -> Self {
+        self.name = Some(value.into());
+        self
+    }
+    /// The new description; `Patch::Null` clears it.
+    pub fn description(mut self, value: impl Into<String>) -> Self {
+        self.description = Patch::Value(value.into());
+        self
+    }
+    /// Clears `description`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_description(mut self) -> Self {
+        self.description = Patch::Null;
+        self
+    }
+    /// The new action.
+    pub fn action(mut self, value: impl Into<HashListAction>) -> Self {
+        self.action = Some(value.into());
+        self
+    }
+}
 
 /// Options for one page of a hash list's entries.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListHashListEntries {
     /// The hash list ID.
     pub hash_list_id: String,
@@ -5377,6 +7095,45 @@ pub struct ListHashListEntries {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<String>,
 }
+impl ListHashListEntries {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            hash_list_id: Default::default(),
+            cursor: Default::default(),
+            page_size: Default::default(),
+            sort: Default::default(),
+        }
+    }
+}
+impl ListHashListEntries {
+    /// Options with `hash_list_id`; set the rest with the methods below.
+    pub fn new(hash_list_id: impl Into<String>) -> Self {
+        Self {
+            hash_list_id: hash_list_id.into(),
+            cursor: Default::default(),
+            page_size: Default::default(),
+            sort: Default::default(),
+        }
+    }
+    /// The cursor from a previous page.
+    pub fn cursor(mut self, value: impl Into<String>) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    /// Entries per page, 1 to 100 (the API's default is 50).
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt,id`. Newest first by default.
+    pub fn sort(mut self, value: impl Into<String>) -> Self {
+        self.sort = Some(value.into());
+        self
+    }
+}
 
 /// Adds a hash to a hash list: set `hash` (and optionally `quality`), or `asset_id` to use an
 /// image asset's perceptual hash.
@@ -5384,8 +7141,9 @@ pub struct ListHashListEntries {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct AddHashListEntry {
     /// The hash list ID.
     #[serde(skip_serializing)]
@@ -5403,6 +7161,51 @@ pub struct AddHashListEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
 }
+impl AddHashListEntry {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            hash_list_id: Default::default(),
+            hash: Default::default(),
+            quality: Default::default(),
+            asset_id: Default::default(),
+            label: Default::default(),
+        }
+    }
+}
+impl AddHashListEntry {
+    /// Options with `hash_list_id`; set the rest with the methods below.
+    pub fn new(hash_list_id: impl Into<String>) -> Self {
+        Self {
+            hash_list_id: hash_list_id.into(),
+            hash: Default::default(),
+            quality: Default::default(),
+            asset_id: Default::default(),
+            label: Default::default(),
+        }
+    }
+    /// A PDQ hash: 64 hexadecimal characters.
+    pub fn hash(mut self, value: impl Into<String>) -> Self {
+        self.hash = Some(value.into());
+        self
+    }
+    /// The hash's quality from 0 to 100.
+    pub fn quality(mut self, value: i64) -> Self {
+        self.quality = Some(value);
+        self
+    }
+    /// An image asset whose perceptual hash to add.
+    pub fn asset_id(mut self, value: impl Into<String>) -> Self {
+        self.asset_id = Some(value.into());
+        self
+    }
+    /// A label, such as a report reference.
+    pub fn label(mut self, value: impl Into<String>) -> Self {
+        self.label = Some(value.into());
+        self
+    }
+}
 
 /// Optional customer assertions for CDN delivery. Neither assertion is verified by CalmLens.
 #[cfg_attr(
@@ -5411,6 +7214,7 @@ pub struct AddHashListEntry {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ViewerClaims {
     /// Viewer country; otherwise inferred from the connection reaching CalmLens.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -5421,6 +7225,25 @@ pub struct ViewerClaims {
     /// sign its URL only for viewers whose age your platform confirmed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub age_confirmed: Option<bool>,
+}
+impl ViewerClaims {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Viewer country; otherwise inferred from the connection reaching CalmLens.
+    pub fn region(mut self, value: impl Into<String>) -> Self {
+        self.region = Some(value.into());
+        self
+    }
+    /// Your platform's confirmation that the viewer passed its age check. Defaults to false,
+    /// including authenticated requests. Your platform confirms the viewer's age; viewer claims are
+    /// assertions from your app, and CalmLens doesn't verify them. To control who loads an age-restricted asset, make it private and
+    /// sign its URL only for viewers whose age your platform confirmed.
+    pub fn age_confirmed(mut self, value: bool) -> Self {
+        self.age_confirmed = Some(value);
+        self
+    }
 }
 
 string_enum! {
@@ -5466,17 +7289,13 @@ pub struct Policy {
     /// The policy ID.
     pub id: String,
     /// The display name.
-    #[serde(default)]
     pub name: String,
     /// What the policy is for.
-    #[serde(default)]
     pub description: String,
     /// What the policy does with each category, its allowances and restrictions.
-    #[serde(default)]
     pub settings: PolicySettings,
     /// Changes with every saved change. Send it with each change; a policy changed since is
     /// refused with `policy/revision-conflict`.
-    #[serde(default)]
     pub revision: u64,
     /// Where the policy started from a built-in preset, or `None`.
     #[serde(default)]
@@ -5485,7 +7304,6 @@ pub struct Policy {
     #[serde(default)]
     pub project_ids: Vec<String>,
     /// Milliseconds since the Unix epoch.
-    #[serde(default)]
     pub created_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
@@ -5493,6 +7311,21 @@ pub struct Policy {
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<Policy, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl Policy {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for Policy {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// The built-in preset a policy started from.
@@ -5505,17 +7338,13 @@ pub struct Policy {
 #[non_exhaustive]
 pub struct PolicyPresetOrigin {
     /// The preset.
-    #[serde(default)]
     pub id: PolicyPresetId,
     /// The preset release the policy is pinned to; resetting restores its settings.
-    #[serde(default)]
     pub version: u64,
     /// The newest release of the preset. A `Pinned` or `Copy` policy on an older `version` can
     /// be upgraded to it with [`PoliciesClient::upgrade`](crate::PoliciesClient::upgrade).
-    #[serde(default)]
     pub latest_version: u64,
     /// How the policy relates to the preset.
-    #[serde(default)]
     pub mode: PolicyPresetMode,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<PolicyPresetOrigin, _>")]
@@ -5564,7 +7393,6 @@ impl PolicySettings {
 #[non_exhaustive]
 pub struct CategoryPolicySettings {
     /// What happens when the category's policy score reaches 0.5 and no rule decides it.
-    #[serde(default)]
     pub action: FlaggedContentAction,
     /// Contexts that let content through, or act on it more softly, when all of the category's
     /// content is one of their qualifiers.
@@ -5611,7 +7439,6 @@ pub struct PolicyRule {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unless: Option<Vec<ModerationQualifier>>,
     /// What happens to matching content.
-    #[serde(default)]
     pub action: FlaggedContentAction,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<PolicyRule, _>")]
@@ -5644,11 +7471,25 @@ pub struct PolicyPage {
     #[serde(default)]
     pub next_cursor: Option<String>,
     /// Whether another page follows.
-    #[serde(default)]
     pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<PolicyPage, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl PolicyPage {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for PolicyPage {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// Options for one page of the organisation's policies.
@@ -5658,6 +7499,7 @@ pub struct PolicyPage {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListPolicies {
     /// The previous page's `next_cursor`; omit for the first page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -5670,17 +7512,65 @@ pub struct ListPolicies {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<String>,
 }
+impl ListPolicies {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The previous page's `next_cursor`; omit for the first page.
+    pub fn cursor(mut self, value: impl Into<String>) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    /// Policies per page, 1 to 100 (the API's default is 50).
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt`. Oldest first by default.
+    pub fn sort(mut self, value: impl Into<String>) -> Self {
+        self.sort = Some(value.into());
+        self
+    }
+}
 
 /// Identifies a policy.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct PolicyId {
     /// The policy ID.
     pub policy_id: String,
+}
+impl PolicyId {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            policy_id: Default::default(),
+        }
+    }
+}
+impl PolicyId {}
+impl From<&str> for PolicyId {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+impl From<String> for PolicyId {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+impl From<&String> for PolicyId {
+    fn from(value: &String) -> Self {
+        Self::new(value)
+    }
 }
 impl PolicyId {
     /// Identifies policy `policy_id`.
@@ -5699,6 +7589,7 @@ impl PolicyId {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct CreatePolicy {
     /// The display name; required with `settings`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -5712,6 +7603,32 @@ pub struct CreatePolicy {
     /// The built-in preset to copy. Send this or `settings`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preset_id: Option<PolicyPresetId>,
+}
+impl CreatePolicy {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The display name; required with `settings`.
+    pub fn name(mut self, value: impl Into<String>) -> Self {
+        self.name = Some(value.into());
+        self
+    }
+    /// What the policy is for.
+    pub fn description(mut self, value: impl Into<String>) -> Self {
+        self.description = Some(value.into());
+        self
+    }
+    /// The settings, defining every category. Send this or `preset_id`.
+    pub fn settings(mut self, value: impl Into<PolicySettings>) -> Self {
+        self.settings = Some(value.into());
+        self
+    }
+    /// The built-in preset to copy. Send this or `settings`.
+    pub fn preset_id(mut self, value: impl Into<PolicyPresetId>) -> Self {
+        self.preset_id = Some(value.into());
+        self
+    }
 }
 impl CreatePolicy {
     /// A copy of the latest release of `preset`.
@@ -5736,8 +7653,9 @@ impl CreatePolicy {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UpdatePolicy {
     /// The policy ID.
     #[serde(skip_serializing)]
@@ -5755,12 +7673,42 @@ pub struct UpdatePolicy {
     pub settings: Option<PolicySettings>,
 }
 impl UpdatePolicy {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            policy_id: Default::default(),
+            revision: Default::default(),
+            name: Default::default(),
+            description: Default::default(),
+            settings: Default::default(),
+        }
+    }
+}
+impl UpdatePolicy {
+    /// The new name.
+    pub fn name(mut self, value: impl Into<String>) -> Self {
+        self.name = Some(value.into());
+        self
+    }
+    /// The new description.
+    pub fn description(mut self, value: impl Into<String>) -> Self {
+        self.description = Some(value.into());
+        self
+    }
+    /// The complete new settings, defining every category.
+    pub fn settings(mut self, value: impl Into<PolicySettings>) -> Self {
+        self.settings = Some(value.into());
+        self
+    }
+}
+impl UpdatePolicy {
     /// Changes nothing yet to policy `policy_id` at `revision`.
     pub fn new(policy_id: impl Into<String>, revision: u64) -> Self {
         Self {
             policy_id: policy_id.into(),
             revision,
-            ..Self::default()
+            ..Self::blank()
         }
     }
 }
@@ -5771,8 +7719,9 @@ impl UpdatePolicy {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ResetPolicy {
     /// The policy ID.
     #[serde(skip_serializing)]
@@ -5782,6 +7731,27 @@ pub struct ResetPolicy {
     /// The pinned `preset.version` you reviewed.
     pub preset_version: u64,
 }
+impl ResetPolicy {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            policy_id: Default::default(),
+            revision: Default::default(),
+            preset_version: Default::default(),
+        }
+    }
+}
+impl ResetPolicy {
+    /// Options with `policy_id`, `revision`, `preset_version`; set the rest with the methods below.
+    pub fn new(policy_id: impl Into<String>, revision: u64, preset_version: u64) -> Self {
+        Self {
+            policy_id: policy_id.into(),
+            revision,
+            preset_version,
+        }
+    }
+}
 
 /// Moves a `Pinned` or `Copy` policy whose settings are unchanged from its preset release to the
 /// latest release of the preset.
@@ -5789,8 +7759,9 @@ pub struct ResetPolicy {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UpgradePolicy {
     /// The policy ID.
     #[serde(skip_serializing)]
@@ -5800,6 +7771,27 @@ pub struct UpgradePolicy {
     /// The `preset.latest_version` you reviewed.
     pub preset_version: u64,
 }
+impl UpgradePolicy {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            policy_id: Default::default(),
+            revision: Default::default(),
+            preset_version: Default::default(),
+        }
+    }
+}
+impl UpgradePolicy {
+    /// Options with `policy_id`, `revision`, `preset_version`; set the rest with the methods below.
+    pub fn new(policy_id: impl Into<String>, revision: u64, preset_version: u64) -> Self {
+        Self {
+            policy_id: policy_id.into(),
+            revision,
+            preset_version,
+        }
+    }
+}
 
 /// Switches automatic updates for the organisation's own preset policy. `enabled` turns a
 /// `Pinned` policy `Live`, replacing its settings with the latest preset's; `false` pins a `Live`
@@ -5808,8 +7800,9 @@ pub struct UpgradePolicy {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct SetPolicyAutomaticUpdates {
     /// The policy ID.
     #[serde(skip_serializing)]
@@ -5821,18 +7814,57 @@ pub struct SetPolicyAutomaticUpdates {
     /// The policy's `preset.latest_version`.
     pub preset_version: u64,
 }
+impl SetPolicyAutomaticUpdates {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            policy_id: Default::default(),
+            enabled: Default::default(),
+            revision: Default::default(),
+            preset_version: Default::default(),
+        }
+    }
+}
+impl SetPolicyAutomaticUpdates {
+    /// Options with `policy_id`, `enabled`, `revision`, `preset_version`; set the rest with the methods below.
+    pub fn new(
+        policy_id: impl Into<String>,
+        enabled: bool,
+        revision: u64,
+        preset_version: u64,
+    ) -> Self {
+        Self {
+            policy_id: policy_id.into(),
+            enabled,
+            revision,
+            preset_version,
+        }
+    }
+}
 
 /// Chooses the policy the project moderates with.
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct AssignPolicy {
     /// One of the organisation's policies.
     pub policy_id: String,
 }
+impl AssignPolicy {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            policy_id: Default::default(),
+        }
+    }
+}
+impl AssignPolicy {}
 impl AssignPolicy {
     /// Assigns policy `policy_id`.
     pub fn new(policy_id: impl Into<String>) -> Self {
@@ -5863,28 +7895,21 @@ string_enum! {
 #[non_exhaustive]
 pub struct UploadPreset {
     /// The upload preset ID.
-    #[serde(default)]
     pub id: String,
     /// The owning project.
-    #[serde(default)]
     pub project_id: String,
     /// Who created the preset, when a person did.
     #[serde(default)]
     pub created_by_user_id: Option<String>,
     /// The key, unique in the project.
-    #[serde(default)]
     pub key: String,
     /// Counts the preset's changes; send it back to refuse a change made since you read it.
-    #[serde(default)]
     pub revision: u64,
     /// The display name.
-    #[serde(default)]
     pub name: String,
     /// Who can upload from a browser or app.
-    #[serde(default)]
     pub access: UploadPresetAccess,
     /// Whether the preset accepts uploads.
-    #[serde(default)]
     pub enabled: bool,
     /// MIME types the preset accepts, such as `image/*`; `None` accepts any supported type.
     #[serde(default)]
@@ -5899,13 +7924,11 @@ pub struct UploadPreset {
     #[serde(default)]
     pub policy_id: Option<String>,
     /// The visibility of uploaded assets.
-    #[serde(default)]
     pub visibility: Visibility,
     /// Processing options for every upload through the preset.
     #[serde(default)]
     pub processing_options: Option<ProcessingOptions>,
     /// Whether browser uploads see the moderation decision for their own upload.
-    #[serde(default)]
     pub reveal_decision: bool,
     /// The most uploads the preset accepts from each client (IP address) per UTC day.
     #[serde(default)]
@@ -5914,7 +7937,6 @@ pub struct UploadPreset {
     #[serde(default)]
     pub allowed_origins: Option<Vec<String>>,
     /// Milliseconds since the Unix epoch.
-    #[serde(default)]
     pub created_at: u64,
     /// Milliseconds since the Unix epoch.
     #[serde(default)]
@@ -5940,11 +7962,25 @@ pub struct UploadPresetPage {
     #[serde(default)]
     pub next_cursor: Option<String>,
     /// Whether another page follows.
-    #[serde(default)]
     pub has_more: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<UploadPresetPage, _>")]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl UploadPresetPage {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for UploadPresetPage {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// Options for one page of the project's upload presets.
@@ -5954,6 +7990,7 @@ pub struct UploadPresetPage {
 )]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ListUploadPresets {
     /// The previous page's `next_cursor`; omit for the first page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -5966,6 +8003,28 @@ pub struct ListUploadPresets {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sort: Option<String>,
 }
+impl ListUploadPresets {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The previous page's `next_cursor`; omit for the first page.
+    pub fn cursor(mut self, value: impl Into<String>) -> Self {
+        self.cursor = Some(value.into());
+        self
+    }
+    /// Upload presets per page, 1 to 100 (the API's default is 50).
+    pub fn page_size(mut self, value: u32) -> Self {
+        self.page_size = Some(value);
+        self
+    }
+    /// The sort: `createdAt` and `id`, comma-separated, each descending when prefixed with `-`,
+    /// such as `-createdAt`. Oldest first by default.
+    pub fn sort(mut self, value: impl Into<String>) -> Self {
+        self.sort = Some(value.into());
+        self
+    }
+}
 
 /// One upload preset's whole definition, by `key`, for
 /// [`UploadPresetsClient::ensure`](crate::UploadPresetsClient::ensure). The definition replaces
@@ -5975,8 +8034,9 @@ pub struct ListUploadPresets {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UploadPresetDefinition {
     /// The key, unique in the project: lowercase letters, digits and inner hyphens, at most 64
     /// characters.
@@ -6027,12 +8087,137 @@ pub struct UploadPresetDefinition {
     pub allowed_origins: Patch<Vec<String>>,
 }
 impl UploadPresetDefinition {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            key: Default::default(),
+            revision: Default::default(),
+            name: Default::default(),
+            access: Default::default(),
+            enabled: Default::default(),
+            allowed_content_types: Default::default(),
+            max_size_in_bytes: Default::default(),
+            folder_id: Default::default(),
+            policy_id: Default::default(),
+            visibility: Default::default(),
+            processing_options: Default::default(),
+            reveal_decision: Default::default(),
+            daily_upload_limit: Default::default(),
+            allowed_origins: Default::default(),
+        }
+    }
+}
+impl UploadPresetDefinition {
+    /// The `revision` you last read, which refuses a preset changed since with
+    /// `upload-preset/revision-conflict`. Send 0 to create it only if no preset has this key;
+    /// omit it to create or replace the preset whatever its revision.
+    pub fn revision(mut self, value: u64) -> Self {
+        self.revision = Some(value);
+        self
+    }
+    /// Who can upload from a browser or app. Defaults to `token`.
+    pub fn access(mut self, value: impl Into<UploadPresetAccess>) -> Self {
+        self.access = Some(value.into());
+        self
+    }
+    /// Whether the preset accepts uploads. Defaults to `true`.
+    pub fn enabled(mut self, value: bool) -> Self {
+        self.enabled = Some(value);
+        self
+    }
+    /// MIME types the preset accepts, such as `image/*`. Empty or left out accepts any supported
+    /// type.
+    pub fn allowed_content_types(mut self, value: impl Into<Vec<String>>) -> Self {
+        self.allowed_content_types = Patch::Value(value.into());
+        self
+    }
+    /// Clears `allowed_content_types`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_allowed_content_types(mut self) -> Self {
+        self.allowed_content_types = Patch::Null;
+        self
+    }
+    /// The largest upload the preset accepts, in bytes. Left out uses the standard upload limits.
+    pub fn max_size_in_bytes(mut self, value: u64) -> Self {
+        self.max_size_in_bytes = Patch::Value(value);
+        self
+    }
+    /// Clears `max_size_in_bytes`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_max_size_in_bytes(mut self) -> Self {
+        self.max_size_in_bytes = Patch::Null;
+        self
+    }
+    /// The folder uploads go into. Left out uses the project's root.
+    pub fn folder_id(mut self, value: impl Into<String>) -> Self {
+        self.folder_id = Patch::Value(value.into());
+        self
+    }
+    /// Clears `folder_id`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_folder_id(mut self) -> Self {
+        self.folder_id = Patch::Null;
+        self
+    }
+    /// The moderation policy for uploads through the preset, one of the organisation's policies.
+    /// Left out uses the project's policy.
+    pub fn policy_id(mut self, value: impl Into<String>) -> Self {
+        self.policy_id = Patch::Value(value.into());
+        self
+    }
+    /// Clears `policy_id`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_policy_id(mut self) -> Self {
+        self.policy_id = Patch::Null;
+        self
+    }
+    /// The visibility of uploaded assets. Defaults to `private`.
+    pub fn visibility(mut self, value: impl Into<Visibility>) -> Self {
+        self.visibility = Some(value.into());
+        self
+    }
+    /// Processing options for every upload through the preset.
+    pub fn processing_options(mut self, value: impl Into<ProcessingOptions>) -> Self {
+        self.processing_options = Patch::Value(value.into());
+        self
+    }
+    /// Clears `processing_options`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_processing_options(mut self) -> Self {
+        self.processing_options = Patch::Null;
+        self
+    }
+    /// Whether browser uploads see the moderation decision for their own upload. Defaults to
+    /// `false`.
+    pub fn reveal_decision(mut self, value: bool) -> Self {
+        self.reveal_decision = Some(value);
+        self
+    }
+    /// The most uploads the preset accepts from each client (IP address) per UTC day. Required
+    /// when `access` is `anyone`.
+    pub fn daily_upload_limit(mut self, value: u64) -> Self {
+        self.daily_upload_limit = Patch::Value(value);
+        self
+    }
+    /// Clears `daily_upload_limit`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_daily_upload_limit(mut self) -> Self {
+        self.daily_upload_limit = Patch::Null;
+        self
+    }
+    /// Sites allowed to upload from the browser. Empty or left out allows any site.
+    pub fn allowed_origins(mut self, value: impl Into<Vec<String>>) -> Self {
+        self.allowed_origins = Patch::Value(value.into());
+        self
+    }
+    /// Clears `allowed_origins`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_allowed_origins(mut self) -> Self {
+        self.allowed_origins = Patch::Null;
+        self
+    }
+}
+impl UploadPresetDefinition {
     /// A preset `key` named `name`, with every other field at its default.
     pub fn new(key: impl Into<String>, name: impl Into<String>) -> Self {
         Self {
             key: key.into(),
             name: name.into(),
-            ..Self::default()
+            ..Self::blank()
         }
     }
 }
@@ -6042,11 +8227,29 @@ impl UploadPresetDefinition {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct EnsureUploadPresets {
     /// The presets, returned in the same order.
     pub upload_presets: Vec<UploadPresetDefinition>,
+}
+impl EnsureUploadPresets {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            upload_presets: Default::default(),
+        }
+    }
+}
+impl EnsureUploadPresets {
+    /// Options with `upload_presets`; set the rest with the methods below.
+    pub fn new(upload_presets: impl Into<Vec<UploadPresetDefinition>>) -> Self {
+        Self {
+            upload_presets: upload_presets.into(),
+        }
+    }
 }
 
 /// The stored presets from [`UploadPresetsClient::ensure`](crate::UploadPresetsClient::ensure).
@@ -6067,6 +8270,21 @@ pub struct EnsureUploadPresetsResponse {
         deserialize_with = "extra_fields::<EnsureUploadPresetsResponse, _>"
     )]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl EnsureUploadPresetsResponse {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for EnsureUploadPresetsResponse {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// Identifies an upload preset.
@@ -6074,11 +8292,37 @@ pub struct EnsureUploadPresetsResponse {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UploadPresetId {
     /// The upload preset ID.
     pub upload_preset_id: String,
+}
+impl UploadPresetId {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            upload_preset_id: Default::default(),
+        }
+    }
+}
+impl UploadPresetId {}
+impl From<&str> for UploadPresetId {
+    fn from(value: &str) -> Self {
+        Self::new(value)
+    }
+}
+impl From<String> for UploadPresetId {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+impl From<&String> for UploadPresetId {
+    fn from(value: &String) -> Self {
+        Self::new(value)
+    }
 }
 impl UploadPresetId {
     /// Identifies upload preset `upload_preset_id`.
@@ -6113,11 +8357,11 @@ string_enum! {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct RemoteUrlRule {
     /// How the rule treats its domains.
-    #[serde(default)]
     pub mode: RemoteUrlRuleMode,
     /// The domains, such as `example.com`.
     #[serde(default)]
@@ -6125,6 +8369,24 @@ pub struct RemoteUrlRule {
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<RemoteUrlRule, _>")]
     pub extra: HashMap<String, Value>,
+}
+impl RemoteUrlRule {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            mode: Default::default(),
+            domains: Default::default(),
+            extra: Default::default(),
+        }
+    }
+}
+impl RemoteUrlRule {
+    /// The domains, such as `example.com`.
+    pub fn domains(mut self, value: impl Into<Vec<String>>) -> Self {
+        self.domains = value.into();
+        self
+    }
 }
 impl RemoteUrlRule {
     /// A rule treating `domains` as `mode` says.
@@ -6146,17 +8408,13 @@ impl RemoteUrlRule {
 #[serde(rename_all = "camelCase")]
 pub struct HumanReviewSettings {
     /// The percentage of allowed decisions to sample.
-    #[serde(default)]
     pub allowed_sample_percent: f64,
     /// The percentage of restricted decisions to sample.
-    #[serde(default)]
     pub restricted_sample_percent: f64,
     /// Queues decisions whose policy score lies less than this many percentage points from the
     /// policy threshold; 0 turns it off.
-    #[serde(default)]
     pub uncertainty_margin_percent: f64,
     /// Queues decisions whose report has evidence moderation couldn't assess.
-    #[serde(default)]
     pub review_missing_evidence: bool,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<HumanReviewSettings, _>")]
@@ -6171,6 +8429,7 @@ pub struct HumanReviewSettings {
 )]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct HumanReviewDefinition {
     /// The percentage of allowed decisions to sample.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -6185,6 +8444,33 @@ pub struct HumanReviewDefinition {
     /// Queues decisions whose report has evidence moderation couldn't assess.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review_missing_evidence: Option<bool>,
+}
+impl HumanReviewDefinition {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// The percentage of allowed decisions to sample.
+    pub fn allowed_sample_percent(mut self, value: f64) -> Self {
+        self.allowed_sample_percent = Some(value);
+        self
+    }
+    /// The percentage of restricted decisions to sample.
+    pub fn restricted_sample_percent(mut self, value: f64) -> Self {
+        self.restricted_sample_percent = Some(value);
+        self
+    }
+    /// Queues decisions whose policy score lies less than this many percentage points from the
+    /// policy threshold; 0 turns it off.
+    pub fn uncertainty_margin_percent(mut self, value: f64) -> Self {
+        self.uncertainty_margin_percent = Some(value);
+        self
+    }
+    /// Queues decisions whose report has evidence moderation couldn't assess.
+    pub fn review_missing_evidence(mut self, value: bool) -> Self {
+        self.review_missing_evidence = Some(value);
+        self
+    }
 }
 impl From<HumanReviewSettings> for HumanReviewDefinition {
     /// Every current setting, e.g. to send a project's settings back with changes.
@@ -6213,20 +8499,15 @@ pub struct ProjectSettings {
     #[serde(default)]
     pub opt_out_jurisdictions: Vec<OptOutJurisdiction>,
     /// Whether the CDN refuses to serve assets whose moderation is still pending.
-    #[serde(default)]
     pub block_unmoderated_assets: bool,
     /// Whether uploaded images keep their embedded metadata (EXIF, XMP and IPTC).
-    #[serde(default)]
     pub store_sensitive_metadata: bool,
     /// Preview. Whether every audio and video upload that keeps its content gets an adaptive
     /// stream (HLS).
-    #[serde(default)]
     pub streaming_enabled: bool,
     /// Whether audio speech and video frames and transcripts are indexed for AI search.
-    #[serde(default)]
     pub ai_media_search_enabled: bool,
     /// Enable paid link checks. Off by default.
-    #[serde(default)]
     pub link_checking_enabled: bool,
     /// The domains accepted when content is submitted by URL; `None` accepts every public domain.
     #[serde(default)]
@@ -6235,7 +8516,6 @@ pub struct ProjectSettings {
     #[serde(default)]
     pub website_submissions_per_minute: Option<u32>,
     /// Which automated decisions are sampled into the human review queue.
-    #[serde(default)]
     pub human_review: HumanReviewSettings,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<ProjectSettings, _>")]
@@ -6252,13 +8532,10 @@ pub struct ProjectSettings {
 #[non_exhaustive]
 pub struct ProjectSettingsResource {
     /// The project.
-    #[serde(default)]
     pub project_id: String,
     /// Counts changes to the project's settings and metadata fields, which share it.
-    #[serde(default)]
     pub revision: u64,
     /// The settings.
-    #[serde(default)]
     pub settings: ProjectSettings,
     /// Fields this SDK version does not know.
     #[serde(
@@ -6266,6 +8543,21 @@ pub struct ProjectSettingsResource {
         deserialize_with = "extra_fields::<ProjectSettingsResource, _>"
     )]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl ProjectSettingsResource {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for ProjectSettingsResource {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// A project's complete settings, for
@@ -6278,6 +8570,7 @@ pub struct ProjectSettingsResource {
 )]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct ProjectSettingsDefinition {
     /// Retention default for new uploads.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -6319,6 +8612,78 @@ pub struct ProjectSettingsDefinition {
     #[serde(flatten)]
     pub extra: HashMap<String, Value>,
 }
+impl ProjectSettingsDefinition {
+    /// Options with nothing set; set them with the methods below.
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Retention default for new uploads.
+    pub fn retain_content(mut self, value: bool) -> Self {
+        self.retain_content = Some(value);
+        self
+    }
+    /// Optional standards this project doesn't serve. Defaults to none.
+    pub fn opt_out_jurisdictions(mut self, value: impl Into<Vec<OptOutJurisdiction>>) -> Self {
+        self.opt_out_jurisdictions = Some(value.into());
+        self
+    }
+    /// Whether the CDN refuses to serve assets whose moderation is still pending. Defaults to
+    /// `true`.
+    pub fn block_unmoderated_assets(mut self, value: bool) -> Self {
+        self.block_unmoderated_assets = Some(value);
+        self
+    }
+    /// Whether uploaded images keep their embedded metadata (EXIF, XMP and IPTC). Defaults to
+    /// `false`. An upload's `processing_options.store_sensitive_metadata` overrides it.
+    pub fn store_sensitive_metadata(mut self, value: bool) -> Self {
+        self.store_sensitive_metadata = Some(value);
+        self
+    }
+    /// Preview. Prepare an adaptive stream (HLS) of every audio and video upload that keeps its
+    /// content. Billed per started minute of media. Defaults to `false`.
+    pub fn streaming_enabled(mut self, value: bool) -> Self {
+        self.streaming_enabled = Some(value);
+        self
+    }
+    /// Index audio speech and video frames and transcripts for AI search. Billed per indexed media
+    /// unit. Defaults to `false`; images are always searchable.
+    pub fn ai_media_search_enabled(mut self, value: bool) -> Self {
+        self.ai_media_search_enabled = Some(value);
+        self
+    }
+    /// Enable paid link checks. Omitted settings use the default, false.
+    pub fn link_checking_enabled(mut self, value: bool) -> Self {
+        self.link_checking_enabled = Some(value);
+        self
+    }
+    /// The domains accepted when content is submitted by URL. Left out or null accepts every
+    /// public domain.
+    pub fn remote_url_rule(mut self, value: impl Into<RemoteUrlRule>) -> Self {
+        self.remote_url_rule = Patch::Value(value.into());
+        self
+    }
+    /// Clears `remote_url_rule`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_remote_url_rule(mut self) -> Self {
+        self.remote_url_rule = Patch::Null;
+        self
+    }
+    /// Lowers how many websites the project can submit per minute. Left out or null uses the
+    /// platform limit.
+    pub fn website_submissions_per_minute(mut self, value: u32) -> Self {
+        self.website_submissions_per_minute = Patch::Value(value);
+        self
+    }
+    /// Clears `website_submissions_per_minute`: sends `null`, where leaving it out keeps the current value.
+    pub fn clear_website_submissions_per_minute(mut self) -> Self {
+        self.website_submissions_per_minute = Patch::Null;
+        self
+    }
+    /// Which automated decisions are sampled into the human review queue. Defaults to none.
+    pub fn human_review(mut self, value: impl Into<HumanReviewDefinition>) -> Self {
+        self.human_review = Some(value.into());
+        self
+    }
+}
 impl From<ProjectSettings> for ProjectSettingsDefinition {
     fn from(settings: ProjectSettings) -> Self {
         Self {
@@ -6344,8 +8709,9 @@ impl From<ProjectSettings> for ProjectSettingsDefinition {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct UpdateProjectSettings {
     /// The `revision` you last read, which refuses settings or metadata fields changed since with
     /// `project-settings/revision-conflict`. Omit it to replace them whatever their revision.
@@ -6360,11 +8726,37 @@ pub struct UpdateProjectSettings {
     pub search_indexing_budget_units: Option<f64>,
 }
 impl UpdateProjectSettings {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            revision: Default::default(),
+            settings: Default::default(),
+            search_indexing_budget_units: Default::default(),
+        }
+    }
+}
+impl UpdateProjectSettings {
+    /// The `revision` you last read, which refuses settings or metadata fields changed since with
+    /// `project-settings/revision-conflict`. Omit it to replace them whatever their revision.
+    pub fn revision(mut self, value: u64) -> Self {
+        self.revision = Some(value);
+        self
+    }
+    /// Needed when turning on `ai_media_search_enabled`: the most indexing units you accept for
+    /// the project's existing media. A smaller value than the estimate is refused with
+    /// `search/estimate-changed`, whose details give the estimate.
+    pub fn search_indexing_budget_units(mut self, value: f64) -> Self {
+        self.search_indexing_budget_units = Some(value);
+        self
+    }
+}
+impl UpdateProjectSettings {
     /// Replaces the project's settings with `settings`, whatever their revision.
     pub fn new(settings: impl Into<ProjectSettingsDefinition>) -> Self {
         Self {
             settings: settings.into(),
-            ..Self::default()
+            ..Self::blank()
         }
     }
 }
@@ -6410,47 +8802,66 @@ string_enum! {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct MetadataField {
     /// The field ID, which assets' metadata values refer to.
-    #[serde(default)]
     pub id: String,
     /// The display title.
-    #[serde(default)]
     pub title: String,
     /// A description.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// The type of the field's values (`type` on the wire).
-    #[serde(default, rename = "type")]
+    #[serde(rename = "type")]
     pub field_type: MetadataFieldType,
     /// The icon the portal shows.
-    #[serde(default)]
     pub icon: MetadataFieldIcon,
     /// The color the portal shows, as `#rrggbb`.
-    #[serde(default)]
     pub color: String,
     /// Fields this SDK version does not know.
     #[serde(flatten, deserialize_with = "extra_fields::<MetadataField, _>")]
     pub extra: HashMap<String, Value>,
 }
 impl MetadataField {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            id: Default::default(),
+            title: Default::default(),
+            description: Default::default(),
+            field_type: Default::default(),
+            icon: Default::default(),
+            color: Default::default(),
+            extra: Default::default(),
+        }
+    }
+}
+impl MetadataField {
+    /// A description.
+    pub fn description(mut self, value: impl Into<String>) -> Self {
+        self.description = Some(value.into());
+        self
+    }
+}
+impl MetadataField {
     /// A field without a description.
     pub fn new(
         id: impl Into<String>,
         title: impl Into<String>,
-        field_type: MetadataFieldType,
-        icon: MetadataFieldIcon,
+        field_type: impl Into<MetadataFieldType>,
+        icon: impl Into<MetadataFieldIcon>,
         color: impl Into<String>,
     ) -> Self {
         Self {
             id: id.into(),
             title: title.into(),
-            field_type,
-            icon,
+            field_type: field_type.into(),
+            icon: icon.into(),
             color: color.into(),
-            ..Self::default()
+            ..Self::blank()
         }
     }
 }
@@ -6465,10 +8876,8 @@ impl MetadataField {
 #[non_exhaustive]
 pub struct MetadataFieldsResource {
     /// The project.
-    #[serde(default)]
     pub project_id: String,
     /// Counts changes to the project's settings and metadata fields, which share it.
-    #[serde(default)]
     pub revision: u64,
     /// The fields, in display order.
     #[serde(default)]
@@ -6479,6 +8888,21 @@ pub struct MetadataFieldsResource {
         deserialize_with = "extra_fields::<MetadataFieldsResource, _>"
     )]
     pub extra: HashMap<String, Value>,
+    /// The HTTP response this came from, read with `last_response()`.
+    #[serde(skip)]
+    pub(crate) last_response: ResponseSlot,
+}
+impl MetadataFieldsResource {
+    /// The HTTP response this result came from (status, request ID and headers), or `None`
+    /// for one decoded or built by hand.
+    pub fn last_response(&self) -> Option<&LastResponse> {
+        self.last_response.0.as_deref()
+    }
+}
+impl Responded for MetadataFieldsResource {
+    fn set_last_response(&mut self, response: LastResponse) {
+        self.last_response = ResponseSlot(Some(std::sync::Arc::new(response)));
+    }
 }
 
 /// Options for [`MetadataFieldsClient::ensure`](crate::MetadataFieldsClient::ensure).
@@ -6486,8 +8910,9 @@ pub struct MetadataFieldsResource {
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct EnsureMetadataFields {
     /// The `revision` you last read, which refuses settings or metadata fields changed since with
     /// `project-settings/revision-conflict`. Omit it to change them whatever their revision.
@@ -6496,14 +8921,40 @@ pub struct EnsureMetadataFields {
     /// The fields to create or replace by ID; other fields are kept.
     pub fields: Vec<MetadataField>,
 }
+impl EnsureMetadataFields {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            revision: Default::default(),
+            fields: Default::default(),
+        }
+    }
+}
+impl EnsureMetadataFields {
+    /// Options with `fields`; set the rest with the methods below.
+    pub fn new(fields: impl Into<Vec<MetadataField>>) -> Self {
+        Self {
+            fields: fields.into(),
+            revision: Default::default(),
+        }
+    }
+    /// The `revision` you last read, which refuses settings or metadata fields changed since with
+    /// `project-settings/revision-conflict`. Omit it to change them whatever their revision.
+    pub fn revision(mut self, value: u64) -> Self {
+        self.revision = Some(value);
+        self
+    }
+}
 
 /// Options for [`MetadataFieldsClient::delete`](crate::MetadataFieldsClient::delete).
 #[cfg_attr(
     feature = "strict-contract",
     macro_rules_attribute::macro_rules_derive(described)
 )]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct DeleteMetadataField {
     /// The field ID.
     pub field_id: String,
@@ -6511,6 +8962,24 @@ pub struct DeleteMetadataField {
     /// `project-settings/revision-conflict`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub revision: Option<u64>,
+}
+impl DeleteMetadataField {
+    /// Every field empty, for the constructors to fill in.
+    #[allow(dead_code)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            field_id: Default::default(),
+            revision: Default::default(),
+        }
+    }
+}
+impl DeleteMetadataField {
+    /// The `revision` you last read, which refuses settings or metadata fields changed since with
+    /// `project-settings/revision-conflict`.
+    pub fn revision(mut self, value: u64) -> Self {
+        self.revision = Some(value);
+        self
+    }
 }
 impl DeleteMetadataField {
     /// Deletes field `field_id`, whatever the revision.

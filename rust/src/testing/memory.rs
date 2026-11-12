@@ -389,7 +389,11 @@ struct Failure {
     raised: Option<crate::Error>,
 }
 fn fail(code: ErrorCode, message: &str) -> Failure {
-    custom(code.as_str(), code.http_status().unwrap_or(400), message)
+    custom(
+        code.as_str(),
+        code.http_status().map_or(400, |status| status.as_u16()),
+        message,
+    )
 }
 fn custom(code: &str, status: u16, message: &str) -> Failure {
     Failure {
@@ -528,7 +532,9 @@ impl Failure {
     fn into_error(self) -> crate::Error {
         match self.raised {
             Some(error) => error,
-            None => crate::Error::new(self.code.as_str(), self.message).with_status(self.status),
+            None => {
+                crate::Error::new(self.code.as_str(), self.message).with_http_status(self.status)
+            }
         }
     }
     fn response(&self) -> MockResponse {
@@ -976,7 +982,7 @@ fn apply_outcome(
     let moderation = classification.entry("moderation").or_insert_with(
         || json!({"manualReviews": [], "flaggedCategories": [], "regions": [], "timeline": null}),
     );
-    moderation["status"] = if decided { outcome } else { "pending" }.into();
+    moderation["decision"] = if decided { outcome.into() } else { Value::Null };
     let upload = section(asset, "upload");
     upload.insert("status".into(), "completed".into());
     upload.insert("updatedAt".into(), now.into());
@@ -1004,7 +1010,7 @@ pub(super) fn snapshot(asset: &Value) -> Value {
         "classification": {
             "status": asset["classification"]["status"],
             "testInput": asset["classification"]["testInput"],
-            "moderation": {"status": asset["classification"]["moderation"]["status"]},
+            "moderation": {"decision": asset["classification"]["moderation"]["decision"]},
         },
         "content": {"status": asset["content"]["status"]},
     })
@@ -1146,7 +1152,7 @@ impl Backend {
         let asset = self
             .owned(&self.storage.assets, id)
             .ok_or_else(|| fail(ErrorCode::AssetNotFound, "Asset not found"))?;
-        let status = text(&asset["classification"]["moderation"]["status"]);
+        let status = text(&asset["classification"]["moderation"]["decision"]);
         let undecided = !matches!(decision, "blocked" | "purged");
         if asset["upload"]["status"] == "uploading"
             || matches!(
@@ -1159,7 +1165,7 @@ impl Backend {
                 "The asset is still processing",
             ));
         }
-        if status == "pending" && undecided {
+        if status.is_empty() && undecided {
             return Err(fail(
                 ErrorCode::AssetDecisionNotAllowed,
                 "An asset pending moderation can only be blocked or purged",
@@ -1720,7 +1726,7 @@ impl Backend {
         let asset = self
             .owned(&self.storage.assets, asset_id)
             .ok_or_else(|| {
-                crate::Error::new(ErrorCode::AssetNotFound, "Asset not found").with_status(404)
+                crate::Error::new(ErrorCode::AssetNotFound, "Asset not found").with_http_status(404)
             })?
             .clone();
         let rerun = self.reruns.contains(asset_id);
@@ -1810,10 +1816,7 @@ impl Backend {
             None => Vec::new(),
             Some(types) => types.split(',').collect(),
         };
-        if types
-            .iter()
-            .any(|kind| matches!(EventType::from(*kind), EventType::Unknown(_)))
-        {
+        if types.iter().any(|kind| !EventType::from(*kind).is_known()) {
             return Err(validation("invalid-value", "types"));
         }
         let asset_id = q.get("assetId").map(String::as_str);
@@ -2443,7 +2446,7 @@ impl Backend {
                 // The mock never reads test inputs.
                 "testInput": false,
                 "moderation": {
-                    "status": "pending", "manualReviews": [], "automatedStatus": null,
+                    "decision": null, "manualReviews": [], "automatedStatus": null,
                     "source": null, "rule": null, "explanationComplete": null,
                     "categories": null, "flaggedCategories": [], "regions": [], "raw": null,
                     "timeline": null, "linkSafety": null,
@@ -2558,7 +2561,7 @@ impl Backend {
             }
             ("POST", "retry") => {
                 if asset["classification"]["status"] != "failed"
-                    || asset["classification"]["moderation"]["status"] != "pending"
+                    || asset["classification"]["moderation"]["decision"] != Value::Null
                 {
                     return Err(fail(
                         ErrorCode::AssetNotRetryable,
@@ -2614,7 +2617,7 @@ impl Backend {
                     let facts = json!([
                         asset_name_fact(&asset),
                         {"key": "asset-type", "value": asset["type"]},
-                        {"key": "moderation-status", "value": asset["classification"]["moderation"]["status"]},
+                        {"key": "moderation-status", "value": asset["classification"]["moderation"]["decision"]},
                     ]);
                     self.push_event(
                         "asset.rerun-requested",
@@ -2785,6 +2788,10 @@ impl Backend {
             let values = SEARCH_FIELDS.map(|field| {
                 match lookup(asset, field) {
                     Value::Array(tags) => tags.iter().map(display).collect::<Vec<_>>().join(" "),
+                    // Like the API, an undecided asset is found by its internal status.
+                    Value::Null if field == "classification.moderation.decision" => {
+                        "pending".to_owned()
+                    }
                     value => display(value),
                 }
                 .to_lowercase()
@@ -2957,7 +2964,7 @@ impl Backend {
             .response();
         }
         let id = text(&asset["id"]);
-        let status = text(&asset["classification"]["moderation"]["status"]);
+        let status = text(&asset["classification"]["moderation"]["decision"]);
         let public = asset["visibility"] == "public";
         // A grant authorises a private asset without the API key.
         let can_download = || {
@@ -3393,7 +3400,7 @@ const SEARCH_FIELDS: [&str; 9] = [
     "type",
     "content.format",
     "content.extension",
-    "classification.moderation.status",
+    "classification.moderation.decision",
 ];
 /// The most distinct query tokens a keyword search uses.
 const SEARCH_TOKENS: usize = 8;
@@ -3402,7 +3409,7 @@ const SEARCH_TOKENS: usize = 8;
 /// by policy or disposed of.
 fn content_purged(asset: &Value) -> bool {
     let moderation = &asset["classification"]["moderation"];
-    moderation["status"] == "purged"
+    moderation["decision"] == "purged"
         || (asset["content"]["status"] == "removed"
             && matches!(
                 text(&asset["content"]["removalReason"]),

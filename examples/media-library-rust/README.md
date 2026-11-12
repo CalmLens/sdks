@@ -22,14 +22,14 @@ moderation:
   it between folders with `assets().move_asset`.
 - **Listing.** Each folder lists 12 images a page with `assets().list`, using `cursor`,
   `folder_id` and a `filter` built only from fixed values: `parentId==null`, optionally with
-  one status: `classification.moderation.status==allowed`, `==limited`, `==age-restricted`, `==blocked` or
-  `==purged`, `classification.moderation.status==pending;classification.status!=failed` for
+  one status: `classification.moderation.decision==allowed`, `==limited`, `==age-restricted`, `==blocked` or
+  `==purged`, `classification.moderation.decision==pending;classification.status!=failed` for
   images in review, or `classification.status==failed`. See
   [Pagination and filtering](https://calmlens.com/docs/guides/pagination-and-filtering).
 - **Search.** Describe an image in natural language with `assets().search` in `hybrid`,
   `keyword` or `semantic` mode. Results show `semanticStatus` and each item's `matchedFields`.
   Search never returns blocked, purged, safety-held or removed content.
-- **Delivery.** Only an image whose `classification.moderation.status` is `allowed` or `limited` and whose
+- **Delivery.** Only an image whose `classification.moderation.decision` is `allowed` or `limited` and whose
   `content.status` is `stored` gets a thumbnail or a download. Each request retrieves the asset's current state, calls `ensure_lens` for a 320px
   square thumbnail lens (`calmlibrary-thumb`) or a 1600px web lens (`calmlibrary-web`), and
   redirects to the rendered resource beneath a 60-second signed asset URL from

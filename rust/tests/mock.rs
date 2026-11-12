@@ -4,7 +4,7 @@ use calmlens::{
     testing::{MockOptions, MockResponse, MockServerClient},
     ErrorCode, ServerClient,
 };
-use common::typed;
+use common::{complete, typed};
 use serde_json::{json, Value};
 
 #[tokio::test]
@@ -35,7 +35,7 @@ async fn api_errors_have_a_message_and_queued_api_errors_their_status() {
         .await
         .unwrap_err();
     assert_eq!(
-        (error.code(), error.status()),
+        (error.code(), error.status().map(|status| status.as_u16())),
         (&ErrorCode::FolderNotEmpty, Some(409))
     );
     assert_eq!(error.request_id(), Some("mock-request-2"));
@@ -44,10 +44,7 @@ async fn api_errors_have_a_message_and_queued_api_errors_their_status() {
     mock.enqueue_api_error("asset/not-found", "Asset not found");
     let response = mock
         .cdn()
-        .serve(CdnRequest {
-            asset_id: Some("asset-1".into()),
-            ..Default::default()
-        })
+        .serve(CdnRequest::new().asset_id("asset-1"))
         .await
         .unwrap();
     let request_id = response.headers()["x-request-id"]
@@ -68,17 +65,17 @@ async fn api_errors_have_a_message_and_queued_api_errors_their_status() {
         .list(ListFolders::default())
         .await
         .unwrap_err();
-    assert_eq!(error.code(), &ErrorCode::Other("billing/new-code".into()));
-    assert_eq!(error.status(), Some(400));
+    assert_eq!(error.code(), &ErrorCode::from("billing/new-code"));
+    assert_eq!(error.status().map(|status| status.as_u16()), Some(400));
 
-    // A known code spelled as Other gets its own status and equals its variant.
-    mock.enqueue_api_error(ErrorCode::Other("server/internal-error".into()), "Internal");
+    // A known code parsed from its string gets its own status and is its variant.
+    mock.enqueue_api_error(ErrorCode::from("server/internal-error"), "Internal");
     let error = mock
         .folders()
         .list(ListFolders::default())
         .await
         .unwrap_err();
-    assert_eq!(error.status(), Some(500));
+    assert_eq!(error.status().map(|status| status.as_u16()), Some(500));
     assert_eq!(error.code(), &ErrorCode::InternalError);
 }
 
@@ -88,7 +85,8 @@ async fn validation_happens_before_the_transport() {
     mock.enqueue(200, json!({"id":"one"}));
     let blank = mock.assets().classify(SubmitAsset::text(" ")).await;
     assert_eq!(blank.unwrap_err().code(), &ErrorCode::InvalidUploadPayload);
-    let unnamed = mock.assets().create(SubmitAsset::default()).await;
+    // An upload with no name and no content.
+    let unnamed = mock.assets().create(SubmitAsset::from_url("", "")).await;
     assert_eq!(
         unnamed.unwrap_err().code(),
         &ErrorCode::InvalidUploadPayload
@@ -105,11 +103,7 @@ async fn validation_happens_before_the_transport() {
     assert_eq!(octet.details().get("source"), Some(&json!("calmlens")));
     let unnumbered = mock
         .assets()
-        .upload_part(UploadPart {
-            asset_id: "asset-1".into(),
-            part: Content::text("x"),
-            ..Default::default()
-        })
+        .upload_part(UploadPart::new("asset-1", Content::text("x")))
         .await;
     assert_eq!(
         unnumbered.unwrap_err().code(),
@@ -134,11 +128,10 @@ async fn multipart_sizes_are_refused_before_the_transport_without_a_status() {
             .await
             .unwrap_err(),
         mock.assets()
-            .upload_part(UploadPart {
-                asset_id: "asset-1".into(),
-                part: Content::bytes(vec![0; MIB], "video/mp4").part(2, false),
-                ..Default::default()
-            })
+            .upload_part(UploadPart::new(
+                "asset-1",
+                Content::bytes(vec![0; MIB], "video/mp4").part(2, false),
+            ))
             .await
             .unwrap_err(),
         // An image part over 20 MiB.
@@ -192,7 +185,7 @@ async fn declared_payload_sizes_are_checked_for_first_and_later_parts() {
                         Asset::new(
                             "asset-1",
                             AssetClassificationStatus::Completed,
-                            AssetModerationStatus::Allowed,
+                            Some(AssetModerationDecision::Allowed),
                         ),
                     );
                 }
@@ -204,11 +197,7 @@ async fn declared_payload_sizes_are_checked_for_first_and_later_parts() {
                 .part(if continuation { 2 } else { 1 }, true);
                 let result = if continuation {
                     mock.assets()
-                        .upload_part(UploadPart {
-                            asset_id: "asset-1".into(),
-                            part,
-                            ..Default::default()
-                        })
+                        .upload_part(UploadPart::new("asset-1", part))
                         .await
                 } else {
                     mock.assets()
@@ -258,10 +247,7 @@ async fn mock_simulates_transport_failures() {
     assert_eq!(cause.kind(), std::io::ErrorKind::TimedOut);
     let reset = mock
         .cdn()
-        .serve(CdnRequest {
-            asset_id: Some("a".into()),
-            ..Default::default()
-        })
+        .serve(CdnRequest::new().asset_id("a"))
         .await
         .unwrap_err();
     assert_eq!(reset.code(), &ErrorCode::TransportError);
@@ -285,11 +271,7 @@ async fn binary_reader_and_stream_content_arrive_unchanged() {
     for _ in 0..3 {
         mock.enqueue(
             200,
-            Asset::new(
-                "asset-1",
-                AssetClassificationStatus::Processing,
-                AssetModerationStatus::Pending,
-            ),
+            Asset::new("asset-1", AssetClassificationStatus::Processing, None),
         );
     }
     mock.assets()
@@ -334,11 +316,7 @@ async fn binary_reader_and_stream_content_arrive_unchanged() {
     // A reader that yields fewer bytes than declared fails instead of sending a short body.
     mock.enqueue(
         200,
-        Asset::new(
-            "asset-2",
-            AssetClassificationStatus::Processing,
-            AssetModerationStatus::Pending,
-        ),
+        Asset::new("asset-2", AssetClassificationStatus::Processing, None),
     );
     let short = mock
         .assets()
@@ -358,11 +336,7 @@ async fn files_stream_from_disk() {
     let mock = MockServerClient::new().unwrap();
     mock.enqueue(
         200,
-        Asset::new(
-            "asset-1",
-            AssetClassificationStatus::Processing,
-            AssetModerationStatus::Pending,
-        ),
+        Asset::new("asset-1", AssetClassificationStatus::Processing, None),
     );
     mock.assets()
         .create(SubmitAsset::new(
@@ -389,7 +363,7 @@ async fn owned_clients_share_the_mock_queue_and_request_log() {
         Asset::new(
             "first",
             AssetClassificationStatus::Completed,
-            AssetModerationStatus::Allowed,
+            Some(AssetModerationDecision::Allowed),
         ),
     );
     mock.enqueue(
@@ -397,15 +371,15 @@ async fn owned_clients_share_the_mock_queue_and_request_log() {
         Asset::new(
             "second",
             AssetClassificationStatus::Completed,
-            AssetModerationStatus::Blocked,
+            Some(AssetModerationDecision::Blocked),
         ),
     );
     let first = owned.assets().retrieve(AssetId::new("a")).await.unwrap();
     let second = mock.assets().retrieve(AssetId::new("b")).await.unwrap();
     assert_eq!(first.id, "first");
     assert_eq!(
-        second.classification.moderation.status,
-        AssetModerationStatus::Blocked
+        second.classification.moderation.decision,
+        Some(AssetModerationDecision::Blocked)
     );
     let requests = mock.requests();
     assert_eq!(requests[0].url, "http://localhost:6110/v1/assets/a");
@@ -429,27 +403,19 @@ async fn reader_uploads_are_sent_once() {
         ))
         .await
         .unwrap_err();
-    assert_eq!(error.status(), Some(503));
+    assert_eq!(error.status().map(|status| status.as_u16()), Some(503));
     assert_eq!(mock.requests().len(), 1);
 }
 
 fn lens(identifier: &str, name: &str) -> LensDefinition {
-    LensDefinition {
-        identifier: identifier.into(),
-        name: name.into(),
-        lens_type: "image".into(),
-        active: Some(true),
-        ..Default::default()
-    }
+    LensDefinition::new(identifier, name, "image").active(true)
 }
 
 #[tokio::test]
 async fn a_lens_without_active_leaves_it_out_and_shares_a_cache_entry_with_active_true() {
     let mock = MockServerClient::in_memory(MockOptions::new()).unwrap();
-    let omitted = LensDefinition {
-        active: None,
-        ..lens("thumb", "Thumb")
-    };
+    let mut omitted = lens("thumb", "Thumb");
+    omitted.active = None;
     mock.ensure_lens(omitted).await.unwrap();
     let body = mock.last_request().unwrap().json().unwrap();
     assert_eq!(
@@ -479,16 +445,14 @@ async fn a_captured_requests_debug_output_leaves_out_the_api_key() {
 #[tokio::test]
 async fn ensure_lenses_keeps_request_order_and_caches() {
     let mock = MockServerClient::new().unwrap();
-    let response = |ids: &[&str]| json!({"lenses": ids.iter().map(|id| json!({"id": format!("lens-{id}"), "identifier": id})).collect::<Vec<_>>()});
+    let response = |ids: &[&str]| json!({"lenses": ids.iter().map(|id| complete::<Lens>(json!({"id": format!("lens-{id}"), "identifier": id, "name": id, "type": "image"}))).collect::<Vec<_>>()});
     mock.enqueue(200, response(&["zeta", "alpha", "mid"]));
     let lenses = mock
-        .ensure_lenses(EnsureLenses {
-            lenses: vec![
-                lens("zeta", "Zeta"),
-                lens("alpha", "Alpha"),
-                lens("mid", "Mid"),
-            ],
-        })
+        .ensure_lenses(EnsureLenses::new(vec![
+            lens("zeta", "Zeta"),
+            lens("alpha", "Alpha"),
+            lens("mid", "Mid"),
+        ]))
         .await
         .unwrap();
     let identifiers: Vec<_> = lenses.iter().map(|l| l.identifier.as_str()).collect();
@@ -504,13 +468,11 @@ async fn ensure_lenses_keeps_request_order_and_caches() {
     // Cached definitions need no request; a changed one is sent alone and keeps its position.
     mock.enqueue(200, response(&["alpha"]));
     let lenses = mock
-        .ensure_lenses(EnsureLenses {
-            lenses: vec![
-                lens("mid", "Mid"),
-                lens("alpha", "Alpha 2"),
-                lens("zeta", "Zeta"),
-            ],
-        })
+        .ensure_lenses(EnsureLenses::new(vec![
+            lens("mid", "Mid"),
+            lens("alpha", "Alpha 2"),
+            lens("zeta", "Zeta"),
+        ]))
         .await
         .unwrap();
     let ids: Vec<_> = lenses.iter().map(|l| l.identifier.as_str()).collect();
@@ -530,7 +492,9 @@ async fn ensure_lenses_keeps_request_order_and_caches() {
 #[tokio::test]
 async fn a_lens_changed_through_the_lenses_client_is_ensured_again() {
     let mock = MockServerClient::new().unwrap();
-    let thumb = json!({"id": "lens-thumb", "identifier": "thumb", "name": "Thumb"});
+    let thumb = complete::<Lens>(
+        json!({"id": "lens-thumb", "identifier": "thumb", "name": "Thumb", "type": "image"}),
+    );
     let ensured = json!({ "lenses": [thumb.clone()] });
     mock.enqueue(200, ensured.clone());
     mock.ensure_lens(lens("thumb", "Thumb")).await.unwrap();
@@ -539,13 +503,12 @@ async fn a_lens_changed_through_the_lenses_client_is_ensured_again() {
 
     mock.enqueue(
         200,
-        json!({"id": "lens-thumb", "identifier": "thumb", "name": "Renamed"}),
+        complete::<Lens>(
+            json!({"id": "lens-thumb", "identifier": "thumb", "name": "Renamed", "type": "image"}),
+        ),
     );
     mock.lenses()
-        .update(UpdateLens {
-            name: Some("Renamed".into()),
-            ..UpdateLens::new("lens-thumb")
-        })
+        .update(UpdateLens::new("lens-thumb").name("Renamed"))
         .await
         .unwrap();
     mock.enqueue(200, ensured.clone());
@@ -580,16 +543,11 @@ async fn patch_clear_is_distinct_from_omission() {
         Asset::new(
             "asset",
             AssetClassificationStatus::Completed,
-            AssetModerationStatus::Allowed,
+            Some(AssetModerationDecision::Allowed),
         ),
     );
     mock.assets()
-        .update(UpdateAsset {
-            asset_id: "asset".into(),
-            description: Patch::Null,
-            tags: Patch::Value(vec![]),
-            ..Default::default()
-        })
+        .update(UpdateAsset::new("asset").clear_description().tags(vec![]))
         .await
         .unwrap();
     assert_eq!(
@@ -615,7 +573,7 @@ fn json_content_options_decode_to_native_payloads() {
 fn enqueue_status(
     mock: &MockServerClient,
     processing: AssetClassificationStatus,
-    moderation: AssetModerationStatus,
+    moderation: Option<AssetModerationDecision>,
     count: usize,
 ) {
     for _ in 0..count {
@@ -629,16 +587,11 @@ fn enqueue_status(
 #[tokio::test]
 async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
     let mock = MockServerClient::new().unwrap();
-    enqueue_status(
-        &mock,
-        AssetClassificationStatus::Processing,
-        AssetModerationStatus::Pending,
-        7,
-    );
+    enqueue_status(&mock, AssetClassificationStatus::Processing, None, 7);
     enqueue_status(
         &mock,
         AssetClassificationStatus::Completed,
-        AssetModerationStatus::Blocked,
+        Some(AssetModerationDecision::Blocked),
         1,
     );
     let started = std::time::Instant::now();
@@ -652,8 +605,8 @@ async fn wait_for_decision_retrieves_with_growing_delays_until_decided() {
     let waited = mock.elapsed();
     assert_eq!(asset.id, "asset-1");
     assert_eq!(
-        asset.classification.moderation.status,
-        AssetModerationStatus::Blocked
+        asset.classification.moderation.decision,
+        Some(AssetModerationDecision::Blocked)
     );
     let requests: Vec<_> = mock
         .requests()
@@ -676,19 +629,19 @@ async fn wait_for_decision_keeps_waiting_while_a_decided_asset_is_unsettled() {
     enqueue_status(
         &mock,
         AssetClassificationStatus::Queued,
-        AssetModerationStatus::Blocked,
+        Some(AssetModerationDecision::Blocked),
         1,
     );
     enqueue_status(
         &mock,
         AssetClassificationStatus::Processing,
-        AssetModerationStatus::Blocked,
+        Some(AssetModerationDecision::Blocked),
         1,
     );
     enqueue_status(
         &mock,
         AssetClassificationStatus::Completed,
-        AssetModerationStatus::Blocked,
+        Some(AssetModerationDecision::Blocked),
         1,
     );
     let asset = mock
@@ -706,12 +659,7 @@ async fn wait_for_decision_keeps_waiting_while_a_decided_asset_is_unsettled() {
 #[tokio::test]
 async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
     let mock = MockServerClient::new().unwrap();
-    enqueue_status(
-        &mock,
-        AssetClassificationStatus::Processing,
-        AssetModerationStatus::Pending,
-        10,
-    );
+    enqueue_status(&mock, AssetClassificationStatus::Processing, None, 10);
     let error = mock
         .assets()
         .wait_for_decision(
@@ -722,7 +670,7 @@ async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
     assert_eq!(error.code(), &ErrorCode::Timeout);
     assert_eq!(
         Value::Object(error.details().clone()),
-        json!({"assetId": "asset-1", "classificationStatus": "processing", "moderationStatus": "pending"})
+        json!({"assetId": "asset-1", "classificationStatus": "processing", "moderationDecision": null})
     );
     // Checks at 0, 0.5, 1.25 and 2.375s, then stop at the 3s deadline.
     assert_eq!(mock.requests().len(), 4);
@@ -732,12 +680,7 @@ async fn wait_for_decision_times_out_at_the_deadline_with_the_last_status() {
 #[tokio::test]
 async fn dropping_wait_for_decision_stops_retrieving() {
     let mock = MockServerClient::new().unwrap();
-    enqueue_status(
-        &mock,
-        AssetClassificationStatus::Processing,
-        AssetModerationStatus::Pending,
-        10,
-    );
+    enqueue_status(&mock, AssetClassificationStatus::Processing, None, 10);
     let assets = mock.assets();
     use std::future::Future;
     let mut waiting = Box::pin(assets.wait_for_decision(WaitForDecision::new("asset-1")));
@@ -813,13 +756,8 @@ async fn asset_info_is_read_without_the_api_key_and_with_the_urls_viewer_claims(
     );
 
     mock.enqueue(200, &info);
-    let claims = ViewerClaims {
-        age_confirmed: Some(true),
-        ..Default::default()
-    };
-    let options = GetAssetInfoOptions {
-        viewer_claims: Some(claims),
-    };
+    let claims = ViewerClaims::new().age_confirmed(true);
+    let options = GetAssetInfoOptions::new().viewer_claims(claims);
     mock.cdn().get_asset_info(signed, options).await.unwrap();
     assert_eq!(
         mock.last_request().unwrap().query,

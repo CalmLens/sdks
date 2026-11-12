@@ -11,14 +11,9 @@ fn file_of(length: usize) -> Vec<u8> {
 }
 
 fn kept(name: &str, content: Content, key: &str) -> SubmitAsset {
-    SubmitAsset {
-        processing_options: Some(ProcessingOptions {
-            retain_content: Some(true),
-            ..Default::default()
-        }),
-        idempotency_key: Some(key.into()),
-        ..SubmitAsset::new(name, content)
-    }
+    SubmitAsset::new(name, content)
+        .processing_options(ProcessingOptions::new().retain_content(true))
+        .idempotency_key(key)
 }
 
 fn stored(mock: &MockServerClient, asset_id: &str) -> Vec<u8> {
@@ -40,11 +35,7 @@ fn params(mock: &MockServerClient, name: &str) -> Vec<Option<String>> {
 }
 
 fn uploading(parts: u32) -> Asset {
-    let mut asset = Asset::new(
-        "asset-1",
-        AssetClassificationStatus::Queued,
-        AssetModerationStatus::Pending,
-    );
+    let mut asset = Asset::new("asset-1", AssetClassificationStatus::Queued, None);
     asset.upload.status = "uploading".into();
     asset.upload.parts_received = Some(parts);
     asset
@@ -54,7 +45,7 @@ fn completed() -> Asset {
     Asset::new(
         "asset-1",
         AssetClassificationStatus::Completed,
-        AssetModerationStatus::Allowed,
+        Some(AssetModerationDecision::Allowed),
     )
 }
 
@@ -335,36 +326,24 @@ async fn a_multipart_upload_through_a_preset_takes_its_settings_and_its_declared
         MockServerClient::in_memory(MockOptions::new().part_size_bytes(5 * MIB as u64)).unwrap();
     let presets = mock
         .upload_presets()
-        .ensure(EnsureUploadPresets {
-            upload_presets: vec![
-                UploadPresetDefinition {
-                    key: "public".into(),
-                    name: "Public".into(),
-                    visibility: Some(Visibility::Public),
-                    ..Default::default()
-                },
-                // Each part fits, but the declared total doesn't.
-                UploadPresetDefinition {
-                    key: "small".into(),
-                    name: "Small".into(),
-                    max_size_in_bytes: Patch::Value(6 * MIB as u64),
-                    ..Default::default()
-                },
-            ],
-        })
+        .ensure(EnsureUploadPresets::new(vec![
+            UploadPresetDefinition::new("public", "Public").visibility(Visibility::Public),
+            // Each part fits, but the declared total doesn't.
+            UploadPresetDefinition::new("small", "Small").max_size_in_bytes(6 * MIB as u64),
+        ]))
         .await
         .unwrap()
         .upload_presets;
-    let upload = |preset: usize| SubmitAsset {
-        upload_preset_id: Some(presets[preset].id.clone()),
-        ..SubmitAsset::new("clip.mp4", Content::bytes(file_of(11 * MIB), "video/mp4"))
+    let upload = |preset: usize| {
+        SubmitAsset::new("clip.mp4", Content::bytes(file_of(11 * MIB), "video/mp4"))
+            .upload_preset_id(presets[preset].id.clone())
     };
     let asset = mock.assets().classify(upload(0)).await.unwrap();
     assert_eq!(asset.visibility, Visibility::Public);
     mock.clear_requests();
     let error = mock.assets().classify(upload(1)).await.unwrap_err();
     assert_eq!(*error.code(), ErrorCode::UploadTooLarge);
-    assert_eq!(error.status(), Some(413));
+    assert_eq!(error.status().map(|status| status.as_u16()), Some(413));
     assert_eq!(
         error.details().get("limitBytes"),
         Some(&json!(6 * MIB)),

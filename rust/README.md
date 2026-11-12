@@ -9,18 +9,18 @@ cargo add calmlens
 cargo add tokio --features macros,rt-multi-thread
 ```
 
-| Feature               | Default | Adds                                                                          |
-| --------------------- | ------- | ----------------------------------------------------------------------------- |
-| `async`               | yes     | The async `calmlens::ServerClient`                                            |
-| `rustls`              | yes     | TLS through rustls with the bundled Mozilla root certificates                 |
-| `rustls-native-roots` |         | TLS through rustls with the operating system's root certificates              |
-| `native-tls`          |         | TLS through the platform library                                              |
-| `blocking`            |         | `calmlens::blocking::ServerClient`, the same API without `async`              |
-| `testing`             |         | `calmlens::testing::MockServerClient`; enable it in `[dev-dependencies]` only |
+| Feature      | Default | Adds                                                                          |
+| ------------ | ------- | ----------------------------------------------------------------------------- |
+| `async`      | yes     | The async `calmlens::ServerClient`                                            |
+| `rustls`     | yes     | TLS through rustls, verifying certificates with the operating system's store  |
+| `native-tls` |         | TLS through the platform library                                              |
+| `blocking`   |         | `calmlens::blocking::ServerClient`, the same API without `async`              |
+| `tracing`    |         | A `tracing` event, with the target `calmlens`, for every HTTP attempt         |
+| `testing`    |         | `calmlens::testing::MockServerClient`; enable it in `[dev-dependencies]` only |
 
 With `default-features = false` the crate contains only the models and the webhook helpers, with no HTTP stack, for services that only receive webhooks.
 
-Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
+Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support). The minimum supported Rust version is 1.88; a minor release may raise it to a version released at least six months earlier, and a patch release never does.
 
 ## Clients
 
@@ -39,9 +39,10 @@ use calmlens::{models::*, ServerClient};
 
 #[tokio::main]
 async fn main() -> calmlens::Result<()> {
+    // Or ServerClient::from_env(), which reads CALMLENS_API_KEY and CALMLENS_PROJECT_ID.
     let client = ServerClient::new("your-api-key", "proj_8fK2mQx7Lp4NvB3tRz9Y")?;
     let asset = client.assets().classify(SubmitAsset::text("Hello world")).await?;
-    if asset.classification.moderation.status == AssetModerationStatus::Allowed {
+    if asset.classification.moderation.decision == Some(AssetModerationDecision::Allowed) {
         println!("{}", asset.id);
     }
     let queued = client
@@ -50,31 +51,33 @@ async fn main() -> calmlens::Result<()> {
         .await?;
     client
         .assets()
-        .update(UpdateAsset { asset_id: queued.id, description: Patch::Null, ..Default::default() })
+        .update(UpdateAsset::new(queued.id).name("Note").clear_description())
         .await?;
     Ok(())
 }
 ```
 
-`assets().classify` and `text().classify` wait for the decision; `assets().create` queues processing, and `assets().wait_for_decision` or a webhook reports the result. `wait_for_decision` returns once the asset is settled: its `classification.status` is `completed`, with the decision in `classification.moderation.status`, or `failed`, with the reason in `classification.failure_reason`. While it is `queued` or `processing` it keeps waiting. The moderation status decides delivery:
+`assets().classify` and `text().classify` wait for the decision; `assets().create` queues processing, and `assets().wait_for_decision` or a webhook reports the result. `wait_for_decision` returns once the asset is settled: its `classification.status` is `completed`, with the decision in `classification.moderation.decision`, or `failed`, with the reason in `classification.failure_reason`. While it is `queued` or `processing` it keeps waiting. The decision decides delivery:
 
-| Status           | Meaning                                                                                                   |
+| Decision         | Meaning                                                                                                   |
 | ---------------- | --------------------------------------------------------------------------------------------------------- |
-| `pending`        | Not decided yet; don't show the content                                                                   |
+| `None`           | Not decided yet; don't show the content                                                                   |
 | `allowed`        | Show it                                                                                                   |
 | `limited`        | Delivered like `allowed`, but reduce its reach: keep it out of recommendations and rank it lower          |
-| `age-restricted` | Show it only behind your own age check; the CDN requires `ViewerClaims { age_confirmed: Some(true), .. }` |
+| `age-restricted` | Show it only behind your own age check; the CDN requires `ViewerClaims::new().age_confirmed(true)`      |
 | `blocked`        | Not delivered; the content is kept                                                                        |
 | `purged`         | Not delivered, and the stored content is deleted                                                          |
 
-Treat an unknown moderation status as not allowed:
+Treat a missing or unknown decision as not allowed:
 
 ```rust
 let publishable = matches!(
-    asset.classification.moderation.status,
-    AssetModerationStatus::Allowed | AssetModerationStatus::Limited
+    asset.classification.moderation.decision,
+    Some(AssetModerationDecision::Allowed | AssetModerationDecision::Limited)
 );
 ```
+
+Options types are `#[non_exhaustive]`: build them with `new`, which takes the required fields, and the chained setters (`clear_*` sends `null`), so a minor release can add an option. Enums keep values this SDK version doesn't list as `Unknown`; to act on one, compare `as_str()` in a `_` arm rather than matching `Unknown`, which stops matching once a later version lists the value.
 
 ## What you can do
 
@@ -90,8 +93,9 @@ let publishable = matches!(
 - Block known images with hash lists: [Hash lists](https://calmlens.com/docs/sdk/rust/reference#hash-lists)
 - Page through assets and poll the events feed: [Pagination](https://calmlens.com/docs/sdk/rust#pagination), [Events](https://calmlens.com/docs/api/events)
 - Verify webhooks with axum or actix-web: [Webhooks](https://calmlens.com/docs/sdk/rust#webhooks), [Webhook helpers](https://calmlens.com/docs/sdk/rust/reference#webhook-helpers)
-- Configure timeouts, retries and your own reqwest client: [Client configuration](https://calmlens.com/docs/sdk/rust/reference#client-configuration), [Retries and idempotency](https://calmlens.com/docs/sdk/rust/reference#retries-and-idempotency)
-- Handle errors by code: [Errors and retries](https://calmlens.com/docs/sdk/rust#errors-and-retries), [Error details](https://calmlens.com/docs/sdk/rust/reference#error-details)
+- Configure timeouts, retries, a proxy, extra root certificates and your app's name, and override them per call: [Client configuration](https://calmlens.com/docs/sdk/rust/reference#client-configuration), [Retries and idempotency](https://calmlens.com/docs/sdk/rust/reference#retries-and-idempotency)
+- Observe every HTTP attempt with a hook, `tracing` or `CALMLENS_LOG`, read each result's `last_response()`, and call endpoints without a method through `request`: [Client configuration](https://calmlens.com/docs/sdk/rust/reference#client-configuration)
+- Handle errors by kind or code: [Errors and retries](https://calmlens.com/docs/sdk/rust#errors-and-retries), [Error details](https://calmlens.com/docs/sdk/rust/reference#error-details)
 
 ## Testing
 

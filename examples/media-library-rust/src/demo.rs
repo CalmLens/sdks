@@ -14,9 +14,9 @@ use crate::messages::{rejected, Failure};
 use axum::http::StatusCode;
 use calmlens::models::{
     Asset, AssetClassificationStatus, AssetContentRemovalReason, AssetContentStatus,
-    AssetModerationDecision, AssetModerationStatus, AssetPage, AssetPreview, AssetRendered,
-    AssetRenderedKind, AssetReview, AssetSearchMatch, AssetSearchResponse, ClassificationCategory,
-    Folder, MetadataItem, ReviewActor, ReviewActorType, SearchMatchField, Visibility,
+    AssetModerationDecision, AssetPage, AssetPreview, AssetRendered, AssetRenderedKind,
+    AssetReview, AssetSearchMatch, AssetSearchResponse, ClassificationCategory, Folder,
+    MetadataItem, ReviewActor, ReviewActorType, SearchMatchField, Visibility,
 };
 use calmlens::{Bytes, Error, ErrorCode};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -100,17 +100,17 @@ impl DemoStore {
                     _ => AssetClassificationStatus::Completed,
                 };
                 asset.classification.updated_at = Some(now_ms());
-                let status = match entry.outcome {
-                    Decision::Allowed => Some(AssetModerationStatus::Allowed),
-                    Decision::Limited => Some(AssetModerationStatus::Limited),
-                    Decision::AgeRestricted => Some(AssetModerationStatus::AgeRestricted),
-                    Decision::Blocked => Some(AssetModerationStatus::Blocked),
-                    Decision::Purged => Some(AssetModerationStatus::Purged),
+                let decision = match entry.outcome {
+                    Decision::Allowed => Some(AssetModerationDecision::Allowed),
+                    Decision::Limited => Some(AssetModerationDecision::Limited),
+                    Decision::AgeRestricted => Some(AssetModerationDecision::AgeRestricted),
+                    Decision::Blocked => Some(AssetModerationDecision::Blocked),
+                    Decision::Purged => Some(AssetModerationDecision::Purged),
                     Decision::Failed | Decision::Pending => None,
                 };
-                if let Some(status) = status {
-                    let automated = AssetModerationDecision::from(status.as_str());
-                    asset.classification.moderation.status = status;
+                if let Some(decision) = decision {
+                    let automated = decision.clone();
+                    asset.classification.moderation.decision = Some(decision);
                     asset.classification.completed_at = Some(now_ms());
                     let moderation = &mut asset.classification.moderation;
                     moderation.source = Some("policy".into());
@@ -341,7 +341,7 @@ impl DemoStore {
                 continue;
             };
             let at = now.saturating_sub(hours * 3_600_000);
-            entry.asset.created_at = Some(at);
+            entry.asset.created_at = at;
             entry.asset.tags = tags.iter().map(|tag| tag.to_string()).collect();
             if photo.is_none() {
                 // A plausible size for the samples that carry no photo bytes.
@@ -367,7 +367,7 @@ impl DemoStore {
         self.settle();
         // Back-date the decisions to a few seconds after each upload.
         for entry in &mut self.assets {
-            if let (Some(created), Some(_)) = (
+            if let (created, Some(_)) = (
                 entry.asset.created_at,
                 entry.asset.classification.completed_at,
             ) {
@@ -387,7 +387,7 @@ impl DemoStore {
         if let Some(id) = self
             .assets
             .iter()
-            .find(|entry| entry.asset.name.as_deref() == Some("Old storefront"))
+            .find(|entry| entry.asset.name == "Old storefront")
             .map(|entry| entry.asset.id.clone())
         {
             let _ = self.remove_content(&id);
@@ -427,10 +427,7 @@ impl DemoStore {
     fn sibling_named(&self, parent: Option<&str>, name: &str, except: Option<&str>) -> bool {
         self.folders.iter().any(|folder| {
             folder.parent_id.as_deref() == parent
-                && folder
-                    .name
-                    .as_deref()
-                    .is_some_and(|existing| existing.eq_ignore_ascii_case(name))
+                && folder.name.eq_ignore_ascii_case(name)
                 && Some(folder.id.as_str()) != except
         })
     }
@@ -451,9 +448,9 @@ impl DemoStore {
             name,
             parent.map(str::to_string),
         );
-        folder.project_id = Some(DEMO_PROJECT_ID.into());
-        folder.created_at = Some(now_ms());
-        folder.updated_at = folder.created_at;
+        folder.project_id = DEMO_PROJECT_ID.into();
+        folder.created_at = now_ms();
+        folder.updated_at = Some(folder.created_at);
         self.folders.push(folder.clone());
         Ok(folder)
     }
@@ -468,7 +465,7 @@ impl DemoStore {
             return Err(api(ErrorCode::DuplicateFolderName));
         }
         let folder = self.folder_mut(id)?;
-        folder.name = Some(name.into());
+        folder.name = name.into();
         folder.updated_at = Some(now_ms());
         Ok(folder.clone())
     }
@@ -478,8 +475,7 @@ impl DemoStore {
             .folder(id)
             .ok_or_else(|| api(ErrorCode::FolderNotFound))?
             .name
-            .clone()
-            .unwrap_or_default();
+            .clone();
         // Walk up from the destination: reaching the moved folder would create a cycle.
         let mut cursor = parent.map(str::to_string);
         while let Some(current) = cursor {
@@ -548,11 +544,11 @@ impl DemoStore {
         let mut asset = Asset::new(
             format!("demo-asset-{}", random_hex(6)),
             AssetClassificationStatus::Queued,
-            AssetModerationStatus::Pending,
+            None,
         );
-        asset.name = Some(upload.name);
-        asset.asset_type = Some("image".into());
-        asset.project_id = Some(DEMO_PROJECT_ID.into());
+        asset.name = upload.name;
+        asset.asset_type = "image".into();
+        asset.project_id = DEMO_PROJECT_ID.into();
         asset.folder_id = upload.folder;
         asset.content.status = AssetContentStatus::Stored;
         asset.content.size_in_bytes = Some(upload.bytes.len() as u64);
@@ -561,8 +557,8 @@ impl DemoStore {
         asset.metadata = upload.metadata;
         asset.tags = Vec::new();
         asset.visibility = Visibility::Private;
-        asset.created_at = Some(now_ms());
-        asset.updated_at = asset.created_at;
+        asset.created_at = now_ms();
+        asset.updated_at = Some(asset.created_at);
         self.assets.insert(
             0,
             DemoAsset {
@@ -679,7 +675,7 @@ impl DemoStore {
         match self.entry_mut(id) {
             Ok(entry) => {
                 let moderation = &mut entry.asset.classification.moderation;
-                moderation.status = AssetModerationStatus::from(decision.as_str());
+                moderation.decision = Some(decision.clone());
                 let mut review = AssetReview::default();
                 review.id = format!("demo-review-{}", random_hex(8));
                 review.decision = decision;
@@ -749,7 +745,7 @@ impl DemoStore {
 
 fn searchable(field: &str, asset: &Asset) -> String {
     match field {
-        "name" => asset.name.clone().unwrap_or_default(),
+        "name" => asset.name.clone(),
         "description" => asset.description.clone().unwrap_or_default(),
         "tags" => asset.tags.join(" "),
         _ => asset

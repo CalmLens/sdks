@@ -156,7 +156,7 @@ fn invalid_json_success_keeps_decode_cause() {
     });
     let error = list_events(&url, Duration::from_secs(5));
     assert_wrapped(&error, "sdk/invalid-response");
-    assert_eq!(error.status(), Some(200));
+    assert_eq!(error.status().map(|status| status.as_u16()), Some(200));
     worker.join().unwrap();
 }
 
@@ -169,10 +169,7 @@ fn truncated_cdn_stream_is_transport_error() {
     });
     let response = client(&url, Duration::from_secs(5))
         .cdn()
-        .serve(CdnRequest {
-            asset_id: Some("asset".into()),
-            ..Default::default()
-        })
+        .serve(CdnRequest::new().asset_id("asset"))
         .unwrap();
     assert_wrapped(&response.bytes().unwrap_err(), "sdk/transport-error");
     worker.join().unwrap();
@@ -188,10 +185,7 @@ fn stalled_cdn_stream_is_timeout() {
     });
     let response = client(&url, Duration::from_millis(300))
         .cdn()
-        .serve(CdnRequest {
-            asset_id: Some("asset".into()),
-            ..Default::default()
-        })
+        .serve(CdnRequest::new().asset_id("asset"))
         .unwrap();
     assert_wrapped(&response.bytes().unwrap_err(), "sdk/timeout");
     worker.join().unwrap();

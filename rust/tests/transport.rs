@@ -41,7 +41,7 @@ fn serve_assets(count: usize, delay: Duration) -> (String, thread::JoinHandle<Ve
             let (_, body) = read_request(&mut stream);
             bodies.push(body);
             thread::sleep(delay);
-            let response = r#"{"id": "asset", "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"status": "allowed"}}}"#;
+            let response = common::complete::<Asset>(serde_json::json!({"id": "asset", "upload": {"status": "completed"}, "classification": {"status": "completed", "moderation": {"decision": "allowed"}}})).to_string();
             let _ = write!(
                 stream,
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -71,8 +71,8 @@ async fn blocking_client_can_be_created_and_dropped_inside_tokio() {
     .unwrap()
     .unwrap();
     assert_eq!(
-        asset.classification.moderation.status,
-        AssetModerationStatus::Allowed
+        asset.classification.moderation.decision,
+        Some(AssetModerationDecision::Allowed)
     );
     drop(client);
     let bodies = worker.join().unwrap();
@@ -95,19 +95,11 @@ fn blocking_wait_for_decision_returns_a_failed_asset_as_decided() {
     let client = mock.blocking().unwrap();
     mock.enqueue(
         200,
-        Asset::new(
-            "asset-1",
-            AssetClassificationStatus::Processing,
-            AssetModerationStatus::Pending,
-        ),
+        Asset::new("asset-1", AssetClassificationStatus::Processing, None),
     );
     mock.enqueue(
         200,
-        Asset::new(
-            "asset-1",
-            AssetClassificationStatus::Failed,
-            AssetModerationStatus::Pending,
-        ),
+        Asset::new("asset-1", AssetClassificationStatus::Failed, None),
     );
     let asset = client
         .assets()
@@ -134,7 +126,7 @@ fn blocking_iterators_and_reads() {
             vec![Asset::new(
                 "a",
                 AssetClassificationStatus::Completed,
-                AssetModerationStatus::Allowed,
+                Some(AssetModerationDecision::Allowed),
             )],
             true,
         );
@@ -147,7 +139,7 @@ fn blocking_iterators_and_reads() {
             vec![Asset::new(
                 "b",
                 AssetClassificationStatus::Completed,
-                AssetModerationStatus::Allowed,
+                Some(AssetModerationDecision::Allowed),
             )],
             false,
         ),
@@ -159,13 +151,7 @@ fn blocking_iterators_and_reads() {
         .collect();
     assert_eq!(ids, ["a", "b"]);
     mock.enqueue_raw(200, &b"streamed body"[..]);
-    let mut response = client
-        .cdn()
-        .serve(CdnRequest {
-            asset_id: Some("a".into()),
-            ..Default::default()
-        })
-        .unwrap();
+    let mut response = client.cdn().serve(CdnRequest::new().asset_id("a")).unwrap();
     let mut body = Vec::new();
     std::io::copy(&mut response, &mut body).unwrap();
     assert_eq!(body, b"streamed body");
@@ -189,21 +175,20 @@ fn streaming_cdn_preserves_range_method_and_headers() {
         .cdn_base_url(&url)
         .build()
         .unwrap();
-    let mut response = client
-        .cdn()
-        .serve(CdnRequest {
-            asset_id: Some("asset".into()),
-            init: Some(HttpOptions {
-                method: Some("GET".into()),
-                headers: [
-                    ("Range".into(), "bytes=0-3".into()),
-                    ("X-Api-Key".into(), "override".into()),
-                ]
-                .into(),
-            }),
-            ..Default::default()
-        })
-        .unwrap();
+    let mut response =
+        client
+            .cdn()
+            .serve(
+                CdnRequest::new()
+                    .asset_id("asset")
+                    .init(HttpOptions::new().method("GET").headers(
+                        std::collections::HashMap::from([
+                            ("Range".to_owned(), "bytes=0-3".to_owned()),
+                            ("X-Api-Key".to_owned(), "override".to_owned()),
+                        ]),
+                    )),
+            )
+            .unwrap();
     assert_eq!(response.status().as_u16(), 206);
     assert_eq!(response.headers()["content-type"], "video/mp4");
     let mut bytes = Vec::new();
@@ -237,7 +222,11 @@ fn an_api_error_without_a_request_id_header_takes_the_body_request_id() {
         .retrieve(AssetId::new("asset-1"))
         .unwrap_err();
     assert_eq!(
-        (error.code(), error.status(), error.request_id()),
+        (
+            error.code(),
+            error.status().map(|status| status.as_u16()),
+            error.request_id()
+        ),
         (
             &calmlens::ErrorCode::AssetNotFound,
             Some(404),
@@ -322,15 +311,15 @@ async fn binary_uploads_are_not_cut_off_by_the_api_call_timeout() {
 
 #[test]
 fn unknown_enum_values_and_fields_decode() {
-    let asset: Asset = serde_json::from_str(
-        r#"{"id":"asset","visibility":"unlisted","newField":{"a":1},"content":{"status":"temporary","extractedText":{"content":"document text"},"futureContent":true},"classification":{"moderation":{"futureScore":2,"status":"quarantined","flaggedCategories":[],"regions":[],"timeline":{"segmentCount":2,"futureCount":1}},"futureList":[{"description":"cat"}]}}"#,
-    )
+    let asset: Asset = serde_json::from_value(common::complete::<Asset>(
+        serde_json::from_str(r#"{"id":"asset","visibility":"unlisted","newField":{"a":1},"content":{"status":"temporary","extractedText":{"type":"string","content":"document text"},"futureContent":true},"classification":{"moderation":{"futureScore":2,"decision":"quarantined","flaggedCategories":[],"regions":[],"timeline":{"segmentCount":2,"futureCount":1}},"futureList":[{"description":"cat"}]}}"#).unwrap(),
+    ))
     .unwrap();
     assert_eq!(
-        asset.classification.moderation.status,
-        AssetModerationStatus::Unknown("quarantined".into())
+        asset.classification.moderation.decision,
+        Some(AssetModerationDecision::from("quarantined"))
     );
-    assert_eq!(asset.visibility, Visibility::Unknown("unlisted".into()));
+    assert_eq!(asset.visibility, Visibility::from("unlisted"));
     assert_eq!(asset.extra["newField"], serde_json::json!({"a": 1}));
     assert_eq!(asset.content.extra["futureContent"], true);
     assert_eq!(
@@ -347,13 +336,13 @@ fn unknown_enum_values_and_fields_decode() {
     let round_trip = serde_json::to_value(Asset::new(
         "a",
         AssetClassificationStatus::Completed,
-        AssetModerationStatus::Unknown("quarantined".into()),
+        Some(AssetModerationDecision::from("quarantined")),
     ))
     .unwrap();
     assert_eq!(
         (
             &round_trip["classification"]["status"],
-            &round_trip["classification"]["moderation"]["status"]
+            &round_trip["classification"]["moderation"]["decision"]
         ),
         (
             &serde_json::json!("completed"),
@@ -364,18 +353,12 @@ fn unknown_enum_values_and_fields_decode() {
 
 #[test]
 fn processing_features_serialize_as_the_api_expects() {
-    let options = ProcessingOptions {
-        features: Some(ProcessingFeatures {
-            ocr: Some(FeatureOptions::enabled()),
-            face_detection: Some(FaceDetectionOptions {
-                age_estimation: Some(true),
-                ..FaceDetectionOptions::enabled()
-            }),
-            streaming: Some(FeatureOptions::default()),
-            ..ProcessingFeatures::default()
-        }),
-        ..ProcessingOptions::default()
-    };
+    let options = ProcessingOptions::new().features(
+        ProcessingFeatures::new()
+            .ocr(FeatureOptions::enabled())
+            .face_detection(FaceDetectionOptions::enabled().age_estimation(true))
+            .streaming(FeatureOptions::new(false)),
+    );
     assert_eq!(
         serde_json::to_value(&options).unwrap(),
         serde_json::json!({"features": {
@@ -388,14 +371,14 @@ fn processing_features_serialize_as_the_api_expects() {
 
 #[test]
 fn report_feature_results_decode() {
-    let report: AssetClassification = serde_json::from_str(
-        r#"{
+    let report: AssetClassification = serde_json::from_value(common::complete::<AssetClassification>(
+        serde_json::from_str(r#"{
             "personDetection":{"status":"not-evaluated","reason":"not-supported"},
             "faceDetection":{"status":"evaluated","faces":[
                 {"box":{"left":-0.02,"top":0.2,"width":0.3,"height":0.4},"confidence":0.99,"ageRange":{"low":21,"high":30}},
                 {"box":{"left":0.5,"top":0.5,"width":0.1,"height":0.1},"confidence":0.8}
-            ]}}"#,
-    )
+            ]}}"#).unwrap(),
+    ))
     .unwrap();
     let features = report;
     let people = features.person_detection.unwrap();
@@ -447,7 +430,10 @@ async fn concurrent_ensure_lenses_send_a_definition_once() {
             read_request(&mut stream);
             served += 1;
             thread::sleep(Duration::from_millis(300));
-            let response = r#"{"lenses": [{"id": "lens-thumb", "identifier": "thumb"}]}"#;
+            let lens = common::complete::<Lens>(
+                serde_json::json!({"id": "lens-thumb", "identifier": "thumb", "name": "thumb", "type": "image"}),
+            );
+            let response = serde_json::json!({"lenses": [lens]}).to_string();
             let _ = write!(
                 stream,
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -462,15 +448,10 @@ async fn concurrent_ensure_lenses_send_a_definition_once() {
         .build()
         .unwrap();
     let ensure = || {
-        client.ensure_lenses(EnsureLenses {
-            lenses: vec![LensDefinition {
-                identifier: "thumb".into(),
-                name: "thumb".into(),
-                lens_type: "image".into(),
-                active: Some(true),
-                ..Default::default()
-            }],
-        })
+        client.ensure_lenses(EnsureLenses::new(vec![LensDefinition::new(
+            "thumb", "thumb", "image",
+        )
+        .active(true)]))
     };
     let (first, second) = tokio::join!(ensure(), ensure());
     assert_eq!(first.unwrap()[0].id, "lens-thumb");

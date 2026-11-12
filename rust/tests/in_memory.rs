@@ -17,13 +17,8 @@ fn options() -> MockOptions {
         .now(move || clock.fetch_add(1, Ordering::SeqCst))
 }
 fn kept(name: &str, bytes: &'static [u8]) -> SubmitAsset {
-    SubmitAsset {
-        processing_options: Some(ProcessingOptions {
-            retain_content: Some(true),
-            ..Default::default()
-        }),
-        ..SubmitAsset::new(name, Content::bytes(bytes, "image/png"))
-    }
+    SubmitAsset::new(name, Content::bytes(bytes, "image/png"))
+        .processing_options(ProcessingOptions::new().retain_content(true))
 }
 fn named(name: &str) -> SubmitAsset {
     SubmitAsset::new(name, Content::text(name))
@@ -73,13 +68,10 @@ async fn storage_keeps_only_kept_content_and_drops_purged_content() {
     let mock = MockServerClient::in_memory(options()).unwrap();
     let asset = mock
         .text()
-        .classify(ClassifyText {
-            processing_options: Some(ProcessingOptions {
-                retain_content: Some(false),
-                ..Default::default()
-            }),
-            ..ClassifyText::new("hello")
-        })
+        .classify(
+            ClassifyText::new("hello")
+                .processing_options(ProcessingOptions::new().retain_content(false)),
+        )
         .await
         .unwrap();
     assert_eq!(asset.asset_type, AssetType::PlaintextDocument);
@@ -125,11 +117,7 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
     );
     let error = mock
         .assets()
-        .list_timeline(ListTimeline {
-            asset_id: decided.id.clone(),
-            page_size: Some(101),
-            ..Default::default()
-        })
+        .list_timeline(ListTimeline::new(decided.id.clone()).page_size(101))
         .await
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::InvalidRequest);
@@ -146,10 +134,7 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
     });
     let error = mock
         .assets()
-        .list_timeline(ListTimeline {
-            asset_id: decided.id.clone(),
-            ..Default::default()
-        })
+        .list_timeline(ListTimeline::new(decided.id.clone()))
         .await
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::AssetHeld);
@@ -164,11 +149,11 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
     ] {
         let response = mock
             .cdn()
-            .serve(CdnRequest {
-                asset_id: Some(decided.id.clone()),
-                resource: Some(resource.clone()),
-                ..Default::default()
-            })
+            .serve(
+                CdnRequest::new()
+                    .asset_id(decided.id.clone())
+                    .resource(resource.clone()),
+            )
             .await
             .unwrap();
         assert_eq!(response.status().as_u16(), 403, "{resource:?}");
@@ -179,13 +164,10 @@ async fn a_safety_hold_withholds_the_timeline_resources_and_rendering() {
 
     let queued = mock
         .assets()
-        .create(SubmitAsset {
-            processing_options: Some(ProcessingOptions {
-                retain_content: Some(true),
-                ..Default::default()
-            }),
-            ..SubmitAsset::new("song.mp3", Content::bytes(&b"mp3"[..], "audio/mpeg"))
-        })
+        .create(
+            SubmitAsset::new("song.mp3", Content::bytes(&b"mp3"[..], "audio/mpeg"))
+                .processing_options(ProcessingOptions::new().retain_content(true)),
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -213,18 +195,15 @@ async fn serves_the_embed_page_of_any_asset_and_no_hls_stream_until_it_is_blocke
     let mock = MockServerClient::in_memory(options()).unwrap();
     let asset = mock
         .assets()
-        .classify(SubmitAsset {
-            processing_options: Some(ProcessingOptions {
-                retain_content: Some(true),
-                features: Some(ProcessingFeatures {
-                    streaming: Some(FeatureOptions::enabled()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            visibility: Some(Visibility::Public),
-            ..SubmitAsset::new("song.wav", Content::bytes(&b"wav"[..], "audio/wav"))
-        })
+        .classify(
+            SubmitAsset::new("song.wav", Content::bytes(&b"wav"[..], "audio/wav"))
+                .processing_options(
+                    ProcessingOptions::new()
+                        .retain_content(true)
+                        .features(ProcessingFeatures::new().streaming(FeatureOptions::enabled())),
+                )
+                .visibility(Visibility::Public),
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -236,31 +215,28 @@ async fn serves_the_embed_page_of_any_asset_and_no_hls_stream_until_it_is_blocke
     );
     let cdn = mock.cdn();
     let serve = |resource: CdnResource| {
-        cdn.serve(CdnRequest {
-            asset_id: Some(asset.id.clone()),
-            resource: Some(resource),
-            ..Default::default()
-        })
+        cdn.serve(
+            CdnRequest::new()
+                .asset_id(asset.id.clone())
+                .resource(resource),
+        )
     };
     let note = mock
         .assets()
-        .classify(SubmitAsset {
-            processing_options: Some(ProcessingOptions {
-                retain_content: Some(true),
-                ..Default::default()
-            }),
-            visibility: Some(Visibility::Public),
-            ..SubmitAsset::new("note.txt", Content::text("hello"))
-        })
+        .classify(
+            SubmitAsset::new("note.txt", Content::text("hello"))
+                .processing_options(ProcessingOptions::new().retain_content(true))
+                .visibility(Visibility::Public),
+        )
         .await
         .unwrap();
     for identifier in [&asset.id, &note.id] {
         let embed = cdn
-            .serve(CdnRequest {
-                asset_id: Some(identifier.clone()),
-                resource: Some(CdnResource::Embed),
-                ..Default::default()
-            })
+            .serve(
+                CdnRequest::new()
+                    .asset_id(identifier.clone())
+                    .resource(CdnResource::Embed),
+            )
             .await
             .unwrap();
         assert_eq!(embed.status().as_u16(), 200, "{identifier}");
@@ -288,26 +264,17 @@ async fn uploads_send_tags_and_the_asset_keeps_them() {
     let tags = vec!["catalogue".to_owned(), "backpacks".to_owned()];
     let raw = mock
         .assets()
-        .create(SubmitAsset {
-            tags: Some(tags.clone()),
-            ..kept("bag.png", b"png")
-        })
+        .create(kept("bag.png", b"png").tags(tags.clone()))
         .await
         .unwrap();
     let text = mock
         .text()
-        .classify(ClassifyText {
-            tags: Some(tags.clone()),
-            ..ClassifyText::new("hello")
-        })
+        .classify(ClassifyText::new("hello").tags(tags.clone()))
         .await
         .unwrap();
     let linked = mock
         .assets()
-        .create(SubmitAsset {
-            tags: Some(tags.clone()),
-            ..SubmitAsset::from_url("page", "https://example.com/bag")
-        })
+        .create(SubmitAsset::from_url("page", "https://example.com/bag").tags(tags.clone()))
         .await
         .unwrap();
     let requests = mock.requests();
@@ -345,10 +312,7 @@ async fn explain_completes_evidence_and_rerun_moderates_again() {
         storage.assets.get_mut(&asset.id).unwrap()["classification"]["moderation"]
             ["explanationComplete"] = json!(false);
     });
-    let explain = |rerun| ExplainAsset {
-        asset_id: asset.id.clone(),
-        rerun,
-    };
+    let explain = |rerun| ExplainAsset::new(asset.id.clone()).rerun(rerun);
     let explained = mock.assets().explain(explain(false)).await.unwrap();
     assert_eq!(
         explained.classification.moderation.explanation_complete,
@@ -376,8 +340,8 @@ async fn explain_completes_evidence_and_rerun_moderates_again() {
         AssetClassificationStatus::Completed
     );
     assert_eq!(
-        rerun.classification.moderation.status,
-        AssetModerationStatus::Allowed
+        rerun.classification.moderation.decision,
+        Some(AssetModerationDecision::Allowed)
     );
 }
 
@@ -394,15 +358,12 @@ async fn rerun_replaces_the_decision_only_with_a_new_one() {
         }))
         .unwrap();
     let asset = mock.assets().classify(kept("r.png", b"png")).await.unwrap();
-    let explain = || ExplainAsset {
-        asset_id: asset.id.clone(),
-        rerun: true,
-    };
+    let explain = || ExplainAsset::new(asset.id.clone()).rerun(true);
     // The response is the asset as the re-run found it; the new decision follows.
     let rerun = mock.assets().explain(explain()).await.unwrap();
     assert_eq!(
-        rerun.classification.moderation.status,
-        AssetModerationStatus::Allowed
+        rerun.classification.moderation.decision,
+        Some(AssetModerationDecision::Allowed)
     );
     let stored = mock
         .assets()
@@ -410,8 +371,8 @@ async fn rerun_replaces_the_decision_only_with_a_new_one() {
         .await
         .unwrap();
     assert_eq!(
-        stored.classification.moderation.status,
-        AssetModerationStatus::Blocked
+        stored.classification.moderation.decision,
+        Some(AssetModerationDecision::Blocked)
     );
     // A failed re-run keeps the decision, and leaves nothing for complete_processing.
     *outcome.lock().unwrap() = MockOutcome::Failed;
@@ -426,8 +387,8 @@ async fn rerun_replaces_the_decision_only_with_a_new_one() {
         AssetClassificationStatus::Completed
     );
     assert_eq!(
-        stored.classification.moderation.status,
-        AssetModerationStatus::Blocked
+        stored.classification.moderation.decision,
+        Some(AssetModerationDecision::Blocked)
     );
     let error = mock.complete_processing(&asset.id, None).unwrap_err();
     assert_eq!(error.code(), &ErrorCode::InvalidArgument);
@@ -463,7 +424,7 @@ async fn failed_processing_can_be_retried_and_deleted_content_cannot() {
         .await
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::AssetNotRetryable);
-    assert_eq!(error.status(), Some(409));
+    assert_eq!(error.status().map(|status| status.as_u16()), Some(409));
 
     let removed = mock
         .assets()
@@ -481,7 +442,7 @@ async fn failed_processing_can_be_retried_and_deleted_content_cannot() {
         .await
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::AssetNotFound);
-    assert_eq!(error.status(), Some(404));
+    assert_eq!(error.status().map(|status| status.as_u16()), Some(404));
     assert!(error.request_id().unwrap().starts_with("mock-request-"));
 }
 
@@ -497,10 +458,7 @@ async fn list_filters_orders_and_pages_with_cursors() {
     .unwrap();
     let folder = mock
         .folders()
-        .create(CreateFolder {
-            name: "Inbox".into(),
-            ..Default::default()
-        })
+        .create(CreateFolder::new("Inbox"))
         .await
         .unwrap();
     let mut ids = Vec::new();
@@ -509,21 +467,18 @@ async fn list_filters_orders_and_pages_with_cursors() {
     }
     let blocked = mock.assets().classify(named("four")).await.unwrap();
     mock.assets()
-        .move_asset(MoveAsset {
-            asset_id: ids[2].clone(),
-            folder_id: Some(folder.id.clone()),
-        })
+        .move_asset(MoveAsset::new(ids[2].clone()).folder_id(folder.id.clone()))
         .await
         .unwrap();
 
     let first = mock
         .assets()
-        .list(ListAssets {
-            page_size: Some(2),
-            filter: Some("classification.moderation.status==pending".into()),
-            sort: Some("createdAt".into()),
-            ..Default::default()
-        })
+        .list(
+            ListAssets::new()
+                .page_size(2)
+                .filter("classification.moderation.decision==null")
+                .sort("createdAt"),
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -533,11 +488,13 @@ async fn list_filters_orders_and_pages_with_cursors() {
     assert!(first.has_more);
     let second = mock
         .assets()
-        .list(ListAssets {
-            page_size: Some(2),
-            cursor: first.next_cursor,
-            filter: Some("classification.moderation.status==pending".into()),
-            sort: Some("createdAt".into()),
+        .list({
+            let mut options = ListAssets::new()
+                .page_size(2)
+                .filter("classification.moderation.decision==null")
+                .sort("createdAt");
+            options.cursor = first.next_cursor;
+            options
         })
         .await
         .unwrap();
@@ -553,10 +510,7 @@ async fn list_filters_orders_and_pages_with_cursors() {
 
     let either = mock
         .assets()
-        .list(ListAssets {
-            filter: Some(format!("name==fo*,id=in=({})", ids[0])),
-            ..Default::default()
-        })
+        .list(ListAssets::new().filter(format!("name==fo*,id=in=({})", ids[0])))
         .await
         .unwrap();
     let mut found: Vec<_> = either.items.iter().map(|a| a.id.clone()).collect();
@@ -564,10 +518,7 @@ async fn list_filters_orders_and_pages_with_cursors() {
     assert_eq!(found, vec![ids[0].clone(), blocked.id.clone()]);
     let in_folder = mock
         .assets()
-        .list(ListAssets {
-            filter: Some(format!("folderId=={}", folder.id)),
-            ..Default::default()
-        })
+        .list(ListAssets::new().filter(format!("folderId=={}", folder.id)))
         .await
         .unwrap();
     assert_eq!(in_folder.items.len(), 1);
@@ -585,21 +536,17 @@ async fn update_patches_and_search_matches_keywords() {
     let mock = MockServerClient::in_memory(options()).unwrap();
     let asset = mock
         .assets()
-        .create(SubmitAsset {
-            description: Some("old".into()),
-            ..named("holiday photo")
-        })
+        .create(named("holiday photo").description("old"))
         .await
         .unwrap();
     mock.assets().create(named("other")).await.unwrap();
     let updated = mock
         .assets()
-        .update(UpdateAsset {
-            asset_id: asset.id.clone(),
-            description: Patch::Null,
-            tags: Patch::Value(vec!["beach".into()]),
-            ..Default::default()
-        })
+        .update(
+            UpdateAsset::new(asset.id.clone())
+                .clear_description()
+                .tags(vec!["beach".into()]),
+        )
         .await
         .unwrap();
     assert_eq!(updated.description, None);
@@ -608,10 +555,7 @@ async fn update_patches_and_search_matches_keywords() {
 
     let results = mock
         .assets()
-        .search(SearchAssets {
-            query: "Holiday beach".into(),
-            ..Default::default()
-        })
+        .search(SearchAssets::new("Holiday beach"))
         .await
         .unwrap();
     assert_eq!(results.items.len(), 1);
@@ -662,19 +606,13 @@ async fn enqueued_events_carry_the_asset_snapshot() {
     );
     let page = mock
         .events()
-        .list(ListEvents {
-            cursor: Some(start.next_cursor),
-            ..Default::default()
-        })
+        .list(ListEvents::new().cursor(start.next_cursor))
         .await
         .unwrap();
     assert_eq!(page.items, vec![event]);
     let error = mock
         .events()
-        .list(ListEvents {
-            cursor: Some("bogus".into()),
-            ..Default::default()
-        })
+        .list(ListEvents::new().cursor("bogus"))
         .await
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::InvalidCursor);
@@ -686,18 +624,12 @@ async fn enqueued_events_carry_the_asset_snapshot() {
 async fn the_events_feed_refuses_unknown_types_and_an_empty_types_list_filters_nothing() {
     let mock = MockServerClient::in_memory(options()).unwrap();
     for types in [
-        vec![EventType::Unknown("asset.exploded".into())],
-        vec![
-            EventType::AssetBlocked,
-            EventType::Unknown("blocked".into()),
-        ],
+        vec![EventType::from("asset.exploded")],
+        vec![EventType::AssetBlocked, EventType::from("blocked")],
     ] {
         let error = mock
             .events()
-            .list(ListEvents {
-                types: Some(types.clone()),
-                ..Default::default()
-            })
+            .list(ListEvents::new().types(types.clone()))
             .await
             .unwrap_err();
         assert_eq!(error.code(), &ErrorCode::InvalidRequest, "{types:?}");
@@ -712,10 +644,7 @@ async fn the_events_feed_refuses_unknown_types_and_an_empty_types_list_filters_n
     }
     let start = mock
         .events()
-        .list(ListEvents {
-            types: Some(Vec::new()),
-            ..Default::default()
-        })
+        .list(ListEvents::new().types(Vec::new()))
         .await
         .unwrap();
     let sent = mock.requests().last().unwrap().query.clone();
@@ -724,10 +653,7 @@ async fn the_events_feed_refuses_unknown_types_and_an_empty_types_list_filters_n
     // The empty list's cursor continues the unfiltered feed.
     let page = mock
         .events()
-        .list(ListEvents {
-            cursor: Some(start.next_cursor),
-            ..Default::default()
-        })
+        .list(ListEvents::new().cursor(start.next_cursor))
         .await
         .unwrap();
     assert_eq!(
@@ -754,10 +680,7 @@ async fn mock_options_set_the_base_urls() {
         .unwrap();
     let response = mock
         .cdn()
-        .serve(CdnRequest {
-            asset_id: Some(asset.id.clone()),
-            ..Default::default()
-        })
+        .serve(CdnRequest::new().asset_id(asset.id.clone()))
         .await
         .unwrap();
     assert_eq!(response.status().as_u16(), 403);
@@ -801,20 +724,13 @@ async fn hash_list_entries_come_from_assets_and_go_with_their_list() {
     });
     let lists = mock.hash_lists();
     let list = lists
-        .create(CreateHashList {
-            name: "Removed".into(),
-            action: HashListAction::Block,
-            ..Default::default()
-        })
+        .create(CreateHashList::new("Removed", HashListAction::Block))
         .await
         .unwrap();
 
-    let from_asset = AddHashListEntry {
-        hash_list_id: list.id.clone(),
-        asset_id: Some(hashed.id.clone()),
-        label: Some("Report 1".into()),
-        ..Default::default()
-    };
+    let from_asset = AddHashListEntry::new(list.id.clone())
+        .asset_id(hashed.id.clone())
+        .label("Report 1");
     let entry = lists.add_entry(from_asset.clone()).await.unwrap();
     assert_eq!(
         (
@@ -830,39 +746,26 @@ async fn hash_list_entries_come_from_assets_and_go_with_their_list() {
     assert_eq!(mock.requests().last().unwrap().response_status, Some(200));
 
     let not_hashed = lists
-        .add_entry(AddHashListEntry {
-            hash_list_id: list.id.clone(),
-            asset_id: Some(unhashed.id.clone()),
-            ..Default::default()
-        })
+        .add_entry(AddHashListEntry::new(list.id.clone()).asset_id(unhashed.id.clone()))
         .await
         .unwrap_err();
     assert_eq!(not_hashed.code(), &ErrorCode::HashListAssetNotHashed);
 
     let newest = lists
-        .add_entry(AddHashListEntry {
-            hash_list_id: list.id.clone(),
-            hash: Some("0".repeat(64)),
-            ..Default::default()
-        })
+        .add_entry(AddHashListEntry::new(list.id.clone()).hash("0".repeat(64)))
         .await
         .unwrap();
     let first = lists
-        .list_entries(ListHashListEntries {
-            hash_list_id: list.id.clone(),
-            page_size: Some(1),
-            ..Default::default()
-        })
+        .list_entries(ListHashListEntries::new(list.id.clone()).page_size(1))
         .await
         .unwrap();
     assert_eq!(first.items[0].id, newest.id);
     assert!(first.has_more);
     let second = lists
-        .list_entries(ListHashListEntries {
-            hash_list_id: list.id.clone(),
-            page_size: Some(1),
-            cursor: first.next_cursor,
-            sort: None,
+        .list_entries({
+            let mut options = ListHashListEntries::new(list.id.clone()).page_size(1);
+            options.cursor = first.next_cursor;
+            options
         })
         .await
         .unwrap();
@@ -919,18 +822,16 @@ async fn an_undecodable_stored_asset_never_reaches_moderate() {
 #[tokio::test]
 async fn ensuring_a_preset_replaces_it_and_reports_the_revision_it_conflicts_with() {
     let mock = MockServerClient::in_memory(options()).unwrap();
-    let ensure = |definition: UploadPresetDefinition| EnsureUploadPresets {
-        upload_presets: vec![definition],
-    };
+    let ensure = |definition: UploadPresetDefinition| EnsureUploadPresets::new(vec![definition]);
     let created = mock
         .upload_presets()
-        .ensure(ensure(UploadPresetDefinition {
-            enabled: Some(false),
-            visibility: Some(Visibility::Public),
-            folder_id: Patch::Value("fldr_1".into()),
-            allowed_content_types: Patch::Value(vec!["image/*".into(), "image/*".into()]),
-            ..UploadPresetDefinition::new("avatars", "Avatars")
-        }))
+        .ensure(ensure(
+            UploadPresetDefinition::new("avatars", "Avatars")
+                .enabled(false)
+                .visibility(Visibility::Public)
+                .folder_id("fldr_1")
+                .allowed_content_types(vec!["image/*".into(), "image/*".into()]),
+        ))
         .await
         .unwrap()
         .upload_presets
@@ -953,10 +854,9 @@ async fn ensuring_a_preset_replaces_it_and_reports_the_revision_it_conflicts_wit
 
     let error = mock
         .upload_presets()
-        .ensure(ensure(UploadPresetDefinition {
-            revision: Some(1),
-            ..UploadPresetDefinition::new("avatars", "Avatars")
-        }))
+        .ensure(ensure(
+            UploadPresetDefinition::new("avatars", "Avatars").revision(1),
+        ))
         .await
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::UploadPresetRevisionConflict);
@@ -970,16 +870,13 @@ async fn iterating_presets_pages_oldest_first_and_fails_with_the_listing() {
     let keys = ["first", "second", "third"];
     for key in keys {
         mock.upload_presets()
-            .ensure(EnsureUploadPresets {
-                upload_presets: vec![UploadPresetDefinition::new(key, key)],
-            })
+            .ensure(EnsureUploadPresets::new(vec![UploadPresetDefinition::new(
+                key, key,
+            )]))
             .await
             .unwrap();
     }
-    let by_one = || ListUploadPresets {
-        page_size: Some(1),
-        ..Default::default()
-    };
+    let by_one = || ListUploadPresets::new().page_size(1);
     let presets: Vec<UploadPreset> = mock
         .upload_presets()
         .iterate(by_one())
@@ -1015,18 +912,15 @@ async fn updating_settings_replaces_them_and_only_a_real_change_moves_the_revisi
     let mock = MockServerClient::in_memory(options()).unwrap();
     let settings = mock.project_settings();
     let changed = settings
-        .update(UpdateProjectSettings::new(ProjectSettingsDefinition {
-            store_sensitive_metadata: Some(true),
-            remote_url_rule: Patch::Value(RemoteUrlRule::new(
-                RemoteUrlRuleMode::Allow,
-                vec!["example.com".into()],
-            )),
-            human_review: Some(HumanReviewDefinition {
-                allowed_sample_percent: Some(2.5),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }))
+        .update(UpdateProjectSettings::new(
+            ProjectSettingsDefinition::new()
+                .store_sensitive_metadata(true)
+                .remote_url_rule(RemoteUrlRule::new(
+                    RemoteUrlRuleMode::Allow,
+                    vec!["example.com".into()],
+                ))
+                .human_review(HumanReviewDefinition::new().allowed_sample_percent(2.5)),
+        ))
         .await
         .unwrap();
     assert_eq!(changed.revision, 2);
@@ -1035,10 +929,7 @@ async fn updating_settings_replaces_them_and_only_a_real_change_moves_the_revisi
     let mut definition = ProjectSettingsDefinition::from(read.settings.clone());
     definition.streaming_enabled = Some(true);
     let kept = settings
-        .update(UpdateProjectSettings {
-            revision: Some(read.revision),
-            ..UpdateProjectSettings::new(definition.clone())
-        })
+        .update(UpdateProjectSettings::new(definition.clone()).revision(read.revision))
         .await
         .unwrap();
     assert_eq!(kept.revision, 3);
@@ -1078,10 +969,7 @@ async fn ensuring_metadata_fields_replaces_by_id_and_keeps_the_others_in_order()
             "#2563eb",
         )
     };
-    let ensure = |fields: Vec<MetadataField>| EnsureMetadataFields {
-        revision: None,
-        fields,
-    };
+    let ensure = |fields: Vec<MetadataField>| EnsureMetadataFields::new(fields);
     let fields = mock.metadata_fields();
     fields
         .ensure(ensure(vec![
@@ -1114,10 +1002,7 @@ async fn ensuring_metadata_fields_replaces_by_id_and_keeps_the_others_in_order()
     assert_eq!(unchanged.fields, changed.fields);
 
     let error = fields
-        .delete(DeleteMetadataField {
-            revision: Some(1),
-            ..DeleteMetadataField::new("sku")
-        })
+        .delete(DeleteMetadataField::new("sku").revision(1))
         .await
         .unwrap_err();
     assert_eq!(error.code(), &ErrorCode::ProjectSettingsRevisionConflict);

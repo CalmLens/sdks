@@ -200,7 +200,11 @@ pub(crate) fn render(app: &PageContext, view: &View) -> String {
                     html,
                     r#" / <a href="{}">{}</a>"#,
                     h(&href(&[("folder", ancestor.id.as_str())])),
-                    h(ancestor.name.as_deref().unwrap_or("Untitled"))
+                    h(if ancestor.name.is_empty() {
+                        "Untitled"
+                    } else {
+                        &ancestor.name
+                    })
                 );
             }
         }
@@ -208,7 +212,7 @@ pub(crate) fn render(app: &PageContext, view: &View) -> String {
             html,
             r#"</div><div class="titlebar"><h1>{}</h1>"#,
             h(folder
-                .and_then(|folder| folder.name.as_deref())
+                .map(|folder| folder.name.as_str())
                 .unwrap_or("All assets"))
         );
         if folder.is_some() {
@@ -393,7 +397,7 @@ fn folder_settings(html: &mut String, folder: &Folder, paths: &[(String, String)
         html,
         r#"<div id="folder-settings" popover><h2>Folder settings</h2><form action="/folders/{id}/rename" method="post">{csrf}<label for="rename">Name</label><input id="rename" name="name" required maxlength="{MAX_FOLDER_NAME}" value="{name}"><div class="dialog-actions"><button type="submit">Rename</button></div></form><form action="/folders/{id}/move" method="post">{csrf}<label for="move-folder">Move into</label>{select}<div class="dialog-actions"><button type="submit">Move folder</button></div></form><form action="/folders/{id}/delete" method="post" style="border-top:1px solid var(--line);margin-top:16px;padding-top:12px">{csrf}<p class="hint">Only an empty folder can be deleted.</p><div class="dialog-actions"><button type="button" popovertarget="folder-settings" popovertargetaction="hide">Close</button><button class="danger" type="submit">Delete folder</button></div></form></div>"#,
         id = h(&folder.id),
-        name = h(folder.name.as_deref().unwrap_or("")),
+        name = h(&folder.name),
         select = folder_select(
             "move-folder",
             "parent",
@@ -409,7 +413,11 @@ fn card(html: &mut String, asset: &Asset, keep: &[(&str, &str)], selected: Optio
     let mut pairs = keep.to_vec();
     pairs.push(("asset", asset.id.as_str()));
     let link = href(&pairs);
-    let name = asset.name.as_deref().unwrap_or(&asset.id);
+    let name = if asset.name.is_empty() {
+        &asset.id
+    } else {
+        &asset.name
+    };
     let _ = write!(
         html,
         r#"<a class="card" href="{}"{} data-status="{}">"#,
@@ -525,7 +533,11 @@ fn detail(
     let _ = write!(
         html,
         r#"<aside class="detail" aria-labelledby="selected"><div class="detail-head"><h2 id="selected">{}</h2><a class="button quiet" href="{}" aria-label="Close details">✕</a></div>"#,
-        h(asset.name.as_deref().unwrap_or(&asset.id)),
+        h(if asset.name.is_empty() {
+            &asset.id
+        } else {
+            &asset.name
+        }),
         h(&href(&close))
     );
     if deliverable(asset) {
@@ -647,9 +659,11 @@ fn detail(
 
     // History: upload, decision and reviews.
     html.push_str(r#"<section class="block" aria-labelledby="history"><h3 id="history" class="section-title">History</h3><ol class="history">"#);
-    if let Some(at) = asset.created_at {
-        let _ = write!(html, "<li>Uploaded<time>{}</time></li>", date(at));
-    }
+    let _ = write!(
+        html,
+        "<li>Uploaded<time>{}</time></li>",
+        date(asset.created_at)
+    );
     if let Some(at) = asset.classification.completed_at {
         let _ = write!(
             html,
@@ -710,7 +724,11 @@ fn detail(
         html,
         r#"<div id="delete-dialog" popover><form action="/assets/{id}/delete" method="post">{csrf}<input type="hidden" name="return_folder" value="{}"><h2>Delete this image?</h2><p class="hint">The record, its details and the file are deleted. This cannot be undone.</p><label><input type="checkbox" name="confirm" value="yes" required style="width:auto;margin-right:6px">Delete {}</label><div class="dialog-actions"><button type="button" popovertarget="delete-dialog" popovertargetaction="hide">Cancel</button><button class="danger solid" type="submit">Delete</button></div></form></div>"#,
         h(current.unwrap_or("")),
-        h(asset.name.as_deref().unwrap_or("this image"))
+        h(if asset.name.is_empty() {
+            "this image"
+        } else {
+            &asset.name
+        })
     );
 }
 
@@ -917,11 +935,11 @@ fn folder_paths(folders: &[Folder]) -> Vec<(String, String)> {
     let mut paths: Vec<(String, String)> = folders
         .iter()
         .map(|folder| {
-            let mut names = vec![folder.name.clone().unwrap_or_default()];
+            let mut names = vec![folder.name.clone()];
             names.extend(
                 ancestors(folders, folder)
                     .iter()
-                    .map(|folder| folder.name.clone().unwrap_or_default()),
+                    .map(|folder| folder.name.clone()),
             );
             names.reverse();
             (folder.id.clone(), names.join(" / "))
@@ -942,7 +960,7 @@ fn tree(
         .iter()
         .filter(|folder| folder.parent_id.as_deref() == parent)
         .collect();
-    children.sort_by_key(|folder| folder.name.clone().unwrap_or_default().to_lowercase());
+    children.sort_by_key(|folder| folder.name.to_lowercase());
     for folder in children {
         if !seen.insert(folder.id.clone()) {
             continue;
@@ -956,7 +974,11 @@ fn tree(
             } else {
                 ""
             },
-            h(folder.name.as_deref().unwrap_or("Untitled"))
+            h(if folder.name.is_empty() {
+                "Untitled"
+            } else {
+                &folder.name
+            })
         );
         if folders
             .iter()

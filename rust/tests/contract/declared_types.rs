@@ -273,6 +273,8 @@ struct WireField {
     rust: String,
     wire: String,
     skippable: bool,
+    /// Whether decoding fills the field in when the response leaves it out.
+    defaulted: bool,
     shape: Shape,
 }
 
@@ -296,6 +298,7 @@ fn wire_fields(attrs: &[&str], fields: Vec<Field>) -> Vec<WireField> {
                 .unwrap_or_else(|| renamed(field.name, rule.as_deref())),
             rust: field.name.to_owned(),
             skippable: serde_has(field.attrs, "skip_serializing_if"),
+            defaulted: serde_has(field.attrs, "default"),
             shape,
         });
     }
@@ -909,6 +912,18 @@ impl Walk<'_> {
                         &at,
                         format!(
                             "required and not nullable, but {name}.{} is {declared}",
+                            field.rust
+                        ),
+                    );
+                }
+                // A response missing a required field fails to decode, rather than holding an
+                // empty value; lists and maps may still default to empty.
+                let collection = matches!(field.shape, Shape::List(_) | Shape::Map(..));
+                if is_required && !optional && field.defaulted && !collection {
+                    self.problem(
+                        &at,
+                        format!(
+                            "required, but {name}.{} decodes as empty when missing (serde default)",
                             field.rust
                         ),
                     );

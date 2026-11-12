@@ -8,8 +8,10 @@ mod common;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use calmlens::models::*;
 use calmlens::testing::{MockResponse, MockServerClient};
-use calmlens::{Error, ServerClient};
-use common::{compare_typed, error_json, fixture, input, invoke, iterator, whole_numbers};
+use calmlens::{AttemptEvent, Error, RequestOptions, ServerClient};
+use common::{
+    check_kind, compare_typed, error_json, fixture, input, invoke, iterator, whole_numbers,
+};
 use futures_util::StreamExt;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
@@ -38,10 +40,26 @@ fn refused_by_type(client: &Map<String, Value>, step: &Value) -> Option<&'static
     None
 }
 
-fn builder(defaults: &Value, overrides: &Map<String, Value>) -> calmlens::ServerClientBuilder {
+/// The case's client builder: from the environment with `clientFromEnv`, else from the options.
+fn builder(
+    defaults: &Value,
+    overrides: &Map<String, Value>,
+    from_env: bool,
+) -> calmlens::Result<calmlens::ServerClientBuilder> {
     let option = |name: &str| overrides.get(name).or_else(|| defaults.get(name));
     let text = |name: &str| option(name).and_then(Value::as_str).unwrap_or_default();
-    let mut builder = ServerClient::builder(text("apiKey"), text("projectId"));
+    let mut builder = if from_env {
+        calmlens::ServerClientBuilder::from_env()?
+    } else {
+        ServerClient::builder(text("apiKey"), text("projectId"))
+    };
+    if let Some(info) = overrides.get("appInfo") {
+        builder = builder.app_info(
+            info["name"].as_str().unwrap(),
+            info["version"].as_str(),
+            info["url"].as_str(),
+        );
+    }
     if let Some(url) = option("baseUrl").and_then(Value::as_str) {
         builder = builder.base_url(url);
     }
@@ -60,7 +78,56 @@ fn builder(defaults: &Value, overrides: &Map<String, Value>) -> calmlens::Server
     if let Some(size) = option("partSizeBytes").and_then(Value::as_u64) {
         builder = builder.part_size_bytes(size);
     }
-    builder
+    Ok(builder)
+}
+
+/// A step's `requestOptions` as [`RequestOptions`].
+fn request_options(options: &Value) -> RequestOptions {
+    let mut built = RequestOptions::new();
+    if let Some(timeout) = options["timeoutMs"].as_u64() {
+        built = built.timeout(Duration::from_millis(timeout));
+    }
+    if let Some(retries) = options["maxRetries"].as_u64() {
+        built = built.max_retries(retries as u32);
+    }
+    if let Some(key) = options["idempotencyKey"].as_str() {
+        built = built.idempotency_key(key);
+    }
+    for (name, value) in options["headers"].as_object().into_iter().flatten() {
+        built = built.header(name, value.as_str().unwrap());
+    }
+    for (name, value) in options["extraQuery"].as_object().into_iter().flatten() {
+        built = built.query(name, value.as_str().unwrap());
+    }
+    for (name, value) in options["extraBody"].as_object().into_iter().flatten() {
+        built = built.body_field(name, value.clone());
+    }
+    built
+}
+
+/// The JSON a case's `attempts` lists for an attempt.
+fn attempt_json(event: &AttemptEvent) -> Value {
+    json!({
+        "operation": event.operation,
+        "method": event.method.as_str(),
+        "path": event.path,
+        "attempt": event.attempt,
+        "delayMs": event.retry_delay.map(|delay| delay.as_millis() as u64),
+        "status": event.status.map(|status| status.as_u16()),
+        "requestId": event.request_id,
+        "errorCode": event.error_code.as_ref().map(calmlens::ErrorCode::as_str),
+    })
+}
+
+/// A result's `lastResponse` as a case lists it.
+fn last_response_json(response: Option<&LastResponse>) -> Value {
+    response.map_or(Value::Null, |response| {
+        json!({
+            "status": response.status.as_u16(),
+            "requestId": response.request_id,
+            "idempotencyKey": response.idempotency_key,
+        })
+    })
 }
 
 fn enqueue(mock: &MockServerClient, response: &Value) {
@@ -150,10 +217,15 @@ enum Outcome {
 
 async fn collect<T: serde::Serialize>(
     stream: futures_util::stream::BoxStream<'static, calmlens::Result<T>>,
+    stop_after: Option<usize>,
 ) -> Outcome {
     let mut stream = stream;
     let mut items = Vec::new();
-    while let Some(item) = stream.next().await {
+    // A caller that breaks out of its loop stops reading after that many items.
+    while stop_after.is_none_or(|stop| items.len() < stop) {
+        let Some(item) = stream.next().await else {
+            break;
+        };
         match item {
             Ok(item) => items.push(serde_json::to_value(item).unwrap()),
             Err(error) => return Outcome::Failed(error, Some(items)),
@@ -162,9 +234,44 @@ async fn collect<T: serde::Serialize>(
     Outcome::Value(Value::Array(items))
 }
 
-async fn run(client: &ServerClient, operation: &str, args: &Value) -> Outcome {
+async fn run(
+    client: &ServerClient,
+    operation: &str,
+    args: &Value,
+    last: &mut Option<Value>,
+    stop_after: Option<usize>,
+) -> Outcome {
     let result: calmlens::Result<Value> = async {
         Ok(match operation {
+            "request" => {
+                let mut path = args["path"].as_str().unwrap().to_owned();
+                let mut client = client.clone();
+                if let Some(query) = args["query"].as_object() {
+                    let mut encoded = reqwest::Url::parse("http://query.invalid/").unwrap();
+                    encoded.query_pairs_mut().extend_pairs(
+                        query
+                            .iter()
+                            .map(|(key, value)| (key, value.as_str().unwrap())),
+                    );
+                    path = format!("{path}?{}", encoded.query().unwrap_or_default());
+                }
+                if let Some(headers) = args["headers"].as_object() {
+                    let mut options = RequestOptions::new();
+                    for (name, value) in headers {
+                        options = options.header(name, value.as_str().unwrap());
+                    }
+                    client = client.with_options(options);
+                }
+                let method =
+                    http::Method::from_bytes(args["method"].as_str().unwrap().as_bytes()).unwrap();
+                let body = args.get("body").filter(|body| !body.is_null());
+                client.request(method, &path, body).await?
+            }
+            "assets.retrieve" => {
+                let asset = client.assets().retrieve(input(args.clone())?).await?;
+                *last = Some(last_response_json(asset.last_response()));
+                serde_json::to_value(asset).unwrap()
+            }
             "assets.create" | "assets.classify" => {
                 let field = if args.get("part").is_some() {
                     "part"
@@ -182,6 +289,7 @@ async fn run(client: &ServerClient, operation: &str, args: &Value) -> Outcome {
                 } else {
                     client.assets().classify(options).await?
                 };
+                *last = Some(last_response_json(asset.last_response()));
                 serde_json::to_value(asset).unwrap()
             }
             "assets.uploadPart" => {
@@ -215,7 +323,7 @@ async fn run(client: &ServerClient, operation: &str, args: &Value) -> Outcome {
     }
     .await;
     match iterator(client, operation, args.clone()) {
-        Some(Ok(stream)) => collect(stream).await,
+        Some(Ok(stream)) => collect(stream, stop_after).await,
         Some(Err(error)) => Outcome::Failed(error, None),
         None => match result {
             Ok(value) => Outcome::Value(value),
@@ -450,7 +558,30 @@ async fn replay(file: &Value, case: &Value) {
         println!("refused by type: {name}: {reason}");
         return;
     }
-    let mock = match MockServerClient::from_builder(builder(&file["client"], &overrides)) {
+    // The case's environment, with every other CALMLENS_* variable cleared, while the client is made.
+    let env = case["env"].as_object();
+    if let Some(env) = env {
+        for (name, _) in std::env::vars().filter(|(name, _)| name.starts_with("CALMLENS_")) {
+            std::env::remove_var(name);
+        }
+        for (name, value) in env {
+            std::env::set_var(name, value.as_str().unwrap());
+        }
+    }
+    let attempts: std::sync::Arc<std::sync::Mutex<Vec<AttemptEvent>>> = Default::default();
+    let seen = attempts.clone();
+    let made =
+        builder(&file["client"], &overrides, case["clientFromEnv"] == true).and_then(|builder| {
+            MockServerClient::from_builder(
+                builder.on_attempt(move |event| seen.lock().unwrap().push(event.clone())),
+            )
+        });
+    if let Some(env) = env {
+        for name in env.keys() {
+            std::env::remove_var(name);
+        }
+    }
+    let mock = match made {
         Ok(mock) => mock,
         Err(error) => {
             // An option the SDK refuses fails at construction; the first step expected it.
@@ -462,22 +593,60 @@ async fn replay(file: &Value, case: &Value) {
     for response in case["responses"].as_array().unwrap() {
         enqueue(&mock, response);
     }
+    let logs = case.get("logs").map(|logs| {
+        let level = match logs["level"].as_str().unwrap() {
+            "debug" => tracing::Level::DEBUG,
+            _ => tracing::Level::INFO,
+        };
+        common::CapturedLogs::new(level)
+    });
+    let lines = logs.as_ref().map(|logs| logs.lines.clone());
+    let _logging = logs.map(tracing::subscriber::set_default);
     let client = mock.client();
     for (index, step) in steps.iter().enumerate() {
         let operation = step["operation"].as_str().unwrap();
         let label = format!("{name}: step {index} {operation}");
         let args = step.get("args").cloned().unwrap_or_else(|| json!({}));
-        let outcome = run(&client, operation, &args).await;
+        let client = match step.get("requestOptions") {
+            Some(options) => client.with_options(request_options(options)),
+            None => client.clone(),
+        };
+        let mut last = None;
+        let stop_after = step["stopAfter"].as_u64().map(|stop| stop as usize);
+        let outcome = run(&client, operation, &args, &mut last, stop_after).await;
         let failed = matches!(outcome, Outcome::Failed(..));
+        if let Some(wanted) = step["expect"].get("lastResponse") {
+            assert_eq!(last.as_ref(), Some(wanted), "{label}: lastResponse");
+            continue;
+        }
         check(outcome, &step["expect"], &label);
         if failed {
             break;
         }
     }
+    if let Some(wanted) = case.get("attempts") {
+        let seen: Vec<Value> = attempts.lock().unwrap().iter().map(attempt_json).collect();
+        assert_eq!(&Value::Array(seen), wanted, "{name}: attempts");
+    }
+    if let Some(lines) = lines {
+        let lines = lines.lock().unwrap();
+        assert!(!lines.is_empty(), "{name}: no log lines");
+        for secret in case["logs"]["mustNotContain"].as_array().unwrap() {
+            let secret = secret.as_str().unwrap();
+            assert!(
+                lines.iter().all(|line| !line.contains(secret)),
+                "{name}: a log line holds {secret}"
+            );
+        }
+    }
     let requests = mock.requests();
     let wanted = case["requests"].as_array().unwrap();
     assert_eq!(requests.len(), wanted.len(), "{name}: request count");
-    let every = file["everyRequest"]["headers"].as_object().unwrap();
+    let mut every = file["everyRequest"]["headers"].as_object().unwrap().clone();
+    if let Some(key) = overrides.get("apiKey") {
+        every.insert("x-api-key".into(), key.clone());
+    }
+    let every = &every;
     let mut uuids = HashMap::new();
     for (index, (request, wanted)) in requests.iter().zip(wanted).enumerate() {
         check_request(
@@ -524,10 +693,12 @@ async fn error_responses_raise_typed_errors() {
     let mut failed = Vec::new();
     for entry in entries {
         let code = entry["code"].as_str().unwrap();
-        // The generated ErrorCode knows the code and its status.
+        // The generated ErrorCode knows each API code and its status.
         let parsed = calmlens::ErrorCode::parse(code);
-        if matches!(parsed, calmlens::ErrorCode::Other(_))
-            || parsed.http_status() != entry["status"].as_u64().map(|status| status as u16)
+        if !code.starts_with("sdk/")
+            && (parsed.as_str() != code
+                || parsed.http_status().map(|status| status.as_u16())
+                    != entry["status"].as_u64().map(|status| status as u16))
         {
             failed.push(format!("{code}: ErrorCode::parse"));
         }
@@ -540,13 +711,24 @@ async fn error_responses_raise_typed_errors() {
             &mock.client(),
             entry["operation"].as_str().unwrap(),
             &entry["args"],
+            &mut None,
+            None,
         )
         .await;
+        let kind = entry["kind"].as_str().unwrap();
+        let body_text = entry["response"]["bodyText"].as_str();
         let checked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if let Outcome::Failed(error, _) = &outcome {
+                check_kind(error, kind, code);
+                // A body that isn't a CalmLens error, such as a proxy's page, is kept as text.
+                if let Some(text) = body_text {
+                    assert_eq!(error.raw_body(), Some(text), "{code}: raw body");
+                }
+            }
             check(outcome, &json!({"error": entry["expected"]}), code)
         }));
         if checked.is_err() || mock.requests().len() != 1 {
-            failed.push(code.to_owned());
+            failed.push(format!("{code} ({kind})"));
         }
     }
     println!("errors: {} cases", entries.len());
@@ -560,6 +742,7 @@ fn error_codes_match_the_api() {
         .as_array()
         .unwrap()
         .iter()
+        .filter(|e| !e["code"].as_str().unwrap().starts_with("sdk/"))
         .map(|e| {
             let status = e["status"].as_u64().unwrap() as u16;
             (e["code"].as_str().unwrap().to_owned(), status)

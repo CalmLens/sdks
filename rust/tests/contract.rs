@@ -253,12 +253,12 @@ async fn untyped_fields_and_values_are_found() {
         .unwrap();
     let mut response = case["response"].clone();
     response["classification"]["moderation"]["futureField"] = json!(1);
-    response["classification"]["moderation"]["status"] = json!("future-status");
+    response["classification"]["moderation"]["decision"] = json!("future-status");
     assert_eq!(
         untyped_in("assets.retrieve", case["options"].clone(), &response).await,
         vec![
             "AssetModeration: field `futureField` at $.classification.moderation.futureField",
-            "AssetModerationStatus: value `future-status` at $.classification.moderation.status",
+            "AssetModerationDecision: value `future-status` at $.classification.moderation.decision",
         ]
     );
 }
@@ -353,11 +353,9 @@ async fn cdn_url_contracts() {
             };
             // Every fixture option must reach the request; serde would otherwise ignore one silently.
             // An invalid transform cannot be re-encoded, so it is checked by presence.
-            let decoded = serde_json::to_value(CdnRequest {
-                transform: None,
-                ..request.clone()
-            })
-            .unwrap();
+            let mut without_transform = request.clone();
+            without_transform.transform = None;
+            let decoded = serde_json::to_value(without_transform).unwrap();
             for key in cdn["options"].as_object().unwrap().keys() {
                 let kept = match key.as_str() {
                     "transform" => request.transform.is_some(),
@@ -431,12 +429,11 @@ async fn webhook_signature_contracts() {
 
 #[test]
 fn a_signed_webhook_can_omit_severity_and_title() {
-    let event: Event = typed(serde_json::json!({
+    let body = serde_json::to_vec(&serde_json::json!({
         "id": "evt_example", "type": "asset.allowed", "projectId": "proj_example",
         "createdAt": 1_700_000_000_000_u64
-    }));
-    let payload = WebhookEventPayload::from_event(&event);
-    let body = serde_json::to_vec(&payload).unwrap();
+    }))
+    .unwrap();
     let timestamp = "1700000000";
     let signature = calmlens::create_webhook_signature_header(&body, timestamp, "secret");
     let parsed = calmlens::construct_webhook_event_at(
@@ -478,7 +475,8 @@ async fn webhook_payload_contracts() {
             );
             assert_eq!(serde_json::to_value(&parsed).unwrap(), *expected);
             // The same conversion CalmLens applies to a stored event before delivering it.
-            let event: Event = typed(item["event"].clone());
+            // An event built in code may leave out what the API always sets, such as its actor.
+            let event: Event = typed(common::complete::<Event>(item["event"].clone()));
             assert_eq!(
                 serde_json::to_value(WebhookEventPayload::from_event(&event)).unwrap(),
                 *expected
@@ -690,7 +688,8 @@ async fn webhook_round_trip_contracts() {
         "webhook round trips",
         named(&fixtures["roundTrips"], "name"),
         |c| async move {
-            let event: Event = typed(c["event"].clone());
+            // An event built in code may leave out what the API always sets, such as its actor.
+            let event: Event = typed(common::complete::<Event>(c["event"].clone()));
             let payload = WebhookEventPayload::from_event(&event);
             assert_eq!(serde_json::to_value(&payload).unwrap(), c["payload"]);
             let body = c["body"].as_str().unwrap();
@@ -1027,10 +1026,9 @@ async fn refuses_transform_options_the_cdn_refuses() {
                 return;
             }
             let options = decoded.unwrap_or_else(|cause| panic!("{label}: {cause}"));
-            let request = CdnRequest {
-                transform: Some(options.into()),
-                ..CdnRequest::asset("asset-1").resource(CdnResource::Rendered)
-            };
+            let request = CdnRequest::asset("asset-1")
+                .resource(CdnResource::Rendered)
+                .transform(options);
             let error = client.cdn().get_asset_url(&request).unwrap_err();
             assert_eq!(error.code(), &ErrorCode::InvalidArgument, "{label}");
             assert_eq!(
@@ -1115,11 +1113,10 @@ async fn validation_and_urls() {
             .code(),
         &ErrorCode::InvalidUploadPayload
     );
-    let both = CdnRequest {
-        lens: Some("one".into()),
-        transform: Some("format=avif".into()),
-        ..CdnRequest::asset("x").resource(CdnResource::Rendered)
-    };
+    let both = CdnRequest::asset("x")
+        .resource(CdnResource::Rendered)
+        .lens("one")
+        .transform("format=avif");
     assert_eq!(
         client.cdn().get_asset_url(&both).unwrap(),
         "https://cdn.calmlens.com/v1/assets/project-1/x/rendered/@one,format=avif"
@@ -1326,7 +1323,8 @@ async fn run_step(
             Ok(serde_json::to_value(asset).unwrap())
         }
         "mock.enqueueEvent" => {
-            let mut event = args.clone();
+            // The rest of the event (ID, time, actor, severity) is the mock's to fill in.
+            let mut event = common::complete::<Event>(args.clone());
             event["id"] = json!("");
             Ok(serde_json::to_value(mock.enqueue_event(typed(event))).unwrap())
         }
@@ -1448,7 +1446,7 @@ async fn check_step(
     if let Some(wanted) = expect.get("error") {
         let error = outcome.expect_err(&label);
         assert_eq!(
-            json!({"code": error.code().as_str(), "status": error.status()}),
+            json!({"code": error.code().as_str(), "status": error.status().map(|status| status.as_u16())}),
             json!({"code": wanted["code"], "status": wanted["status"]}),
             "{label}"
         );
@@ -1685,8 +1683,9 @@ fn references() -> BTreeSet<&'static str> {
         "assets().iterate_children" => ServerClient::assets, AssetsClient::iterate_children;
         "ensure_lens" => ServerClient::ensure_lens;
         "ensure_lenses" => ServerClient::ensure_lenses;
+        "request" => ServerClient::request;
         "events().list" => ServerClient::events, EventsClient::list;
-        "events().pages" => ServerClient::events, EventsClient::pages;
+        "events().iterate" => ServerClient::events, EventsClient::iterate;
         "text().classify" => ServerClient::text, TextClient::classify;
         "upload_tokens().sign" => ServerClient::upload_tokens, UploadTokensClient::sign;
         "cdn().get_asset_url" => ServerClient::cdn, CdnClient::get_asset_url;
@@ -1796,7 +1795,9 @@ type Field = fn(&calmlens::Error) -> Value;
 fn error_fields() -> BTreeMap<&'static str, Field> {
     BTreeMap::from([
         ("code()", (|e| json!(e.code().as_str())) as Field),
-        ("status()", |e| json!(e.status())),
+        ("status()", |e| {
+            json!(e.status().map(|status| status.as_u16()))
+        }),
         ("request_id()", |e| json!(e.request_id())),
         ("retry_after()", |e| {
             json!(e.retry_after().map(|d| d.as_secs()))
@@ -1850,9 +1851,10 @@ async fn offers_every_capability() {
             let present = match capability["kind"].as_str().unwrap() {
                 "constant" => values.get(name).map(String::as_str) == value,
                 "cdn-resource" => {
-                    let request = CdnRequest {
-                        resource: value.map(CdnResource::from),
-                        ..CdnRequest::asset("asset-1")
+                    let request = {
+                        let mut options = CdnRequest::asset("asset-1");
+                        options.resource = value.map(CdnResource::from);
+                        options
                     };
                     values.get(name).map(String::as_str) == value
                         && client.cdn().get_asset_url(&request).is_ok_and(|url| {
@@ -1909,7 +1911,7 @@ async fn retryable_follows_code_and_status() {
             let expected = case["retryable"].as_bool().unwrap();
             let mut built = calmlens::Error::new(ErrorCode::parse(code), "message");
             if let Some(status) = status {
-                built = built.with_status(status);
+                built = built.with_status(http::StatusCode::from_u16(status).unwrap());
             }
             assert_eq!(
                 built.is_retryable(),
@@ -1921,6 +1923,16 @@ async fn retryable_follows_code_and_status() {
                 case["local"].as_bool().unwrap(),
                 "Error::new {code} {status:?}"
             );
+            // Another SDK's own codes, such as JavaScript's `sdk/no-fetch`, have no kind here.
+            #[allow(deprecated)]
+            let foreign = matches!(ErrorCode::parse(code), ErrorCode::Unknown(_));
+            if !foreign {
+                common::check_kind(
+                    &built,
+                    case["kind"].as_str().unwrap(),
+                    &format!("Error::new {code} {status:?}"),
+                );
+            }
             // The error a client raises for an API response with this code and status.
             if let Some(status) = status {
                 let mock = MockServerClient::new().unwrap();
@@ -1936,7 +1948,10 @@ async fn retryable_follows_code_and_status() {
                     .await
                     .unwrap_err();
                 assert_eq!(
-                    (raised.code().as_str(), raised.status()),
+                    (
+                        raised.code().as_str(),
+                        raised.status().map(|status| status.as_u16())
+                    ),
                     (code, Some(status))
                 );
                 assert_eq!(raised.is_retryable(), expected, "raised {code} {status}");
@@ -2010,6 +2025,7 @@ async fn refuses_rejected_requests_before_sending() {
                         .unwrap_or_else(|cause| panic!("{name}: {cause}"))
                         .expect_err(name);
                     assert_eq!(rejection["error"], error.code().as_str(), "{name}");
+                    common::check_kind(&error, rejection["kind"].as_str().unwrap(), name);
                     assert!(error.is_local(), "{name}");
                     assert_eq!((error.status(), error.request_id()), (None, None), "{name}");
                 }
@@ -2018,4 +2034,31 @@ async fn refuses_rejected_requests_before_sending() {
     )
     .await;
     assert_eq!(mock.requests().len(), 0);
+}
+
+/// surface.json `errorKinds`: every kind's Rust name resolves to an `ErrorKind` whose parent is
+/// the kind's parent, and `ErrorKind` has no kind the contract lacks.
+#[test]
+fn error_kinds_match_the_surface() {
+    let surface = fixture("surface");
+    let kinds = surface["errorKinds"].as_array().unwrap();
+    let mut resolved = Vec::new();
+    for entry in kinds {
+        let id = entry["id"].as_str().unwrap();
+        let Some(kind) = common::error_kind(id) else {
+            assert_eq!(
+                entry["names"]["rust"], "Error",
+                "{id}: the root kind is Error"
+            );
+            continue;
+        };
+        let parent = entry["parent"].as_str().and_then(common::error_kind);
+        assert_eq!(kind.parent(), parent, "{id}: parent");
+        resolved.push(kind);
+    }
+    assert_eq!(
+        resolved,
+        common::ERROR_KINDS,
+        "every ErrorKind, in surface.json order"
+    );
 }

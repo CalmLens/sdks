@@ -142,7 +142,7 @@ jobs:
           warnings
         working-directory: rust
       - run: cargo +${{ matrix.rust }} clippy --locked --no-default-features --features
-          blocking,rustls-native-roots -- -D warnings
+          blocking,native-tls -- -D warnings
         working-directory: rust
       - run: cargo +${{ matrix.rust }} doc --locked --no-deps --features
           blocking,testing
