@@ -842,7 +842,7 @@ module CalmLens
   # deliveries and the public events feed leave out facts that hold personal or account data.
   type event_type = "asset.uploaded" | "asset.classified" | "asset.region-restricted" | "asset.allowed" | "asset.limited" |
                     "asset.age-restricted" | "asset.blocked" | "asset.purged" | "asset.failed" | "asset.progress-updated" |
-                    "asset.deleted" | "asset.content-removed" | "asset.retried" | "asset.rerun-requested" | "asset.review-requested" |
+                    "asset.deleted" | "asset.content-removed" | "asset.retried" | "asset.rerun-requested" | "asset.review-requested" | "asset.review-completed" |
                     "asset.hash-matched" | "asset.link-flagged" | "usage.free-uploads-exhausted" | "usage.uploads-paused" |
                     "upload-preset.daily-limit-reached" | "project.member-joined" | "project.member-removed" |
                     "project.member-left" | "project.member-role-changed" | "project.invitation-sent" |
