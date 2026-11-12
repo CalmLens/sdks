@@ -20,8 +20,8 @@
     {
       "secret": "whsec_test",
       "timestamp": "1760000000",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"assetSequence\":null,\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"uploadPresetId\":\"preset-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"blocked\"}}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1760000000000}",
-      "signature": "v1=32c680636e5c0f1e0c184233aa410af88acedd1d6033d5d288d4b7155feb45b4"
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"assetSequence\":null,\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"uploadPresetId\":\"preset-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"blocked\"},\"testInput\":false}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1760000000000}",
+      "signature": "v1=15935959610ea6e2de6e81a60e3fda894c7d53b16e510297ca0df251b7a5fd8b"
     }
   ],
   "verification": [
@@ -38,8 +38,8 @@
       "name": "payload",
       "secret": "whsec_test",
       "timestamp": "1760000000",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"assetSequence\":null,\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"uploadPresetId\":\"preset-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"blocked\"}}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1760000000000}",
-      "signature": "v1=32c680636e5c0f1e0c184233aa410af88acedd1d6033d5d288d4b7155feb45b4",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"actor\":{\"type\":\"automated\",\"id\":null},\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":\"héllo 🌍\",\"assetId\":\"asset-1\",\"assetSequence\":null,\"asset\":{\"id\":\"asset-1\",\"externalId\":\"post-1\",\"uploadPresetId\":\"preset-1\",\"content\":{\"status\":\"stored\"},\"upload\":{\"status\":\"completed\"},\"classification\":{\"status\":\"completed\",\"moderation\":{\"decision\":\"blocked\"},\"testInput\":false}},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1760000000000}",
+      "signature": "v1=15935959610ea6e2de6e81a60e3fda894c7d53b16e510297ca0df251b7a5fd8b",
       "now": 1760000000,
       "valid": true
     },
@@ -335,7 +335,8 @@
             "status": "completed",
             "moderation": {
               "decision": "blocked"
-            }
+            },
+            "testInput": false
           }
         },
         "actor": {
@@ -379,7 +380,8 @@
             "status": "completed",
             "moderation": {
               "decision": "blocked"
-            }
+            },
+            "testInput": false
           }
         },
         "facts": [
@@ -732,19 +734,19 @@
   "parseErrors": [
     {
       "name": "signature by another secret",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=a46163f7cae0460a8a3b5c3a839f9decf7480fa85e2b330d2181144799e4b5b9",
+      "signature": "v1=ca1fb249f57dcee541772374e557af66f14b1dfe61baf0b05ff311614e618183",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-signature"
     },
     {
       "name": "stale delivery",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=572b81d6045e03bba82231c5c3eeb480f01238a62f90e419cfe3b8e87cbcf11c",
+      "signature": "v1=36993f10c7500f5d0f595fb8b3cb4b9065bd67ff8d0afcf229d4a5834bb093a6",
       "now": 1700000301,
       "error": "sdk/invalid-webhook-signature"
     },
@@ -804,100 +806,100 @@
     },
     {
       "name": "missing id",
-      "body": "{\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=48e2ec1498ad062bcde1a5f522cc074ea9d324b18485e357e971e25f0041df56",
+      "signature": "v1=e49c3ce3289a6b558be974cc994ad11e21c21348104a599191bdaaa7cf54538f",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "numeric id",
-      "body": "{\"id\":1,\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":1,\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=67008fc80c8485c4464b9f330c354c467599166b3129ef6e898150b2c598b7a4",
+      "signature": "v1=8fdbd2d6c02526512c2ffe037703a2a498ee2942ca92d84144e3710d69adbdae",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "missing type",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=dc287dd3fe48af13457da13aeb18e46f9941e0373f06d914209b337db67e6281",
+      "signature": "v1=f631e5326566b66a66fafdb95950da262ecd3b4383d207a322f863fc031c01bf",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "missing projectId",
-      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=9c1f5891658b854a12de10a7bcb1828a29aec42173415f492cdca86e806a5c2b",
+      "signature": "v1=c37ebd3a6a7f4140209e70479901b68e38c8ce147deb38ecfdcbe3b32bf66f6e",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "missing createdAt",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}]}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}]}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=50608b52cf401ca729b9281f4a742c7953ebf6019214c02e57bdb78e7604ae21",
+      "signature": "v1=6a662a409206d4ae6c31b274af4390516479c72cd61d0d7143eea20ab36bcb0d",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "createdAt as a string",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":\"1700000000000\"}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":\"1700000000000\"}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=2d9cba7c4a6d38fefd54cc2e7ad9172eba9a39747a95b92bc69fedcc92a5fcd7",
+      "signature": "v1=b723a96e7c45fb2a073369ab8c2c0291b65ecafc5b9c97723b50a2fa095df225",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "severity is null",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":null,\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":null,\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=d5abdaa01cf4237f3cf02e11f19a1aeb072a2083c430a3d419c3472e9559b442",
+      "signature": "v1=bfefe3f5ae24c56ec3dff0a5183d5b2ea01a47288bfb80b8de6e9080da76d658",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "title is a number",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":1,\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":1,\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=08bf837d345099823fdebdf2c185aff2b4f429d23b0b69fca607a9944a549ec6",
+      "signature": "v1=de79960803a03de1fef8fe0c3b99b037a33710f2e9bc11648606e632f0d4d7d5",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "description is a number",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":1,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":1,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=93a09edfcd8878236dee4ee10b56788542a282b14df60e665e0b6427ae8dfb6d",
+      "signature": "v1=6a45ac63b293b2c096e81a8767937103103982e48a1f337bf4b88029bb35c30e",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "assetId is a number",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":1,\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":1,\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=9cf1e1978f78ac40f6f52e01024729c5d02f37a6a4ec87364ff916f91518421b",
+      "signature": "v1=f86df6a02431b0ec5e2f7274952abf9fc2179fa5fa232a7aced5833e8f2403f6",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "assetSequence is a string",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":\"3\",\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":\"3\",\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=cf3854ba485bd24cb17a285f54fd035da4187539c01c5bdae326426bd17d9a07",
+      "signature": "v1=37c4b3e48ab42346fb69de2793b8335dc36d7ae26f5f0f63f2d62d89444d6fb5",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
@@ -921,55 +923,55 @@
     },
     {
       "name": "facts is an object",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":{\"key\":\"test\",\"value\":true},\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":{\"key\":\"test\",\"value\":true},\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=b323792e8682fac4865777a9fe146b881d04c1cccf38e03c55c891a8179baa16",
+      "signature": "v1=93ab1fca6e40ea88407788fe999d064b94fe5863137df7f8aabdfaa314f49ac2",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "facts is null",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":null,\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":null,\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=296a1d6a188b5657934022dda8448ea40097f1c8f3b7575ab58f49d62cacd2e1",
+      "signature": "v1=b3d33261cbf5c0a276cd764f8a475d1ce6cbb4b42b166c0e0aede8229146157c",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "fact without a key",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"value\":true}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"value\":true}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=df228c469ef22429dff2c79e4e9f69e7cad35bb90b2b44b88f963f22f5e815c6",
+      "signature": "v1=50f2cae88a0756e04271b74808b0efbe08b368cc86aea5ebb52c80a08f81b574",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "fact without a value",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"k\"}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"k\"}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=30771fd231b47ae4431490fa8a7f03885e934f0fec010a6e1c44febb2eac3277",
+      "signature": "v1=d0346ccb883edba63314469f06b524f2a547a138f73c6eb39dda330bdd7e44ca",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "fact is a string",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[\"test\"],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[\"test\"],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=04e836985b72332ec57a5c975fb55655c0d6912411319c0f8cff7c17decb7c80",
+      "signature": "v1=94c3feb88501d6c8745a405f6d1d227d9884a6962fabdb088c93b531be20be94",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     },
     {
       "name": "fact with a numeric url",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"k\",\"value\":1,\"url\":1}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"k\",\"value\":1,\"url\":1}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=f1b0664eebc1a32fff6d7807744ce03547c8b124b9a9b87edafed33c03a29528",
+      "signature": "v1=64c63f47b04cf787c6373d740e9f6f5ccf55ba1641a566784e03256103bc54a1",
       "now": 1700000000,
       "error": "sdk/invalid-webhook-payload"
     }
@@ -1017,10 +1019,10 @@
     },
     {
       "name": "a full event",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=572b81d6045e03bba82231c5c3eeb480f01238a62f90e419cfe3b8e87cbcf11c",
+      "signature": "v1=36993f10c7500f5d0f595fb8b3cb4b9065bd67ff8d0afcf229d4a5834bb093a6",
       "now": 1700000000,
       "expected": {
         "id": "event-1",
@@ -1032,7 +1034,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1100,10 +1115,10 @@
     },
     {
       "name": "unknown fields are kept",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000,\"version\":2,\"delivery\":{\"attempt\":3},\"region\":\"eu\",\"nested\":{\"list\":[1,null,\"x\"]}}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"Asset blocked\",\"description\":null,\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000,\"version\":2,\"delivery\":{\"attempt\":3},\"region\":\"eu\",\"nested\":{\"list\":[1,null,\"x\"]}}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=800b0878d0c7e75236811cf0d24497ca528ee96d0c52cb43757c1f7d291a2ec3",
+      "signature": "v1=d6c47e30624bf19a4fec4aacf3de1be07f9ed5e6f2ab117367f165794f03a070",
       "now": 1700000000,
       "expected": {
         "id": "event-1",
@@ -1115,7 +1130,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1199,10 +1227,10 @@
     },
     {
       "name": "non-ASCII and escaped characters",
-      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"héllo 🌍   \\\"quoted\\\" \\\\ /\",\"description\":\"<b>&</b>\",\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\"},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
+      "body": "{\"id\":\"event-1\",\"projectId\":\"project-1\",\"type\":\"asset.blocked\",\"severity\":\"high\",\"title\":\"héllo 🌍   \\\"quoted\\\" \\\\ /\",\"description\":\"<b>&</b>\",\"assetId\":\"asset-1\",\"assetSequence\":3,\"asset\":{\"id\":\"asset-1\",\"upload\":{\"status\":\"uploading\"},\"classification\":{\"status\":\"queued\",\"testInput\":false,\"moderation\":{\"decision\":null}},\"content\":{\"status\":\"temporary\"}},\"actor\":{\"type\":\"automated\",\"id\":null},\"facts\":[{\"key\":\"flagged-categories\",\"value\":[\"harassment\"]}],\"createdAt\":1700000000000}",
       "secret": "key",
       "timestamp": "1700000000",
-      "signature": "v1=f5184aa79e1aec6bfe0cf6756ddf9ea8ef818249e57cba32bfc314d5a983aee6",
+      "signature": "v1=0ce3b3c9ced7588a92ee7b9d661457e2524745fd0129a20ca472c8dee8234058",
       "now": 1700000000,
       "expected": {
         "id": "event-1",
@@ -1214,7 +1242,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1262,7 +1303,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1290,7 +1344,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1322,7 +1389,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1351,7 +1431,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1379,7 +1472,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1407,7 +1513,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1435,7 +1554,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1463,7 +1595,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1491,7 +1636,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1514,7 +1672,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1788,7 +1959,20 @@
         "assetId": "asset-1",
         "assetSequence": 4,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1819,7 +2003,20 @@
         "assetId": "asset-1",
         "assetSequence": 9,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1850,7 +2047,20 @@
         "assetId": "asset-1",
         "assetSequence": 5,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1881,7 +2091,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1912,7 +2135,20 @@
         "assetId": "asset-1",
         "assetSequence": 2,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1943,7 +2179,20 @@
         "assetId": null,
         "assetSequence": null,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -1976,7 +2225,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -2025,7 +2287,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -2077,7 +2352,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -2126,7 +2414,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -2175,7 +2476,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -2226,7 +2540,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
@@ -2282,7 +2609,20 @@
         "assetId": "asset-1",
         "assetSequence": 3,
         "asset": {
-          "id": "asset-1"
+          "id": "asset-1",
+          "upload": {
+            "status": "uploading"
+          },
+          "classification": {
+            "status": "queued",
+            "testInput": false,
+            "moderation": {
+              "decision": null
+            }
+          },
+          "content": {
+            "status": "temporary"
+          }
         },
         "actor": {
           "type": "automated",
