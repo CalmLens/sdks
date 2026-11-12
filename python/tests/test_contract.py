@@ -1,7 +1,8 @@
 """Replay the shared SDK contract fixtures that packages/sdk-contract writes to sdks/go/testdata
 (format in packages/sdk-contract/README.md): requests captured from the JavaScript SDK, path
 safety and CDN URLs, API errors, scripted client cases, transform options, webhooks, upload
-tokens, the mock behaviour scenarios, the server SDK surface, defaults and rejections. Each
+tokens, the mock behaviour scenarios, the server SDK surface, defaults, rejections and the declared
+types (types.json). Each
 fixture case is its own subtest; cases a capability marks not applicable to Python are skipped
 by name with the reason."""
 from __future__ import annotations
@@ -1238,3 +1239,489 @@ def _decode_png(png: bytes) -> tuple[int, int, bytes]:
 
 if __name__ == "__main__":
     unittest.main()
+import collections.abc
+# ---- Declared types ---------------------------------------------------------------------------
+
+TYPES = _fixture("types.json")
+
+#: Option fields with Python-native forms that ``types.json`` leaves out, as the README's
+#: "Declared types" section describes: upload payloads and the client-side wait.
+_NATIVE_OPTIONS: dict[str, dict[str, str]] = {
+    "assets.create": {
+        "content": "the upload payload (bytes, base64, text or a file), sent as the multipart file",
+        "part": "the first part of a multipart upload, sent as the multipart file",
+        "url": "a remote URL to fetch, the payload's URL form",
+        "totalSizeInBytes": "the multipart upload's total size, sent with the upload payload",
+    },
+    "assets.uploadPart": {
+        "part": "the part's payload, sent as the multipart file",
+    },
+}
+
+#: Options every operation leaves out of ``types.json``: the client supplies the project, and ``wait``
+#: is the classify helpers' own polling (README "Declared types").
+_CLIENT_OPTIONS = {"projectId": "the client's project", "wait": "the client's own polling for a decision"}
+
+#: Fields and values the SDK keeps for API features a feature switch in
+#: ``packages/shared/src/SharedConstants.ts`` hides, so ``types.json`` lacks them.
+_SWITCHED_FIELDS = {"linkSafety": "ENABLE_LINK_SAFETY", "aiGeneratedDetection": "ENABLE_AI_GENERATED_DETECTION"}
+_SWITCHED_VALUES = {
+    # The asset.link-flagged event, its facts and the link-safety moderation source.
+    **{value: "ENABLE_LINK_SAFETY" for value in ("asset.link-flagged", "link-safety", "link-verdict", "link-url",
+                                                 "link-final-url", "link-status")},
+}
+
+#: Differences Python cannot express, keyed by ``(operation, side, path)``, with the reason.
+_TYPE_ALLOWLIST: dict[tuple[str, str, str], str] = {
+    ("events.list", "result", "$.items[].facts[].value"):
+        "one EventFact TypedDict holds every fact; a fact value's type depends on its key, which a "
+        "TypedDict cannot tie to another field's literal, so the value is Any",
+}
+
+#: Python's JSON value (metadata item values): typing has no JSON type, so it is ``Any``.
+_JSON_KINDS = {"string", "number", "boolean", "null", "array", "object"}
+
+#: Literal sets Python keeps open in options too, with the reason.
+_OPEN_OPTION_VALUES = {
+    "ModerationQualifier": "policy settings are read from a policy and sent back, so their rules share the "
+                           "response's open qualifier type",
+}
+
+_NONE = type(None)
+_UNION_ORIGINS: tuple[Any, ...] = (typing.Union, __import__("types").UnionType)
+_LIST_ORIGINS: tuple[Any, ...] = (list, collections.abc.Sequence)
+_DICT_ORIGINS: tuple[Any, ...] = (dict, collections.abc.Mapping)
+
+
+def _unwrap(declared: Any) -> Any:
+    """``declared`` without ``Annotated``, ``Required`` and ``NotRequired``."""
+    while True:
+        origin = typing.get_origin(declared)
+        if origin is typing.Annotated:
+            declared = typing.get_args(declared)[0]
+        elif origin is not None and getattr(origin, "_name", None) in ("Required", "NotRequired"):
+            declared = typing.get_args(declared)[0]
+        else:
+            return declared
+
+
+def _members(declared: Any) -> list[Any]:
+    """A union's members, flattened, or ``[declared]``."""
+    declared = _unwrap(declared)
+    if typing.get_origin(declared) in _UNION_ORIGINS:
+        return [member for arg in typing.get_args(declared) for member in _members(arg)]
+    return [declared]
+
+
+def _describe(declared: Any) -> str:
+    return getattr(declared, "__name__", None) or str(declared).replace("typing.", "")
+
+
+class _TypeWalker:
+    """Walks a declared Python type alongside a JSON Schema from ``types.json``."""
+
+    def __init__(self, operation: str, side: str, method: str = "GET"):
+        self.operation, self.side, self.method = operation, side, method
+        self.problems: list[str] = []
+
+    def report(self, path: str, problem: str) -> None:
+        if (self.operation, self.side, path) not in _TYPE_ALLOWLIST:
+            self.problems.append(f"{self.operation} {self.side} {path}: {problem}")
+
+    def problems_of(self, schema: Any, declared: Any, path: str, seen: frozenset[str]) -> list[str]:
+        """The problems of one comparison, without reporting them."""
+        walker = _TypeWalker(self.operation, self.side, self.method)
+        walker.compare(schema, declared, path, seen)
+        return walker.problems
+
+    @staticmethod
+    def deref(schema: Any, seen: frozenset[str]) -> tuple[Any, frozenset[str]] | None:
+        """``schema`` with its references resolved, or ``None`` at a reference already being walked."""
+        while isinstance(schema, dict) and "$ref" in schema:
+            name = schema["$ref"].removeprefix("#/definitions/")
+            if name in seen:
+                return None
+            seen = seen | {name}
+            schema = TYPES["definitions"][name]
+        return schema, seen
+
+    def split_null(self, schema: dict[str, Any], seen: frozenset[str]) -> tuple[bool, list[Any]]:
+        """Whether the schema allows ``null``, and its other branches (each resolved)."""
+        branches = schema.get("anyOf") or schema.get("oneOf")
+        if branches is None:
+            kinds = schema.get("type")
+            if isinstance(kinds, list):
+                rest = [kind for kind in kinds if kind != "null"]
+                if rest == ["boolean", "string"]:
+                    # Booleans sent in form fields arrive as strings; the SDK declares bool.
+                    rest = ["boolean"]
+                branches = [{**schema, "type": kind} for kind in rest]
+                return "null" in kinds, branches
+            if kinds == "null":
+                return True, []
+            return False, [schema]
+        nullable, rest = False, []
+        for branch in branches:
+            resolved = self.deref(branch, seen)
+            if resolved is None:
+                rest.append(branch)
+                continue
+            inner_nullable, inner = self.split_null(resolved[0], resolved[1])
+            nullable = nullable or inner_nullable
+            rest.extend(item for item in inner if item != {"type": "null"})
+        return nullable, rest
+
+    def compare(self, schema: Any, declared: Any, path: str, seen: frozenset[str]) -> None:
+        resolved = self.deref(schema, seen)
+        if resolved is None:
+            return
+        schema, seen = resolved
+        members = _members(declared)
+        if not {key for key in schema if key not in ("format",)} - {"type"} and "type" not in schema:
+            if members != [Any]:
+                self.report(path, f"declared {_describe(declared)}, but the schema is an open JSON value (Any)")
+            return
+        if members == [Any]:
+            if not self.is_json_value(schema, seen):
+                self.report(path, "declared Any, but the schema has a type")
+            return
+        nullable, branches = self.split_null(schema, seen)
+        declared_nullable = _NONE in members
+        members = [member for member in members if member is not _NONE]
+        if nullable and not declared_nullable and (self.side == "result" or self.method == "PATCH"):
+            self.report(path, "the schema allows null, but the declared type is not Optional")
+        elif declared_nullable and not nullable:
+            self.report(path, "declared Optional, but the schema does not allow null")
+        if not branches:
+            return
+        self.compare_branches(branches, members, path, seen)
+
+    def compare_branches(self, branches: list[Any], members: list[Any], path: str, seen: frozenset[str]) -> None:
+        values = self.values(branches)
+        if values is not None:
+            self.compare_values(values, members, path)
+            return
+        if len(branches) == 1:
+            self.compare_one(branches[0], members, path, seen)
+            return
+        objects = [self.deref(branch, seen) for branch in branches]
+        typed_dicts = [member for member in members if typing.is_typeddict(member)]
+        if len(typed_dicts) == 1 and len(members) == 1 and all(
+                item is not None and item[0].get("type") == "object" and "properties" in item[0] for item in objects):
+            # One TypedDict for every object branch: compare it with their merged properties.
+            self.compare_one(self.merge([item[0] for item in objects if item is not None]), members, path, seen)
+            return
+        tag = self.tag([item[0] for item in objects if item is not None]) if None not in objects else None
+        if tag is not None and typed_dicts and len(typed_dicts) == len(members):
+            self.compare_tagged(tag, [item[0] for item in objects if item is not None], typed_dicts, path, seen)
+            return
+        unmatched = list(members)
+        leftovers: list[Any] = []
+        for branch in branches:
+            match = next((member for member in unmatched
+                          if not self.problems_of(branch, member, path, seen)), None)
+            if match is None:
+                leftovers.append(branch)
+            else:
+                unmatched.remove(match)
+        for branch in leftovers:
+            if len(leftovers) == 1 and len(unmatched) == 1:
+                self.compare(branch, unmatched.pop(), path, seen)
+            else:
+                self.report(path, f"no declared member covers the schema branch {self.summary(branch)}")
+        for member in unmatched:
+            self.report(path, f"declared member {_describe(member)} matches no schema branch")
+
+    def is_json_value(self, schema: dict[str, Any], seen: frozenset[str]) -> bool:
+        """Whether ``schema`` is any JSON value: a union of every JSON kind."""
+        branches = schema.get("anyOf") or schema.get("oneOf") or []
+        kinds: set[str] = set()
+        for branch in branches:
+            resolved = self.deref(branch, frozenset())
+            kind = resolved[0].get("type") if resolved else None
+            kinds.update(kind if isinstance(kind, list) else [str(kind)])
+        return kinds == _JSON_KINDS
+
+    @staticmethod
+    def tag(objects: list[dict[str, Any]]) -> str | None:
+        """The property every object branch holds as a distinct constant (``type`` or ``key``)."""
+        for name in ("type", "key", "kind"):
+            values = [item.get("properties", {}).get(name, {}).get("const") for item in objects]
+            if None not in values and len(set(values)) == len(values):
+                return name
+        return None
+
+    def compare_tagged(self, tag: str, objects: list[dict[str, Any]], members: list[Any], path: str,
+                       seen: frozenset[str]) -> None:
+        """Pair a tagged union's branches with the TypedDicts whose ``tag`` literal holds their value."""
+        by_value: dict[Any, Any] = {}
+        for member in members:
+            hint = typing.get_type_hints(member, include_extras=True).get(tag)
+            for value in [arg for item in _members(hint) if typing.get_origin(item) is typing.Literal
+                          for arg in typing.get_args(item)]:
+                by_value[value] = member
+        grouped: dict[Any, list[dict[str, Any]]] = {}
+        for item in objects:
+            value = item["properties"][tag]["const"]
+            member = by_value.get(value)
+            if member is None:
+                self.report(path, f"no declared member has {tag} {value!r}")
+            else:
+                grouped.setdefault(member, []).append(item)
+        for member in members:
+            items = grouped.get(member)
+            if not items:
+                self.report(path, f"declared member {_describe(member)} matches no schema branch")
+                continue
+            values = ",".join(str(item["properties"][tag]["const"]) for item in items)
+            # A member may cover several tags (``kind: Literal["default", "below-threshold"]``).
+            self.compare_object(items[0] if len(items) == 1 else self.merge(items), member, f"{path}<{values}>", seen)
+
+    @staticmethod
+    def summary(schema: Any) -> str:
+        return json.dumps(schema)[:120]
+
+    def merge(self, objects: list[dict[str, Any]]) -> dict[str, Any]:
+        """Object branches as one object: every property, as the union of its branches' schemas,
+        required where every branch requires it."""
+        properties: dict[str, list[Any]] = {}
+        for item in objects:
+            for name, property_schema in item["properties"].items():
+                if property_schema not in properties.setdefault(name, []):
+                    properties[name].append(property_schema)
+        required = set.intersection(*(set(item.get("required", [])) for item in objects))
+        return {"type": "object",
+                "properties": {name: self.merge_values(schemas) for name, schemas in properties.items()},
+                "required": sorted(required)}
+
+    def merge_values(self, schemas: list[Any]) -> Any:
+        """One property's schemas across merged branches: arrays as one array of their items."""
+        if len(schemas) == 1:
+            return schemas[0]
+        resolved = [self.deref(schema, frozenset()) for schema in schemas]
+        if all(item is not None and item[0].get("type") == "array" and "items" in item[0] for item in resolved):
+            items: list[Any] = []
+            for item in resolved:
+                assert item is not None
+                inner = item[0]["items"]
+                for branch in inner.get("oneOf") or inner.get("anyOf") or [inner]:
+                    if branch not in items:
+                        items.append(branch)
+            return {"type": "array", "items": {"anyOf": items}}
+        return {"anyOf": schemas}
+
+    def values(self, branches: list[Any]) -> list[Any] | None:
+        """The listed values when every branch is an ``enum`` or ``const``."""
+        values: list[Any] = []
+        for branch in branches:
+            resolved = self.deref(branch, frozenset())
+            if resolved is None:
+                return None
+            item = resolved[0]
+            if "const" in item:
+                values.append(item["const"])
+            elif "enum" in item:
+                values.extend(item["enum"])
+            else:
+                return None
+        return values
+
+    def compare_values(self, values: list[Any], members: list[Any], path: str) -> None:
+        declared: list[Any] = []
+        others = []
+        for member in members:
+            if typing.get_origin(member) is typing.Literal:
+                declared.extend(typing.get_args(member))
+            else:
+                others.append(member)
+        kinds = {type(value) for value in values}
+        if others == [str] and kinds == {str} and declared and (
+                self.side == "result" or self.open_in_options(members)):
+            others = []  # Responses keep enum-like strings open: the listed literals or str.
+        if others:
+            self.report(path, f"declared {', '.join(map(_describe, others))}, but the schema lists only "
+                              f"{sorted(map(str, values))}")
+        if not declared and others:
+            return
+        missing = [value for value in values if value not in declared]
+        extra = [value for value in declared if value not in values and value not in _SWITCHED_VALUES]
+        if missing:
+            self.report(path, f"the declared literals lack {missing}")
+        if extra:
+            self.report(path, f"declared literals {extra} the schema lacks")
+
+    @staticmethod
+    def open_in_options(members: list[Any]) -> bool:
+        return any(set(members) == set(_members(getattr(calmlens.types, name))) for name in _OPEN_OPTION_VALUES)
+
+    def compare_one(self, schema: dict[str, Any], members: list[Any], path: str, seen: frozenset[str]) -> None:
+        kind = schema.get("type")
+        if len(members) != 1:
+            self.report(path, f"declared a union of {', '.join(map(_describe, members))}, but the schema "
+                              f"has one branch {self.summary(schema)}")
+            return
+        declared = members[0]
+        origin = typing.get_origin(declared)
+        if typing.get_origin(declared) is typing.Literal:
+            self.report(path, f"declared literals {list(typing.get_args(declared))}, but the schema lists no values")
+            return
+        if kind == "string":
+            if declared is not str:
+                self.report(path, f"declared {_describe(declared)}, but the schema is a string")
+        elif kind == "boolean":
+            if declared is not bool:
+                self.report(path, f"declared {_describe(declared)}, but the schema is a boolean")
+        elif kind == "integer":
+            if declared not in (int, float):
+                self.report(path, f"declared {_describe(declared)}, but the schema is an integer")
+        elif kind == "number":
+            if declared is int:
+                self.report(path, "declared int, but the schema is a number that can have a fraction")
+            elif declared is not float:
+                self.report(path, f"declared {_describe(declared)}, but the schema is a number")
+        elif kind == "array":
+            if "prefixItems" in schema:
+                args = typing.get_args(declared)
+                if origin is not tuple or len(args) != len(schema["prefixItems"]):
+                    self.report(path, f"declared {_describe(declared)}, but the schema is a "
+                                      f"{len(schema['prefixItems'])}-item tuple")
+                    return
+                for index, (item, arg) in enumerate(zip(schema["prefixItems"], args)):
+                    self.compare(item, arg, f"{path}[{index}]", seen)
+            elif origin not in _LIST_ORIGINS:
+                self.report(path, f"declared {_describe(declared)}, but the schema is an array")
+            else:
+                self.compare(schema.get("items", {}), typing.get_args(declared)[0], f"{path}[]", seen)
+        elif kind == "object":
+            if "properties" in schema:
+                self.compare_object(schema, declared, path, seen)
+            elif schema.get("additionalProperties", {}) == {} and (typing.is_typeddict(declared) or origin in _DICT_ORIGINS):
+                pass  # A record of open values accepts any declared object.
+            elif origin in _DICT_ORIGINS:
+                key, value = typing.get_args(declared)
+                names = schema.get("propertyNames")
+                if names is not None:
+                    _, branches = self.split_null(names, seen)
+                    self.compare_branches(branches, _members(key), f"{path}{{key}}", seen)
+                elif key is not str:
+                    self.report(path, f"declared keys {_describe(key)}, but the schema's keys are strings")
+                additional = schema.get("additionalProperties")
+                self.compare(additional if isinstance(additional, dict) else {}, value, f"{path}{{}}", seen)
+            else:
+                self.report(path, f"declared {_describe(declared)}, but the schema is a record")
+        elif kind is None and not ({"enum", "const", "properties", "items"} & schema.keys()):
+            if declared is not Any:
+                self.report(path, f"declared {_describe(declared)}, but the schema is an open JSON value (Any)")
+        else:
+            self.report(path, f"the schema type {kind!r} has no Python mapping in this runner")
+
+    def compare_object(self, schema: dict[str, Any], declared: Any, path: str, seen: frozenset[str]) -> None:
+        if typing.get_origin(declared) in _DICT_ORIGINS and set(schema.get("required", [])) == set(schema["properties"]):
+            # A map keyed by a literal set, every key present (``Dict[ClassificationCategory, ...]``).
+            key, value = typing.get_args(declared)
+            self.compare_values(list(schema["properties"]), _members(key), f"{path}{{key}}")
+            for name, property_schema in schema["properties"].items():
+                self.compare(property_schema, value, f"{path}.{name}", seen)
+            return
+        if not typing.is_typeddict(declared):
+            self.report(path, f"declared {_describe(declared)}, but the schema is an object with properties")
+            return
+        hints = typing.get_type_hints(declared, include_extras=True)
+        required_keys = declared.__required_keys__
+        required = set(schema.get("required", []))
+        for name, property_schema in schema["properties"].items():
+            field = f"{path}.{name}"
+            if name not in hints:
+                self.report(field, "the schema property is not declared")
+                continue
+            if name in required and name not in required_keys:
+                self.report(field, "the schema requires it, but it is declared NotRequired")
+            elif name not in required and name in required_keys:
+                self.report(field, "the schema does not require it, but it is declared Required")
+            self.compare(property_schema, hints[name], field, seen)
+        for name in hints:
+            if name not in schema["properties"] and name not in _SWITCHED_FIELDS:
+                self.report(f"{path}.{name}", "declared, but the schema lacks it")
+
+
+def _operation_method(operation: dict[str, Any]) -> Any:
+    client = CalmLensServerClient(api_key="ck_test", project_id="project-1")
+    return _resolve_name(client, operation["names"]["python"])
+
+
+def _options_type(method: Any) -> Any:
+    parameters = list(inspect.signature(method).parameters.values())
+    if not parameters or parameters[0].kind is not inspect.Parameter.POSITIONAL_ONLY:
+        return None
+    hints = typing.get_type_hints(method, include_extras=True)
+    return next(member for member in _members(hints[parameters[0].name]) if member is not _NONE)
+
+
+def _check_options(operation: dict[str, Any]) -> list[str]:
+    walker = _TypeWalker(operation["id"], "options", operation["method"])
+    method = _operation_method(operation)
+    native = {**_NATIVE_OPTIONS.get(operation["id"], {}), **_CLIENT_OPTIONS,
+              **{name: "a client option (types.json clientOptions)" for name in operation["options"].get("clientOptions", [])}}
+    properties = {name: spec["schema"] for name, spec in operation["options"]["properties"].items()}
+    schema = {"type": "object", "properties": properties, "required": operation["options"]["required"]}
+    options = _options_type(method)
+    hints = typing.get_type_hints(method, include_extras=True)
+    keywords = {name: parameter for name, parameter in inspect.signature(method).parameters.items()
+                if parameter.kind is inspect.Parameter.KEYWORD_ONLY and name != "idempotency_key"}
+    if not properties and options is None and not keywords:
+        return walker.problems
+    if options is None:
+        walker.report("$", "the method takes no options dict")
+        return walker.problems
+    if not properties and not typing.is_typeddict(options) and not keywords:
+        return walker.problems  # Takes no options; the optional positional dict is for symmetry.
+    if not typing.is_typeddict(options):
+        walker.report("$", f"the options type {_describe(options)} is not a TypedDict")
+        return walker.problems
+    fields = typing.get_type_hints(options, include_extras=True)
+    trimmed = cast(Any, typing.TypedDict)(options.__name__, {name: hint for name, hint in fields.items()
+                                                             if name not in native}, total=False)
+    trimmed.__required_keys__ = frozenset(name for name in options.__required_keys__ if name not in native)
+    trimmed.__optional_keys__ = frozenset(name for name in options.__optional_keys__ if name not in native)
+    walker.compare_object(schema, trimmed, "$", frozenset())
+    for name in fields:
+        if _snake(name) not in keywords:
+            walker.report(f"$.{name}", f"the options dict declares it, but there is no keyword {_snake(name)}")
+    for keyword in keywords:
+        field = next((field for field in fields if _snake(field) == keyword), None)
+        if field is None:
+            walker.report(f"$.{keyword}", "a keyword argument the options dict lacks")
+        elif field in properties and hints[keyword] != fields[field]:
+            for problem in walker.problems_of(properties[field], hints[keyword], f"$.{field}", frozenset()):
+                walker.problems.append(f"{problem} (keyword {keyword})")
+    return walker.problems
+
+
+def _check_result(operation: dict[str, Any]) -> list[str]:
+    walker = _TypeWalker(operation["id"], "result")
+    if operation["result"] is None:
+        return walker.problems  # No model: deletes, and the lens helpers' own results.
+    declared = typing.get_type_hints(_operation_method(operation), include_extras=True)["return"]
+    if declared is _NONE:
+        walker.report("$", "declared None, but the operation returns a model")
+    else:
+        walker.compare(operation["result"], declared, "$", frozenset())
+    return walker.problems
+
+
+class DeclaredTypeTests(unittest.TestCase):
+    """Each operation's declared options and result types against ``types.json``."""
+
+    def test_every_operation_has_a_method(self) -> None:
+        missing = [operation["id"] for operation in TYPES["operations"] if _operation_method(operation) is None]
+        self.assertEqual(missing, [])
+
+    def test_option_types_match_the_api(self) -> None:
+        problems = [problem for operation in TYPES["operations"] for problem in _check_options(operation)]
+        self.assertEqual(problems, [], "\n" + "\n".join(problems))
+
+    def test_result_types_match_the_api(self) -> None:
+        problems = [problem for operation in TYPES["operations"] for problem in _check_result(operation)]
+        self.assertEqual(problems, [], "\n" + "\n".join(problems))
+
+

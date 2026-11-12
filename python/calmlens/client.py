@@ -38,7 +38,7 @@ from .moderation_context import select_moderation_context_items
 from .types import (IMAGE_TRANSFORM_COLOUR_KEYS, Asset, AssetBatchOperation, AssetIdOptions, AssetPage, AssetTimelinePage, AssetSearchResponse, AssetInfo, AssetUrlOptions, CdnResource, CdnTransform,
                     Content, CreateFolderOptions, EnsureLensesOptions, Event, EventType, EventsPage, Folder, FolderPage, ListFoldersOptions, FolderIdOptions, Lens,
                     ImageTransformOptions, LensDefinition, LensType, ListAssetsOptions, ListChildrenOptions, ListTimelineOptions, ListEventsOptions,
-                    BatchAssetsOptions, BatchAssetsResponse,
+                    BatchAssetsOptions, BatchAssetsResponse, KnownEventType, KnownPolicyPresetId,
                     MetadataItem, ModerationContext, ClassifyTextOptions, ExplainAssetOptions, MoveAssetOptions, MoveFolderOptions, PartContent,
                     ProcessingOptions, SearchAssetsOptions, SearchMode, ServeInit, ServeOptions, SignedAssetUrl,
                     SignedUploadToken, SignAssetUrlOptions, GetAssetInfoOptions, SignUploadTokenOptions, SubmitAssetOptions,
@@ -1533,21 +1533,18 @@ class Assets:
                                             body={k: v for k, v in merged.items() if k != "assetId"}))
 
     def list_children(self, options: ListChildrenOptions | None = None, /, *, asset_id: str = _UNSET,
-                      cursor: str = _UNSET, page_size: int = _UNSET, sort: str = _UNSET,
-                      filter: str = _UNSET) -> AssetPage:
+                      cursor: str = _UNSET, page_size: int = _UNSET, sort: str = _UNSET) -> AssetPage:
         """One page of the assets extracted from an asset (pages of a document, a website's
         text and images, ...), sorted like :meth:`list`. Use :meth:`iter_children` to walk every page."""
-        merged = _merge("assets.listChildren", options, asset_id=asset_id, cursor=cursor, page_size=page_size, sort=sort,
-                        filter=filter)
+        merged = _merge("assets.listChildren", options, asset_id=asset_id, cursor=cursor, page_size=page_size, sort=sort)
         return cast(AssetPage, self._c._request(
             "GET", "/assets/" + _id(merged.get("assetId"), "assetId") + "/children",
             query={k: v for k, v in merged.items() if k != "assetId"}))
 
     def iter_children(self, options: ListChildrenOptions | None = None, /, *, asset_id: str = _UNSET,
-                      page_size: int = _UNSET, sort: str = _UNSET,
-                      filter: str = _UNSET) -> Iterator[Asset]:
+                      page_size: int = _UNSET, sort: str = _UNSET) -> Iterator[Asset]:
         """Yield every child of an asset, requesting pages lazily."""
-        merged = _merge("assets.eachChild", options, asset_id=asset_id, page_size=page_size, sort=sort, filter=filter)
+        merged = _merge("assets.eachChild", options, asset_id=asset_id, page_size=page_size, sort=sort)
         _id(merged.get("assetId"), "assetId")
         return cast(Iterator[Asset], _iterate_pages(
             lambda index: self.list_children(cast(ListChildrenOptions, {**merged, "cursor": index})),
@@ -1795,7 +1792,7 @@ class Assets:
 
     def decide(self, options: DecideAssetOptions | None = None, /, *, asset_id: str = _UNSET,
                decision: Literal["allowed", "limited", "age-restricted", "blocked", "purged"] = _UNSET,
-               note: str = _UNSET, confirm_purge: bool = _UNSET) -> Asset:
+               note: str = _UNSET, confirm_purge: Literal[True] = _UNSET) -> Asset:
         """Record a reviewer's decision, replacing the policy's: ``classification.moderation.status``
         becomes ``decision``, the decision and ``note`` join ``classification.moderation.manualReviews``
         and the matching ``asset.<status>`` event is sent with the API key as its ``actor``. An asset still
@@ -2027,7 +2024,7 @@ class Policies:
         return cast(Policy, self._c._request("GET", self._path(merged.get("policyId"))))
 
     def create(self, options: CreatePolicyOptions | None = None, /, *, name: str = _UNSET,
-               description: str = _UNSET, settings: PolicySettings = _UNSET, preset_id: str = _UNSET) -> Policy:
+               description: str = _UNSET, settings: PolicySettings = _UNSET, preset_id: KnownPolicyPresetId = _UNSET) -> Policy:
         """Create a policy from ``settings`` (defining every category) with a ``name``, or a copy of
         the latest release of a built-in preset with ``preset_id``. It moderates nothing until it is
         assigned to a project or named on an upload preset."""
@@ -2250,7 +2247,7 @@ class Events:
         self._c = client
 
     def list(self, options: ListEventsOptions | None = None, /, *, cursor: str = _UNSET,
-             page_size: int = _UNSET, types: List[EventType] = _UNSET, asset_id: str = _UNSET) -> EventsPage:
+             page_size: int = _UNSET, types: List[KnownEventType] = _UNSET, asset_id: str = _UNSET) -> EventsPage:
         """Events created after ``cursor`` (a previous response's ``nextCursor``), oldest first.
         Without ``cursor`` it returns no events and a ``nextCursor`` for now. ``types`` and
         ``asset_id`` narrow the feed to some event types or one asset's events; a cursor belongs to
@@ -2267,7 +2264,7 @@ class Events:
         return cast(EventsPage, self._c._request("GET", self._c._project("events"), query=merged))
 
     def iter_pages(self, options: ListEventsOptions | None = None, /, *, cursor: str = _UNSET,
-                   page_size: int = _UNSET, types: List[EventType] = _UNSET,
+                   page_size: int = _UNSET, types: List[KnownEventType] = _UNSET,
                    asset_id: str = _UNSET) -> Iterator[EventsPage]:
         """Yield pages from ``cursor`` until one reports ``hasMore=False``. Persist the last
         page's ``nextCursor`` to resume later. Without ``cursor`` it yields one empty page whose
@@ -2286,7 +2283,7 @@ class Events:
             merged["cursor"] = page["nextCursor"]
 
     def iter(self, options: ListEventsOptions | None = None, /, *, cursor: str = _UNSET,
-             page_size: int = _UNSET, types: List[EventType] = _UNSET, asset_id: str = _UNSET) -> Iterator[Event]:
+             page_size: int = _UNSET, types: List[KnownEventType] = _UNSET, asset_id: str = _UNSET) -> Iterator[Event]:
         """Yield every event currently waiting after ``cursor`` (see :meth:`iter_pages`)."""
         for page in self.iter_pages(options, cursor=cursor, page_size=page_size, types=types, asset_id=asset_id):
             yield from page["items"]

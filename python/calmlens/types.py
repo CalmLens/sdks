@@ -36,7 +36,7 @@ __all__ = [
     "EvaluatedCategoryResult", "EvaluatedFaceDetectionResult", "EvaluatedPersonDetectionResult",
     "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
     "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
-    "EventSeverity", "EventType", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
+    "EventSeverity", "EventType", "KnownEventType", "KnownPolicyPresetId", "ModerationSource", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
     "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "StreamingFeatureOptions", "AssetPreview", "AssetModerationTimeline", "AssetInfo", "AssetInfoContent", "AssetAvailability",
     "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
     "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensType",
@@ -133,17 +133,26 @@ SearchMode = Literal["keyword", "semantic", "hybrid"]
 #: Fields a search result matched on. New fields may be added.
 AssetSearchMatchField = Union[Literal["name", "id", "externalId", "description", "tags", "type", "content.format",
                                       "content.extension", "classification.moderation.status", "visual", "transcript"], str]
+#: The built-in policy presets this SDK version knows (request values).
+KnownPolicyPresetId = Literal["general-community", "children-platform", "education-support", "wholesome-community"]
+#: A built-in policy preset. New presets may be added.
+PolicyPresetId = Union[KnownPolicyPresetId, str]
+#: What decided an automated moderation status (``classification.moderation.source``). New
+#: sources may be added.
+ModerationSource = Union[Literal["policy", "hash-list", "mandatory-rule", "children", "link-safety"], str]
 #: State of the project's semantic search index. New values may be added.
 SemanticStatus = Union[Literal["disabled", "ready", "indexing", "unavailable"], str]
+#: The event types this SDK version knows (request values, such as ``events.list`` ``types``).
+KnownEventType = Literal["asset.uploaded", "asset.classified", "asset.region-restricted", "asset.allowed",
+                         "asset.limited", "asset.age-restricted", "asset.blocked", "asset.purged", "asset.failed",
+                         "asset.progress-updated", "asset.deleted", "asset.content-removed", "asset.retried",
+                         "asset.rerun-requested", "asset.review-requested", "asset.review-completed", "asset.hash-matched", "asset.link-flagged",
+                         "usage.free-uploads-exhausted", "usage.uploads-paused", "upload-preset.daily-limit-reached",
+                         "project.member-joined", "project.member-removed", "project.member-left",
+                         "project.member-role-changed", "project.invitation-sent", "project.transferred",
+                         "api-key.created", "api-key.revoked", "api-key.deleted", "connector.disabled"]
 #: Event types. New types may be added; ignore ones you don't handle.
-EventType = Union[Literal["asset.uploaded", "asset.classified", "asset.region-restricted", "asset.allowed",
-                          "asset.limited", "asset.age-restricted", "asset.blocked", "asset.purged", "asset.failed",
-                          "asset.progress-updated", "asset.deleted", "asset.content-removed", "asset.retried",
-                          "asset.rerun-requested", "asset.review-requested", "asset.review-completed", "asset.hash-matched", "asset.link-flagged",
-                          "usage.free-uploads-exhausted", "usage.uploads-paused", "upload-preset.daily-limit-reached",
-                          "project.member-joined", "project.member-removed", "project.member-left",
-                          "project.member-role-changed", "project.invitation-sent", "project.transferred",
-                          "api-key.created", "api-key.revoked", "api-key.deleted", "connector.disabled"], str]
+EventType = Union[KnownEventType, str]
 #: Default severity of an event type. New values may be added.
 EventSeverity = Union[Literal["low", "high"], str]
 #: Registered fact keys (kebab-case) across event types, plus ``test`` on test sends. Webhook,
@@ -152,7 +161,8 @@ EventSeverity = Union[Literal["low", "high"], str]
 EventFactKey = Union[Literal[
     "asset-name", "asset-type", "file-format", "parent-asset", "flagged-categories", "moderation-status",
     "automated-status", "region", "rule", "status", "note", "previous-status", "failure-reason",
-    "completed-sections", "total-sections", "batch-id", "review-reason", "uncertain-categories", "hash-list-id",
+    "completed-sections", "total-sections", "batch-id", "review-reason", "uncertain-categories", "child-asset",
+    "child-status", "review-id", "decision", "applied-to-asset", "reviewer-name", "hash-list-id",
     "hash-list-name", "distance", "match-action", "link-verdict", "link-url", "link-final-url", "link-status",
     "limit", "used", "organisation-id", "reason", "resumes-at", "preset-id", "preset-name", "daily-limit",
     "member-user-id", "member-name", "role", "previous-role", "invitee-email", "previous-organisation-id",
@@ -550,13 +560,13 @@ class LinkSafetyDecision(TypedDict):
 
 
 class _PolicyRuleSnapshotRequired(TypedDict):
-    when: List[str]
+    when: List[ModerationQualifier]
     action: ModerationAction
 
 
 class PolicyRuleSnapshot(_PolicyRuleSnapshotRequired, total=False):
     name: str
-    unless: List[str]
+    unless: List[ModerationQualifier]
 
 
 class CategoryPolicySettingsSnapshot(TypedDict):
@@ -589,16 +599,16 @@ CategoryPolicySource = Union[CategoryPolicyDefaultSource, CategoryPolicyRuleSour
 
 
 class _RegionalDecisionRequired(TypedDict):
-    region: str
+    region: Union[Literal["DE", "AT", "FR", "GB", "EU", "AU", "BR"], str]
     #: The status in force in the region, stricter than ``moderation["status"]``: ``limited``,
     #: ``age-restricted``, ``blocked`` or ``purged``.
-    status: AssetModerationDecision
+    status: Union[Literal["limited", "age-restricted", "blocked", "purged"], str]
     #: The mandatory rule that sets it.
     rule: str
 
 
 class RegionalDecision(_RegionalDecisionRequired, total=False):
-    category: str
+    category: ClassificationCategory
 
 
 class _CategoryPolicyScoreRequired(TypedDict):
@@ -803,7 +813,7 @@ class ModerationRaw(_ModerationRawRequired):
 
 class DecisionPolicyPreset(TypedDict):
     """The built-in preset release a decision's policy used."""
-    id: str
+    id: PolicyPresetId
     version: int
 
 
@@ -822,7 +832,7 @@ class AssetPendingReview(TypedDict):
     #: ``sampled`` or ``uncertain``.
     reason: Literal["sampled", "uncertain"]
     #: The categories that made the decision uncertain; empty for a sampled decision.
-    uncertainCategories: List[str]
+    uncertainCategories: List[ClassificationCategory]
 
 
 class _AssetModerationRequired(TypedDict):
@@ -837,14 +847,14 @@ class _AssetModerationRequired(TypedDict):
     #: joined the queue; ``None`` when no review is waiting. Hold content until it is ``None``.
     pendingReview: Optional[AssetPendingReview]
     #: What decided ``automatedStatus``, such as ``policy`` or ``hash-list``; ``None`` before a decision.
-    source: Optional[str]
+    source: Optional[ModerationSource]
     #: The mandatory rule that decided, when ``source`` is ``mandatory-rule``; otherwise ``None``.
     rule: Optional[str]
     #: Whether every question a complete explanation needs was answered; ``None`` before a decision.
     explanationComplete: Optional[bool]
     #: The policy's score and action for each category; ``None`` before a decision.
-    categories: Optional[Dict[str, CategoryPolicyScore]]
-    flaggedCategories: List[str]
+    categories: Optional[Dict[ClassificationCategory, CategoryPolicyScore]]
+    flaggedCategories: List[ClassificationCategory]
     regions: List[RegionalDecision]
     #: The scores behind the decision; ``None`` before a decision.
     raw: Optional[ModerationRaw]
@@ -948,28 +958,28 @@ class _AssetRequired(TypedDict):
     upload: AssetUpload
     classification: AssetClassification
     content: AssetContent
+    #: For a child extracted from a document, the pages of the parent it shows, numbered from 1;
+    #: empty when its page isn't known or it has no parent document.
+    parentPages: list[int]
+    #: The asset's custom metadata items; empty when it has none.
+    metadata: list[MetadataItem]
+    #: The asset's tags; empty when it has none.
+    tags: list[str]
+    visibility: Union[Visibility, str]
 
 
 class Asset(_AssetRequired, total=False):
     parentId: Optional[str]
-    #: For a child extracted from a document, the pages of the parent it shows, numbered from 1;
-    #: empty when its page isn't known or it has no parent document.
-    parentPages: list[int]
     folderId: Optional[str]
     uploadPresetId: Optional[str]
     updatedAt: int
     description: Optional[str]
     externalId: Optional[str]
     externalUrl: Optional[str]
-    #: The asset's custom metadata items; empty when it has none.
-    metadata: list[MetadataItem]
     #: Your label for who wrote the content, or ``None`` when none was given.
     authorId: Optional[str]
     #: The earlier posts CalmLens used, or ``None`` when none were given or the content is removed.
     context: Optional[ModerationContext]
-    #: The asset's tags; empty when it has none.
-    tags: list[str]
-    visibility: Union[Visibility, str]
 
 
 class AssetPage(TypedDict):
@@ -1099,9 +1109,6 @@ class HashListEntryPage(TypedDict):
 
 # ---- Policies ---------------------------------------------------------------------------------
 
-#: A built-in policy preset. New presets may be added.
-PolicyPresetId = Union[Literal["general-community", "children-platform", "education-support",
-                               "wholesome-community"], str]
 
 
 class CategoryPolicySettings(TypedDict):
@@ -1364,22 +1371,25 @@ class Actor(TypedDict):
     id: Optional[str]
 
 
-class Event(TypedDict):
-    """An event as ``events.list`` returns it and a webhook delivers it."""
+class _EventRequired(TypedDict):
     id: str
     projectId: str
     actor: Actor
     type: EventType
     severity: EventSeverity
     title: str
+    facts: list[EventFact]
+    createdAt: int
+
+
+class Event(_EventRequired, total=False):
+    """An event as ``events.list`` returns it and a webhook delivers it."""
     description: Optional[str]
     assetId: Optional[str]
     #: Increases with each event about the same asset; ``None`` for events not about an asset.
     #: Deliveries can arrive out of order: see :func:`~calmlens.webhooks.is_newer_asset_event`.
     assetSequence: Optional[int]
     asset: Optional[EventAsset]
-    facts: list[EventFact]
-    createdAt: int
 
 
 class _WebhookEventPayloadRequired(TypedDict):
@@ -1541,7 +1551,7 @@ class CreatePolicyOptions(TypedDict, total=False):
     name: str
     description: str
     settings: PolicySettings
-    presetId: Literal["general-community", "children-platform", "education-support", "wholesome-community"]
+    presetId: KnownPolicyPresetId
 
 
 class _UpdatePolicyRequired(PolicyIdOptions):
@@ -1610,7 +1620,7 @@ class _DecideAssetRequired(AssetIdOptions):
 class DecideAssetOptions(_DecideAssetRequired, total=False):
     """A reviewer's decision for ``assets.decide``."""
     #: Must be ``True`` to purge: purging permanently deletes the stored content.
-    confirmPurge: bool
+    confirmPurge: Literal[True]
 
 
 #: What ``assets.batch`` does to every asset: ``delete`` deletes it with its child assets and stored
@@ -1686,7 +1696,6 @@ class ListChildrenOptions(_ListChildrenRequired, total=False):
     #: Comma-separated ``createdAt`` and ``id``, each descending when prefixed with ``-``, such as
     #: ``"-createdAt,id"``; newest first by default.
     sort: str
-    filter: str
 
 
 class _ListTimelineRequired(TypedDict):
@@ -1733,7 +1742,7 @@ class ListEventsOptions(TypedDict, total=False):
     #: 1 to 100, default 50.
     pageSize: int
     #: Only these event types. Sent as one comma-separated value.
-    types: List[EventType]
+    types: List[KnownEventType]
     #: Only events about this asset.
     assetId: str
 
@@ -1791,11 +1800,11 @@ class _UploadPresetRequired(TypedDict):
     #: Whether browser uploads see the moderation decision for their own upload.
     revealDecision: bool
     createdAt: int
-    updatedAt: int
 
 
 class UploadPreset(_UploadPresetRequired, total=False):
     """An upload preset: the rules for uploads made from browsers and apps."""
+    updatedAt: int
     createdByUserId: Optional[str]
     #: MIME types the preset accepts, such as ``image/*``; ``None`` accepts any supported type.
     allowedContentTypes: Optional[List[str]]
