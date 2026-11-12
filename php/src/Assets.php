@@ -544,7 +544,7 @@ final class Assets extends Resource
 
     /**
      * Retrieves an asset until it is settled, its `classification.status` `completed` (with its
-     * decision in `classification.moderation.decision`) or `failed`, and returns it. A `queued` or
+     * decision in `classification.moderation.status`) or `failed`, and returns it. A `queued` or
      * `processing` asset is still waiting, even when a reviewer has already decided it. Waits 0.5
      * seconds before the second check and 1.5 times longer each time, at most 2 seconds. Throws
      * `TimeoutException` (`sdk/timeout`, with the asset's statuses in `details`) once `timeout`
