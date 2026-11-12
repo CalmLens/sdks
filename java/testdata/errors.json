@@ -2,6 +2,7 @@
   {
     "code": "viewer-claims/invalid",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -34,6 +35,7 @@
   {
     "code": "viewer/age-confirmation-required",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -66,6 +68,7 @@
   {
     "code": "viewer-region/invalid",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -98,6 +101,7 @@
   {
     "code": "viewer/region-required",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -130,6 +134,7 @@
   {
     "code": "asset/regional-evidence-required",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -162,6 +167,7 @@
   {
     "code": "signed-url/expired",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -194,6 +200,7 @@
   {
     "code": "signed-url/invalid",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -226,6 +233,7 @@
   {
     "code": "signed-url/original-not-granted",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -258,6 +266,7 @@
   {
     "code": "validation/invalid-request",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -290,6 +299,7 @@
   {
     "code": "validation/invalid-type",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -322,6 +332,7 @@
   {
     "code": "validation/too-small",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -354,6 +365,7 @@
   {
     "code": "validation/too-big",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -386,6 +398,7 @@
   {
     "code": "validation/invalid-format",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -418,6 +431,7 @@
   {
     "code": "validation/invalid-value",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -450,6 +464,7 @@
   {
     "code": "validation/unknown-field",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -482,6 +497,7 @@
   {
     "code": "request/unsupported-content-type",
     "status": 415,
+    "kind": "api",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -514,6 +530,7 @@
   {
     "code": "filter/invalid",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -546,6 +563,7 @@
   {
     "code": "ordering/unsupported-field",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -578,6 +596,7 @@
   {
     "code": "request/route-not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -610,6 +629,7 @@
   {
     "code": "server/internal-error",
     "status": 500,
+    "kind": "server",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -642,6 +662,7 @@
   {
     "code": "auth/unauthenticated",
     "status": 401,
+    "kind": "authentication",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -674,6 +695,7 @@
   {
     "code": "session-token/expired",
     "status": 401,
+    "kind": "authentication",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -706,6 +728,7 @@
   {
     "code": "session-token/invalid",
     "status": 401,
+    "kind": "authentication",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -738,6 +761,7 @@
   {
     "code": "search/unavailable",
     "status": 503,
+    "kind": "server",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -770,6 +794,7 @@
   {
     "code": "transform/invalid",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -802,6 +827,7 @@
   {
     "code": "transform-options/invalid",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -834,6 +860,7 @@
   {
     "code": "remote-url/too-many-redirects",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -866,6 +893,7 @@
   {
     "code": "cursor/invalid",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -898,6 +926,7 @@
   {
     "code": "api-key/missing",
     "status": 401,
+    "kind": "authentication",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -930,6 +959,7 @@
   {
     "code": "api-key/invalid",
     "status": 401,
+    "kind": "authentication",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -962,6 +992,7 @@
   {
     "code": "api-key/project-mismatch",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -994,6 +1025,7 @@
   {
     "code": "api-key/not-accepted",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1026,6 +1058,7 @@
   {
     "code": "auth/permission-denied",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1058,6 +1091,7 @@
   {
     "code": "upload/too-large",
     "status": 413,
+    "kind": "payload-too-large",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1090,6 +1124,7 @@
   {
     "code": "document/too-many-items",
     "status": 422,
+    "kind": "unprocessable-entity",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1122,6 +1157,7 @@
   {
     "code": "media/duration-limit",
     "status": 422,
+    "kind": "unprocessable-entity",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1154,6 +1190,7 @@
   {
     "code": "image/invalid",
     "status": 422,
+    "kind": "unprocessable-entity",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1186,6 +1223,7 @@
   {
     "code": "image/too-large",
     "status": 422,
+    "kind": "unprocessable-entity",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1218,6 +1256,7 @@
   {
     "code": "usage/free-uploads-exhausted",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1250,6 +1289,7 @@
   {
     "code": "usage/uploads-paused",
     "status": 402,
+    "kind": "api",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1282,6 +1322,7 @@
   {
     "code": "upload/unsupported-type",
     "status": 415,
+    "kind": "api",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1314,6 +1355,7 @@
   {
     "code": "upload-payload/invalid",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1346,6 +1388,7 @@
   {
     "code": "upload/options-in-query",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1378,6 +1421,7 @@
   {
     "code": "upload/use-upload-part",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1410,6 +1454,7 @@
   {
     "code": "upload/not-open",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1442,6 +1487,7 @@
   {
     "code": "upload-part/invalid-number",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1474,6 +1520,7 @@
   {
     "code": "upload/missing",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1506,6 +1553,7 @@
   {
     "code": "upload/size-mismatch",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1538,6 +1586,7 @@
   {
     "code": "idempotency/invalid-key",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1570,6 +1619,7 @@
   {
     "code": "idempotency/key-reused",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1602,6 +1652,7 @@
   {
     "code": "idempotency/request-in-progress",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1635,6 +1686,7 @@
   {
     "code": "asset/no-rendered-version",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1667,6 +1719,7 @@
   {
     "code": "asset/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1699,6 +1752,7 @@
   {
     "code": "project/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1731,6 +1785,7 @@
   {
     "code": "asset/child-not-deletable",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1763,6 +1818,7 @@
   {
     "code": "asset/review-changed",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1795,6 +1851,7 @@
   {
     "code": "asset/review-note-required",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1827,6 +1884,7 @@
   {
     "code": "asset/update-failed",
     "status": 500,
+    "kind": "server",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1859,6 +1917,7 @@
   {
     "code": "asset/held",
     "status": 423,
+    "kind": "api",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1891,6 +1950,7 @@
   {
     "code": "asset/processing",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1923,6 +1983,7 @@
   {
     "code": "asset/decision-not-allowed",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1955,6 +2016,7 @@
   {
     "code": "asset/decision-unchanged",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -1987,6 +2049,7 @@
   {
     "code": "asset/not-retryable",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2019,6 +2082,7 @@
   {
     "code": "asset/content-unavailable",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2051,6 +2115,7 @@
   {
     "code": "asset/content-purged",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2083,6 +2148,7 @@
   {
     "code": "asset/not-decided",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2115,6 +2181,7 @@
   {
     "code": "asset/policy-changed",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2147,6 +2214,7 @@
   {
     "code": "asset/reviewed",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2179,6 +2247,7 @@
   {
     "code": "support-ticket/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2211,6 +2280,7 @@
   {
     "code": "asset/duplicate-external-id",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2243,6 +2313,7 @@
   {
     "code": "folder/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2275,6 +2346,7 @@
   {
     "code": "folder/duplicate-name",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2307,6 +2379,7 @@
   {
     "code": "folder/not-empty",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2339,6 +2412,7 @@
   {
     "code": "folder/parent-cycle",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2371,6 +2445,7 @@
   {
     "code": "lens/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2403,6 +2478,7 @@
   {
     "code": "lens/identifier-taken",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2435,6 +2511,7 @@
   {
     "code": "lens/identifier-reserved",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2467,6 +2544,7 @@
   {
     "code": "hash-list/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2499,6 +2577,7 @@
   {
     "code": "hash-list-entry/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2531,6 +2610,7 @@
   {
     "code": "hash-list/limit-reached",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2563,6 +2643,7 @@
   {
     "code": "hash-list-entry/limit-reached",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2595,6 +2676,7 @@
   {
     "code": "hash-list/asset-not-hashed",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2627,6 +2709,7 @@
   {
     "code": "policy/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2659,6 +2742,7 @@
   {
     "code": "policy/revision-conflict",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2691,6 +2775,7 @@
   {
     "code": "policy/projects-changed",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2723,6 +2808,7 @@
   {
     "code": "policy/in-use",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2755,6 +2841,7 @@
   {
     "code": "policy/used-by-another-project",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2787,6 +2874,7 @@
   {
     "code": "policy/no-preset",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2819,6 +2907,7 @@
   {
     "code": "policy/preset-version-conflict",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2851,6 +2940,7 @@
   {
     "code": "policy/preset-update-unavailable",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2883,6 +2973,7 @@
   {
     "code": "policy/automatic-updates-unavailable",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2915,6 +3006,7 @@
   {
     "code": "upload-preset/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2947,6 +3039,7 @@
   {
     "code": "upload-preset/disabled",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -2979,6 +3072,7 @@
   {
     "code": "upload-preset/token-required",
     "status": 401,
+    "kind": "authentication",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3011,6 +3105,7 @@
   {
     "code": "remote-url/not-allowed",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3043,6 +3138,7 @@
   {
     "code": "upload/website-rate-limit-reached",
     "status": 429,
+    "kind": "rate-limit",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3076,6 +3172,7 @@
   {
     "code": "upload-preset/daily-limit-reached",
     "status": 429,
+    "kind": "rate-limit",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3109,6 +3206,7 @@
   {
     "code": "upload-preset/origin-not-allowed",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3141,6 +3239,7 @@
   {
     "code": "upload-preset/field-not-allowed",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3173,6 +3272,7 @@
   {
     "code": "upload-preset/revision-conflict",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3205,6 +3305,7 @@
   {
     "code": "upload-preset/key-taken",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3237,6 +3338,7 @@
   {
     "code": "upload-preset/daily-limit-required",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3269,6 +3371,7 @@
   {
     "code": "upload-preset/invalid-folder",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3301,6 +3404,7 @@
   {
     "code": "upload-preset/invalid-policy",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3333,6 +3437,7 @@
   {
     "code": "project-settings/revision-conflict",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3365,6 +3470,7 @@
   {
     "code": "search/estimate-changed",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3397,6 +3503,7 @@
   {
     "code": "metadata-field/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3429,6 +3536,7 @@
   {
     "code": "upload-token/invalid",
     "status": 401,
+    "kind": "authentication",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3461,6 +3569,7 @@
   {
     "code": "upload-token/expired",
     "status": 401,
+    "kind": "authentication",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3493,6 +3602,7 @@
   {
     "code": "upload-token/used",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3525,6 +3635,7 @@
   {
     "code": "remote-url/invalid",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3557,6 +3668,7 @@
   {
     "code": "remote-url/unavailable",
     "status": 422,
+    "kind": "unprocessable-entity",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3589,6 +3701,7 @@
   {
     "code": "appeal/not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3621,6 +3734,7 @@
   {
     "code": "appeal/judgment-not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3653,6 +3767,7 @@
   {
     "code": "appeal/asset-not-found",
     "status": 404,
+    "kind": "not-found",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3685,6 +3800,7 @@
   {
     "code": "appeal/permission-denied",
     "status": 403,
+    "kind": "permission-denied",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3717,6 +3833,7 @@
   {
     "code": "appeal/already-reviewed",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3749,6 +3866,7 @@
   {
     "code": "appeal/decision-changed",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3781,6 +3899,7 @@
   {
     "code": "appeal/invalid-action",
     "status": 400,
+    "kind": "bad-request",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3813,6 +3932,7 @@
   {
     "code": "appeal/content-unavailable",
     "status": 409,
+    "kind": "conflict",
     "operation": "assets.retrieve",
     "args": {
       "assetId": "asset-1"
@@ -3840,6 +3960,246 @@
       "details": {
         "reason": "appeal_content_unavailable"
       }
+    }
+  },
+  {
+    "code": "sdk/http-error",
+    "status": 400,
+    "kind": "bad-request",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "content-type": "text/html",
+        "x-request-id": "req-proxy-400"
+      },
+      "bodyText": "<html><body>400</body></html>"
+    },
+    "expected": {
+      "code": "sdk/http-error",
+      "status": 400,
+      "requestId": "req-proxy-400",
+      "retryAfter": null,
+      "details": null
+    }
+  },
+  {
+    "code": "sdk/http-error",
+    "status": 401,
+    "kind": "authentication",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "content-type": "text/html",
+        "x-request-id": "req-proxy-401"
+      },
+      "bodyText": "<html><body>401</body></html>"
+    },
+    "expected": {
+      "code": "sdk/http-error",
+      "status": 401,
+      "requestId": "req-proxy-401",
+      "retryAfter": null,
+      "details": null
+    }
+  },
+  {
+    "code": "sdk/http-error",
+    "status": 403,
+    "kind": "permission-denied",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "content-type": "text/html",
+        "x-request-id": "req-proxy-403"
+      },
+      "bodyText": "<html><body>403</body></html>"
+    },
+    "expected": {
+      "code": "sdk/http-error",
+      "status": 403,
+      "requestId": "req-proxy-403",
+      "retryAfter": null,
+      "details": null
+    }
+  },
+  {
+    "code": "sdk/http-error",
+    "status": 404,
+    "kind": "not-found",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "content-type": "text/html",
+        "x-request-id": "req-proxy-404"
+      },
+      "bodyText": "<html><body>404</body></html>"
+    },
+    "expected": {
+      "code": "sdk/http-error",
+      "status": 404,
+      "requestId": "req-proxy-404",
+      "retryAfter": null,
+      "details": null
+    }
+  },
+  {
+    "code": "sdk/http-error",
+    "status": 409,
+    "kind": "conflict",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 409,
+      "headers": {
+        "content-type": "text/html",
+        "x-request-id": "req-proxy-409"
+      },
+      "bodyText": "<html><body>409</body></html>"
+    },
+    "expected": {
+      "code": "sdk/http-error",
+      "status": 409,
+      "requestId": "req-proxy-409",
+      "retryAfter": null,
+      "details": null
+    }
+  },
+  {
+    "code": "sdk/http-error",
+    "status": 413,
+    "kind": "payload-too-large",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 413,
+      "headers": {
+        "content-type": "text/html",
+        "x-request-id": "req-proxy-413"
+      },
+      "bodyText": "<html><body>413</body></html>"
+    },
+    "expected": {
+      "code": "sdk/http-error",
+      "status": 413,
+      "requestId": "req-proxy-413",
+      "retryAfter": null,
+      "details": null
+    }
+  },
+  {
+    "code": "sdk/http-error",
+    "status": 422,
+    "kind": "unprocessable-entity",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "content-type": "text/html",
+        "x-request-id": "req-proxy-422"
+      },
+      "bodyText": "<html><body>422</body></html>"
+    },
+    "expected": {
+      "code": "sdk/http-error",
+      "status": 422,
+      "requestId": "req-proxy-422",
+      "retryAfter": null,
+      "details": null
+    }
+  },
+  {
+    "code": "sdk/http-error",
+    "status": 429,
+    "kind": "rate-limit",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 429,
+      "headers": {
+        "content-type": "text/html",
+        "x-request-id": "req-proxy-429"
+      },
+      "bodyText": "<html><body>429</body></html>"
+    },
+    "expected": {
+      "code": "sdk/http-error",
+      "status": 429,
+      "requestId": "req-proxy-429",
+      "retryAfter": null,
+      "details": null
+    }
+  },
+  {
+    "code": "sdk/http-error",
+    "status": 500,
+    "kind": "server",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 500,
+      "headers": {
+        "content-type": "text/html",
+        "x-request-id": "req-proxy-500"
+      },
+      "bodyText": "<html><body>500</body></html>"
+    },
+    "expected": {
+      "code": "sdk/http-error",
+      "status": 500,
+      "requestId": "req-proxy-500",
+      "retryAfter": null,
+      "details": null
+    }
+  },
+  {
+    "code": "sdk/http-error",
+    "status": 502,
+    "kind": "server",
+    "operation": "assets.retrieve",
+    "args": {
+      "assetId": "asset-1"
+    },
+    "response": {
+      "status": 502,
+      "headers": {
+        "content-type": "text/html",
+        "x-request-id": "req-proxy-502"
+      },
+      "bodyText": "<html><body>502</body></html>"
+    },
+    "expected": {
+      "code": "sdk/http-error",
+      "status": 502,
+      "requestId": "req-proxy-502",
+      "retryAfter": null,
+      "details": null
     }
   }
 ]

@@ -1777,823 +1777,960 @@
       "code": "sdk/transport-error",
       "status": null,
       "retryable": true,
-      "local": true
+      "local": true,
+      "kind": "connection"
     },
     {
       "code": "sdk/timeout",
       "status": null,
       "retryable": true,
-      "local": true
+      "local": true,
+      "kind": "timeout"
     },
     {
       "code": "sdk/cancelled",
       "status": null,
       "retryable": false,
-      "local": true
+      "local": true,
+      "kind": "cancelled"
     },
     {
       "code": "sdk/invalid-response",
       "status": null,
       "retryable": false,
-      "local": true
+      "local": true,
+      "kind": "invalid-response"
     },
     {
       "code": "sdk/http-error",
       "status": null,
       "retryable": false,
-      "local": true
+      "local": true,
+      "kind": "invalid-argument"
     },
     {
       "code": "sdk/response-too-large",
       "status": null,
       "retryable": false,
-      "local": true
+      "local": true,
+      "kind": "invalid-response"
     },
     {
       "code": "sdk/invalid-argument",
       "status": null,
       "retryable": false,
-      "local": true
+      "local": true,
+      "kind": "invalid-argument"
     },
     {
       "code": "sdk/invalid-config",
       "status": null,
       "retryable": false,
-      "local": true
+      "local": true,
+      "kind": "configuration"
     },
     {
       "code": "sdk/no-fetch",
       "status": null,
       "retryable": false,
-      "local": true
+      "local": true,
+      "kind": "configuration"
     },
     {
       "code": "sdk/invalid-webhook-signature",
       "status": null,
       "retryable": false,
-      "local": true
+      "local": true,
+      "kind": "webhook-verification"
     },
     {
       "code": "sdk/invalid-webhook-payload",
       "status": null,
       "retryable": false,
-      "local": true
+      "local": true,
+      "kind": "webhook-verification"
     },
     {
       "code": "sdk/http-error",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "sdk/http-error",
       "status": 429,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "rate-limit"
     },
     {
       "code": "sdk/http-error",
       "status": 500,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "server"
     },
     {
       "code": "sdk/http-error",
       "status": 502,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "server"
     },
     {
       "code": "sdk/http-error",
       "status": 503,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "server"
     },
     {
       "code": "sdk/http-error",
       "status": 504,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "server"
     },
     {
       "code": "viewer-claims/invalid",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "viewer/age-confirmation-required",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "viewer-region/invalid",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "viewer/region-required",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "asset/regional-evidence-required",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "signed-url/expired",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "signed-url/invalid",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "signed-url/original-not-granted",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "validation/invalid-request",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "validation/invalid-type",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "validation/too-small",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "validation/too-big",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "validation/invalid-format",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "validation/invalid-value",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "validation/unknown-field",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "request/unsupported-content-type",
       "status": 415,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "api"
     },
     {
       "code": "filter/invalid",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "ordering/unsupported-field",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "request/route-not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "server/internal-error",
       "status": 500,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "server"
     },
     {
       "code": "auth/unauthenticated",
       "status": 401,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "authentication"
     },
     {
       "code": "session-token/expired",
       "status": 401,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "authentication"
     },
     {
       "code": "session-token/invalid",
       "status": 401,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "authentication"
     },
     {
       "code": "search/unavailable",
       "status": 503,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "server"
     },
     {
       "code": "transform/invalid",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "transform-options/invalid",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "remote-url/too-many-redirects",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "cursor/invalid",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "api-key/missing",
       "status": 401,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "authentication"
     },
     {
       "code": "api-key/invalid",
       "status": 401,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "authentication"
     },
     {
       "code": "api-key/project-mismatch",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "api-key/not-accepted",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "auth/permission-denied",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "upload/too-large",
       "status": 413,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "payload-too-large"
     },
     {
       "code": "document/too-many-items",
       "status": 422,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "unprocessable-entity"
     },
     {
       "code": "media/duration-limit",
       "status": 422,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "unprocessable-entity"
     },
     {
       "code": "image/invalid",
       "status": 422,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "unprocessable-entity"
     },
     {
       "code": "image/too-large",
       "status": 422,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "unprocessable-entity"
     },
     {
       "code": "usage/free-uploads-exhausted",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "usage/uploads-paused",
       "status": 402,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "api"
     },
     {
       "code": "upload/unsupported-type",
       "status": 415,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "api"
     },
     {
       "code": "upload-payload/invalid",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "upload/options-in-query",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "upload/use-upload-part",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "upload/not-open",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "upload-part/invalid-number",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "upload/missing",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "upload/size-mismatch",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "idempotency/invalid-key",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "idempotency/key-reused",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "idempotency/request-in-progress",
       "status": 409,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/no-rendered-version",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "asset/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "project/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "asset/child-not-deletable",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/review-changed",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/review-note-required",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "asset/update-failed",
       "status": 500,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "server"
     },
     {
       "code": "asset/held",
       "status": 423,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "api"
     },
     {
       "code": "asset/processing",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/decision-not-allowed",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/decision-unchanged",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/not-retryable",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/content-unavailable",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/content-purged",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/not-decided",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/policy-changed",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "asset/reviewed",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "support-ticket/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "asset/duplicate-external-id",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "folder/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "folder/duplicate-name",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "folder/not-empty",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "folder/parent-cycle",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "lens/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "lens/identifier-taken",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "lens/identifier-reserved",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "hash-list/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "hash-list-entry/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "hash-list/limit-reached",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "hash-list-entry/limit-reached",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "hash-list/asset-not-hashed",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "policy/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "policy/revision-conflict",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "policy/projects-changed",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "policy/in-use",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "policy/used-by-another-project",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "policy/no-preset",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "policy/preset-version-conflict",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "policy/preset-update-unavailable",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "policy/automatic-updates-unavailable",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "upload-preset/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "upload-preset/disabled",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "upload-preset/token-required",
       "status": 401,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "authentication"
     },
     {
       "code": "remote-url/not-allowed",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "upload/website-rate-limit-reached",
       "status": 429,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "rate-limit"
     },
     {
       "code": "upload-preset/daily-limit-reached",
       "status": 429,
       "retryable": true,
-      "local": false
+      "local": false,
+      "kind": "rate-limit"
     },
     {
       "code": "upload-preset/origin-not-allowed",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "upload-preset/field-not-allowed",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "upload-preset/revision-conflict",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "upload-preset/key-taken",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "upload-preset/daily-limit-required",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "upload-preset/invalid-folder",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "upload-preset/invalid-policy",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "project-settings/revision-conflict",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "search/estimate-changed",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "metadata-field/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "upload-token/invalid",
       "status": 401,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "authentication"
     },
     {
       "code": "upload-token/expired",
       "status": 401,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "authentication"
     },
     {
       "code": "upload-token/used",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "remote-url/invalid",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "remote-url/unavailable",
       "status": 422,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "unprocessable-entity"
     },
     {
       "code": "appeal/not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "appeal/judgment-not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "appeal/asset-not-found",
       "status": 404,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "not-found"
     },
     {
       "code": "appeal/permission-denied",
       "status": 403,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "permission-denied"
     },
     {
       "code": "appeal/already-reviewed",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "appeal/decision-changed",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     },
     {
       "code": "appeal/invalid-action",
       "status": 400,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "bad-request"
     },
     {
       "code": "appeal/content-unavailable",
       "status": 409,
       "retryable": false,
-      "local": false
+      "local": false,
+      "kind": "conflict"
     }
   ],
   "defaults": [
@@ -2902,6 +3039,273 @@
         "profanity-fictional",
         "profanity-support-prevention"
       ]
+    }
+  },
+  "errorKinds": [
+    {
+      "id": "error",
+      "parent": null,
+      "description": "Every error the SDK raises.",
+      "names": {
+        "javascript": "CalmLensError",
+        "python": "CalmLensError",
+        "go": "Error",
+        "rust": "Error",
+        "java": "CalmLensException",
+        "ruby": "CalmLens::Error",
+        "php": "CalmLens\\CalmLensException"
+      }
+    },
+    {
+      "id": "api",
+      "parent": "error",
+      "description": "The API, or a proxy in front of it, answered with a non-2xx status.",
+      "names": {
+        "javascript": "CalmLensApiError",
+        "python": "CalmLensAPIError",
+        "go": "ErrAPI",
+        "rust": "ErrorKind::Api",
+        "java": "ApiException",
+        "ruby": "CalmLens::APIError",
+        "php": "CalmLens\\Exception\\ApiException"
+      }
+    },
+    {
+      "id": "bad-request",
+      "parent": "api",
+      "description": "HTTP 400: the request was invalid.",
+      "names": {
+        "javascript": "CalmLensBadRequestError",
+        "python": "CalmLensBadRequestError",
+        "go": "ErrBadRequest",
+        "rust": "ErrorKind::BadRequest",
+        "java": "BadRequestException",
+        "ruby": "CalmLens::BadRequestError",
+        "php": "CalmLens\\Exception\\BadRequestException"
+      }
+    },
+    {
+      "id": "authentication",
+      "parent": "api",
+      "description": "HTTP 401: the API key is missing or invalid.",
+      "names": {
+        "javascript": "CalmLensAuthenticationError",
+        "python": "CalmLensAuthenticationError",
+        "go": "ErrAuthentication",
+        "rust": "ErrorKind::Authentication",
+        "java": "AuthenticationException",
+        "ruby": "CalmLens::AuthenticationError",
+        "php": "CalmLens\\Exception\\AuthenticationException"
+      }
+    },
+    {
+      "id": "permission-denied",
+      "parent": "api",
+      "description": "HTTP 403: the API key lacks a grant.",
+      "names": {
+        "javascript": "CalmLensPermissionDeniedError",
+        "python": "CalmLensPermissionDeniedError",
+        "go": "ErrPermissionDenied",
+        "rust": "ErrorKind::PermissionDenied",
+        "java": "PermissionDeniedException",
+        "ruby": "CalmLens::PermissionDeniedError",
+        "php": "CalmLens\\Exception\\PermissionDeniedException"
+      }
+    },
+    {
+      "id": "not-found",
+      "parent": "api",
+      "description": "HTTP 404: the resource doesn't exist.",
+      "names": {
+        "javascript": "CalmLensNotFoundError",
+        "python": "CalmLensNotFoundError",
+        "go": "ErrNotFound",
+        "rust": "ErrorKind::NotFound",
+        "java": "NotFoundException",
+        "ruby": "CalmLens::NotFoundError",
+        "php": "CalmLens\\Exception\\NotFoundException"
+      }
+    },
+    {
+      "id": "conflict",
+      "parent": "api",
+      "description": "HTTP 409: the request conflicts with the resource's state.",
+      "names": {
+        "javascript": "CalmLensConflictError",
+        "python": "CalmLensConflictError",
+        "go": "ErrConflict",
+        "rust": "ErrorKind::Conflict",
+        "java": "ConflictException",
+        "ruby": "CalmLens::ConflictError",
+        "php": "CalmLens\\Exception\\ConflictException"
+      }
+    },
+    {
+      "id": "payload-too-large",
+      "parent": "api",
+      "description": "HTTP 413: the content is over a size limit.",
+      "names": {
+        "javascript": "CalmLensPayloadTooLargeError",
+        "python": "CalmLensPayloadTooLargeError",
+        "go": "ErrPayloadTooLarge",
+        "rust": "ErrorKind::PayloadTooLarge",
+        "java": "PayloadTooLargeException",
+        "ruby": "CalmLens::PayloadTooLargeError",
+        "php": "CalmLens\\Exception\\PayloadTooLargeException"
+      }
+    },
+    {
+      "id": "unprocessable-entity",
+      "parent": "api",
+      "description": "HTTP 422: the content can't be processed.",
+      "names": {
+        "javascript": "CalmLensUnprocessableEntityError",
+        "python": "CalmLensUnprocessableEntityError",
+        "go": "ErrUnprocessableEntity",
+        "rust": "ErrorKind::UnprocessableEntity",
+        "java": "UnprocessableEntityException",
+        "ruby": "CalmLens::UnprocessableEntityError",
+        "php": "CalmLens\\Exception\\UnprocessableEntityException"
+      }
+    },
+    {
+      "id": "rate-limit",
+      "parent": "api",
+      "description": "HTTP 429: too many requests.",
+      "names": {
+        "javascript": "CalmLensRateLimitError",
+        "python": "CalmLensRateLimitError",
+        "go": "ErrRateLimit",
+        "rust": "ErrorKind::RateLimit",
+        "java": "RateLimitException",
+        "ruby": "CalmLens::RateLimitError",
+        "php": "CalmLens\\Exception\\RateLimitException"
+      }
+    },
+    {
+      "id": "server",
+      "parent": "api",
+      "description": "HTTP 500 or above: the API failed.",
+      "names": {
+        "javascript": "CalmLensServerError",
+        "python": "CalmLensServerError",
+        "go": "ErrServer",
+        "rust": "ErrorKind::Server",
+        "java": "ServerException",
+        "ruby": "CalmLens::ServerError",
+        "php": "CalmLens\\Exception\\ServerException"
+      }
+    },
+    {
+      "id": "connection",
+      "parent": "error",
+      "description": "No complete response: the connection failed or was cut.",
+      "names": {
+        "javascript": "CalmLensConnectionError",
+        "python": "CalmLensConnectionError",
+        "go": "ErrConnection",
+        "rust": "ErrorKind::Connection",
+        "java": "ConnectionException",
+        "ruby": "CalmLens::ConnectionError",
+        "php": "CalmLens\\Exception\\ConnectionException"
+      }
+    },
+    {
+      "id": "timeout",
+      "parent": "error",
+      "description": "A request took longer than its timeout, or a wait reached its deadline.",
+      "names": {
+        "javascript": "CalmLensTimeoutError",
+        "python": "CalmLensTimeoutError",
+        "go": "ErrTimeout",
+        "rust": "ErrorKind::Timeout",
+        "java": "TimeoutException",
+        "ruby": "CalmLens::TimeoutError",
+        "php": "CalmLens\\Exception\\TimeoutException"
+      }
+    },
+    {
+      "id": "cancelled",
+      "parent": "error",
+      "description": "The caller cancelled the call.",
+      "names": {
+        "javascript": "CalmLensCancelledError",
+        "python": "CalmLensCancelledError",
+        "go": "ErrCancelled",
+        "rust": "ErrorKind::Cancelled",
+        "java": "CancelledException",
+        "ruby": "CalmLens::CancelledError",
+        "php": "CalmLens\\Exception\\CancelledException"
+      }
+    },
+    {
+      "id": "invalid-argument",
+      "parent": "error",
+      "description": "The SDK refused the call before sending anything.",
+      "names": {
+        "javascript": "CalmLensInvalidArgumentError",
+        "python": "CalmLensInvalidArgumentError",
+        "go": "ErrInvalidArgument",
+        "rust": "ErrorKind::InvalidArgument",
+        "java": "InvalidArgumentException",
+        "ruby": "CalmLens::InvalidArgumentError",
+        "php": "CalmLens\\Exception\\InvalidArgumentException"
+      }
+    },
+    {
+      "id": "configuration",
+      "parent": "invalid-argument",
+      "description": "The client's configuration is invalid.",
+      "names": {
+        "javascript": "CalmLensConfigurationError",
+        "python": "CalmLensConfigurationError",
+        "go": "ErrConfiguration",
+        "rust": "ErrorKind::Configuration",
+        "java": "ConfigurationException",
+        "ruby": "CalmLens::ConfigurationError",
+        "php": "CalmLens\\Exception\\ConfigurationException"
+      }
+    },
+    {
+      "id": "invalid-response",
+      "parent": "error",
+      "description": "A response wasn't what the operation returns.",
+      "names": {
+        "javascript": "CalmLensInvalidResponseError",
+        "python": "CalmLensInvalidResponseError",
+        "go": "ErrInvalidResponse",
+        "rust": "ErrorKind::InvalidResponse",
+        "java": "InvalidResponseException",
+        "ruby": "CalmLens::InvalidResponseError",
+        "php": "CalmLens\\Exception\\InvalidResponseException"
+      }
+    },
+    {
+      "id": "webhook-verification",
+      "parent": "error",
+      "description": "A webhook delivery couldn't be verified or parsed.",
+      "names": {
+        "javascript": "CalmLensWebhookVerificationError",
+        "python": "CalmLensWebhookVerificationError",
+        "go": "ErrWebhookVerification",
+        "rust": "ErrorKind::WebhookVerification",
+        "java": "WebhookVerificationException",
+        "ruby": "CalmLens::WebhookVerificationError",
+        "php": "CalmLens\\Exception\\WebhookVerificationException"
+      }
+    }
+  ],
+  "asyncClient": {
+    "names": {
+      "python": "AsyncCalmLensServerClient",
+      "java": "ServerClient.async"
+    },
+    "notApplicable": {
+      "javascript": "Every method returns a Promise.",
+      "go": "Methods block; run them in goroutines and cancel them with their context.",
+      "rust": "The client is asynchronous; the `blocking` feature is the synchronous one.",
+      "ruby": "Ruby clients are synchronous; run calls in threads or fibers.",
+      "php": "PHP clients are synchronous."
     }
   }
 }
