@@ -60,9 +60,10 @@ final class ServerClient
      * @param ?LoggerInterface $logger a PSR-3 logger for each request's outcome (info) and retries
      *   (debug); `CALMLENS_LOG=info` or `debug` logs to standard error instead. Logs never hold the
      *   API key, bodies, queries or a CDN URL's asset segment.
-     * @param ?\Closure(array{operation: string, method: string, path: string, attempt: int, delay: ?int,
-     *   status: ?int, requestId: ?string, duration: float}): void $onAttempt called after each request
-     *   attempt, with the delay in milliseconds before the next one (null for the last).
+     * @param ?\Closure(array{operation: ?string, method: string, path: string, attempt: int, delayMs: ?int,
+     *   status: ?int, requestId: ?string, errorCode: ?string, duration: float}): void $onAttempt called
+     *   after each request attempt, with the wait in milliseconds before the next one (null for the
+     *   last) and the error code the attempt failed with; `operation` is null for `request()`.
      * @param float $timeout seconds each API request attempt may take, reading the response included.
      * @param ?float $uploadTimeout seconds each binary upload attempt (file content and multipart
      *   parts) may take; none by default, since files may be large. Text uploads use `timeout`.
@@ -166,10 +167,10 @@ final class ServerClient
         if (!preg_match('/^[A-Z]+$/D', $method) || !str_starts_with($path, '/') || str_starts_with($path, '//') || preg_match('/[\s?#]/', $path)) {
             Values::invalid('Pass an HTTP method and a path beneath the base URL, starting with /, without a query');
         }
-        $this->session->operation = 'request';
+        $this->session->operation = null;
         $json = $this->session->request($method, $path, query: $query, body: $body, options: $requestOptions);
         $last = $this->session->lastResponse;
-        return new ApiResponse($last->status ?? 204, $last->headers ?? [], $last?->requestId, $json);
+        return new ApiResponse($last->status ?? 204, $last->headers ?? [], $last?->requestId, $json, $last?->idempotencyKey);
     }
 
     /**

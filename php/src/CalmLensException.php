@@ -61,6 +61,8 @@ class CalmLensException extends \RuntimeException implements Exception\Exception
                 $status >= 500 => Exception\ServerException::class,
                 default => Exception\ApiException::class,
             },
+            // An error response without a CalmLens code, raised before its status was known (a redirect).
+            $errorCode === SdkErrorCodes::HTTP_ERROR => Exception\ApiException::class,
             $errorCode === SdkErrorCodes::TIMEOUT => Exception\TimeoutException::class,
             $errorCode === 'sdk/cancelled' => Exception\CancelledException::class,
             $errorCode === SdkErrorCodes::TRANSPORT_ERROR => Exception\ConnectionException::class,

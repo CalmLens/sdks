@@ -152,10 +152,11 @@ final class ClientOptionsTest extends TestCase
         $client->folders->retrieve(['folderId' => 'folder-1']);
         $client->cdn->serve(['assetId' => 'sig_secretgrant', 'resource' => 'original', 'viewerClaims' => ['region' => 'DE']]);
         self::assertSame([
-            ['folders.retrieve', 'GET', '/folders/folder-1', 1, 0, 500, null],
-            ['folders.retrieve', 'GET', '/folders/folder-1', 2, null, 200, 'req-9'],
-            ['cdn.serve', 'GET', '/assets/project-1/[redacted]/original', 1, null, 200, null],
-        ], array_map(fn (array $e) => [$e['operation'], $e['method'], $e['path'], $e['attempt'], $e['delay'], $e['status'], $e['requestId']], $events));
+            ['folders.retrieve', 'GET', '/v1/folders/folder-1', 1, 0, 500, null, 'server/internal'],
+            ['folders.retrieve', 'GET', '/v1/folders/folder-1', 2, null, 200, 'req-9', null],
+            ['cdn.serve', 'GET', '/v1/assets/project-1/[redacted]/original', 1, null, 200, null, null],
+        ], array_map(fn (array $e) => [$e['operation'], $e['method'], $e['path'], $e['attempt'], $e['delayMs'], $e['status'],
+            $e['requestId'], $e['errorCode']], $events));
         foreach ($events as $event) {
             self::assertIsFloat($event['duration']);
         }

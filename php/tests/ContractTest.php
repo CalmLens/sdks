@@ -94,8 +94,12 @@ final class ContractTest extends TestCase
         unset($options['requestOptions']);
         $parts = explode('.', $operation);
         $target = count($parts) === 1 ? $client : $client->{$parts[0]};
-        return self::plain($target->{end($parts)}($options, ...($request === [] ? [] : [$request])));
+        self::$lastResult = $target->{end($parts)}($options, ...($request === [] ? [] : [$request]));
+        return self::plain(self::$lastResult);
     }
+
+    /** What the last `invoke` returned, before `plain`: the object a step's `lastResponse` reads. */
+    private static mixed $lastResult = null;
 
     /** API objects, and lists of them, as the arrays they were decoded from. */
     private static function plain(mixed $value): mixed
@@ -366,9 +370,26 @@ final class ContractTest extends TestCase
         return $all;
     }
 
-    private static function runClientStep(ServerClient $client, string $operation, array $args): mixed
+    /** A step's request options, from their JavaScript names. */
+    private static function requestOptions(array $options): array
     {
+        if (array_key_exists('timeoutMs', $options)) {
+            $options['timeout'] = $options['timeoutMs'] / 1000;
+            unset($options['timeoutMs']);
+        }
+        return $options;
+    }
+
+    private static function runClientStep(ServerClient $client, string $operation, array $args, array $requestOptions = []): mixed
+    {
+        if ($operation === 'request') {
+            $options = $requestOptions + (isset($args['headers']) ? ['headers' => $args['headers']] : []);
+            return $client->request($args['method'], $args['path'], $args['query'] ?? [], $args['body'] ?? null, $options);
+        }
         $args = self::phpArgs($operation, $args);
+        if ($requestOptions !== []) {
+            $args['requestOptions'] = $requestOptions + ($args['requestOptions'] ?? []);
+        }
         return $operation === 'events.iterate' ? self::collect($client->events->each($args))
             : (self::iterator($client, $operation, $args) ?? self::invoke($client, $operation, $args));
     }
@@ -384,8 +405,8 @@ final class ContractTest extends TestCase
 
     private static function clientOptions(array $options): array
     {
-        $named = ['apiKey' => $options['apiKey'], 'projectId' => $options['projectId']];
-        foreach (['baseUrl', 'cdnBaseUrl', 'maxRetries', 'maxResponseBytes', 'partSizeBytes'] as $key) {
+        $named = array_intersect_key($options, ['apiKey' => 0, 'projectId' => 0]);
+        foreach (['baseUrl', 'cdnBaseUrl', 'maxRetries', 'maxResponseBytes', 'partSizeBytes', 'appInfo'] as $key) {
             if (array_key_exists($key, $options)) {
                 $named[$key] = $options[$key];
             }
@@ -509,9 +530,30 @@ final class ContractTest extends TestCase
         $sleeps = [];
         $client = null;
         $constructionError = null;
+        $attempts = [];
+        $logger = new class extends \Psr\Log\AbstractLogger {
+            public array $lines = [];
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->lines[] = [$level, $message . ' ' . json_encode($context, JSON_UNESCAPED_SLASHES)];
+            }
+        };
+        // Only the case's CALMLENS_* variables are set while the client is made.
+        $saved = array_filter(getenv(), fn ($name) => str_starts_with((string) $name, 'CALMLENS_'), ARRAY_FILTER_USE_KEY);
+        if (isset($case['env'])) {
+            foreach (array_keys($saved) as $name) {
+                putenv($name);
+            }
+            foreach ($case['env'] as $name => $value) {
+                putenv("$name=$value");
+            }
+        }
         try {
-            $options = self::clientOptions(($case['client'] ?? []) + self::fixtures('client-cases')['client']);
-            $client = new ServerClient(...$options, httpClient: new Client(['handler' => $handler]));
+            $fixed = self::fixtures('client-cases')['client'];
+            $options = self::clientOptions(($case['client'] ?? []) + (!empty($case['clientFromEnv']) ? array_diff_key($fixed, ['apiKey' => 0, 'projectId' => 0]) : $fixed));
+            $client = new ServerClient(...$options, httpClient: new Client(['handler' => $handler]),
+                onAttempt: function (array $event) use (&$attempts) { unset($event['duration']); $attempts[] = $event; },
+                logger: isset($case['logs']) ? $logger : null);
             // Waits are recorded rather than slept, on a virtual clock.
             $session = (fn (): Session => $this->session)->call($client);
             $elapsed = 0.0;
@@ -519,6 +561,15 @@ final class ContractTest extends TestCase
             $session->clock = function () use (&$elapsed): float { return $elapsed; };
         } catch (CalmLensException $error) {
             $constructionError = $error;
+        } finally {
+            if (isset($case['env'])) {
+                foreach (array_keys($case['env']) as $name) {
+                    putenv($name);
+                }
+                foreach ($saved as $name => $value) {
+                    putenv("$name=$value");
+                }
+            }
         }
         foreach ($case['steps'] as $index => $step) {
             $label = 'step ' . ($index + 1) . " ({$step['operation']})";
@@ -527,7 +578,11 @@ final class ContractTest extends TestCase
             $error = $constructionError;
             if ($error === null) {
                 try {
-                    $result = self::runClientStep($client, $step['operation'], self::decodeArgs($step['args'] ?? []));
+                    self::$lastResult = null;
+                    $result = self::runClientStep($client, $step['operation'], self::decodeArgs($step['args'] ?? []),
+                        self::requestOptions($step['requestOptions'] ?? []));
+                    $object = $result instanceof \CalmLens\ApiResponse ? $result : self::$lastResult;
+                    $result = $result instanceof \CalmLens\ApiResponse ? $result->json : $result;
                 } catch (CalmLensException|PartialResult $caught) {
                     $error = $caught;
                 }
@@ -561,6 +616,25 @@ final class ContractTest extends TestCase
             } else {
                 self::assertSameJson($expected['result'] ?? null, $result, $label);
             }
+            if (isset($expected['lastResponse'])) {
+                $last = $object?->getLastResponse();
+                self::assertNotNull($last, "$label: lastResponse");
+                self::assertSame($expected['lastResponse'], ['status' => $last->status, 'requestId' => $last->requestId,
+                    'idempotencyKey' => $last->idempotencyKey], "$label: lastResponse");
+            }
+        }
+        if (isset($case['attempts'])) {
+            self::assertSame($case['attempts'], $attempts, 'attempts');
+        }
+        if (isset($case['logs'])) {
+            $levels = ['debug' => 0, 'info' => 1, 'notice' => 2, 'warning' => 3, 'error' => 4, 'critical' => 5, 'alert' => 6, 'emergency' => 7];
+            $lines = array_column(array_filter($logger->lines, fn ($line) => $levels[$line[0]] >= $levels[$case['logs']['level']]), 1);
+            self::assertNotSame([], $lines, 'log lines');
+            foreach ($lines as $line) {
+                foreach ($case['logs']['mustNotContain'] as $secret) {
+                    self::assertStringNotContainsString($secret, $line, 'log line');
+                }
+            }
         }
 
         self::assertCount(count($case['requests']), $received, 'requests sent');
@@ -575,7 +649,12 @@ final class ContractTest extends TestCase
             usort($wantPairs, fn ($a, $b) => strcmp($a[0] . "\0" . $a[1], $b[0] . "\0" . $b[1]));
             self::assertSame($wantPairs, self::queryPairs($uri->getQuery()), "$label: query");
             self::assertSame($wantPairs, self::queryPairs($want['rawQuery']), "$label: rawQuery");
-            foreach ($want['headers'] + self::fixtures('client-cases')['everyRequest']['headers'] as $name => $value) {
+            $every = self::fixtures('client-cases')['everyRequest']['headers'];
+            if (isset($case['client']['apiKey'])) {
+                // A case's own API key is the one every request carries.
+                $every = ['x-api-key' => $case['client']['apiKey']] + $every;
+            }
+            foreach ($want['headers'] + $every as $name => $value) {
                 self::checkHeader($label, $name, $request->hasHeader($name) ? $request->getHeaderLine($name) : null, $value, $uuids);
             }
             if (array_key_exists('form', $want)) {

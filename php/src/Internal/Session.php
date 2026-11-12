@@ -41,8 +41,8 @@ final class Session
     public const MAX_ENSURED_LENSES = 1000;
     /** The response the last API request ended with, for `getLastResponse()`. */
     public ?ApiResponse $lastResponse = null;
-    /** The operation being sent, such as `assets.retrieve`, for attempt events and logs. */
-    public string $operation = 'request';
+    /** The operation being sent, such as `assets.retrieve`, for attempt events and logs; null for a raw request. */
+    public ?string $operation = null;
     /** The request options every method takes. */
     public const REQUEST_OPTIONS = ['timeout', 'connectTimeout', 'uploadTimeout', 'maxRetries', 'maxResponseBytes', 'idempotencyKey',
         'headers', 'extraQuery', 'extraBody'];
@@ -167,7 +167,7 @@ final class Session
         $response = $this->execute($method, $url, $headers, $raw, $settings, deadline: $deadline);
         $status = $response->getStatusCode();
         $bytes = $this->readBounded($response, $settings['maxResponseBytes']);
-        $this->lastResponse = self::apiResponse($response);
+        $this->lastResponse = self::apiResponse($response, idempotencyKey: $headers['Idempotency-Key'] ?? null);
         if ($bytes === '' && ($status === 204 || $method === 'DELETE')) {
             return null;
         }
@@ -344,10 +344,11 @@ final class Session
     }
 
     /**
-     * Reports one attempt to the `onAttempt` hook and the logger: its operation, method and path,
-     * 1-based attempt number, the delay before the next attempt (null for the last one), status and
-     * request ID (null without a response) and duration in milliseconds. The path has no query, and
-     * a CDN path hides its asset segment, which can be a signed grant; no header or body is reported.
+     * Reports one attempt to the `onAttempt` hook and the logger: its operation (null for a raw
+     * request), method and URL path, 1-based attempt number, `delayMs` before the next attempt (null
+     * for the last one), status and request ID (null without a response), the error code it failed
+     * with and its duration in milliseconds. The path has no query, and a CDN path hides its asset
+     * segment, which can be a signed grant; no header or body is reported.
      */
     private function attempted(string $method, string $url, bool $cdn, int $attempt, ?int $status, ?string $requestId,
         int|float $started, ?int $delay, ?string $errorCode = null): void
@@ -356,21 +357,19 @@ final class Session
             return;
         }
         $path = (string) parse_url($url, PHP_URL_PATH);
-        $base = (string) parse_url($cdn ? $this->cdnBaseUrl : $this->baseUrl, PHP_URL_PATH);
-        $path = str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
         if ($cdn) {
-            $path = preg_replace('#^(/assets/[^/]+/)[^/]+#', '$1[redacted]', $path) ?? '[redacted]';
+            $path = preg_replace('#(/assets/[^/]+/)[^/]+#', '$1[redacted]', $path, 1) ?? '[redacted]';
         }
         $event = ['operation' => $this->operation, 'method' => $method, 'path' => $path, 'attempt' => $attempt + 1,
-            'delay' => $delay, 'status' => $status, 'requestId' => $requestId,
+            'delayMs' => $delay, 'status' => $status, 'requestId' => $requestId, 'errorCode' => $errorCode,
             'duration' => round((hrtime(true) - $started) / 1e6, 3)];
         if ($this->onAttempt !== null) {
             ($this->onAttempt)($event);
         }
         if ($this->logger !== null) {
             $outcome = $status === null ? ($errorCode ?? 'failed') : (string) $status;
-            $message = "{$event['operation']}: $method $path $outcome in {$event['duration']}ms";
-            $context = array_filter($event + ['errorCode' => $errorCode], fn ($value) => $value !== null);
+            $message = ($event['operation'] ?? 'request') . ": $method $path $outcome in {$event['duration']}ms";
+            $context = array_filter($event, fn ($value) => $value !== null);
             // A retried attempt is detail; the attempt a call ends with is the call's outcome.
             if ($delay !== null) {
                 $this->logger->debug("$message; retrying in {$delay}ms", $context);
@@ -381,10 +380,10 @@ final class Session
     }
 
     /** The response behind a result: its status, headers and request ID. */
-    private static function apiResponse(ResponseInterface $response, mixed $json = null): ApiResponse
+    private static function apiResponse(ResponseInterface $response, mixed $json = null, ?string $idempotencyKey = null): ApiResponse
     {
         return new ApiResponse($response->getStatusCode(), $response->getHeaders(),
-            $response->hasHeader('X-Request-Id') ? $response->getHeaderLine('X-Request-Id') : null, $json);
+            $response->hasHeader('X-Request-Id') ? $response->getHeaderLine('X-Request-Id') : null, $json, $idempotencyKey);
     }
 
     private function decisionTimeLeft(?float $deadline): ?float

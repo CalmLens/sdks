@@ -6,7 +6,7 @@ namespace CalmLens;
 
 /**
  * The HTTP response behind a result: its `status`, `headers` and `requestId` (the `X-Request-Id`
- * header; include it when contacting support). `$asset->getLastResponse()` returns the one an
+ * header; include it when contacting support), and the `idempotencyKey` the request carried. `$asset->getLastResponse()` returns the one an
  * object came from, and `ServerClient::request()` returns one with its decoded `json` body.
  */
 final class ApiResponse
@@ -17,6 +17,7 @@ final class ApiResponse
         public readonly array $headers,
         public readonly ?string $requestId,
         public readonly mixed $json = null,
+        public readonly ?string $idempotencyKey = null,
     ) {}
 
     /** A response header by case-insensitive name, its values joined with `, `, or null. */
