@@ -591,7 +591,6 @@ describe("SDK surface", () => {
  */
 const NOT_CAPABILITIES: Record<string, string> = {
   toJSON: "serializes the client without its API key, for JSON.stringify",
-  request: "the raw-request escape hatch for endpoints the SDK doesn't cover yet",
 };
 
 describe("stale public methods", () => {
