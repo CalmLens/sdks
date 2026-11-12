@@ -54,7 +54,7 @@ func TestMockLifecycle(t *testing.T) {
 		t.Fatal(page, err)
 	}
 	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["status"] = string(calmlens.ClassificationStatusFailed)
-	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["decision"] = string(calmlens.ModerationStatusPending)
+	c.DatabaseStorage.Assets[a.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["decision"] = nil
 	a, err = c.Assets.Retry(ctx, calmlens.AssetIDOptions{AssetID: a.ID})
 	if err != nil || a.Classification.Status != calmlens.ClassificationStatusProcessing || a.Classification.Moderation.Decision != nil || a.Classification.CompletedAt != nil {
 		t.Fatal(a, err)
@@ -672,7 +672,7 @@ func TestMockWaitForDecisionReadsStorage(t *testing.T) {
 	started := time.Now()
 	_, err = c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID, Timeout: calmlens.Ptr(time.Hour)})
 	var timeout *calmlens.Error
-	if !errors.As(err, &timeout) || timeout.Code != calmlens.CodeSDKTimeout || timeout.Details["moderationStatus"] != calmlens.ModerationStatusPending || time.Since(started) > 5*time.Second {
+	if !errors.As(err, &timeout) || timeout.Code != calmlens.CodeSDKTimeout || timeout.Details["moderationDecision"] != nil || time.Since(started) > 5*time.Second {
 		t.Fatal(err, time.Since(started))
 	}
 	// Every check read the asset again.
@@ -682,14 +682,14 @@ func TestMockWaitForDecisionReadsStorage(t *testing.T) {
 	}
 	// A decided asset still processing isn't settled yet.
 	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
-		db.Assets[queued.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["decision"] = calmlens.ModerationStatusBlocked
+		db.Assets[queued.ID]["classification"].(calmlens.JSON)["moderation"].(calmlens.JSON)["decision"] = string(calmlens.ModerationStatusBlocked)
 	})
 	_, err = c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID, Timeout: calmlens.Ptr(time.Duration(0))})
-	if !errors.As(err, &timeout) || timeout.Code != calmlens.CodeSDKTimeout || timeout.Details["classificationStatus"] != calmlens.ClassificationStatusProcessing {
+	if !errors.As(err, &timeout) || timeout.Code != calmlens.CodeSDKTimeout || timeout.Details["classificationStatus"] != string(calmlens.ClassificationStatusProcessing) {
 		t.Fatal(err)
 	}
 	c.WithStorage(func(db *InMemoryDatabaseStorage, _ *InMemoryImageStorage) {
-		db.Assets[queued.ID]["classification"].(calmlens.JSON)["status"] = calmlens.ClassificationStatusCompleted
+		db.Assets[queued.ID]["classification"].(calmlens.JSON)["status"] = string(calmlens.ClassificationStatusCompleted)
 	})
 	got, err := c.Assets.WaitForDecision(ctx, calmlens.WaitForDecisionOptions{AssetID: queued.ID})
 	if err != nil || got.ID != queued.ID || (got.Classification.Moderation.Decision == nil || *got.Classification.Moderation.Decision != calmlens.ModerationDecisionBlocked) {

@@ -48,6 +48,17 @@ var surfaceFunctions = map[string]any{
 	"calmlenstest.CreateMockAPIKey": CreateMockAPIKey,
 }
 
+// errorKindSentinels are the errors.Is sentinels of surface.json's errorKinds, by Go name.
+var errorKindSentinels = map[string]error{
+	"ErrAPI": calmlens.ErrAPI, "ErrBadRequest": calmlens.ErrBadRequest, "ErrAuthentication": calmlens.ErrAuthentication,
+	"ErrPermissionDenied": calmlens.ErrPermissionDenied, "ErrNotFound": calmlens.ErrNotFound, "ErrConflict": calmlens.ErrConflict,
+	"ErrPayloadTooLarge": calmlens.ErrPayloadTooLarge, "ErrUnprocessableEntity": calmlens.ErrUnprocessableEntity,
+	"ErrRateLimit": calmlens.ErrRateLimit, "ErrServer": calmlens.ErrServer, "ErrConnection": calmlens.ErrConnection,
+	"ErrTimeout": calmlens.ErrTimeout, "ErrCancelled": calmlens.ErrCancelled, "ErrInvalidArgument": calmlens.ErrInvalidArgument,
+	"ErrConfiguration": calmlens.ErrConfiguration, "ErrInvalidResponse": calmlens.ErrInvalidResponse,
+	"ErrWebhookVerification": calmlens.ErrWebhookVerification,
+}
+
 var surfaceConstants = map[string]string{
 	"WebhookDeliveryHeader":          calmlens.WebhookDeliveryHeader,
 	"WebhookTimestampHeader":         calmlens.WebhookTimestampHeader,
@@ -88,7 +99,11 @@ type surfaceCapability struct {
 }
 
 type surfaceFixture struct {
-	Capabilities  []surfaceCapability
+	Capabilities []surfaceCapability
+	ErrorKinds   []struct {
+		ID    string
+		Names struct{ Go string }
+	}
 	ErrorResponse struct {
 		Operation string
 		Options   map[string]any
@@ -162,8 +177,22 @@ func TestRetryableContract(t *testing.T) {
 			Code      string
 			Status    *int
 			Retryable bool
+			Kind      string
 		}
+		ErrorKinds []struct {
+			ID     string
+			Parent *string
+			Names  struct{ Go string }
+		}
+		Capabilities []surfaceCapability
 	}](t, "surface.json")
+	// SDK codes Go never raises, by the reason surface.json gives.
+	notRaised := map[string]string{}
+	for _, capability := range fixture.Capabilities {
+		if code, ok := strings.CutPrefix(capability.ID, "errors.sdkCode."); ok && capability.NotApplicable["go"] != "" {
+			notRaised["sdk/"+code] = capability.NotApplicable["go"]
+		}
+	}
 	if len(fixture.Retryable) == 0 {
 		t.Fatal("surface.json has no retryable cases")
 	}
@@ -174,6 +203,29 @@ func TestRetryableContract(t *testing.T) {
 		}
 		t.Run(fmt.Sprintf("%s %d", c.Code, status), func(t *testing.T) {
 			e := &calmlens.Error{Code: calmlens.ErrorCode(c.Code), Status: status}
+			// The error is its kind and every kind above it, and no other. A code Go never raises
+			// has no kind here.
+			want := map[string]bool{}
+			if _, ok := notRaised[c.Code]; ok {
+				c.Kind = ""
+			}
+			for id := &c.Kind; id != nil && *id != ""; {
+				found := false
+				for _, kind := range fixture.ErrorKinds {
+					if kind.ID == *id {
+						want[kind.Names.Go], id, found = true, kind.Parent, true
+						break
+					}
+				}
+				if !found {
+					t.Fatalf("unknown error kind %q", *id)
+				}
+			}
+			for name, sentinel := range errorKindSentinels {
+				if c.Kind != "" && errors.Is(e, sentinel) != want[name] {
+					t.Errorf("errors.Is(err, calmlens.%s) = %v, want %v (kind %s)", name, !want[name], want[name], c.Kind)
+				}
+			}
 			if got := e.Retryable(); got != c.Retryable {
 				t.Fatalf("Retryable() = %v, want %v", got, c.Retryable)
 			}
@@ -268,9 +320,17 @@ func TestSurface(t *testing.T) {
 			}
 		})
 	}
+	// Every error kind resolves: the root to *calmlens.Error, the others to sentinels.
+	for _, kind := range surface.ErrorKinds {
+		name := kind.Names.Go
+		if _, sentinel := errorKindSentinels[name]; !sentinel && !(kind.ID == "error" && name == "Error") {
+			t.Errorf("missing error kind %s (%s)", kind.ID, name)
+		}
+		used[name] = true
+	}
 	// A reference the manifest no longer lists is stale.
 	var stale []string
-	for _, names := range []map[string]any{surfaceFunctions, toAny(surfaceConstants), toAny(surfaceTypes)} {
+	for _, names := range []map[string]any{surfaceFunctions, toAny(surfaceConstants), toAny(surfaceTypes), toAny(errorKindSentinels)} {
 		for name := range names {
 			if !used[name] {
 				stale = append(stale, name)

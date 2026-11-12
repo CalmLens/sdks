@@ -1,8 +1,12 @@
 package calmlens
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -15,10 +19,13 @@ type Params struct {
 	// Headers are added to each request of the call. They can't replace the headers the SDK
 	// sets itself (X-Api-Key, User-Agent, Accept, Content-Type and Idempotency-Key).
 	Headers http.Header
-	// Extra holds fields this SDK doesn't declare, such as a field added to the API after it: they
-	// are added to the JSON body, or to the query of a request without one. Uploads, whose
-	// options travel in the request body or form, refuse them.
-	Extra map[string]any
+	// ExtraQuery holds query parameters this SDK doesn't declare, such as one added to the API
+	// after it; they are added to each request's query.
+	ExtraQuery url.Values
+	// ExtraBody holds body fields this SDK doesn't declare. They are added to the JSON body, and
+	// never replace a field the SDK sends. A request without a JSON body, such as a GET or an
+	// upload of file content, refuses them.
+	ExtraBody map[string]any
 	// Timeout replaces Options.Timeout, or Options.UploadTimeout for binary uploads, for each
 	// attempt of the call. Negative values are rejected.
 	Timeout time.Duration
@@ -86,4 +93,55 @@ func withoutIdempotencyKey(ctx context.Context) context.Context {
 	params := *paramsOf(ctx)
 	params.IdempotencyKey = ""
 	return context.WithValue(ctx, paramsKey{}, &params)
+}
+
+// RequestOptions describe a request ServerClient.Request sends.
+type RequestOptions struct {
+	// Method is the HTTP method, such as "GET" or "POST".
+	Method string
+	// Path is the API path after the base URL, starting with "/", such as
+	// "/projects/<project ID>/assets". The SDK sends it as given.
+	Path string
+	// Query holds the query parameters.
+	Query url.Values
+	// Body, when not nil, is encoded as the JSON body.
+	Body   any
+	Params `json:"-"`
+}
+
+// RawResponse is a response ServerClient.Request received.
+type RawResponse struct {
+	APIResource
+	// Body is the response body, JSON for every API route.
+	Body json.RawMessage
+}
+
+// Decode decodes the body into out, with numbers as json.Number where out holds any.
+func (r *RawResponse) Decode(out any) error { return decodeJSON(r.Body, out) }
+
+// Request sends an API request this SDK has no method for, such as a route added to the API after
+// it, with the client's API key, user agent, retries (for GET, HEAD and requests with an
+// IdempotencyKey), Params, logging and errors. A non-2xx answer returns a *Error.
+func (c *ServerClient) Request(ctx context.Context, options RequestOptions) (*RawResponse, error) {
+	ctx, err := withCall(ctx, "request", options.Params)
+	if err != nil {
+		return nil, err
+	}
+	if options.Method == "" || strings.ContainsAny(options.Method, " \t\r\n") {
+		return nil, invalid(CodeSDKInvalidArgument, "Method is required")
+	}
+	if !strings.HasPrefix(options.Path, "/") || strings.HasPrefix(options.Path, "//") || strings.ContainsAny(options.Path, "?#") {
+		return nil, invalid(CodeSDKInvalidArgument, `Path must start with "/" and hold no query or fragment`)
+	}
+	var result RawResponse
+	if err = c.send(ctx, call{method: strings.ToUpper(options.Method), path: options.Path, params: options.Query, body: options.Body}, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UnmarshalJSON keeps the body as it is.
+func (r *RawResponse) UnmarshalJSON(data []byte) error {
+	r.Body = bytes.Clone(data)
+	return nil
 }

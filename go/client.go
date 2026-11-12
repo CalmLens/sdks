@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -56,7 +58,9 @@ type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-// Options configures NewServerClient. APIKey and ProjectID are required.
+// Options configures NewServerClient. APIKey and ProjectID are required: left empty, they are read
+// from the CALMLENS_API_KEY and CALMLENS_PROJECT_ID environment variables, and BaseURL from
+// CALMLENS_BASE_URL, unless IgnoreEnvironment is set.
 type Options struct {
 	// APIKey is the project API key. It is sent as X-Api-Key, so it can only hold printable ASCII
 	// without spaces, and is never printed by String.
@@ -65,6 +69,21 @@ type Options struct {
 	ProjectID string
 	// BaseURL overrides the API base URL (default https://api.calmlens.com/v1).
 	BaseURL string
+	// IgnoreEnvironment stops the client reading CALMLENS_API_KEY, CALMLENS_PROJECT_ID,
+	// CALMLENS_BASE_URL and CALMLENS_LOG, such as in a server that holds several projects' keys.
+	IgnoreEnvironment bool
+	// AppInfo names your application in the User-Agent header, after the SDK's.
+	AppInfo *AppInfo
+	// Logger receives a record for each API request: at Info its outcome, and at Debug each
+	// attempt and retry. Records never hold the API key, upload tokens, signed URLs or bodies.
+	// Without one, CALMLENS_LOG=info or debug logs to standard error.
+	Logger *slog.Logger
+	// OnAttempt is called after each attempt of an API request, retries included.
+	OnAttempt func(Attempt)
+	// MaxRetryDelay caps the wait before a retry, from a backoff or a Retry-After header
+	// (default RetryMaxDelay for backoffs and RetryAfterMax for Retry-After). A Retry-After
+	// longer than it fails the call instead.
+	MaxRetryDelay time.Duration
 	// CDNBaseURL overrides the CDN base URL (default https://cdn.calmlens.com/v1).
 	CDNBaseURL string
 	// Timeout bounds each attempt of an API call, including reading the response body. Zero
@@ -151,6 +170,10 @@ type ServerClient struct {
 	// deferUploadChecks leaves multipart size checks to the API; calmlenstest sets it so its
 	// in-memory API answers them in the API's order.
 	deferUploadChecks bool
+	// userAgent is the SDK's User-Agent with the application's AppInfo.
+	userAgent string
+	// logger is Options.Logger, or the CALMLENS_LOG logger, or nil.
+	logger *slog.Logger
 }
 
 // String describes the client without its API key. It takes a value so a dereferenced client
@@ -165,6 +188,29 @@ func (c ServerClient) GoString() string { return c.String() }
 // NewServerClient validates every option before applying defaults or copying the HTTP client.
 // Invalid options return a *Error with code sdk/invalid-config.
 func NewServerClient(options Options) (*ServerClient, error) {
+	if !options.IgnoreEnvironment {
+		for _, value := range []struct {
+			field *string
+			name  string
+		}{{&options.APIKey, "CALMLENS_API_KEY"}, {&options.ProjectID, "CALMLENS_PROJECT_ID"}, {&options.BaseURL, "CALMLENS_BASE_URL"}} {
+			if *value.field == "" {
+				*value.field = os.Getenv(value.name)
+			}
+		}
+	}
+	if options.MaxRetryDelay < 0 {
+		return nil, invalid(CodeSDKInvalidConfig, "MaxRetryDelay cannot be negative")
+	}
+	agent, err := options.AppInfo.userAgent()
+	if err != nil {
+		return nil, err
+	}
+	logger := options.Logger
+	if logger == nil && !options.IgnoreEnvironment {
+		if logger, err = environmentLogger(os.Getenv("CALMLENS_LOG")); err != nil {
+			return nil, err
+		}
+	}
 	if options.APIKey == "" || options.ProjectID == "" {
 		return nil, invalid(CodeSDKInvalidConfig, "API key and project ID are required")
 	}
@@ -228,7 +274,7 @@ func NewServerClient(options Options) (*ServerClient, error) {
 	if options.MaxRetries != nil {
 		maxRetries = *options.MaxRetries
 	}
-	c := &ServerClient{options: options, maxRetries: maxRetries, http: doer, lenses: &lensCache{lenses: map[string]Lens{}, lock: make(chan struct{}, 1)}, sleep: sleep, now: time.Now}
+	c := &ServerClient{options: options, maxRetries: maxRetries, http: doer, userAgent: userAgent + agent, logger: logger, lenses: &lensCache{lenses: map[string]Lens{}, lock: make(chan struct{}, 1)}, sleep: sleep, now: time.Now}
 	c.services()
 	return c, nil
 }
@@ -400,12 +446,16 @@ func encodeJSON(value any) ([]byte, error) {
 // retryDelay is how long to wait before repeating a request that failed with err, and whether
 // to repeat it at all: a Retry-After header replaces the backoff, and one over RetryAfterMax
 // is not waited out.
-func retryDelay(err *Error, attempt int) (time.Duration, bool) {
-	delay := backoff(attempt)
-	if err.RetryAfter != nil {
-		delay = *err.RetryAfter
+func (c *ServerClient) retryDelay(err *Error, attempt int) (time.Duration, bool) {
+	limit := c.options.MaxRetryDelay
+	delay := c.backoff(attempt)
+	if err.RetryAfter == nil {
+		return delay, true
 	}
-	return delay, delay <= RetryAfterMax
+	if limit == 0 {
+		limit = RetryAfterMax
+	}
+	return *err.RetryAfter, *err.RetryAfter <= limit
 }
 
 // send performs a call, retrying it when that is safe, and decodes the response into out.
@@ -430,25 +480,24 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 		if payload, err = encodeJSON(spec.body); err != nil {
 			return argumentError("Could not encode the request body", err)
 		}
-		if payload, err = withExtra(payload, params.Extra); err != nil {
+		if payload, err = withExtra(payload, params.ExtraBody); err != nil {
 			return err
 		}
 		headers.Set("Content-Type", "application/json")
-	} else if spec.raw != nil {
-		if len(params.Extra) > 0 {
-			return invalid(CodeSDKInvalidArgument, "Params.Extra can't be sent with an upload")
+	} else {
+		if len(params.ExtraBody) > 0 {
+			return invalid(CodeSDKInvalidArgument, "Params.ExtraBody needs a request with a JSON body")
 		}
-		rewind = rewinder(spec.raw)
-	} else if len(params.Extra) > 0 {
-		extra, err := query(params.Extra)
-		if err != nil {
-			return err
+		if spec.raw != nil {
+			rewind = rewinder(spec.raw)
 		}
+	}
+	if len(params.ExtraQuery) > 0 {
 		separator := "?"
 		if len(spec.params) > 0 {
 			separator = "&"
 		}
-		endpoint += separator + extra.Encode()
+		endpoint += separator + params.ExtraQuery.Encode()
 	}
 	idempotencyKey := spec.idempotencyKey
 	if idempotencyKey == "" && spec.method != http.MethodGet && spec.method != http.MethodHead {
@@ -478,26 +527,41 @@ func (c *ServerClient) send(ctx context.Context, spec call, out any) error {
 		case spec.raw != nil:
 			reader, size = spec.raw, spec.size
 		}
-		err := c.attempt(ctx, spec.method, endpoint, headers, reader, size, timeout, out)
+		record := Attempt{Operation: operationOf(ctx), Method: spec.method, Path: spec.path, Attempt: attempt + 1}
+		started := time.Now()
+		err := c.attempt(ctx, spec.method, endpoint, headers, reader, size, timeout, out, &record)
+		record.Duration, record.Err = time.Since(started), err
 		if err == nil {
+			c.observe(ctx, record, true)
 			return nil
 		}
 		sdkErr, ok := err.(*Error)
-		if !ok || !retryable || attempt >= maxRetries || !sdkErr.Retryable() || ctx.Err() != nil {
-			return err
+		if ok {
+			sdkErr.Method, sdkErr.Path, sdkErr.Attempts = spec.method, spec.path, attempt+1
 		}
-		if rewind == nil || rewind() != nil {
+		delay, wait := time.Duration(0), false
+		if ok && retryable && attempt < maxRetries && sdkErr.Retryable() && ctx.Err() == nil && rewind != nil && rewind() == nil {
 			// A stream that cannot be rewound cannot be sent again.
-			return err
+			delay, wait = c.retryDelay(sdkErr, attempt)
 		}
-		delay, wait := retryDelay(sdkErr, attempt)
 		if !wait {
+			c.observe(ctx, record, true)
 			return err
 		}
+		record.Delay = delay
+		c.observe(ctx, record, false)
 		if waitErr := c.sleep(ctx, delay); waitErr != nil {
 			return transportError(waitErr)
 		}
 	}
+}
+
+// backoff is backoff capped at Options.MaxRetryDelay.
+func (c *ServerClient) backoff(attempt int) time.Duration {
+	if c.options.MaxRetryDelay > 0 {
+		return min(backoff(attempt), c.options.MaxRetryDelay)
+	}
+	return backoff(attempt)
 }
 
 // backoff is capped exponential backoff with jitter: retry n waits between half and all of
@@ -509,7 +573,7 @@ func backoff(attempt int) time.Duration {
 }
 
 // attempt sends one HTTP request and reads its response.
-func (c *ServerClient) attempt(ctx context.Context, method, endpoint string, headers http.Header, body io.Reader, size int64, timeout time.Duration, out any) error {
+func (c *ServerClient) attempt(ctx context.Context, method, endpoint string, headers http.Header, body io.Reader, size int64, timeout time.Duration, out any, record *Attempt) error {
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -529,12 +593,13 @@ func (c *ServerClient) attempt(ctx context.Context, method, endpoint string, hea
 	}
 	req.Header = headers.Clone()
 	req.Header.Set("X-Api-Key", c.options.APIKey)
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", c.userAgent)
 	res, err := c.http.Do(req)
 	if err != nil {
 		return transportError(err)
 	}
 	defer res.Body.Close()
+	record.Status, record.RequestID = res.StatusCode, res.Header.Get("X-Request-Id")
 	if isRedirect(res) {
 		return redirectError(res)
 	}
@@ -549,6 +614,10 @@ func (c *ServerClient) attempt(ctx context.Context, method, endpoint string, hea
 		return nil
 	}
 	requestID := res.Header.Get("X-Request-Id")
+	if raw, ok := out.(*RawResponse); ok && len(data) == 0 {
+		raw.setLastResponse(&APIResponse{StatusCode: res.StatusCode, Header: res.Header, RequestID: requestID, IdempotencyKey: headers.Get("Idempotency-Key")})
+		return nil
+	}
 	if len(data) == 0 {
 		return &Error{Code: CodeSDKInvalidResponse, Message: "Empty JSON response", Status: res.StatusCode, RequestID: requestID, Header: res.Header}
 	}
@@ -561,14 +630,14 @@ func (c *ServerClient) attempt(ctx context.Context, method, endpoint string, hea
 	return nil
 }
 
-// withExtra adds Params.Extra to a JSON object body; the body's own fields win.
+// withExtra adds Params.ExtraBody to a JSON object body; the body's own fields win.
 func withExtra(payload []byte, extra map[string]any) ([]byte, error) {
 	if len(extra) == 0 {
 		return payload, nil
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(payload, &fields); err != nil || fields == nil {
-		return nil, invalid(CodeSDKInvalidArgument, "Params.Extra needs a JSON object body")
+		return nil, invalid(CodeSDKInvalidArgument, "Params.ExtraBody needs a JSON object body")
 	}
 	for key, value := range extra {
 		if _, declared := fields[key]; declared {
@@ -576,7 +645,7 @@ func withExtra(payload []byte, extra map[string]any) ([]byte, error) {
 		}
 		encoded, err := encodeJSON(value)
 		if err != nil {
-			return nil, argumentError("Could not encode Params.Extra", err)
+			return nil, argumentError("Could not encode Params.ExtraBody", err)
 		}
 		fields[key] = encoded
 	}
@@ -612,9 +681,20 @@ func redirectError(res *http.Response) error {
 	return &Error{Code: CodeSDKHTTPError, Message: "Unexpected redirect (HTTP " + strconv.Itoa(res.StatusCode) + ")", Status: res.StatusCode, RequestID: res.Header.Get("X-Request-Id"), Header: res.Header}
 }
 
+// maxErrorBody is the most of an error response's body Error.Body keeps.
+const maxErrorBody = 16 << 10
+
+// capBody keeps at most maxErrorBody bytes of an error response's body.
+func capBody(data []byte) string {
+	if len(data) > maxErrorBody {
+		data = data[:maxErrorBody]
+	}
+	return string(data)
+}
+
 // responseError converts a non-2xx response into *Error.
 func responseError(res *http.Response, data []byte, now time.Time) error {
-	result := &Error{Status: res.StatusCode, RequestID: res.Header.Get("X-Request-Id"), Header: res.Header, RetryAfter: parseRetryAfter(res.Header.Get("Retry-After"), now)}
+	result := &Error{Status: res.StatusCode, RequestID: res.Header.Get("X-Request-Id"), Header: res.Header, RetryAfter: parseRetryAfter(res.Header.Get("Retry-After"), now), Body: capBody(data)}
 	var failure struct {
 		Code      *string `json:"code"`
 		Message   *string `json:"message"`
@@ -652,7 +732,7 @@ func decodeJSON(data []byte, out any) error {
 // EnsureLens creates a lens, or changes it to this definition, by identifier and returns it.
 // See EnsureLenses.
 func (c *ServerClient) EnsureLens(ctx context.Context, options EnsureLensOptions) (*Lens, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "ensureLens", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -680,7 +760,7 @@ const EnsureLensesMaxPerRequest = 100
 // lens. More than EnsureLensesMaxPerRequest new definitions are sent in consecutive requests, in
 // order.
 func (c *ServerClient) EnsureLenses(ctx context.Context, options EnsureLensesOptions) ([]Lens, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "ensureLenses", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}

@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"net/http"
 	"net/url"
@@ -92,7 +93,12 @@ type Options struct {
 	// Set it to test the client's retry behaviour. Waits take no real time: retry backoff and
 	// Assets.WaitForDecision only advance the mock client's clock, so WaitForDecision returns
 	// sdk/timeout at once for an asset that stays queued or processing.
-	MaxRetries      *int
+	MaxRetries *int
+	// AppInfo, Logger and OnAttempt work as in calmlens.Options. The mock never reads the
+	// environment.
+	AppInfo         *calmlens.AppInfo
+	Logger          *slog.Logger
+	OnAttempt       func(calmlens.Attempt)
 	DatabaseStorage *InMemoryDatabaseStorage
 	ImageStorage    *InMemoryImageStorage
 	// CreateID returns a new ID for an object of the kind prefix names ("asset", "fldr", "hl",
@@ -646,7 +652,7 @@ func NewServerClient(options Options) (*MockServerClient, error) {
 		images.Content = map[string]*StoredContent{}
 	}
 	mock := &MockServerClient{DatabaseStorage: db, ImageStorage: images, options: options, lenses: map[string]calmlens.JSON{}, uploads: map[string]*upload{}, replays: map[string]replay{}, assetSequences: map[string]int64{}, processingOptions: map[string]calmlens.JSON{}, reruns: map[string]bool{}, config: newConfigurationStore()}
-	client, err := calmlens.NewServerClient(calmlens.Options{APIKey: options.APIKey, ProjectID: options.ProjectID, BaseURL: options.BaseURL, CDNBaseURL: options.CDNBaseURL, Timeout: options.Timeout, UploadTimeout: options.UploadTimeout, MaxRetries: options.MaxRetries, MaxResponseBytes: options.MaxResponseBytes, PartSizeBytes: options.PartSizeBytes, HTTPClient: &http.Client{Transport: transport{mock}}})
+	client, err := calmlens.NewServerClient(calmlens.Options{IgnoreEnvironment: true, AppInfo: options.AppInfo, Logger: options.Logger, OnAttempt: options.OnAttempt, APIKey: options.APIKey, ProjectID: options.ProjectID, BaseURL: options.BaseURL, CDNBaseURL: options.CDNBaseURL, Timeout: options.Timeout, UploadTimeout: options.UploadTimeout, MaxRetries: options.MaxRetries, MaxResponseBytes: options.MaxResponseBytes, PartSizeBytes: options.PartSizeBytes, HTTPClient: &http.Client{Transport: transport{mock}}})
 	if err != nil {
 		return nil, err
 	}
@@ -2736,6 +2742,10 @@ func (m *MockServerClient) search(q url.Values) (any, error) {
 		values := map[string]string{}
 		for _, field := range searchFields {
 			value := lookup(a, field)
+			// The API searches an undecided asset's decision as "pending".
+			if field == "classification.moderation.decision" && value == nil {
+				value = "pending"
+			}
 			if field == "tags" {
 				tags := []string{}
 				if list, ok := value.([]any); ok {

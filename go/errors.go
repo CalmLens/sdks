@@ -3,6 +3,7 @@ package calmlens
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"math"
 	"net"
 	"net/http"
@@ -69,6 +70,29 @@ type Error struct {
 	RetryAfter *time.Duration `json:"-"`
 	// Cause is the underlying error, if any. It is returned by Unwrap.
 	Cause error `json:"-"`
+	// Body is the error response's body as sent, up to 16 KiB, such as a proxy's HTML page; empty
+	// when no response was received.
+	Body string `json:"-"`
+	// Method and Path are the API request's method and path (without the query), such as "GET"
+	// and "/assets/asset_1", or empty for an error raised before a request or by the CDN.
+	Method, Path string `json:"-"`
+	// Attempts is how many times the request was sent, retries included, or 0 when it never was.
+	Attempts int `json:"-"`
+}
+
+// LogValue describes the error for log/slog without its body, headers or details.
+func (e *Error) LogValue() slog.Value {
+	attrs := []slog.Attr{slog.String("code", string(e.Code)), slog.String("message", e.Message)}
+	if e.Status != 0 {
+		attrs = append(attrs, slog.Int("status", e.Status))
+	}
+	if e.RequestID != "" {
+		attrs = append(attrs, slog.String("request_id", e.RequestID))
+	}
+	if e.Method != "" {
+		attrs = append(attrs, slog.String("method", e.Method), slog.String("path", e.Path), slog.Int("attempts", e.Attempts))
+	}
+	return slog.GroupValue(attrs...)
 }
 
 // Error formats the code, status, message and request ID.

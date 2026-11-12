@@ -516,6 +516,7 @@ func TestRejections(t *testing.T) {
 		Operation string
 		Options   json.RawMessage
 		Error     string
+		Kind      string
 	}](t, "rejections.json")
 	for _, rejection := range cases {
 		t.Run(rejection.Name, func(t *testing.T) {
@@ -542,6 +543,7 @@ func TestRejections(t *testing.T) {
 			if got := string(CodeOf(err)); got != rejection.Error || len(transport.received) != 0 {
 				t.Fatalf("got %q (%v) after %d requests; want %q before any request", got, err, len(transport.received), rejection.Error)
 			}
+			checkErrorKind(t, rejection.Name, err, rejection.Kind)
 			var failure *Error
 			if !errors.As(err, &failure) || !failure.Local() || !IsLocal(err) || failure.Status != 0 || failure.RequestID != "" {
 				t.Fatalf("got %#v; want a local error without a status or request ID", err)

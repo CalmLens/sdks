@@ -222,7 +222,7 @@ type PoliciesService struct{ c *ServerClient }
 // List returns one page of the organisation's policies, oldest first unless options.Sort says
 // otherwise. Use ListAll to iterate over every page.
 func (s *PoliciesService) List(ctx context.Context, options ListPoliciesOptions) (*PolicyPage, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "policies.list", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -257,7 +257,7 @@ type RetrieveAssignedPolicyOptions struct {
 // RetrieveAssigned returns the policy the project moderates with. Uploads through an upload
 // preset that names its own policy use that one instead.
 func (s *PoliciesService) RetrieveAssigned(ctx context.Context, options RetrieveAssignedPolicyOptions) (*Policy, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "policies.retrieveAssigned", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -270,7 +270,7 @@ func (s *PoliciesService) RetrieveAssigned(ctx context.Context, options Retrieve
 
 // Retrieve returns a policy.
 func (s *PoliciesService) Retrieve(ctx context.Context, options PolicyIDOptions) (*Policy, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "policies.retrieve", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -280,7 +280,7 @@ func (s *PoliciesService) Retrieve(ctx context.Context, options PolicyIDOptions)
 // Create creates a policy. It moderates nothing until you assign it to a project or name it on
 // an upload preset.
 func (s *PoliciesService) Create(ctx context.Context, options CreatePolicyOptions) (*Policy, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "policies.create", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -294,7 +294,7 @@ func (s *PoliciesService) Create(ctx context.Context, options CreatePolicyOption
 // Update changes a policy's name, description or settings; later moderation uses them. Saving a
 // live policy (PolicyPresetModeLive) pins it under the same ID.
 func (s *PoliciesService) Update(ctx context.Context, options UpdatePolicyOptions) (*Policy, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "policies.update", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -316,7 +316,7 @@ type presetBody struct {
 // Reset restores the settings of the preset release a pinned policy or copy is pinned to,
 // discarding its changes.
 func (s *PoliciesService) Reset(ctx context.Context, options ResetPolicyOptions) (*Policy, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "policies.reset", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -326,7 +326,7 @@ func (s *PoliciesService) Reset(ctx context.Context, options ResetPolicyOptions)
 // Upgrade moves a pinned policy or copy whose settings are unchanged from its preset release to
 // the latest release of the preset.
 func (s *PoliciesService) Upgrade(ctx context.Context, options UpgradePolicyOptions) (*Policy, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "policies.upgrade", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -336,7 +336,7 @@ func (s *PoliciesService) Upgrade(ctx context.Context, options UpgradePolicyOpti
 // SetAutomaticUpdates switches automatic updates on or off for the organisation's own preset
 // policy: on turns a pinned policy live, and off pins a live policy at its current preset release.
 func (s *PoliciesService) SetAutomaticUpdates(ctx context.Context, options SetPolicyAutomaticUpdatesOptions) (*Policy, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "policies.setAutomaticUpdates", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -350,7 +350,7 @@ func (s *PoliciesService) SetAutomaticUpdates(ctx context.Context, options SetPo
 
 // Delete deletes a policy that no project or upload preset uses.
 func (s *PoliciesService) Delete(ctx context.Context, options PolicyIDOptions) error {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "policies.delete", options.Params)
 	if paramsErr != nil {
 		return paramsErr
 	}
@@ -363,7 +363,7 @@ func (s *PoliciesService) Delete(ctx context.Context, options PolicyIDOptions) e
 
 // Assign chooses the policy the project moderates with.
 func (s *PoliciesService) Assign(ctx context.Context, options AssignPolicyOptions) (*Policy, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "policies.assign", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}

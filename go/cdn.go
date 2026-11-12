@@ -299,7 +299,7 @@ func (s *CDNService) GetAssetURL(options CDNAssetURLOptions) (string, error) {
 // asset URL; ResourceOriginal only when signed with Original. With a Resource, it returns that
 // resource's URL beneath the grant. The options are checked before anything is sent.
 func (s *CDNService) SignAssetURL(ctx context.Context, options SignAssetURLOptions) (*SignedAssetURL, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "cdn.signAssetUrl", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -348,7 +348,7 @@ func (s *CDNService) SignAssetURL(ctx context.Context, options SignAssetURLOptio
 // as a browser would. A refusal returns *Error with the CDN's code, such as signed-url/expired or
 // asset/not-available.
 func (s *CDNService) GetAssetInfo(ctx context.Context, assetURL string, options GetAssetInfoOptions) (*AssetInfo, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "cdn.getAssetInfo", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -381,7 +381,7 @@ func (s *CDNService) GetAssetInfo(ctx context.Context, assetURL string, options 
 		return nil, argumentError("Could not build the CDN request", err)
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", s.c.userAgent)
 	res, err := s.c.http.Do(req)
 	if err != nil {
 		return nil, transportError(err)
@@ -413,7 +413,7 @@ func (s *CDNService) GetAssetInfo(ctx context.Context, assetURL string, options 
 // honouring Retry-After); when retries run out, the last response is returned. A redirect is
 // never followed: it fails with sdk/http-error and its status.
 func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.Response, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "cdn.serve", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -442,7 +442,7 @@ func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.
 			if !ok || !canRetry || !sdkErr.Retryable() || ctx.Err() != nil {
 				return nil, err
 			}
-			if waitErr := s.c.sleep(ctx, backoff(attempt)); waitErr != nil {
+			if waitErr := s.c.sleep(ctx, s.c.backoff(attempt)); waitErr != nil {
 				return nil, transportError(waitErr)
 			}
 			continue
@@ -455,7 +455,7 @@ func (s *CDNService) Serve(ctx context.Context, options CDNServeOptions) (*http.
 			return response, nil
 		}
 		failure := &Error{Status: response.StatusCode, RetryAfter: parseRetryAfter(response.Header.Get("Retry-After"), s.c.now())}
-		delay, wait := retryDelay(failure, attempt)
+		delay, wait := s.c.retryDelay(failure, attempt)
 		if !failure.Retryable() || !wait {
 			return response, nil
 		}
@@ -491,7 +491,7 @@ func (s *CDNService) attempt(ctx context.Context, method, endpoint string, heade
 		}
 	}
 	req.Header.Set("X-Api-Key", s.c.options.APIKey)
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", s.c.userAgent)
 	response, err := s.c.http.Do(req)
 	if !timer.Stop() && timedOut.Load() {
 		cancel()

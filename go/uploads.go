@@ -198,7 +198,7 @@ func readAgain(raw io.Reader, size int64) *source {
 // and other content as a multipart/form-data upload whose options part holds the fields and
 // whose file part holds the bytes.
 func (s *AssetsService) Create(ctx context.Context, options SubmitAssetOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.create", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -208,7 +208,7 @@ func (s *AssetsService) Create(ctx context.Context, options SubmitAssetOptions) 
 // Classify submits an asset and waits for classification where supported (audio and video
 // always return pending).
 func (s *AssetsService) Classify(ctx context.Context, options SubmitAssetOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.classify", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -584,7 +584,7 @@ func partNumber(value any) (int, bool) {
 // final part waits for the decision was chosen when the upload started and is saved by CalmLens;
 // Wait overrides it.
 func (s *AssetsService) UploadPart(ctx context.Context, options UploadAssetPartOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.uploadPart", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}

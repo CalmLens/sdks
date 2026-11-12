@@ -178,7 +178,7 @@ type UploadPresetsService struct{ c *ServerClient }
 // List returns one page of the project's upload presets, oldest first unless options.Sort says
 // otherwise. Use ListAll to iterate over every page.
 func (s *UploadPresetsService) List(ctx context.Context, options ListUploadPresetsOptions) (*UploadPresetPage, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "uploadPresets.list", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -209,7 +209,7 @@ func (s *UploadPresetsService) ListAll(options ListUploadPresetsOptions) *Iterat
 // keeps its revision, so deploys can send their presets every time. Every preset is checked before
 // any is saved.
 func (s *UploadPresetsService) Ensure(ctx context.Context, options EnsureUploadPresetsOptions) (*EnsureUploadPresetsResponse, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "uploadPresets.ensure", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -223,7 +223,7 @@ func (s *UploadPresetsService) Ensure(ctx context.Context, options EnsureUploadP
 // Delete deletes an upload preset. Browsers can no longer upload through it; assets already
 // uploaded stay.
 func (s *UploadPresetsService) Delete(ctx context.Context, options UploadPresetIDOptions) error {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "uploadPresets.delete", options.Params)
 	if paramsErr != nil {
 		return paramsErr
 	}
@@ -382,7 +382,7 @@ type GetProjectSettingsOptions struct {
 // Get returns the project's settings, with every default filled in, and the revision to send back
 // with a change.
 func (s *ProjectSettingsService) Get(ctx context.Context, options GetProjectSettingsOptions) (*ProjectSettingsResource, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "projectSettings.get", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -396,7 +396,7 @@ func (s *ProjectSettingsService) Get(ctx context.Context, options GetProjectSett
 // Update replaces the project's settings: settings left out return to their defaults. Unchanged
 // settings keep their revision.
 func (s *ProjectSettingsService) Update(ctx context.Context, options UpdateProjectSettingsOptions) (*ProjectSettingsResource, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "projectSettings.update", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -458,7 +458,7 @@ type ListMetadataFieldsOptions struct {
 
 // List returns the project's metadata fields in display order.
 func (s *MetadataFieldsService) List(ctx context.Context, options ListMetadataFieldsOptions) (*MetadataFieldsResource, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "metadataFields.list", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -472,7 +472,7 @@ func (s *MetadataFieldsService) List(ctx context.Context, options ListMetadataFi
 // Ensure creates each field, or replaces it with the definition sent, by ID. Other fields are kept
 // and new ones are added at the end. Unchanged fields keep their revision.
 func (s *MetadataFieldsService) Ensure(ctx context.Context, options EnsureMetadataFieldsOptions) (*MetadataFieldsResource, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "metadataFields.ensure", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -485,7 +485,7 @@ func (s *MetadataFieldsService) Ensure(ctx context.Context, options EnsureMetada
 
 // Delete deletes a metadata field definition. Assets keep the metadata values they hold.
 func (s *MetadataFieldsService) Delete(ctx context.Context, options DeleteMetadataFieldOptions) error {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "metadataFields.delete", options.Params)
 	if paramsErr != nil {
 		return paramsErr
 	}

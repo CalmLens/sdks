@@ -450,11 +450,11 @@ func invoke(t *testing.T, ctx context.Context, c *ServerClient, operation string
 		return collect(ctx, c.Lenses.ListAll(into[ListLensesOptions](t, args)))
 	case "events.iterate":
 		it := c.Events.ListAll(into[ListEventsOptions](t, args))
-		pages := []EventsPage{}
-		for it.NextPage(ctx) {
-			pages = append(pages, *it.Page())
+		events := []Event{}
+		for it.Next(ctx) {
+			events = append(events, it.Event())
 		}
-		return fixtureCall{result: pages, partial: pages}, it.Err()
+		return fixtureCall{result: events, partial: events}, it.Err()
 	case "cdn.serve":
 		options := CDNServeOptions{CDNAssetURLOptions: fixtureCDN(t, args)}
 		if init, ok := args["init"].(map[string]any); ok {
@@ -794,6 +794,7 @@ func TestAPIErrorFixtures(t *testing.T) {
 		Code      string
 		Operation string
 		Args      json.RawMessage
+		Kind      string
 		Response  scriptedResponse
 		Expected  map[string]any
 	}](t, "errors.json")
@@ -806,6 +807,11 @@ func TestAPIErrorFixtures(t *testing.T) {
 			}
 			_, err = invoke(t, context.Background(), c, fixture.Operation, decodeArgs(t, fixture.Args))
 			checkError(t, fixture.Code, err, fixture.Expected)
+			checkErrorKind(t, fixture.Code, err, fixture.Kind)
+			// A proxy's answer is kept as it was sent.
+			if failure := (*Error)(nil); fixture.Response.BodyText != nil && (!errors.As(err, &failure) || failure.Body != *fixture.Response.BodyText) {
+				t.Fatalf("Body of %v, want %q", err, *fixture.Response.BodyText)
+			}
 			// The code constant and the status the SDK knows for it match the API's.
 			if status, ok := PublicErrorStatus(ErrorCode(fixture.Code)); !strings.HasPrefix(fixture.Code, "sdk/") && (!ok || float64(status) != fixture.Expected["status"]) {
 				t.Fatalf("PublicErrorStatus(%q) = %d, %v", fixture.Code, status, ok)
@@ -1320,5 +1326,51 @@ func TestClientDefaults(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// errorKinds are the sentinels of surface.json's errorKinds by their Go names; the root kind,
+// "Error", is the *Error type itself.
+var errorKinds = map[string]error{
+	"ErrAPI": ErrAPI, "ErrBadRequest": ErrBadRequest, "ErrAuthentication": ErrAuthentication,
+	"ErrPermissionDenied": ErrPermissionDenied, "ErrNotFound": ErrNotFound, "ErrConflict": ErrConflict,
+	"ErrPayloadTooLarge": ErrPayloadTooLarge, "ErrUnprocessableEntity": ErrUnprocessableEntity,
+	"ErrRateLimit": ErrRateLimit, "ErrServer": ErrServer, "ErrConnection": ErrConnection,
+	"ErrTimeout": ErrTimeout, "ErrCancelled": ErrCancelled, "ErrInvalidArgument": ErrInvalidArgument,
+	"ErrConfiguration": ErrConfiguration, "ErrInvalidResponse": ErrInvalidResponse,
+	"ErrWebhookVerification": ErrWebhookVerification,
+}
+
+// checkErrorKind checks that err is the kind surface.json's errorKinds calls kind, and each kind
+// above it, through errors.Is (and errors.As for the root), and no other kind.
+func checkErrorKind(t *testing.T, label string, err error, kind string) {
+	t.Helper()
+	surface := fixtures.Read[struct {
+		ErrorKinds []struct {
+			ID     string
+			Parent *string
+			Names  struct{ Go string }
+		}
+	}](t, "surface.json")
+	byID := map[string]int{}
+	for i, k := range surface.ErrorKinds {
+		byID[k.ID] = i
+	}
+	if _, ok := byID[kind]; !ok {
+		t.Fatalf("%s: unknown error kind %q", label, kind)
+	}
+	want := map[string]bool{}
+	for id := &kind; id != nil; id = surface.ErrorKinds[byID[*id]].Parent {
+		want[surface.ErrorKinds[byID[*id]].Names.Go] = true
+	}
+	var failure *Error
+	if !errors.As(err, &failure) {
+		t.Fatalf("%s: %v is not a *calmlens.Error", label, err)
+	}
+	wrapped := fmt.Errorf("wrapped: %w", err)
+	for name, sentinel := range errorKinds {
+		if errors.Is(wrapped, sentinel) != want[name] {
+			t.Errorf("%s: errors.Is(err, %s) = %v, want %v (kind %s)", label, name, !want[name], want[name], kind)
+		}
 	}
 }

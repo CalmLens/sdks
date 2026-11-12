@@ -21,7 +21,7 @@ type EventsService struct{ c *ServerClient }
 
 // Search finds assets by keyword, semantic or hybrid search.
 func (s *AssetsService) Search(ctx context.Context, options SearchAssetsOptions) (*AssetSearchResponse, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.search", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -38,7 +38,7 @@ func (s *AssetsService) Search(ctx context.Context, options SearchAssetsOptions)
 
 // List returns one page of assets. Use ListAll to iterate over every page.
 func (s *AssetsService) List(ctx context.Context, options ListAssetsOptions) (*AssetPage, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.list", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -55,7 +55,7 @@ func (s *AssetsService) List(ctx context.Context, options ListAssetsOptions) (*A
 
 // Retrieve returns the current state of an asset.
 func (s *AssetsService) Retrieve(ctx context.Context, options AssetIDOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.retrieve", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -74,7 +74,7 @@ func (s *AssetsService) Retrieve(ctx context.Context, options AssetIDOptions) (*
 
 // Update patches an asset; see UpdateAssetOptions.
 func (s *AssetsService) Update(ctx context.Context, options UpdateAssetOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.update", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -85,7 +85,7 @@ func (s *AssetsService) Update(ctx context.Context, options UpdateAssetOptions) 
 // again: processing returns to ClassificationStatusProcessing and moderation to
 // ModerationStatusPending.
 func (s *AssetsService) Retry(ctx context.Context, options AssetIDOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.retry", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -98,7 +98,7 @@ func (s *AssetsService) Retry(ctx context.Context, options AssetIDOptions) (*Ass
 // blocked or purged. Purging needs ConfirmPurge and the assets:delete permission, and
 // permanently deletes the stored content.
 func (s *AssetsService) Decide(ctx context.Context, options DecideAssetOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.decide", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -113,7 +113,7 @@ func (s *AssetsService) Decide(ctx context.Context, options DecideAssetOptions) 
 // EventAssetClassified and asset.<status> events, and a failed re-run keeps it. A reviewed asset
 // fails with CodeAssetReviewed, and one whose content is gone with CodeAssetContentUnavailable.
 func (s *AssetsService) Explain(ctx context.Context, options ExplainAssetOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.explain", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -140,11 +140,11 @@ const (
 // it. It waits 0.5s before the
 // second check and 1.5 times longer each time after that, up to 2s. A zero Timeout checks once.
 // When Timeout (default DefaultDecisionTimeout) passes before it is settled it returns a *Error with code
-// sdk/timeout and Details {"assetId", "classificationStatus", "moderationStatus"} holding the last
+// sdk/timeout and Details {"assetId", "classificationStatus", "moderationDecision"} holding the last
 // statuses seen. Cancelling ctx
 // stops waiting with sdk/cancelled. Webhooks report decisions without polling.
 func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDecisionOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.waitForDecision", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -165,10 +165,12 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 	delay := decisionPollFirstDelay
 	var last *Asset
 	timedOut := func() (*Asset, error) {
-		details := JSON{"assetId": options.AssetID, "classificationStatus": nil, "moderationStatus": nil}
+		details := JSON{"assetId": options.AssetID, "classificationStatus": nil, "moderationDecision": nil}
 		if last != nil {
-			details["classificationStatus"] = last.Classification.Status
-			details["moderationStatus"] = last.Classification.Moderation.Decision
+			details["classificationStatus"] = string(last.Classification.Status)
+			if decision := last.Classification.Moderation.Decision; decision != nil {
+				details["moderationDecision"] = string(*decision)
+			}
 		}
 		return nil, &Error{Code: CodeSDKTimeout, Message: "Asset " + options.AssetID + " did not settle within " + timeout.String(), Details: details}
 	}
@@ -213,7 +215,7 @@ func (s *AssetsService) WaitForDecision(ctx context.Context, options WaitForDeci
 // Content.Status ContentStatusRemoved with RemovalReason ContentRemovalReasonRequested, and the
 // CDN no longer serves its content.
 func (s *AssetsService) RemoveContent(ctx context.Context, options AssetIDOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.removeContent", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -223,7 +225,7 @@ func (s *AssetsService) RemoveContent(ctx context.Context, options AssetIDOption
 // Delete removes the asset record together with its stored content. An asset extracted from
 // another (one with a ParentID) fails with CodeAssetChildNotDeletable: delete its parent instead.
 func (s *AssetsService) Delete(ctx context.Context, options AssetIDOptions) error {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.delete", options.Params)
 	if paramsErr != nil {
 		return paramsErr
 	}
@@ -242,7 +244,7 @@ func (s *AssetsService) Delete(ctx context.Context, options AssetIDOptions) erro
 // asset.deleted or asset.content-removed for each asset, with a FactBatchID fact naming BatchID.
 // Assets under a safety hold are skipped. It is not retried: it carries no Idempotency-Key.
 func (s *AssetsService) Batch(ctx context.Context, options BatchAssetsOptions) (*BatchAssetsResponse, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.batch", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -276,7 +278,7 @@ func validateBatchAssetsOptions(options BatchAssetsOptions) error {
 
 // Move moves an asset into a folder, or to the root when FolderID is nil.
 func (s *AssetsService) Move(ctx context.Context, options MoveAssetOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.move", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -298,7 +300,7 @@ func (s *AssetsService) assetRequest(ctx context.Context, method, id, suffix str
 // ListChildren returns one page of an asset's children. Use ListChildrenAll to iterate
 // over every page.
 func (s *AssetsService) ListChildren(ctx context.Context, options ListAssetChildrenOptions) (*AssetPage, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.listChildren", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -322,7 +324,7 @@ func (s *AssetsService) ListChildren(ctx context.Context, options ListAssetChild
 // segments there are. Pass each page's NextCursor back unchanged; cursors are opaque. Use
 // ListTimelineAll to iterate over every page.
 func (s *AssetsService) ListTimeline(ctx context.Context, options ListAssetTimelineOptions) (*AssetTimelinePage, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "assets.listTimeline", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -349,7 +351,7 @@ func (s *AssetsService) ListTimeline(ctx context.Context, options ListAssetTimel
 // Pass the page's NextCursor as Cursor for the next page, or use ListAll to iterate over every
 // page.
 func (s *FoldersService) List(ctx context.Context, options ListFoldersOptions) (*FolderPage, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "folders.list", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -366,7 +368,7 @@ func (s *FoldersService) List(ctx context.Context, options ListFoldersOptions) (
 
 // Retrieve returns a folder.
 func (s *FoldersService) Retrieve(ctx context.Context, options FolderIDOptions) (*Folder, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "folders.retrieve", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -375,7 +377,7 @@ func (s *FoldersService) Retrieve(ctx context.Context, options FolderIDOptions) 
 
 // Create creates a folder.
 func (s *FoldersService) Create(ctx context.Context, options CreateFolderOptions) (*Folder, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "folders.create", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -388,7 +390,7 @@ func (s *FoldersService) Create(ctx context.Context, options CreateFolderOptions
 
 // Update renames a folder.
 func (s *FoldersService) Update(ctx context.Context, options UpdateFolderOptions) (*Folder, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "folders.update", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -397,7 +399,7 @@ func (s *FoldersService) Update(ctx context.Context, options UpdateFolderOptions
 
 // Move moves a folder under ParentID, or to the root when ParentID is nil.
 func (s *FoldersService) Move(ctx context.Context, options MoveFolderOptions) (*Folder, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "folders.move", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -406,7 +408,7 @@ func (s *FoldersService) Move(ctx context.Context, options MoveFolderOptions) (*
 
 // Delete deletes an empty folder.
 func (s *FoldersService) Delete(ctx context.Context, options FolderIDOptions) error {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "folders.delete", options.Params)
 	if paramsErr != nil {
 		return paramsErr
 	}
@@ -431,7 +433,7 @@ func (s *FoldersService) folderRequest(ctx context.Context, method, id, suffix s
 
 // List returns one page of the event feed. Use ListAll to follow the cursor.
 func (s *EventsService) List(ctx context.Context, options ListEventsOptions) (*EventsPage, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "events.list", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -457,7 +459,7 @@ func (s *EventsService) List(ctx context.Context, options ListEventsOptions) (*E
 
 // Classify moderates plain text and waits for the decision.
 func (s *TextService) Classify(ctx context.Context, options ClassifyTextOptions) (*Asset, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "text.classify", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -478,7 +480,7 @@ type HashListsService struct{ c *ServerClient }
 // List returns one page of the project's hash lists, newest first unless options.Sort says
 // otherwise. Use ListAll to iterate over every page.
 func (s *HashListsService) List(ctx context.Context, options ListHashListsOptions) (*HashListPage, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "hashLists.list", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -495,7 +497,7 @@ func (s *HashListsService) List(ctx context.Context, options ListHashListsOption
 
 // Retrieve returns a hash list.
 func (s *HashListsService) Retrieve(ctx context.Context, options HashListIDOptions) (*HashList, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "hashLists.retrieve", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -504,7 +506,7 @@ func (s *HashListsService) Retrieve(ctx context.Context, options HashListIDOptio
 
 // Create creates a hash list.
 func (s *HashListsService) Create(ctx context.Context, options CreateHashListOptions) (*HashList, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "hashLists.create", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -517,7 +519,7 @@ func (s *HashListsService) Create(ctx context.Context, options CreateHashListOpt
 
 // Update renames a hash list or changes its action; the new action applies to later uploads.
 func (s *HashListsService) Update(ctx context.Context, options UpdateHashListOptions) (*HashList, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "hashLists.update", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -526,7 +528,7 @@ func (s *HashListsService) Update(ctx context.Context, options UpdateHashListOpt
 
 // Delete deletes a hash list and every entry in it.
 func (s *HashListsService) Delete(ctx context.Context, options HashListIDOptions) error {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "hashLists.delete", options.Params)
 	if paramsErr != nil {
 		return paramsErr
 	}
@@ -540,7 +542,7 @@ func (s *HashListsService) Delete(ctx context.Context, options HashListIDOptions
 // ListEntries returns one page of a hash list's entries, newest first unless options.Sort says
 // otherwise. Use ListEntriesAll to iterate over every page.
 func (s *HashListsService) ListEntries(ctx context.Context, options ListHashListEntriesOptions) (*HashListEntryPage, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "hashLists.listEntries", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -562,7 +564,7 @@ func (s *HashListsService) ListEntries(ctx context.Context, options ListHashList
 // AddEntry adds a hash, or an image asset's hash, to a hash list. A hash already in the list
 // returns its existing entry.
 func (s *HashListsService) AddEntry(ctx context.Context, options AddHashListEntryOptions) (*HashListEntry, error) {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "hashLists.addEntry", options.Params)
 	if paramsErr != nil {
 		return nil, paramsErr
 	}
@@ -579,7 +581,7 @@ func (s *HashListsService) AddEntry(ctx context.Context, options AddHashListEntr
 
 // RemoveEntry removes an entry from its hash list.
 func (s *HashListsService) RemoveEntry(ctx context.Context, options HashListEntryIDOptions) error {
-	ctx, paramsErr := withParams(ctx, options.Params)
+	ctx, paramsErr := withCall(ctx, "hashLists.removeEntry", options.Params)
 	if paramsErr != nil {
 		return paramsErr
 	}
