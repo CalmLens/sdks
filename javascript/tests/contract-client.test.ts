@@ -25,17 +25,32 @@ import {
 } from "../src/client/CalmLensUtils";
 import { UPLOAD_TOKEN_DEFAULT_TTL_SECONDS } from "../src/contract/UploadToken.js";
 import * as server from "../src/server";
-import { CalmLensError, CalmLensServerClient } from "../src/server";
+import {
+  CalmLensError,
+  type CalmLensLastResponse,
+  CalmLensServerClient,
+  type RequestOptions,
+} from "../src/server";
 import { expectErrorKind, testdata } from "./testdata";
 import { readUploadForm } from "./upload-form";
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
-const invoke = async (client: CalmLensServerClient, operation: string, args: unknown) => {
+const invoke = async (
+  client: CalmLensServerClient,
+  operation: string,
+  args: unknown,
+  requestOptions?: RequestOptions,
+  stopAfter?: number,
+) => {
   const collect = async (iterator: AsyncIterable<unknown>) => {
     const items: unknown[] = [];
     try {
-      for await (const item of iterator) items.push(item);
+      for await (const item of iterator) {
+        items.push(item);
+        // As a caller breaking out of its loop does: no further page is fetched.
+        if (stopAfter !== undefined && items.length >= stopAfter) break;
+      }
     } catch (error) {
       throw Object.assign(new Error("iteration failed"), { partial: items, error });
     }
@@ -44,18 +59,23 @@ const invoke = async (client: CalmLensServerClient, operation: string, args: unk
   const anyArgs = args as never;
   switch (operation) {
     case "events.iterate":
-      return collect(client.events.list(anyArgs));
+      return collect(client.events.list(anyArgs, requestOptions));
     case "ensureLens":
-      return client.ensureLens(anyArgs);
+      return client.ensureLens(anyArgs, requestOptions);
     case "ensureLenses":
-      return client.ensureLenses(anyArgs);
+      return client.ensureLenses(anyArgs, requestOptions);
+    case "request": {
+      const { method, path, ...rest } = args as { method: never; path: string };
+      return client.request(method, path, rest, requestOptions);
+    }
   }
   const [resource, method] = operation.split(".") as [string, string];
-  // Every list's iterator yields its items in order.
   // Iterating a list (`assets.iterate` iterates `assets.list`) yields its items in order.
   if (method.startsWith("iterate"))
-    return collect((client as any)[resource][method.replace(/^iterate/, "list")](anyArgs));
-  return (client as any)[resource][method](args);
+    return collect(
+      (client as any)[resource][method.replace(/^iterate/, "list")](anyArgs, requestOptions),
+    );
+  return (client as any)[resource][method](args, requestOptions);
 };
 
 /** The error fields every runner compares, `null` where there is none. */
@@ -241,12 +261,19 @@ interface ClientCase {
   area: string;
   requires?: string;
   client?: Record<string, Json>;
+  env?: Record<string, string>;
+  clientFromEnv?: boolean;
+  attempts?: Record<string, Json>[];
+  logs?: { level: "info" | "debug"; mustNotContain: string[] };
   cancelAfterRequests?: number;
   responses: ScriptedResponse[];
   steps: {
     operation: string;
     args?: Json;
+    requestOptions?: Record<string, Json>;
+    stopAfter?: number;
     expect?: {
+      lastResponse?: Record<string, Json>;
       result?: Json;
       error?: Record<string, Json>;
       partialResult?: Json[];
@@ -380,18 +407,45 @@ describe("scripted client cases", () => {
       }) as typeof fetch;
 
       const started = performance.now();
+      const attempts: Record<string, unknown>[] = [];
+      const logLines: string[] = [];
       let client: CalmLensServerClient | undefined;
       let constructionError: unknown;
+      // The case's environment, with every other CALMLENS_* variable cleared, while the client is made.
+      const savedEnv = { ...process.env };
+      if (clientCase.env) {
+        for (const name of Object.keys(process.env)) {
+          if (name.startsWith("CALMLENS_")) delete process.env[name];
+        }
+        Object.assign(process.env, clientCase.env);
+      }
       try {
+        const { apiKey, projectId, ...fixtureClient } = clientCases.client as Record<string, Json>;
         client = new CalmLensServerClient({
-          ...(clientCases.client as object),
+          ...(clientCase.clientFromEnv ? fixtureClient : { apiKey, projectId, ...fixtureClient }),
           ...(clientCase.client as object),
           fetch: fetchImpl,
           cdnFetch: fetchImpl,
           ...(clientCase.cancelAfterRequests ? { signal: abort.signal } : {}),
+          ...(clientCase.attempts && {
+            onAttempt: ({ durationMs: _duration, ...attempt }: Record<string, unknown>) =>
+              attempts.push(attempt),
+          }),
+          ...(clientCase.logs && {
+            logLevel: clientCase.logs.level,
+            logger: {
+              debug: (line: string) => logLines.push(line),
+              info: (line: string) => logLines.push(line),
+            },
+          }),
         } as never);
       } catch (error) {
         constructionError = error;
+      } finally {
+        if (clientCase.env) {
+          for (const name of Object.keys(process.env)) delete process.env[name];
+          Object.assign(process.env, savedEnv);
+        }
       }
       for (const [index, step] of clientCase.steps.entries()) {
         const label = `step ${index + 1} (${step.operation})`;
@@ -400,7 +454,13 @@ describe("scripted client cases", () => {
         let error: unknown = constructionError;
         if (!error) {
           try {
-            result = await invoke(client!, step.operation, decodeArgs(step.args ?? {}));
+            result = await invoke(
+              client!,
+              step.operation,
+              decodeArgs(step.args ?? {}),
+              step.requestOptions as RequestOptions | undefined,
+              step.stopAfter,
+            );
           } catch (caught) {
             error = caught;
           }
@@ -429,6 +489,17 @@ describe("scripted client cases", () => {
           break;
         }
         if (error) throw error;
+        if (expected?.lastResponse) {
+          const last = (result as { lastResponse?: CalmLensLastResponse }).lastResponse;
+          expect(
+            {
+              status: last?.status,
+              requestId: last?.requestId ?? null,
+              idempotencyKey: last?.idempotencyKey ?? null,
+            },
+            `${label}: lastResponse`,
+          ).toEqual(expected.lastResponse as never);
+        }
         if (expected?.cdn) {
           const response = result as Response;
           expect(
@@ -448,6 +519,15 @@ describe("scripted client cases", () => {
         }
       }
       const elapsed = performance.now() - started;
+      if (clientCase.attempts) expect(attempts, "attempts").toEqual(clientCase.attempts);
+      if (clientCase.logs) {
+        expect(logLines.length, "log lines").toBeGreaterThan(0);
+        for (const line of logLines) {
+          for (const secret of clientCase.logs.mustNotContain) {
+            expect(line.includes(secret), `log line holds ${secret}`).toBe(false);
+          }
+        }
+      }
 
       expect(received.length, "requests sent").toBe(clientCase.requests.length);
       const uuids = new Map<string, string>();
@@ -467,6 +547,10 @@ describe("scripted client cases", () => {
         );
         for (const [name, value] of Object.entries({
           ...clientCases.everyRequest.headers,
+          // A case's own API key is the one every request sends.
+          ...(typeof clientCase.client?.apiKey === "string" && {
+            "x-api-key": clientCase.client.apiKey,
+          }),
           ...want.headers,
         })) {
           checkHeader(label, name, got.headers.get(name), value, uuids);
