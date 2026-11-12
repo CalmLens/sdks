@@ -277,10 +277,12 @@ final class ContractTest extends TestCase
     /** The mock answers each code with this status, so a stale ErrorCodes class would mislead callers and tests. */
     public function testErrorCodesMatchTheSharedErrorsFixture(): void
     {
-        self::assertSame(array_column(self::fixtures('errors'), 'status', 'code'), ErrorCodes::STATUSES);
+        // One entry per API code; the `sdk/http-error` entries are a proxy's answers, one per status kind.
+        $api = array_values(array_filter(self::fixtures('errors'), fn (array $entry) => !str_starts_with($entry['code'], 'sdk/')));
+        self::assertSame(array_column($api, 'status', 'code'), ErrorCodes::STATUSES);
         $constants = (new ReflectionClass(ErrorCodes::class))->getConstants();
         unset($constants['STATUSES']);
-        self::assertEqualsCanonicalizing(array_column(self::fixtures('errors'), 'code'), array_values($constants));
+        self::assertEqualsCanonicalizing(array_column($api, 'code'), array_values($constants));
     }
 
     // client-cases.json: the real client against scripted responses.
