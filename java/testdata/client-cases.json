@@ -1300,9 +1300,7 @@
             ]
           ],
           "headers": {
-            "idempotency-key": {
-              "$uuid": "generated-1"
-            },
+            "idempotency-key": "upload-1",
             "accept": "application/json",
             "x-calmlens-upload": {
               "$absent": true
