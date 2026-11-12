@@ -806,6 +806,7 @@ class ContractTest {
       want.add("code", wanted.get("code"));
       want.add("status", wanted.get("status"));
       assertEquals(want, actual, label);
+      if (wanted.has("kind")) Fixtures.assertKind(error, wanted.get("kind").getAsString(), label);
       if (wanted.has("retryAfter")) {
         assertInstanceOf(ApiException.class, error, label);
         assertEquals(Optional.of(Duration.ofSeconds(wanted.get("retryAfter").getAsLong())), ((ApiException) error).getRetryAfter(), label + ": retryAfter");
@@ -928,6 +929,64 @@ class ContractTest {
     JsonObject classification = Fixtures.read("surface.json").getAsJsonObject().getAsJsonObject("classification");
     assertEquals(classification.get("categories"), Json.GSON.toJsonTree(MockClassificationValues.categories()));
     assertEquals(classification.get("qualifiers"), Json.GSON.toJsonTree(MockClassificationValues.qualifiers()));
+  }
+
+  /**
+   * Public methods of the client and its resources that no surface.json capability names, each
+   * with why it is plumbing rather than an API capability. Anything else unnamed is stale.
+   */
+  private static final Map<String, String> PLUMBING = Map.ofEntries(
+      Map.entry("close", "closes the client"),
+      Map.entry("withRequestOptions", "a client with changed per-call options"),
+      Map.entry("async", "the asynchronous form of the same capabilities (surface.json asyncClient)"),
+      Map.entry("request", "the raw request for API paths the SDK has no method for yet (client cases)"),
+      Map.entry("getProjectId", "reads the client's configuration"),
+      Map.entry("getBaseUrl", "reads the client's configuration"),
+      Map.entry("getCdnBaseUrl", "reads the client's configuration"),
+      Map.entry("getTimeout", "reads the client's configuration"),
+      Map.entry("getUploadTimeout", "reads the client's configuration"),
+      Map.entry("getMaxRetries", "reads the client's configuration"),
+      Map.entry("getMaxResponseBytes", "reads the client's configuration"),
+      Map.entry("getPartSizeBytes", "reads the client's configuration"),
+      Map.entry("CalmLensServerClient.builder", "starts the client's configuration"),
+      Map.entry("CalmLensServerClient.fromEnv", "builds the client from the environment (client cases)"),
+      Map.entry("CalmLensServerClient.parseWebhookRequest", "parseWebhookEvent reading the signature and timestamp from the request's headers"),
+      Map.entry("events().pages", "events.iterate a page at a time, with each page's cursor, which mock-scenarios.json replays"),
+      Map.entry("toString", "Java's object description"));
+
+  /** The capability name of a public method: {@code resource().name}, {@code name} or {@code CalmLensServerClient.name}. */
+  private static List<String> publicMethodNames() {
+    java.util.Set<String> names = new java.util.TreeSet<>();
+    java.util.Set<Class<?>> resources = new java.util.HashSet<>();
+    for (Method method : CalmLensServerClient.class.getDeclaredMethods()) {
+      if (!Modifier.isPublic(method.getModifiers()) || method.isSynthetic()) continue;
+      // A resource accessor, such as assets(), leads to that resource's methods.
+      if (method.getParameterCount() == 0 && method.getReturnType().getEnclosingClass() == CalmLensServerClient.class
+          && method.getReturnType().getSimpleName().endsWith("Service")) {
+        resources.add(method.getReturnType());
+        for (Method member : method.getReturnType().getDeclaredMethods())
+          if (Modifier.isPublic(member.getModifiers()) && !member.isSynthetic()) names.add(method.getName() + "()." + member.getName());
+        continue;
+      }
+      names.add(Modifier.isStatic(method.getModifiers()) ? "CalmLensServerClient." + method.getName() : method.getName());
+    }
+    assertFalse(resources.isEmpty(), "the client has no resources");
+    return List.copyOf(names);
+  }
+
+  /** Every public method of the client and its resources is a surface.json capability, or listed plumbing. */
+  @Test void offersNoStaleMethods() throws Exception {
+    java.util.Set<String> capabilities = new java.util.HashSet<>();
+    for (JsonElement element : Fixtures.read("surface.json").getAsJsonObject().getAsJsonArray("capabilities")) {
+      JsonObject capability = element.getAsJsonObject();
+      String kind = capability.get("kind").getAsString();
+      JsonElement name = capability.getAsJsonObject("names").get("java");
+      if ((kind.equals("method") || kind.equals("function")) && name != null && !name.isJsonNull()) capabilities.add(name.getAsString());
+    }
+    List<String> methods = publicMethodNames();
+    List<String> stale = methods.stream().filter(name -> !capabilities.contains(name) && !PLUMBING.containsKey(name)).toList();
+    List<String> unusedPlumbing = PLUMBING.keySet().stream().filter(name -> !methods.contains(name)).sorted().toList();
+    assertTrue(stale.isEmpty() && unusedPlumbing.isEmpty(), "methods no capability names: " + stale + "; plumbing no longer public: " + unusedPlumbing);
   }
 
   /** surface.json asyncClient: the client's asynchronous form, whose operations return futures. */

@@ -245,7 +245,8 @@ class ClientCasesTest {
         if (error == null) {
           try {
             RequestOptions callOptions = step.has("requestOptions") ? requestOptions(step.getAsJsonObject("requestOptions")) : null;
-            result = invoke(client, operation, step.has("args") ? step.getAsJsonObject("args") : new JsonObject(), async, callOptions);
+            int stopAfter = step.has("stopAfter") ? step.get("stopAfter").getAsInt() : Integer.MAX_VALUE;
+            result = invoke(client, operation, step.has("args") ? step.getAsJsonObject("args") : new JsonObject(), async, callOptions, stopAfter);
           } catch (Throwable thrown) {
             error = thrown;
           }
@@ -430,11 +431,14 @@ class ClientCasesTest {
   // ------------------------------------------------------------------ Operations
 
   /** Every item an iterable yields as JSON; a failure carries what was yielded first. */
-  private static JsonArray collect(Iterable<?> items) {
+  private static JsonArray collect(Iterable<?> items) { return collect(items, Integer.MAX_VALUE); }
+
+  /** The items an iterator yields, stopping after {@code limit} without asking for another. */
+  private static JsonArray collect(Iterable<?> items, int limit) {
     JsonArray all = new JsonArray();
     Iterator<?> iterator = items.iterator();
     try {
-      while (iterator.hasNext()) all.add(ContractTest.tree(iterator.next()));
+      while (all.size() < limit && iterator.hasNext()) all.add(ContractTest.tree(iterator.next()));
     } catch (CalmLensException failure) {
       throw new IterationFailed(all, failure);
     }
@@ -500,7 +504,8 @@ class ClientCasesTest {
     }
   }
 
-  private static Object invoke(CalmLensServerClient client, String operation, JsonObject args, boolean async, RequestOptions stepOptions) throws Throwable {
+  private static Object invoke(CalmLensServerClient client, String operation, JsonObject args, boolean async, RequestOptions stepOptions,
+      int stopAfter) throws Throwable {
     JsonObject options = args.deepCopy();
     RequestOptions request = stepOptions;
     if (options.has("idempotencyKey")) {
@@ -543,7 +548,7 @@ class ClientCasesTest {
         // The async client has no lazy iterators: they run on the synchronous one.
         Object result = Fixtures.invoke(client, operation, options, async && !Fixtures.isIterator(operation));
         // Every list's iterator yields its items in order.
-        return Fixtures.isIterator(operation) ? collect((Iterable<?>) result) : result;
+        return Fixtures.isIterator(operation) ? collect((Iterable<?>) result, stopAfter) : result;
       }
     }
   }

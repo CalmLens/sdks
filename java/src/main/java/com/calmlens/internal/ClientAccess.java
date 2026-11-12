@@ -28,6 +28,12 @@ public interface ClientAccess {
       int defaultMaxRetries, boolean deferUploadChecks);
 
   /**
+   * @param failure what a transport threw
+   * @return the client's exception for it: a timeout or a connection failure
+   */
+  com.calmlens.exception.CalmLensException transportError(Throwable failure);
+
+  /**
    * @param response a CDN response
    * @param body its body stream
    * @return the response as {@code cdn().serve} returns it

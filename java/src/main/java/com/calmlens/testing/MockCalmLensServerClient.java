@@ -822,7 +822,7 @@ public final class MockCalmLensServerClient implements AutoCloseable {
       Thread.currentThread().interrupt();
       throw CalmLensException.of(ErrorCodes.SDK_CANCELLED, "Request interrupted", interrupted);
     } catch (IOException failure) {
-      throw CalmLensServerClient.transportError(failure);
+      throw ClientAccess.Holder.get().transportError(failure);
     }
     return ClientAccess.Holder.get().cdnResponse(response, response.body());
   }

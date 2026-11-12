@@ -273,6 +273,8 @@ public final class CalmLensServerClient implements AutoCloseable {
         return CalmLensServerClient.signUploadToken(apiKey, params, now, nonce);
       }
 
+      @Override public CalmLensException transportError(Throwable failure) { return CalmLensServerClient.transportError(failure); }
+
       @Override public CdnResponse cdnResponse(Transport.Response response, InputStream body) { return new CdnResponse(response, body); }
 
       @Override public boolean isAcceptedUploadMimeType(String mimeType) { return CalmLensServerClient.isAcceptedUploadMimeType(mimeType); }
@@ -1246,7 +1248,7 @@ public final class CalmLensServerClient implements AutoCloseable {
    * @param failure what the transport threw
    * @return the exception, not thrown
    */
-  public static CalmLensException transportError(Throwable failure) {
+  static CalmLensException transportError(Throwable failure) {
     Throwable classify = failure instanceof UncheckedIOException unchecked && unchecked.getCause() != null ? unchecked.getCause() : failure;
     String message = failure.getMessage() == null ? failure.getClass().getName() : failure.getMessage();
     boolean timedOut = classify instanceof HttpTimeoutException || classify instanceof SocketTimeoutException;
