@@ -1335,9 +1335,7 @@ final class ContractTest extends TestCase
 
 
     /** Public methods that are PHP plumbing rather than API capabilities, each with the reason. */
-    private const NOT_CAPABILITIES = [
-        'request' => 'the raw request escape hatch, which surface.json has no capability for yet',
-    ];
+    private const NOT_CAPABILITIES = [];
 
     /**
      * Every public method of the client and of each of its services is a `method` capability, so
