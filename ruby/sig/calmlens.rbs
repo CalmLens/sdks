@@ -512,7 +512,7 @@ module CalmLens
   # test input key from the portal.
   module TestInputs
     type action = "allow" | "limit" | "age-restrict" | "block"
-    type region = "DE" | "AT" | "FR" | "GB" | "EU" | "AU" | "BR"
+    type region = moderation_region
     type regional_action = { "region" => region, "action" => "limit" | "age-restrict" | "block" }
     # One qualifying instance; set an action on every instance or on none.
     type test_instance = { "category" => classification_category, ?"score" => number, ?"action" => action, "qualifiers" => Array[String] }

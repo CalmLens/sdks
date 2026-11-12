@@ -102,9 +102,12 @@ module CalmLens
   # Preview. The adaptive stream of audio or video: HLS with fragmented MP4 (CMAF) segments, served
   # at the CDN's `hls` resource (`hls/index.m3u8`) and played by its `embed` resource. Renditions list
   # video from the largest down, then audio.
+  # Why there is no stream: the streaming allowance is used up, billing or the spend limit stops it,
+  # preparing it failed, or the content was not kept.
+  type asset_hls_unavailable_reason = "allowance-used" | "billing-required" | "spend-limit" | "processing-failed" | "content-not-kept"
   type asset_hls = {
-    "status" => String,
-    "reason" => String?,
+    "status" => "preparing" | "ready" | "unavailable",
+    "reason" => asset_hls_unavailable_reason?,
     "renditions" => Array[asset_hls_rendition]
   }
   type asset_rendered_kind = "image" | "pdf" | "video" | "audio"
@@ -167,8 +170,8 @@ module CalmLens
     # Link detection's result for an image; `nil` when it didn't run.
     "linkDetection" => link_detection_result?,
     # Preview. Person and face detection's results; `nil` when they didn't run.
-    ?"personDetection" => person_detection_result?,
-    ?"faceDetection" => face_detection_result?,
+    "personDetection" => person_detection_result?,
+    "faceDetection" => face_detection_result?,
     # Preview. Where the asset's links lead when the project's policy acts on links; otherwise `nil`.
     ?"linkSafety" => link_safety_result?,
     ?"aiGeneratedDetection" => ai_generated_detection_result?
@@ -188,11 +191,13 @@ module CalmLens
   }
   # A stricter delivery decision in one region the project serves: the status in force there, the
   # mandatory rule that sets it and the category whose findings it acted on, when it acts on one.
+  # The regions whose laws set mandatory delivery rules.
+  type moderation_region = "DE" | "AT" | "FR" | "GB" | "EU" | "AU" | "BR"
   type regional_decision = {
-    "region" => String,
+    "region" => moderation_region,
     "status" => "limited" | "age-restricted" | "blocked" | "purged",
     "rule" => String,
-    ?"category" => String
+    ?"category" => classification_category
   }
   # What decided the automated status: the `policy`'s categories, the asset's `children`, a
   # `hash-list` match, a `mandatory-rule` or `link-safety`.
@@ -202,14 +207,14 @@ module CalmLens
   type decision_policy = {
     "id" => String,
     "revision" => Integer,
-    "preset" => { "id" => String, "version" => Integer }?
+    "preset" => { "id" => policy_preset_id, "version" => Integer }?
   }
   # A review the human review queue is waiting for: when the asset joined it (Unix milliseconds),
   # why, and the categories that made the decision uncertain.
   type asset_pending_review = {
     "requestedAt" => Integer,
     "reason" => "sampled" | "uncertain",
-    "uncertainCategories" => Array[String]
+    "uncertainCategories" => Array[classification_category]
   }
   # Every field but `status`, `manualReviews`, `flaggedCategories`, `regions` and `timeline` is `nil`
   # until moderation decides; `pendingReview` is `nil` when no review is waiting.
@@ -226,9 +231,9 @@ module CalmLens
     "source" => moderation_source?,
     # The mandatory rule that decided, when `source` is `mandatory-rule`; otherwise `nil`.
     "rule" => String?,
-    "flaggedCategories" => Array[String], "regions" => Array[regional_decision],
+    "flaggedCategories" => Array[classification_category], "regions" => Array[regional_decision],
     "explanationComplete" => bool?,
-    "categories" => Hash[String, category_policy_score]?,
+    "categories" => Hash[classification_category, category_policy_score]?,
     # Preview. What the policy's link-safety section made of the asset's links; `nil` when the
     # policy doesn't act on links.
     ?"linkSafety" => link_safety_decision?,
@@ -273,7 +278,7 @@ module CalmLens
     "projectId" => String,
     ?"parentId" => String?,
     # The pages of the parent document a child shows, from 1; empty when unknown or not a child.
-    ?"parentPages" => Array[Integer],
+    "parentPages" => Array[Integer],
     ?"folderId" => String?,
     ?"uploadPresetId" => String?,
     "createdAt" => Integer,
@@ -305,6 +310,7 @@ module CalmLens
   # a child asset with its own result (`assets.list_children`).
   type feature_not_evaluated_reason = not_evaluated_reason | "in-children"
   type classification_category = "sexual" | "violence" | "self-harm" | "harassment" | "hate" | "criminal-activity"
+                                | "personal-information" | "profanity"
 
   # `status: "evaluated"` carries `someScore`, `likelihood` and optionally `allScore`;
   # `status: "not-evaluated"` carries `reason`.
@@ -663,7 +669,7 @@ module CalmLens
     ?"features" => {
       ?"ocr" => { "enabled" => bool }?,
       ?"personDetection" => { "enabled" => bool }?,
-      ?"faceDetection" => { "enabled" => bool, ?"ageEstimation" => bool? }?,
+      ?"faceDetection" => { "enabled" => bool, ?"ageEstimation" => bool }?,
       ?"linkDetection" => { "enabled" => bool }?,
       ?"streaming" => { "enabled" => bool }?
     }?
@@ -689,7 +695,7 @@ module CalmLens
     ?"dailyUploadLimit" => Integer?,
     ?"allowedOrigins" => Array[String]?,
     "createdAt" => Integer,
-    "updatedAt" => Integer
+    ?"updatedAt" => Integer
   }
   type upload_preset_page = { "items" => Array[upload_preset], "hasMore" => bool, "nextCursor" => String? }
   type ensure_upload_presets_response = { "uploadPresets" => Array[upload_preset] }
@@ -701,8 +707,10 @@ module CalmLens
     "uncertaintyMarginPercent" => number,
     "reviewMissingEvidence" => bool
   }
+  # Jurisdictions a project can opt out of serving.
+  type opt_out_jurisdiction = "EU"
   type public_project_settings = {
-    "optOutJurisdictions" => Array[String],
+    "optOutJurisdictions" => Array[opt_out_jurisdiction],
     "retainContent" => bool,
     "blockUnmoderatedAssets" => bool,
     "storeSensitiveMetadata" => bool,
@@ -831,7 +839,7 @@ module CalmLens
     "preset" => policy_preset_origin?,
     "projectIds" => Array[String],
     "createdAt" => Integer,
-    "updatedAt" => Integer
+    ?"updatedAt" => Integer
   }
   # A page of the organisation's policies, oldest first unless `sort` says otherwise.
   type policy_page = { "items" => Array[policy], "hasMore" => bool, "nextCursor" => String? }
@@ -852,10 +860,22 @@ module CalmLens
   # A registered fact's value: text, an enum value, a count or a time in milliseconds (such as
   # `resumes-at`), a list of enum values (such as `flagged-categories`), or null.
   # Test sends carry `{ "key" => "test", "value" => true }`.
-  type event_fact_value = String | Integer | bool | Array[String] | nil
+  type event_fact_value = String | Integer | bool | Array[classification_category] | nil
+  # The fact keys registered in EventCatalog.ts.
+  type event_fact_key = "asset-name" | "asset-type" | "file-format" | "test" | "parent-asset" | "flagged-categories"
+                      | "moderation-status" | "automated-status" | "region" | "rule" | "status" | "reviewer-name" | "note"
+                      | "child-asset" | "child-status" | "previous-status" | "failure-reason" | "completed-sections"
+                      | "total-sections" | "batch-id" | "review-reason" | "uncertain-categories" | "review-id" | "decision"
+                      | "applied-to-asset" | "hash-list-id" | "hash-list-name" | "distance" | "match-action" | "limit" | "used"
+                      | "organisation-id" | "reason" | "resumes-at" | "preset-id" | "preset-name" | "daily-limit"
+                      | "member-user-id" | "member-name" | "role" | "previous-role" | "invitee-email"
+                      | "previous-organisation-id" | "previous-organisation-name" | "organisation-name" | "method"
+                      | "api-keys-revoked" | "connectors-paused" | "key-id" | "key-name" | "created-by-name"
+                      | "revoked-by-name" | "deleted-by-name" | "connector-id" | "connector-name" | "connector-type"
+                      | "consecutive-failures" | "last-error"
   # A registered fact. `key` is a kebab-case key registered for the event's type, such as
   # `asset-name` or `flagged-categories`. Render `url` only when it is an internal path or HTTP(S) URL.
-  type event_fact = { "key" => String, "value" => event_fact_value, ?"url" => String }
+  type event_fact = { "key" => event_fact_key, "value" => event_fact_value, ?"url" => String }
   type event_fact_input = { key: String, value: event_fact_value, ?url: String }
 
   # Snapshot of the asset's processing, moderation and content status when the event was created.
@@ -885,11 +905,11 @@ module CalmLens
     "type" => event_type,
     "severity" => event_severity,
     "title" => String,
-    "description" => String?,
-    "assetId" => String?,
-    # Increases with each event about the same asset; nil for events not about an asset.
-    "assetSequence" => Integer?,
-    "asset" => event_asset?,
+    ?"description" => String?,
+    ?"assetId" => String?,
+    # Increases with each event about the same asset; nil or missing for events not about an asset.
+    ?"assetSequence" => Integer?,
+    ?"asset" => event_asset?,
     "facts" => Array[event_fact],
     "createdAt" => Integer
   }
@@ -959,7 +979,7 @@ module CalmLens
     asset_id: String,
     decision: "allowed" | "limited" | "age-restricted" | "blocked" | "purged",
     note: String,
-    ?confirm_purge: bool,
+    ?confirm_purge: true,
     ?request_options: request_options
   }
   # The resources beneath an asset URL ({CalmLens::CDN::RESOURCES}).
@@ -1130,7 +1150,16 @@ module CalmLens
     ?off_platform_links: { action: "limit" | "age-restrict" | "block", allowed_domains: Array[String] }
   }
   type policy_settings_input = policy_settings | {
-    category_settings: Hash[String | Symbol, category_policy_settings_input],
+    category_settings: {
+      sexual: category_policy_settings_input,
+      violence: category_policy_settings_input,
+      :"self-harm" => category_policy_settings_input,
+      harassment: category_policy_settings_input,
+      hate: category_policy_settings_input,
+      :"criminal-activity" => category_policy_settings_input,
+      :"personal-information" => category_policy_settings_input,
+      profanity: category_policy_settings_input
+    },
     ?link_safety: link_safety_settings_input
   }
   # `sort` is `createdAt` and `id`, `createdAt` (oldest first) by default.
@@ -1205,7 +1234,7 @@ module CalmLens
   type upload_preset_id_options = { upload_preset_id: String, ?request_options: request_options }
   # The complete settings: those left out return to their defaults.
   type project_settings_input = {
-    ?opt_out_jurisdictions: Array[String],
+    ?opt_out_jurisdictions: Array[opt_out_jurisdiction],
     ?retain_content: bool,
     ?block_unmoderated_assets: bool,
     ?store_sensitive_metadata: bool,
