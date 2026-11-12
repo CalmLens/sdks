@@ -342,7 +342,7 @@ final class ContractTest extends TestCase
      * Collects what a list's iterator yields, for an `<resource>.iterate…` operation, under its PHP
      * name in surface.json (such as `hashLists->eachEntry`); null for any other operation.
      */
-    private static function iterator(ServerClient $client, string $operation, array $args): ?array
+    private static function iterator(ServerClient $client, string $operation, array $args, ?int $stopAfter = null): ?array
     {
         if (!preg_match('/^\w+\.iterate/', $operation)) {
             return null;
@@ -350,19 +350,23 @@ final class ContractTest extends TestCase
         foreach (self::fixtures('surface')['capabilities'] as $capability) {
             if ($capability['id'] === $operation) {
                 [$resource, $method] = explode('->', $capability['names']['php']);
-                return self::collect($client->{$resource}->{$method}($args));
+                return self::collect($client->{$resource}->{$method}($args), $stopAfter);
             }
         }
         self::fail("No PHP name for $operation");
     }
 
     /** Collects an iterator, attaching what it yielded to a failure. */
-    private static function collect(iterable $items): array
+    private static function collect(iterable $items, ?int $stopAfter = null): array
     {
         $all = [];
         try {
             foreach ($items as $item) {
                 $all[] = self::plain($item);
+                // A caller breaking out of its loop: the iterator fetches no page it isn't asked for.
+                if ($stopAfter !== null && count($all) >= $stopAfter) {
+                    break;
+                }
             }
         } catch (CalmLensException $error) {
             throw new PartialResult($all, $error);
@@ -380,7 +384,7 @@ final class ContractTest extends TestCase
         return $options;
     }
 
-    private static function runClientStep(ServerClient $client, string $operation, array $args, array $requestOptions = []): mixed
+    private static function runClientStep(ServerClient $client, string $operation, array $args, array $requestOptions = [], ?int $stopAfter = null): mixed
     {
         if ($operation === 'request') {
             $options = $requestOptions + (isset($args['headers']) ? ['headers' => $args['headers']] : []);
@@ -390,8 +394,7 @@ final class ContractTest extends TestCase
         if ($requestOptions !== []) {
             $args['requestOptions'] = $requestOptions + ($args['requestOptions'] ?? []);
         }
-        return $operation === 'events.iterate' ? self::collect($client->events->each($args))
-            : (self::iterator($client, $operation, $args) ?? self::invoke($client, $operation, $args));
+        return self::iterator($client, $operation, $args, $stopAfter) ?? self::invoke($client, $operation, $args);
     }
 
     /** An API error body's `details` is always an object; the decoded fixture holds an empty one as `[]`. */
@@ -580,7 +583,7 @@ final class ContractTest extends TestCase
                 try {
                     self::$lastResult = null;
                     $result = self::runClientStep($client, $step['operation'], self::decodeArgs($step['args'] ?? []),
-                        self::requestOptions($step['requestOptions'] ?? []));
+                        self::requestOptions($step['requestOptions'] ?? []), $step['stopAfter'] ?? null);
                     $object = $result instanceof \CalmLens\ApiResponse ? $result : self::$lastResult;
                     $result = $result instanceof \CalmLens\ApiResponse ? $result->json : $result;
                 } catch (CalmLensException|PartialResult $caught) {
@@ -1122,7 +1125,7 @@ final class ContractTest extends TestCase
             case 'cdn.getAssetInfo':
                 return self::plain($client->cdn->getAssetInfo($args['url'], array_diff_key($args, ['url' => true])));
             case 'events.pages':
-                return self::collect($client->events->eachPage($args));
+                return self::collect($client->events->list($args)->autoPagingPages());
         }
         return self::iterator($client, $operation, $args) ?? self::invoke($client, $operation, self::phpArgs($operation, $args));
     }
@@ -1181,6 +1184,9 @@ final class ContractTest extends TestCase
                         $error = $error instanceof PartialResult ? $error->error : $error;
                         self::assertSame(['code' => $expect['error']['code'], 'status' => $expect['error']['status']],
                             ['code' => $error->errorCode, 'status' => $error->status], $label);
+                        if (isset($expect['error']['kind'])) {
+                            self::assertKind($expect['error']['kind'], $error, $label);
+                        }
                         if (isset($expect['error']['retryAfter'])) {
                             self::assertSame((float) $expect['error']['retryAfter'], $error->retryAfter(), "$label: retryAfter");
                         }
@@ -1325,6 +1331,46 @@ final class ContractTest extends TestCase
                 return self::mockOutcome($name) === 'blocked';
         }
         self::fail('Unknown capability kind ' . $capability['kind']);
+    }
+
+
+    /** Public methods that are PHP plumbing rather than API capabilities, each with the reason. */
+    private const NOT_CAPABILITIES = [
+        'request' => 'the raw request escape hatch, which surface.json has no capability for yet',
+    ];
+
+    /**
+     * Every public method of the client and of each of its services is a `method` capability, so
+     * the SDK keeps no method the API has dropped. PHP's magic methods (`__construct`,
+     * `__debugInfo`) are language plumbing.
+     */
+    public function testEveryPublicClientMethodIsACapability(): void
+    {
+        $names = [];
+        foreach (self::fixtures('surface')['capabilities'] as $capability) {
+            if ($capability['kind'] === 'method' && isset($capability['names']['php'])) {
+                $names[$capability['names']['php']] = true;
+            }
+        }
+        $client = new ReflectionClass(ServerClient::class);
+        $methods = [];
+        foreach ($client->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+            if ($method->getDeclaringClass()->getName() === ServerClient::class) {
+                $methods[] = $method->getName();
+            }
+        }
+        foreach ($client->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+            $type = $property->getType();
+            if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
+                foreach ((new ReflectionClass($type->getName()))->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+                    $methods[] = $property->getName() . '->' . $method->getName();
+                }
+            }
+        }
+        $stale = array_values(array_filter($methods, fn (string $name) => !isset($names[$name])
+            && !str_starts_with(preg_replace('/^\w+->/', '', $name), '__') && !isset(self::NOT_CAPABILITIES[$name])));
+        self::assertSame([], $stale, 'public methods no capability names');
+        self::assertSame([], array_values(array_diff(array_keys(self::NOT_CAPABILITIES), $methods)), 'allowlisted methods that no longer exist');
     }
 
     #[DataProvider('capabilities')]

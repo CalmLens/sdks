@@ -51,3 +51,6 @@ API key, bodies, queries or a CDN URL's asset segment.
 
 API exceptions keep the response body (`$error->body`, up to 16 KiB), such as a proxy's error page,
 and every SDK exception implements `CalmLens\Exception\ExceptionInterface`.
+
+`events->eachPage()` is removed: `events->each()` yields every event, and an event page's
+`autoPagingPages()` yields each page from there on, to save its `nextCursor` and resume.

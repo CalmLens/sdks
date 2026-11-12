@@ -567,7 +567,7 @@ final class MockServerClientTest extends TestCase
             $asset = self::image($mock);
             $client->assets->delete(['assetId' => $asset['id']]);
         }
-        $pages = iterator_to_array($client->events->eachPage(['cursor' => $start['nextCursor'], 'types' => ['asset.deleted'], 'pageSize' => 2]), false);
+        $pages = iterator_to_array($client->events->list(['cursor' => $start['nextCursor'], 'types' => ['asset.deleted'], 'pageSize' => 2])->autoPagingPages(), false);
         self::assertSame([['asset.deleted', 'asset.deleted'], ['asset.deleted']],
             array_map(fn (EventCollection $page) => array_map(fn (Event $event) => $event->type, $page->items), $pages));
     }

@@ -272,7 +272,7 @@ final class MockServerClient
      */
     public static function signUploadToken(#[\SensitiveParameter] string $apiKey, array $options, int $now, string $nonce): UploadToken
     {
-        return \CalmLens\UploadTokens::signAt($apiKey, $options, $now, $nonce);
+        return \CalmLens\Internal\UploadTokenSigner::sign($apiKey, $options, $now, $nonce);
     }
 
     public function enqueueJson(mixed $body, int $status = 200, array $headers = []): self

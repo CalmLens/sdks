@@ -50,19 +50,8 @@ final class Events extends Resource
     }
 
     /**
-     * Yields pages from `cursor` until `hasMore` is false; save each page's `nextCursor` to resume.
-     *
-     * @param array{cursor?: string, pageSize?: int, types?: list<EventType>, assetId?: string} $params
-     * @param RequestOptions $requestOptions
-     * @return \Generator<int, EventCollection>
-     */
-    public function eachPage(array $params = [], array $requestOptions = []): \Generator
-    {
-        yield from $this->list($params, $requestOptions)->autoPagingPages();
-    }
-
-    /**
-     * Yields every event from `cursor` until `hasMore` is false.
+     * Yields every event from `cursor` until `hasMore` is false. To work page by page, such as to save
+     * each page's `nextCursor` and resume from it, iterate `list()->autoPagingPages()`.
      *
      * @param array{cursor?: string, pageSize?: int, types?: list<EventType>, assetId?: string} $params
      * @param RequestOptions $requestOptions

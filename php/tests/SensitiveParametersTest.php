@@ -47,7 +47,7 @@ final class SensitiveParametersTest extends TestCase
     {
         $found = array_keys(iterator_to_array(self::secretParameters()));
         foreach (['CalmLens\ServerClient::__construct($apiKey)', 'CalmLens\Internal\Session::__construct($apiKey)',
-            'CalmLens\Webhooks::verify($secret)', 'CalmLens\UploadTokens::signAt($apiKey)',
+            'CalmLens\Webhooks::verify($secret)', 'CalmLens\Internal\UploadTokenSigner::sign($apiKey)',
             'CalmLens\Testing\TestInputs::generateTestTextCode($testInputKey)', 'CalmLens\Testing\TestInputs::tag($testInputKey)',
             'CalmLens\Testing\MockServerClient::grantsOf($apiKey)'] as $name) {
             self::assertContains($name, $found);

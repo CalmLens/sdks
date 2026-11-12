@@ -296,7 +296,7 @@ final class Assets extends Resource
     }
 
     /** Refuses a batch the API would reject for its size, an ID or the operation (`sdk/invalid-argument`). */
-    public static function validateBatch(array $options): void
+    private static function validateBatch(array $options): void
     {
         $ids = $options['assetIds'] ?? null;
         if (!is_array($ids) || !array_is_list($ids) || count($ids) < 1 || count($ids) > self::MAX_BATCH_ASSETS) {
