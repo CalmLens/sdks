@@ -1514,7 +1514,7 @@ class Assets:
                 break
             self._c._sleep(min(delay, remaining))
             delay = min(DECISION_POLL_MAX_DELAY, delay * DECISION_POLL_DELAY_FACTOR)
-        raise CalmLensError(
+        raise CalmLensTimeoutError(
             error_codes.SDK_TIMEOUT,
             f"Asset {requested_id} had no moderation decision after {limit:g}s "
             f"(classification status: {classification_status}, moderation status: {moderation_status})",

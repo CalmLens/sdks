@@ -432,7 +432,8 @@ class WaitForDecisionTests(ClientTestCase):
     def test_backs_off_to_two_seconds_and_times_out_at_the_deadline(self):
         self.client._clock = lambda: sum(self.sleeps)
         self.result = {"id": "asset-1", "upload": {"status": "completed"}, "classification": {'status': 'processing', 'moderation': {'status': 'pending'}}}
-        with self.assertRaises(CalmLensError) as raised:
+        # The deadline raises the same class as a request timeout, so one `except` catches both.
+        with self.assertRaises(CalmLensTimeoutError) as raised:
             self.client.assets.wait_for_decision({"assetId": "asset-1", "timeout": 20})
         self.assertEqual(raised.exception.code, error_codes.SDK_TIMEOUT)
         self.assertEqual(raised.exception.details,

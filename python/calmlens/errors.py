@@ -7,8 +7,9 @@ Every failure the SDK raises is a :class:`CalmLensError` (or a subclass), with a
   error code (see :mod:`calmlens.error_codes`), or ``sdk/http-error`` when the response had
   no error body.
 * :class:`CalmLensTransportError`: the request failed before a complete response arrived
-  (``sdk/transport-error``); :class:`CalmLensTimeoutError` (``sdk/timeout``) when a
-  connection or read timed out. The native exception is kept as ``__cause__``.
+  (``sdk/transport-error``). The native exception is kept as ``__cause__``.
+* :class:`CalmLensTimeoutError`: ``sdk/timeout``, when a request took longer than its timeout or
+  ``wait_for_decision`` reached its deadline.
 * :class:`CalmLensValidationError`: the SDK rejected the call before sending anything,
   for example ``sdk/invalid-argument``, ``sdk/invalid-config`` or ``upload-payload/invalid``.
 * :class:`WebhookVerificationError`: ``parse_webhook_event`` could not verify a delivery
@@ -123,8 +124,9 @@ class CalmLensTransportError(CalmLensError):
     """The request failed before a complete response was received."""
 
 
-class CalmLensTimeoutError(CalmLensTransportError):
-    """Connecting or waiting for data took longer than the configured timeout."""
+class CalmLensTimeoutError(CalmLensError):
+    """``sdk/timeout``: a request took longer than its timeout, or ``wait_for_decision`` reached
+    its deadline without a decision."""
 
 
 class CalmLensValidationError(CalmLensError, ValueError):
