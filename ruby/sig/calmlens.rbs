@@ -70,7 +70,8 @@ module CalmLens
     attr_reader status: Integer
     attr_reader headers: Hash[String, String]
     attr_reader request_id: String?
-    def initialize: (status: Integer, headers: Hash[String, String], request_id: String?) -> void
+    attr_reader idempotency_key: String?
+    def initialize: (status: Integer, headers: Hash[String, String], request_id: String?, idempotency_key: String?) -> void
   end
 
   class Model
@@ -200,7 +201,7 @@ module CalmLens
   type app_info = { name: String, ?version: String, ?url: String }
   # One request attempt, as ServerClient's `on_request:` hook receives it.
   type request_event = { operation: String?, method: String, path: String?, attempt: Integer, delay: number?,
-                         status: Integer?, request_id: String?, duration: Float }
+                         status: Integer?, request_id: String?, error_code: String?, duration: Float }
 
   # A Ruby Logger, or anything with `info` and `debug` taking a block.
   interface _Logger

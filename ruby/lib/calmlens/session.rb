@@ -105,7 +105,8 @@ module CalmLens
       headers['Idempotency-Key'] = request_options[:idempotency_key] || SecureRandom.uuid if idempotent || request_options[:idempotency_key]
       limit = request_options.fetch(:max_response_bytes, @max_response_bytes)
       deadline = request_options.fetch(:upload_timeout, @upload_timeout) if upload
-      execute(method, url, headers, raw, request_options, deadline: deadline) { |response| parse(method, response, limit) }
+      key = headers['Idempotency-Key']
+      execute(method, url, headers, raw, request_options, deadline: deadline) { |response| parse(method, response, limit, key) }
     end
 
     # A JSON body with the caller's `extra_body` fields added.
@@ -265,10 +266,11 @@ module CalmLens
           raise value
         end
 
+        context[:error] = value
         outcome = :retry
         value = delay
       end
-      observe(request, context, outcome == :retry ? value : nil, nil)
+      observe(request, context, outcome == :retry ? value : nil, context[:error])
       [outcome, value]
     end
 
@@ -280,7 +282,7 @@ module CalmLens
       event = { operation: Thread.current[:calmlens_operation], method: request.method,
                 path: loggable_path(request.url, context[:authenticate]), attempt: context[:attempt] + 1, delay: delay,
                 status: context[:status] || error&.status, request_id: context[:request_id] || error&.request_id,
-                duration: (Process.clock_gettime(Process::CLOCK_MONOTONIC) - context[:started]).round(6) }
+                error_code: error&.code, duration: (Process.clock_gettime(Process::CLOCK_MONOTONIC) - context[:started]).round(6) }
       @on_request&.call(event)
       log(:info) do
         outcome = if delay
@@ -332,6 +334,7 @@ module CalmLens
     rescue Error => e
       raise unless context[:again] && !delivered && e.retryable?
 
+      context[:error] = e
       [:retry, backoff(context[:attempt])]
     end
 
@@ -407,9 +410,9 @@ module CalmLens
                                status: response.status, headers: response.headers)
     end
 
-    def parse(method, response, limit)
+    def parse(method, response, limit, idempotency_key = nil)
       Thread.current[@last_response_key] = LastResponse.new(status: response.status, headers: response.headers.dup.freeze,
-                                                            request_id: response.request_id)
+                                                            request_id: response.request_id, idempotency_key: idempotency_key)
       text = read(response, limit).dup.force_encoding(Encoding::UTF_8)
       return nil if text.empty? && (response.status == 204 || method == 'DELETE')
 

@@ -92,9 +92,10 @@ module CalmLens
     # @param log_level [String, nil] `info` (each attempt's outcome) or `debug` (also each attempt as
     #   it starts); `CALMLENS_LOG` by default, else `info` when a logger is given.
     # @param on_request [#call, nil] called after each attempt with
-    #   `{operation:, method:, path:, attempt:, delay:, status:, request_id:, duration:}`: `delay` is
-    #   the wait before the next attempt (nil when there is none), `duration` the attempt's seconds,
-    #   and `path` nil for a CDN URL, which may be signed. Use it for metrics or tracing.
+    #   `{operation:, method:, path:, attempt:, delay:, status:, request_id:, error_code:, duration:}`:
+    #   `operation` is the method, such as `assets.retrieve` (nil for {#request}), `delay` the wait
+    #   before the next attempt (nil when there is none), `error_code` the attempt's error, `duration`
+    #   its seconds, and `path` nil for a CDN URL, which may be signed. Use it for metrics or tracing.
     # @raise [ConfigurationError] `sdk/invalid-config` for a missing or malformed setting.
     def initialize(api_key: ENV.fetch('CALMLENS_API_KEY', nil), project_id: ENV.fetch('CALMLENS_PROJECT_ID', nil),
                    base_url: ENV.fetch('CALMLENS_BASE_URL', DEFAULT_BASE_URL), cdn_base_url: DEFAULT_CDN_BASE_URL,
@@ -180,12 +181,14 @@ module CalmLens
       raise Internal.invalid('query must be a Hash') unless query.is_a?(Hash)
 
       _, options = Internal.options({ request_options: request_options })
-      Thread.current[:calmlens_operation] ||= 'request'
+      outer = Thread.current[:calmlens_operation]
+      # A raw request has no operation name.
+      Thread.current[:calmlens_operation] = nil
       json = @session.request(verb, path, query: query.transform_keys(&:to_s), body: body && Internal.normalize(body),
                                           headers: Internal.headers(headers), request_options: options)
       json.is_a?(Hash) ? Model.new(json, last_response: @session.last_response) : json
     ensure
-      Thread.current[:calmlens_operation] = nil if Thread.current[:calmlens_operation] == 'request'
+      Thread.current[:calmlens_operation] = outer
     end
 
     # The `User-Agent`, with your integration's name, version and URL.

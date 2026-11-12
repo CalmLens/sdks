@@ -8,6 +8,7 @@ require 'net/http'
 require 'stringio'
 require_relative 'contract_fixtures'
 require_relative 'operation_call'
+require_relative 'client_case_support'
 
 # Replays the shared fixtures that check the real client's requests and results, written by
 # packages/sdk-contract (format in its README.md) to testdata: requests.json, paths.json,
@@ -15,6 +16,7 @@ require_relative 'operation_call'
 class ContractClientTest < Minitest::Test
   extend ContractFixtures
   include OperationCall
+  include ClientCaseSupport
 
   # Defines one test per fixture case, named after the case and its position.
   def self.each_case(prefix, cases)
@@ -207,6 +209,7 @@ class ContractClientTest < Minitest::Test
   def client_options(options)
     options.to_h do |name, value|
       next [:timeout, value / 1000.0] if name == 'timeoutMs'
+      next [:app_info, value.transform_keys(&:to_sym)] if name == 'appInfo'
 
       [CLIENT_OPTIONS.fetch(name), value]
     end
@@ -277,7 +280,8 @@ class ContractClientTest < Minitest::Test
       assert_equal want.slice('method', 'origin', 'path'), { 'method' => got[:method], 'origin' => origin, 'path' => path }, label
       # Queries compare decoded, as the API's parser reads them; pair order is free.
       assert_equal want['query'].sort, URI.decode_www_form(query.to_s).sort, "#{label}: query"
-      CLIENT_CASES['everyRequest']['headers'].merge(want['headers']).each do |name, value|
+      api_key = clientcase.dig('client', 'apiKey') || CLIENT_CASES['client']['apiKey']
+      CLIENT_CASES['everyRequest']['headers'].merge('x-api-key' => api_key).merge(want['headers']).each do |name, value|
         check_header(label, name, header(got[:headers], name), value, uuids)
       end
       check_body(label, want, got[:body], header(got[:headers], 'Content-Type'))
@@ -301,29 +305,6 @@ class ContractClientTest < Minitest::Test
     else
       assert_equal want.slice('bodyLength', 'bodySha256', 'bodyBase64'), raw_body(body, want.key?('bodyBase64')), "#{label}: raw body"
     end
-  end
-
-  # Reads an upload form as the API does: exactly an `options` part, then a `file` part, then the
-  # closing boundary.
-  def read_upload_form(body, content_type)
-    boundary = content_type.to_s.match(%r{\Amultipart/form-data;\s*boundary=(?:"([^"]+)"|([^;\s]+))}i)
-    flunk "not an upload form: #{content_type}" unless boundary
-    framed = "\r\n".b + body.b
-    delimiter = "\r\n--#{boundary[1] || boundary[2]}".b
-    assert framed.start_with?(delimiter), "the form doesn't start with its boundary"
-    parts = []
-    at = 0
-    until framed.byteslice(at + delimiter.bytesize, 2) == '--'
-      header_end = framed.index("\r\n\r\n", at)
-      following = header_end && framed.index(delimiter, header_end + 4)
-      flunk 'the form ends before its closing boundary' unless following
-      headers = framed.byteslice(at + delimiter.bytesize + 2, header_end - at - delimiter.bytesize - 2)
-      parts << { name: headers[/^content-disposition:\s*form-data;[^\r\n]*?\bname="([^"]*)"/i, 1],
-                 type: headers[/^content-type:\s*([^\r\n]*)/i, 1], bytes: framed.byteslice(header_end + 4, following - header_end - 4) }
-      at = following
-    end
-    assert_equal %w[options file], parts.map { |part| part[:name] }, 'the form holds options then file'
-    { options: JSON.parse(parts[0][:bytes].dup.force_encoding(Encoding::UTF_8)), type: parts[1][:type], bytes: parts[1][:bytes] }
   end
 
   def check_error(label, wanted, error)
@@ -352,9 +333,14 @@ class ContractClientTest < Minitest::Test
 
   # The case's client, with a virtual clock whose waits are recorded and pass at once; or the error
   # its options raise.
-  def scripted_client(clientcase, received, sleeps)
-    options = client_options(CLIENT_CASES['client'].merge(clientcase['client'] || {}))
-    client = CalmLens::ServerClient.new(**options, transport: scripted_transport(clientcase, received))
+  def scripted_client(clientcase, received, sleeps, observed = {})
+    fixture = clientcase['clientFromEnv'] ? CLIENT_CASES['client'].except('apiKey', 'projectId') : CLIENT_CASES['client']
+    options = client_options(fixture.merge(clientcase['client'] || {}))
+    options[:on_request] = ->(event) { observed[:attempts] << event } if observed[:attempts]
+    options.merge!(logger: observed[:logger], log_level: clientcase.dig('logs', 'level')) if observed[:logger]
+    client = with_env(clientcase.fetch('env', {})) do
+      CalmLens::ServerClient.new(**options, transport: scripted_transport(clientcase, received))
+    end
     waited = 0.0
     client.instance_variable_get(:@session).use_clock(monotonic: -> { waited }, pause: lambda { |seconds|
       sleeps << (seconds * 1000).round
@@ -368,7 +354,8 @@ class ContractClientTest < Minitest::Test
   def replay_client_case(clientcase)
     received = []
     sleeps = []
-    client = scripted_client(clientcase, received, sleeps)
+    observed = { attempts: (clientcase.key?('attempts') ? [] : nil), logger: (CapturingLogger.new if clientcase.key?('logs')) }
+    client = scripted_client(clientcase, received, sleeps, observed)
     construction = client if client.is_a?(CalmLens::Error)
     clientcase['steps'].each_with_index do |step, index|
       label = "step #{index + 1} (#{step['operation']})"
@@ -376,7 +363,7 @@ class ContractClientTest < Minitest::Test
       error = construction
       unless error
         begin
-          result = invoke(client, step['operation'], ruby_args(step['operation'], decode(step.fetch('args', {}))))
+          result = run_step(client, step)
         rescue CalmLens::Error, IterationFailed => e
           error = e
         end
@@ -388,9 +375,12 @@ class ContractClientTest < Minitest::Test
       raise error if error
 
       check_result(label, step['expect'], result)
+      check_last_response(label, step['expect']['lastResponse'], result) if step['expect']&.key?('lastResponse')
     end
     check_requests(clientcase, received)
     check_sleeps(clientcase.fetch('sleepsMs', []), sleeps)
+    check_attempts(clientcase['attempts'], observed[:attempts]) if clientcase.key?('attempts')
+    check_logs(clientcase['logs'], observed[:logger].lines) if clientcase.key?('logs')
   end
 
   def check_sleeps(expected, sleeps)

@@ -110,6 +110,8 @@ module CalmLens
     # @return [Error]
     def self.build(code, message = nil, status: nil, **)
       klass = if status then APIError.class_for(status)
+              # An error response without a CalmLens code is an API error even without a status.
+              elsif code == SdkErrorCodes::HTTP_ERROR then APIError
               elsif code == SdkErrorCodes::TIMEOUT then TimeoutError
               elsif code == SdkErrorCodes::TRANSPORT_ERROR then ConnectionError
               elsif code == SdkErrorCodes::CANCELLED then CancelledError

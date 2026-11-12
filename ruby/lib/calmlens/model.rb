@@ -4,8 +4,9 @@ require 'json'
 
 module CalmLens
   # What the API answered to the request that returned a result: its HTTP status, its headers
-  # (lowercase names) and its `X-Request-Id`. Quote the request ID when contacting support.
-  LastResponse = Data.define(:status, :headers, :request_id)
+  # (lowercase names), its `X-Request-Id` and the `Idempotency-Key` the request carried (nil
+  # without one). Quote the request ID when contacting support.
+  LastResponse = Data.define(:status, :headers, :request_id, :idempotency_key)
 
   # A read-only API object, such as an {Asset} or a {Folder}. Every result is one.
   #
