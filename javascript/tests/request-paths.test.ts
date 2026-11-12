@@ -44,6 +44,7 @@ describe("request paths", () => {
 
   it("rejects listChildren without an asset ID before sending a request", async () => {
     const { client, requests } = createClient();
+    // @ts-expect-error The options, with their asset ID, are required.
     expect(await errorCode(client.assets.listChildren())).toBe("sdk/invalid-argument");
     expect(requests).toEqual([]);
   });

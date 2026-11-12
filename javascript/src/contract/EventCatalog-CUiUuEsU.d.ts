@@ -1976,6 +1976,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>>;
     };
@@ -1983,7 +1984,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       memberUserId: string;
       memberName?: string | null | undefined;
-      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "reviewer" | "viewer";
     }>;
     factInfo: {
       label: string;
@@ -2014,6 +2015,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>;
     }, zod.core.$strip>;
@@ -2041,6 +2043,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>>;
     };
@@ -2048,7 +2051,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       memberUserId: string;
       memberName?: string | null | undefined;
-      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "reviewer" | "viewer";
     }>;
     factInfo: {
       label: string;
@@ -2079,6 +2082,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>;
     }, zod.core.$strip>;
@@ -2106,6 +2110,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>>;
     };
@@ -2113,7 +2118,7 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       memberUserId: string;
       memberName?: string | null | undefined;
-      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "reviewer" | "viewer";
     }>;
     factInfo: {
       label: string;
@@ -2144,6 +2149,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>;
     }, zod.core.$strip>;
@@ -2171,6 +2177,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>>;
       role: EventFieldDefinition<zod.ZodEnum<{
@@ -2178,6 +2185,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>>;
     };
@@ -2185,8 +2193,8 @@ declare const EVENT_TYPE_INFO: {
     example: NoInfer<{
       memberUserId: string;
       memberName?: string | null | undefined;
-      previousRole: "admin" | "configurator" | "custom" | "editor" | "viewer";
-      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
+      previousRole: "admin" | "configurator" | "custom" | "editor" | "reviewer" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "reviewer" | "viewer";
     }>;
     factInfo: {
       label: string;
@@ -2217,6 +2225,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>;
       role: zod.ZodEnum<{
@@ -2224,6 +2233,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>;
     }, zod.core.$strip>;
@@ -2250,13 +2260,14 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>>;
     };
     /** Example data, used for synthetic test sends (`createSampleEvent`). */
     example: NoInfer<{
       inviteeEmail: string;
-      role: "admin" | "configurator" | "custom" | "editor" | "viewer";
+      role: "admin" | "configurator" | "custom" | "editor" | "reviewer" | "viewer";
     }>;
     factInfo: {
       label: string;
@@ -2286,6 +2297,7 @@ declare const EVENT_TYPE_INFO: {
         configurator: "configurator";
         custom: "custom";
         editor: "editor";
+        reviewer: "reviewer";
         viewer: "viewer";
       }>;
     }, zod.core.$strip>;

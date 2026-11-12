@@ -478,10 +478,12 @@ export default class CalmLensServerClient {
       },
 
       /** Lists one page of the assets extracted from a website or multimedia document. */
-      listChildren: async (
-        options: ListAssetChildrenOptions = {} as ListAssetChildrenOptions,
-      ): Promise<AssetChildrenPage> => {
-        const { assetId, ...query } = checked("assets.listChildren", options);
+      listChildren: async (options: ListAssetChildrenOptions): Promise<AssetChildrenPage> => {
+        // Untyped callers may leave the options out; the asset ID check then refuses the call.
+        const { assetId, ...query } = checked(
+          "assets.listChildren",
+          options ?? ({} as ListAssetChildrenOptions),
+        );
         return this.request("GET", `/assets/${requireId(assetId, "Asset ID")}/children`, {
           query,
         });

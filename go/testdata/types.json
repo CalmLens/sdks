@@ -2,6 +2,7 @@
   "operations": [
     {
       "id": "folders.list",
+      "method": "GET",
       "names": {
         "javascript": "folders.list",
         "python": "folders.list",
@@ -44,7 +45,8 @@
             }
           }
         },
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -82,6 +84,7 @@
     },
     {
       "id": "folders.retrieve",
+      "method": "GET",
       "names": {
         "javascript": "folders.retrieve",
         "python": "folders.retrieve",
@@ -102,7 +105,8 @@
         },
         "required": [
           "folderId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.1"
@@ -110,6 +114,7 @@
     },
     {
       "id": "folders.create",
+      "method": "POST",
       "names": {
         "javascript": "folders.create",
         "python": "folders.create",
@@ -143,7 +148,8 @@
         },
         "required": [
           "name"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.1"
@@ -151,6 +157,7 @@
     },
     {
       "id": "folders.update",
+      "method": "PATCH",
       "names": {
         "javascript": "folders.update",
         "python": "folders.update",
@@ -177,7 +184,8 @@
         },
         "required": [
           "folderId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.1"
@@ -185,6 +193,7 @@
     },
     {
       "id": "folders.delete",
+      "method": "DELETE",
       "names": {
         "javascript": "folders.delete",
         "python": "folders.delete",
@@ -205,12 +214,14 @@
         },
         "required": [
           "folderId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": null
     },
     {
       "id": "folders.move",
+      "method": "POST",
       "names": {
         "javascript": "folders.move",
         "python": "folders.move",
@@ -245,7 +256,8 @@
         "required": [
           "folderId",
           "parentId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.1"
@@ -253,6 +265,7 @@
     },
     {
       "id": "assets.create",
+      "method": "POST",
       "names": {
         "javascript": "assets.create",
         "python": "assets.create",
@@ -267,8 +280,15 @@
           "externalUrl": {
             "location": "body",
             "schema": {
-              "type": "string",
-              "format": "uri"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uri"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "name": {
@@ -316,7 +336,7 @@
                         "type": "string"
                       },
                       "value": {
-                        "$ref": "#/definitions/assets.create.metadata.__schema0"
+                        "$ref": "#/definitions/assets.create.metadata.0.__schema0"
                       }
                     },
                     "required": [
@@ -570,6 +590,9 @@
         },
         "required": [
           "name"
+        ],
+        "clientOptions": [
+          "idempotencyKey"
         ]
       },
       "result": {
@@ -629,21 +652,19 @@
               "file"
             ]
           },
-          "name": {},
+          "name": {
+            "type": "string"
+          },
           "description": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalId": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalUrl": {
@@ -688,7 +709,9 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {},
+                "id": {
+                  "type": "string"
+                },
                 "value": {
                   "$ref": "#/definitions/assets.create.__schema0"
                 }
@@ -702,7 +725,9 @@
           },
           "tags": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "string"
+            }
           },
           "visibility": {
             "type": "string",
@@ -715,10 +740,10 @@
             "$ref": "#/definitions/shared.3"
           },
           "classification": {
-            "$ref": "#/definitions/shared.35"
+            "$ref": "#/definitions/shared.4"
           },
           "content": {
-            "$ref": "#/definitions/shared.43"
+            "$ref": "#/definitions/shared.36"
           }
         },
         "required": [
@@ -740,6 +765,7 @@
     },
     {
       "id": "assets.uploadPart",
+      "method": "POST",
       "names": {
         "javascript": "assets.uploadPart",
         "python": "assets.upload_part",
@@ -760,6 +786,9 @@
         },
         "required": [
           "assetId"
+        ],
+        "clientOptions": [
+          "idempotencyKey"
         ]
       },
       "result": {
@@ -819,21 +848,19 @@
               "file"
             ]
           },
-          "name": {},
+          "name": {
+            "type": "string"
+          },
           "description": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalId": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalUrl": {
@@ -878,7 +905,9 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {},
+                "id": {
+                  "type": "string"
+                },
                 "value": {
                   "$ref": "#/definitions/assets.uploadPart.__schema0"
                 }
@@ -892,7 +921,9 @@
           },
           "tags": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "string"
+            }
           },
           "visibility": {
             "type": "string",
@@ -905,10 +936,10 @@
             "$ref": "#/definitions/shared.3"
           },
           "classification": {
-            "$ref": "#/definitions/shared.35"
+            "$ref": "#/definitions/shared.4"
           },
           "content": {
-            "$ref": "#/definitions/shared.43"
+            "$ref": "#/definitions/shared.36"
           }
         },
         "required": [
@@ -930,6 +961,7 @@
     },
     {
       "id": "assets.list",
+      "method": "GET",
       "names": {
         "javascript": "assets.list",
         "python": "assets.list",
@@ -973,7 +1005,8 @@
             }
           }
         },
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -1037,21 +1070,19 @@
                     "file"
                   ]
                 },
-                "name": {},
+                "name": {
+                  "type": "string"
+                },
                 "description": {
-                  "anyOf": [
-                    {},
-                    {
-                      "type": "null"
-                    }
+                  "type": [
+                    "string",
+                    "null"
                   ]
                 },
                 "externalId": {
-                  "anyOf": [
-                    {},
-                    {
-                      "type": "null"
-                    }
+                  "type": [
+                    "string",
+                    "null"
                   ]
                 },
                 "externalUrl": {
@@ -1096,7 +1127,9 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": {},
+                      "id": {
+                        "type": "string"
+                      },
                       "value": {
                         "$ref": "#/definitions/assets.list.__schema0"
                       }
@@ -1110,7 +1143,9 @@
                 },
                 "tags": {
                   "type": "array",
-                  "items": {}
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 "visibility": {
                   "type": "string",
@@ -1123,10 +1158,10 @@
                   "$ref": "#/definitions/shared.3"
                 },
                 "classification": {
-                  "$ref": "#/definitions/shared.35"
+                  "$ref": "#/definitions/shared.4"
                 },
                 "content": {
-                  "$ref": "#/definitions/shared.43"
+                  "$ref": "#/definitions/shared.36"
                 }
               },
               "required": [
@@ -1166,6 +1201,7 @@
     },
     {
       "id": "assets.search",
+      "method": "GET",
       "names": {
         "javascript": "assets.search",
         "python": "assets.search",
@@ -1203,7 +1239,8 @@
         },
         "required": [
           "query"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -1273,21 +1310,19 @@
                         "file"
                       ]
                     },
-                    "name": {},
+                    "name": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "externalId": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "externalUrl": {
@@ -1332,7 +1367,9 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": {},
+                          "id": {
+                            "type": "string"
+                          },
                           "value": {
                             "$ref": "#/definitions/assets.search.__schema0"
                           }
@@ -1346,7 +1383,9 @@
                     },
                     "tags": {
                       "type": "array",
-                      "items": {}
+                      "items": {
+                        "type": "string"
+                      }
                     },
                     "visibility": {
                       "type": "string",
@@ -1359,10 +1398,10 @@
                       "$ref": "#/definitions/shared.3"
                     },
                     "classification": {
-                      "$ref": "#/definitions/shared.35"
+                      "$ref": "#/definitions/shared.4"
                     },
                     "content": {
-                      "$ref": "#/definitions/shared.43"
+                      "$ref": "#/definitions/shared.36"
                     }
                   },
                   "required": [
@@ -1432,6 +1471,7 @@
     },
     {
       "id": "assets.retrieve",
+      "method": "GET",
       "names": {
         "javascript": "assets.retrieve",
         "python": "assets.retrieve",
@@ -1452,7 +1492,8 @@
         },
         "required": [
           "assetId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -1511,21 +1552,19 @@
               "file"
             ]
           },
-          "name": {},
+          "name": {
+            "type": "string"
+          },
           "description": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalId": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalUrl": {
@@ -1570,7 +1609,9 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {},
+                "id": {
+                  "type": "string"
+                },
                 "value": {
                   "$ref": "#/definitions/assets.retrieve.__schema0"
                 }
@@ -1584,7 +1625,9 @@
           },
           "tags": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "string"
+            }
           },
           "visibility": {
             "type": "string",
@@ -1597,10 +1640,10 @@
             "$ref": "#/definitions/shared.3"
           },
           "classification": {
-            "$ref": "#/definitions/shared.35"
+            "$ref": "#/definitions/shared.4"
           },
           "content": {
-            "$ref": "#/definitions/shared.43"
+            "$ref": "#/definitions/shared.36"
           }
         },
         "required": [
@@ -1622,6 +1665,7 @@
     },
     {
       "id": "assets.listChildren",
+      "method": "GET",
       "names": {
         "javascript": "assets.listChildren",
         "python": "assets.list_children",
@@ -1660,7 +1704,8 @@
         },
         "required": [
           "assetId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -1724,21 +1769,19 @@
                     "file"
                   ]
                 },
-                "name": {},
+                "name": {
+                  "type": "string"
+                },
                 "description": {
-                  "anyOf": [
-                    {},
-                    {
-                      "type": "null"
-                    }
+                  "type": [
+                    "string",
+                    "null"
                   ]
                 },
                 "externalId": {
-                  "anyOf": [
-                    {},
-                    {
-                      "type": "null"
-                    }
+                  "type": [
+                    "string",
+                    "null"
                   ]
                 },
                 "externalUrl": {
@@ -1783,7 +1826,9 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": {},
+                      "id": {
+                        "type": "string"
+                      },
                       "value": {
                         "$ref": "#/definitions/assets.listChildren.__schema0"
                       }
@@ -1797,7 +1842,9 @@
                 },
                 "tags": {
                   "type": "array",
-                  "items": {}
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 "visibility": {
                   "type": "string",
@@ -1810,10 +1857,10 @@
                   "$ref": "#/definitions/shared.3"
                 },
                 "classification": {
-                  "$ref": "#/definitions/shared.35"
+                  "$ref": "#/definitions/shared.4"
                 },
                 "content": {
-                  "$ref": "#/definitions/shared.43"
+                  "$ref": "#/definitions/shared.36"
                 }
               },
               "required": [
@@ -1853,6 +1900,7 @@
     },
     {
       "id": "assets.listTimeline",
+      "method": "GET",
       "names": {
         "javascript": "assets.listTimeline",
         "python": "assets.list_timeline",
@@ -1885,7 +1933,8 @@
         },
         "required": [
           "assetId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -1911,7 +1960,7 @@
                   "type": "number"
                 },
                 "categories": {
-                  "$ref": "#/definitions/shared.21"
+                  "$ref": "#/definitions/shared.18"
                 }
               },
               "required": [
@@ -1943,6 +1992,7 @@
     },
     {
       "id": "assets.update",
+      "method": "PATCH",
       "names": {
         "javascript": "assets.update",
         "python": "assets.update",
@@ -2011,7 +2061,7 @@
                         "type": "string"
                       },
                       "value": {
-                        "$ref": "#/definitions/assets.update.metadata.__schema0"
+                        "$ref": "#/definitions/assets.update.metadata.0.__schema0"
                       }
                     },
                     "required": [
@@ -2062,7 +2112,8 @@
         },
         "required": [
           "assetId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -2121,21 +2172,19 @@
               "file"
             ]
           },
-          "name": {},
+          "name": {
+            "type": "string"
+          },
           "description": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalId": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalUrl": {
@@ -2180,7 +2229,9 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {},
+                "id": {
+                  "type": "string"
+                },
                 "value": {
                   "$ref": "#/definitions/assets.update.__schema0"
                 }
@@ -2194,7 +2245,9 @@
           },
           "tags": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "string"
+            }
           },
           "visibility": {
             "type": "string",
@@ -2207,10 +2260,10 @@
             "$ref": "#/definitions/shared.3"
           },
           "classification": {
-            "$ref": "#/definitions/shared.35"
+            "$ref": "#/definitions/shared.4"
           },
           "content": {
-            "$ref": "#/definitions/shared.43"
+            "$ref": "#/definitions/shared.36"
           }
         },
         "required": [
@@ -2232,6 +2285,7 @@
     },
     {
       "id": "assets.removeContent",
+      "method": "DELETE",
       "names": {
         "javascript": "assets.removeContent",
         "python": "assets.remove_content",
@@ -2252,7 +2306,8 @@
         },
         "required": [
           "assetId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -2311,21 +2366,19 @@
               "file"
             ]
           },
-          "name": {},
+          "name": {
+            "type": "string"
+          },
           "description": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalId": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalUrl": {
@@ -2370,7 +2423,9 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {},
+                "id": {
+                  "type": "string"
+                },
                 "value": {
                   "$ref": "#/definitions/assets.removeContent.__schema0"
                 }
@@ -2384,7 +2439,9 @@
           },
           "tags": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "string"
+            }
           },
           "visibility": {
             "type": "string",
@@ -2397,10 +2454,10 @@
             "$ref": "#/definitions/shared.3"
           },
           "classification": {
-            "$ref": "#/definitions/shared.35"
+            "$ref": "#/definitions/shared.4"
           },
           "content": {
-            "$ref": "#/definitions/shared.43"
+            "$ref": "#/definitions/shared.36"
           }
         },
         "required": [
@@ -2422,6 +2479,7 @@
     },
     {
       "id": "assets.delete",
+      "method": "DELETE",
       "names": {
         "javascript": "assets.delete",
         "python": "assets.delete",
@@ -2442,12 +2500,14 @@
         },
         "required": [
           "assetId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": null
     },
     {
       "id": "assets.move",
+      "method": "POST",
       "names": {
         "javascript": "assets.move",
         "python": "assets.move",
@@ -2482,7 +2542,8 @@
         "required": [
           "assetId",
           "folderId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -2541,21 +2602,19 @@
               "file"
             ]
           },
-          "name": {},
+          "name": {
+            "type": "string"
+          },
           "description": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalId": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalUrl": {
@@ -2600,7 +2659,9 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {},
+                "id": {
+                  "type": "string"
+                },
                 "value": {
                   "$ref": "#/definitions/assets.move.__schema0"
                 }
@@ -2614,7 +2675,9 @@
           },
           "tags": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "string"
+            }
           },
           "visibility": {
             "type": "string",
@@ -2627,10 +2690,10 @@
             "$ref": "#/definitions/shared.3"
           },
           "classification": {
-            "$ref": "#/definitions/shared.35"
+            "$ref": "#/definitions/shared.4"
           },
           "content": {
-            "$ref": "#/definitions/shared.43"
+            "$ref": "#/definitions/shared.36"
           }
         },
         "required": [
@@ -2652,6 +2715,7 @@
     },
     {
       "id": "assets.retry",
+      "method": "POST",
       "names": {
         "javascript": "assets.retry",
         "python": "assets.retry",
@@ -2672,7 +2736,8 @@
         },
         "required": [
           "assetId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -2731,21 +2796,19 @@
               "file"
             ]
           },
-          "name": {},
+          "name": {
+            "type": "string"
+          },
           "description": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalId": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalUrl": {
@@ -2790,7 +2853,9 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {},
+                "id": {
+                  "type": "string"
+                },
                 "value": {
                   "$ref": "#/definitions/assets.retry.__schema0"
                 }
@@ -2804,7 +2869,9 @@
           },
           "tags": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "string"
+            }
           },
           "visibility": {
             "type": "string",
@@ -2817,10 +2884,10 @@
             "$ref": "#/definitions/shared.3"
           },
           "classification": {
-            "$ref": "#/definitions/shared.35"
+            "$ref": "#/definitions/shared.4"
           },
           "content": {
-            "$ref": "#/definitions/shared.43"
+            "$ref": "#/definitions/shared.36"
           }
         },
         "required": [
@@ -2842,6 +2909,7 @@
     },
     {
       "id": "assets.explain",
+      "method": "POST",
       "names": {
         "javascript": "assets.explain",
         "python": "assets.explain",
@@ -2868,7 +2936,8 @@
         },
         "required": [
           "assetId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -2927,21 +2996,19 @@
               "file"
             ]
           },
-          "name": {},
+          "name": {
+            "type": "string"
+          },
           "description": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalId": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalUrl": {
@@ -2986,7 +3053,9 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {},
+                "id": {
+                  "type": "string"
+                },
                 "value": {
                   "$ref": "#/definitions/assets.explain.__schema0"
                 }
@@ -3000,7 +3069,9 @@
           },
           "tags": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "string"
+            }
           },
           "visibility": {
             "type": "string",
@@ -3013,10 +3084,10 @@
             "$ref": "#/definitions/shared.3"
           },
           "classification": {
-            "$ref": "#/definitions/shared.35"
+            "$ref": "#/definitions/shared.4"
           },
           "content": {
-            "$ref": "#/definitions/shared.43"
+            "$ref": "#/definitions/shared.36"
           }
         },
         "required": [
@@ -3038,6 +3109,7 @@
     },
     {
       "id": "assets.decide",
+      "method": "POST",
       "names": {
         "javascript": "assets.decide",
         "python": "assets.decide",
@@ -3058,12 +3130,20 @@
           "decision": {
             "location": "body",
             "schema": {
-              "type": "string",
-              "enum": [
-                "allowed",
-                "limited",
-                "age-restricted",
-                "blocked"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "allowed",
+                    "limited",
+                    "age-restricted",
+                    "blocked"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "const": "purged"
+                }
               ]
             }
           },
@@ -3084,9 +3164,9 @@
         "required": [
           "assetId",
           "decision",
-          "note",
-          "confirmPurge"
-        ]
+          "note"
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -3145,21 +3225,19 @@
               "file"
             ]
           },
-          "name": {},
+          "name": {
+            "type": "string"
+          },
           "description": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalId": {
-            "anyOf": [
-              {},
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "externalUrl": {
@@ -3204,7 +3282,9 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {},
+                "id": {
+                  "type": "string"
+                },
                 "value": {
                   "$ref": "#/definitions/assets.decide.__schema0"
                 }
@@ -3218,7 +3298,9 @@
           },
           "tags": {
             "type": "array",
-            "items": {}
+            "items": {
+              "type": "string"
+            }
           },
           "visibility": {
             "type": "string",
@@ -3231,10 +3313,10 @@
             "$ref": "#/definitions/shared.3"
           },
           "classification": {
-            "$ref": "#/definitions/shared.35"
+            "$ref": "#/definitions/shared.4"
           },
           "content": {
-            "$ref": "#/definitions/shared.43"
+            "$ref": "#/definitions/shared.36"
           }
         },
         "required": [
@@ -3256,6 +3338,7 @@
     },
     {
       "id": "assets.batch",
+      "method": "POST",
       "names": {
         "javascript": "assets.batch",
         "python": "assets.batch",
@@ -3290,7 +3373,8 @@
         "required": [
           "assetIds",
           "operation"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -3316,6 +3400,7 @@
     },
     {
       "id": "cdn.signAssetUrl",
+      "method": "POST",
       "names": {
         "javascript": "cdn.signAssetUrl",
         "python": "cdn.sign_asset_url",
@@ -3352,7 +3437,13 @@
             }
           }
         },
-        "required": []
+        "required": [],
+        "clientOptions": [
+          "resource",
+          "lens",
+          "transform",
+          "viewerClaims"
+        ]
       },
       "result": {
         "type": "object",
@@ -3373,6 +3464,7 @@
     },
     {
       "id": "ensureLenses",
+      "method": "PUT",
       "names": {
         "javascript": "ensureLenses",
         "python": "ensure_lenses",
@@ -3443,12 +3535,14 @@
         },
         "required": [
           "lenses"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": null
     },
     {
       "id": "lenses.list",
+      "method": "GET",
       "names": {
         "javascript": "lenses.list",
         "python": "lenses.list",
@@ -3479,7 +3573,8 @@
             }
           }
         },
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -3510,6 +3605,7 @@
     },
     {
       "id": "lenses.create",
+      "method": "POST",
       "names": {
         "javascript": "lenses.create",
         "python": "lenses.create",
@@ -3583,7 +3679,8 @@
           "identifier",
           "name",
           "type"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.44"
@@ -3591,6 +3688,7 @@
     },
     {
       "id": "lenses.retrieve",
+      "method": "GET",
       "names": {
         "javascript": "lenses.retrieve",
         "python": "lenses.retrieve",
@@ -3611,7 +3709,8 @@
         },
         "required": [
           "lensId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.44"
@@ -3619,6 +3718,7 @@
     },
     {
       "id": "lenses.update",
+      "method": "PATCH",
       "names": {
         "javascript": "lenses.update",
         "python": "lenses.update",
@@ -3690,7 +3790,8 @@
         },
         "required": [
           "lensId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.44"
@@ -3698,6 +3799,7 @@
     },
     {
       "id": "lenses.delete",
+      "method": "DELETE",
       "names": {
         "javascript": "lenses.delete",
         "python": "lenses.delete",
@@ -3718,12 +3820,14 @@
         },
         "required": [
           "lensId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": null
     },
     {
       "id": "events.list",
+      "method": "GET",
       "names": {
         "javascript": "events.list",
         "python": "events.list",
@@ -3795,7 +3899,8 @@
             }
           }
         },
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -3849,13 +3954,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -3881,7 +3986,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -3910,7 +4015,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -3935,7 +4041,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4023,13 +4130,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -4055,7 +4162,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -4084,7 +4191,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4106,42 +4214,13 @@
                               }
                             },
                             "required": [
-                              "key"
-                            ],
-                            "additionalProperties": false
-                          },
-                          {
-                            "type": "object",
-                            "properties": {
-                              "key": {
-                                "type": "string",
-                                "const": "flagged-categories"
-                              },
-                              "value": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string",
-                                  "enum": [
-                                    "sexual",
-                                    "violence",
-                                    "self-harm",
-                                    "harassment",
-                                    "hate",
-                                    "criminal-activity",
-                                    "personal-information",
-                                    "profanity"
-                                  ]
-                                }
-                              },
-                              "url": {
-                                "type": "string"
-                              }
-                            },
-                            "required": [
                               "key",
                               "value"
                             ],
                             "additionalProperties": false
+                          },
+                          {
+                            "$ref": "#/definitions/shared.48"
                           },
                           {
                             "type": "object",
@@ -4193,7 +4272,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4281,13 +4361,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -4313,7 +4393,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -4342,7 +4422,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4364,7 +4445,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4527,13 +4609,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -4559,7 +4641,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -4588,7 +4670,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4610,7 +4693,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4635,7 +4719,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4657,7 +4742,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4676,7 +4762,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4767,13 +4854,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -4799,7 +4886,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -4828,7 +4915,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4850,7 +4938,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4875,7 +4964,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4897,7 +4987,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -4916,7 +5007,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5007,13 +5099,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -5039,7 +5131,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -5068,7 +5160,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5090,7 +5183,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5115,7 +5209,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5137,7 +5232,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5156,7 +5252,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5247,13 +5344,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -5279,7 +5376,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -5308,7 +5405,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5330,7 +5428,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5355,7 +5454,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5377,7 +5477,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5396,7 +5497,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5487,13 +5589,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -5519,7 +5621,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -5548,7 +5650,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5570,7 +5673,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5595,7 +5699,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5617,7 +5722,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5636,7 +5742,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5727,13 +5834,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -5759,7 +5866,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -5788,7 +5895,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5810,7 +5918,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5842,7 +5951,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -5964,13 +6074,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -5996,7 +6106,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -6025,7 +6135,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -6156,13 +6267,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -6188,7 +6299,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -6217,7 +6328,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -6239,7 +6351,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -6327,13 +6440,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -6359,7 +6472,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -6388,7 +6501,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -6410,7 +6524,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -6498,13 +6613,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -6530,7 +6645,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -6559,7 +6674,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -6650,13 +6766,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -6682,7 +6798,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -6711,7 +6827,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -6829,13 +6946,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -6861,7 +6978,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -6890,7 +7007,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -6912,7 +7030,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -7083,13 +7202,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -7115,7 +7234,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -7144,7 +7263,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -7166,7 +7286,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -7255,7 +7376,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -7366,13 +7488,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -7398,7 +7520,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -7427,7 +7549,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -7449,7 +7572,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -7621,13 +7745,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -7653,7 +7777,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -7808,13 +7932,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -7840,7 +7964,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -7899,7 +8023,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -7987,13 +8112,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -8019,7 +8144,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -8174,13 +8299,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -8206,7 +8331,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -8255,7 +8380,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -8346,13 +8472,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -8378,7 +8504,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -8427,7 +8553,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -8518,13 +8645,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -8550,7 +8677,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -8599,7 +8726,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -8690,13 +8818,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -8722,7 +8850,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -8771,7 +8899,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -8890,13 +9019,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -8922,7 +9051,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -9040,13 +9169,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -9072,7 +9201,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -9311,13 +9440,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -9343,7 +9472,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -9392,7 +9521,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -9441,7 +9571,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -9529,13 +9660,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -9561,7 +9692,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -9610,7 +9741,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -9632,7 +9764,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -9720,13 +9853,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -9752,7 +9885,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -9801,7 +9934,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -9823,7 +9957,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -9911,13 +10046,13 @@
                         "high"
                       ]
                     },
-                    "title": {},
+                    "title": {
+                      "type": "string"
+                    },
                     "description": {
-                      "anyOf": [
-                        {},
-                        {
-                          "type": "null"
-                        }
+                      "type": [
+                        "string",
+                        "null"
                       ]
                     },
                     "assetId": {
@@ -9943,7 +10078,7 @@
                     "asset": {
                       "anyOf": [
                         {
-                          "$ref": "#/definitions/shared.46"
+                          "$ref": "#/definitions/shared.45"
                         },
                         {
                           "type": "null"
@@ -10058,7 +10193,8 @@
                               }
                             },
                             "required": [
-                              "key"
+                              "key",
+                              "value"
                             ],
                             "additionalProperties": false
                           },
@@ -10160,6 +10296,7 @@
     },
     {
       "id": "hashLists.list",
+      "method": "GET",
       "names": {
         "javascript": "hashLists.list",
         "python": "hash_lists.list",
@@ -10190,7 +10327,8 @@
             }
           }
         },
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -10221,6 +10359,7 @@
     },
     {
       "id": "hashLists.retrieve",
+      "method": "GET",
       "names": {
         "javascript": "hashLists.retrieve",
         "python": "hash_lists.retrieve",
@@ -10241,7 +10380,8 @@
         },
         "required": [
           "hashListId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.51"
@@ -10249,6 +10389,7 @@
     },
     {
       "id": "hashLists.create",
+      "method": "POST",
       "names": {
         "javascript": "hashLists.create",
         "python": "hash_lists.create",
@@ -10289,7 +10430,8 @@
         "required": [
           "name",
           "action"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.51"
@@ -10297,6 +10439,7 @@
     },
     {
       "id": "hashLists.update",
+      "method": "PATCH",
       "names": {
         "javascript": "hashLists.update",
         "python": "hash_lists.update",
@@ -10342,7 +10485,8 @@
         },
         "required": [
           "hashListId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.51"
@@ -10350,6 +10494,7 @@
     },
     {
       "id": "hashLists.delete",
+      "method": "DELETE",
       "names": {
         "javascript": "hashLists.delete",
         "python": "hash_lists.delete",
@@ -10370,12 +10515,14 @@
         },
         "required": [
           "hashListId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": null
     },
     {
       "id": "hashLists.listEntries",
+      "method": "GET",
       "names": {
         "javascript": "hashLists.listEntries",
         "python": "hash_lists.list_entries",
@@ -10414,7 +10561,8 @@
         },
         "required": [
           "hashListId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -10445,6 +10593,7 @@
     },
     {
       "id": "hashLists.addEntry",
+      "method": "POST",
       "names": {
         "javascript": "hashLists.addEntry",
         "python": "hash_lists.add_entry",
@@ -10499,7 +10648,8 @@
         },
         "required": [
           "hashListId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "$ref": "#/definitions/shared.52"
@@ -10507,6 +10657,7 @@
     },
     {
       "id": "hashLists.removeEntry",
+      "method": "DELETE",
       "names": {
         "javascript": "hashLists.removeEntry",
         "python": "hash_lists.remove_entry",
@@ -10527,12 +10678,14 @@
         },
         "required": [
           "entryId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": null
     },
     {
       "id": "policies.list",
+      "method": "GET",
       "names": {
         "javascript": "policies.list",
         "python": "policies.list",
@@ -10563,7 +10716,8 @@
             }
           }
         },
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -10571,7 +10725,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/definitions/shared.57"
+              "$ref": "#/definitions/shared.53"
             }
           },
           "nextCursor": {
@@ -10594,6 +10748,7 @@
     },
     {
       "id": "policies.retrieve",
+      "method": "GET",
       "names": {
         "javascript": "policies.retrieve",
         "python": "policies.retrieve",
@@ -10614,14 +10769,16 @@
         },
         "required": [
           "policyId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.57"
+        "$ref": "#/definitions/shared.53"
       }
     },
     {
       "id": "policies.create",
+      "method": "POST",
       "names": {
         "javascript": "policies.create",
         "python": "policies.create",
@@ -10648,7 +10805,7 @@
           "settings": {
             "location": "body",
             "schema": {
-              "$ref": "#/definitions/shared.55"
+              "$ref": "#/definitions/shared.54"
             }
           },
           "presetId": {
@@ -10664,14 +10821,16 @@
             }
           }
         },
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.57"
+        "$ref": "#/definitions/shared.53"
       }
     },
     {
       "id": "policies.update",
+      "method": "PATCH",
       "names": {
         "javascript": "policies.update",
         "python": "policies.update",
@@ -10710,21 +10869,23 @@
           "settings": {
             "location": "body",
             "schema": {
-              "$ref": "#/definitions/shared.55"
+              "$ref": "#/definitions/shared.54"
             }
           }
         },
         "required": [
           "policyId",
           "revision"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.57"
+        "$ref": "#/definitions/shared.53"
       }
     },
     {
       "id": "policies.reset",
+      "method": "POST",
       "names": {
         "javascript": "policies.reset",
         "python": "policies.reset",
@@ -10759,14 +10920,16 @@
           "policyId",
           "revision",
           "presetVersion"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.57"
+        "$ref": "#/definitions/shared.53"
       }
     },
     {
       "id": "policies.upgrade",
+      "method": "POST",
       "names": {
         "javascript": "policies.upgrade",
         "python": "policies.upgrade",
@@ -10801,14 +10964,16 @@
           "policyId",
           "revision",
           "presetVersion"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.57"
+        "$ref": "#/definitions/shared.53"
       }
     },
     {
       "id": "policies.setAutomaticUpdates",
+      "method": "PUT",
       "names": {
         "javascript": "policies.setAutomaticUpdates",
         "python": "policies.set_automatic_updates",
@@ -10850,14 +11015,16 @@
           "enabled",
           "revision",
           "presetVersion"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.57"
+        "$ref": "#/definitions/shared.53"
       }
     },
     {
       "id": "policies.delete",
+      "method": "DELETE",
       "names": {
         "javascript": "policies.delete",
         "python": "policies.delete",
@@ -10878,12 +11045,14 @@
         },
         "required": [
           "policyId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": null
     },
     {
       "id": "policies.retrieveAssigned",
+      "method": "GET",
       "names": {
         "javascript": "policies.retrieveAssigned",
         "python": "policies.retrieve_assigned",
@@ -10895,14 +11064,16 @@
       },
       "options": {
         "properties": {},
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.57"
+        "$ref": "#/definitions/shared.53"
       }
     },
     {
       "id": "policies.assign",
+      "method": "PUT",
       "names": {
         "javascript": "policies.assign",
         "python": "policies.assign",
@@ -10923,14 +11094,16 @@
         },
         "required": [
           "policyId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.57"
+        "$ref": "#/definitions/shared.53"
       }
     },
     {
       "id": "uploadPresets.list",
+      "method": "GET",
       "names": {
         "javascript": "uploadPresets.list",
         "python": "upload_presets.list",
@@ -10961,7 +11134,8 @@
             }
           }
         },
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -10969,7 +11143,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/definitions/shared.60"
+              "$ref": "#/definitions/shared.58"
             }
           },
           "nextCursor": {
@@ -10992,6 +11166,7 @@
     },
     {
       "id": "uploadPresets.ensure",
+      "method": "PUT",
       "names": {
         "javascript": "uploadPresets.ensure",
         "python": "upload_presets.ensure",
@@ -11127,7 +11302,8 @@
         },
         "required": [
           "uploadPresets"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
         "type": "object",
@@ -11135,7 +11311,7 @@
           "uploadPresets": {
             "type": "array",
             "items": {
-              "$ref": "#/definitions/shared.60"
+              "$ref": "#/definitions/shared.58"
             }
           }
         },
@@ -11147,6 +11323,7 @@
     },
     {
       "id": "uploadPresets.delete",
+      "method": "DELETE",
       "names": {
         "javascript": "uploadPresets.delete",
         "python": "upload_presets.delete",
@@ -11167,12 +11344,14 @@
         },
         "required": [
           "uploadPresetId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": null
     },
     {
       "id": "projectSettings.get",
+      "method": "GET",
       "names": {
         "javascript": "projectSettings.get",
         "python": "project_settings.get",
@@ -11184,14 +11363,16 @@
       },
       "options": {
         "properties": {},
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.63"
+        "$ref": "#/definitions/shared.61"
       }
     },
     {
       "id": "projectSettings.update",
+      "method": "PUT",
       "names": {
         "javascript": "projectSettings.update",
         "python": "project_settings.update",
@@ -11311,14 +11492,16 @@
         },
         "required": [
           "settings"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.63"
+        "$ref": "#/definitions/shared.61"
       }
     },
     {
       "id": "metadataFields.list",
+      "method": "GET",
       "names": {
         "javascript": "metadataFields.list",
         "python": "metadata_fields.list",
@@ -11330,14 +11513,16 @@
       },
       "options": {
         "properties": {},
-        "required": []
+        "required": [],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.65"
+        "$ref": "#/definitions/shared.64"
       }
     },
     {
       "id": "metadataFields.ensure",
+      "method": "PUT",
       "names": {
         "javascript": "metadataFields.ensure",
         "python": "metadata_fields.ensure",
@@ -11410,14 +11595,16 @@
         },
         "required": [
           "fields"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": {
-        "$ref": "#/definitions/shared.65"
+        "$ref": "#/definitions/shared.64"
       }
     },
     {
       "id": "metadataFields.delete",
+      "method": "DELETE",
       "names": {
         "javascript": "metadataFields.delete",
         "python": "metadata_fields.delete",
@@ -11444,13 +11631,14 @@
         },
         "required": [
           "fieldId"
-        ]
+        ],
+        "clientOptions": []
       },
       "result": null
     }
   ],
   "definitions": {
-    "assets.create.metadata.__schema0": {
+    "assets.create.metadata.0.__schema0": {
       "anyOf": [
         {
           "type": "string"
@@ -11467,7 +11655,7 @@
         {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/assets.create.metadata.__schema0"
+            "$ref": "#/definitions/assets.create.metadata.0.__schema0"
           }
         },
         {
@@ -11476,7 +11664,7 @@
             "type": "string"
           },
           "additionalProperties": {
-            "$ref": "#/definitions/assets.create.metadata.__schema0"
+            "$ref": "#/definitions/assets.create.metadata.0.__schema0"
           }
         }
       ]
@@ -11667,7 +11855,7 @@
         }
       ]
     },
-    "assets.update.metadata.__schema0": {
+    "assets.update.metadata.0.__schema0": {
       "anyOf": [
         {
           "type": "string"
@@ -11684,7 +11872,7 @@
         {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/assets.update.metadata.__schema0"
+            "$ref": "#/definitions/assets.update.metadata.0.__schema0"
           }
         },
         {
@@ -11693,7 +11881,7 @@
             "type": "string"
           },
           "additionalProperties": {
-            "$ref": "#/definitions/assets.update.metadata.__schema0"
+            "$ref": "#/definitions/assets.update.metadata.0.__schema0"
           }
         }
       ]
@@ -11885,21 +12073,192 @@
       ]
     },
     "shared.1": {
-      "$ref": "#/definitions/shared.1"
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "integer"
+        },
+        "updatedAt": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "name",
+        "createdAt"
+      ],
+      "additionalProperties": false
     },
     "shared.2": {
-      "$ref": "#/definitions/shared.2"
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "authorId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
     },
     "shared.3": {
-      "$ref": "#/definitions/shared.3"
-    },
-    "shared.4": {
-      "$ref": "#/definitions/shared.4"
-    },
-    "shared.5": {
-      "$ref": "#/definitions/shared.5"
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "uploading",
+            "completed"
+          ]
+        },
+        "updatedAt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "partsReceived": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "updatedAt",
+        "partsReceived"
+      ],
+      "additionalProperties": false
     },
     "shared.6": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "limited",
+            "age-restricted",
+            "blocked",
+            "purged"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decidedBy": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "user",
+                "api-key"
+              ]
+            },
+            "id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        "reviewedAt": {
+          "type": "integer"
+        },
+        "applied": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "decision",
+        "note",
+        "decidedBy",
+        "reviewedAt",
+        "applied"
+      ],
+      "additionalProperties": false
+    },
+    "shared.8": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": [
+            "general-community",
+            "children-platform",
+            "education-support",
+            "wholesome-community"
+          ]
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "shared.7": {
       "type": "object",
       "properties": {
         "id": {
@@ -11911,7 +12270,7 @@
         "preset": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.5"
+              "$ref": "#/definitions/shared.8"
             },
             {
               "type": "null"
@@ -11926,13 +12285,359 @@
       ],
       "additionalProperties": false
     },
-    "shared.7": {
-      "$ref": "#/definitions/shared.7"
-    },
-    "shared.8": {
-      "$ref": "#/definitions/shared.8"
-    },
     "shared.9": {
+      "type": "object",
+      "properties": {
+        "requestedAt": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "sampled",
+            "uncertain"
+          ]
+        },
+        "uncertainCategories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "sexual",
+              "violence",
+              "self-harm",
+              "harassment",
+              "hate",
+              "criminal-activity",
+              "personal-information",
+              "profanity"
+            ]
+          }
+        }
+      },
+      "required": [
+        "requestedAt",
+        "reason",
+        "uncertainCategories"
+      ],
+      "additionalProperties": false
+    },
+    "shared.13": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "when": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "sexual-pornographic-media",
+              "hate-nazi-symbols-public-display",
+              "hate-nazi-insignia-public-display",
+              "hate-nazi-genocide-public-peace",
+              "hate-nazi-genocide-denial-or-approval",
+              "hate-adjudicated-nazi-crimes-denial",
+              "violence-high-impact",
+              "self-harm-age-restricted",
+              "personal-information-contact",
+              "personal-information-email",
+              "personal-information-phone",
+              "personal-information-government-id",
+              "personal-information-financial",
+              "personal-information-location",
+              "personal-information-identifiers",
+              "personal-information-credentials",
+              "personal-information-request",
+              "personal-information-self-disclosure",
+              "personal-information-third-party",
+              "personal-information-historical",
+              "personal-information-documentary",
+              "personal-information-educational",
+              "personal-information-fictional",
+              "personal-information-support-prevention",
+              "profanity-mild",
+              "profanity-strong",
+              "profanity-slurs",
+              "profanity-obfuscated",
+              "profanity-historical",
+              "profanity-documentary",
+              "profanity-educational",
+              "profanity-fictional",
+              "profanity-support-prevention",
+              "sexual-nudity",
+              "sexual-activity",
+              "sexual-explicit-language",
+              "sexual-assault-media",
+              "sexual-non-consensual",
+              "sexual-intimate-image-abuse",
+              "sexual-extreme",
+              "sexual-strangulation",
+              "sexual-incest",
+              "sexual-minors",
+              "sexual-solicitation",
+              "sexual-paid",
+              "sexual-adult-promotion",
+              "sexual-revealing-clothing",
+              "sexual-suggestive",
+              "sexual-non-erotic-nudity",
+              "sexual-text",
+              "sexual-historical",
+              "sexual-documentary",
+              "sexual-educational",
+              "sexual-discussion",
+              "sexual-fictional",
+              "sexual-artistic",
+              "sexual-support-prevention",
+              "violence-attack",
+              "violence-threat",
+              "violence-preparation",
+              "violence-encouragement",
+              "violence-wish",
+              "violence-coded-incitement",
+              "violence-extremism",
+              "violence-injury",
+              "violence-violent-death",
+              "violence-natural-death",
+              "violence-graphic",
+              "violence-decapitation-act",
+              "violence-gore",
+              "violence-weapon",
+              "violence-sport",
+              "violence-text",
+              "violence-historical",
+              "violence-documentary",
+              "violence-educational",
+              "violence-discussion",
+              "violence-fictional",
+              "violence-fantasy",
+              "violence-support-prevention",
+              "self-harm-thoughts",
+              "self-harm-preparation",
+              "self-harm-act",
+              "self-harm-methods",
+              "self-harm-encouragement",
+              "self-harm-historical",
+              "self-harm-documentary",
+              "self-harm-educational",
+              "self-harm-fictional",
+              "self-harm-support-prevention",
+              "harassment-abuse",
+              "harassment-mild",
+              "harassment-bullying",
+              "harassment-public-target",
+              "harassment-threat",
+              "harassment-sexual",
+              "harassment-encouragement",
+              "harassment-historical",
+              "harassment-documentary",
+              "harassment-educational",
+              "harassment-fictional",
+              "harassment-support-prevention",
+              "hate-abuse",
+              "hate-slurs",
+              "hate-dehumanization",
+              "hate-inferiority",
+              "hate-exclusion",
+              "hate-symbol",
+              "hate-hostility",
+              "hate-threat",
+              "hate-personal",
+              "hate-historical",
+              "hate-documentary",
+              "hate-educational",
+              "hate-fictional",
+              "hate-counterspeech",
+              "hate-support-prevention",
+              "criminal-activity-demonstration",
+              "criminal-activity-preparation",
+              "criminal-activity-request",
+              "criminal-activity-instructions",
+              "criminal-activity-promotion",
+              "criminal-activity-coded-incitement",
+              "criminal-activity-substances",
+              "criminal-activity-grooming",
+              "criminal-activity-csam",
+              "criminal-activity-alcohol",
+              "criminal-activity-tobacco",
+              "criminal-activity-gambling",
+              "criminal-activity-fraud",
+              "criminal-activity-sexual-solicitation",
+              "criminal-activity-graffiti",
+              "criminal-activity-historical",
+              "criminal-activity-documentary",
+              "criminal-activity-educational",
+              "criminal-activity-discussion",
+              "criminal-activity-fictional",
+              "criminal-activity-support-prevention"
+            ]
+          }
+        },
+        "unless": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "sexual-pornographic-media",
+              "hate-nazi-symbols-public-display",
+              "hate-nazi-insignia-public-display",
+              "hate-nazi-genocide-public-peace",
+              "hate-nazi-genocide-denial-or-approval",
+              "hate-adjudicated-nazi-crimes-denial",
+              "violence-high-impact",
+              "self-harm-age-restricted",
+              "personal-information-contact",
+              "personal-information-email",
+              "personal-information-phone",
+              "personal-information-government-id",
+              "personal-information-financial",
+              "personal-information-location",
+              "personal-information-identifiers",
+              "personal-information-credentials",
+              "personal-information-request",
+              "personal-information-self-disclosure",
+              "personal-information-third-party",
+              "personal-information-historical",
+              "personal-information-documentary",
+              "personal-information-educational",
+              "personal-information-fictional",
+              "personal-information-support-prevention",
+              "profanity-mild",
+              "profanity-strong",
+              "profanity-slurs",
+              "profanity-obfuscated",
+              "profanity-historical",
+              "profanity-documentary",
+              "profanity-educational",
+              "profanity-fictional",
+              "profanity-support-prevention",
+              "sexual-nudity",
+              "sexual-activity",
+              "sexual-explicit-language",
+              "sexual-assault-media",
+              "sexual-non-consensual",
+              "sexual-intimate-image-abuse",
+              "sexual-extreme",
+              "sexual-strangulation",
+              "sexual-incest",
+              "sexual-minors",
+              "sexual-solicitation",
+              "sexual-paid",
+              "sexual-adult-promotion",
+              "sexual-revealing-clothing",
+              "sexual-suggestive",
+              "sexual-non-erotic-nudity",
+              "sexual-text",
+              "sexual-historical",
+              "sexual-documentary",
+              "sexual-educational",
+              "sexual-discussion",
+              "sexual-fictional",
+              "sexual-artistic",
+              "sexual-support-prevention",
+              "violence-attack",
+              "violence-threat",
+              "violence-preparation",
+              "violence-encouragement",
+              "violence-wish",
+              "violence-coded-incitement",
+              "violence-extremism",
+              "violence-injury",
+              "violence-violent-death",
+              "violence-natural-death",
+              "violence-graphic",
+              "violence-decapitation-act",
+              "violence-gore",
+              "violence-weapon",
+              "violence-sport",
+              "violence-text",
+              "violence-historical",
+              "violence-documentary",
+              "violence-educational",
+              "violence-discussion",
+              "violence-fictional",
+              "violence-fantasy",
+              "violence-support-prevention",
+              "self-harm-thoughts",
+              "self-harm-preparation",
+              "self-harm-act",
+              "self-harm-methods",
+              "self-harm-encouragement",
+              "self-harm-historical",
+              "self-harm-documentary",
+              "self-harm-educational",
+              "self-harm-fictional",
+              "self-harm-support-prevention",
+              "harassment-abuse",
+              "harassment-mild",
+              "harassment-bullying",
+              "harassment-public-target",
+              "harassment-threat",
+              "harassment-sexual",
+              "harassment-encouragement",
+              "harassment-historical",
+              "harassment-documentary",
+              "harassment-educational",
+              "harassment-fictional",
+              "harassment-support-prevention",
+              "hate-abuse",
+              "hate-slurs",
+              "hate-dehumanization",
+              "hate-inferiority",
+              "hate-exclusion",
+              "hate-symbol",
+              "hate-hostility",
+              "hate-threat",
+              "hate-personal",
+              "hate-historical",
+              "hate-documentary",
+              "hate-educational",
+              "hate-fictional",
+              "hate-counterspeech",
+              "hate-support-prevention",
+              "criminal-activity-demonstration",
+              "criminal-activity-preparation",
+              "criminal-activity-request",
+              "criminal-activity-instructions",
+              "criminal-activity-promotion",
+              "criminal-activity-coded-incitement",
+              "criminal-activity-substances",
+              "criminal-activity-grooming",
+              "criminal-activity-csam",
+              "criminal-activity-alcohol",
+              "criminal-activity-tobacco",
+              "criminal-activity-gambling",
+              "criminal-activity-fraud",
+              "criminal-activity-sexual-solicitation",
+              "criminal-activity-graffiti",
+              "criminal-activity-historical",
+              "criminal-activity-documentary",
+              "criminal-activity-educational",
+              "criminal-activity-discussion",
+              "criminal-activity-fictional",
+              "criminal-activity-support-prevention"
+            ]
+          }
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "allow",
+            "limit",
+            "age-restrict",
+            "block",
+            "purge"
+          ]
+        }
+      },
+      "required": [
+        "when",
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "shared.12": {
       "type": "object",
       "properties": {
         "action": {
@@ -11948,13 +12653,13 @@
         "allowances": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.8"
+            "$ref": "#/definitions/shared.13"
           }
         },
         "restrictions": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.8"
+            "$ref": "#/definitions/shared.13"
           }
         }
       },
@@ -11965,13 +12670,55 @@
       ],
       "additionalProperties": false
     },
-    "shared.10": {
-      "$ref": "#/definitions/shared.10"
+    "shared.14": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "allowance"
+        },
+        "indexes": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "conditionScore": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "indexes",
+        "conditionScore"
+      ],
+      "additionalProperties": false
+    },
+    "shared.15": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "restriction"
+        },
+        "indexes": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "conditionScore": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "kind",
+        "indexes",
+        "conditionScore"
+      ],
+      "additionalProperties": false
     },
     "shared.11": {
-      "$ref": "#/definitions/shared.11"
-    },
-    "shared.12": {
       "type": "object",
       "properties": {
         "score": {
@@ -11988,7 +12735,7 @@
           ]
         },
         "settings": {
-          "$ref": "#/definitions/shared.9"
+          "$ref": "#/definitions/shared.12"
         },
         "source": {
           "oneOf": [
@@ -12019,10 +12766,10 @@
               "additionalProperties": false
             },
             {
-              "$ref": "#/definitions/shared.10"
+              "$ref": "#/definitions/shared.14"
             },
             {
-              "$ref": "#/definitions/shared.11"
+              "$ref": "#/definitions/shared.15"
             }
           ]
         }
@@ -12033,7 +12780,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.13": {
+    "shared.10": {
       "type": "object",
       "propertyNames": {
         "type": "string",
@@ -12049,19 +12796,110 @@
         ]
       },
       "additionalProperties": {
-        "$ref": "#/definitions/shared.12"
+        "$ref": "#/definitions/shared.11"
       }
     },
-    "shared.14": {
-      "$ref": "#/definitions/shared.14"
-    },
-    "shared.15": {
-      "$ref": "#/definitions/shared.15"
-    },
     "shared.16": {
-      "$ref": "#/definitions/shared.16"
+      "type": "object",
+      "properties": {
+        "region": {
+          "type": "string",
+          "enum": [
+            "DE",
+            "AT",
+            "FR",
+            "GB",
+            "EU",
+            "AU",
+            "BR"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "limited",
+            "age-restricted",
+            "blocked",
+            "purged"
+          ]
+        },
+        "rule": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "sexual",
+            "violence",
+            "self-harm",
+            "harassment",
+            "hate",
+            "criminal-activity",
+            "personal-information",
+            "profanity"
+          ]
+        }
+      },
+      "required": [
+        "region",
+        "status",
+        "rule"
+      ],
+      "additionalProperties": false
     },
-    "shared.17": {
+    "shared.21": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "evaluated"
+        },
+        "someScore": {
+          "type": "number"
+        },
+        "allScore": {
+          "type": "number"
+        },
+        "likelihood": {
+          "type": "string",
+          "enum": [
+            "very-unlikely",
+            "unlikely",
+            "possible",
+            "likely",
+            "very-likely"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "someScore",
+        "likelihood"
+      ],
+      "additionalProperties": false
+    },
+    "shared.22": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "not-evaluated"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "not-supported",
+            "unavailable"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "shared.20": {
       "type": "object",
       "propertyNames": {
         "type": "string",
@@ -12209,15 +13047,15 @@
       "additionalProperties": {
         "oneOf": [
           {
-            "$ref": "#/definitions/shared.15"
+            "$ref": "#/definitions/shared.21"
           },
           {
-            "$ref": "#/definitions/shared.16"
+            "$ref": "#/definitions/shared.22"
           }
         ]
       }
     },
-    "shared.18": {
+    "shared.19": {
       "type": "object",
       "properties": {
         "status": {
@@ -12238,7 +13076,7 @@
           "type": "number"
         },
         "qualifiers": {
-          "$ref": "#/definitions/shared.17"
+          "$ref": "#/definitions/shared.20"
         }
       },
       "required": [
@@ -12248,7 +13086,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.19": {
+    "shared.23": {
       "type": "object",
       "properties": {
         "status": {
@@ -12269,7 +13107,7 @@
           "type": "number"
         },
         "qualifiers": {
-          "$ref": "#/definitions/shared.17"
+          "$ref": "#/definitions/shared.20"
         }
       },
       "required": [
@@ -12279,7 +13117,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.20": {
+    "shared.24": {
       "type": "object",
       "properties": {
         "status": {
@@ -12294,7 +13132,7 @@
           ]
         },
         "qualifiers": {
-          "$ref": "#/definitions/shared.17"
+          "$ref": "#/definitions/shared.20"
         }
       },
       "required": [
@@ -12303,110 +13141,110 @@
       ],
       "additionalProperties": false
     },
-    "shared.21": {
+    "shared.18": {
       "type": "object",
       "properties": {
         "sexual": {
           "oneOf": [
             {
-              "$ref": "#/definitions/shared.18"
-            },
-            {
               "$ref": "#/definitions/shared.19"
             },
             {
-              "$ref": "#/definitions/shared.20"
+              "$ref": "#/definitions/shared.23"
+            },
+            {
+              "$ref": "#/definitions/shared.24"
             }
           ]
         },
         "violence": {
           "oneOf": [
             {
-              "$ref": "#/definitions/shared.18"
-            },
-            {
               "$ref": "#/definitions/shared.19"
             },
             {
-              "$ref": "#/definitions/shared.20"
+              "$ref": "#/definitions/shared.23"
+            },
+            {
+              "$ref": "#/definitions/shared.24"
             }
           ]
         },
         "self-harm": {
           "oneOf": [
             {
-              "$ref": "#/definitions/shared.18"
-            },
-            {
               "$ref": "#/definitions/shared.19"
             },
             {
-              "$ref": "#/definitions/shared.20"
+              "$ref": "#/definitions/shared.23"
+            },
+            {
+              "$ref": "#/definitions/shared.24"
             }
           ]
         },
         "harassment": {
           "oneOf": [
             {
-              "$ref": "#/definitions/shared.18"
-            },
-            {
               "$ref": "#/definitions/shared.19"
             },
             {
-              "$ref": "#/definitions/shared.20"
+              "$ref": "#/definitions/shared.23"
+            },
+            {
+              "$ref": "#/definitions/shared.24"
             }
           ]
         },
         "hate": {
           "oneOf": [
             {
-              "$ref": "#/definitions/shared.18"
-            },
-            {
               "$ref": "#/definitions/shared.19"
             },
             {
-              "$ref": "#/definitions/shared.20"
+              "$ref": "#/definitions/shared.23"
+            },
+            {
+              "$ref": "#/definitions/shared.24"
             }
           ]
         },
         "criminal-activity": {
           "oneOf": [
             {
-              "$ref": "#/definitions/shared.18"
-            },
-            {
               "$ref": "#/definitions/shared.19"
             },
             {
-              "$ref": "#/definitions/shared.20"
+              "$ref": "#/definitions/shared.23"
+            },
+            {
+              "$ref": "#/definitions/shared.24"
             }
           ]
         },
         "personal-information": {
           "oneOf": [
             {
-              "$ref": "#/definitions/shared.18"
-            },
-            {
               "$ref": "#/definitions/shared.19"
             },
             {
-              "$ref": "#/definitions/shared.20"
+              "$ref": "#/definitions/shared.23"
+            },
+            {
+              "$ref": "#/definitions/shared.24"
             }
           ]
         },
         "profanity": {
           "oneOf": [
             {
-              "$ref": "#/definitions/shared.18"
-            },
-            {
               "$ref": "#/definitions/shared.19"
             },
             {
-              "$ref": "#/definitions/shared.20"
+              "$ref": "#/definitions/shared.23"
+            },
+            {
+              "$ref": "#/definitions/shared.24"
             }
           ]
         }
@@ -12423,19 +13261,51 @@
       ],
       "additionalProperties": false
     },
-    "shared.22": {
-      "$ref": "#/definitions/shared.22"
+    "shared.25": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "hash-list"
+          ]
+        },
+        "hashListId": {
+          "type": "string"
+        },
+        "hashListEntryId": {
+          "type": "string"
+        },
+        "distance": {
+          "type": "integer"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "flag",
+            "block"
+          ]
+        }
+      },
+      "required": [
+        "source",
+        "hashListId",
+        "hashListEntryId",
+        "distance",
+        "action"
+      ],
+      "additionalProperties": false
     },
-    "shared.23": {
+    "shared.17": {
       "type": "object",
       "properties": {
         "categories": {
-          "$ref": "#/definitions/shared.21"
+          "$ref": "#/definitions/shared.18"
         },
         "hashMatches": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.22"
+            "$ref": "#/definitions/shared.25"
           }
         }
       },
@@ -12445,7 +13315,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.24": {
+    "shared.5": {
       "type": "object",
       "properties": {
         "status": {
@@ -12462,7 +13332,7 @@
         "manualReviews": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.4"
+            "$ref": "#/definitions/shared.6"
           }
         },
         "automatedStatus": {
@@ -12501,7 +13371,7 @@
         "policy": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.6"
+              "$ref": "#/definitions/shared.7"
             },
             {
               "type": "null"
@@ -12511,7 +13381,7 @@
         "pendingReview": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.7"
+              "$ref": "#/definitions/shared.9"
             },
             {
               "type": "null"
@@ -12541,7 +13411,7 @@
         "categories": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.13"
+              "$ref": "#/definitions/shared.10"
             },
             {
               "type": "null"
@@ -12567,13 +13437,13 @@
         "regions": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.14"
+            "$ref": "#/definitions/shared.16"
           }
         },
         "raw": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.23"
+              "$ref": "#/definitions/shared.17"
             },
             {
               "type": "null"
@@ -12617,14 +13487,35 @@
       ],
       "additionalProperties": false
     },
-    "shared.25": {
-      "$ref": "#/definitions/shared.25"
+    "shared.28": {
+      "type": "object",
+      "properties": {
+        "left": {
+          "type": "number"
+        },
+        "top": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "left",
+        "top",
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
     },
-    "shared.26": {
+    "shared.27": {
       "type": "object",
       "properties": {
         "box": {
-          "$ref": "#/definitions/shared.25"
+          "$ref": "#/definitions/shared.28"
         },
         "personalInformation": {
           "type": "boolean"
@@ -12636,7 +13527,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.27": {
+    "shared.26": {
       "type": "object",
       "properties": {
         "status": {
@@ -12646,7 +13537,7 @@
         "textRegions": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.26"
+            "$ref": "#/definitions/shared.27"
           }
         }
       },
@@ -12656,14 +13547,33 @@
       ],
       "additionalProperties": false
     },
-    "shared.28": {
-      "$ref": "#/definitions/shared.28"
-    },
     "shared.29": {
       "type": "object",
       "properties": {
+        "status": {
+          "type": "string",
+          "const": "not-evaluated"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "not-supported",
+            "unavailable",
+            "in-children"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "shared.31": {
+      "type": "object",
+      "properties": {
         "box": {
-          "$ref": "#/definitions/shared.25"
+          "$ref": "#/definitions/shared.28"
         },
         "confidence": {
           "type": "number"
@@ -12685,7 +13595,7 @@
         "people": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.29"
+            "$ref": "#/definitions/shared.31"
           }
         }
       },
@@ -12695,11 +13605,11 @@
       ],
       "additionalProperties": false
     },
-    "shared.31": {
+    "shared.33": {
       "type": "object",
       "properties": {
         "box": {
-          "$ref": "#/definitions/shared.25"
+          "$ref": "#/definitions/shared.28"
         },
         "confidence": {
           "type": "number"
@@ -12737,7 +13647,7 @@
         "faces": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.31"
+            "$ref": "#/definitions/shared.33"
           }
         }
       },
@@ -12747,14 +13657,14 @@
       ],
       "additionalProperties": false
     },
-    "shared.33": {
+    "shared.35": {
       "type": "object",
       "properties": {
         "value": {
           "type": "string"
         },
         "box": {
-          "$ref": "#/definitions/shared.25"
+          "$ref": "#/definitions/shared.28"
         }
       },
       "required": [
@@ -12773,7 +13683,7 @@
         "qrCodes": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.33"
+            "$ref": "#/definitions/shared.35"
           }
         },
         "links": {
@@ -12807,7 +13717,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.35": {
+    "shared.4": {
       "type": "object",
       "properties": {
         "status": {
@@ -12890,17 +13800,17 @@
           "type": "boolean"
         },
         "moderation": {
-          "$ref": "#/definitions/shared.24"
+          "$ref": "#/definitions/shared.5"
         },
         "ocr": {
           "anyOf": [
             {
               "oneOf": [
                 {
-                  "$ref": "#/definitions/shared.27"
+                  "$ref": "#/definitions/shared.26"
                 },
                 {
-                  "$ref": "#/definitions/shared.28"
+                  "$ref": "#/definitions/shared.29"
                 }
               ]
             },
@@ -12917,7 +13827,7 @@
                   "$ref": "#/definitions/shared.30"
                 },
                 {
-                  "$ref": "#/definitions/shared.28"
+                  "$ref": "#/definitions/shared.29"
                 }
               ]
             },
@@ -12934,7 +13844,7 @@
                   "$ref": "#/definitions/shared.32"
                 },
                 {
-                  "$ref": "#/definitions/shared.28"
+                  "$ref": "#/definitions/shared.29"
                 }
               ]
             },
@@ -12951,7 +13861,7 @@
                   "$ref": "#/definitions/shared.34"
                 },
                 {
-                  "$ref": "#/definitions/shared.28"
+                  "$ref": "#/definitions/shared.29"
                 }
               ]
             },
@@ -12976,20 +13886,290 @@
       ],
       "additionalProperties": false
     },
-    "shared.36": {
-      "$ref": "#/definitions/shared.36"
-    },
     "shared.37": {
-      "$ref": "#/definitions/shared.37"
+      "type": "object",
+      "properties": {
+        "placedAt": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "suspected-illegal-content"
+          ]
+        },
+        "disposedAt": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "placedAt",
+        "reason"
+      ],
+      "additionalProperties": false
     },
     "shared.38": {
-      "$ref": "#/definitions/shared.38"
+      "type": "object",
+      "properties": {
+        "md5": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha1": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha384": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha512": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "shared.39": {
-      "$ref": "#/definitions/shared.39"
+      "type": "object",
+      "properties": {
+        "capturedAt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cameraMake": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cameraModel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lensModel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "software": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "creator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "copyright": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "digitalSourceType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "containsLocation": {
+          "type": "boolean"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "latitude": {
+                  "type": "number"
+                },
+                "longitude": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "latitude",
+                "longitude"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "capturedAt",
+        "cameraMake",
+        "cameraModel",
+        "lensModel",
+        "software",
+        "creator",
+        "copyright",
+        "digitalSourceType",
+        "containsLocation",
+        "location"
+      ],
+      "additionalProperties": false
     },
     "shared.40": {
-      "$ref": "#/definitions/shared.40"
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "image",
+            "pdf",
+            "video",
+            "audio"
+          ]
+        },
+        "format": {
+          "type": "string"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "peaks": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "format",
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "shared.42": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "video",
+            "audio"
+          ]
+        },
+        "width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bandwidth": {
+          "type": "integer"
+        },
+        "codecs": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "width",
+        "height",
+        "bandwidth",
+        "codecs"
+      ],
+      "additionalProperties": false
     },
     "shared.41": {
       "type": "object",
@@ -13022,7 +14202,7 @@
         "renditions": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.40"
+            "$ref": "#/definitions/shared.42"
           }
         }
       },
@@ -13033,10 +14213,51 @@
       ],
       "additionalProperties": false
     },
-    "shared.42": {
-      "$ref": "#/definitions/shared.42"
-    },
     "shared.43": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "height": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "thumbhash": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "averageColor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "thumbhash",
+        "averageColor"
+      ],
+      "additionalProperties": false
+    },
+    "shared.36": {
       "type": "object",
       "properties": {
         "status": {
@@ -13077,7 +14298,7 @@
         "safetyHold": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.36"
+              "$ref": "#/definitions/shared.37"
             },
             {
               "type": "null"
@@ -13109,7 +14330,7 @@
         "checksums": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.37"
+              "$ref": "#/definitions/shared.38"
             },
             {
               "type": "null"
@@ -13175,7 +14396,7 @@
         "metadata": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.38"
+              "$ref": "#/definitions/shared.39"
             },
             {
               "type": "null"
@@ -13210,7 +14431,9 @@
                       "type": "string",
                       "const": "document"
                     },
-                    "id": {}
+                    "id": {
+                      "type": "string"
+                    }
                   },
                   "required": [
                     "type",
@@ -13228,7 +14451,7 @@
         "rendered": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.39"
+              "$ref": "#/definitions/shared.40"
             },
             {
               "type": "null"
@@ -13248,7 +14471,7 @@
         "preview": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.42"
+              "$ref": "#/definitions/shared.43"
             },
             {
               "type": "null"
@@ -13280,12 +14503,121 @@
       "additionalProperties": false
     },
     "shared.44": {
-      "$ref": "#/definitions/shared.44"
-    },
-    "shared.45": {
-      "$ref": "#/definitions/shared.45"
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "projectId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "identifier": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "image",
+            "video",
+            "audio",
+            "document",
+            "website"
+          ]
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "transform": {
+          "anyOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "type": "integer"
+        },
+        "updatedAt": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "identifier",
+        "name",
+        "type",
+        "active",
+        "createdAt"
+      ],
+      "additionalProperties": false
     },
     "shared.46": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "processing",
+            "completed",
+            "failed"
+          ]
+        },
+        "testInput": {
+          "type": "boolean"
+        },
+        "moderation": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "allowed",
+                "limited",
+                "age-restricted",
+                "blocked",
+                "purged"
+              ]
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "status",
+        "testInput",
+        "moderation"
+      ],
+      "additionalProperties": false
+    },
+    "shared.45": {
       "type": "object",
       "properties": {
         "id": {
@@ -13320,7 +14652,7 @@
           "additionalProperties": false
         },
         "classification": {
-          "$ref": "#/definitions/shared.45"
+          "$ref": "#/definitions/shared.46"
         },
         "content": {
           "type": "object",
@@ -13349,36 +14681,238 @@
       "additionalProperties": false
     },
     "shared.47": {
-      "$ref": "#/definitions/shared.47"
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "const": "asset-type"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "image",
+                "video",
+                "audio",
+                "plaintext-document",
+                "multimedia-document",
+                "website",
+                "file"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "additionalProperties": false
     },
     "shared.48": {
-      "$ref": "#/definitions/shared.48"
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "const": "flagged-categories"
+        },
+        "value": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "sexual",
+              "violence",
+              "self-harm",
+              "harassment",
+              "hate",
+              "criminal-activity",
+              "personal-information",
+              "profanity"
+            ]
+          }
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "additionalProperties": false
     },
     "shared.49": {
-      "$ref": "#/definitions/shared.49"
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "const": "child-status"
+        },
+        "value": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "limited",
+            "age-restricted",
+            "blocked",
+            "purged"
+          ]
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "additionalProperties": false
     },
     "shared.50": {
-      "$ref": "#/definitions/shared.50"
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "const": "role"
+        },
+        "value": {
+          "type": "string",
+          "enum": [
+            "admin",
+            "configurator",
+            "editor",
+            "viewer",
+            "custom",
+            "reviewer"
+          ]
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "additionalProperties": false
     },
     "shared.51": {
-      "$ref": "#/definitions/shared.51"
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "flag",
+            "block"
+          ]
+        },
+        "createdAt": {
+          "type": "integer"
+        },
+        "updatedAt": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "name",
+        "action",
+        "createdAt"
+      ],
+      "additionalProperties": false
     },
     "shared.52": {
-      "$ref": "#/definitions/shared.52"
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "hashListId": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "quality": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assetId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "hashListId",
+        "hash",
+        "quality",
+        "createdAt"
+      ],
+      "additionalProperties": false
     },
-    "shared.53": {
+    "shared.56": {
       "type": "object",
       "properties": {
         "allowances": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.8"
+            "$ref": "#/definitions/shared.13"
           }
         },
         "restrictions": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.8"
+            "$ref": "#/definitions/shared.13"
           }
         },
         "action": {
@@ -13399,32 +14933,32 @@
       ],
       "additionalProperties": false
     },
-    "shared.54": {
+    "shared.55": {
       "type": "object",
       "properties": {
         "sexual": {
-          "$ref": "#/definitions/shared.53"
+          "$ref": "#/definitions/shared.56"
         },
         "violence": {
-          "$ref": "#/definitions/shared.53"
+          "$ref": "#/definitions/shared.56"
         },
         "self-harm": {
-          "$ref": "#/definitions/shared.53"
+          "$ref": "#/definitions/shared.56"
         },
         "harassment": {
-          "$ref": "#/definitions/shared.53"
+          "$ref": "#/definitions/shared.56"
         },
         "hate": {
-          "$ref": "#/definitions/shared.53"
+          "$ref": "#/definitions/shared.56"
         },
         "criminal-activity": {
-          "$ref": "#/definitions/shared.53"
+          "$ref": "#/definitions/shared.56"
         },
         "personal-information": {
-          "$ref": "#/definitions/shared.53"
+          "$ref": "#/definitions/shared.56"
         },
         "profanity": {
-          "$ref": "#/definitions/shared.53"
+          "$ref": "#/definitions/shared.56"
         }
       },
       "required": [
@@ -13439,11 +14973,11 @@
       ],
       "additionalProperties": false
     },
-    "shared.55": {
+    "shared.54": {
       "type": "object",
       "properties": {
         "categorySettings": {
-          "$ref": "#/definitions/shared.54"
+          "$ref": "#/definitions/shared.55"
         }
       },
       "required": [
@@ -13451,10 +14985,42 @@
       ],
       "additionalProperties": false
     },
-    "shared.56": {
-      "$ref": "#/definitions/shared.56"
-    },
     "shared.57": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": [
+            "general-community",
+            "children-platform",
+            "education-support",
+            "wholesome-community"
+          ]
+        },
+        "version": {
+          "type": "integer"
+        },
+        "latestVersion": {
+          "type": "integer"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "live",
+            "pinned",
+            "copy"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "latestVersion",
+        "mode"
+      ],
+      "additionalProperties": false
+    },
+    "shared.53": {
       "type": "object",
       "properties": {
         "id": {
@@ -13467,7 +15033,7 @@
           "type": "string"
         },
         "settings": {
-          "$ref": "#/definitions/shared.55"
+          "$ref": "#/definitions/shared.54"
         },
         "revision": {
           "type": "integer"
@@ -13475,7 +15041,7 @@
         "preset": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.56"
+              "$ref": "#/definitions/shared.57"
             },
             {
               "type": "null"
@@ -13507,8 +15073,109 @@
       ],
       "additionalProperties": false
     },
-    "shared.58": {
-      "$ref": "#/definitions/shared.58"
+    "shared.60": {
+      "type": "object",
+      "properties": {
+        "ocr": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "personDetection": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "faceDetection": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "ageEstimation": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "linkDetection": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "streaming": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "shared.59": {
       "type": "object",
@@ -13528,7 +15195,7 @@
         "features": {
           "anyOf": [
             {
-              "$ref": "#/definitions/shared.58"
+              "$ref": "#/definitions/shared.60"
             },
             {
               "type": "null"
@@ -13538,7 +15205,7 @@
       },
       "additionalProperties": false
     },
-    "shared.60": {
+    "shared.58": {
       "type": "object",
       "properties": {
         "id": {
@@ -13563,7 +15230,9 @@
         "revision": {
           "type": "integer"
         },
-        "name": {},
+        "name": {
+          "type": "string"
+        },
         "access": {
           "type": "string",
           "enum": [
@@ -13681,8 +15350,29 @@
       ],
       "additionalProperties": false
     },
-    "shared.61": {
-      "$ref": "#/definitions/shared.61"
+    "shared.63": {
+      "type": "object",
+      "properties": {
+        "allowedSamplePercent": {
+          "type": "number"
+        },
+        "restrictedSamplePercent": {
+          "type": "number"
+        },
+        "uncertaintyMarginPercent": {
+          "type": "number"
+        },
+        "reviewMissingEvidence": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "allowedSamplePercent",
+        "restrictedSamplePercent",
+        "uncertaintyMarginPercent",
+        "reviewMissingEvidence"
+      ],
+      "additionalProperties": false
     },
     "shared.62": {
       "type": "object",
@@ -13755,7 +15445,7 @@
           ]
         },
         "humanReview": {
-          "$ref": "#/definitions/shared.61"
+          "$ref": "#/definitions/shared.63"
         }
       },
       "required": [
@@ -13772,7 +15462,7 @@
       ],
       "additionalProperties": false
     },
-    "shared.63": {
+    "shared.61": {
       "type": "object",
       "properties": {
         "projectId": {
@@ -13792,10 +15482,54 @@
       ],
       "additionalProperties": false
     },
-    "shared.64": {
-      "$ref": "#/definitions/shared.64"
-    },
     "shared.65": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "date",
+            "url"
+          ]
+        },
+        "icon": {
+          "type": "string",
+          "enum": [
+            "tag",
+            "hash",
+            "user",
+            "folder",
+            "layers",
+            "photo",
+            "link"
+          ]
+        },
+        "color": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "type",
+        "icon",
+        "color"
+      ],
+      "additionalProperties": false
+    },
+    "shared.64": {
       "type": "object",
       "properties": {
         "projectId": {
@@ -13807,7 +15541,7 @@
         "fields": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/shared.64"
+            "$ref": "#/definitions/shared.65"
           }
         }
       },

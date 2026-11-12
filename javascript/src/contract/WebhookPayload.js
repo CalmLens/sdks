@@ -1987,6 +1987,7 @@ const USAGE_FREE_UPLOADS_EXHAUSTED = defineEventType({
 		organisationId: EXAMPLE_IDS.org
 	}
 });
+const MEMBER_ROLE_SCHEMA = zod.enum(PROJECT_MEMBER_ROLE_SCHEMA.options);
 const PROJECT_MEMBER_JOINED = defineEventType({
 	id: "project.member-joined",
 	name: msg("Member joined"),
@@ -2009,7 +2010,7 @@ const PROJECT_MEMBER_JOINED = defineEventType({
 			inAppOnly: true,
 			names: "member"
 		}),
-		role: field(PROJECT_MEMBER_ROLE_SCHEMA, {
+		role: field(MEMBER_ROLE_SCHEMA, {
 			label: msg("Role"),
 			description: "The member's role: `admin`, `configurator`, `editor`, `viewer` or `custom`.",
 			display: "enum",
@@ -2074,7 +2075,6 @@ const CONNECTOR_DISABLED = defineEventType({
 	}
 });
 /** Project roles a member can hold; reviewers only exist while the human review beta is on. */
-const MEMBER_ROLE_SCHEMA = PROJECT_MEMBER_ROLE_SCHEMA;
 const memberUserIdField = field(zod.string(), {
 	label: msg("Member ID"),
 	description: "User ID of the member.",
@@ -2821,9 +2821,9 @@ const getEventFactUrl = (fact) => {
 const factUrl = zod.string().refine((url) => getEventFactUrl({ url }) !== void 0, "Fact links must be app paths or HTTP(S) URLs").optional();
 const factSchema = (key, value) => zod.strictObject({
 	key: zod.literal(key),
-	value,
+	value: value.nonoptional(),
 	url: factUrl
-}).refine((fact) => fact.value !== void 0, "Facts require a value");
+});
 const EVENT_FACT_SCHEMAS = Object.fromEntries(EVENT_TYPES.map((type) => [type, zod.array(zod.discriminatedUnion("key", [...Object.entries(EVENT_TYPE_INFO[type].fields).map(([key, definition]) => factSchema(eventFactKey(key), definition.schema)), factSchema("test", zod.boolean())]))]));
 const EVENT_FACT_SCHEMA = zod.strictObject({
 	key: zod.string(),
