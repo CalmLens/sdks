@@ -34,8 +34,8 @@ import org.junit.jupiter.api.function.ThrowingConsumer;
 /**
  * Replays the shared SDK contract fixtures in {@code testdata/} (packages/sdk-contract/README.md):
  * requests, paths, webhooks, errors, upload tokens, transform options, mock behaviour scenarios,
- * the capability surface (its capabilities, errorResponse and retryable errors) and refused
- * requests. {@link ClientCasesTest} replays the client cases and surface.json's defaults; each
+ * the capability surface (its capabilities, errorResponse and retryable errors), refused requests
+ * and the declared types ({@code types.json}, compared by {@link DeclaredTypes}). {@link ClientCasesTest} replays the client cases and surface.json's defaults; each
  * fixture is replayed in one of the two, read through {@link Fixtures#read}. Each fixture case is
  * its own dynamic test.
  */
@@ -1082,5 +1082,110 @@ class ContractTest {
       assertEquals(0, error.getStatus(), name);
       assertNull(error.getRequestId(), name);
     });
+  }
+
+  // types.json
+
+  /**
+   * Differences from types.json that Java keeps on purpose, keyed by {@code <operation|*>
+   * <options|result|*> <path and problem>}: a problem matches when its operation and side match and
+   * its {@code $.<path>: <problem>} contains the key's text.
+   */
+  private static final Map<String, String> TYPE_DIFFERENCES = Map.of(
+      "* * features.aiGeneratedDetection: declared, but",
+      "Behind ENABLE_AI_GENERATED_DETECTION (packages/shared/src/SharedConstants.ts), which is off, so the API hides the option",
+      "* result classification.aiGeneratedDetection: declared, but",
+      "Behind ENABLE_AI_GENERATED_DETECTION (packages/shared/src/SharedConstants.ts), which is off, so the API hides the result",
+      "* result classification.linkSafety: declared, but",
+      "Behind ENABLE_LINK_SAFETY (packages/shared/src/SharedConstants.ts), which is off, so the API hides the result",
+      "* result moderation.linkSafety: declared, but",
+      "Behind ENABLE_LINK_SAFETY (packages/shared/src/SharedConstants.ts), which is off, so the API hides the link-safety decision",
+      "* * settings.linkSafety: declared, but",
+      "Behind ENABLE_LINK_SAFETY (packages/shared/src/SharedConstants.ts), which is off, so the API hides the policy's link-safety settings",
+      "* result moderation.automatedStatus: AssetModerationStatus has [pending], which",
+      "Declared as the asset's AssetModerationStatus so it compares with status(); an open value class can't be narrowed to the values the policy itself decides",
+      "* result moderation.regions[].status: AssetModerationStatus has [allowed, pending], which",
+      "Declared as the asset's AssetModerationStatus so it compares with status(); an open value class can't be narrowed to the restricted values a region can have");
+
+  private static final String INFORMATIONAL = "Java has open value classes only for the values that decide delivery and"
+      + " review (classification and moderation status, review decisions, content status, rendered kind, visibility and"
+      + " hash list action); other listed result values are Strings, so a value a newer API adds decodes unchanged";
+  private static final String CATEGORIES = "Moderation categories and qualifiers are Strings, so categories and qualifiers"
+      + " the API adds decode and can be configured without an SDK update";
+  private static final String OPTION_VALUES = "Option values are plain Strings, like the matching result fields, so a value"
+      + " the API adds can be sent without an SDK update; the API refuses an unknown one";
+
+  /** Fields the SDK keeps as open Strings where the API lists values, by {@code Class.field}, with the reason. */
+  private static final Map<String, String> OPEN_STRINGS = openStrings(
+      INFORMATIONAL, List.of("Asset.type", "AssetClassification.failureReason", "AssetContent.removalReason", "AssetHls.reason",
+          "AssetHls.status", "AssetHlsRendition.kind", "AssetModeration.source", "AssetPendingReview.reason",
+          "AssetSearchMatch.matchedFields[]", "AssetSearchResponse.semanticStatus", "AssetUpload.status", "BatchAssetsResponse.status",
+          "CategoryPolicyScore.action", "CategoryPolicySettingsSnapshot.action", "CategoryPolicySource.kind", "CategoryResult.likelihood",
+          "CategoryResult.reason", "CategoryResult.status", "DecisionPolicyPreset.id", "DetectedLink.source", "Event.severity",
+          "Event.type", "EventActor.type", "EventAssetUpload.status", "EventFact.key", "EventsPage.excludedTypes[]",
+          "ExtractedText.type", "FaceDetectionResult.reason", "FaceDetectionResult.status", "HashMatch.source", "Lens.type",
+          "LinkDetectionResult.reason", "LinkDetectionResult.status", "MediaClassificationSegment.source", "MetadataField.icon",
+          "MetadataField.type", "OcrResult.reason", "OcrResult.status", "PersonDetectionResult.reason", "PersonDetectionResult.status",
+          "PolicyCategorySettings.action", "PolicyPreset.id", "PolicyPreset.mode", "PolicyRuleSnapshot.action",
+          "ProjectSettings.optOutJurisdictions[]", "QualifierResult.likelihood", "QualifierResult.reason", "QualifierResult.status",
+          "RegionalDecision.region", "RemoteUrlRule.mode", "ReviewDecider.type", "SafetyHold.reason", "UploadPreset.access"),
+      CATEGORIES, List.of("AssetModeration.categories{key}", "AssetModeration.flaggedCategories[]",
+          "AssetPendingReview.uncertainCategories[]", "CategoryResult.qualifiers{key}", "MediaClassificationSegment.categories{key}",
+          "ModerationRaw.categories{key}", "PolicyRuleSnapshot.unless[]", "PolicyRuleSnapshot.when[]",
+          "PolicySettings.categorySettings{key}", "RegionalDecision.category"),
+      OPTION_VALUES, List.of("CreatePolicy.presetId", "LensDefinition.lensType", "ListEvents.types[]",
+          "ProjectSettingsInput.optOutJurisdictions[]", "SearchAssets.mode", "UpdateLens.lensType", "UploadPresetDefinition.access"));
+
+  private static Map<String, String> openStrings(Object... reasonsAndFields) {
+    Map<String, String> fields = new HashMap<>();
+    for (int i = 0; i < reasonsAndFields.length; i += 2)
+      for (Object field : (List<?>) reasonsAndFields[i + 1]) assertNull(fields.put((String) field, (String) reasonsAndFields[i]), (String) field);
+    return fields;
+  }
+
+  /** The client method an operation's {@code names.java} names, as {@link Fixtures#invoke} finds it. */
+  private static Method typedMethod(String name) throws Exception {
+    String[] parts = name.split("\\.");
+    Class<?> target = parts.length == 1 ? CalmLensServerClient.class : CalmLensServerClient.class.getField(parts[0]).getType();
+    String method = parts[parts.length - 1];
+    return Arrays.stream(target.getMethods())
+        .filter(m -> m.getName().equals(method) && m.getParameterCount() == 1 && m.getParameterTypes()[0] != String.class)
+        .findFirst()
+        .or(() -> Arrays.stream(target.getMethods()).filter(m -> m.getName().equals(method) && m.getParameterCount() == 0).findFirst())
+        .orElseThrow(() -> new AssertionError("no method " + name));
+  }
+
+  private static boolean allowed(String problem, Map<String, Boolean> used) {
+    for (String key : TYPE_DIFFERENCES.keySet()) {
+      String[] parts = key.split(" ", 3);
+      String[] actual = problem.split(" ", 3);
+      if ((parts[0].equals("*") || parts[0].equals(actual[0])) && (parts[1].equals("*") || parts[1].equals(actual[1])) && actual[2].contains(parts[2])) {
+        used.put(key, true);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Each operation's options builder and result model match its schema in types.json, compared by
+   * {@link DeclaredTypes}; every difference fails with its path, and every listed difference is
+   * still found.
+   */
+  @Test void declaredTypesMatchTheApi() throws Exception {
+    JsonObject contract = Fixtures.read("types.json").getAsJsonObject();
+    List<String> problems = new ArrayList<>();
+    Map<String, Boolean> used = new HashMap<>();
+    java.util.Set<String> usedOpenStrings = new java.util.HashSet<>();
+    for (JsonElement element : contract.getAsJsonArray("operations")) {
+      JsonObject operation = element.getAsJsonObject();
+      Method method = typedMethod(operation.getAsJsonObject("names").get("java").getAsString());
+      for (String problem : new DeclaredTypes(contract, OPEN_STRINGS, usedOpenStrings).check(operation, method))
+        if (!allowed(problem, used)) problems.add(problem);
+    }
+    List<String> stale = Stream.concat(TYPE_DIFFERENCES.keySet().stream().filter(k -> !used.containsKey(k)),
+        OPEN_STRINGS.keySet().stream().filter(k -> !usedOpenStrings.contains(k))).sorted().toList();
+    assertTrue(problems.isEmpty() && stale.isEmpty(),
+        "declared types differ from types.json:\n" + String.join("\n", problems) + (stale.isEmpty() ? "" : "\nunused differences: " + stale));
   }
 }

@@ -1314,6 +1314,8 @@ public final class Models {
     private String mode;
     private Integer pageSize;
     public SearchAssets() {}
+    /** @param query the text to search for */
+    public SearchAssets(String query) { this.query = query; }
     public SearchAssets query(String value) { query = value; return this; }
     /** @param value {@code keyword}, {@code semantic} or {@code hybrid} @return these options */
     public SearchAssets mode(String value) { mode = value; return this; }
@@ -1390,7 +1392,6 @@ public final class Models {
     private Patch<String> description;
     private Patch<List<String>> tags;
     private Patch<List<MetadataItem>> metadata;
-    private Patch<String> folderId;
     private Patch<String> externalId;
     private Patch<String> externalUrl;
     private Patch<Visibility> visibility;
@@ -1403,7 +1404,6 @@ public final class Models {
     public UpdateAsset description(Patch<String> value) { description = value; return this; }
     public UpdateAsset tags(Patch<List<String>> value) { tags = value; return this; }
     public UpdateAsset metadata(Patch<List<MetadataItem>> value) { metadata = value; return this; }
-    public UpdateAsset folderId(Patch<String> value) { folderId = value; return this; }
     public UpdateAsset externalId(Patch<String> value) { externalId = value; return this; }
     public UpdateAsset externalUrl(Patch<String> value) { externalUrl = value; return this; }
     public UpdateAsset visibility(Patch<Visibility> value) { visibility = value; return this; }
@@ -1614,27 +1614,24 @@ public final class Models {
   public static final class CreateFolder {
     private String name;
     private Patch<String> parentId;
-    private String description;
     public CreateFolder() {}
     /** @param name the folder name */
     public CreateFolder(String name) { this.name = name; }
     public CreateFolder name(String value) { name = value; return this; }
     public CreateFolder parentId(Patch<String> value) { parentId = value; return this; }
-    public CreateFolder description(String value) { description = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
   /** Options for {@code folders.update}. */
   public static final class UpdateFolder {
     private String folderId;
-    private Patch<String> name;
-    private Patch<String> description;
+    private String name;
     public UpdateFolder() {}
     /** @param folderId the folder */
     public UpdateFolder(String folderId) { this.folderId = folderId; }
     public UpdateFolder folderId(String value) { folderId = value; return this; }
-    public UpdateFolder name(Patch<String> value) { name = value; return this; }
-    public UpdateFolder description(Patch<String> value) { description = value; return this; }
+    /** @param value the new name; a folder always has one, so it can't be cleared @return these options */
+    public UpdateFolder name(String value) { name = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
@@ -2727,16 +2724,18 @@ public final class Models {
   /** Options for {@code hashLists.update}; unset fields keep their value. A new action applies to later uploads. */
   public static final class UpdateHashList {
     private String hashListId;
-    private Patch<String> name;
+    private String name;
     private Patch<String> description;
-    private Patch<HashListAction> action;
+    private HashListAction action;
     public UpdateHashList() {}
     /** @param hashListId the hash list */
     public UpdateHashList(String hashListId) { this.hashListId = hashListId; }
     public UpdateHashList hashListId(String value) { hashListId = value; return this; }
-    public UpdateHashList name(Patch<String> value) { name = value; return this; }
+    /** @param value the new name; a list always has one, so it can't be cleared @return these options */
+    public UpdateHashList name(String value) { name = value; return this; }
     public UpdateHashList description(Patch<String> value) { description = value; return this; }
-    public UpdateHashList action(Patch<HashListAction> value) { action = value; return this; }
+    /** @param value what later matches do; a list always has an action, so it can't be cleared @return these options */
+    public UpdateHashList action(HashListAction value) { action = value; return this; }
     @Override public String toString() { return describe(this); }
   }
 
