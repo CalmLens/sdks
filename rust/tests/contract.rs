@@ -1450,6 +1450,9 @@ async fn check_step(
             json!({"code": wanted["code"], "status": wanted["status"]}),
             "{label}"
         );
+        if let Some(kind) = wanted["kind"].as_str() {
+            common::check_kind(&error, kind, &label);
+        }
         if let Some(details) = wanted.get("details") {
             assert!(
                 has_details(error.details(), details),
@@ -2060,5 +2063,85 @@ fn error_kinds_match_the_surface() {
         resolved,
         common::ERROR_KINDS,
         "every ErrorKind, in surface.json order"
+    );
+}
+
+/// Public client methods that are language plumbing rather than API capabilities, with the
+/// reason, as the README's "Stale public methods" allows.
+const PLUMBING_METHODS: &[(&str, &str)] = &[
+    ("new", "Creates the client with the default options."),
+    ("builder", "Creates the client builder for its options."),
+    ("from_env", "Creates the client from the CALMLENS_* environment variables."),
+    ("with_timeout", "A handle of the same client with another timeout."),
+    ("with_max_retries", "A handle of the same client with another retry limit."),
+    ("with_options", "A handle of the same client with per-call request options."),
+    ("project_id", "Reads the project the client was configured for."),
+    (
+        "events().pages",
+        "Yields the event pages behind events().iterate, so a poller can persist each page's cursor.",
+    ),
+];
+
+/// surface.json `method` capabilities name every public method of the client and its
+/// sub-clients, read from `src/client.rs` since Rust has no reflection; anything else is listed
+/// in `PLUMBING_METHODS` with its reason.
+#[test]
+fn every_public_client_method_is_a_capability() {
+    let surface = fixture("surface");
+    let names: BTreeSet<&str> = surface["capabilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|capability| capability["names"]["rust"].as_str())
+        .collect();
+    let source =
+        std::fs::read_to_string(format!("{}/src/client.rs", env!("CARGO_MANIFEST_DIR"))).unwrap();
+    let accessor = regex_lite::Regex::new(r"pub fn (\w+)\(&self\) -> (\w+Client)<'_>").unwrap();
+    let accessors: HashMap<String, String> = accessor
+        .captures_iter(&source)
+        .map(|captures| (captures[2].to_owned(), captures[1].to_owned()))
+        .collect();
+    let block = regex_lite::Regex::new(r"^impl (\w+)(?:<'_>)? \{").unwrap();
+    let method = regex_lite::Regex::new(r"^    pub (?:async )?fn (\w+)").unwrap();
+    let (mut current, mut found) = (None::<String>, BTreeSet::new());
+    for line in source.lines() {
+        if let Some(captures) = block.captures(line) {
+            current = Some(captures[1].to_owned());
+        } else if line.starts_with('}') {
+            current = None;
+        } else if let (Some(owner), Some(captures)) = (&current, method.captures(line)) {
+            let name = &captures[1];
+            let full = match accessors.get(owner) {
+                Some(prefix) => format!("{prefix}().{name}"),
+                None if owner == "ServerClient" => name.to_owned(),
+                None => continue,
+            };
+            // The sub-client accessors themselves, such as `assets()`.
+            if owner == "ServerClient" && accessors.values().any(|prefix| prefix == name) {
+                continue;
+            }
+            found.insert(full);
+        }
+    }
+    let allowed: BTreeSet<&str> = PLUMBING_METHODS.iter().map(|(name, _)| *name).collect();
+    let stale: Vec<&String> = found
+        .iter()
+        .filter(|name| !names.contains(name.as_str()) && !allowed.contains(name.as_str()))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "public methods no capability names: {stale:?}"
+    );
+    let unused: Vec<&&str> = allowed
+        .iter()
+        .filter(|name| !found.contains(**name))
+        .collect();
+    assert!(
+        unused.is_empty(),
+        "PLUMBING_METHODS lists methods that don't exist: {unused:?}"
+    );
+    assert!(
+        found.contains("assets().retrieve"),
+        "the source scan found the methods"
     );
 }
