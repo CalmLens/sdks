@@ -7,9 +7,9 @@ namespace CalmLens\Model;
 use CalmLens\CalmLensObject;
 
 /**
- * An asset's moderation decision: `status`, and the evidence and reviews behind it.
+ * An asset's moderation decision: `decision`, and the evidence and reviews behind it.
  *
- * @property-read self::STATUS_* $status
+ * @property-read null|self::DECISION_* $decision
  * @property-read list<ManualReview> $manualReviews
  * @property-read null|self::AUTOMATED_STATUS_* $automatedStatus
  * @property-read null|self::SOURCE_* $source
@@ -25,12 +25,11 @@ use CalmLens\CalmLensObject;
  */
 final class Moderation extends CalmLensObject
 {
-    public const STATUS_PENDING = 'pending';
-    public const STATUS_ALLOWED = 'allowed';
-    public const STATUS_LIMITED = 'limited';
-    public const STATUS_AGE_RESTRICTED = 'age-restricted';
-    public const STATUS_BLOCKED = 'blocked';
-    public const STATUS_PURGED = 'purged';
+    public const DECISION_ALLOWED = 'allowed';
+    public const DECISION_LIMITED = 'limited';
+    public const DECISION_AGE_RESTRICTED = 'age-restricted';
+    public const DECISION_BLOCKED = 'blocked';
+    public const DECISION_PURGED = 'purged';
 
     public const AUTOMATED_STATUS_ALLOWED = 'allowed';
     public const AUTOMATED_STATUS_LIMITED = 'limited';

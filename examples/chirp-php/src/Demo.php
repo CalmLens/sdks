@@ -130,7 +130,7 @@ final class Demo
     {
         $asset = $this->mock->assets[$assetId] ?? null;
         $bytes = $this->mock->content[$assetId]['bytes'] ?? null;
-        if ($asset === null || $asset['visibility'] !== 'public' || $asset['classification']['moderation']['status'] === 'purged' || $bytes === null) {
+        if ($asset === null || $asset['visibility'] !== 'public' || $asset['classification']['moderation']['decision'] === 'purged' || $bytes === null) {
             return [403, ['Content-Type' => 'text/plain'], 'Asset is not available'];
         }
         $image = function_exists('imagecreatefromstring') ? @imagecreatefromstring($bytes) : false;

@@ -20,7 +20,7 @@ final class CommentController
         }
         // Allowed and limited comments publish (limited is only marked so an app can reduce its reach);
         // pending, age-restricted, blocked, purged and unknown statuses do not.
-        if (!in_array($asset->classification?->moderation?->status, [Moderation::STATUS_ALLOWED, Moderation::STATUS_LIMITED], true)) {
+        if (!in_array($asset->classification?->moderation?->decision, [Moderation::DECISION_ALLOWED, Moderation::DECISION_LIMITED], true)) {
             return back()->withInput()->withErrors(['comment' => 'This comment cannot be published yet.']);
         }
         // Session storage keeps this demo database-free and private to the visitor.

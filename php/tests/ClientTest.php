@@ -22,7 +22,7 @@ use PHPUnit\Framework\TestCase;
 final class ClientTest extends TestCase
 {
     /** An upload's response: an asset with its statuses. */
-    private const ASSET = ['id' => 'a', 'upload' => ['status' => 'completed'], 'classification' => ['status' => 'processing', 'moderation' => ['status' => 'pending']]];
+    private const ASSET = ['id' => 'a', 'upload' => ['status' => 'completed'], 'classification' => ['status' => 'processing', 'moderation' => ['decision' => null]]];
 
     private function error(string $code, callable $call): CalmLensException
     {

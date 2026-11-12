@@ -33,7 +33,7 @@ final class AutomaticMultipartTest extends TestCase
     private static function asset(string $status, ?int $partsReceived): array
     {
         return ['id' => 'asset-1', 'upload' => ['status' => $status, 'partsReceived' => $partsReceived],
-            'classification' => ['status' => 'pending', 'moderation' => ['status' => 'pending']]];
+            'classification' => ['status' => 'pending', 'moderation' => ['decision' => null]]];
     }
 
     /**

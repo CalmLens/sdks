@@ -5,7 +5,7 @@ optional images, replies, a home timeline and profiles with bios. Everyone's wor
 are moderated before anyone else sees them.
 
 - **Posts, replies and bios** are classified synchronously with `text->classify`. Text whose
-  `classification.moderation.status` isn't `allowed` or `limited` is refused and never saved; the author sees
+  `classification.moderation.decision` isn't `allowed` or `limited` is refused and never saved; the author sees
   why ("may contain harassment"). Text has no sensitive view, so `age-restricted` text is
   refused too. If CalmLens can't be reached, nothing is saved.
 - **Images** are uploaded with `assets->create` and stay `pending` until CalmLens decides. A

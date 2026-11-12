@@ -56,18 +56,18 @@ final class MockServerClientTest extends TestCase
         yield ['age-restricted', 'completed', 'age-restricted', 'stored'];
         yield ['blocked', 'completed', 'blocked', 'stored'];
         yield ['purged', 'completed', 'purged', 'removed'];
-        yield ['failed', 'failed', 'pending', 'stored'];
-        yield ['pending', 'processing', 'pending', 'stored'];
+        yield ['failed', 'failed', null, 'stored'];
+        yield ['pending', 'processing', null, 'stored'];
     }
 
     #[DataProvider('outcomes')]
-    public function testModerateStatusSetsStatusesAndPurgedRemovesContent(string $outcome, string $classification, string $moderation, string $content): void
+    public function testModerateStatusSetsStatusesAndPurgedRemovesContent(string $outcome, string $classification, ?string $moderation, string $content): void
     {
         $mock = new MockServerClient(moderate: fn () => $outcome);
         $asset = self::image($mock);
         $stored = $mock->client()->assets->retrieve(['assetId' => $asset['id']]);
         self::assertSame($classification, $stored['classification']['status']);
-        self::assertSame($moderation, $stored['classification']['moderation']['status']);
+        self::assertSame($moderation, $stored['classification']['moderation']['decision']);
         self::assertSame($content, $stored['content']['status']);
         self::assertSame($content === 'removed', !isset($mock->content[$asset['id']]));
         if ($outcome === 'purged') {
@@ -81,8 +81,8 @@ final class MockServerClientTest extends TestCase
         $client = $mock->client();
         $kind = $client->text->classify(['name' => 'kind', 'processingOptions' => ['retainContent' => false], 'text' => 'hello']);
         $rude = $client->text->classify(['name' => 'rude', 'processingOptions' => ['retainContent' => false], 'text' => 'go away']);
-        self::assertSame('allowed', $kind['classification']['moderation']['status']);
-        self::assertSame('blocked', $rude['classification']['moderation']['status']);
+        self::assertSame('allowed', $kind['classification']['moderation']['decision']);
+        self::assertSame('blocked', $rude['classification']['moderation']['decision']);
         self::assertSame(['removed', 'retention'], [$kind['content']['status'], $kind['content']['removalReason']]);
         self::assertSame([], $mock->content);
     }
@@ -97,7 +97,7 @@ final class MockServerClientTest extends TestCase
         $mock->events = [];
         $retried = $client->assets->retry(['assetId' => $asset['id']]);
         self::assertSame(['completed', 'blocked', ['violence']], [$retried['classification']['status'],
-            $retried['classification']['moderation']['status'], $retried['classification']['moderation']['flaggedCategories']]);
+            $retried['classification']['moderation']['decision'], $retried['classification']['moderation']['flaggedCategories']]);
         self::assertSame(['asset.retried', 'asset.classified', 'asset.blocked'], array_column($mock->events, 'type'));
     }
 
@@ -246,9 +246,9 @@ final class MockServerClientTest extends TestCase
         }
         $names = fn (string $filter) => array_column($client->assets->list(['filter' => $filter])['items'], 'name');
         self::assertSame(['note-b.txt', 'note-a.txt'], $names('name==note-*'));
-        self::assertSame(['photo.png', 'note-a.txt'], $names('classification.moderation.status==blocked,name==note-a.txt'));
-        self::assertSame(['note-b.txt'], $names('name==note-*;classification.moderation.status=out=(allowed,blocked)'));
-        self::assertSame(['photo.png'], $names('classification.moderation.status=in=("blocked")'));
+        self::assertSame(['photo.png', 'note-a.txt'], $names('classification.moderation.decision==blocked,name==note-a.txt'));
+        self::assertSame(['note-b.txt'], $names('name==note-*;classification.moderation.decision=out=(allowed,blocked)'));
+        self::assertSame(['photo.png'], $names('classification.moderation.decision=in=("blocked")'));
     }
 
     public function testFailNextRequestSimulatesConnectionFailuresAndApiErrors(): void
@@ -363,15 +363,15 @@ final class MockServerClientTest extends TestCase
         $mock->assets[$asset['id']]['classification']['moderation']['explanationComplete'] = false;
         $explained = $client->assets->explain(['assetId' => $asset['id']]);
         self::assertSame([true, 'blocked'], [$explained['classification']['moderation']['explanationComplete'],
-            $explained['classification']['moderation']['status']]);
+            $explained['classification']['moderation']['decision']]);
         $mock->assets[$asset['id']]['classification']['moderation']['manualReviews'] = [['decision' => 'blocked']];
         self::assertSame(ErrorCodes::ASSET_REVIEWED, self::code(fn () => $client->assets->explain(['assetId' => $asset['id'], 'rerun' => true])));
         $mock->assets[$asset['id']]['classification']['moderation']['manualReviews'] = [];
         $rerun = $client->assets->explain(['assetId' => $asset['id'], 'rerun' => true]);
-        self::assertSame(['completed', 'blocked'], [$rerun['classification']['status'], $rerun['classification']['moderation']['status']]);
+        self::assertSame(['completed', 'blocked'], [$rerun['classification']['status'], $rerun['classification']['moderation']['decision']]);
         // A failed re-run keeps the decision and leaves nothing to complete.
         $kept = $mock->completeProcessing($asset['id'], 'failed');
-        self::assertSame(['completed', 'blocked'], [$kept['classification']['status'], $kept['classification']['moderation']['status']]);
+        self::assertSame(['completed', 'blocked'], [$kept['classification']['status'], $kept['classification']['moderation']['decision']]);
         self::assertSame(SdkErrorCodes::INVALID_ARGUMENT, self::code(fn () => $mock->completeProcessing($asset['id'])));
     }
 
@@ -381,18 +381,18 @@ final class MockServerClientTest extends TestCase
         $client = $mock->client();
         $asset = self::image($mock);
         $rerun = $client->assets->explain(['assetId' => $asset['id'], 'rerun' => true]);
-        self::assertSame('blocked', $rerun['classification']['moderation']['status']);
-        self::assertSame('allowed', $client->assets->retrieve(['assetId' => $asset['id']])['classification']['moderation']['status']);
+        self::assertSame('blocked', $rerun['classification']['moderation']['decision']);
+        self::assertSame('allowed', $client->assets->retrieve(['assetId' => $asset['id']])['classification']['moderation']['decision']);
     }
 
     public function testWaitForDecisionKeepsWaitingWhileQueuedOrProcessingEvenOnceDecided(): void
     {
         $mock = new MockServerClient();
         foreach ([['queued', 'pending'], ['processing', 'blocked'], ['completed', 'blocked']] as [$classification, $moderation]) {
-            $mock->enqueueJson(['id' => 'asset-1', 'classification' => ['status' => $classification, 'moderation' => ['status' => $moderation]]]);
+            $mock->enqueueJson(['id' => 'asset-1', 'classification' => ['status' => $classification, 'moderation' => ['decision' => $moderation]]]);
         }
         $asset = $mock->client()->assets->waitForDecision(['assetId' => 'asset-1']);
-        self::assertSame(['completed', 'blocked'], [$asset['classification']['status'], $asset['classification']['moderation']['status']]);
+        self::assertSame(['completed', 'blocked'], [$asset['classification']['status'], $asset['classification']['moderation']['decision']]);
         self::assertCount(3, $mock->requests());
     }
 
@@ -508,7 +508,7 @@ final class MockServerClientTest extends TestCase
         $mock = new MockServerClient(moderate: fn (MockModerationInput $input) => $input->content->bytes === 'hello there' ? 'blocked' : 'allowed');
         $asset = $mock->client()->assets->classify(['name' => 'note.txt', 'content' => ['plainText' => 'hello there', 'type' => 'text/plain'],
             'description' => 'A note', 'authorId' => 'pupil-7']);
-        self::assertSame(['blocked', 'A note', 'pupil-7'], [$asset['classification']['moderation']['status'], $asset['description'], $asset['authorId']]);
+        self::assertSame(['blocked', 'A note', 'pupil-7'], [$asset['classification']['moderation']['decision'], $asset['description'], $asset['authorId']]);
         self::assertSame(['wait' => 'true'], $mock->requests()[0]->query);
         self::assertSame(['name' => 'note.txt', 'description' => 'A note', 'authorId' => 'pupil-7',
             'content' => ['plainText' => 'hello there', 'type' => 'text/plain']], $mock->requests()[0]->body());

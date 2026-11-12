@@ -107,7 +107,7 @@ final class Moderation
     public static function outcome(Asset $asset): array
     {
         $classification = $asset->classification;
-        $status = $classification?->moderation?->status;
+        $status = $classification?->moderation?->decision;
         $findings = [];
         foreach ($classification?->moderation?->raw?->categories ?? [] as $category => $result) {
             // `not-evaluated` means unknown, not safe: never read it as a zero score.

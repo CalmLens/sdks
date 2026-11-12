@@ -36,8 +36,8 @@ $client = new CalmLens\ServerClient(
     projectId: getenv('CALMLENS_PROJECT_ID'),
 );
 $asset = $client->text->classify(['text' => 'Hello world']);
-// pending, then allowed, limited, age-restricted, blocked or purged. Treat any other value as not ready.
-if (in_array($asset->classification->moderation->status, [Moderation::STATUS_ALLOWED, Moderation::STATUS_LIMITED], true)) {
+// null until decided, then allowed, limited, age-restricted, blocked or purged. Treat any other value as not ready.
+if (in_array($asset->classification->moderation->decision, [Moderation::DECISION_ALLOWED, Moderation::DECISION_LIMITED], true)) {
     // Publish the comment.
 }
 ```
@@ -46,13 +46,13 @@ Keep API keys on the server, and reuse a client within a request or worker. Meth
 array of params with camelCase keys, and request options such as an `idempotencyKey` or `timeout`
 as a second array. Results are objects in `CalmLens\Model`, such as `Asset` and `Event`: read a
 field as a property (`$asset->classification->status`) or an array key, or the whole object with
-`toArray()`. Enumerated values are class constants, such as `Moderation::STATUS_BLOCKED`, and lists
+`toArray()`. Enumerated values are class constants, such as `Moderation::DECISION_BLOCKED`, and lists
 are `Collection` pages whose `autoPagingIterator()` yields every item. The docblocks type every
 field and param for PHPStan.
 
-| Status           | What to do                                                                   |
+| Decision         | What to do                                                                   |
 | ---------------- | ---------------------------------------------------------------------------- |
-| `pending`        | Keep it unpublished; wait with a webhook or `assets->waitForDecision()`.     |
+| `null`           | Not decided yet: keep it unpublished; wait with a webhook or `assets->waitForDecision()`. |
 | `allowed`        | Publish it.                                                                  |
 | `limited`        | Publish it, with reduced reach (out of recommendations and notifications).   |
 | `age-restricted` | Show it only to viewers your app has decided may see age-restricted content. |

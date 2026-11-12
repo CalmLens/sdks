@@ -21,7 +21,7 @@ final class AssetSearchMatch extends CalmLensObject
     public const MATCHED_FIELDS_TYPE = 'type';
     public const MATCHED_FIELDS_CONTENT_FORMAT = 'content.format';
     public const MATCHED_FIELDS_CONTENT_EXTENSION = 'content.extension';
-    public const MATCHED_FIELDS_CLASSIFICATION_MODERATION_STATUS = 'classification.moderation.status';
+    public const MATCHED_FIELDS_CLASSIFICATION_MODERATION_DECISION = 'classification.moderation.decision';
     public const MATCHED_FIELDS_VISUAL = 'visual';
     public const MATCHED_FIELDS_TRANSCRIPT = 'transcript';
 

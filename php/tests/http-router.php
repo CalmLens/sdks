@@ -9,7 +9,7 @@ header('Content-Type: application/json');
 echo json_encode([
     'id' => 'asset-1',
     'upload' => ['status' => 'completed'],
-    'classification' => ['status' => 'processing', 'moderation' => ['status' => 'pending']],
+    'classification' => ['status' => 'processing', 'moderation' => ['decision' => null]],
     'method' => $_SERVER['REQUEST_METHOD'],
     'path' => parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH),
     'query' => $_GET,

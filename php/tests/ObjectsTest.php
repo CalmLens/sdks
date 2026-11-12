@@ -21,7 +21,7 @@ final class ObjectsTest extends TestCase
 {
     private const ASSET = [
         'id' => 'asset-1', 'type' => 'image', 'futureField' => ['added' => true],
-        'classification' => ['status' => 'completed', 'moderation' => ['status' => 'allowed',
+        'classification' => ['status' => 'completed', 'moderation' => ['decision' => 'allowed',
             'raw' => ['categories' => ['self-harm' => ['status' => 'not-evaluated', 'reason' => 'unavailable']], 'hashMatches' => []],
             'categories' => []]],
         'metadata' => [['id' => 'campaign.id', 'value' => ['nested' => 'json']]],

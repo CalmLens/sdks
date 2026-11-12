@@ -544,7 +544,7 @@ final class Assets extends Resource
 
     /**
      * Retrieves an asset until it is settled, its `classification.status` `completed` (with its
-     * decision in `classification.moderation.status`) or `failed`, and returns it. A `queued` or
+     * decision in `classification.moderation.decision`) or `failed`, and returns it. A `queued` or
      * `processing` asset is still waiting, even when a reviewer has already decided it. Waits 0.5
      * seconds before the second check and 1.5 times longer each time, at most 2 seconds. Throws
      * `TimeoutException` (`sdk/timeout`, with the asset's statuses in `details`) once `timeout`
@@ -584,7 +584,7 @@ final class Assets extends Resource
                 break;
             }
             $classification = $asset['classification'] ?? [];
-            $status = $classification['moderation']['status'] ?? null;
+            $status = $classification['moderation']['decision'] ?? null;
             if (in_array($classification['status'] ?? null, ['completed', 'failed'], true)) {
                 return $this->model(Asset::class, $asset);
             }
@@ -630,7 +630,10 @@ final class Assets extends Resource
     {
         if (!is_array($data) || !is_string($data['id'] ?? null) || $data['id'] === ''
             || !is_string($data['upload']['status'] ?? null) || !is_string($data['classification']['status'] ?? null)
-            || !is_string($data['classification']['moderation']['status'] ?? null)) {
+            || !is_array($data['classification']['moderation'] ?? null)
+            || !array_key_exists('decision', $data['classification']['moderation'])
+            || ($data['classification']['moderation']['decision'] !== null
+                && !is_string($data['classification']['moderation']['decision']))) {
             throw CalmLensException::create('sdk/invalid-response', 'Expected an asset response', 200);
         }
         return $data;

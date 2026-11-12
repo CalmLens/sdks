@@ -349,7 +349,7 @@ final class MockServerClient
         // An `asset.<status>` event carries the moderation status it announces.
         $announced = self::ANNOUNCED_STATUSES[$event['type'] ?? ''] ?? null;
         if ($snapshot !== null && $announced !== null) {
-            $snapshot['classification']['moderation']['status'] = $announced;
+            $snapshot['classification']['moderation']['decision'] = $announced;
         }
         // Like the API: each event about an asset takes the asset's next number; others have none.
         $sequence = null;
@@ -465,7 +465,7 @@ final class MockServerClient
     {
         return ['id' => $asset['id'], 'externalId' => $asset['externalId'] ?? null, 'uploadPresetId' => $asset['uploadPresetId'] ?? null,
             'upload' => ['status' => $asset['upload']['status']], 'classification' => ['status' => $asset['classification']['status'],
-                'testInput' => $asset['classification']['testInput'], 'moderation' => ['status' => $asset['classification']['moderation']['status']]], 'content' => ['status' => $asset['content']['status']]];
+                'testInput' => $asset['classification']['testInput'], 'moderation' => ['decision' => $asset['classification']['moderation']['decision']]], 'content' => ['status' => $asset['content']['status']]];
     }
 
     private static function grantsOf(#[\SensitiveParameter] string $apiKey): array
@@ -824,7 +824,7 @@ final class MockServerClient
             case 'DELETE content':
                 return $this->requestedRemoval($asset);
             case 'POST retry':
-                if ($asset['classification']['status'] !== 'failed' || $asset['classification']['moderation']['status'] !== 'pending') {
+                if ($asset['classification']['status'] !== 'failed' || $asset['classification']['moderation']['decision'] !== null) {
                     self::fail(ErrorCodes::ASSET_NOT_RETRYABLE);
                 }
                 if ($asset['content']['status'] === 'removed') {
@@ -858,7 +858,7 @@ final class MockServerClient
                 // its decision while it's moderated again under the current policy.
                 $this->enqueueEvent(['type' => 'asset.rerun-requested', 'severity' => 'low', 'assetId' => $id, 'asset' => $this->snapshot($asset),
                     'actor' => self::API_KEY_ACTOR, 'facts' => [self::nameFact($asset), ['key' => 'asset-type', 'value' => $asset['type']],
-                        ['key' => 'moderation-status', 'value' => $asset['classification']['moderation']['status']]]]);
+                        ['key' => 'moderation-status', 'value' => $asset['classification']['moderation']['decision']]]]);
                 $this->settleRerun($asset, $this->decisionFor($asset, MockModerationInput::RERUN, true));
                 return $asset;
             case 'POST move':
@@ -1071,7 +1071,7 @@ final class MockServerClient
             'classification' => ['status' => $final ? 'processing' : 'queued', 'failureReason' => null, 'updatedAt' => $now, 'completedAt' => null,
                 // The mock analyses nothing in sections, and never reads test inputs.
                 'progress' => null, 'testInput' => false,
-                'moderation' => ['status' => 'pending', 'manualReviews' => [], 'automatedStatus' => null, 'policy' => null,
+                'moderation' => ['decision' => null, 'manualReviews' => [], 'automatedStatus' => null, 'policy' => null,
                     'pendingReview' => null, 'source' => null, 'rule' => null,
                     'explanationComplete' => null, 'categories' => null, 'flaggedCategories' => [], 'regions' => [], 'raw' => null,
                     'linkSafety' => null, 'timeline' => null],
@@ -1336,7 +1336,7 @@ final class MockServerClient
         $asset['classification'] = ['status' => $status, 'failureReason' => $status === 'failed' ? 'processing-error' : null,
             'updatedAt' => $now, 'completedAt' => $decided ? $now : null] + $asset['classification'];
         $asset['classification']['moderation'] = array_replace($asset['classification']['moderation'],
-            ['status' => $decided ? $outcome : 'pending'], $report ?? []);
+            ['decision' => $decided ? $outcome : null], $report ?? []);
         $asset['updatedAt'] = $now;
         return $this->assets[$asset['id']] = $asset;
     }
@@ -1375,9 +1375,9 @@ final class MockServerClient
         if ($asset['upload']['status'] === 'uploading' || $asset['classification']['status'] === 'processing') {
             self::fail(ErrorCodes::ASSET_PROCESSING);
         }
-        $status = $asset['classification']['moderation']['status'];
+        $status = $asset['classification']['moderation']['decision'];
         $restrictive = in_array($decision, ['blocked', 'purged'], true);
-        if (!$restrictive && $status === 'pending') {
+        if (!$restrictive && $status === null) {
             self::fail(ErrorCodes::ASSET_DECISION_NOT_ALLOWED);
         }
         if ($decision === $status) {
@@ -1386,7 +1386,7 @@ final class MockServerClient
         if (!$restrictive && $status === 'purged') {
             self::fail(ErrorCodes::ASSET_CONTENT_PURGED);
         }
-        $asset['classification']['moderation']['status'] = $decision;
+        $asset['classification']['moderation']['decision'] = $decision;
         unset($this->pendingReruns[$asset['id']]);
         $asset['classification']['moderation']['manualReviews'][] = self::review(($this->createId)('rev'), $decision, $note, ($this->now)());
         $asset = $this->assets[$asset['id']] = $this->touch($asset);
@@ -1938,7 +1938,7 @@ final class MockServerClient
     /** Keyword search fields, in the order matches are reported, and where each value sits in the asset. */
     private const SEARCH_FIELDS = ['name' => ['name'], 'id' => ['id'], 'externalId' => ['externalId'],
         'description' => ['description'], 'tags' => ['tags'], 'type' => ['type'], 'content.format' => ['content', 'format'],
-        'content.extension' => ['content', 'extension'], 'classification.moderation.status' => ['classification', 'moderation', 'status']];
+        'content.extension' => ['content', 'extension'], 'classification.moderation.decision' => ['classification', 'moderation', 'decision']];
 
     /**
      * Keyword search like the API: every whitespace-separated token (case-insensitive, at most 8
@@ -1965,6 +1965,10 @@ final class MockServerClient
                 $value = $asset;
                 foreach ($path as $key) {
                     $value = is_array($value) ? ($value[$key] ?? null) : null;
+                }
+                // An undecided asset matches `pending`, as in the API.
+                if ($field === 'classification.moderation.decision') {
+                    $value ??= 'pending';
                 }
                 $values[$field] = strtolower(implode(' ', array_map('strval', is_array($value) ? $value : ($value === null ? [] : [$value]))));
             }
@@ -2775,7 +2779,7 @@ final class MockServerClient
             return $this->serveInfo($method, $asset, $query, $canDownload());
         }
         $notAvailable = fn () => $this->json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);
-        $status = $asset['classification']['moderation']['status'];
+        $status = $asset['classification']['moderation']['decision'];
         $rendered = $asset['content']['rendered'] ?? null;
         $preview = $asset['content']['preview'] ?? null;
         // Like the CDN, a safety hold refuses every resource.
@@ -2878,7 +2882,7 @@ final class MockServerClient
             return $this->json(400, ['code' => ErrorCodes::INVALID_VIEWER_CLAIMS, 'message' => 'Invalid viewer claims']);
         }
         $content = $asset['content'];
-        $status = $asset['classification']['moderation']['status'];
+        $status = $asset['classification']['moderation']['decision'];
         $restricted = $private || in_array($status, ['blocked', 'purged'], true);
         if ($restricted && !$authorised) {
             return $this->json(403, ['code' => 'asset/not-available', 'message' => 'Asset is not available']);

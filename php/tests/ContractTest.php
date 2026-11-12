@@ -1180,7 +1180,7 @@ final class ContractTest extends TestCase
     {
         $mock = new MockServerClient(...[$option => fn () => 'blocked']);
         $asset = $mock->client()->assets->classify(['name' => 'note.txt', 'content' => ['plainText' => 'hello', 'type' => 'text/plain']]);
-        return $asset['classification']['moderation']['status'] ?? null;
+        return $asset['classification']['moderation']['decision'] ?? null;
     }
 
     /** `Class::member` with the class relative to the CalmLens namespace. */

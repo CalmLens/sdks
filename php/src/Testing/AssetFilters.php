@@ -33,7 +33,7 @@ final class AssetFilters
         'classification.status' => ['kind' => 'text', 'nullable' => false, 'operators' => ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out=']],
         'classification.updatedAt' => ['kind' => 'number', 'nullable' => true, 'operators' => ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out=']],
         'classification.completedAt' => ['kind' => 'number', 'nullable' => true, 'operators' => ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out=']],
-        'classification.moderation.status' => ['kind' => 'text', 'nullable' => false, 'operators' => ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out=']],
+        'classification.moderation.decision' => ['kind' => 'text', 'nullable' => true, 'operators' => ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out=']],
         'content.status' => ['kind' => 'text', 'nullable' => false, 'operators' => ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out=']],
         'content.removalReason' => ['kind' => 'text', 'nullable' => true, 'operators' => ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out=']],
         'content.updatedAt' => ['kind' => 'number', 'nullable' => true, 'operators' => ['==', '!=', '>', '>=', '<', '<=', '=in=', '=out=']],

@@ -7,14 +7,13 @@ namespace CalmLens\Model;
 use CalmLens\CalmLensObject;
 
 /**
- * @property-read self::STATUS_* $status
+ * @property-read null|self::DECISION_* $decision
  */
 final class EventAssetModeration extends CalmLensObject
 {
-    public const STATUS_PENDING = 'pending';
-    public const STATUS_ALLOWED = 'allowed';
-    public const STATUS_LIMITED = 'limited';
-    public const STATUS_AGE_RESTRICTED = 'age-restricted';
-    public const STATUS_BLOCKED = 'blocked';
-    public const STATUS_PURGED = 'purged';
+    public const DECISION_ALLOWED = 'allowed';
+    public const DECISION_LIMITED = 'limited';
+    public const DECISION_AGE_RESTRICTED = 'age-restricted';
+    public const DECISION_BLOCKED = 'blocked';
+    public const DECISION_PURGED = 'purged';
 }

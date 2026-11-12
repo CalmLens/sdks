@@ -27,7 +27,7 @@ final class CommentTest extends TestCase
     private static function asset(string $status): array
     {
         return ['id' => 'asset-1', 'upload' => ['status' => 'completed'],
-            'classification' => ['status' => 'completed', 'moderation' => ['status' => $status]]];
+            'classification' => ['status' => 'completed', 'moderation' => ['decision' => $status]]];
     }
 
     public static function published(): iterable
