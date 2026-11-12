@@ -6,7 +6,9 @@
     describeUploadItem,
     resolveMessages,
     type UploaderProps,
+    withProvidedOptions,
   } from "../ui.js";
+  import { getCalmLensContext } from "./context.js";
   import Icon from "./Icon.svelte";
 
   let {
@@ -17,10 +19,12 @@
     ...options
   }: UploaderProps = $props();
 
+  // What a setCalmLensContext above gives, under the uploader's own options.
+  const provided = getCalmLensContext();
   // The latest options, without restarting uploads when the parent re-renders.
-  const own = createUploadController(options);
+  const own = createUploadController(withProvidedOptions(provided, { ...options }));
   $effect.pre(() => {
-    if (!external) own.setOptions({ ...options });
+    if (!external) own.setOptions(withProvidedOptions(provided, { ...options }));
   });
   onMount(() => () => own.clear());
 

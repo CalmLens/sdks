@@ -48,6 +48,7 @@ export { CALMLENS_STYLES } from "./Styles";
 export type { CalmLensTheme } from "./Theme";
 export { CALMLENS_THEME, resolveTheme } from "./Theme";
 export type {
+  CalmLensProvidedOptions,
   CalmLensUpload,
   CustomUploadContext,
   CustomUploadResult,
@@ -58,4 +59,9 @@ export type {
   UploadSnapshot,
   UploadStage,
 } from "./UploadController";
-export { createUploadController, isFileAccepted, UploadController } from "./UploadController";
+export {
+  createUploadController,
+  isFileAccepted,
+  UploadController,
+  withProvidedOptions,
+} from "./UploadController";

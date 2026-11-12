@@ -4,13 +4,17 @@
 // `error`, `availability-change`, `play`, `ended` and `timeupdate`.
 
 import {
+  type App,
   computed,
   defineComponent,
   h,
+  type InjectionKey,
+  inject,
   type MaybeRefOrGetter,
   onMounted,
   onScopeDispose,
   type PropType,
+  provide,
   ref,
   type ShallowRef,
   shallowRef,
@@ -57,9 +61,11 @@ import {
 } from "./ui/Messages";
 import { ASSET_FILE_ICON_SIZE } from "./ui/Props";
 import {
+  type CalmLensProvidedOptions,
   createUploadController,
   type UploadController,
   type UploadFile,
+  withProvidedOptions,
 } from "./ui/UploadController";
 import type { ViewerAsset } from "./ui/viewers";
 
@@ -106,16 +112,40 @@ const subscribeSnapshot = <F extends UploadFile>(
   return snapshot;
 };
 
+const CALMLENS_PROVIDED_KEY: InjectionKey<CalmLensProvidedOptions<any>> = Symbol("calmlens");
+
+/**
+ * Gives every `CalmLensUploader` and `useCalmLensUpload` in this component's descendants these
+ * upload options, such as `uploadPresetId` and `tokenUrl`, so they needn't be passed to each one.
+ * Call it in `setup`, or pass the app to provide them app-wide. An option a component sets itself
+ * wins, and a nested call adds to the outer one's options.
+ */
+export const provideCalmLens = <F extends UploadFile = File>(
+  options: CalmLensProvidedOptions<F>,
+  app?: App,
+): void => {
+  if (app) {
+    app.provide(CALMLENS_PROVIDED_KEY, options);
+    return;
+  }
+  provide(
+    CALMLENS_PROVIDED_KEY,
+    withProvidedOptions(inject(CALMLENS_PROVIDED_KEY, undefined), options),
+  );
+};
+
 /**
  * Uploads files through an upload preset and keeps `snapshot` up to date as each one uploads and
  * is checked. Use it to build your own upload UI; `CalmLensUploader` is built on it. Uploads
  * still running when the component unmounts are cancelled.
  */
 export const useCalmLensUpload = <F extends UploadFile = File>(
-  options: MaybeRefOrGetter<UploadControllerOptions<F>>,
+  own: MaybeRefOrGetter<UploadControllerOptions<F>>,
 ): UseCalmLensUploadResult<F> => {
-  const controller = createUploadController(toValue(options));
-  watchEffect(() => controller.setOptions(toValue(options)));
+  const provided = inject(CALMLENS_PROVIDED_KEY, undefined);
+  const options = () => withProvidedOptions(provided, toValue(own));
+  const controller = createUploadController(options());
+  watchEffect(() => controller.setOptions(options()));
   const snapshot = subscribeSnapshot(controller);
   onScopeDispose(() => controller.clear());
   return {

@@ -63,6 +63,30 @@ const mockPreset = (
 });
 
 for (const binding of BINDINGS) {
+  describe.skipIf(!binding.mountProvidedUploader)(`${binding.name} provider`, () => {
+    it("gives the uploader beneath it the upload preset and client", async () => {
+      const uploaded: CalmLensUpload[] = [];
+      mounted = binding.mountProvidedUploader!(mockPreset("allowed"), {
+        messages,
+        onUploaded: (upload) => uploaded.push(upload),
+      });
+      binding.pick(mounted, [photo()]);
+
+      await waitFor(() => expect(statuses(mounted!.container)).toEqual(["msg:allowed"]));
+      expect(uploaded.map(({ status }) => status)).toEqual(["allowed"]);
+    });
+
+    it("lets the uploader's own options win", async () => {
+      mounted = binding.mountProvidedUploader!(mockPreset("allowed"), {
+        ...mockPreset("blocked"),
+        messages,
+      });
+      binding.pick(mounted, [photo()]);
+
+      await waitFor(() => expect(statuses(mounted!.container)).toEqual(["msg:blocked"]));
+    });
+  });
+
   describe(`${binding.name} uploader`, () => {
     it("uploads a picked file through the upload preset and reports the decision", async () => {
       const uploaded: CalmLensUpload[] = [];

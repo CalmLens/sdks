@@ -13,16 +13,23 @@ import {
   readConfigurationState,
 } from "./configuration";
 import { createLocalSigningSecret, describeEventTypes, listen, unavailableWarning } from "./listen";
-import { credentialsPath, DEFAULT_API_URL, login, logout, readCredentials } from "./login";
+import {
+  credentialsPath,
+  DEFAULT_API_URL,
+  login,
+  logout,
+  PROFILE_PATTERN,
+  readCredentials,
+} from "./login";
 
 const HELP = `CalmLens CLI
 
 Usage:
-  calmlens login [--read-only] [--no-browser]
-  calmlens logout
+  calmlens login [--read-only] [--no-browser] [--profile <name>]
+  calmlens logout [--profile <name>]
   calmlens listen --forward-to <url> [options]
   calmlens trigger [sexual|violence|self-harm|harassment|hate|criminal-activity|clean] [options]
-  calmlens plan [--config <path>] [--prune]
+  calmlens plan [--config <path>] [--prune] [--detailed-exitcode]
   calmlens apply [--config <path>] [--prune]
 
 Install it with \`brew install calmlens/sdks/calmlens\` (after
@@ -66,6 +73,13 @@ Options:
   --prune                For plan and apply: also delete upload presets, lenses and metadata
                          fields the file doesn't list (never policies)
   --api-url <url>        API base URL (default: $CALMLENS_BASE_URL or https://api.calmlens.com/v1)
+  --profile <name>       Use, or sign in to, a named login, so several projects can be signed in
+                         at once (default: $CALMLENS_PROFILE, else the default login)
+  --json                 For listen, trigger, plan and apply: print JSON on stdout (listen: one
+                         line per delivery attempt) and messages on stderr
+  --detailed-exitcode    For plan: exit 0 with no changes, 2 with changes and 1 on an error
+  --log-level <level>    Log the CLI's API requests to stderr: off, info (retries and failures)
+                         or debug (every request) (default: $CALMLENS_LOG, else off)
   -v, --version          Show the CLI version
   -h, --help             Show this help
 `;
@@ -76,6 +90,17 @@ const fail = (message: string): never => {
   process.stderr.write(`${message}\n`);
   process.exit(1);
 };
+
+const LOG_LEVELS = ["off", "info", "debug"] as const;
+type CliLogLevel = (typeof LOG_LEVELS)[number];
+
+/** API request logs go to stderr, so stdout stays the command's output (and `--json`'s). */
+const stderrLogger = {
+  debug: (message: string) => process.stderr.write(`${message}\n`),
+  info: (message: string) => process.stderr.write(`${message}\n`),
+};
+
+const printJson = (value: unknown) => process.stdout.write(`${JSON.stringify(value)}\n`);
 
 const describeError = (error: unknown) => {
   if (error instanceof CalmLensError) {
@@ -101,6 +126,10 @@ const main = async () => {
       config: { type: "string" },
       prune: { type: "boolean" },
       "no-browser": { type: "boolean" },
+      profile: { type: "string" },
+      json: { type: "boolean" },
+      "detailed-exitcode": { type: "boolean" },
+      "log-level": { type: "string" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
     },
@@ -123,16 +152,31 @@ const main = async () => {
     }
   }
 
+  const json = Boolean(values.json);
+  // Human-readable messages go to stderr with --json, so stdout holds only JSON.
+  const say = (text: string) => (json ? process.stderr : process.stdout).write(text);
+  const profile = values.profile ?? (process.env.CALMLENS_PROFILE?.trim() || undefined);
+  if (profile !== undefined && !PROFILE_PATTERN.test(profile)) {
+    fail(`"${profile}" isn't a profile name: use letters, digits, - and _, up to 64 characters.`);
+  }
+  const logLevel = (values["log-level"] ?? process.env.CALMLENS_LOG?.trim().toLowerCase()) as
+    | CliLogLevel
+    | undefined;
+  if (logLevel !== undefined && !LOG_LEVELS.includes(logLevel)) {
+    fail(`--log-level must be one of ${LOG_LEVELS.join(", ")}.`);
+  }
+
   if (command === "login") {
     try {
       const credentials = await login({
+        profile,
         apiUrl: values["api-url"] ?? process.env.CALMLENS_BASE_URL ?? DEFAULT_API_URL,
         readOnly: Boolean(values["read-only"]),
         openBrowser: !values["no-browser"],
         write: (text) => process.stdout.write(text),
       });
       process.stdout.write(
-        `Signed in to project ${credentials.projectId}. Saved to ${credentialsPath()}.\n`,
+        `Signed in to project ${credentials.projectId}. Saved to ${credentialsPath(profile)}.\n`,
       );
     } catch (error) {
       fail(`Sign-in failed: ${describeError(error)}`);
@@ -140,7 +184,7 @@ const main = async () => {
     return;
   }
   if (command === "logout") {
-    const result = await logout();
+    const result = await logout(profile);
     process.stdout.write(
       result === "revoked"
         ? "Signed out and revoked the key.\n"
@@ -154,7 +198,10 @@ const main = async () => {
   // An explicit key or project wins; otherwise the login's key, project and API URL go together.
   const explicitKey = values["api-key"] ?? process.env.CALMLENS_API_KEY;
   const explicitProject = values["project-id"] ?? process.env.CALMLENS_PROJECT_ID;
-  const stored = explicitKey || explicitProject ? undefined : await readCredentials();
+  const stored = explicitKey || explicitProject ? undefined : await readCredentials(profile);
+  if (profile !== undefined && !stored && !(explicitKey && explicitProject)) {
+    fail(`No login for profile "${profile}". Run \`calmlens login --profile ${profile}\`.`);
+  }
   const apiKey = explicitKey ?? stored?.apiKey;
   const projectId = explicitProject ?? stored?.projectId;
   if (!apiKey || !projectId) {
@@ -168,6 +215,8 @@ const main = async () => {
     apiKey: apiKey as string,
     projectId: projectId as string,
     ...(baseUrl ? { baseUrl } : {}),
+    logLevel: logLevel ?? "off",
+    logger: stderrLogger,
   });
 
   if (command === "listen") {
@@ -197,9 +246,15 @@ const main = async () => {
         eventTypes,
         intervalMs: intervalSeconds * 1000,
         signal: controller.signal,
+        ...(json && {
+          // Each attempt is a JSON line on stdout; the readable lines move to stderr.
+          log: (line: string) => process.stderr.write(`${line}\n`),
+          onDelivery: printJson,
+        }),
         // Printed only once CalmLens has accepted the key, so a bad key fails without it.
         onReady: ({ unavailableTypes }) => {
-          process.stdout.write(
+          if (json) printJson({ type: "ready", projectId, forwardTo, unavailableTypes });
+          say(
             [
               `Forwarding CalmLens events for project ${projectId} to ${forwardTo}`,
               configuredSecret
@@ -247,9 +302,11 @@ const main = async () => {
         name: `cli-trigger-${kind}`,
         content: { plainText: text, type: "text/plain" },
       });
-      process.stdout.write(
-        `Created asset ${asset.id}: ${asset.classification.moderation.decision}.\n`,
-      );
+      if (json) printJson(asset);
+      else
+        process.stdout.write(
+          `Created asset ${asset.id}: ${asset.classification.moderation.decision}.\n`,
+        );
     } catch (error) {
       fail(`Trigger failed: ${describeError(error)}`);
     }
@@ -268,12 +325,16 @@ const main = async () => {
       const config = parseConfiguration(text, path);
       const state = await readConfigurationState(client, config);
       const plan = planConfiguration(config, state, { prune: Boolean(values.prune) });
-      process.stdout.write(formatPlan(plan));
-      if (command === "apply" && plan.changes.length) {
-        await applyConfiguration(client, config, state, plan, (line) =>
-          process.stdout.write(`${line}\n`),
-        );
-        process.stdout.write("Applied.\n");
+      say(formatPlan(plan));
+      const applying = command === "apply" && plan.changes.length > 0;
+      if (applying) {
+        await applyConfiguration(client, config, state, plan, (line) => say(`${line}\n`));
+        say("Applied.\n");
+      }
+      if (json) printJson({ changes: plan.changes, unchanged: plan.unchanged, applied: applying });
+      // As Terraform's -detailed-exitcode: 2 says the plan has changes.
+      if (command === "plan" && values["detailed-exitcode"] && plan.changes.length) {
+        process.exitCode = 2;
       }
     } catch (error) {
       if (error instanceof CalmLensError && error.code.endsWith("/revision-conflict"))

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   createLocalSigningSecret,
+  type DeliveryRecord,
   deliverEvent,
   describeEventTypes,
   type EventSource,
@@ -98,11 +99,13 @@ describe("calmlens listen", () => {
       () => new Response(null, { status: 204 }),
     ];
     const lines: string[] = [];
+    const deliveries: DeliveryRecord[] = [];
     const result = await deliverEvent(event, {
       forwardTo: "http://localhost:3000/hook",
       secret,
       retryDelaysMs: [0, 0, 0, 0],
       log: (line) => lines.push(line),
+      onDelivery: (delivery) => deliveries.push(delivery),
       fetchImpl: async (_url, init) => {
         const headers = new Headers(init?.headers);
         attempts.push(headers);
@@ -124,6 +127,30 @@ describe("calmlens listen", () => {
     expect(deliveryIds.size).toBe(1);
     expect(isId([...deliveryIds][0], "dlv")).toBe(true);
     expect(lines).toHaveLength(4);
+    // listen --json prints one record per attempt.
+    expect(
+      deliveries.map(({ attempt, status, error, retryInMs, ok, deliveryId, eventId }) => ({
+        attempt,
+        status,
+        error,
+        retryInMs,
+        ok,
+        deliveryId,
+        eventId,
+      })),
+    ).toEqual(
+      [
+        { status: null, error: "ECONNREFUSED", retryInMs: 0, ok: false },
+        { status: 503, error: null, retryInMs: 0, ok: false },
+        { status: 429, error: null, retryInMs: 0, ok: false },
+        { status: 204, error: null, retryInMs: null, ok: true },
+      ].map((expected, index) => ({
+        attempt: index + 1,
+        ...expected,
+        deliveryId: [...deliveryIds][0],
+        eventId: EXAMPLE_IDS.evt,
+      })),
+    );
   });
 
   test("doesn't retry responses a real delivery wouldn't retry, and gives up after the last attempt", async () => {

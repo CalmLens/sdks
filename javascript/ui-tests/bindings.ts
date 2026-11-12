@@ -4,20 +4,26 @@ import { createElement } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { flushSync as flushSvelte, mount as mountSvelte, unmount as unmountSvelte } from "svelte";
-import { createApp, h } from "vue";
+import { createApp, defineComponent, h } from "vue";
 import "../src/elements";
 import * as react from "../src/react";
 import * as native from "../src/react-native";
 import * as svelte from "../src/svelte/index.js";
-import type { AssetProps } from "../src/ui";
+import type { AssetProps, CalmLensProvidedOptions } from "../src/ui";
 import type { UploaderProps } from "../src/ui/BrowserUpload";
 import * as vue from "../src/vue";
+import ProvidedUploader from "./ProvidedUploader.svelte";
 
 export type Mounted = { container: HTMLElement; unmount: () => void };
 
 export type Binding = {
   name: string;
   mountUploader: (props: UploaderProps) => Mounted;
+  /** Mounts the uploader beneath the binding's provider, which gives it `provided`. */
+  mountProvidedUploader?: (
+    provided: CalmLensProvidedOptions<File>,
+    props: UploaderProps,
+  ) => Mounted;
   mountAsset: (props: AssetProps) => Mounted;
   /** Picks files the way the binding's users do: the file input, or the app's picker. */
   pick: (mounted: Mounted, files: File[]) => void;
@@ -169,6 +175,20 @@ export const BINDINGS: Binding[] = [
       flushSync(() => root.render(createElement(react.CalmLensUploader, props)));
       return done(container, () => root.unmount());
     },
+    mountProvidedUploader: (provided, props) => {
+      const container = containerFor();
+      const root = createRoot(container);
+      flushSync(() =>
+        root.render(
+          createElement(
+            react.CalmLensProvider<File>,
+            provided,
+            createElement(react.CalmLensUploader, props),
+          ),
+        ),
+      );
+      return done(container, () => root.unmount());
+    },
     mountAsset: (props) => {
       const container = containerFor();
       const root = createRoot(container);
@@ -186,6 +206,18 @@ export const BINDINGS: Binding[] = [
       app.mount(container);
       return done(container, () => app.unmount());
     },
+    mountProvidedUploader: (provided, props) => {
+      const container = containerFor();
+      const Parent = defineComponent({
+        setup() {
+          vue.provideCalmLens(provided);
+          return () => h(vue.CalmLensUploader, props);
+        },
+      });
+      const app = createApp(Parent);
+      app.mount(container);
+      return done(container, () => app.unmount());
+    },
     mountAsset: (props) => {
       const container = containerFor();
       const app = createApp({ render: () => h(vue.CalmLensAsset, props) });
@@ -200,6 +232,15 @@ export const BINDINGS: Binding[] = [
     mountUploader: (props) => {
       const container = containerFor();
       const component = mountSvelte(svelte.CalmLensUploader, { target: container, props });
+      flushSvelte();
+      return done(container, () => void unmountSvelte(component));
+    },
+    mountProvidedUploader: (provided, props) => {
+      const container = containerFor();
+      const component = mountSvelte(ProvidedUploader, {
+        target: container,
+        props: { ...props, provided },
+      });
       flushSvelte();
       return done(container, () => void unmountSvelte(component));
     },
@@ -250,6 +291,23 @@ export const BINDINGS: Binding[] = [
       const pick = async () => picked.files.splice(0);
       flushSync(() =>
         root.render(createElement(native.CalmLensUploader<File>, { ...props, pick })),
+      );
+      return done(container, () => root.unmount());
+    },
+    mountProvidedUploader: (provided, props) => {
+      const container = containerFor();
+      const picked = { files: [] as File[] };
+      nativePicks.set(container, picked);
+      const root = createRoot(container);
+      const pick = async () => picked.files.splice(0);
+      flushSync(() =>
+        root.render(
+          createElement(
+            native.CalmLensProvider<File>,
+            provided,
+            createElement(native.CalmLensUploader<File>, { ...props, pick }),
+          ),
+        ),
       );
       return done(container, () => root.unmount());
     },

@@ -1,14 +1,59 @@
 // The upload hooks shared by `calmlens/react` and `calmlens/react-native`. They hold no
 // DOM or native code, so both libraries render the same queue the same way.
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
+  createContext,
+  createElement,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import {
+  type CalmLensProvidedOptions,
   createUploadController,
   type UploadController,
   type UploadControllerOptions,
   type UploadFile,
   type UploadSnapshot,
+  withProvidedOptions,
 } from "./UploadController";
+
+const CalmLensContext = createContext<CalmLensProvidedOptions<any> | undefined>(undefined);
+
+export type CalmLensProviderProps<F extends UploadFile = File> = CalmLensProvidedOptions<F> & {
+  children?: ReactNode;
+};
+
+/**
+ * Gives every `CalmLensUploader` and `useCalmLensUpload` beneath it these upload options, such as
+ * `uploadPresetId` and `tokenUrl`, so they needn't be passed to each one. An option a component
+ * sets itself wins. A provider inside another adds to the outer one's options.
+ */
+export function CalmLensProvider<F extends UploadFile = File>({
+  children,
+  ...options
+}: CalmLensProviderProps<F>) {
+  const outer = useContext(CalmLensContext);
+  const { uploadPresetId, token, tokenUrl, baseUrl, createClient, upload, checkStatus } = options;
+  const value = useMemo(
+    () =>
+      withProvidedOptions(outer, {
+        uploadPresetId,
+        token,
+        tokenUrl,
+        baseUrl,
+        createClient,
+        upload,
+        checkStatus,
+      }) as CalmLensProvidedOptions<F>,
+    [outer, uploadPresetId, token, tokenUrl, baseUrl, createClient, upload, checkStatus],
+  );
+  return createElement(CalmLensContext.Provider, { value }, children);
+}
 
 export interface UseCalmLensUploadResult<F extends UploadFile = UploadFile>
   extends UploadSnapshot<F> {
@@ -47,9 +92,10 @@ export const useUploadSnapshot = <F extends UploadFile>(
 
 /** A controller this component owns: it takes the latest options and cancels on unmount. */
 export const useOwnController = <F extends UploadFile>(
-  options: UploadControllerOptions<F>,
+  own: UploadControllerOptions<F>,
   active = true,
 ) => {
+  const options = withProvidedOptions(useContext(CalmLensContext), own);
   const [controller] = useState(() => createUploadController(options));
   // The latest callbacks, without restarting uploads when a parent re-renders.
   if (active) controller.setOptions(options);

@@ -538,3 +538,25 @@ export class UploadController<F extends UploadFile = UploadFile> {
 export const createUploadController = <F extends UploadFile = UploadFile>(
   options: UploadControllerOptions<F>,
 ): UploadController<F> => new UploadController(options);
+
+/**
+ * The upload options a provider (`CalmLensProvider`, `provideCalmLens`, `setCalmLensContext`)
+ * gives every uploader and upload hook beneath it.
+ */
+export type CalmLensProvidedOptions<F extends UploadFile = UploadFile> = Pick<
+  UploadControllerOptions<F>,
+  "uploadPresetId" | "token" | "tokenUrl" | "baseUrl" | "createClient" | "upload" | "checkStatus"
+>;
+
+/** `options` over what a provider gives: an option an uploader sets (not `undefined`) wins. */
+export const withProvidedOptions = <O extends object>(
+  provided: CalmLensProvidedOptions<any> | undefined,
+  options: O,
+): O => {
+  if (!provided) return options;
+  const merged: Record<string, unknown> = { ...provided };
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined) merged[key] = value;
+  }
+  return merged as O;
+};

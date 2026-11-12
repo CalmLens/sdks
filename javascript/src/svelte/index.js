@@ -9,3 +9,4 @@ export { default as CalmLensSpreadsheetViewer } from "./CalmLensSpreadsheetViewe
 export { default as CalmLensTextViewer } from "./CalmLensTextViewer.svelte";
 export { default as CalmLensUploader } from "./CalmLensUploader.svelte";
 export { default as CalmLensWebsiteViewer } from "./CalmLensWebsiteViewer.svelte";
+export { getCalmLensContext, setCalmLensContext } from "./context.js";

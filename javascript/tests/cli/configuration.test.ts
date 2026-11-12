@@ -170,6 +170,40 @@ test("the CLI's plan prints the differences and changes nothing", async () => {
     expect(stdout).toContain("project settings (blockUnmoderatedAssets)");
     // A file listing only settings reads and changes nothing else, so a narrow key is enough.
     expect(requests).toEqual([`GET /v1/projects/${EXAMPLE_IDS.proj}/settings`]);
+
+    // --json prints the plan as JSON on stdout; --detailed-exitcode exits 2 for changes.
+    const detailed = Bun.spawn(
+      [...command, "plan", "--config", file, "--json", "--detailed-exitcode"],
+      {
+        env: {
+          PATH: Bun.env.PATH ?? "",
+          CALMLENS_API_KEY: "offline-test",
+          CALMLENS_PROJECT_ID: EXAMPLE_IDS.proj,
+          CALMLENS_BASE_URL: `${server.url}v1`,
+        },
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const [json, text, detailedExit] = await Promise.all([
+      new Response(detailed.stdout).text(),
+      new Response(detailed.stderr).text(),
+      detailed.exited,
+    ]);
+    expect(detailedExit).toBe(2);
+    expect(JSON.parse(json)).toEqual({
+      changes: [
+        {
+          kind: "settings",
+          action: "update",
+          name: "settings",
+          fields: ["blockUnmoderatedAssets"],
+        },
+      ],
+      unchanged: 0,
+      applied: false,
+    });
+    expect(text).toContain("project settings (blockUnmoderatedAssets)");
   } finally {
     server.stop(true);
     await rm(directory, { recursive: true, force: true });

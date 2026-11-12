@@ -19,7 +19,7 @@ The package has two clients, each with its own import:
 
 API keys are secret, so `CalmLensServerClient` refuses to start in a web page or app. Upload from browsers and apps with `CalmLensAppClient`, and serve private content to them with signed URLs. The package ships ES modules and CommonJS with type declarations. The main, `/server` and `/app` entry points load no other packages at runtime. The package depends only on `zod`, which its type declarations and testing helpers use. The browser UI also needs `hls.js` and `pdfjs-dist` (`npm install calmlens hls.js pdfjs-dist`), optional peer dependencies it loads only when it plays a stream or shows a document, so a server install leaves them out.
 
-Versions follow semantic versioning: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support).
+The type declarations need TypeScript 5.9 or later; each build checks them with TypeScript 5.9. Versions follow semantic versioning, types included: see [Versioning and support](https://calmlens.com/docs/sdk#versioning-and-support) and [Requirements and type changes](https://calmlens.com/docs/sdk/javascript/reference#requirements-and-type-changes).
 
 ## Quick start
 

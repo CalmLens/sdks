@@ -44,20 +44,26 @@ const transpilers = {
 plugin({
   name: "calmlens-ui-tests",
   setup(build) {
-    build.onLoad({ filter: sdkSource(".*\\.svelte") }, async ({ path }) => {
+    // The SDK's Svelte components, and the test components beside this file.
+    const testSvelte = new RegExp(
+      `^${here.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/[^/]*\\.svelte$`,
+    );
+    const compileSvelte = async ({ path }: { path: string }) => {
       const { js } = compile(await Bun.file(path).text(), {
         filename: path,
         generate: "client",
         dev: false,
       });
-      return { contents: pinLibraries(js.code), loader: "js" };
-    });
+      return { contents: pinLibraries(js.code), loader: "js" as const };
+    };
+    build.onLoad({ filter: sdkSource(".*\\.svelte") }, compileSvelte);
+    build.onLoad({ filter: testSvelte }, compileSvelte);
     build.onLoad({ filter: sdkSource("(?!contract/).*\\.tsx?") }, async ({ path }) => {
       const transpiler = path.endsWith(".tsx") ? transpilers.tsx : transpilers.ts;
       const code = transpiler.transformSync(await Bun.file(path).text());
       return { contents: pinLibraries(code), loader: "js" };
     });
-    build.onLoad({ filter: sdkSource("svelte/index\\.js") }, async ({ path }) => ({
+    build.onLoad({ filter: sdkSource("svelte/[^/]*\\.js") }, async ({ path }) => ({
       contents: pinLibraries(await Bun.file(path).text()),
       loader: "js",
     }));

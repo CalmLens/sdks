@@ -39,7 +39,12 @@ import type { UploadFile, UploadItem } from "./ui/UploadController";
 
 // Not `./ui`: its stream player loads hls.js, which native players never need.
 export * from "./ui/Core";
-export { type UseCalmLensUploadResult, useCalmLensUpload } from "./ui/ReactUpload";
+export {
+  CalmLensProvider,
+  type CalmLensProviderProps,
+  type UseCalmLensUploadResult,
+  useCalmLensUpload,
+} from "./ui/ReactUpload";
 
 /** What the uploader asks your picker for. */
 export interface PickRequest {

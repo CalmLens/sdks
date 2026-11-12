@@ -60,6 +60,7 @@ export type {
   UseCalmLensUploadResult,
 } from "./ui/BrowserUpload";
 export { createUploadController } from "./ui/BrowserUpload";
+export { CalmLensProvider, type CalmLensProviderProps } from "./ui/ReactUpload";
 export * from "./viewers/React";
 
 /**

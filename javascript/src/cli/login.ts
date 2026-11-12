@@ -19,26 +19,39 @@ export interface StoredCredentials {
   apiUrl: string;
 }
 
-export const credentialsPath = () => {
+/** A profile name: letters, digits, `-` and `_`, as `--profile` and `CALMLENS_PROFILE` take it. */
+export const PROFILE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+/**
+ * Where a profile's login is kept: `credentials.json` for the default profile, and
+ * `credentials-<profile>.json` for a named one, so several projects can be signed in at once.
+ */
+export const credentialsPath = (profile?: string) => {
+  if (profile !== undefined && !PROFILE_PATTERN.test(profile)) {
+    throw new Error(
+      `"${profile}" isn't a profile name: use letters, digits, - and _, up to 64 characters.`,
+    );
+  }
   const base =
     process.env.CALMLENS_CONFIG_DIR ??
     (process.platform === "win32"
       ? join(process.env.APPDATA ?? join(homedir(), "AppData", "Roaming"), "calmlens")
       : join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "calmlens"));
-  return join(base, "credentials.json");
+  return join(base, profile ? `credentials-${profile}.json` : "credentials.json");
 };
 
-export const readCredentials = async (): Promise<StoredCredentials | undefined> => {
+export const readCredentials = async (profile?: string): Promise<StoredCredentials | undefined> => {
+  const path = credentialsPath(profile);
   try {
-    const stored = JSON.parse(await readFile(credentialsPath(), "utf8")) as StoredCredentials;
+    const stored = JSON.parse(await readFile(path, "utf8")) as StoredCredentials;
     return stored.apiKey && stored.projectId && stored.apiUrl ? stored : undefined;
   } catch {
     return undefined;
   }
 };
 
-const writeCredentials = async (credentials: StoredCredentials) => {
-  const path = credentialsPath();
+const writeCredentials = async (credentials: StoredCredentials, profile?: string) => {
+  const path = credentialsPath(profile);
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   await writeFile(path, `${JSON.stringify(credentials, null, 2)}\n`, { mode: 0o600 });
   // writeFile keeps an existing file's mode.
@@ -91,6 +104,8 @@ export const login = async (options: {
   openBrowser: boolean;
   write: (text: string) => void;
   sleep?: (ms: number) => Promise<void>;
+  /** The profile to keep the login under; the default profile when left out. */
+  profile?: string;
 }): Promise<StoredCredentials> => {
   const sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   const started = await post(oauthUrl(options.apiUrl, "/oauth/device/code"), {
@@ -125,7 +140,7 @@ export const login = async (options: {
         projectId: polled.body.project_id as string,
         apiUrl: options.apiUrl,
       };
-      await writeCredentials(credentials);
+      await writeCredentials(credentials, options.profile);
       return credentials;
     }
     if (polled.body.error === "authorization_pending") continue;
@@ -147,12 +162,12 @@ export const login = async (options: {
  * Revokes the stored key (it lasts until revoked) and forgets it. `forgotten` means CalmLens
  * couldn't be reached, so the key still works until it's revoked in the portal.
  */
-export const logout = async (): Promise<"revoked" | "forgotten" | "signed-out"> => {
-  const stored = await readCredentials();
+export const logout = async (profile?: string): Promise<"revoked" | "forgotten" | "signed-out"> => {
+  const stored = await readCredentials(profile);
   if (!stored) return "signed-out";
   const revoked = await post(oauthUrl(stored.apiUrl, "/oauth/revoke"), { token: stored.apiKey })
     .then((result) => result.ok)
     .catch(() => false);
-  await rm(credentialsPath(), { force: true });
+  await rm(credentialsPath(profile), { force: true });
   return revoked ? "revoked" : "forgotten";
 };

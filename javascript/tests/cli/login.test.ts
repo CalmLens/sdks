@@ -118,6 +118,28 @@ test("signs in with a device code, uses the stored key, then revokes it on logou
     expect(afterLogout.exitCode).toBe(1);
     expect(afterLogout.stderr).toContain("calmlens login");
 
+    // A named profile keeps its own login, beside the default one.
+    const profiled = await run([
+      "login",
+      "--profile",
+      "work",
+      "--read-only",
+      "--no-browser",
+      "--api-url",
+      apiUrl,
+    ]);
+    expect(profiled.exitCode).toBe(0);
+    expect(await Bun.file(join(configDir, "credentials-work.json")).exists()).toBe(true);
+    expect(await Bun.file(credentialsFile).exists()).toBe(false);
+    const profiledTrigger = await run(["trigger", "clean", "--profile", "work", "--json"]);
+    expect(profiledTrigger.exitCode).toBe(0);
+    expect(JSON.parse(profiledTrigger.stdout)).toMatchObject({ id: asset.id });
+    expect(uploads.at(-1)).toEqual({ path: `/v1/projects/${projectId}/assets`, key: issuedKey });
+    expect((await run(["trigger", "clean", "--profile", "home"])).exitCode).toBe(1);
+    expect((await run(["trigger", "clean", "--profile", "../escape"])).exitCode).toBe(1);
+    expect((await run(["logout", "--profile", "work"])).exitCode).toBe(0);
+    expect(await Bun.file(join(configDir, "credentials-work.json")).exists()).toBe(false);
+
     decision = "deny";
     const declined = await run(["login", "--no-browser", "--api-url", apiUrl]);
     expect(declined.exitCode).toBe(1);

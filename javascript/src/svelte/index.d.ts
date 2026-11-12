@@ -1,6 +1,7 @@
 import type { Component, Snippet } from "svelte";
 import type {
   AssetProps,
+  CalmLensProvidedOptions,
   CalmLensUpload as CoreCalmLensUpload,
   UploadControllerOptions as CoreUploadControllerOptions,
   UploaderProps as CoreUploaderProps,
@@ -21,6 +22,17 @@ export type CalmLensUpload<F extends UploadFile = File> = CoreCalmLensUpload<F>;
 export type UploadSnapshot<F extends UploadFile = File> = CoreUploadSnapshot<F>;
 export type UploadControllerOptions<F extends UploadFile = File> = CoreUploadControllerOptions<F>;
 export type UploaderProps<F extends UploadFile = File> = CoreUploaderProps<F>;
+/**
+ * Gives every `CalmLensUploader` in this component's descendants these upload options, such as
+ * `uploadPresetId` and `tokenUrl`. Call it while the component initialises. An option an uploader
+ * sets itself wins, and a nested call adds to the outer one's options.
+ */
+export declare const setCalmLensContext: <F extends UploadFile = File>(
+  options: CalmLensProvidedOptions<F>,
+) => void;
+/** The options the nearest `setCalmLensContext` gave, if any. */
+export declare const getCalmLensContext: () => CalmLensProvidedOptions<File> | undefined;
+
 /** Creates an upload queue for the components, such as one a form starts on submit. */
 export declare const createUploadController: <F extends UploadFile = File>(
   options: UploadControllerOptions<F>,

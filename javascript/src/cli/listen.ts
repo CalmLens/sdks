@@ -32,7 +32,27 @@ export interface ListenOptions {
   onReady?: (ready: { unavailableTypes: string[] }) => void;
   /** Waits between attempts of a failed delivery; defaults to `RETRY_DELAYS_MS`. */
   retryDelaysMs?: readonly number[];
+  /** Called after every delivery attempt with its outcome, for `listen --json`. */
+  onDelivery?: (delivery: DeliveryRecord) => void;
   fetchImpl?: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>;
+}
+
+/** One delivery attempt, as `listen --json` prints it. */
+export interface DeliveryRecord {
+  type: "delivery";
+  eventId: string;
+  eventType: string;
+  deliveryId: string;
+  attempt: number;
+  attempts: number;
+  ok: boolean;
+  /** The handler's HTTP status, or `null` when it couldn't be reached. */
+  status: number | null;
+  /** Why the handler couldn't be reached, such as `ECONNREFUSED`, or `null`. */
+  error: string | null;
+  durationMs: number;
+  /** The wait before the next attempt, or `null` when this is the last. */
+  retryInMs: number | null;
 }
 
 export interface ForwardResult {
@@ -164,7 +184,7 @@ export const deliverEvent = async (
   event: Event,
   options: Pick<
     ListenOptions,
-    "forwardTo" | "secret" | "fetchImpl" | "signal" | "log" | "retryDelaysMs"
+    "forwardTo" | "secret" | "fetchImpl" | "signal" | "log" | "retryDelaysMs" | "onDelivery"
   >,
 ): Promise<ForwardResult> => {
   const log = options.log ?? ((line: string) => process.stdout.write(`${line}\n`));
@@ -179,6 +199,19 @@ export const deliverEvent = async (
         ? Math.max(baseDelay, Math.min(MAX_RETRY_AFTER_MS, (result.retryAfterSeconds ?? 0) * 1000))
         : undefined;
     log(formatForwardLine(event, result, new Date(), { attempt, attempts, delayMs }));
+    options.onDelivery?.({
+      type: "delivery",
+      eventId: event.id,
+      eventType: event.type,
+      deliveryId,
+      attempt,
+      attempts,
+      ok: result.ok,
+      status: result.status ?? null,
+      error: result.error ?? null,
+      durationMs: result.durationMs,
+      retryInMs: delayMs ?? null,
+    });
     if (delayMs === undefined || options.signal?.aborted) return result;
     await sleep(delayMs, options.signal);
     if (options.signal?.aborted) return result;

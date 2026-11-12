@@ -32,10 +32,11 @@
     "check:fix": "tsc --noEmit --project tsconfig.json && npx @biomejs/biome check --write",
     "check": "tsc --noEmit --project tsconfig.json && tsc --project tsconfig.contract.json && npx @biomejs/biome check",
     "cleanup": "rimraf esm && rimraf cjs && rimraf bin",
-    "build": "npm run cleanup && rolldown -c rolldown.config.mjs && node scripts/post-build.js && npm run build:cli && npm run verify:package",
+    "build": "npm run cleanup && rolldown -c rolldown.config.mjs && node scripts/post-build.js && npm run build:cli && npm run verify:package && npm run verify:types",
     "build:cli": "bun scripts/build-cli.ts",
     "build:cli:binary": "bun scripts/build-cli.ts --binary",
-    "verify:package": "node scripts/verify-package.mjs"
+    "verify:package": "node scripts/verify-package.mjs",
+    "verify:types": "node scripts/check-minimum-typescript.mjs"
   },
   "keywords": [
     "calmlens",
@@ -71,6 +72,7 @@
     "rolldown-plugin-dts": "0.28.8",
     "svelte": "5.57.2",
     "typescript": "7.0.2",
+    "typescript-minimum": "npm:typescript@5.9.3",
     "vue": "3.5.44"
   },
   "dependencies": {

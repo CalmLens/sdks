@@ -126,13 +126,16 @@ const CODE_KINDS: Partial<Record<string, CalmLensErrorKind>> = {
 
 /**
  * The kind of an error with `code` and `status`: the SDK's own codes by code; any other error by
- * its HTTP status when the API answered (`api` for a status without a kind of its own); and an
- * error the SDK raised before sending, such as `upload/unsupported-type`, as `invalid-argument`.
+ * its HTTP status when the API answered (`api` for a status without a kind of its own, or a
+ * hidden one); and an error the SDK raised before sending, such as `upload/unsupported-type`, as
+ * `invalid-argument`.
  */
 export const errorKindOf = (code: string, status: number | undefined): CalmLensErrorKind => {
   const byCode = CODE_KINDS[code];
   if (byCode) return byCode;
-  if (status === undefined) return "invalid-argument";
+  // A response whose status the runtime hides, such as a redirect in a browser, is still an
+  // answer; any other error without one was raised before sending.
+  if (status === undefined) return code === "sdk/http-error" ? "api" : "invalid-argument";
   if (status >= 500) return "server";
   return STATUS_KINDS[status] ?? "api";
 };
