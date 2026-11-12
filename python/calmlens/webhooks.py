@@ -11,10 +11,11 @@ import json
 import math
 import re
 import time
-from typing import Any, Mapping, cast
+from typing import Any, Mapping
 
 from . import error_codes
-from .errors import WebhookVerificationError
+from .errors import CalmLensWebhookVerificationError
+from ._object import CalmLensObject
 from .types import Event, WebhookEventPayload
 
 __all__ = [
@@ -34,6 +35,13 @@ WEBHOOK_SIGNATURE_TOLERANCE_SECONDS = 300
 _TIMESTAMP = re.compile(r"[0-9]+")
 
 
+def _wire(event: object) -> Mapping[str, Any]:
+    """An event's JSON: a result object's ``to_dict()``, or the JSON itself."""
+    if isinstance(event, CalmLensObject):
+        return event.to_dict()
+    return event if isinstance(event, Mapping) else {}
+
+
 def _raw(payload: object, name: str = "payload") -> bytes:
     if isinstance(payload, str):
         return payload.encode("utf-8")
@@ -47,10 +55,11 @@ def _hmac_hex(secret: str, message: bytes) -> str:
     return hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
 
 
-def to_webhook_event_payload(event: Event) -> WebhookEventPayload:
+def to_webhook_event_payload(event: Event | Mapping[str, Any]) -> dict[str, Any]:
     """The JSON body a webhook connector delivers for an event, such as one returned by
-    ``events.list``: the event in the same shape ``events.list`` returns it. Fields outside that
-    shape are left out."""
+    ``events.list`` (or its ``to_dict()`` JSON): the event in the same shape ``events.list`` returns
+    it. Fields outside that shape are left out."""
+    event = _wire(event)
     payload: dict[str, Any] = {"id": event["id"], "projectId": event["projectId"]}
     # ``actor`` follows ``projectId``, as in the API's payloads; an event built without one
     # (such as a hand-written test event) gets none.
@@ -67,7 +76,7 @@ def to_webhook_event_payload(event: Event) -> WebhookEventPayload:
         "facts": event["facts"],
         "createdAt": event["createdAt"],
     })
-    return cast(WebhookEventPayload, payload)
+    return payload
 
 
 def create_webhook_signature_header(payload: str | bytes, timestamp: int | str, secret: str) -> str:
@@ -167,8 +176,9 @@ def parse_webhook_event(payload: str | bytes, *, signature: str | None = None, t
     """Verify a delivery, then parse it.
 
     Takes the same arguments as :func:`verify_webhook_signature` and returns the parsed
-    :class:`~calmlens.types.WebhookEventPayload`, unknown fields included. Raises
-    :class:`WebhookVerificationError` with code ``sdk/invalid-webhook-signature`` when
+    :class:`~calmlens.types.WebhookEventPayload` (``event.type``, ``event.asset_id``, ...), unknown
+    fields included. Raises
+    :class:`CalmLensWebhookVerificationError` with code ``sdk/invalid-webhook-signature`` when
     verification fails, or ``sdk/invalid-webhook-payload`` when the verified body is not a
     webhook event: a JSON object with string ``id``, ``type`` and ``projectId``, a numeric
     ``createdAt``, and the API's types for its other known fields when present.
@@ -176,15 +186,15 @@ def parse_webhook_event(payload: str | bytes, *, signature: str | None = None, t
     body = _raw(payload)
     if not verify_webhook_signature(body, signature=signature, timestamp=timestamp, secret=secret, headers=headers,
                                     tolerance_seconds=tolerance_seconds, now=now):
-        raise WebhookVerificationError(error_codes.SDK_INVALID_WEBHOOK_SIGNATURE,
+        raise CalmLensWebhookVerificationError(error_codes.SDK_INVALID_WEBHOOK_SIGNATURE,
                                        "Webhook signature or timestamp is invalid")
     try:
         event = json.loads(body)
     except (ValueError, UnicodeDecodeError) as error:
-        raise WebhookVerificationError(error_codes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not valid JSON") from error
+        raise CalmLensWebhookVerificationError(error_codes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not valid JSON") from error
     if not _is_webhook_event(event):
-        raise WebhookVerificationError(error_codes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not a CalmLens event")
-    return cast(WebhookEventPayload, event)
+        raise CalmLensWebhookVerificationError(error_codes.SDK_INVALID_WEBHOOK_PAYLOAD, "Webhook body is not a CalmLens event")
+    return WebhookEventPayload(event)
 
 
 def _is_number(value: object) -> bool:
@@ -216,22 +226,22 @@ def _is_webhook_event(value: object) -> bool:
                     and _optional(fact, "url", False) for fact in facts))
 
 
-def get_event_fact(event: Mapping[str, Any], key: str) -> Any:
+def get_event_fact(event: CalmLensObject | Mapping[str, Any], key: str) -> Any:
     """The value of one of an event's facts, by key, such as ``get_event_fact(event,
     "flagged-categories")`` on an ``asset.blocked`` event, or ``None`` when the event doesn't carry
     it. A key the event repeats gives its first value. The fact's ``url``, when it has one, is on
-    the fact in ``event["facts"]``."""
-    facts = event.get("facts") if isinstance(event, Mapping) else None
+    the fact in ``event.facts``."""
+    facts = _wire(event).get("facts")
     for fact in facts if isinstance(facts, list) else []:
         if isinstance(fact, Mapping) and fact.get("key") == key:
             return fact.get("value")
     return None
 
 
-def get_event_facts(event: Mapping[str, Any]) -> dict[str, Any]:
+def get_event_facts(event: CalmLensObject | Mapping[str, Any]) -> dict[str, Any]:
     """An event's facts as a dict of values by key, such as ``{"flagged-categories": ["hate"]}``.
     A key the event repeats keeps its first value, as :func:`get_event_fact` reads it."""
-    facts = event.get("facts") if isinstance(event, Mapping) else None
+    facts = _wire(event).get("facts")
     values: dict[str, Any] = {}
     for fact in facts if isinstance(facts, list) else []:
         if isinstance(fact, Mapping) and isinstance(fact.get("key"), str) and fact["key"] not in values:
@@ -239,19 +249,19 @@ def get_event_facts(event: Mapping[str, Any]) -> dict[str, Any]:
     return values
 
 
-def is_test_webhook_event(event: Mapping[str, Any]) -> bool:
+def is_test_webhook_event(event: CalmLensObject | Mapping[str, Any]) -> bool:
     """Whether a webhook event is a test send from the portal or the CLI rather than a real
     event: it carries the registered ``{"key": "test", "value": True}`` fact."""
-    facts = event.get("facts") if isinstance(event, Mapping) else None
+    facts = _wire(event).get("facts")
     return isinstance(facts, list) and any(
         isinstance(fact, Mapping) and fact.get("key") == "test" and fact.get("value") is True for fact in facts)
 
 
-def is_newer_asset_event(event: Mapping[str, Any], last_sequence: int | None) -> bool:
+def is_newer_asset_event(event: CalmLensObject | Mapping[str, Any], last_sequence: int | None) -> bool:
     """Whether to apply ``event`` after ``last_sequence``, the highest ``assetSequence`` you have
     applied for its asset (``None`` when none). Deliveries can arrive out of order: an event about
     an asset is newer only with a higher ``assetSequence``, so a retried or repeated delivery of an
     earlier one returns False. Events that aren't about an asset have no sequence and are always
     new. Store the highest ``assetSequence`` applied per ``assetId`` and ignore lower ones."""
-    sequence = event.get("assetSequence") if isinstance(event, Mapping) else None
+    sequence = _wire(event).get("assetSequence")
     return sequence is None or last_sequence is None or sequence > last_sequence

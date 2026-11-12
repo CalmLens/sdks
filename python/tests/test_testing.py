@@ -5,12 +5,13 @@ import json
 import unittest
 from pathlib import Path
 from urllib.parse import urlencode
-from urllib.request import Request
+from calmlens.client import TransportRequest
 
-from calmlens import CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensTransportError, error_codes
+from calmlens import CalmLensAPIError, CalmLensError, CalmLensTimeoutError, CalmLensConnectionError, error_codes
 from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, default_moderate, mock_decision
+from wire import to_json
 
-DOWNLOAD = create_mock_api_key([{"actions": ["assets:download"], "folderId": None, "includeSubfolders": True}])
+DOWNLOAD = create_mock_api_key([{"actions": ["assets:download"], "folder_id": None, "include_subfolders": True}])
 
 _BOUNDARY = "test-boundary"
 
@@ -32,7 +33,7 @@ class MockTests(unittest.TestCase):
         asset = c.assets.create(name="a.png", content={"data": b"png", "type": "image/png"})
         clock[0] = 2000
         decided = c.complete_processing(asset["id"], mock_decision("allowed").pending_review("sampled"))
-        self.assertEqual(decided["classification"]["moderation"]["pendingReview"],
+        self.assertEqual(to_json(decided["classification"]["moderation"]["pendingReview"]),
                          {"requestedAt": 2000, "reason": "sampled", "uncertainCategories": []})
 
     def test_a_first_part_declaring_more_than_its_preset_allows_is_refused(self):
@@ -53,11 +54,15 @@ class MockTests(unittest.TestCase):
 
     def test_results_are_copies_of_the_stored_records(self):
         c = self.client
-        a = c.assets.classify({'name': 'text', 'content': {'plainText': 'hello', 'type': 'text/plain'}})
-        a["classification"]["moderation"]["status"] = "blocked"
-        self.assertEqual(c.assets.retrieve({"assetId": a["id"]})["classification"]["moderation"]["status"], "allowed")
-        c.assets.list()["items"][0]["name"] = "changed"
-        self.assertEqual(c.database_storage.assets[a["id"]]["name"], "text")
+        a = c.assets.classify(name='text', content={'plain_text': 'hello', 'type': 'text/plain'})
+        copied = a.to_dict()
+        copied["classification"]["moderation"]["decision"] = "blocked"
+        self.assertEqual(c.assets.retrieve(asset_id=a['id']).classification.moderation.decision, "allowed")
+        listed = c.assets.list().items[0].to_dict()
+        listed["name"] = "changed"
+        self.assertEqual(c.database_storage.assets[a.id]["name"], "text")
+        with self.assertRaises(AttributeError):
+            setattr(a, "name", "changed")
 
     def test_stores_the_tags_an_upload_is_created_with_from_a_raw_upload_or_a_url(self):
         c = self.client
@@ -71,7 +76,7 @@ class MockTests(unittest.TestCase):
         c = self.client
         asset = c.assets.classify(name="text", content={"plainText": "hello", "type": "text/plain"})
         blocked = c.assets.decide(asset_id=asset["id"], decision="blocked", note="  Spam  ")
-        [review] = blocked["classification"]["moderation"]["manualReviews"]
+        [review] = to_json(blocked.classification.moderation.manual_reviews)
         self.assertTrue(review.pop("id").startswith("rev_"))
         self.assertEqual(review, {"decision": "blocked", "note": "Spam", "decidedBy": {"type": "api-key", "id": None},
                                   "reviewedAt": 123, "applied": True})
@@ -83,10 +88,10 @@ class MockTests(unittest.TestCase):
         asset = c.assets.classify(name="photo.png", content={"data": b"png", "type": "image/png"},
                                   processing_options={"features": {"personDetection": {"enabled": True}}})
         self.assertNotIn("processingOptions", asset)
-        self.assertEqual(asset["classification"]["personDetection"], {"status": "evaluated", "people": []})
+        self.assertEqual(to_json(asset["classification"]["personDetection"]), {"status": "evaluated", "people": []})
         # Features it didn't turn on report nothing, apart from link detection, which is on by default.
         self.assertEqual((asset["classification"]["faceDetection"], asset["classification"]["ocr"]), (None, None))
-        self.assertEqual(asset["classification"]["linkDetection"], {"status": "evaluated", "qrCodes": [], "links": []})
+        self.assertEqual(to_json(asset["classification"]["linkDetection"]), {"status": "evaluated", "qrCodes": [], "links": []})
 
     def test_hash_list_entries_come_from_assets_once_and_go_with_their_list(self):
         c = MockCalmLensServerClient()
@@ -132,7 +137,7 @@ class MockTests(unittest.TestCase):
         c = MockCalmLensServerClient()
         keep = {"retainContent": True}
         image = c.assets.create(name="a.png", content={"data": b"png", "type": "image/png"}, processing_options=keep)
-        self.assertEqual((image["content"]["rendered"], image["content"]["preview"]),
+        self.assertEqual(to_json((image["content"]["rendered"], image["content"]["preview"])),
                          ({"kind": "image", "format": "image/png", "width": None, "height": None},
                           {"width": None, "height": None, "thumbhash": None, "averageColor": None}))
         decided = c.complete_processing(image["id"])
@@ -183,7 +188,7 @@ class MockTests(unittest.TestCase):
                  (f"{base}/{video['id']}/hls/index.m3u8", 404, "asset/no-rendered-version"),
                  (f"{base}/{video['id']}/hls/video-720p.m3u8", 404, "asset/no-rendered-version")]
         for url, status, code in cases:
-            with self.subTest(url=url), c.transport(Request(url), 1) as response:
+            with self.subTest(url=url), c.transport(TransportRequest("GET", url), 1) as response:
                 self.assertEqual((response.status, json.loads(response.read())["code"]), (status, code))
         # Unlike the stream, the embed page serves every asset type that may be delivered.
         sheet = c.assets.classify(name="sheet.csv", content={"data": b"a,b", "type": "text/csv"},
@@ -200,7 +205,7 @@ class MockTests(unittest.TestCase):
                                   processing_options={"retainContent": True}, visibility="private")
         signed = c.cdn.sign_asset_url(asset_id=asset["id"], expires_in=2, original=True)
         # Every SDK's mock writes the grant as the hex of "{assetId}.{1|0}.{expiresAt}".
-        self.assertEqual(signed, {"url": f"{c.cdn_base_url}/assets/{c.project_id}/sig_"
+        self.assertEqual(to_json(signed), {"url": f"{c.cdn_base_url}/assets/{c.project_id}/sig_"
                                          + f"{asset['id']}.1.3000".encode().hex(), "expiresAt": 3000})
         with c.fetch_cdn(signed["url"] + "/original") as response:
             self.assertEqual((response.status, response.read()), (200, b"png"))
@@ -209,7 +214,7 @@ class MockTests(unittest.TestCase):
             self.assertEqual((response.status, json.loads(response.read())["code"]),
                              (403, error_codes.SIGNED_URL_EXPIRED))
         with self.assertRaises(CalmLensAPIError) as raised:
-            c.cdn.get_asset_info(signed["url"])
+            c.cdn.get_asset_info(signed['url'])
         self.assertEqual((raised.exception.code, raised.exception.status), (error_codes.SIGNED_URL_EXPIRED, 403))
 
     def test_a_held_asset_cannot_be_signed_and_its_info_is_unavailable(self):
@@ -220,7 +225,7 @@ class MockTests(unittest.TestCase):
         with self.assertRaises(CalmLensAPIError) as raised:
             c.cdn.sign_asset_url(asset_id=asset["id"])
         self.assertEqual(raised.exception.code, error_codes.ASSET_HELD)
-        self.assertEqual(c.cdn.get_asset_info(c.cdn.get_asset_url(asset_id=asset["id"]))["availability"], "unavailable")
+        self.assertEqual(c.cdn.get_asset_info(c.cdn.get_asset_url(asset_id=asset['id']))["availability"], "unavailable")
 
     def test_unknown_mock_options_and_a_moderate_that_is_not_a_function_are_configuration_errors(self):
         for options in ({"moderate": "blocked"}, {"queued_outcome": "pending"}):
@@ -254,7 +259,7 @@ class MockTests(unittest.TestCase):
         c.enqueue_event("api-key.created")
         c.enqueue_event("project.member-joined", actor={"type": "user", "id": "user-1"})
         actors = [(event["type"], event["actor"]) for event in c.events.iter(cursor=cursor)]
-        self.assertEqual(actors, [
+        self.assertEqual(to_json(actors), [
             ("asset.uploaded", {"type": "api-key", "id": None}),
             ("asset.classified", {"type": "automated", "id": None}),
             ("asset.allowed", {"type": "automated", "id": None}),
@@ -289,22 +294,22 @@ class MockTests(unittest.TestCase):
         moderation["explanationComplete"] = False
         explained = c.assets.explain(asset_id=asset["id"])
         self.assertEqual((explained["classification"]["moderation"]["explanationComplete"],
-                          explained["classification"]["moderation"]["status"]), (True, "blocked"))
+                          explained["classification"]["moderation"]["decision"]), (True, "blocked"))
         moderation["manualReviews"] = [{"decision": "blocked"}]
         with self.assertRaises(CalmLensAPIError) as raised:
             c.assets.explain(asset_id=asset["id"], rerun=True)
         self.assertEqual(raised.exception.code, error_codes.ASSET_REVIEWED)
         moderation["manualReviews"] = []
         # The response is the asset as the re-run found it; the new decision follows.
-        rerun = c.assets.explain({"assetId": asset["id"], "rerun": True})
-        self.assertEqual((rerun["classification"]["status"], rerun["classification"]["moderation"]["status"]),
+        rerun = c.assets.explain(asset_id=asset['id'], rerun=True)
+        self.assertEqual((rerun["classification"]["status"], rerun["classification"]["moderation"]["decision"]),
                          ("completed", "blocked"))
-        self.assertEqual(c.assets.retrieve(asset_id=asset["id"])["classification"]["moderation"]["status"], "allowed")
+        self.assertEqual(c.assets.retrieve(asset_id=asset["id"])["classification"]["moderation"]["decision"], "allowed")
         # A failed re-run keeps the decision and records no processing events.
         rerun_outcome[0] = "failed"
         c.assets.explain(asset_id=asset["id"], rerun=True)
         stored = c.assets.retrieve(asset_id=asset["id"])
-        self.assertEqual((stored["classification"]["status"], stored["classification"]["moderation"]["status"]),
+        self.assertEqual((stored["classification"]["status"], stored["classification"]["moderation"]["decision"]),
                          ("completed", "allowed"))
         self.assertEqual(c.database_storage.events[-1]["type"], "asset.rerun-requested")
         with self.assertRaises(CalmLensError) as raised:
@@ -317,10 +322,10 @@ class MockTests(unittest.TestCase):
         for mime_type in json.loads(fixture.read_text())["refused"]:
             with self.subTest(mime_type):
                 query = urlencode({"wait": "false", "contentType": mime_type, "sizeInBytes": 5})
-                request = Request(f"{self.client.base_url}/projects/{self.client.project_id}/assets?{query}",
-                                  data=_upload_form({"name": "x"}, mime_type, b"hello"), method="POST",
-                                  headers={"Content-Type": "multipart/form-data; boundary=" + _BOUNDARY,
-                                           "X-CalmLens-Upload": "content"})
+                request = TransportRequest(
+                    "POST", f"{self.client.base_url}/projects/{self.client.project_id}/assets?{query}",
+                    {"Content-Type": "multipart/form-data; boundary=" + _BOUNDARY, "X-CalmLens-Upload": "content"},
+                    _upload_form({"name": "x"}, mime_type, b"hello"))
                 with self.client.transport(request, 1) as response:
                     self.assertEqual(response.status, 415)
                     body = json.loads(response.read())
@@ -346,7 +351,7 @@ class MockTests(unittest.TestCase):
         ]
         for query, data, headers, status, code, details in cases:
             with self.subTest(code=code, query=query):
-                request = Request(f"{assets}?{query}", data=data, method="POST", headers=headers)
+                request = TransportRequest("POST", f"{assets}?{query}", headers, data)
                 with self.client.transport(request, 1) as response:
                     self.assertEqual(response.status, status)
                     body = json.loads(response.read())
@@ -355,13 +360,13 @@ class MockTests(unittest.TestCase):
 
     def test_an_upload_form_is_told_apart_by_its_options_not_its_boundary(self):
         c = MockCalmLensServerClient()
-        first = c.assets.create(name="a.pdf", content={"data": b"%PDF", "type": "application/pdf"}, idempotency_key="k")
+        first = c.assets.create(name="a.pdf", content={"data": b"%PDF", "type": "application/pdf"}, options={"idempotency_key": "k"})
         # The retry is a new form with a new boundary: it replays the first result.
-        again = c.assets.create(name="a.pdf", content={"data": b"%PDF", "type": "application/pdf"}, idempotency_key="k")
+        again = c.assets.create(name="a.pdf", content={"data": b"%PDF", "type": "application/pdf"}, options={"idempotency_key": "k"})
         self.assertEqual(again["id"], first["id"])
         self.assertEqual(len(c.database_storage.assets), 1)
         with self.assertRaises(CalmLensAPIError) as raised:
-            c.assets.create(name="b.pdf", content={"data": b"%PDF", "type": "application/pdf"}, idempotency_key="k")
+            c.assets.create(name="b.pdf", content={"data": b"%PDF", "type": "application/pdf"}, options={"idempotency_key": "k"})
         self.assertEqual(raised.exception.code, error_codes.IDEMPOTENCY_KEY_REUSED)
 
     def test_refuses_null_and_invalid_fields_where_the_api_does_before_the_asset_lookup(self):
@@ -376,9 +381,8 @@ class MockTests(unittest.TestCase):
                  ("PATCH", "assets/missing", {"name": None}, "validation/invalid-type", "name")]
         for method, route, body, code, path in cases:
             with self.subTest(method=method, body=body):
-                request = Request(f"{self.client.base_url}/{route}",
-                                  data=json.dumps(body).encode(), method=method,
-                                  headers={"Content-Type": "application/json"})
+                request = TransportRequest(method, f"{self.client.base_url}/{route}",
+                                           {"Content-Type": "application/json"}, json.dumps(body).encode())
                 with self.client.transport(request, 1) as response:
                     self.assertEqual(response.status, 400)
                     answer = json.loads(response.read())
@@ -402,7 +406,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         c = MockCalmLensServerClient(project_id="p1", base_url="https://api.example.test/v2/", cdn_base_url="https://cdn.example.test/v2",
                                timeout=5, mock_options={"create_id": lambda prefix: "a1"})
         self.assertEqual((c.project_id, c.base_url, c.cdn_base_url, c.timeout), ("p1", "https://api.example.test/v2", "https://cdn.example.test/v2", 5))
-        self.assertEqual(c.cdn.get_asset_url({"assetId": "a1", "resource": "rendered"}), "https://cdn.example.test/v2/assets/p1/a1/rendered")
+        self.assertEqual(c.cdn.get_asset_url(asset_id='a1', resource='rendered'), "https://cdn.example.test/v2/assets/p1/a1/rendered")
         with self.assertRaises(CalmLensError):
             MockCalmLensServerClient(timeout=0)
         with self.assertRaises(CalmLensError):
@@ -425,17 +429,17 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         cursor = c.events.list()["nextCursor"]
         c.clear_requests()
         c.assets.classify(name="note", external_id="e1", content={"plain_text": "hi", "type": "text/plain"})
-        c.assets.update({"assetId": "a1", "tags": ["x"]})
+        c.assets.update(asset_id='a1', tags=['x'])
         c.events.list(cursor=cursor, page_size=5)
-        c.cdn.serve({"assetId": "a1", "lens": "thumb"}).close()
+        c.cdn.serve(asset_id='a1', lens='thumb').close()
         upload, update, events, serve = c.requests
         self.assertEqual((upload.method, upload.path, upload.status), ("POST", "/projects/p1/assets", 200))
-        self.assertNotIn("X-calmlens-upload", upload.headers)
+        self.assertIsNone(upload.get_header("X-calmlens-upload"))
         self.assertEqual(upload.query, {"wait": True})
         self.assertEqual(upload.body, {"name": "note", "externalId": "e1",
                                        "content": {"plainText": "hi", "type": "text/plain"}})
-        self.assertEqual(upload.headers["Content-type"], "application/json")
-        self.assertIn("Idempotency-key", upload.headers)
+        self.assertEqual(upload.get_header("Content-type"), "application/json")
+        self.assertIsNotNone(upload.get_header("Idempotency-Key"))
         self.assertNotIn(c.api_key, repr(upload))
         self.assertTrue(upload.url.startswith(c.base_url + "/projects/p1/assets?"))
         self.assertEqual((update.method, update.path, update.body), ("PATCH", "/assets/a1", {"tags": ["x"]}))
@@ -446,7 +450,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         c.clear_requests()
         c.assets.create(name="doc.pdf", author_id="pupil-7", content={"data": b"%PDF", "type": "application/pdf"})
         (form,) = c.requests
-        self.assertEqual(form.headers["X-calmlens-upload"], "content")
+        self.assertEqual(form.get_header("X-calmlens-upload"), "content")
         self.assertEqual(form.query, {"wait": False, "contentType": "application/pdf", "sizeInBytes": 4})
         self.assertEqual(form.body, {"options": {"name": "doc.pdf", "authorId": "pupil-7"}, "file": b"%PDF"})
 
@@ -455,7 +459,7 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         timeout, reset = TimeoutError("slow"), ConnectionResetError("reset")
         api = CalmLensError("usage/free-uploads-exhausted", status=429, retry_after=3)
         c.enqueue_error(timeout).enqueue_error(reset).enqueue_error(api).enqueue_error(http.client.IncompleteRead(b""))
-        for expected, cause in ((CalmLensTimeoutError, timeout), (CalmLensTransportError, reset)):
+        for expected, cause in ((CalmLensTimeoutError, timeout), (CalmLensConnectionError, reset)):
             with self.assertRaises(expected) as raised:
                 c.text.classify(text="hello")
             self.assertIs(raised.exception.__cause__, cause)
@@ -464,10 +468,10 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
         error = raised.exception
         self.assertEqual((error.code, error.status, error.retry_after), ("usage/free-uploads-exhausted", 429, 3.0))
         self.assertTrue(error.request_id)
-        with self.assertRaises(CalmLensTransportError):
-            c.cdn.serve({"assetId": "a1"})
+        with self.assertRaises(CalmLensConnectionError):
+            c.cdn.serve(asset_id='a1')
         self.assertEqual(c.database_storage.assets, {})
-        self.assertEqual(c.text.classify(text="hello")["classification"]["moderation"]["status"], "allowed")
+        self.assertEqual(c.text.classify(text="hello")["classification"]["moderation"]["decision"], "allowed")
         self.assertEqual(len(c.requests), 5)
         c.enqueue_error(CalmLensError(error_codes.ASSET_NOT_FOUND))
         with self.assertRaises(CalmLensAPIError) as raised:
@@ -477,8 +481,8 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
     def test_retries_resend_the_idempotency_key(self):
         c = MockCalmLensServerClient(max_retries=1, mock_options={"create_id": lambda prefix: "a1"})
         c.enqueue_error(CalmLensError("server/unavailable", status=503))
-        c.assets.create(name="x", content={"plainText": "hi", "type": "text/plain"}, idempotency_key="key-1")
-        self.assertEqual([r.headers["Idempotency-key"] for r in c.requests], ["key-1", "key-1"])
+        c.assets.create(name="x", content={"plainText": "hi", "type": "text/plain"}, options={"idempotency_key": "key-1"})
+        self.assertEqual([r.get_header("Idempotency-key") for r in c.requests], ["key-1", "key-1"])
         self.assertEqual(len(c.database_storage.assets), 1)
 
     def test_small_images_complete_as_one_final_part(self):
@@ -505,16 +509,16 @@ class MockConfigurationAndCaptureTests(unittest.TestCase):
                 raise ConnectionResetError("the response was lost")
             return response
         c.transport = losing_the_second_part
-        with self.assertRaises(CalmLensTransportError):
-            c.assets.classify(name="a.png", content={"data": data, "type": "image/png"}, idempotency_key="K")
+        with self.assertRaises(CalmLensConnectionError):
+            c.assets.classify(name="a.png", content={"data": data, "type": "image/png"}, options={"idempotency_key": "K"})
         c.transport = serve
-        asset = c.assets.classify(name="a.png", content={"data": data, "type": "image/png"}, idempotency_key="K")
+        asset = c.assets.classify(name="a.png", content={"data": data, "type": "image/png"}, options={"idempotency_key": "K"})
         self.assertEqual((asset["type"], asset["upload"]["status"], asset["content"]["sizeInBytes"]),
                          ("image", "completed", len(data)))
         self.assertEqual(len(c.database_storage.assets), 1)
         self.assertEqual(moderated, [data])
         resumed = c.requests[2:]
-        self.assertEqual([(r.query.get("partNumber"), r.headers["Idempotency-key"], r.status) for r in resumed],
+        self.assertEqual([(r.query.get("partNumber"), r.get_header("Idempotency-key"), r.status) for r in resumed],
                          [(1, "K", 200), (2, "K:part-2", 200), (3, "K:part-3", 200)])
         self.assertEqual(c.assets.retrieve(asset_id=asset["id"]), asset)
 
@@ -576,7 +580,7 @@ class MockProjectConfigurationTests(unittest.TestCase):
         renamed = {**user, "title": "Account"}
         region = {"id": "region", "title": "Region", "type": "string", "icon": "tag", "color": "#16a34a"}
         result = fields.ensure(fields=[region, renamed])
-        self.assertEqual(result["fields"], [renamed, order, region])
+        self.assertEqual(to_json(result["fields"]), [renamed, order, region])
         self.assertEqual(result["revision"], 3)
         self.assertEqual(fields.ensure(fields=[order])["revision"], 3)
 

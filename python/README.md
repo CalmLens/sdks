@@ -1,7 +1,8 @@
 # CalmLens Python SDK
 
 Server-side Python SDK for [CalmLens](https://calmlens.com) content moderation, storage and CDN delivery.
-It requires Python 3.10 or later, has no runtime dependencies and is fully typed (`py.typed`, checked with `mypy --strict`).
+It requires Python 3.10 or later, has no runtime dependencies and is fully typed (`py.typed`, checked with `mypy --strict`),
+with a synchronous client and an asynchronous one.
 
 ## Install
 
@@ -23,25 +24,29 @@ from calmlens import CalmLensServerClient
 client = CalmLensServerClient()
 
 asset = client.text.classify(text="Great photo!", external_id="comment-42")
-if asset["classification"]["moderation"]["status"] == "allowed":
+if asset.classification.moderation.decision == "allowed":
     print("Allowed: safe to show")
 
 with open("photo.jpg", "rb") as file:  # streamed, not read into memory
     queued = client.assets.create(name="photo.jpg", content={"data": file, "type": "image/jpeg"})
 
-decided = client.assets.wait_for_decision(asset_id=queued["id"], timeout=30)
+decided = client.assets.wait_for_decision(asset_id=queued.id, timeout=30)
+print(decided.last_response.request_id)
 ```
 
-Methods take snake_case keyword arguments, or one options dict with the API's camelCase keys
-(`client.assets.retrieve({"assetId": "..."})`). Responses are plain dicts with the API's camelCase
-field names, typed as `TypedDict`s in `calmlens.types`.
+Methods take snake_case keyword arguments, and dict options (such as `processing_options`) take
+snake_case keys. Results are typed objects from `calmlens.types`, read through snake_case attributes
+(`asset.classification.moderation.decision`); `to_dict()` returns the API's JSON. Lists return a
+page you can iterate, with `auto_paging_iter()` for every page after it. Every method takes
+per-call `options` such as `{"timeout": 10, "idempotency_key": "..."}`. From `asyncio`, use
+`AsyncCalmLensServerClient`, which has the same methods, awaitable.
 
 `assets.create` returns without waiting for the decision; `assets.classify` and `text.classify` wait for it.
-Act on `classification.moderation.status`:
+Act on `classification.moderation.decision`:
 
 | Status           | What to do                                                                    |
 | ---------------- | ----------------------------------------------------------------------------- |
-| `pending`        | Moderation hasn't decided yet: wait, poll or handle a webhook.                |
+| `None`           | Moderation hasn't decided yet: wait, poll or handle a webhook.                |
 | `allowed`        | Show the content.                                                             |
 | `limited`        | Show it with reduced reach: keep it out of recommendations and notifications. |
 | `age-restricted` | Show it only to viewers your app has age-checked.                             |
@@ -74,10 +79,12 @@ Treat a status you don't recognise, and a failed request, as not allowed.
   [viewer claims](https://calmlens.com/docs/sdk/python/reference#viewer-claims).
 - [Verify and parse webhooks](https://calmlens.com/docs/sdk/python/reference#webhooks) from Flask, Django or
   FastAPI, or [poll the events feed](https://calmlens.com/docs/sdk/python/reference#events-feed).
-- [Handle errors](https://calmlens.com/docs/sdk/python/reference#errors) with stable error codes, and rely on
+- [Handle errors](https://calmlens.com/docs/sdk/python/reference#errors) with stable error codes and a class per
+  kind of failure, such as `CalmLensNotFoundError` and `CalmLensRateLimitError`, and rely on
   [safe retries and idempotency keys](https://calmlens.com/docs/sdk/python/reference#retries-and-idempotency).
 - [Configure the client](https://calmlens.com/docs/sdk/python/reference#configuration): timeouts, proxies,
-  connection reuse across threads and forked workers, and use from `asyncio`.
+  TLS settings, your own transport, logging (`CALMLENS_LOG`), a hook for every attempt, connection reuse across
+  threads and forked workers, and the [async client](https://calmlens.com/docs/sdk/python/reference#async-client).
 
 ## Testing
 

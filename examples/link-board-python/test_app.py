@@ -6,7 +6,7 @@ import unittest
 from types import SimpleNamespace
 from urllib.parse import urlencode
 
-from calmlens import CalmLensError
+from calmlens import Asset, AssetModeration, CalmLensError
 from calmlens.testing import MockCalmLensServerClient
 
 from app import (RECHECK_SECONDS, Board, ConfigurationError, InvalidInput, Moderator, create_moderator, explain,
@@ -130,7 +130,7 @@ class DemoFlowTests(unittest.TestCase):
         board.refresh()
         link = board.links[0]
         stored = board.moderator.client.database_storage.assets[link["asset_id"]]
-        stored["classification"]["moderation"].update(status="allowed", manualReviews=[
+        stored["classification"]["moderation"].update(decision="allowed", manualReviews=[
             {"id": "r1", "decision": "allowed", "note": None, "decidedBy": {"type": "user", "id": None}, "reviewedAt": 1, "applied": True}])
         clock.now = 5 + RECHECK_SECONDS - 1
         board.refresh()
@@ -199,7 +199,7 @@ class LiveTests(unittest.TestCase):
             board = live_board(client)
             board.submit("https://example.com/", "Hello")
             stored = client.database_storage.assets[board.links[0]["asset_id"]]
-            stored["classification"]["status"], stored["classification"]["moderation"]["status"] = processing, moderation
+            stored["classification"]["status"], stored["classification"]["moderation"]["decision"] = processing, moderation
             board.refresh()
             self.assertEqual(board.links[0]["status"], "pending")
             self.assertEqual(clickable(board), [])
@@ -207,7 +207,7 @@ class LiveTests(unittest.TestCase):
         board = live_board(client)
         board.submit("https://example.com/", "Hello")
         stored = client.database_storage.assets[board.links[0]["asset_id"]]
-        stored["classification"]["status"], stored["classification"]["moderation"]["status"] = "completed", "allowed"
+        stored["classification"]["status"], stored["classification"]["moderation"]["decision"] = "completed", "allowed"
         client.enqueue_error(ConnectionResetError("reset"))
         with self.assertLogs(level="WARNING"):
             board.refresh()
@@ -219,7 +219,7 @@ class LiveTests(unittest.TestCase):
         board.submit("https://example.com/", "Hello")
         stored = client.database_storage.assets[board.links[0]["asset_id"]]
         stored["classification"]["status"] = "completed"
-        stored["classification"]["moderation"].update(status="blocked", raw={"categories": {
+        stored["classification"]["moderation"].update(decision="blocked", raw={"categories": {
             "hate": {"status": "evaluated", "score": 0.81}, "sexual": {"status": "not-evaluated", "reason": "unavailable"}}},
             source="policy", flaggedCategories=["hate"], automatedStatus="blocked")
         board.refresh()
@@ -255,9 +255,10 @@ class StartupTests(unittest.TestCase):
 
 class UnitTests(unittest.TestCase):
     def test_not_evaluated_is_unknown_not_zero(self):
-        result = explain({"raw": {"categories": {"hate": {"status": "not-evaluated", "reason": "unavailable"},
-                                         "violence": {"status": "partial", "score": 0.5},
-                                         "sexual": {"status": "evaluated", "score": 0}}}})
+        result = explain(AssetModeration.construct_from({"raw": {"categories": {
+            "hate": {"status": "not-evaluated", "reason": "unavailable"},
+            "violence": {"status": "partial", "score": 0.5, "likelihood": "possible"},
+            "sexual": {"status": "evaluated", "score": 0, "likelihood": "very-unlikely"}}}}))
         self.assertEqual(result, {"found": [("violence", 0.5)], "unknown": ["hate"]})
         self.assertEqual(explain(None), {"found": [], "unknown": []})
 
@@ -325,7 +326,7 @@ class HandlerTests(unittest.TestCase):
 
     def test_live_handler_ignores_demo_outcomes(self):
         choices = []
-        moderator = SimpleNamespace(demo=False, check_note=lambda link_id, note, choice: choices.append(choice) or {"id": "n", "classification": {"moderation": {"status": "blocked"}}})
+        moderator = SimpleNamespace(demo=False, check_note=lambda link_id, note, choice: choices.append(choice) or Asset.construct_from({"id": "n", "classification": {"moderation": {"decision": "blocked"}}}))
         board = Board(moderator)
         self.request(board, "POST", "/links", {"url": "https://example.com/", "note": "Hi", "csrf": board.csrf_token, "demo_result": "blocked"})
         self.assertEqual(choices, ["allowed"])

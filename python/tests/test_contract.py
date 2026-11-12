@@ -7,6 +7,7 @@ fixture case is its own subtest; cases a capability marks not applicable to Pyth
 by name with the reason."""
 from __future__ import annotations
 
+import asyncio
 import base64
 import copy
 import email.message
@@ -29,16 +30,18 @@ from urllib.parse import parse_qsl, urlsplit
 
 import calmlens
 from calmlens import (CalmLensAPIError, CalmLensError, CalmLensServerClient, CalmLensTimeoutError,
-                      CalmLensTransportError, CalmLensValidationError, WebhookVerificationError, client as client_module,
+                      CalmLensConnectionError, CalmLensInvalidArgumentError, CalmLensWebhookVerificationError, client as client_module,
                       get_event_fact, get_event_facts, is_newer_asset_event, is_test_webhook_event, parse_webhook_event, testing, to_webhook_event_payload,
                       verify_webhook_signature)
 from calmlens import _mock_classification, _signed_test_inputs
+from calmlens import errors as errors_module
 from calmlens._option_keys import NULLABLE_OPTION_KEYS
 from calmlens.client import _serialize_transform
 from calmlens.testing import MockCalmLensServerClient, create_mock_api_key, sign_upload_token
 from calmlens.types import IMAGE_TRANSFORM_COLOUR_KEYS, ImageTransformOptions
 from calmlens.webhooks import create_webhook_headers, create_webhook_signature_header
 from upload_form import read_upload_form
+from wire import python_options
 
 TESTDATA = Path(__file__).resolve().parents[2] / "go" / "testdata"
 
@@ -58,9 +61,23 @@ def _snake(path: str) -> str:
     return re.sub(r"(?<!^)(?<!\.)(?=[A-Z])", "_", path).lower()
 
 
+def _wire(value: Any) -> Any:
+    """Result objects (and lists or dicts of them) as the API's JSON."""
+    if isinstance(value, calmlens.CalmLensObject):
+        return value.to_dict()
+    if isinstance(value, (list, tuple)):
+        return [_wire(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _wire(item) for key, item in value.items()}
+    return value
+
+
 def _json(value: Any) -> Any:
     """A result as the JSON the fixtures hold."""
-    return json.loads(json.dumps(value))
+    return json.loads(json.dumps(_wire(value)))
+
+
+_python_options = python_options
 
 
 # ---- Translating JavaScript operations and options --------------------------------------------
@@ -69,7 +86,10 @@ def _json(value: Any) -> Any:
 #: JavaScript's name for the events iterator).
 _ITERATORS = {capability["id"]: capability["names"]["python"] for capability in SURFACE["capabilities"]
               if capability["kind"] == "method" and ".iterate" in capability["id"]}
-_ITERATORS["events.pages"] = _ITERATORS["events.iterate"]
+# JavaScript's ``events.iterate`` yields events and ``events.pages`` the pages: Python's
+# ``events.iter`` and ``events.iter_pages``.
+_ITERATORS["events.pages"] = "events.iter_pages"
+_ITERATORS["events.iterate"] = "events.iter"
 
 
 class _Partial(Exception):
@@ -90,20 +110,60 @@ def _content(value: Any) -> Any:
     return value
 
 
-def _invoke(client: CalmLensServerClient, operation: str, args: Any, as_keywords: bool = False) -> Any:
-    """Run a JavaScript client operation with JavaScript option names on the Python client: as one
-    options dict, or with ``as_keywords`` as the snake_case keyword arguments callers write, such as
-    ``viewer_claims=None``."""
+class _ReadCDNResponse:
+    """An :class:`AsyncCDNResponse` read in full inside the event loop, readable as a CDNResponse."""
+
+    def __init__(self, status: int, headers: dict[str, str], body: bytes):
+        self.status, self.headers, self._body = status, headers, body
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> _ReadCDNResponse:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        pass
+
+
+def _await(value: Any) -> Any:
+    """An async client's result as the sync client returns it: awaited, an async iterator
+    collected (raising ``_Partial`` with the items before a failure), a CDN body read."""
+    async def resolve() -> Any:
+        if inspect.isawaitable(value):
+            result = await value
+            if isinstance(result, calmlens.AsyncCDNResponse):
+                async with result as response:
+                    return _ReadCDNResponse(response.status, response.headers, await response.read())
+            return result
+        items: list[Any] = []
+        try:
+            async for item in value:
+                items.append(item)
+        except CalmLensError as error:
+            raise _Partial(items, error) from error
+        return items
+    return asyncio.run(resolve())
+
+
+def _invoke(client: CalmLensServerClient, operation: str, args: Any, as_keywords: bool = True,
+            use_async: bool = False) -> Any:
+    """Run a JavaScript client operation with JavaScript option names on the Python client, as the
+    snake_case keyword arguments callers write, such as ``viewer_claims=None``; with ``use_async``
+    through an :class:`AsyncCalmLensServerClient` running the same client."""
     args = dict(args or {})
     for key in ("content", "part"):
         if key in args:
             args[key] = _content(args[key])
+    root: Any = calmlens.AsyncCalmLensServerClient.from_client(client) if use_async else client
 
-    def call(method: Any, options: dict[str, Any], **keywords: Any) -> Any:
-        if as_keywords:
-            return method(**{_snake(key): value for key, value in options.items()}, **keywords)
-        return method(options, **keywords)
+    def call(method: Any, given: dict[str, Any], **keywords: Any) -> Any:
+        result = method(**_python_options(given), **keywords)
+        return _await(result) if use_async and (inspect.isawaitable(result) or hasattr(result, "__aiter__")) \
+            else result
     if operation in _ITERATORS:
+        if use_async:
+            return call(_resolve_name(root, _ITERATORS[operation]), args)
         items: list[Any] = []
         try:
             for item in call(_resolve_name(client, _ITERATORS[operation]), args):
@@ -115,8 +175,8 @@ def _invoke(client: CalmLensServerClient, operation: str, args: Any, as_keywords
         args["timeout"] = args.pop("timeoutMs") / 1000
     keywords = {}
     if "idempotencyKey" in args:
-        keywords["idempotency_key"] = args.pop("idempotencyKey")
-    return call(_resolve_name(client, _snake(operation)), args, **keywords)
+        keywords["options"] = {"idempotency_key": args.pop("idempotencyKey")}
+    return call(_resolve_name(root, _snake(operation)), args, **keywords)
 
 
 def _client_options(options: dict[str, Any]) -> dict[str, Any]:
@@ -172,7 +232,7 @@ def _json_response(body: Any, status: int = 200, headers: dict[str, str] | None 
 
 
 def _refuse(request: Any, timeout: float) -> Any:
-    raise AssertionError(f"Sent {request.full_url}")
+    raise AssertionError(f"Sent {request.url}")
 
 
 def _client(transport: Any = _refuse, **options: Any) -> CalmLensServerClient:
@@ -194,18 +254,24 @@ class RequestTests(unittest.TestCase):
     def test_javascript_requests(self) -> None:
         """Each request fixture sends the recorded request and returns the recorded response."""
         for index, fixture in enumerate(_fixture("requests.json"), 1):
-            with self.subTest(f"{index}: {fixture['operation']}"):
+            for use_async in (False, True):
+                with self.subTest(f"{index}: {fixture['operation']}", use_async=use_async):
+                    self._replay_request(fixture, use_async)
+
+    def _replay_request(self, fixture: dict[str, Any], use_async: bool) -> None:
+            if True:
                 captured = []
 
                 def transport(request: Any, timeout: float, response: Any = fixture["response"]) -> _Response:
-                    captured.append((request, _body_bytes(request.data)))
+                    captured.append((request, _body_bytes(request.body)))
                     return _json_response(response)
-                result = _invoke(_client(transport), fixture["operation"], fixture.get("options"))
+                result = _invoke(_client(transport), fixture["operation"], fixture.get("options"),
+                                 use_async=use_async)
                 self.assertEqual(len(captured), 1)
                 request, data = captured[0]
-                url = urlsplit(request.full_url)
+                url = urlsplit(request.url)
                 body: Any = data.decode() if data else None
-                if body and request.headers.get("Content-type") == "application/json":
+                if body and request.get_header("Content-type") == "application/json":
                     body = json.loads(body)
                 self.assertEqual({"method": request.method, "path": url.path, "query": dict(parse_qsl(url.query)),
                                   "body": body}, fixture["request"])
@@ -228,10 +294,10 @@ class RequestTests(unittest.TestCase):
         for case in paths["cdnUrls"]:
             with self.subTest(cdn=case["options"]):
                 if "url" in case:
-                    self.assertEqual(c.cdn.get_asset_url(case["options"]), case["url"])
+                    self.assertEqual(c.cdn.get_asset_url(**_python_options(case['options'])), case["url"])
                 else:
                     with self.assertRaises(CalmLensError) as raised:
-                        c.cdn.get_asset_url(case["options"])
+                        c.cdn.get_asset_url(**_python_options(case['options']))
                     self.assertEqual(raised.exception.code, case["error"])
 
     def test_api_errors(self) -> None:
@@ -240,17 +306,39 @@ class RequestTests(unittest.TestCase):
             with self.subTest(fixture["code"]):
                 response = fixture["response"]
 
-                def transport(request: Any, timeout: float, response: Any = response) -> _Response:
-                    return _Response(response["status"], response["headers"], json.dumps(response["body"]).encode())
+                text = response["bodyText"] if "bodyText" in response else json.dumps(response["body"])
+
+                def transport(request: Any, timeout: float, response: Any = response, text: str = text) -> _Response:
+                    return _Response(response["status"], response["headers"], text.encode())
                 with self.assertRaises(CalmLensAPIError) as raised:
                     _invoke(_client(transport), fixture["operation"], fixture["args"])
                 self.assertEqual(_error_fields(raised.exception), fixture["expected"])
+                self.assertEqual(_kind_problems(raised.exception, fixture["kind"]), [])
+                # The raw body is kept (a proxy's HTML page among them), and left out of str().
+                self.assertEqual(raised.exception.body, text)
+                self.assertNotIn(text, str(raised.exception))
 
 
 # ---- requests.json against the declared types ---------------------------------------------------
 
 def _type_name(hint: Any) -> str:
     return getattr(hint, "__name__", None) or repr(hint)
+
+
+def _attribute(key: str) -> str:
+    """An API field name as a result object's attribute: ``nextCursor`` -> ``next_cursor``."""
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", key).lower().replace("-", "_")
+
+
+def _model_fields(model: type) -> dict[str, Any]:
+    return {name: hint for name, hint in typing.get_type_hints(model).items() if not name.startswith("_")}
+
+
+def _union_members(hint: Any) -> list[Any]:
+    origin = typing.get_origin(hint)
+    if origin is typing.Union or (origin is not None and getattr(origin, "__name__", "") == "UnionType"):
+        return [member for arg in typing.get_args(hint) for member in _union_members(arg)]
+    return [hint]
 
 
 def _type_errors(value: Any, hint: Any, path: str, complete: bool = True) -> list[str]:
@@ -274,6 +362,20 @@ def _type_errors(value: Any, hint: Any, path: str, complete: bool = True) -> lis
     if origin is typing.Literal:
         return [] if any(value == arg and type(value) is type(arg) for arg in args) else [
             f"{path}: {value!r} is not one of {list(args)}"]
+    if isinstance(hint, type) and issubclass(hint, calmlens.CalmLensObject):
+        # A result object: every key the API sent is a declared attribute (its snake_case name),
+        # and a field typed without ``None`` is always sent.
+        if not isinstance(value, dict):
+            return [f"{path}: {value!r} is not an object ({hint.__name__})"]
+        fields = _model_fields(hint)
+        names = {_attribute(key): key for key in value}
+        errors = [f"{path}.{key}: not declared on {hint.__name__}" for key in value if _attribute(key) not in fields]
+        errors += [f"{path}.{name}: required by {hint.__name__} but missing" for name, field in fields.items()
+                   if complete and name not in names and type(None) not in _union_members(field)]
+        for key, item in value.items():
+            if _attribute(key) in fields:
+                errors += _type_errors(item, fields[_attribute(key)], f"{path}.{key}", complete)
+        return errors
     if typing.is_typeddict(hint):
         if not isinstance(value, dict):
             return [f"{path}: {value!r} is not an object ({_type_name(hint)})"]
@@ -308,25 +410,26 @@ def _type_errors(value: Any, hint: Any, path: str, complete: bool = True) -> lis
     raise AssertionError(f"{path}: the type checker can't check {hint!r}")
 
 
-def _declared(operation: str) -> tuple[Any, Any]:
-    """The Python method behind a fixture operation (as ``_invoke`` resolves it): its options type
-    and its return type."""
+def _declared(operation: str) -> tuple[dict[str, Any], Any]:
+    """The Python method behind a fixture operation (as ``_invoke`` resolves it): its keyword
+    argument types and its return type."""
     method = _resolve_name(_client(), _ITERATORS.get(operation) or _snake(operation))
     assert method is not None, f"no Python method for {operation}"
     hints = typing.get_type_hints(method, vars(client_module))
-    first = next(iter(inspect.signature(method).parameters))
-    options = [member for member in typing.get_args(hints[first]) if member is not type(None)]
-    return options[0], hints["return"]
+    keywords = {name: hints[name] for name, parameter in inspect.signature(method).parameters.items()
+                if parameter.kind is inspect.Parameter.KEYWORD_ONLY}
+    return keywords, hints["return"]
 
 
 class TypeContractTests(unittest.TestCase):
     """The request fixtures, including the full models the generator fills from the API's schemas,
-    match the TypedDicts the client methods declare: every field the API sends is declared, every
-    required field is present and every value has its declared type."""
+    match the result objects and keyword arguments the client methods declare: every field the API
+    sends is declared, every field typed without ``None`` is present and every value has its
+    declared type."""
 
     def test_responses_match_the_declared_return_types(self) -> None:
         """Every response holds only declared fields of the declared types; the generator's
-        full-model cases (``fullModel``) must also hold every required field."""
+        full-model cases (``fullModel``) must also hold every field typed without ``None``."""
         for index, fixture in enumerate(_fixture("requests.json"), 1):
             operation = fixture["operation"]
             with self.subTest(f"{index}: {operation}"):
@@ -340,29 +443,32 @@ class TypeContractTests(unittest.TestCase):
                                               complete=fixture.get("fullModel") is True), [])
 
     def test_options_match_the_declared_option_types(self) -> None:
-        """Every option has its declared type, apart from ``None`` for an option the API refuses
-        ``null`` for, which the client leaves out (the requests fixtures check that it does)."""
+        """Every option, in snake_case, is a keyword argument of its declared type, apart from
+        ``None`` for an option the API refuses ``null`` for, which the client leaves out (the
+        requests fixtures check that it does)."""
         for index, fixture in enumerate(_fixture("requests.json"), 1):
             operation = fixture["operation"]
             with self.subTest(f"{index}: {operation}"):
-                options_type, _ = _declared(operation)
+                keywords, _ = _declared(operation)
                 nullable = NULLABLE_OPTION_KEYS.get(operation, frozenset())
                 options = {key: _content(value) if key in ("content", "part") else value
                            for key, value in (fixture.get("options") or {}).items()
                            if key != "idempotencyKey" and (value is not None or key in nullable)}
-                self.assertEqual(_type_errors(options, options_type, "options"), [])
+                errors = []
+                for key, value in _python_options(options).items():
+                    if key not in keywords:
+                        errors.append(f"options.{key}: not a keyword argument")
+                    else:
+                        errors += _type_errors(value, keywords[key], f"options.{key}")
+                self.assertEqual(errors, [])
                 contract = fixture.get("inputContract", {})
                 if "field" in contract:
                     method = _resolve_name(_client(), _snake(operation))
                     keyword = _snake(contract["field"])
                     parameter = inspect.signature(method).parameters[keyword]
                     self.assertEqual(parameter.kind, inspect.Parameter.KEYWORD_ONLY)
-                    hint = typing.get_type_hints(method, vars(client_module))[keyword]
-                    self.assertEqual(_type_errors(options[contract["field"]], hint, keyword), [])
-                if contract.get("requiredKeys"):
-                    self.assertTrue(typing.is_typeddict(options_type), operation)
-                    self.assertEqual(set(contract["requiredKeys"]) - options_type.__required_keys__, set(),
-                                     f"{operation}: required inputs must be required by its options type")
+                self.assertEqual({_snake(key) for key in contract.get("requiredKeys", [])} - set(keywords), set(),
+                                 f"{operation}: required inputs must be keyword arguments")
 
 
 class TransformTests(unittest.TestCase):
@@ -388,7 +494,7 @@ class TransformTests(unittest.TestCase):
         for case in self.fixture["invalid"]:
             for name, call in calls.items():
                 with self.subTest(name, options=case["options"]):
-                    with self.assertRaises(CalmLensValidationError) as raised:
+                    with self.assertRaises(CalmLensInvalidArgumentError) as raised:
                         call(case["options"])
                     self.assertEqual(raised.exception.code, "sdk/invalid-argument")
                     self.assertEqual(raised.exception.details,
@@ -411,7 +517,7 @@ class UploadMimeTypeTests(unittest.TestCase):
         part, without sending a request (``_client`` fails on any request)."""
         for mime_type in self.fixture["refused"]:
             for mode in ("content", "part"):
-                with self.subTest(mime_type, mode=mode), self.assertRaises(CalmLensValidationError) as raised:
+                with self.subTest(mime_type, mode=mode), self.assertRaises(CalmLensInvalidArgumentError) as raised:
                     _client().assets.create(name="x", **{mode: {"base64": "aGVsbG8=", "type": mime_type}})
                 self.assertEqual(raised.exception.code, "upload/unsupported-type")
                 self.assertEqual(raised.exception.details, {"mimeType": mime_type, "source": "calmlens"})
@@ -460,9 +566,9 @@ class _Scripted:
         self.received: list[dict[str, Any]] = []
 
     def __call__(self, request: Any, timeout: float) -> _Response:
-        self.received.append({"method": request.get_method(), "url": request.full_url,
-                              "headers": {name.lower(): value for name, value in request.header_items()},
-                              "body": _body_bytes(request.data)})
+        self.received.append({"method": request.method, "url": request.url,
+                              "headers": {name.lower(): value for name, value in request.headers.items()},
+                              "body": _body_bytes(request.body)})
         responses = self.case["responses"]
         if len(self.received) > len(responses):
             raise AssertionError(f"request {len(self.received)} has no scripted response")
@@ -508,9 +614,11 @@ class ClientCaseTests(unittest.TestCase):
                     if NOT_APPLICABLE[requires]:
                         print(f"\nskipped {case['name']!r} (not applicable: {NOT_APPLICABLE[requires]})")
                         continue
-                self._run_case(case)
+                for use_async in (False, True):
+                    with self.subTest(use_async=use_async):
+                        self._run_case(case, use_async)
 
-    def _run_case(self, case: dict[str, Any]) -> None:
+    def _run_case(self, case: dict[str, Any], use_async: bool = False) -> None:
         transport = _Scripted(case)
         sleeps: list[float] = []
         client: CalmLensServerClient | None = None
@@ -530,7 +638,8 @@ class ClientCaseTests(unittest.TestCase):
             if error is None:
                 assert client is not None
                 try:
-                    result = _invoke(client, step["operation"], _decode_args(step.get("args") or {}))
+                    result = _invoke(client, step["operation"], _decode_args(step.get("args") or {}),
+                                     use_async=use_async)
                 except _Partial as failure:
                     error, partial = failure.error, _json(failure.items)
                 except CalmLensError as failure:
@@ -627,21 +736,29 @@ def _raised_error() -> CalmLensError:
 
 # The class the SDK raises for each SDK error code; errors carrying an HTTP status are
 # CalmLensAPIError. Other SDK codes use the base class.
-_RAISED_CLASS = {
-    "sdk/timeout": CalmLensTimeoutError,
-    "sdk/transport-error": CalmLensTransportError,
-    "sdk/invalid-argument": CalmLensValidationError,
-    "sdk/invalid-config": CalmLensValidationError,
-    "sdk/invalid-webhook-signature": WebhookVerificationError,
-    "sdk/invalid-webhook-payload": WebhookVerificationError,
-}
+#: The error kinds (surface.json ``errorKinds``) by ID, and the class each one names.
+ERROR_KINDS = {kind["id"]: kind for kind in SURFACE["errorKinds"]}
+
+
+def _kind_class(kind: str) -> type:
+    return cast(type, getattr(calmlens, ERROR_KINDS[kind]["names"]["python"]))
+
+
+def _kind_problems(error: BaseException, kind: str) -> list[str]:
+    """Where ``error`` isn't an instance of its kind's class and every ancestor kind's class."""
+    problems, current = [], kind
+    while current is not None:
+        if not isinstance(error, _kind_class(current)):
+            problems.append(f"{type(error).__name__} is not a {_kind_class(current).__name__} ({current})")
+        current = ERROR_KINDS[current].get("parent")
+    return problems
 
 
 def _mock_outcome(option: str) -> str:
     """The status a mock option gives an upload: ``moderate`` answering ``blocked``."""
     mock = testing.MockCalmLensServerClient(mock_options=cast(Any, {option: lambda moderation: "blocked"}))
-    asset = mock.assets.classify({"name": "note.txt", "content": {"plainText": "hello", "type": "text/plain"}})
-    return str(asset["classification"]["moderation"]["status"])
+    asset = mock.assets.classify(name='note.txt', content={'plain_text': 'hello', 'type': 'text/plain'})
+    return str(asset["classification"]["moderation"]["decision"])
 
 
 def _present(capability: dict[str, Any]) -> bool:
@@ -659,7 +776,7 @@ def _present(capability: dict[str, Any]) -> bool:
                 "errors.retryAfter": expected["retryAfterSeconds"]}[capability["id"]]
         return bool(getattr(_raised_error(), name, None) == want)
     if kind == "cdn-resource":
-        url = _client().cdn.get_asset_url({"assetId": "asset-1", "resource": name})
+        url = _client().cdn.get_asset_url(asset_id='asset-1', resource=name)
         return url.endswith(f"/asset-1/{capability['path']}")
     if kind == "cdn-option":
         get_asset_url = _client().cdn.get_asset_url
@@ -693,13 +810,26 @@ class SurfaceTests(unittest.TestCase):
                          classification["qualifiers"])
 
     def test_retryable_errors(self) -> None:
+        """Each code and status raises its kind of error, which says whether it is retryable and
+        local; the property comes from the code and status alone, so the base class agrees."""
         for case in SURFACE["retryable"]:
-            raised = CalmLensAPIError if case["status"] is not None else _RAISED_CLASS.get(case["code"], CalmLensError)
-            for error_class in dict.fromkeys((CalmLensError, raised)):
-                with self.subTest(case["code"], status=case["status"], error_class=error_class.__name__):
-                    error = error_class(case["code"], status=case["status"])
+            raised = errors_module._error(case["code"], status=case["status"])
+            with self.subTest(case["code"], status=case["status"]):
+                self.assertEqual(_kind_problems(raised, case["kind"]), [])
+                for error in (raised, CalmLensError(case["code"], status=case["status"])):
                     self.assertIs(error.is_retryable, case["retryable"])
                     self.assertIs(error.is_local, case["local"])
+
+    def test_every_error_kind_has_its_class(self) -> None:
+        """Every error kind names a class, exported from ``calmlens``, that subclasses its parent's."""
+        for kind in SURFACE["errorKinds"]:
+            with self.subTest(kind["id"]):
+                cls = _kind_class(kind["id"])
+                self.assertTrue(issubclass(cls, BaseException))
+                if kind.get("parent"):
+                    self.assertTrue(issubclass(cls, _kind_class(kind["parent"])))
+                else:
+                    self.assertIs(cls, CalmLensError)
 
     def test_defaults(self) -> None:
         """The client defaults equal JavaScript's, and the cases that observe them exist."""
@@ -707,9 +837,9 @@ class SurfaceTests(unittest.TestCase):
         values = {
             "baseUrl": c.base_url, "cdnBaseUrl": c.cdn_base_url, "timeoutMs": c.timeout * 1000,
             "uploadTimeoutMs": None if c.upload_timeout is None else c.upload_timeout * 1000,
-            "maxRetries": c.max_retries, "retryBaseDelayMs": client_module.RETRY_BASE_DELAY * 1000,
-            "retryMaxDelayMs": client_module.RETRY_MAX_DELAY * 1000,
-            "retryAfterMaxMs": client_module.MAX_RETRY_AFTER_SECONDS * 1000,
+            "maxRetries": c.max_retries, "retryBaseDelayMs": client_module._RETRY_BASE_DELAY * 1000,
+            "retryMaxDelayMs": client_module._RETRY_MAX_DELAY * 1000,
+            "retryAfterMaxMs": client_module._MAX_RETRY_AFTER_SECONDS * 1000,
             "maxResponseBytes": c.max_response_bytes, "partSizeBytes": c.part_size_bytes,
             "signedUrlExpiresIn": client_module.DEFAULT_SIGNED_URL_EXPIRES_IN,
             "uploadTokenExpiresInSeconds": client_module.DEFAULT_UPLOAD_TOKEN_EXPIRES_IN,
@@ -733,6 +863,7 @@ class SurfaceTests(unittest.TestCase):
                 with self.assertRaises(CalmLensError) as raised:
                     _invoke(_client(), case["operation"], case["options"])
                 self.assertEqual(raised.exception.code, case["error"])
+                self.assertEqual(_kind_problems(raised.exception, case["kind"]), [])
                 self.assertIs(raised.exception.is_local, True)
                 self.assertIsNone(raised.exception.status)
                 self.assertIsNone(raised.exception.request_id)
@@ -751,8 +882,8 @@ class UploadTokenTests(unittest.TestCase):
     def test_signs_exactly(self) -> None:
         for case in self.fixture["signing"]:
             with self.subTest(case["name"]):
-                signed = sign_upload_token(case["apiKey"], case["options"], now=case["now"], nonce=case["nonce"])
-                self.assertEqual(signed, {"token": case["expected"]["token"], "expiresAt": case["expected"]["expiresAt"]})
+                signed = sign_upload_token(case['apiKey'], **_python_options(case['options']), now=case['now'], nonce=case['nonce'])
+                self.assertEqual(_wire(signed), {"token": case["expected"]["token"], "expiresAt": case["expected"]["expiresAt"]})
 
     def test_signs_with_the_clients_clock_and_a_fresh_nonce(self) -> None:
         import time
@@ -761,7 +892,7 @@ class UploadTokenTests(unittest.TestCase):
                 expected = case["expected"]
                 c = CalmLensServerClient(api_key=case["apiKey"], project_id="project-1")
                 before = int(time.time() * 1000)
-                signed = c.upload_tokens.sign(case["options"])
+                signed = c.upload_tokens.sign(**_python_options(case['options']))
                 after = int(time.time() * 1000)
                 claims, body, signature = _decode_claims(signed["token"])
                 lifetime = expected["expiresAt"] - case["now"]
@@ -779,10 +910,10 @@ class UploadTokenTests(unittest.TestCase):
             with self.subTest(case["name"]):
                 c = CalmLensServerClient(api_key=case["apiKey"], project_id="project-1")
                 with self.assertRaises(CalmLensError) as raised:
-                    c.upload_tokens.sign(case["options"])
+                    c.upload_tokens.sign(**_python_options(case['options']))
                 self.assertEqual(raised.exception.code, case["error"])
                 with self.assertRaises(CalmLensError) as raised:
-                    sign_upload_token(case["apiKey"], case["options"], now=0, nonce="n")
+                    sign_upload_token(case['apiKey'], **_python_options(case['options']), now=0, nonce='n')
                 self.assertEqual(raised.exception.code, case["error"])
 
     def test_verification_cases_document_the_server(self) -> None:
@@ -814,7 +945,7 @@ class WebhookContractTests(unittest.TestCase):
             with self.subTest(type=case["expectedType"], fact=case["expectedFactKey"]):
                 parsed = parse_webhook_event(case["body"], signature=case["signature"], timestamp=case["timestamp"],
                                              secret=case["secret"], now=case["now"])
-                self.assertEqual(parsed, json.loads(case["body"]))
+                self.assertEqual(_wire(parsed), json.loads(case["body"]))
                 self.assertEqual(parsed["type"], case["expectedType"])
                 self.assertEqual(parsed["facts"][0]["key"], case["expectedFactKey"])
 
@@ -849,7 +980,7 @@ class WebhookContractTests(unittest.TestCase):
     def test_parse_errors(self) -> None:
         for case in self.fixtures["parseErrors"]:
             with self.subTest(case["name"]):
-                with self.assertRaises(WebhookVerificationError) as raised:
+                with self.assertRaises(CalmLensWebhookVerificationError) as raised:
                     parse_webhook_event(case["body"], signature=case["signature"], timestamp=case["timestamp"],
                                         secret=case["secret"], now=case["now"])
                 self.assertEqual(raised.exception.code, case["error"])
@@ -859,7 +990,7 @@ class WebhookContractTests(unittest.TestCase):
             with self.subTest(case["name"]):
                 event = parse_webhook_event(case["body"], signature=case["signature"], timestamp=case["timestamp"],
                                             secret=case["secret"], now=case["now"])
-                self.assertEqual(event, case["expected"])
+                self.assertEqual(_wire(event), case["expected"])
                 self.assertIs(is_test_webhook_event(event), case["isTest"])
 
     def test_test_facts(self) -> None:
@@ -893,7 +1024,7 @@ class WebhookContractTests(unittest.TestCase):
                 self.assertEqual(headers, case["headers"])
                 received = parse_webhook_event(case["body"], headers=headers, secret=case["secret"],
                                                now=case["timestampSeconds"])
-                self.assertEqual(received, case["payload"])
+                self.assertEqual(_wire(received), case["payload"])
                 self.assertIs(is_test_webhook_event(received), case["isTest"])
 
 
@@ -981,7 +1112,7 @@ def _run(client: MockCalmLensServerClient, operation: str, args: dict[str, Any],
         return _json(client.enqueue_event(args["type"], asset_id=args.get("assetId"), facts=args.get("facts"),
                                           actor=args.get("actor")))
     if operation == "mock.grant":
-        client.set_api_key_grants(args["grants"])
+        client.set_api_key_grants(_python_options(args["grants"]))
         return None
     if operation == "mock.failNext":
         client.fail_next_request(args["failure"], operation=args.get("operation"), details=args.get("details"),
@@ -996,7 +1127,7 @@ def _run(client: MockCalmLensServerClient, operation: str, args: dict[str, Any],
                     if (response.content_type or "").startswith("application/json") else None)
             return {"status": response.status, "code": code, "bytes": body, "headers": response.headers}
     if operation == "cdn.getAssetInfo":
-        return _json(client.cdn.get_asset_info(args["url"], viewer_claims=args.get("viewerClaims", client_module._UNSET)))
+        return _json(client.cdn.get_asset_info(args['url'], viewer_claims=_python_options(args.get('viewerClaims', client_module._UNSET))))
     try:
         # Scenarios call the mock as users do, with keyword arguments.
         return _json(_invoke(client, operation, args, as_keywords=True))
@@ -1034,7 +1165,7 @@ class MockScenarioTests(unittest.TestCase):
             retries["part_size_bytes"] = mock["partSizeBytes"]
         if not mock.get("defaultProject"):
             retries["project_id"] = "project-1"
-        client = MockCalmLensServerClient(api_key=create_mock_api_key(mock.get("apiKeyGrants")),
+        client = MockCalmLensServerClient(api_key=create_mock_api_key(_python_options(mock.get("apiKeyGrants"))),
                                           mock_options=cast(Any, options), **retries)
         # The status of each response the mock answers, to check a step's final one.
         statuses: list[int] = []
@@ -1135,7 +1266,7 @@ class SignedTestInputTests(unittest.TestCase):
                     try:
                         testing.generate_test_text_code(
                             {"instances": [{"category": category, "qualifiers": [qualifier]}]}, key)
-                    except CalmLensValidationError as error:
+                    except CalmLensInvalidArgumentError as error:
                         self.assertEqual(error.code, "sdk/invalid-argument")
                     else:
                         accepted.append(qualifier)
@@ -1162,7 +1293,7 @@ class SignedTestInputTests(unittest.TestCase):
                     {"faces": [{"box": [0, 0, 1, 1], "age": {"low": 0, "high": age_max + 1}}]}]
         for detections in rejected:
             with self.subTest(rejected=detections):
-                with self.assertRaises(CalmLensValidationError) as raised:
+                with self.assertRaises(CalmLensInvalidArgumentError) as raised:
                     code(detections)
                 self.assertEqual(raised.exception.code, "sdk/invalid-argument")
 
@@ -1187,14 +1318,14 @@ class SignedTestInputTests(unittest.TestCase):
                 self.assertEqual(_decode_png(image.png), (image.width, image.height, image.rgba))
         for case in self.FIXTURE["imageRejections"]:
             with self.subTest(case["name"]):
-                with self.assertRaises(CalmLensValidationError) as raised:
+                with self.assertRaises(CalmLensInvalidArgumentError) as raised:
                     testing.paint_test_image(case.get("input", case.get("signal")), case["key"])
                 self.assertEqual(raised.exception.code, "sdk/invalid-argument")
 
     def test_rejections(self) -> None:
         for case in self.FIXTURE["rejections"]:
             with self.subTest(case["name"], kind=case["kind"]):
-                with self.assertRaises(CalmLensValidationError) as raised:
+                with self.assertRaises(CalmLensInvalidArgumentError) as raised:
                     if case["kind"] == "media":
                         testing.generate_media_test_code(case["signal"], case["key"])
                     else:
@@ -1270,6 +1401,9 @@ _SWITCHED_VALUES = {
     **{value: "ENABLE_LINK_SAFETY" for value in ("asset.link-flagged", "link-safety", "link-verdict", "link-url",
                                                  "link-final-url", "link-status")},
 }
+
+#: Keyword arguments every method takes that aren't API options: per-call request options.
+_OPTION_KEYWORDS = {"options"}
 
 #: Differences Python cannot express, keyed by ``(operation, side, path)``, with the reason.
 _TYPE_ALLOWLIST: dict[tuple[str, str, str], str] = {
@@ -1371,7 +1505,7 @@ class _TypeWalker:
             rest.extend(item for item in inner if item != {"type": "null"})
         return nullable, rest
 
-    def compare(self, schema: Any, declared: Any, path: str, seen: frozenset[str]) -> None:
+    def compare(self, schema: Any, declared: Any, path: str, seen: frozenset[str], null_checked: bool = False) -> None:
         resolved = self.deref(schema, seen)
         if resolved is None:
             return
@@ -1388,7 +1522,9 @@ class _TypeWalker:
         nullable, branches = self.split_null(schema, seen)
         declared_nullable = _NONE in members
         members = [member for member in members if member is not _NONE]
-        if nullable and not declared_nullable and (self.side == "result" or self.method == "PATCH"):
+        if null_checked:
+            pass  # The object's field rule already compared Optional with null and absence.
+        elif nullable and not declared_nullable and (self.side == "result" or self.method == "PATCH"):
             self.report(path, "the schema allows null, but the declared type is not Optional")
         elif declared_nullable and not nullable:
             self.report(path, "declared Optional, but the schema does not allow null")
@@ -1405,7 +1541,7 @@ class _TypeWalker:
             self.compare_one(branches[0], members, path, seen)
             return
         objects = [self.deref(branch, seen) for branch in branches]
-        typed_dicts = [member for member in members if typing.is_typeddict(member)]
+        typed_dicts = [member for member in members if typing.is_typeddict(member) or _is_model(member)]
         if len(typed_dicts) == 1 and len(members) == 1 and all(
                 item is not None and item[0].get("type") == "object" and "properties" in item[0] for item in objects):
             # One TypedDict for every object branch: compare it with their merged properties.
@@ -1623,25 +1759,58 @@ class _TypeWalker:
             for name, property_schema in schema["properties"].items():
                 self.compare(property_schema, value, f"{path}.{name}", seen)
             return
-        if not typing.is_typeddict(declared):
+        model = _is_model(declared)
+        if not model and not typing.is_typeddict(declared):
             self.report(path, f"declared {_describe(declared)}, but the schema is an object with properties")
             return
-        hints = typing.get_type_hints(declared, include_extras=True)
-        required_keys = declared.__required_keys__
+        hints = _declared_fields(declared)
         required = set(schema.get("required", []))
         for name, property_schema in schema["properties"].items():
             field = f"{path}.{name}"
-            if name not in hints:
-                self.report(field, "the schema property is not declared")
+            attribute = name if name in hints else _attribute(name)
+            if attribute not in hints:
+                self.report(field, f"the schema property is not declared (as {attribute})")
                 continue
-            if name in required and name not in required_keys:
+            if model:
+                # A result object reads an absent field as None, so a field the API may leave out
+                # is Optional, as one it may send as null is.
+                nullable, _ = self.split_null(self.deref(property_schema, seen)[0], seen) \
+                    if self.deref(property_schema, seen) else (False, [])
+                optional = _NONE in _members(hints[attribute]) or hints[attribute] is Any
+                if hints[attribute] is Any:
+                    pass  # A JSON value: Any holds null and absence too.
+                elif optional and not (nullable or name not in required):
+                    self.report(field, "declared Optional, but the API always sends it and never null")
+                elif not optional and (nullable or name not in required):
+                    self.report(field, "the API may leave it out or send null, but it is not declared Optional")
+                self.compare(property_schema, hints[attribute], field, seen, null_checked=True)
+                continue
+            required_keys = declared.__required_keys__
+            if name in required and attribute not in required_keys:
                 self.report(field, "the schema requires it, but it is declared NotRequired")
-            elif name not in required and name in required_keys:
+            elif name not in required and attribute in required_keys:
                 self.report(field, "the schema does not require it, but it is declared Required")
-            self.compare(property_schema, hints[name], field, seen)
-        for name in hints:
-            if name not in schema["properties"] and name not in _SWITCHED_FIELDS:
-                self.report(f"{path}.{name}", "declared, but the schema lacks it")
+            self.compare(property_schema, hints[attribute], field, seen)
+        names = {name if name in hints else _attribute(name) for name in schema["properties"]}
+        for attribute in hints:
+            if attribute not in names and attribute not in _SWITCHED_FIELDS \
+                    and _camel_attribute(attribute) not in _SWITCHED_FIELDS:
+                self.report(f"{path}.{attribute}", "declared, but the schema lacks it")
+
+
+def _is_model(declared: Any) -> bool:
+    return isinstance(declared, type) and issubclass(declared, calmlens.CalmLensObject)
+
+
+def _declared_fields(declared: Any) -> dict[str, Any]:
+    """A result object's attributes, or a TypedDict's keys, with their types."""
+    return {name: hint for name, hint in typing.get_type_hints(declared, include_extras=True).items()
+            if not name.startswith("_")}
+
+
+def _camel_attribute(name: str) -> str:
+    head, *tail = name.split("_")
+    return head + "".join(word.title() for word in tail)
 
 
 def _operation_method(operation: dict[str, Any]) -> Any:
@@ -1649,51 +1818,33 @@ def _operation_method(operation: dict[str, Any]) -> Any:
     return _resolve_name(client, operation["names"]["python"])
 
 
-def _options_type(method: Any) -> Any:
-    parameters = list(inspect.signature(method).parameters.values())
-    if not parameters or parameters[0].kind is not inspect.Parameter.POSITIONAL_ONLY:
-        return None
-    hints = typing.get_type_hints(method, include_extras=True)
-    return next(member for member in _members(hints[parameters[0].name]) if member is not _NONE)
-
-
 def _check_options(operation: dict[str, Any]) -> list[str]:
+    """The method's keyword arguments against the operation's options: one keyword per option, in
+    snake_case, with no default exactly when the API requires the option."""
     walker = _TypeWalker(operation["id"], "options", operation["method"])
     method = _operation_method(operation)
     native = {**_NATIVE_OPTIONS.get(operation["id"], {}), **_CLIENT_OPTIONS,
               **{name: "a client option (types.json clientOptions)" for name in operation["options"].get("clientOptions", [])}}
     properties = {name: spec["schema"] for name, spec in operation["options"]["properties"].items()}
-    schema = {"type": "object", "properties": properties, "required": operation["options"]["required"]}
-    options = _options_type(method)
+    required = set(operation["options"]["required"])
     hints = typing.get_type_hints(method, include_extras=True)
     keywords = {name: parameter for name, parameter in inspect.signature(method).parameters.items()
-                if parameter.kind is inspect.Parameter.KEYWORD_ONLY and name != "idempotency_key"}
-    if not properties and options is None and not keywords:
-        return walker.problems
-    if options is None:
-        walker.report("$", "the method takes no options dict")
-        return walker.problems
-    if not properties and not typing.is_typeddict(options) and not keywords:
-        return walker.problems  # Takes no options; the optional positional dict is for symmetry.
-    if not typing.is_typeddict(options):
-        walker.report("$", f"the options type {_describe(options)} is not a TypedDict")
-        return walker.problems
-    fields = typing.get_type_hints(options, include_extras=True)
-    trimmed = cast(Any, typing.TypedDict)(options.__name__, {name: hint for name, hint in fields.items()
-                                                             if name not in native}, total=False)
-    trimmed.__required_keys__ = frozenset(name for name in options.__required_keys__ if name not in native)
-    trimmed.__optional_keys__ = frozenset(name for name in options.__optional_keys__ if name not in native)
-    walker.compare_object(schema, trimmed, "$", frozenset())
-    for name in fields:
-        if _snake(name) not in keywords:
-            walker.report(f"$.{name}", f"the options dict declares it, but there is no keyword {_snake(name)}")
+                if parameter.kind is inspect.Parameter.KEYWORD_ONLY}
+    for name, property_schema in properties.items():
+        keyword = _attribute(name)
+        if keyword not in keywords:
+            walker.report(f"$.{name}", f"no keyword argument {keyword}")
+            continue
+        has_default = keywords[keyword].default is not inspect.Parameter.empty
+        if name in required and has_default:
+            walker.report(f"$.{name}", f"the API requires it, but keyword {keyword} has a default")
+        elif name not in required and not has_default:
+            walker.report(f"$.{name}", f"the API does not require it, but keyword {keyword} has no default")
+        walker.compare(property_schema, hints[keyword], f"$.{name}", frozenset())
     for keyword in keywords:
-        field = next((field for field in fields if _snake(field) == keyword), None)
-        if field is None:
-            walker.report(f"$.{keyword}", "a keyword argument the options dict lacks")
-        elif field in properties and hints[keyword] != fields[field]:
-            for problem in walker.problems_of(properties[field], hints[keyword], f"$.{field}", frozenset()):
-                walker.problems.append(f"{problem} (keyword {keyword})")
+        if _camel_attribute(keyword) not in properties and _camel_attribute(keyword) not in native \
+                and keyword not in _OPTION_KEYWORDS:
+            walker.report(f"$.{keyword}", "a keyword argument the API's options lack")
     return walker.problems
 
 

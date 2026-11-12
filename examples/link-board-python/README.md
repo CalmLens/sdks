@@ -12,7 +12,7 @@ including the text and images it finds there, before anyone can click the link.
    child assets. Nothing is retained after processing, because the board never serves the page
    itself.
 3. While the page is being checked, the board shows the address as plain text and refreshes
-   every few seconds, reading the moderation status (`classification.moderation.status`) with
+   every few seconds, reading the moderation status (`classification.moderation.decision`) with
    `assets.retrieve`. Only an `allowed` or `limited` page becomes a link
    (`rel="noopener noreferrer nofollow ugc"`). A `limited` page is delivered like an allowed one
    but should reach fewer people, so the board folds its link behind **Show link**. An
@@ -81,7 +81,7 @@ asset = client.assets.create(
     name="Calmboard link",
     url=url,
     external_id=f"{link_id}:page",
-    processing_options={"retainContent": False},
+    processing_options={"retain_content": False},
 )
 ```
 

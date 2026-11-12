@@ -88,7 +88,7 @@ def decide(asset: dict, status: str, report: dict):
     """Finishes processing with a demo moderation status; ``purged`` also removes the content."""
     now = int(time.time() * 1000)
     asset["classification"]["status"] = "completed"
-    asset["classification"]["moderation"].update(status=status, **report)
+    asset["classification"]["moderation"].update(decision=status, **report)
     asset["classification"]["moderation"]["automatedStatus"] = status
     asset["classification"]["completedAt"] = now
     if status == "purged":
@@ -114,15 +114,16 @@ class DemoModerator(Moderator):
     def check_note(self, link_id: str, note: str, demo_result: str) -> Asset:
         asset = super().check_note(link_id, note, demo_result)
         if demo_result == "note-blocked":
-            report = demo_report("harassment", 0.91)
-            for stored in (self.mock.database_storage.assets[asset["id"]], asset):
-                stored["classification"]["moderation"].update(status="blocked", **report)
+            # Results are read-only: change the stored asset (the API's JSON) and read it back.
+            stored = self.mock.database_storage.assets[asset.id]
+            stored["classification"]["moderation"].update(decision="blocked", **demo_report("harassment", 0.91))
+            asset = Asset.construct_from(stored)
         return asset
 
     def submit_link(self, link_id: str, url: str, demo_result: str) -> Asset:
         asset = super().submit_link(link_id, url, demo_result)
         with self.plans_lock:
-            self.plans[asset["id"]] = (demo_result, self.clock() + DEMO_DELAY_SECONDS, url)
+            self.plans[asset.id] = (demo_result, self.clock() + DEMO_DELAY_SECONDS, url)
         return asset
 
     def make_due(self, asset_id: str, seconds: float = 0):

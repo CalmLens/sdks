@@ -1,14 +1,20 @@
-"""Wire types: ``TypedDict``s that keep the API's camelCase JSON field names.
+"""The API's types: result objects and the dicts that options take.
 
-Responses are plain dicts, so fields added by newer API versions stay readable with
-``.get()``. Enum-like response values (``status``, ``type``, ``visibility``, ...) are typed
-as the known literals *or* ``str``: values this SDK version doesn't list never fail decoding
-or type checking. Compare them against the literals below, and treat unknown values as "not
-allowed". Request options use the closed literal sets the API accepts.
+Every method returns a :class:`~calmlens.CalmLensObject` (or a :class:`~calmlens.ListObject` page)
+read through typed snake_case attributes, such as ``asset.classification.moderation.decision``.
+Fields added by newer API versions stay readable, and ``to_dict()`` returns the API's JSON.
+Enum-like result values (``status``, ``type``, ``visibility``, ...) are typed as the known literals
+*or* ``str``: values this SDK version doesn't list never fail decoding or type checking. Compare
+them against the literals below, and treat unknown values as "not allowed".
+
+Options are keyword arguments in snake_case. A dict option, such as ``processing_options``, is a
+``...Params`` ``TypedDict`` with snake_case keys, and takes the closed literal sets the API
+accepts. Transform options keep the CDN's names, and metadata values are sent as given.
 """
 from collections.abc import Mapping
 from typing import Any, BinaryIO, Dict, List, Literal, Optional, TypedDict, Union
 
+from ._object import CalmLensObject, ListObject
 from .qualifiers import ModerationQualifier
 
 class ViewerClaims(TypedDict, total=False):
@@ -19,50 +25,45 @@ class ViewerClaims(TypedDict, total=False):
     Viewer claims are assertions from your application; CalmLens doesn't verify them. Default claims (no region, age
     not confirmed) are left out of URLs so default URLs stay cacheable.
     """
-
     region: str
-    ageConfirmed: bool
+    age_confirmed: bool
 
 
 __all__ = [
-    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "CategoryPolicyDefaultSource", "CategoryPolicyRuleSource", "RegionalDecision", "ViewerClaims", "CategoryPolicyScore",
-    "AgeRange", "Asset", "AssetClassificationFailureReason", "AssetContent", "AssetContentRemovalReason", "AssetContentStatus", "AssetIdOptions",
-    "Actor", "ActorType", "ReviewActor", "AssetReview", "AssetModeration", "AssetPendingReview", "DecisionPolicy", "DecisionPolicyPreset", "ModerationRaw", "AssetModerationDecision", "AssetModerationStatus", "AssetPage", "AssetTimelinePage", "AssetTimelineSegment", "AssetClassification", "ClassificationProgress", "AssetUpload",
-    "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField",
-    "AssetSearchResponse", "AssetType", "AssetUrlOptions", "BinaryData", "BoundingBox",
-    "CategoryResult", "CdnResource", "CdnTransform", "Checksums", "ClassificationCategories",
-    "ClassificationCategory", "Content", "CreateFolderOptions",
-    "DetectedFace", "DetectedPerson", "EnsureLensesOptions",
-    "EvaluatedCategoryResult", "EvaluatedFaceDetectionResult", "EvaluatedPersonDetectionResult",
-    "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent", "EventAssetModeration",
-    "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
-    "EventSeverity", "EventType", "KnownEventType", "KnownPolicyPresetId", "ModerationSource", "EventsPage", "ExplainAssetOptions", "ExtractedText", "FaceDetectionFeatureOptions",
-    "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder", "FolderPage", "ListFoldersOptions", "FolderIdOptions", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "StreamingFeatureOptions", "AssetPreview", "AssetModerationTimeline", "AssetInfo", "AssetInfoContent", "AssetAvailability",
-    "ImageTransformBorder", "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim",
-    "ImageTransformTrimBorder", "InlineExtractedText", "Lens", "LensDefinition", "LensType",
-    "Likelihood", "ListAssetsOptions", "ListChildrenOptions", "ListTimelineOptions", "ListEventsOptions",
-    "MediaClassificationSegment", "MediaSegmentSource", "MetadataItem", "ClassifyTextOptions", "ModerationAction",
-    "ModerationQualifier", "MoveAssetOptions", "MoveFolderOptions", "NotEvaluatedCategoryResult",
-    "FeatureNotEvaluatedReason", "NotEvaluatedFeatureResult", "NotEvaluatedQualifierResult", "NotEvaluatedReason", "OcrFeatureOptions",
-    "PartContent", "PartialCategoryResult", "PersonDetectionFeatureOptions", "PersonDetectionResult",
-    "ProcessingFeatures", "ProcessingOptions",
-    "QualifierResult", "QualifierResults", "SafetyHold", "SafetyHoldReason", "SearchAssetsOptions", "SearchMode",
-    "SemanticStatus", "ServeInit", "ServeOptions", "SignedAssetUrl", "SignAssetUrlOptions", "GetAssetInfoOptions", "StoredExtractedText",
-    "SignedUploadToken", "SignUploadTokenOptions", "SubmitAssetOptions", "UpdateAssetOptions",
-    "UpdateFolderOptions", "UploadPartOptions", "Visibility", "WaitForDecisionOptions",
-    "WebhookEventPayload",
-    "TextRegion", "DetectedQrCode", "DetectedLink", "EvaluatedLinkDetectionResult",
-    "LinkDetectionResult", "ProvenanceSignal", "EvaluatedAiGeneratedDetectionResult", "AiGeneratedDetectionResult",
-    "LinkDetectionFeatureOptions", "AiGeneratedDetectionFeatureOptions", "LinkSafetyVerdict", "LinkSafetyAction",
-    "LinkSafetyEvidence", "CheckedLink", "EvaluatedLinkSafetyResult", "LinkSafetyResult", "OffPlatformLinkSettings",
-    "LinkSafetySettings", "LinkSafetyDecision", "HashMatch", "HashListAction", "HashList",
-    "HashListEntry", "HashListPage", "ListHashListsOptions", "HashListEntryPage", "HashListIdOptions",
-    "HashListEntryIdOptions", "DecideAssetOptions", "CreateHashListOptions", "UpdateHashListOptions", "ListHashListEntriesOptions", "AddHashListEntryOptions",
-    "PolicyPresetId", "CategoryPolicySettings", "CategorySettings", "PolicySettings", "PolicyPresetMode", "PolicyPreset",
-    "Policy", "PolicyPage", "ListPoliciesOptions", "PolicyIdOptions", "CreatePolicyOptions", "UpdatePolicyOptions",
-    "ResetPolicyOptions", "UpgradePolicyOptions", "SetPolicyAutomaticUpdatesOptions", "AssignPolicyOptions",
-    "LensPage", "ListLensesOptions", "LensIdOptions", "UpdateLensOptions", "EvaluatedOcrResult", "OcrResult",
-    "UploadPreset", "UploadPresetAccess", "UploadPresetPage", "UploadPresetDefinition", "UploadPresetIdOptions", "ListUploadPresetsOptions", "EnsureUploadPresetsOptions", "EnsureUploadPresetsResponse", "OptOutJurisdiction", "RemoteUrlRule", "HumanReviewSettings", "HumanReviewSettingsInput", "PublicProjectSettings", "PublicProjectSettingsInput", "ProjectSettingsResource", "UpdateProjectSettingsOptions", "MetadataFieldType", "MetadataFieldIcon", "MetadataField", "MetadataFieldDefinition", "MetadataFieldsResource", "EnsureMetadataFieldsOptions", "DeleteMetadataFieldOptions",
+    "ModerationQualifier", "ModerationContextItem", "ModerationContext", "IMAGE_TRANSFORM_COLOUR_KEYS",
+    "AssetBatchOperation", "BatchAssetsResponse",
+    "PolicyRuleSnapshot", "CategoryPolicySettingsSnapshot", "CategoryPolicySource", "CategoryPolicyDefaultSource", "CategoryPolicyRuleSource", "RegionalDecision",
+    "ViewerClaims", "CategoryPolicyScore", "AgeRange", "Asset", "AssetClassificationFailureReason", "AssetContent",
+    "AssetContentRemovalReason", "AssetContentStatus", "Actor", "ActorType", "ReviewActor", "AssetReview",
+    "AssetModeration", "AssetPendingReview", "DecisionPolicy", "DecisionPolicyPreset", "ModerationRaw", "AssetModerationDecision",
+    "AssetModerationStatus", "AssetPage", "AssetTimelinePage", "AssetTimelineSegment", "AssetClassification", "ClassificationProgress",
+    "AssetUpload", "AssetClassificationStatus", "AssetSearchMatch", "AssetSearchMatchField", "AssetSearchResponse", "AssetType",
+    "BinaryData", "BoundingBox", "CategoryResult", "CdnResource", "CdnTransform", "Checksums",
+    "ClassificationCategories", "ClassificationCategory", "Content", "DetectedFace", "DetectedPerson", "EvaluatedCategoryResult",
+    "EvaluatedFaceDetectionResult", "EvaluatedPersonDetectionResult", "EvaluatedQualifierResult", "Event", "EventAsset", "EventAssetContent",
+    "EventAssetModeration", "EventAssetClassification", "EventAssetUpload", "EventFact", "EventFactKey", "EventFactValue",
+    "EventSeverity", "EventType", "KnownEventType", "KnownPolicyPresetId", "ModerationSource", "EventsPage",
+    "ExtractedText", "FaceDetectionFeatureOptions", "FaceDetectionResult", "FileMetadata", "FileMetadataLocation", "Folder",
+    "FolderPage", "AssetRendered", "AssetRenderedKind", "AssetHls", "AssetHlsRendition", "StreamingFeatureOptions",
+    "AssetPreview", "AssetModerationTimeline", "AssetInfo", "AssetInfoContent", "AssetAvailability", "ImageTransformBorder",
+    "ImageTransformGravityPoint", "ImageTransformOptions", "ImageTransformTrim", "ImageTransformTrimBorder", "InlineExtractedText", "Lens",
+    "LensDefinition", "LensType", "Likelihood", "MediaClassificationSegment", "MediaSegmentSource", "MetadataItem",
+    "ModerationAction", "NotEvaluatedCategoryResult", "FeatureNotEvaluatedReason", "NotEvaluatedFeatureResult", "NotEvaluatedQualifierResult", "NotEvaluatedReason",
+    "OcrFeatureOptions", "PartContent", "PartialCategoryResult", "PersonDetectionFeatureOptions", "PersonDetectionResult", "ProcessingFeatures",
+    "ProcessingOptions", "QualifierResult", "QualifierResults", "SafetyHold", "SafetyHoldReason", "SearchMode",
+    "SemanticStatus", "ServeInit", "SignedAssetUrl", "StoredExtractedText", "SignedUploadToken", "Visibility",
+    "WebhookEventPayload", "TextRegion", "DetectedQrCode", "DetectedLink", "EvaluatedLinkDetectionResult", "LinkDetectionResult",
+    "ProvenanceSignal", "EvaluatedAiGeneratedDetectionResult", "AiGeneratedDetectionResult", "LinkDetectionFeatureOptions", "AiGeneratedDetectionFeatureOptions", "LinkSafetyVerdict",
+    "LinkSafetyAction", "LinkSafetyEvidence", "CheckedLink", "EvaluatedLinkSafetyResult", "LinkSafetyResult", "OffPlatformLinkSettings",
+    "LinkSafetySettings", "LinkSafetyDecision", "HashMatch", "HashListAction", "HashList", "HashListEntry",
+    "HashListPage", "HashListEntryPage", "PolicyPresetId", "CategoryPolicySettings", "CategorySettings", "PolicySettings",
+    "PolicyPresetMode", "PolicyPreset", "Policy", "PolicyPage", "LensPage", "EvaluatedOcrResult",
+    "OcrResult", "UploadPreset", "UploadPresetAccess", "UploadPresetPage", "UploadPresetDefinition", "EnsureUploadPresetsResponse",
+    "OptOutJurisdiction", "RemoteUrlRule", "HumanReviewSettings", "HumanReviewSettingsInput", "PublicProjectSettings", "PublicProjectSettingsInput",
+    "ProjectSettingsResource", "MetadataFieldType", "MetadataFieldIcon", "MetadataField", "MetadataFieldDefinition", "MetadataFieldsResource",
+    "AiGeneratedDetectionFeatureParams", "CategoryPolicySettingsParams", "CategorySettingsParams", "FaceDetectionFeatureParams", "LinkDetectionFeatureParams", "LinkSafetySettingsParams",
+    "MetadataItemParams", "ModerationContextItemParams", "ModerationContextParams", "OcrFeatureParams", "OffPlatformLinkSettingsParams", "PersonDetectionFeatureParams",
+    "PolicyRuleSnapshotParams", "PolicySettingsParams", "ProcessingFeaturesParams", "ProcessingParams", "RemoteUrlRuleParams", "StreamingFeatureParams",
 ]
 
 # ---- Enum-like values -----------------------------------------------------------------------
@@ -72,7 +73,7 @@ __all__ = [
 #: ``completed`` or ``failed``. The asset is settled once it is ``completed`` or ``failed``. New
 #: statuses may be added.
 AssetClassificationStatus = Union[Literal["queued", "processing", "completed", "failed"], str]
-#: The moderation decision in force, which also decides delivery (``classification.moderation.status``):
+#: The moderation decision in force, which also decides delivery (``classification.moderation.decision``):
 #: ``pending``, then ``allowed``, ``limited`` (delivered like ``allowed``, but marked so your app can
 #: reduce its reach, such as keeping it out of recommendations, trending and notifications, ranking it
 #: lower or collapsing it), ``age-restricted`` (delivered only through signed URLs or API keys),
@@ -132,7 +133,7 @@ CdnResource = Literal["original", "rendered", "preview", "placeholder", "hls", "
 SearchMode = Literal["keyword", "semantic", "hybrid"]
 #: Fields a search result matched on. New fields may be added.
 AssetSearchMatchField = Union[Literal["name", "id", "externalId", "description", "tags", "type", "content.format",
-                                      "content.extension", "classification.moderation.status", "visual", "transcript"], str]
+                                      "content.extension", "classification.moderation.decision", "visual", "transcript"], str]
 #: The built-in policy presets this SDK version knows (request values).
 KnownPolicyPresetId = Literal["general-community", "children-platform", "education-support", "wholesome-community"]
 #: A built-in policy preset. New presets may be added.
@@ -184,6 +185,7 @@ BinaryData = Union[bytes, bytearray, memoryview, BinaryIO]
 
 # ---- Upload payloads --------------------------------------------------------------------------
 
+
 class _ContentRequired(TypedDict):
     type: str
 
@@ -196,75 +198,118 @@ class Content(_ContentRequired, total=False):
     bytes and seekable files and is required for other streams. ``partNumber`` and
     ``isFinal`` apply to multipart parts.
     """
-    plainText: str
+    plain_text: str
     base64: str
     data: BinaryData
-    sizeInBytes: int
-    partNumber: int
-    isFinal: bool
+    size_in_bytes: int
+    part_number: int
+    is_final: bool
 
 
 class PartContent(TypedDict, total=False):
     """A multipart continuation part (``type`` is taken from the first request)."""
     type: str
-    plainText: str
+    plain_text: str
     base64: str
     data: BinaryData
-    sizeInBytes: int
-    partNumber: int
-    isFinal: bool
+    size_in_bytes: int
+    part_number: int
+    is_final: bool
 
 
-class MetadataItem(TypedDict):
+class MetadataItem(CalmLensObject):
     """A custom metadata item. ``value`` is any JSON value you choose, so it is untyped."""
     id: str
     value: Any
 
 
-class _ModerationContextItemRequired(TypedDict):
+class MetadataItemParams(TypedDict):
+    """A custom metadata item. ``value`` is any JSON value you choose, so it is untyped."""
+    id: str
+    value: Any
+
+
+class ModerationContextItem(CalmLensObject):
+    """An earlier post in the conversation. ``authorId`` is your label for who wrote it."""
+    text: str
+    author_id: Optional[str]
+
+
+class _ModerationContextItemParamsRequired(TypedDict):
     text: str
 
 
-class ModerationContextItem(_ModerationContextItemRequired, total=False):
+class ModerationContextItemParams(_ModerationContextItemParamsRequired, total=False):
     """An earlier post in the conversation. ``authorId`` is your label for who wrote it."""
-    authorId: str
+    author_id: str
 
 
-class ModerationContext(TypedDict):
+class ModerationContext(CalmLensObject):
     """Earlier posts in the conversation, oldest first."""
     items: list[ModerationContextItem]
 
 
-class OcrFeatureOptions(TypedDict):
+class ModerationContextParams(TypedDict):
+    """Earlier posts in the conversation, oldest first."""
+    items: list[ModerationContextItemParams]
+
+
+class OcrFeatureOptions(CalmLensObject):
     """Extract image text onto the image asset and add a text moderation pass to its report."""
     enabled: bool
 
 
-class PersonDetectionFeatureOptions(TypedDict):
+class OcrFeatureParams(TypedDict):
+    """Extract image text onto the image asset and add a text moderation pass to its report."""
+    enabled: bool
+
+
+class PersonDetectionFeatureOptions(CalmLensObject):
     """Preview. Locate people in images; results never change the moderation decision."""
     enabled: bool
 
 
-class _FaceDetectionFeatureRequired(TypedDict):
+class PersonDetectionFeatureParams(TypedDict):
+    """Preview. Locate people in images; results never change the moderation decision."""
     enabled: bool
 
 
-class FaceDetectionFeatureOptions(_FaceDetectionFeatureRequired, total=False):
+class FaceDetectionFeatureOptions(CalmLensObject):
     """Preview. Locate faces in images, optionally estimating an age range for each."""
-    ageEstimation: bool
+    enabled: bool
+    age_estimation: Optional[bool]
 
 
-class LinkDetectionFeatureOptions(TypedDict):
+class _FaceDetectionFeatureParamsRequired(TypedDict):
+    enabled: bool
+
+
+class FaceDetectionFeatureParams(_FaceDetectionFeatureParamsRequired, total=False):
+    """Preview. Locate faces in images, optionally estimating an age range for each."""
+    age_estimation: bool
+
+
+class LinkDetectionFeatureOptions(CalmLensObject):
     """Find web links in images, in QR codes and in OCR text."""
     enabled: bool
 
 
-class AiGeneratedDetectionFeatureOptions(TypedDict):
+class LinkDetectionFeatureParams(TypedDict):
+    """Find web links in images, in QR codes and in OCR text."""
+    enabled: bool
+
+
+class AiGeneratedDetectionFeatureOptions(CalmLensObject):
     """Preview. Read AI provenance metadata (C2PA, IPTC, generator settings) from image files."""
     enabled: bool
 
 
-class StreamingFeatureOptions(TypedDict):
+class AiGeneratedDetectionFeatureParams(TypedDict):
+    """Preview. Read AI provenance metadata (C2PA, IPTC, generator settings) from image files."""
+    enabled: bool
+
+
+class StreamingFeatureOptions(CalmLensObject):
     """Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made
     browser-safe, served at the ``hls`` resource and played by the ``embed`` resource. Needs
     ``retainContent``. Billed per started minute of media; ``enabled: False`` turns it
@@ -273,44 +318,74 @@ class StreamingFeatureOptions(TypedDict):
     enabled: bool
 
 
-class ProcessingFeatures(TypedDict, total=False):
+class StreamingFeatureParams(TypedDict):
+    """Preview. Prepare an adaptive stream (HLS) of audio or video once it is decided and made
+    browser-safe, served at the ``hls`` resource and played by the ``embed`` resource. Needs
+    ``retainContent``. Billed per started minute of media; ``enabled: False`` turns it
+    off for an upload in a project that streams by default."""
+    #: Whether to prepare the stream. Left out, the project's streaming setting decides.
+    enabled: bool
+
+
+class ProcessingFeatures(CalmLensObject):
     """Optional analyses to run on an asset, keyed by feature. ``linkDetection`` runs unless
     its ``enabled`` is false; every other feature is off unless its ``enabled`` is true.
     Unknown features are rejected."""
     ocr: Optional[OcrFeatureOptions]
-    personDetection: Optional[PersonDetectionFeatureOptions]
-    faceDetection: Optional[FaceDetectionFeatureOptions]
-    linkDetection: Optional[LinkDetectionFeatureOptions]
-    aiGeneratedDetection: Optional[AiGeneratedDetectionFeatureOptions]
+    person_detection: Optional[PersonDetectionFeatureOptions]
+    face_detection: Optional[FaceDetectionFeatureOptions]
+    link_detection: Optional[LinkDetectionFeatureOptions]
+    ai_generated_detection: Optional[AiGeneratedDetectionFeatureOptions]
     streaming: Optional[StreamingFeatureOptions]
 
 
-class ProcessingOptions(TypedDict, total=False):
+class ProcessingFeaturesParams(TypedDict, total=False):
+    """Optional analyses to run on an asset, keyed by feature. ``linkDetection`` runs unless
+    its ``enabled`` is false; every other feature is off unless its ``enabled`` is true.
+    Unknown features are rejected."""
+    ocr: Optional[OcrFeatureParams]
+    person_detection: Optional[PersonDetectionFeatureParams]
+    face_detection: Optional[FaceDetectionFeatureParams]
+    link_detection: Optional[LinkDetectionFeatureParams]
+    ai_generated_detection: Optional[AiGeneratedDetectionFeatureParams]
+    streaming: Optional[StreamingFeatureParams]
+
+
+class ProcessingOptions(CalmLensObject):
     """``processingOptions`` for an upload."""
-    retainContent: Optional[bool]
+    retain_content: Optional[bool]
     #: Overrides the project's ``storeSensitiveMetadata`` setting for this upload. When false,
     #: embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
     #: and ``content.metadata`` leaves out the creator and location. When true, the image is stored as
     #: uploaded.
-    storeSensitiveMetadata: Optional[bool]
+    store_sensitive_metadata: Optional[bool]
     features: Optional[ProcessingFeatures]
+
+
+class ProcessingParams(TypedDict, total=False):
+    """``processingOptions`` for an upload."""
+    retain_content: Optional[bool]
+    #: Overrides the project's ``storeSensitiveMetadata`` setting for this upload. When false,
+    #: embedded image metadata (EXIF, XMP and IPTC) is removed from the file before it is stored,
+    #: and ``content.metadata`` leaves out the creator and location. When true, the image is stored as
+    #: uploaded.
+    store_sensitive_metadata: Optional[bool]
+    features: Optional[ProcessingFeaturesParams]
 
 
 # ---- Classification report --------------------------------------------------------------------
 
-class _EvaluatedQualifierRequired(TypedDict):
+
+class EvaluatedQualifierResult(CalmLensObject):
     status: Literal["evaluated"]
     #: Confidence that *some* of the content is this qualifier.
-    someScore: float
+    some_score: float
     likelihood: Likelihood
-
-
-class EvaluatedQualifierResult(_EvaluatedQualifierRequired, total=False):
     #: Confidence that the content is *only* this qualifier; never above ``someScore``.
-    allScore: float
+    all_score: Optional[float]
 
 
-class NotEvaluatedQualifierResult(TypedDict):
+class NotEvaluatedQualifierResult(CalmLensObject):
     status: Literal["not-evaluated"]
     reason: NotEvaluatedReason
 
@@ -321,34 +396,25 @@ QualifierResult = Union[EvaluatedQualifierResult, NotEvaluatedQualifierResult]
 QualifierResults = Dict[ModerationQualifier, QualifierResult]
 
 
-class _EvaluatedCategoryRequired(TypedDict):
+class EvaluatedCategoryResult(CalmLensObject):
     status: Literal["evaluated"]
     likelihood: Likelihood
     score: float
+    qualifiers: Optional[QualifierResults]
 
 
-class EvaluatedCategoryResult(_EvaluatedCategoryRequired, total=False):
-    qualifiers: QualifierResults
-
-
-class _PartialCategoryRequired(TypedDict):
+class PartialCategoryResult(CalmLensObject):
+    """Some of the content (for example a media segment) could not be assessed."""
     status: Literal["partial"]
     likelihood: Likelihood
     score: float
+    qualifiers: Optional[QualifierResults]
 
 
-class PartialCategoryResult(_PartialCategoryRequired, total=False):
-    """Some of the content (for example a media segment) could not be assessed."""
-    qualifiers: QualifierResults
-
-
-class _NotEvaluatedCategoryRequired(TypedDict):
+class NotEvaluatedCategoryResult(CalmLensObject):
     status: Literal["not-evaluated"]
     reason: NotEvaluatedReason
-
-
-class NotEvaluatedCategoryResult(_NotEvaluatedCategoryRequired, total=False):
-    qualifiers: QualifierResults
+    qualifiers: Optional[QualifierResults]
 
 
 #: A category result; narrow on ``result["status"]`` before reading ``score``.
@@ -357,10 +423,10 @@ CategoryResult = Union[EvaluatedCategoryResult, PartialCategoryResult, NotEvalua
 ClassificationCategories = Dict[ClassificationCategory, CategoryResult]
 
 
-class MediaClassificationSegment(TypedDict):
+class MediaClassificationSegment(CalmLensObject):
     source: MediaSegmentSource
-    startSeconds: float
-    endSeconds: float
+    start_seconds: float
+    end_seconds: float
     categories: ClassificationCategories
 
 
@@ -368,7 +434,7 @@ class MediaClassificationSegment(TypedDict):
 AssetTimelineSegment = MediaClassificationSegment
 
 
-class BoundingBox(TypedDict):
+class BoundingBox(CalmLensObject):
     """Position and size as fractions of the image width and height, from 0 to 1."""
     left: float
     top: float
@@ -376,66 +442,64 @@ class BoundingBox(TypedDict):
     height: float
 
 
-class AgeRange(TypedDict):
+class AgeRange(CalmLensObject):
     """Estimated age range in years. Estimates can be off by several years."""
     low: int
     high: int
 
 
-class _DetectedRequired(TypedDict):
+class DetectedPerson(CalmLensObject):
     box: BoundingBox
     confidence: float
 
 
-class DetectedPerson(_DetectedRequired):
-    pass
+class DetectedFace(CalmLensObject):
+    box: BoundingBox
+    confidence: float
+    age_range: Optional[AgeRange]
 
 
-class DetectedFace(_DetectedRequired, total=False):
-    ageRange: AgeRange
-
-
-class NotEvaluatedFeatureResult(TypedDict):
+class NotEvaluatedFeatureResult(CalmLensObject):
     status: Literal["not-evaluated"]
     reason: FeatureNotEvaluatedReason
 
 
-class EvaluatedPersonDetectionResult(TypedDict):
+class EvaluatedPersonDetectionResult(CalmLensObject):
     status: Literal["evaluated"]
     people: list[DetectedPerson]
 
 
-class EvaluatedFaceDetectionResult(TypedDict):
+class EvaluatedFaceDetectionResult(CalmLensObject):
     status: Literal["evaluated"]
     faces: list[DetectedFace]
 
 
-class TextRegion(TypedDict):
+class TextRegion(CalmLensObject):
     """Where OCR found text in the image."""
     box: BoundingBox
     #: Whether the region is personal information, such as an email address, phone number or card
     #: number, rather than a paragraph of text.
-    personalInformation: bool
+    personal_information: bool
 
 
-class EvaluatedOcrResult(TypedDict):
+class EvaluatedOcrResult(CalmLensObject):
     status: Literal["evaluated"]
     #: Where OCR found text, and personal information within it. The text itself is ``content.extractedText``.
-    textRegions: list[TextRegion]
+    text_regions: list[TextRegion]
 
 
 #: What OCR found in an image; narrow on ``result["status"]`` before reading ``textRegions``.
 OcrResult = Union[EvaluatedOcrResult, NotEvaluatedFeatureResult]
 
 
-class DetectedQrCode(TypedDict):
+class DetectedQrCode(CalmLensObject):
     """A decoded QR code."""
     #: The text the QR code holds, such as a URL.
     value: str
     box: BoundingBox
 
 
-class DetectedLink(TypedDict):
+class DetectedLink(CalmLensObject):
     """A web link found in the image."""
     #: The link, with ``https://`` added when the image left it out.
     url: str
@@ -443,13 +507,13 @@ class DetectedLink(TypedDict):
     source: Union[Literal["qr-code", "text"], str]
 
 
-class EvaluatedLinkDetectionResult(TypedDict):
+class EvaluatedLinkDetectionResult(CalmLensObject):
     status: Literal["evaluated"]
-    qrCodes: list[DetectedQrCode]
+    qr_codes: list[DetectedQrCode]
     links: list[DetectedLink]
 
 
-class ProvenanceSignal(TypedDict):
+class ProvenanceSignal(CalmLensObject):
     """Provenance metadata found in the image file."""
     #: ``c2pa``, ``iptc-digital-source-type`` or ``generator-metadata``. New kinds may be added.
     kind: Union[Literal["c2pa", "iptc-digital-source-type", "generator-metadata"], str]
@@ -457,7 +521,7 @@ class ProvenanceSignal(TypedDict):
     value: str
 
 
-class EvaluatedAiGeneratedDetectionResult(TypedDict):
+class EvaluatedAiGeneratedDetectionResult(CalmLensObject):
     status: Literal["evaluated"]
     #: ``ai-generated``, ``ai-edited`` or ``unknown`` when the file carries no AI provenance
     #: (which doesn't mean a person made it: re-saved images lose their metadata).
@@ -488,7 +552,7 @@ LinkSafetyVerdict = Union[Literal["safe", "adult", "gambling", "phishing", "malw
 LinkSafetyAction = Union[Literal["allow", "limit", "age-restrict", "block"], str]
 
 
-class LinkSafetyEvidence(TypedDict):
+class LinkSafetyEvidence(CalmLensObject):
     """Preview. One reputation check of a link, every address it redirects through and its
     destination."""
     #: ``domain-categories`` (the domain categories of every address on the way) or
@@ -502,13 +566,13 @@ class LinkSafetyEvidence(TypedDict):
     labels: list[str]
 
 
-class CheckedLink(TypedDict):
+class CheckedLink(CalmLensObject):
     """Preview. A link in the asset and what its destination is."""
     #: The link as found, with ``https://`` added when it was left out.
     url: str
     #: Where the link leads after following its redirects, or ``None`` when a short link or redirect
     #: chain could not be followed.
-    finalUrl: Optional[str]
+    final_url: Optional[str]
     #: How many redirects were followed to reach ``finalUrl``.
     redirects: int
     #: ``qr-code`` or ``text``. New sources may be added.
@@ -517,7 +581,7 @@ class CheckedLink(TypedDict):
     evidence: list[LinkSafetyEvidence]
 
 
-class EvaluatedLinkSafetyResult(TypedDict):
+class EvaluatedLinkSafetyResult(CalmLensObject):
     status: Literal["evaluated"]
     links: list[CheckedLink]
 
@@ -528,28 +592,46 @@ class EvaluatedLinkSafetyResult(TypedDict):
 LinkSafetyResult = Union[EvaluatedLinkSafetyResult, NotEvaluatedFeatureResult]
 
 
-class OffPlatformLinkSettings(TypedDict):
+class OffPlatformLinkSettings(CalmLensObject):
     """Preview. Acts on every link whose destination is outside ``allowedDomains``, whatever its
     verdict."""
     #: ``limit``, ``age-restrict`` or ``block``.
     action: LinkSafetyAction
     #: Bare lowercase domains such as ``example.com``. A domain also covers its subdomains.
-    allowedDomains: list[str]
+    allowed_domains: list[str]
 
 
-class _LinkSafetySettingsRequired(TypedDict):
-    #: What happens to an asset with a link of each verdict (``phishing``, ``malware``, ``adult``,
-    #: ``gambling``, ``unresolved``). A verdict left out is allowed.
-    verdictActions: Dict[str, LinkSafetyAction]
+class OffPlatformLinkSettingsParams(TypedDict):
+    """Preview. Acts on every link whose destination is outside ``allowedDomains``, whatever its
+    verdict."""
+    #: ``limit``, ``age-restrict`` or ``block``.
+    action: LinkSafetyAction
+    #: Bare lowercase domains such as ``example.com``. A domain also covers its subdomains.
+    allowed_domains: list[str]
 
 
-class LinkSafetySettings(_LinkSafetySettingsRequired, total=False):
+class LinkSafetySettings(CalmLensObject):
     """Preview. What happens to assets that link to unsafe destinations. Link checks never change a
     moderation category's score."""
-    offPlatformLinks: OffPlatformLinkSettings
+    #: What happens to an asset with a link of each verdict (``phishing``, ``malware``, ``adult``,
+    #: ``gambling``, ``unresolved``). A verdict left out is allowed.
+    verdict_actions: Dict[str, LinkSafetyAction]
+    off_platform_links: Optional[OffPlatformLinkSettings]
 
 
-class LinkSafetyDecision(TypedDict):
+class _LinkSafetySettingsParamsRequired(TypedDict):
+    #: What happens to an asset with a link of each verdict (``phishing``, ``malware``, ``adult``,
+    #: ``gambling``, ``unresolved``). A verdict left out is allowed.
+    verdict_actions: Dict[str, LinkSafetyAction]
+
+
+class LinkSafetySettingsParams(_LinkSafetySettingsParamsRequired, total=False):
+    """Preview. What happens to assets that link to unsafe destinations. Link checks never change a
+    moderation category's score."""
+    off_platform_links: OffPlatformLinkSettingsParams
+
+
+class LinkSafetyDecision(CalmLensObject):
     """Preview. What the policy's link-safety section made of the asset's links."""
     #: The strongest action the asset's links take under the policy's link-safety settings.
     action: LinkSafetyAction
@@ -559,29 +641,36 @@ class LinkSafetyDecision(TypedDict):
     settings: LinkSafetySettings
 
 
-class _PolicyRuleSnapshotRequired(TypedDict):
+class PolicyRuleSnapshot(CalmLensObject):
+    when: List[ModerationQualifier]
+    action: ModerationAction
+    name: Optional[str]
+    unless: Optional[List[ModerationQualifier]]
+
+
+class _PolicyRuleSnapshotParamsRequired(TypedDict):
     when: List[ModerationQualifier]
     action: ModerationAction
 
 
-class PolicyRuleSnapshot(_PolicyRuleSnapshotRequired, total=False):
+class PolicyRuleSnapshotParams(_PolicyRuleSnapshotParamsRequired, total=False):
     name: str
     unless: List[ModerationQualifier]
 
 
-class CategoryPolicySettingsSnapshot(TypedDict):
+class CategoryPolicySettingsSnapshot(CalmLensObject):
     #: The category's default action.
     action: ModerationAction
     allowances: List[PolicyRuleSnapshot]
     restrictions: List[PolicyRuleSnapshot]
 
 
-class CategoryPolicyDefaultSource(TypedDict):
+class CategoryPolicyDefaultSource(CalmLensObject):
     """The category's ``default`` action, or a policy score ``below-threshold``."""
     kind: Literal["default", "below-threshold"]
 
 
-class CategoryPolicyRuleSource(TypedDict):
+class CategoryPolicyRuleSource(CalmLensObject):
     """The ``allowance`` or ``restriction`` rules that decided the category's action."""
     kind: Literal["allowance", "restriction"]
     #: Indexes into the category's ``settings["allowances"]`` or ``settings["restrictions"]`` of the
@@ -591,40 +680,33 @@ class CategoryPolicyRuleSource(TypedDict):
     #: The evidence that triggered the rules, from 0 to 1: a restriction's same-content presence,
     #: or the allowances' coverage. A rule with ``unless`` qualifiers, or several ``when``
     #: qualifiers, is assessed as a whole, so its qualifiers can be missing from ``raw``.
-    conditionScore: float
+    condition_score: float
 
 
 #: What decided a category's action; narrow on ``source["kind"]``.
 CategoryPolicySource = Union[CategoryPolicyDefaultSource, CategoryPolicyRuleSource]
 
 
-class _RegionalDecisionRequired(TypedDict):
+class RegionalDecision(CalmLensObject):
     region: Union[Literal["DE", "AT", "FR", "GB", "EU", "AU", "BR"], str]
-    #: The status in force in the region, stricter than ``moderation["status"]``: ``limited``,
+    #: The status in force in the region, stricter than ``moderation["decision"]``: ``limited``,
     #: ``age-restricted``, ``blocked`` or ``purged``.
     status: Union[Literal["limited", "age-restricted", "blocked", "purged"], str]
     #: The mandatory rule that sets it.
     rule: str
+    category: Optional[ClassificationCategory]
 
 
-class RegionalDecision(_RegionalDecisionRequired, total=False):
-    category: ClassificationCategory
-
-
-class _CategoryPolicyScoreRequired(TypedDict):
-    """How strongly a category meets the policy (``score``) and what the policy does with it."""
+class CategoryPolicyScore(CalmLensObject):
     score: float
     action: ModerationAction
-
-
-class CategoryPolicyScore(_CategoryPolicyScoreRequired, total=False):
-    source: CategoryPolicySource
-    settings: CategoryPolicySettingsSnapshot
+    source: Optional[CategoryPolicySource]
+    settings: Optional[CategoryPolicySettingsSnapshot]
 
 
 # ---- Assets -----------------------------------------------------------------------------------
 
-class Checksums(TypedDict, total=False):
+class Checksums(CalmLensObject):
     md5: Optional[str]
     sha1: Optional[str]
     sha256: Optional[str]
@@ -637,7 +719,7 @@ class Checksums(TypedDict, total=False):
 AssetRenderedKind = Literal["image", "pdf", "video", "audio"]
 
 
-class AssetHlsRendition(TypedDict):
+class AssetHlsRendition(CalmLensObject):
     """One rendition of the adaptive (HLS) stream, as its master playlist lists it."""
     #: ``video`` for a picture size (video renditions carry no sound; they play with the ``audio``
     #: rendition), or ``audio``.
@@ -651,7 +733,7 @@ class AssetHlsRendition(TypedDict):
     codecs: str
 
 
-class AssetHls(TypedDict):
+class AssetHls(CalmLensObject):
     """Preview. The adaptive stream of audio or video: HLS with fragmented MP4 (CMAF) segments,
     served at the ``hls`` resource (``/hls/index.m3u8``) and played by the ``embed`` resource."""
     #: ``preparing`` until the stream is saved, ``ready`` once ``renditions`` lists it,
@@ -663,7 +745,8 @@ class AssetHls(TypedDict):
     renditions: list[AssetHlsRendition]
 
 
-class _AssetRenderedRequired(TypedDict):
+class AssetRendered(CalmLensObject):
+    """The displayable file of the asset, served at the ``rendered`` resource."""
     kind: AssetRenderedKind
     #: MIME type of the rendered file. An image is served in the best format the client accepts,
     #: such as AVIF or WebP, unless a transform sets one.
@@ -672,16 +755,12 @@ class _AssetRenderedRequired(TypedDict):
     #: unknown or for PDFs and audio.
     width: Optional[int]
     height: Optional[int]
-
-
-class AssetRendered(_AssetRenderedRequired, total=False):
-    """The displayable file of the asset, served at the ``rendered`` resource."""
     #: Audio only, once processing has measured them: up to 512 loudness peaks from 0 to 1, evenly
     #: spaced over the audio, for drawing a waveform.
-    peaks: list[float]
+    peaks: Optional[list[float]]
 
 
-class AssetPreview(TypedDict):
+class AssetPreview(CalmLensObject):
     """A still image for the asset, served at the ``preview`` resource: the image itself, a
     document's first page or slide, a website's first screen, a video's poster frame or an audio
     waveform."""
@@ -692,25 +771,22 @@ class AssetPreview(TypedDict):
     #: at the ``placeholder`` resource).
     thumbhash: Optional[str]
     #: Average color of the source still image.
-    averageColor: Optional[str]
+    average_color: Optional[str]
 
 
-class _SafetyHoldRequired(TypedDict):
-    placedAt: int
+class SafetyHold(CalmLensObject):
+    placed_at: int
     reason: SafetyHoldReason
+    disposed_at: Optional[int]
 
 
-class SafetyHold(_SafetyHoldRequired, total=False):
-    disposedAt: Optional[int]
-
-
-class InlineExtractedText(TypedDict):
+class InlineExtractedText(CalmLensObject):
     """Small extracted text stored on the asset."""
     type: Literal["string"]
     content: str
 
 
-class StoredExtractedText(TypedDict):
+class StoredExtractedText(CalmLensObject):
     """Larger extracted text stored separately."""
     type: Literal["document"]
     id: str
@@ -720,24 +796,24 @@ class StoredExtractedText(TypedDict):
 ExtractedText = Union[InlineExtractedText, StoredExtractedText]
 
 
-class FileMetadataLocation(TypedDict):
+class FileMetadataLocation(CalmLensObject):
     """A GPS position in decimal degrees."""
     latitude: float
     longitude: float
 
 
-class FileMetadata(TypedDict):
+class FileMetadata(CalmLensObject):
     """Descriptive metadata embedded in an uploaded image. Each text field is ``None`` when the
     file doesn't record it."""
     #: When the picture was taken, as the file records it: an ISO 8601 date and time, such as
     #: ``2026-05-01T12:30:00+01:00``. It includes the UTC offset only when the file records one;
     #: without it, the time is the camera's local time.
-    capturedAt: Optional[str]
+    captured_at: Optional[str]
     #: Camera manufacturer, such as ``Canon``.
-    cameraMake: Optional[str]
+    camera_make: Optional[str]
     #: Camera or phone model, such as ``EOS R5``.
-    cameraModel: Optional[str]
-    lensModel: Optional[str]
+    camera_model: Optional[str]
+    lens_model: Optional[str]
     #: Software that created or last edited the file.
     software: Optional[str]
     #: Creator or artist the file names. Sensitive: recorded only when ``storeSensitiveMetadata``
@@ -748,23 +824,23 @@ class FileMetadata(TypedDict):
     #: IPTC digital source type the file declares, such as ``digitalCapture`` for a camera photo or
     #: ``trainedAlgorithmicMedia`` for generated media. Files can declare any value, so treat it as
     #: a claim.
-    digitalSourceType: Optional[str]
+    digital_source_type: Optional[str]
     #: Whether the uploaded file embedded GPS coordinates, whatever ``storeSensitiveMetadata`` is
     #: set to.
-    containsLocation: bool
+    contains_location: bool
     #: Where the picture was taken, from its GPS coordinates. Sensitive: recorded only when
     #: ``storeSensitiveMetadata`` is on.
     location: Optional[FileMetadataLocation]
 
 
-class AssetUpload(TypedDict):
+class AssetUpload(CalmLensObject):
     """Receiving content, including multipart progress."""
     status: Literal["uploading", "completed"]
-    updatedAt: Optional[int]
-    partsReceived: Optional[int]
+    updated_at: Optional[int]
+    parts_received: Optional[int]
 
 
-class ReviewActor(TypedDict):
+class ReviewActor(CalmLensObject):
     """Who made a reviewer's decision: a ``user`` (a person, or an assistant's key acting for one)
     or an ``api-key``."""
     type: Union[Literal["user", "api-key"], str]
@@ -772,52 +848,49 @@ class ReviewActor(TypedDict):
     id: Optional[str]
 
 
-class AssetReview(TypedDict):
+class AssetReview(CalmLensObject):
     id: str
     decision: AssetModerationDecision
     note: Optional[str]
-    decidedBy: ReviewActor
-    reviewedAt: int
+    decided_by: ReviewActor
+    reviewed_at: int
     #: Whether the decision was applied to the asset. ``False`` for a review queue decision
     #: recorded without changing the asset's status.
     applied: bool
 
 
-class HashMatch(TypedDict):
+class HashMatch(CalmLensObject):
     """An entry in the project's hash lists that the image matched."""
     #: Where the matching hash came from. New sources may be added.
     source: Union[Literal["hash-list"], str]
-    hashListId: str
-    hashListEntryId: str
+    hash_list_id: str
+    hash_list_entry_id: str
     #: Number of bits that differ between the hashes, 0 to 256. 0 is the same picture.
     distance: int
     #: ``block`` when the match is close enough for a block list to block, otherwise ``flag``.
     action: Union[HashListAction, str]
 
 
-class AssetModerationTimeline(TypedDict):
+class AssetModerationTimeline(CalmLensObject):
     """Summary of an audio or video asset's findings timeline."""
     #: How many segments the timeline holds; page through them with ``assets.list_timeline``.
-    segmentCount: int
+    segment_count: int
 
 
-class _ModerationRawRequired(TypedDict):
+class ModerationRaw(CalmLensObject):
+    """The scores and hash matches behind a moderation decision."""
     categories: ClassificationCategories
     #: The hash list entries the image matched; empty when it matched none.
-    hashMatches: List[HashMatch]
+    hash_matches: List[HashMatch]
 
 
-class ModerationRaw(_ModerationRawRequired):
-    """The scores and hash matches behind a moderation decision."""
-
-
-class DecisionPolicyPreset(TypedDict):
+class DecisionPolicyPreset(CalmLensObject):
     """The built-in preset release a decision's policy used."""
     id: PolicyPresetId
     version: int
 
 
-class DecisionPolicy(TypedDict):
+class DecisionPolicy(CalmLensObject):
     """The policy that made a decision: its ID, its revision then and the preset release it used."""
     id: str
     revision: int
@@ -825,115 +898,109 @@ class DecisionPolicy(TypedDict):
     preset: Optional[DecisionPolicyPreset]
 
 
-class AssetPendingReview(TypedDict):
+class AssetPendingReview(CalmLensObject):
     """A review the human review queue is waiting for."""
     #: When the asset joined the queue, in Unix milliseconds.
-    requestedAt: int
+    requested_at: int
     #: ``sampled`` or ``uncertain``.
     reason: Literal["sampled", "uncertain"]
     #: The categories that made the decision uncertain; empty for a sampled decision.
-    uncertainCategories: List[ClassificationCategory]
+    uncertain_categories: List[ClassificationCategory]
 
 
-class _AssetModerationRequired(TypedDict):
-    manualReviews: List[AssetReview]
-    status: AssetModerationStatus
+class AssetModeration(CalmLensObject):
+    manual_reviews: List[AssetReview]
+    decision: Optional[AssetModerationDecision]
     #: The status automated moderation decided; ``None`` before a decision. Manual reviews can
-    #: change ``status`` without changing this, so the two differ when a reviewer overrode it.
-    automatedStatus: Optional[AssetModerationDecision]
+    #: change ``decision`` without changing this, so the two differ when a reviewer overrode it.
+    automated_status: Optional[AssetModerationDecision]
     #: The policy that made the automated decision, as it was then; ``None`` before a decision.
     policy: Optional[DecisionPolicy]
     #: The review the human review queue is waiting for, set with the automated decision that
     #: joined the queue; ``None`` when no review is waiting. Hold content until it is ``None``.
-    pendingReview: Optional[AssetPendingReview]
+    pending_review: Optional[AssetPendingReview]
     #: What decided ``automatedStatus``, such as ``policy`` or ``hash-list``; ``None`` before a decision.
     source: Optional[ModerationSource]
     #: The mandatory rule that decided, when ``source`` is ``mandatory-rule``; otherwise ``None``.
     rule: Optional[str]
     #: Whether every question a complete explanation needs was answered; ``None`` before a decision.
-    explanationComplete: Optional[bool]
+    explanation_complete: Optional[bool]
     #: The policy's score and action for each category; ``None`` before a decision.
     categories: Optional[Dict[ClassificationCategory, CategoryPolicyScore]]
-    flaggedCategories: List[ClassificationCategory]
+    flagged_categories: List[ClassificationCategory]
     regions: List[RegionalDecision]
     #: The scores behind the decision; ``None`` before a decision.
     raw: Optional[ModerationRaw]
     #: For audio and video, a summary of the findings timeline; ``None`` for other assets, before
     #: there are findings and while a safety or copyright hold withholds the content.
     timeline: Optional[AssetModerationTimeline]
-
-
-class AssetModeration(_AssetModerationRequired, total=False):
     #: Present only when link safety is enabled; ``None`` before a link decision.
-    linkSafety: Optional[LinkSafetyDecision]
+    link_safety: Optional[LinkSafetyDecision]
 
 
-class ClassificationProgress(TypedDict):
+class ClassificationProgress(CalmLensObject):
     """How far long audio or video, analysed in sections, has got."""
-    completedSections: int
-    totalSections: int
+    completed_sections: int
+    total_sections: int
 
 
-class _AssetClassificationRequired(TypedDict):
+class AssetClassification(CalmLensObject):
     status: AssetClassificationStatus
     #: Why processing failed, while ``status`` is ``failed``; otherwise ``None``.
-    failureReason: Optional[AssetClassificationFailureReason]
-    updatedAt: Optional[int]
-    completedAt: Optional[int]
+    failure_reason: Optional[AssetClassificationFailureReason]
+    updated_at: Optional[int]
+    completed_at: Optional[int]
     #: Sections analysed so far while long audio or video is processing; otherwise ``None``.
     progress: Optional[ClassificationProgress]
     #: Whether the results came from one of the project's test inputs rather than analysing the
     #: content. Never use test results, such as age ranges, for real decisions.
-    testInput: bool
+    test_input: bool
     moderation: AssetModeration
     #: What OCR found in an image; ``None`` until it has run or when it wasn't requested.
     ocr: Optional[OcrResult]
     #: Preview. The people person detection found; ``None`` until it has run or when it wasn't requested.
-    personDetection: Optional[PersonDetectionResult]
+    person_detection: Optional[PersonDetectionResult]
     #: Preview. The faces face detection found; ``None`` until it has run or when it wasn't requested.
-    faceDetection: Optional[FaceDetectionResult]
+    face_detection: Optional[FaceDetectionResult]
     #: The QR codes and web links link detection found; ``None`` until it has run or when it is off.
-    linkDetection: Optional[LinkDetectionResult]
-
-
-class AssetClassification(_AssetClassificationRequired, total=False):
+    link_detection: Optional[LinkDetectionResult]
     #: Present only when link safety is enabled; ``None`` when no link check ran.
-    linkSafety: Optional[LinkSafetyResult]
-    aiGeneratedDetection: Optional[AiGeneratedDetectionResult]
+    link_safety: Optional[LinkSafetyResult]
+    ai_generated_detection: Optional[AiGeneratedDetectionResult]
 
 
-class AssetContent(TypedDict):
+class AssetContent(CalmLensObject):
     """Content state: whether CalmLens holds the source, preview, extracted text and file
     metadata (``temporary`` until processing finishes, ``stored`` or ``removed``) and its
     properties."""
     status: AssetContentStatus
-    removalReason: Optional[AssetContentRemovalReason]
+    removal_reason: Optional[AssetContentRemovalReason]
     #: When the content status last changed, in milliseconds since the Unix epoch.
-    updatedAt: Optional[int]
-    safetyHold: Optional[SafetyHold]
+    updated_at: Optional[int]
+    safety_hold: Optional[SafetyHold]
     #: MIME type of the content.
     format: Optional[str]
     extension: Optional[str]
-    sizeInBytes: Optional[int]
+    size_in_bytes: Optional[int]
     checksums: Optional[Checksums]
     #: Width in pixels of the uploaded image or video; ``None`` when unknown, for other types and
     #: while the asset is held.
     width: Optional[int]
     height: Optional[int]
     #: Length in seconds of audio and video once analysed; otherwise ``None``.
-    durationSeconds: Optional[float]
+    duration_seconds: Optional[float]
     #: Number of pages or slides of a document or presentation, when known.
-    pageCount: Optional[int]
+    page_count: Optional[int]
     #: PDQ perceptual hash of an image asset, as 64 hexadecimal characters; ``None`` while held.
-    perceptualHash: Optional[str]
+    perceptual_hash: Optional[str]
     #: How much detail ``perceptualHash`` captured, from 0 to 100. Hashes below 50 come from flat or
     #: featureless images and match unrelated pictures, so leave them out of comparisons.
-    perceptualHashQuality: Optional[int]
+    perceptual_hash_quality: Optional[int]
     #: Metadata embedded in an uploaded image, such as its capture time, camera and software.
     #: Read-only and separate from the asset's own ``metadata``; ``None`` when the image declares
     #: none, for other asset types, once the content is removed and while the asset is held.
     metadata: Optional[FileMetadata]
-    extractedText: Optional[ExtractedText]
+    extracted_text: Optional[ExtractedText]
     #: The displayable file, served at the ``rendered`` resource: an image, a PDF, or browser-safe
     #: video or audio. ``None`` when the asset has none, once the content is removed and while the
     #: asset is held.
@@ -949,169 +1016,155 @@ class AssetContent(TypedDict):
     preview: Optional[AssetPreview]
 
 
-class _AssetRequired(TypedDict):
+class Asset(CalmLensObject):
     id: str
-    projectId: str
+    project_id: str
     name: str
     type: AssetType
-    createdAt: int
+    created_at: int
     upload: AssetUpload
     classification: AssetClassification
     content: AssetContent
     #: For a child extracted from a document, the pages of the parent it shows, numbered from 1;
     #: empty when its page isn't known or it has no parent document.
-    parentPages: list[int]
+    parent_pages: list[int]
     #: The asset's custom metadata items; empty when it has none.
     metadata: list[MetadataItem]
     #: The asset's tags; empty when it has none.
     tags: list[str]
     visibility: Union[Visibility, str]
-
-
-class Asset(_AssetRequired, total=False):
-    parentId: Optional[str]
-    folderId: Optional[str]
-    uploadPresetId: Optional[str]
-    updatedAt: int
+    parent_id: Optional[str]
+    folder_id: Optional[str]
+    upload_preset_id: Optional[str]
+    updated_at: Optional[int]
     description: Optional[str]
-    externalId: Optional[str]
-    externalUrl: Optional[str]
+    external_id: Optional[str]
+    external_url: Optional[str]
     #: Your label for who wrote the content, or ``None`` when none was given.
-    authorId: Optional[str]
+    author_id: Optional[str]
     #: The earlier posts CalmLens used, or ``None`` when none were given or the content is removed.
     context: Optional[ModerationContext]
 
 
-class AssetPage(TypedDict):
+class AssetPage(ListObject[Asset]):
     items: list[Asset]
-    hasMore: bool
-    nextCursor: str | None
+    has_more: bool
+    next_cursor: str | None
 
 
-class AssetTimelinePage(TypedDict):
+class AssetTimelinePage(ListObject[MediaClassificationSegment]):
     """One page of an audio or video asset's findings timeline, in time order."""
     items: list[AssetTimelineSegment]
-    hasMore: bool
-    nextCursor: str | None
+    has_more: bool
+    next_cursor: str | None
 
 
-class AssetSearchMatch(TypedDict):
+class AssetSearchMatch(CalmLensObject):
     asset: Asset
     score: float
-    matchedFields: list[AssetSearchMatchField]
+    matched_fields: list[AssetSearchMatchField]
 
 
-class AssetSearchResponse(TypedDict):
+class AssetSearchResponse(CalmLensObject):
     query: str
     items: list[AssetSearchMatch]
-    semanticStatus: SemanticStatus
+    semantic_status: SemanticStatus
 
 
-class SignedAssetUrl(TypedDict):
+class SignedAssetUrl(CalmLensObject):
     """A signed asset URL, or a resource URL beneath its grant."""
     url: str
     #: When the grant expires, in milliseconds since the Unix epoch.
-    expiresAt: int
+    expires_at: int
 
 
 #: Whether the viewer an asset URL's claims describe can see the asset now. New values may be added.
 AssetAvailability = Union[Literal["available", "age-restricted", "unavailable"], str]
 
 
-class AssetInfoContent(TypedDict):
+class AssetInfoContent(CalmLensObject):
     """The display fields of an asset's content, named as on :class:`Asset`."""
     format: Optional[str]
     width: Optional[int]
     height: Optional[int]
-    durationSeconds: Optional[float]
-    pageCount: Optional[int]
+    duration_seconds: Optional[float]
+    page_count: Optional[int]
     rendered: Optional[AssetRendered]
     preview: Optional[AssetPreview]
     hls: Optional[AssetHls]
 
 
-class _AssetInfoRequired(TypedDict):
-    id: str
-    projectId: str
-    type: AssetType
-    content: AssetInfoContent
-    availability: AssetAvailability
-
-
-class AssetInfo(_AssetInfoRequired, total=False):
+class AssetInfo(CalmLensObject):
     """What ``cdn.get_asset_info`` returns: the asset URL's ``info`` resource, an allowlist of the
     asset's public fields (no moderation, metadata, names, tags or extracted text) and whether the
     viewer can see it now."""
+    id: str
+    project_id: str
+    type: AssetType
+    content: AssetInfoContent
+    availability: AssetAvailability
     #: A website asset's page.
-    externalUrl: Optional[str]
+    external_url: Optional[str]
 
 
 # ---- Folders ----------------------------------------------------------------------------------
 
-class _FolderRequired(TypedDict):
+
+class Folder(CalmLensObject):
     id: str
-    projectId: str
+    project_id: str
     name: str
-    createdAt: int
-
-
-class Folder(_FolderRequired, total=False):
-    parentId: Optional[str]
-    updatedAt: int
+    created_at: int
+    parent_id: Optional[str]
+    updated_at: Optional[int]
 
 
 # ---- Hash lists -------------------------------------------------------------------------------
 
-class _HashListRequired(TypedDict):
+
+class HashList(CalmLensObject):
+    """A list of perceptual hashes that image uploads are compared with."""
     id: str
-    projectId: str
+    project_id: str
     name: str
     action: Union[HashListAction, str]
-    createdAt: int
-
-
-class HashList(_HashListRequired, total=False):
-    """A list of perceptual hashes that image uploads are compared with."""
+    created_at: int
     description: Optional[str]
-    updatedAt: int
+    updated_at: Optional[int]
 
 
-class _HashListEntryRequired(TypedDict):
+class HashListEntry(CalmLensObject):
     id: str
-    projectId: str
-    hashListId: str
+    project_id: str
+    hash_list_id: str
     #: PDQ hash of the listed image, as 64 hexadecimal characters.
     hash: str
     #: PDQ quality of the hash from 0 to 100, or ``None`` when it was added without one. Entries
     #: below 50 are never matched.
     quality: Optional[int]
-    createdAt: int
-
-
-class HashListEntry(_HashListEntryRequired, total=False):
+    created_at: int
     label: Optional[str]
     #: The asset the hash was taken from, when it was added by ``assetId``.
-    assetId: Optional[str]
+    asset_id: Optional[str]
 
 
-class HashListPage(TypedDict):
+class HashListPage(ListObject[HashList]):
     """One page of the project's hash lists, newest first unless ``sort`` says otherwise."""
     items: List[HashList]
-    hasMore: bool
-    nextCursor: Optional[str]
+    has_more: bool
+    next_cursor: Optional[str]
 
 
-class HashListEntryPage(TypedDict):
+class HashListEntryPage(ListObject[HashListEntry]):
     items: List[HashListEntry]
-    hasMore: bool
-    nextCursor: Optional[str]
+    has_more: bool
+    next_cursor: Optional[str]
 
 
 # ---- Policies ---------------------------------------------------------------------------------
 
 
-
-class CategoryPolicySettings(TypedDict):
+class CategoryPolicySettings(CalmLensObject):
     """What a policy does with one category: ``action`` when its policy score reaches 0.5,
     ``allowances`` that let covered content through or act on it more softly, and
     ``restrictions``, which outweigh allowances."""
@@ -1120,22 +1173,51 @@ class CategoryPolicySettings(TypedDict):
     restrictions: List[PolicyRuleSnapshot]
 
 
-#: A policy's settings for every category; each one is required.
-CategorySettings = TypedDict("CategorySettings", {
-    "sexual": CategoryPolicySettings, "violence": CategoryPolicySettings, "self-harm": CategoryPolicySettings,
-    "harassment": CategoryPolicySettings, "hate": CategoryPolicySettings,
-    "criminal-activity": CategoryPolicySettings, "personal-information": CategoryPolicySettings,
-    "profanity": CategoryPolicySettings})
+class CategoryPolicySettingsParams(TypedDict):
+    """What a policy does with one category: ``action`` when its policy score reaches 0.5,
+    ``allowances`` that let covered content through or act on it more softly, and
+    ``restrictions``, which outweigh allowances."""
+    action: ModerationAction
+    allowances: List[PolicyRuleSnapshotParams]
+    restrictions: List[PolicyRuleSnapshotParams]
 
 
-class _PolicySettingsRequired(TypedDict):
-    #: Settings for every category (``sexual``, ``violence``, ...).
-    categorySettings: CategorySettings
+class CategorySettings(CalmLensObject):
+    """A policy's settings for every category. ``to_dict()`` and ``settings["self-harm"]`` use the
+    API's category names."""
+    sexual: CategoryPolicySettings
+    violence: CategoryPolicySettings
+    self_harm: CategoryPolicySettings
+    harassment: CategoryPolicySettings
+    hate: CategoryPolicySettings
+    criminal_activity: CategoryPolicySettings
+    personal_information: CategoryPolicySettings
+    profanity: CategoryPolicySettings
 
 
-class PolicySettings(_PolicySettingsRequired, total=False):
+#: A policy's settings for every category, keyed by the API's category names; each one is required.
+CategorySettingsParams = TypedDict("CategorySettingsParams", {
+    "sexual": CategoryPolicySettingsParams, "violence": CategoryPolicySettingsParams,
+    "self-harm": CategoryPolicySettingsParams, "harassment": CategoryPolicySettingsParams,
+    "hate": CategoryPolicySettingsParams, "criminal-activity": CategoryPolicySettingsParams,
+    "personal-information": CategoryPolicySettingsParams, "profanity": CategoryPolicySettingsParams})
+
+
+class PolicySettings(CalmLensObject):
     """What a policy does with each category, its allowances and restrictions."""
-    linkSafety: LinkSafetySettings
+    #: Settings for every category (``sexual``, ``violence``, ...).
+    category_settings: CategorySettings
+    link_safety: Optional[LinkSafetySettings]
+
+
+class _PolicySettingsParamsRequired(TypedDict):
+    #: Settings for every category (``sexual``, ``violence``, ...).
+    category_settings: CategorySettingsParams
+
+
+class PolicySettingsParams(_PolicySettingsParamsRequired, total=False):
+    """What a policy does with each category, its allowances and restrictions."""
+    link_safety: LinkSafetySettingsParams
 
 
 #: How a policy relates to its preset: ``live`` follows every preset release (the organisation's
@@ -1144,18 +1226,19 @@ class PolicySettings(_PolicySettingsRequired, total=False):
 PolicyPresetMode = Union[Literal["live", "pinned", "copy"], str]
 
 
-class PolicyPreset(TypedDict):
+class PolicyPreset(CalmLensObject):
     """Where a policy started from a built-in preset."""
     id: PolicyPresetId
     #: The preset release the policy is pinned to. ``policies.reset`` restores this version's settings.
     version: int
     #: The newest release of the preset. A ``pinned`` or ``copy`` policy on an older one can move to
     #: it with ``policies.upgrade``.
-    latestVersion: int
+    latest_version: int
     mode: PolicyPresetMode
 
 
-class _PolicyRequired(TypedDict):
+class Policy(CalmLensObject):
+    """A moderation policy. Policies belong to the organisation and its projects share them."""
     id: str
     name: str
     description: str
@@ -1165,20 +1248,16 @@ class _PolicyRequired(TypedDict):
     revision: int
     preset: Optional[PolicyPreset]
     #: Projects this policy moderates, as their default policy or through an upload preset.
-    projectIds: List[str]
-    createdAt: int
+    project_ids: List[str]
+    created_at: int
+    updated_at: Optional[int]
 
 
-class Policy(_PolicyRequired, total=False):
-    """A moderation policy. Policies belong to the organisation and its projects share them."""
-    updatedAt: int
-
-
-class PolicyPage(TypedDict):
+class PolicyPage(ListObject[Policy]):
     """One page of the organisation's policies, oldest first unless ``sort`` says otherwise."""
     items: List[Policy]
-    hasMore: bool
-    nextCursor: Optional[str]
+    has_more: bool
+    next_cursor: Optional[str]
 
 
 # ---- Lenses and CDN transforms ----------------------------------------------------------------
@@ -1287,75 +1366,67 @@ IMAGE_TRANSFORM_COLOUR_KEYS = frozenset({"background", "border.color", "trim.bor
 CdnTransform = Union[str, ImageTransformOptions]
 
 
-class _LensResponseRequired(TypedDict):
+class Lens(CalmLensObject):
+    """A named image transform the CDN applies at ``/@<identifier>``. The CDN serves files made
+    with its current definition."""
     id: str
     identifier: str
     name: str
     type: Union[LensType, str]
     active: bool
-    createdAt: int
-
-
-class Lens(_LensResponseRequired, total=False):
-    """A named image transform the CDN applies at ``/@<identifier>``. The CDN serves files made
-    with its current definition."""
-    projectId: Optional[str]
+    created_at: int
+    project_id: Optional[str]
     description: Optional[str]
     transform: Optional[ImageTransformOptions]
-    updatedAt: int
+    updated_at: Optional[int]
 
 
-class LensPage(TypedDict):
+class LensPage(ListObject[Lens]):
     """One page of the project's lenses, newest first unless ``sort`` says otherwise."""
     items: List[Lens]
-    hasMore: bool
-    nextCursor: Optional[str]
+    has_more: bool
+    next_cursor: Optional[str]
 
 
 # ---- Events -----------------------------------------------------------------------------------
 
-class _EventFactRequired(TypedDict):
+
+class EventFact(CalmLensObject):
     key: EventFactKey
     value: EventFactValue
-
-
-class EventFact(_EventFactRequired, total=False):
     #: A stable link that opens the fact's item in the CalmLens portal.
-    url: str
+    url: Optional[str]
 
 
-class EventAssetUpload(TypedDict):
+class EventAssetUpload(CalmLensObject):
     status: Literal["uploading", "completed"]
 
 
-class EventAssetModeration(TypedDict):
-    status: AssetModerationStatus
+class EventAssetModeration(CalmLensObject):
+    decision: Optional[AssetModerationDecision]
 
 
-class EventAssetClassification(TypedDict):
+class EventAssetClassification(CalmLensObject):
     status: AssetClassificationStatus
     #: Whether the results came from one of the project's test inputs rather than analysing the
     #: content. Never use test results, such as age ranges, for real decisions.
-    testInput: bool
+    test_input: bool
     moderation: EventAssetModeration
 
 
-class EventAssetContent(TypedDict):
+class EventAssetContent(CalmLensObject):
     status: AssetContentStatus
 
 
-class _EventAssetRequired(TypedDict):
+class EventAsset(CalmLensObject):
+    """Snapshot of an asset's processing, moderation and content status when the event was
+    created."""
     id: str
     upload: EventAssetUpload
     classification: EventAssetClassification
     content: EventAssetContent
-
-
-class EventAsset(_EventAssetRequired, total=False):
-    """Snapshot of an asset's processing, moderation and content status when the event was
-    created."""
-    externalId: Optional[str]
-    uploadPresetId: Optional[str]
+    external_id: Optional[str]
+    upload_preset_id: Optional[str]
 
 
 #: Who caused an event: a ``user`` (a person in the portal, or an assistant acting for one), an
@@ -1363,7 +1434,7 @@ class EventAsset(_EventAssetRequired, total=False):
 ActorType = Union[Literal["user", "api-key", "automated", "system"], str]
 
 
-class Actor(TypedDict):
+class Actor(CalmLensObject):
     """Who caused an event."""
     type: ActorType
     #: The user's or API key's ID; ``None`` for ``automated`` and ``system``, and when the ID was
@@ -1371,256 +1442,59 @@ class Actor(TypedDict):
     id: Optional[str]
 
 
-class _EventRequired(TypedDict):
+class Event(CalmLensObject):
+    """An event as ``events.list`` returns it and a webhook delivers it."""
     id: str
-    projectId: str
+    project_id: str
     actor: Actor
     type: EventType
     severity: EventSeverity
     title: str
     facts: list[EventFact]
-    createdAt: int
-
-
-class Event(_EventRequired, total=False):
-    """An event as ``events.list`` returns it and a webhook delivers it."""
+    created_at: int
     description: Optional[str]
-    assetId: Optional[str]
+    asset_id: Optional[str]
     #: Increases with each event about the same asset; ``None`` for events not about an asset.
     #: Deliveries can arrive out of order: see :func:`~calmlens.webhooks.is_newer_asset_event`.
-    assetSequence: Optional[int]
+    asset_sequence: Optional[int]
     asset: Optional[EventAsset]
 
 
-class _WebhookEventPayloadRequired(TypedDict):
-    id: str
-    projectId: str
-    type: str
-    createdAt: int
-
-
-class WebhookEventPayload(_WebhookEventPayloadRequired, total=False):
+class WebhookEventPayload(CalmLensObject):
     """The JSON body of a webhook delivery: the event in the shape ``events.list`` returns it.
     ``type`` is a string so event types added later still parse; a received body may carry
     fields this SDK doesn't know."""
-    actor: Actor
-    severity: str
-    title: str
+    id: str
+    project_id: str
+    type: str
+    created_at: int
+    actor: Optional[Actor]
+    severity: Optional[str]
+    title: Optional[str]
     description: Optional[str]
-    assetId: Optional[str]
-    assetSequence: Optional[int]
+    asset_id: Optional[str]
+    asset_sequence: Optional[int]
     asset: Optional[EventAsset]
-    facts: list[EventFact]
+    facts: Optional[list[EventFact]]
 
 
-class EventsPage(TypedDict):
+class EventsPage(ListObject[Event]):
     items: list[Event]
     #: Pass as ``cursor`` for the next request. Unlike other lists it is never ``None``: keep it to
     #: receive later events.
-    nextCursor: str
-    hasMore: bool
+    next_cursor: str
+    has_more: bool
     #: Event types this feed never includes, because the API key lacks the permission to see them.
     #: Give the key that permission to receive them.
-    excludedTypes: list[EventType]
+    excluded_types: list[EventType]
 
 
 # ---- Request options --------------------------------------------------------------------------
 
-class _SubmitRequired(TypedDict):
-    name: str
 
-
-class SubmitAssetOptions(_SubmitRequired, total=False):
-    content: Content
-    part: Content
-    url: str
-    description: str
-    processingOptions: ProcessingOptions
-    visibility: Visibility
-    metadata: list[MetadataItem]
-    tags: list[str]
-    authorId: str
-    context: ModerationContext
-    externalId: str
-    externalUrl: str
-    folderId: Optional[str]
-    uploadPresetId: str
-    totalSizeInBytes: int
-
-
-class _SignUploadTokenRequired(TypedDict):
-    uploadPresetId: str
-
-
-class SignUploadTokenOptions(_SignUploadTokenRequired, total=False):
-    externalId: str
-    #: How long the token can start an upload, in seconds: 1 to 3600, default 600.
-    expiresIn: int
-
-
-class SignedUploadToken(TypedDict):
+class SignedUploadToken(CalmLensObject):
     token: str
-    expiresAt: int
-
-
-class AssetIdOptions(TypedDict):
-    assetId: str
-
-
-class FolderIdOptions(TypedDict):
-    folderId: str
-
-
-class HashListIdOptions(TypedDict):
-    hashListId: str
-
-
-class HashListEntryIdOptions(TypedDict):
-    entryId: str
-
-
-class _CreateHashListRequired(TypedDict):
-    name: str
-    action: HashListAction
-
-
-class CreateHashListOptions(_CreateHashListRequired, total=False):
-    description: Optional[str]
-
-
-class UpdateHashListOptions(HashListIdOptions, total=False):
-    name: str
-    description: Optional[str]
-    action: HashListAction
-
-
-class ListHashListsOptions(TypedDict, total=False):
-    #: The previous page's ``nextCursor``; omit for the first page.
-    cursor: str
-    #: 1 to 100, default 50.
-    pageSize: int
-    #: Comma-separated ``createdAt`` and ``id``, each descending when prefixed with ``-``, such as
-    #: ``"-createdAt,id"``; newest first by default.
-    sort: str
-
-
-class ListHashListEntriesOptions(HashListIdOptions, total=False):
-    #: The previous page's ``nextCursor``; omit for the first page.
-    cursor: str
-    pageSize: int
-    #: Comma-separated ``createdAt`` and ``id``, each descending when prefixed with ``-``, such as
-    #: ``"-createdAt,id"``; newest first by default.
-    sort: str
-
-
-class ListPoliciesOptions(TypedDict, total=False):
-    #: The previous page's ``nextCursor``; omit for the first page.
-    cursor: str
-    #: 1 to 100, default 50.
-    pageSize: int
-    #: Comma-separated ``createdAt`` and ``id``, each descending when prefixed with ``-``, such as
-    #: ``"-createdAt,id"``; oldest first by default.
-    sort: str
-
-
-class ListLensesOptions(TypedDict, total=False):
-    #: The previous page's ``nextCursor``; omit for the first page.
-    cursor: str
-    #: 1 to 100, default 50.
-    pageSize: int
-    #: Comma-separated ``createdAt`` and ``id``, each descending when prefixed with ``-``, such as
-    #: ``"-createdAt,id"``; newest first by default.
-    sort: str
-
-
-class AddHashListEntryOptions(HashListIdOptions, total=False):
-    """Send ``hash`` (and ``quality`` when you know it) or ``assetId``, an image asset in the project."""
-    hash: str
-    quality: Optional[int]
-    assetId: str
-    label: Optional[str]
-
-
-class PolicyIdOptions(TypedDict):
-    policyId: str
-
-
-class CreatePolicyOptions(TypedDict, total=False):
-    """Send ``settings`` (defining every category) with a ``name``, or ``presetId`` to copy the
-    latest release of a built-in preset, which defaults to the preset's name."""
-    name: str
-    description: str
-    settings: PolicySettings
-    presetId: KnownPolicyPresetId
-
-
-class _UpdatePolicyRequired(PolicyIdOptions):
-    #: The policy's current ``revision``; a policy changed since is refused.
-    revision: int
-
-
-class UpdatePolicyOptions(_UpdatePolicyRequired, total=False):
-    name: str
-    description: str
-    #: The complete new settings, defining every category.
-    settings: PolicySettings
-
-
-class ResetPolicyOptions(PolicyIdOptions):
-    #: The policy's current ``revision``; a policy changed since is refused.
-    revision: int
-    #: The pinned ``preset.version`` you reviewed.
-    presetVersion: int
-
-
-class UpgradePolicyOptions(PolicyIdOptions):
-    #: The policy's current ``revision``; a policy changed since is refused.
-    revision: int
-    #: The ``preset.latestVersion`` you reviewed.
-    presetVersion: int
-
-
-class SetPolicyAutomaticUpdatesOptions(PolicyIdOptions):
-    enabled: bool
-    revision: int
-    #: The preset's ``latestVersion`` you reviewed.
-    presetVersion: int
-
-
-class AssignPolicyOptions(TypedDict):
-    policyId: str
-
-
-class _UploadPartRequired(AssetIdOptions):
-    part: PartContent
-
-
-class UploadPartOptions(_UploadPartRequired, total=False):
-    #: Whether the final part waits for the decision (``True``) or returns with the asset
-    #: ``queued`` (``False``), overriding the choice saved when the upload started.
-    wait: bool
-
-
-class MoveAssetOptions(AssetIdOptions):
-    folderId: Optional[str]
-
-
-class ExplainAssetOptions(AssetIdOptions, total=False):
-    rerun: bool
-
-
-class _DecideAssetRequired(AssetIdOptions):
-    #: The moderation status to set: ``allowed``, ``limited``, ``age-restricted``, ``blocked`` or
-    #: ``purged`` (which also needs ``confirmPurge``).
-    decision: Literal["allowed", "limited", "age-restricted", "blocked", "purged"]
-    #: Why the reviewer decided this, 1 to 1499 characters after trimming.
-    note: str
-
-
-class DecideAssetOptions(_DecideAssetRequired, total=False):
-    """A reviewer's decision for ``assets.decide``."""
-    #: Must be ``True`` to purge: purging permanently deletes the stored content.
-    confirmPurge: Literal[True]
+    expires_at: int
 
 
 #: What ``assets.batch`` does to every asset: ``delete`` deletes it with its child assets and stored
@@ -1628,154 +1502,29 @@ class DecideAssetOptions(_DecideAssetRequired, total=False):
 AssetBatchOperation = Literal["delete", "remove-content"]
 
 
-class BatchAssetsOptions(TypedDict):
-    #: IDs of 1 to 500 assets in the project.
-    assetIds: List[str]
-    operation: AssetBatchOperation
-
-
-class BatchAssetsResponse(TypedDict):
+class BatchAssetsResponse(CalmLensObject):
     """``assets.batch`` returns once the operation is queued: ``{"batchId", "status": "queued",
     "assetCount"}``. The ``asset.deleted`` and ``asset.content-removed`` events it causes carry a
     ``batch-id`` fact naming ``batchId``."""
-    batchId: str
+    batch_id: str
     #: ``queued``; new statuses may be added.
     status: Union[Literal["queued"], str]
     #: How many assets the batch covers.
-    assetCount: int
+    asset_count: int
 
 
-class MoveFolderOptions(FolderIdOptions):
-    parentId: Optional[str]
-
-
-class _CreateFolderRequired(TypedDict):
-    name: str
-
-
-class CreateFolderOptions(_CreateFolderRequired, total=False):
-    parentId: Optional[str]
-
-
-class _ClassifyTextRequired(TypedDict):
-    text: str
-
-
-class ClassifyTextOptions(_ClassifyTextRequired, total=False):
-    name: str
-    description: str
-    processingOptions: ProcessingOptions
-    metadata: list[MetadataItem]
-    tags: list[str]
-    visibility: Visibility
-    authorId: str
-    context: ModerationContext
-    externalId: str
-    externalUrl: str
-    folderId: Optional[str]
-    uploadPresetId: str
-
-
-class ListAssetsOptions(TypedDict, total=False):
-    cursor: str
-    pageSize: int
-    #: Comma-separated ``createdAt`` and ``id``, each descending when prefixed with ``-``, such as
-    #: ``"-createdAt,id"``; newest first by default.
-    sort: str
-    #: An RSQL filter, such as ``folderId==fldr_…`` or ``classification.moderation.status==allowed``.
-    filter: str
-
-
-class _ListChildrenRequired(TypedDict):
-    assetId: str
-
-
-class ListChildrenOptions(_ListChildrenRequired, total=False):
-    cursor: str
-    pageSize: int
-    #: Comma-separated ``createdAt`` and ``id``, each descending when prefixed with ``-``, such as
-    #: ``"-createdAt,id"``; newest first by default.
-    sort: str
-
-
-class _ListTimelineRequired(TypedDict):
-    assetId: str
-
-
-class ListTimelineOptions(_ListTimelineRequired, total=False):
-    cursor: str
-    pageSize: int
-
-
-class _SearchRequired(TypedDict):
-    query: str
-
-
-class SearchAssetsOptions(_SearchRequired, total=False):
-    #: How many of the best matches to return: 1 to 20, default 10.
-    pageSize: int
-    mode: SearchMode
-
-
-class UpdateAssetOptions(AssetIdOptions, total=False):
-    name: str
-    description: Optional[str]
-    tags: Optional[list[str]]
-    metadata: Optional[list[MetadataItem]]
-    externalId: Optional[str]
-    externalUrl: Optional[str]
-    visibility: Optional[Visibility]
-
-
-class WaitForDecisionOptions(AssetIdOptions, total=False):
-    #: Seconds to wait for a decision before ``sdk/timeout`` (default 60).
-    timeout: float
-
-
-class UpdateFolderOptions(FolderIdOptions, total=False):
-    name: str
-
-
-class ListEventsOptions(TypedDict, total=False):
-    #: The previous response's ``nextCursor``. Omit it to get a cursor for now without any events.
-    cursor: str
-    #: 1 to 100, default 50.
-    pageSize: int
-    #: Only these event types. Sent as one comma-separated value.
-    types: List[KnownEventType]
-    #: Only events about this asset.
-    assetId: str
-
-
-class _LensRequired(TypedDict):
+class _LensDefinitionRequired(TypedDict):
     identifier: str
     name: str
     type: LensType
 
 
-class LensDefinition(_LensRequired, total=False):
+class LensDefinition(_LensDefinitionRequired, total=False):
     """A lens definition for ``ensure_lens``, ``ensure_lenses`` and ``lenses.create``."""
     description: Optional[str]
     #: Whether the CDN serves the lens. Defaults to true.
     active: bool
     transform: Optional[ImageTransformOptions]
-
-
-class LensIdOptions(TypedDict):
-    lensId: str
-
-
-class UpdateLensOptions(LensIdOptions, total=False):
-    name: str
-    description: Optional[str]
-    type: LensType
-    #: Whether the CDN serves the lens. Left out, it stays as it is.
-    active: bool
-    transform: Optional[ImageTransformOptions]
-
-
-class EnsureLensesOptions(TypedDict):
-    lenses: list[LensDefinition]
 
 
 # ---- Configuration: upload presets, project settings, metadata fields -----------------------
@@ -1785,9 +1534,10 @@ class EnsureLensesOptions(TypedDict):
 UploadPresetAccess = Literal["token", "anyone"]
 
 
-class _UploadPresetRequired(TypedDict):
+class UploadPreset(CalmLensObject):
+    """An upload preset: the rules for uploads made from browsers and apps."""
     id: str
-    projectId: str
+    project_id: str
     #: Identifies the preset within its project, for ``upload_presets.ensure``.
     key: str
     #: Counts changes to the preset, starting at 1. Send it back with a change, so a change made
@@ -1798,43 +1548,29 @@ class _UploadPresetRequired(TypedDict):
     enabled: bool
     visibility: Union[Visibility, str]
     #: Whether browser uploads see the moderation decision for their own upload.
-    revealDecision: bool
-    createdAt: int
-
-
-class UploadPreset(_UploadPresetRequired, total=False):
-    """An upload preset: the rules for uploads made from browsers and apps."""
-    updatedAt: int
-    createdByUserId: Optional[str]
+    reveal_decision: bool
+    created_at: int
+    updated_at: Optional[int]
+    created_by_user_id: Optional[str]
     #: MIME types the preset accepts, such as ``image/*``; ``None`` accepts any supported type.
-    allowedContentTypes: Optional[List[str]]
+    allowed_content_types: Optional[List[str]]
     #: Largest upload the preset accepts, in bytes; ``None`` uses the standard upload limits.
-    maxSizeInBytes: Optional[int]
-    folderId: Optional[str]
+    max_size_in_bytes: Optional[int]
+    folder_id: Optional[str]
     #: Moderation policy for uploads through the preset; ``None`` uses the project's policy.
-    policyId: Optional[str]
-    processingOptions: Optional[ProcessingOptions]
+    policy_id: Optional[str]
+    processing_options: Optional[ProcessingOptions]
     #: Most uploads the preset accepts from each client (IP address) per UTC day.
-    dailyUploadLimit: Optional[int]
+    daily_upload_limit: Optional[int]
     #: Sites allowed to upload from the browser; ``None`` allows any site.
-    allowedOrigins: Optional[List[str]]
+    allowed_origins: Optional[List[str]]
 
 
-class UploadPresetPage(TypedDict):
+class UploadPresetPage(ListObject[UploadPreset]):
     """One page of the project's upload presets, oldest first unless ``sort`` says otherwise."""
     items: List[UploadPreset]
-    hasMore: bool
-    nextCursor: Optional[str]
-
-
-class ListUploadPresetsOptions(TypedDict, total=False):
-    #: The previous page's ``nextCursor``; omit for the first page.
-    cursor: str
-    #: 1 to 100, default 50.
-    pageSize: int
-    #: Comma-separated ``createdAt`` and ``id``, each descending when prefixed with ``-``, such as
-    #: ``"-createdAt,id"``; oldest first by default.
-    sort: str
+    has_more: bool
+    next_cursor: Optional[str]
 
 
 class _UploadPresetDefinitionRequired(TypedDict):
@@ -1852,39 +1588,30 @@ class UploadPresetDefinition(_UploadPresetDefinitionRequired, total=False):
     access: UploadPresetAccess
     #: Defaults to True.
     enabled: bool
-    allowedContentTypes: Optional[List[str]]
-    maxSizeInBytes: Optional[int]
-    folderId: Optional[str]
-    policyId: Optional[str]
+    allowed_content_types: Optional[List[str]]
+    max_size_in_bytes: Optional[int]
+    folder_id: Optional[str]
+    policy_id: Optional[str]
     #: Defaults to ``private``.
     visibility: Visibility
-    processingOptions: Optional[ProcessingOptions]
+    processing_options: Optional[ProcessingParams]
     #: Defaults to False.
-    revealDecision: bool
+    reveal_decision: bool
     #: Required when ``access`` is ``anyone``.
-    dailyUploadLimit: Optional[int]
-    allowedOrigins: Optional[List[str]]
+    daily_upload_limit: Optional[int]
+    allowed_origins: Optional[List[str]]
 
 
-class EnsureUploadPresetsOptions(TypedDict):
-    #: At most 50 presets, each key once.
-    uploadPresets: List[UploadPresetDefinition]
-
-
-class EnsureUploadPresetsResponse(TypedDict):
+class EnsureUploadPresetsResponse(CalmLensObject):
     """The stored presets, in the order they were sent."""
-    uploadPresets: List[UploadPreset]
-
-
-class UploadPresetIdOptions(TypedDict):
-    uploadPresetId: str
+    upload_presets: List[UploadPreset]
 
 
 #: Optional standards a project can choose not to serve.
 OptOutJurisdiction = Literal["EU"]
 
 
-class RemoteUrlRule(TypedDict):
+class RemoteUrlRule(CalmLensObject):
     """Which domains a project accepts when content is submitted by URL. A domain also covers its
     subdomains."""
     #: ``allow`` accepts only the listed domains; ``deny`` accepts every domain except them.
@@ -1892,101 +1619,92 @@ class RemoteUrlRule(TypedDict):
     domains: List[str]
 
 
-class HumanReviewSettings(TypedDict):
+class RemoteUrlRuleParams(TypedDict):
+    """Which domains a project accepts when content is submitted by URL. A domain also covers its
+    subdomains."""
+    #: ``allow`` accepts only the listed domains; ``deny`` accepts every domain except them.
+    mode: Literal["allow", "deny"]
+    domains: List[str]
+
+
+class HumanReviewSettings(CalmLensObject):
     """Which automated decisions are sampled into the human review queue."""
-    allowedSamplePercent: float
-    restrictedSamplePercent: float
+    allowed_sample_percent: float
+    restricted_sample_percent: float
     #: Queues decisions whose policy score lies less than this many percentage points from the
     #: policy threshold. 0 turns it off.
-    uncertaintyMarginPercent: float
+    uncertainty_margin_percent: float
     #: Queues decisions whose report has evidence that couldn't be assessed.
-    reviewMissingEvidence: bool
+    review_missing_evidence: bool
 
 
 class HumanReviewSettingsInput(TypedDict, total=False):
     """Human review settings to save. Those left out default to 0 and False."""
-    allowedSamplePercent: float
-    restrictedSamplePercent: float
-    uncertaintyMarginPercent: float
-    reviewMissingEvidence: bool
+    allowed_sample_percent: float
+    restricted_sample_percent: float
+    uncertainty_margin_percent: float
+    review_missing_evidence: bool
 
 
-class PublicProjectSettings(TypedDict):
+class PublicProjectSettings(CalmLensObject):
     """A project's settings, with defaults filled in. Its policy and metadata fields have their own
     methods."""
-    optOutJurisdictions: List[Union[OptOutJurisdiction, str]]
+    opt_out_jurisdictions: List[Union[OptOutJurisdiction, str]]
     #: When True, the CDN refuses to serve assets whose moderation is still pending.
-    retainContent: bool
-    blockUnmoderatedAssets: bool
+    retain_content: bool
+    block_unmoderated_assets: bool
     #: When True, uploaded images keep their embedded metadata (EXIF, XMP and IPTC).
-    storeSensitiveMetadata: bool
+    store_sensitive_metadata: bool
     #: Preview. Prepare an adaptive stream (HLS) of every audio and video upload that keeps its
     #: content. Billed per started minute of media.
-    streamingEnabled: bool
+    streaming_enabled: bool
     #: Index audio speech and video frames and transcripts for AI search. Billed per indexed media
     #: unit.
-    aiMediaSearchEnabled: bool
-    linkCheckingEnabled: bool
+    ai_media_search_enabled: bool
+    link_checking_enabled: bool
     #: ``None`` accepts every public domain.
-    remoteUrlRule: Optional[RemoteUrlRule]
+    remote_url_rule: Optional[RemoteUrlRule]
     #: Lowers how many websites the project can submit per minute; ``None`` uses the platform limit.
-    websiteSubmissionsPerMinute: Optional[int]
-    humanReview: HumanReviewSettings
+    website_submissions_per_minute: Optional[int]
+    human_review: HumanReviewSettings
 
 
 class PublicProjectSettingsInput(TypedDict, total=False):
     """The complete settings to save. Settings left out return to their defaults: no opted-out
     jurisdictions, ``retainContent`` and ``blockUnmoderatedAssets`` True, the other switches False, and the rest ``None``
     or no human review."""
-    optOutJurisdictions: List[OptOutJurisdiction]
-    retainContent: bool
-    blockUnmoderatedAssets: bool
-    storeSensitiveMetadata: bool
-    streamingEnabled: bool
-    aiMediaSearchEnabled: bool
-    linkCheckingEnabled: bool
-    remoteUrlRule: Optional[RemoteUrlRule]
-    websiteSubmissionsPerMinute: Optional[int]
-    humanReview: HumanReviewSettingsInput
+    opt_out_jurisdictions: List[OptOutJurisdiction]
+    retain_content: bool
+    block_unmoderated_assets: bool
+    store_sensitive_metadata: bool
+    streaming_enabled: bool
+    ai_media_search_enabled: bool
+    link_checking_enabled: bool
+    remote_url_rule: Optional[RemoteUrlRuleParams]
+    website_submissions_per_minute: Optional[int]
+    human_review: HumanReviewSettingsInput
 
 
-class ProjectSettingsResource(TypedDict):
+class ProjectSettingsResource(CalmLensObject):
     """A project's settings and the revision to send back with a change."""
-    projectId: str
+    project_id: str
     #: Counts changes to the project's settings and metadata fields, starting at 1.
     revision: int
     settings: PublicProjectSettings
-
-
-class _UpdateProjectSettingsRequired(TypedDict):
-    settings: PublicProjectSettingsInput
-
-
-class UpdateProjectSettingsOptions(_UpdateProjectSettingsRequired, total=False):
-    #: The ``revision`` you read. Settings or metadata fields changed since are refused with
-    #: ``project-settings/revision-conflict``. Omit it to replace them whatever their revision.
-    revision: int
-    #: Needed when turning on ``aiMediaSearchEnabled``: the most indexing units you accept for the
-    #: project's existing media. Less than the estimate is refused with
-    #: ``search/estimate-changed``, whose details give the estimate.
-    searchIndexingBudgetUnits: float
 
 
 MetadataFieldType = Literal["string", "number", "boolean", "date", "url"]
 MetadataFieldIcon = Literal["tag", "hash", "user", "folder", "layers", "photo", "link"]
 
 
-class _MetadataFieldRequired(TypedDict):
+class MetadataField(CalmLensObject):
+    """A metadata field the portal shows and filters by."""
     id: str
     title: str
     type: Union[MetadataFieldType, str]
     icon: Union[MetadataFieldIcon, str]
     color: str
-
-
-class MetadataField(_MetadataFieldRequired, total=False):
-    """A metadata field the portal shows and filters by."""
-    description: str
+    description: Optional[str]
 
 
 class _MetadataFieldDefinitionRequired(TypedDict):
@@ -2003,60 +1721,12 @@ class MetadataFieldDefinition(_MetadataFieldDefinitionRequired, total=False):
     description: str
 
 
-class MetadataFieldsResource(TypedDict):
+class MetadataFieldsResource(CalmLensObject):
     """A project's metadata fields in display order, and the revision to send back with a change."""
-    projectId: str
+    project_id: str
     #: The revision the fields share with the project's settings.
     revision: int
     fields: List[MetadataField]
-
-
-class _EnsureMetadataFieldsRequired(TypedDict):
-    #: At most 50, each ID once. Other fields are kept; new ones are added at the end.
-    fields: List[MetadataFieldDefinition]
-
-
-class EnsureMetadataFieldsOptions(_EnsureMetadataFieldsRequired, total=False):
-    #: The ``revision`` you read; a change made since is refused with
-    #: ``project-settings/revision-conflict``.
-    revision: int
-
-
-class _DeleteMetadataFieldRequired(TypedDict):
-    fieldId: str
-
-
-class DeleteMetadataFieldOptions(_DeleteMetadataFieldRequired, total=False):
-    #: The ``revision`` you read; a change made since is refused with
-    #: ``project-settings/revision-conflict``.
-    revision: int
-
-
-class AssetUrlOptions(TypedDict, total=False):
-    """An asset's CDN URL: exactly one of ``assetId`` and ``externalId``, and optionally a resource
-    beneath it with its lens or transform, and the viewer's claims."""
-    #: Defaults to the client's project.
-    projectId: str
-    assetId: str
-    externalId: str
-    #: Without it the URL is the asset URL itself, which takes no lens or transform.
-    resource: CdnResource
-    lens: str
-    transform: CdnTransform
-    viewerClaims: ViewerClaims
-
-
-class SignAssetUrlOptions(AssetUrlOptions, total=False):
-    #: The grant's lifetime: 1 to 86400 whole seconds, default 900.
-    expiresIn: int
-    #: Whether the grant serves ``original``, the exact upload. Defaults to False.
-    original: bool
-
-
-class GetAssetInfoOptions(TypedDict, total=False):
-    #: The viewer's claims, in place of those the URL carries.
-    viewerClaims: ViewerClaims
-
 
 
 class ServeInit(TypedDict, total=False):
@@ -2064,25 +1734,9 @@ class ServeInit(TypedDict, total=False):
     headers: Mapping[str, str]
 
 
-class ServeOptions(AssetUrlOptions, total=False):
-    init: ServeInit
-
-
-class ListFoldersOptions(TypedDict, total=False):
-    #: List this folder's children; omit for the project root.
-    parentId: str
-    #: The previous page's ``nextCursor``; omit for the first page.
-    cursor: str
-    #: 1 to 100, default 50.
-    pageSize: int
-    #: ``name`` (the default) or ``createdAt``, descending when prefixed with ``-``.
-    sort: str
-    search: str
-
-
-class FolderPage(TypedDict):
+class FolderPage(ListObject[Folder]):
     items: List[Folder]
     #: Folders above the listed or requested folders, for showing their paths.
     ancestors: List[Folder]
-    hasMore: bool
-    nextCursor: Optional[str]
+    has_more: bool
+    next_cursor: Optional[str]

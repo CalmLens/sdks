@@ -21,7 +21,7 @@ class TransportTests(unittest.TestCase):
             protocol_version = 'HTTP/1.1'
             def do_GET(self):
                 ports.append(self.client_address[1])
-                body = b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"status":"pending"}}}'
+                body = b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"decision":null}}}'
                 self.send_response(200)
                 self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
@@ -31,20 +31,20 @@ class TransportTests(unittest.TestCase):
         thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
         try:
             with CalmLensServerClient(api_key='key', project_id='project', base_url=f'http://127.0.0.1:{server.server_port}') as client:
-                for _ in range(3): client.assets.retrieve({'assetId':'asset'})
+                for _ in range(3): client.assets.retrieve(asset_id='asset')
             self.assertEqual(len(set(ports)), 1)
-            with self.assertRaises(CalmLensError): client.assets.retrieve({'assetId':'asset'})
+            with self.assertRaises(CalmLensError): client.assets.retrieve(asset_id='asset')
         finally: server.shutdown(); server.server_close(); thread.join()
 
     def test_unrelated_parts_are_concurrent(self):
         barrier = threading.Barrier(2)
         def transport(request, timeout):
             barrier.wait(timeout=2)
-            response = io.BytesIO(b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"status":"pending"}}}'); response.status = 200
+            response = io.BytesIO(b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"decision":null}}}'); response.status = 200
             return response
         client = CalmLensServerClient(api_key='key', project_id='project', transport=transport)
         with ThreadPoolExecutor(2) as pool:
-            results = list(pool.map(lambda asset: client.assets.upload_part({'assetId':asset,'part':{'plainText':'final','partNumber':2,'isFinal':True}}), ['one','two']))
+            results = list(pool.map(lambda asset: client.assets.upload_part(asset_id=asset, part={'plain_text': 'final', 'part_number': 2, 'is_final': True}), ['one','two']))
         self.assertEqual(len(results), 2)
 
 
@@ -87,8 +87,8 @@ class TransportFailureTests(unittest.TestCase):
             with self.subTest(error=type(error).__name__):
                 def transport(request, timeout): raise error
                 client = CalmLensServerClient(api_key='key', project_id='project', transport=transport, max_retries=0)
-                self.assert_wrapped(lambda: client.assets.retrieve({'assetId': 'asset'}), error, code)
-                self.assert_wrapped(lambda: client.cdn.serve({'assetId': 'asset'}), error, code)
+                self.assert_wrapped(lambda: client.assets.retrieve(asset_id='asset'), error, code)
+                self.assert_wrapped(lambda: client.cdn.serve(asset_id='asset'), error, code)
 
     def test_errors_raised_while_reading_the_body_are_wrapped(self):
         for error, code in self.FAILURES:
@@ -96,7 +96,7 @@ class TransportFailureTests(unittest.TestCase):
                 client = CalmLensServerClient(api_key='key', project_id='project', transport=lambda r, t: _FailingRead(error),
                                         max_retries=0)
                 self.assert_wrapped(lambda: client.events.list(), error, code)
-                with client.cdn.serve({'assetId': 'asset'}) as response:
+                with client.cdn.serve(asset_id='asset') as response:
                     self.assertEqual(response.status, 200)
                     self.assert_wrapped(response.read, error, code)
 
@@ -105,7 +105,7 @@ class TransportFailureTests(unittest.TestCase):
             def transport(request, timeout): raise error
             client = CalmLensServerClient(api_key='key', project_id='project', transport=transport)
             with self.subTest(error=type(error).__name__), self.assertRaises(type(error)) as raised:
-                client.assets.retrieve({'assetId': 'asset'})
+                client.assets.retrieve(asset_id='asset')
             self.assertIs(raised.exception, error)
 
 
@@ -143,7 +143,7 @@ class DefaultTransportFailureTests(unittest.TestCase):
             with CalmLensServerClient(api_key='key', project_id='project', base_url=server.url, timeout=timeout,
                                 max_retries=0) as client:
                 with self.assertRaises(CalmLensError) as raised:
-                    client.assets.retrieve({'assetId': 'asset'})
+                    client.assets.retrieve(asset_id='asset')
             return raised.exception
         finally:
             server.close()
@@ -169,7 +169,7 @@ class DefaultTransportFailureTests(unittest.TestCase):
 
     def test_decision_deadline_interrupts_a_drip_fed_response(self):
         def handler(connection):
-            body = b'{"id":"asset","classification":{"status":"completed","moderation":{"status":"allowed"}}}'
+            body = b'{"id":"asset","classification":{"status":"completed","moderation":{"decision":"allowed"}}}'
             try:
                 connection.sendall(f'HTTP/1.1 200 OK\r\nContent-Length: {len(body)}\r\n\r\n'.encode())
                 for offset in range(0, len(body), 10):
@@ -186,7 +186,7 @@ class DefaultTransportFailureTests(unittest.TestCase):
                     client.assets.wait_for_decision(asset_id='asset', timeout=.08)
                 self.assertEqual(raised.exception.code, 'sdk/timeout')
                 self.assertEqual(raised.exception.details, {
-                    'assetId': 'asset', 'classificationStatus': None, 'moderationStatus': None})
+                    'assetId': 'asset', 'classificationStatus': None, 'moderationDecision': None})
         finally:
             server.close()
 
@@ -219,7 +219,7 @@ class DefaultTransportFailureTests(unittest.TestCase):
         sock.close()
         client = CalmLensServerClient(api_key='key', project_id='project', base_url=f'http://127.0.0.1:{port}', max_retries=0)
         with self.assertRaises(CalmLensError) as raised:
-            client.assets.retrieve({'assetId': 'asset'})
+            client.assets.retrieve(asset_id='asset')
         self.assertEqual(raised.exception.code, 'sdk/transport-error')
         self.assertIsInstance(raised.exception.__cause__, ConnectionRefusedError)
 
@@ -229,7 +229,7 @@ class _KeepAliveServer:
     before answering request ``index`` on a connection (with the socket) and after it (with
     None); returning False closes the connection at that point."""
 
-    BODY = b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"status":"pending"}}}'
+    BODY = b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"decision":null}}}'
 
     def __init__(self, on_request):
         self.sock = socket.socket()
@@ -270,9 +270,9 @@ class StaleConnectionTests(unittest.TestCase):
         server = _KeepAliveServer(on_request)
         try:
             with CalmLensServerClient(api_key='key', project_id='project', base_url=server.url, timeout=5) as client:
-                client.assets.retrieve({'assetId': 'asset'})
+                client.assets.retrieve(asset_id='asset')
                 time.sleep(pause)
-                self.assertEqual(client.assets.retrieve({'assetId': 'asset'})['id'], 'asset')
+                self.assertEqual(client.assets.retrieve(asset_id='asset')['id'], 'asset')
             return server
         finally:
             server.close()
@@ -293,7 +293,7 @@ class StaleConnectionTests(unittest.TestCase):
             with CalmLensServerClient(api_key='key', project_id='project', base_url=server.url, timeout=5,
                                 max_retries=0) as client:
                 with self.assertRaises(CalmLensError) as raised:
-                    client.assets.retrieve({'assetId': 'asset'})
+                    client.assets.retrieve(asset_id='asset')
             self.assertEqual(raised.exception.code, 'sdk/transport-error')
             self.assertIsInstance(raised.exception.__cause__, http.client.RemoteDisconnected)
             self.assertEqual(server.connections, 1)

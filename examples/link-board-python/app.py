@@ -13,7 +13,8 @@ import time
 import uuid
 from urllib.parse import parse_qs, urlencode, urlsplit
 
-from calmlens import Asset, CalmLensServerClient, CalmLensError, CalmLensTransportError, AssetModeration
+from calmlens import (Asset, AssetModeration, CalmLensConnectionError, CalmLensError, CalmLensServerClient,
+                      EvaluatedCategoryResult, PartialCategoryResult)
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 6401
@@ -108,9 +109,9 @@ def validate_url(value: str) -> str:
 def link_status(asset: Asset) -> str:
     """A shared link's state from its asset: the moderation status once CalmLens has decided,
     ``error`` when processing failed, else ``pending``. A status this app doesn't know stays pending."""
-    if asset["classification"]["status"] == "failed":
+    if asset.classification.status == "failed":
         return "error"
-    status = asset["classification"]["moderation"]["status"]
+    status = asset.classification.moderation.decision
     return status if status in DECIDED_STATUSES else "pending"
 
 
@@ -120,11 +121,11 @@ def explain(report: AssetModeration | None) -> dict:
     found: list[tuple[str, float]] = []
     unknown: list[str] = []
     # ``raw`` is None until moderation decides.
-    raw = (report or {}).get("raw") or {}
-    for category, result in sorted((raw.get("categories") or {}).items()):
-        if result["status"] in ("evaluated", "partial"):
-            if result["score"] >= SHOWN_SCORE:
-                found.append((category, result["score"]))
+    raw = report.raw if report else None
+    for category, result in sorted((raw.categories if raw else {}).items()):
+        if isinstance(result, (EvaluatedCategoryResult, PartialCategoryResult)):
+            if result.score >= SHOWN_SCORE:
+                found.append((category, result.score))
         else:
             unknown.append(category)
     found.sort(key=lambda item: -item[1])
@@ -134,21 +135,21 @@ def explain(report: AssetModeration | None) -> dict:
 def decision_source(report: AssetModeration | None) -> str | None:
     """Where the decision came from: ``children`` when the page's parts decided it, ``policy``
     when the page's own scores did, or a reviewer's or hash list's decision."""
-    return (report or {}).get("source")
+    return report.source if report else None
 
 
 def latest_review(report: AssetModeration | None) -> str | None:
     """The decision of the latest moderator review applied to the asset, if any."""
-    reviews = [review for review in (report or {}).get("manualReviews") or [] if review.get("applied")]
-    return max(reviews, key=lambda review: review["reviewedAt"])["decision"] if reviews else None
+    reviews = [review for review in (report.manual_reviews if report else None) or [] if review.applied]
+    return max(reviews, key=lambda review: review.reviewed_at).decision if reviews else None
 
 
 def page_preview(children: list[Asset]) -> dict:
     """The page's title and description, read from the text part CalmLens extracted."""
     for child in children:
-        name = child.get("name") or ""
-        if child.get("type") == "plaintext-document" and name.endswith(TEXT_PART_SUFFIX):
-            description = child.get("description") or ""
+        name = child.name or ""
+        if child.type == "plaintext-document" and name.endswith(TEXT_PART_SUFFIX):
+            description = child.description or ""
             return {"title": name[: -len(TEXT_PART_SUFFIX)].strip(),
                     "description": "" if description == DEFAULT_TEXT_DESCRIPTION else description}
     return {"title": "", "description": ""}
@@ -175,7 +176,7 @@ class Moderator:
     def check_note(self, link_id: str, note: str, demo_result: str) -> Asset:
         return self.client.text.classify(
             name="Calmboard note", external_id=external_id(link_id, "note"), text=note,
-            processing_options={"retainContent": False},
+            processing_options={"retain_content": False},
         )
 
     def submit_link(self, link_id: str, url: str, demo_result: str) -> Asset:
@@ -183,7 +184,7 @@ class Moderator:
         # never serves the page, so nothing is retained after processing.
         return self.client.assets.create(
             name="Calmboard link", url=url, external_id=external_id(link_id, "page"),
-            processing_options={"retainContent": False},
+            processing_options={"retain_content": False},
         )
 
     def retrieve(self, asset_id: str) -> Asset:
@@ -297,13 +298,13 @@ class Board:
         try:
             if not link["note_allowed"]:
                 note_asset = self.moderator.check_note(link["id"], link["note"], demo_result)
-                report = note_asset["classification"]["moderation"]
+                report = note_asset.classification.moderation
                 with self.lock:
-                    link["note_asset_id"] = note_asset["id"]
-                if report["status"] not in SHOWN_STATUSES:
+                    link["note_asset_id"] = note_asset.id
+                if report.decision not in SHOWN_STATUSES:
                     with self.lock:
                         link.update(status="note-not-allowed", note_found=explain(report)["found"])
-                    return "note-not-allowed" if report["status"] in DECIDED_STATUSES else "note-unfinished"
+                    return "note-not-allowed" if report.decision in DECIDED_STATUSES else "note-unfinished"
                 with self.lock:
                     link["note_allowed"] = True
             asset = self.moderator.submit_link(link["id"], link["url"], demo_result)
@@ -312,7 +313,7 @@ class Board:
                 link["status"] = "error"
             raise
         with self.lock:
-            link.update(asset_id=asset["id"], status="pending")
+            link.update(asset_id=asset.id, status="pending")
         return "shared"
 
     def refresh(self):
@@ -338,11 +339,11 @@ class Board:
         update: dict = {"status": status}
         if status not in DECIDED_STATUSES:
             return update
-        report = asset["classification"]["moderation"]
+        report = asset.classification.moderation
         update["review"] = latest_review(report)
         # The parts are read once, when the page is first decided: they don't change afterwards.
         if link["preview"] is None:
-            children = self._children(asset["id"])
+            children = self._children(asset.id)
             update["preview"] = page_preview(children)
             update["parts"] = [self._part(child) for child in children]
             # The parts that caused the decision first; the rest stay in the API's order (newest first).
@@ -367,10 +368,10 @@ class Board:
 
     @staticmethod
     def _part(child: Asset) -> dict:
-        report = child["classification"]["moderation"]
-        is_text = child.get("type") == "plaintext-document"
-        return {"name": "Page text" if is_text else (child.get("name") or "Image"), "type": child.get("type"),
-                "status": report.get("status") or "pending", **explain(report)}
+        report = child.classification.moderation
+        is_text = child.type == "plaintext-document"
+        return {"name": "Page text" if is_text else (child.name or "Image"), "type": child.type,
+                "status": report.decision or "pending", **explain(report)}
 
     def remove(self, link_id: str) -> str:
         link = self._find(link_id)
@@ -578,7 +579,7 @@ def make_handler(board: Board):
                 # gets a fixed message, never the SDK's error text.
                 logging.warning("CalmLens request failed: %s (status %s, request %s)", error.code, error.status,
                                 error.request_id)
-                unreachable = isinstance(error, CalmLensTransportError)
+                unreachable = isinstance(error, CalmLensConnectionError)
                 self.send_page("CalmLens could not be reached. Please try again." if unreachable else "The request to CalmLens failed. Please try again.", 502)
                 return
             except InvalidInput as error:

@@ -37,7 +37,7 @@ class _RecordingServer:
                         if not size:
                             break
                 recorder.requests.append((self.requestline, self.headers, body))
-                payload = b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"status":"pending"}}}'
+                payload = b'{"id":"asset","upload":{"status":"completed"},"classification":{"status":"processing","moderation":{"decision":null}}}'
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Content-Length', str(len(payload)))
