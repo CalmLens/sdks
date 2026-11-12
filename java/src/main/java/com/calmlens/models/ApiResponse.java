@@ -14,12 +14,21 @@ import org.jspecify.annotations.Nullable;
 public final class ApiResponse {
   private final int status;
   private final Map<String, List<String>> headers;
+  private final @Nullable String idempotencyKey;
 
   /**
    * @param status the HTTP status
    * @param headers the response headers
    */
-  public ApiResponse(int status, @Nullable Map<String, List<String>> headers) {
+  public ApiResponse(int status, @Nullable Map<String, List<String>> headers) { this(status, headers, null); }
+
+  /**
+   * @param status the HTTP status
+   * @param headers the response headers
+   * @param idempotencyKey the {@code Idempotency-Key} the request carried, or null
+   */
+  public ApiResponse(int status, @Nullable Map<String, List<String>> headers, @Nullable String idempotencyKey) {
+    this.idempotencyKey = idempotencyKey;
     this.status = status;
     Map<String, List<String>> copy = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
     if (headers != null) headers.forEach((name, values) -> { if (name != null && values != null) copy.put(name, List.copyOf(values)); });
@@ -40,6 +49,9 @@ public final class ApiResponse {
     List<String> values = headers.get(name);
     return values == null || values.isEmpty() ? Optional.empty() : Optional.of(values.get(0));
   }
+
+  /** @return the {@code Idempotency-Key} the request carried, such as an upload's; empty for none */
+  public Optional<String> getIdempotencyKey() { return Optional.ofNullable(idempotencyKey); }
 
   /** @return the {@code X-Request-Id} CalmLens gave the request */
   public Optional<String> getRequestId() { return getHeader("x-request-id"); }

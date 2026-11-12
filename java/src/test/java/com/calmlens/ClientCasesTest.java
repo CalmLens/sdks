@@ -187,10 +187,37 @@ class ClientCasesTest {
 
     CalmLensServerClient client = null;
     CalmLensException constructionError = null;
+    List<RequestEvent> attempts = new ArrayList<>();
+    List<String> logLines = new ArrayList<>();
+    // The environment can't be set in Java; fromEnv's system properties stand for it, and an empty
+    // property hides a variable the machine happens to have.
+    Map<String, String> properties = Map.of("CALMLENS_API_KEY", "calmlens.apiKey", "CALMLENS_PROJECT_ID", "calmlens.projectId",
+        "CALMLENS_BASE_URL", "calmlens.baseUrl");
+    boolean fromEnv = clientCase.has("clientFromEnv") && clientCase.get("clientFromEnv").getAsBoolean();
+    Map<String, String> saved = new HashMap<>();
+    if (clientCase.has("env") || fromEnv) {
+      JsonObject env = clientCase.has("env") ? clientCase.getAsJsonObject("env") : new JsonObject();
+      properties.forEach((variable, property) -> {
+        saved.put(property, System.getProperty(property));
+        System.setProperty(property, env.has(variable) ? env.get(variable).getAsString() : "");
+      });
+    }
     try {
       CalmLensServerClient.Builder builder = CalmLensServerClient.builder();
-      if (string(options, "apiKey") != null) builder.apiKey(string(options, "apiKey"));
-      if (string(options, "projectId") != null) builder.projectId(string(options, "projectId"));
+      if (fromEnv) builder.fromEnv();
+      else {
+        if (string(options, "apiKey") != null) builder.apiKey(string(options, "apiKey"));
+        if (string(options, "projectId") != null) builder.projectId(string(options, "projectId"));
+      }
+      if (options.has("appInfo")) {
+        JsonObject app = options.getAsJsonObject("appInfo");
+        builder.appInfo(app.get("name").getAsString(), string(app, "version"), string(app, "url"));
+      }
+      builder.requestListener(attempts::add);
+      if (clientCase.has("logs")) {
+        builder.logLevel(clientCase.getAsJsonObject("logs").get("level").getAsString());
+        builder.logger(new CapturingLogger(logLines));
+      }
       if (options.has("baseUrl")) builder.baseUrl(options.get("baseUrl").getAsString());
       if (options.has("cdnBaseUrl")) builder.cdnBaseUrl(options.get("cdnBaseUrl").getAsString());
       if (options.has("maxRetries")) builder.maxRetries(options.get("maxRetries").getAsInt());
@@ -202,6 +229,8 @@ class ClientCasesTest {
           () -> System.nanoTime() + slept[0], CalmLensServerClient.DEFAULT_MAX_RETRIES, false);
     } catch (CalmLensException refused) {
       constructionError = refused;
+    } finally {
+      saved.forEach((property, value) -> { if (value == null) System.clearProperty(property); else System.setProperty(property, value); });
     }
 
     try {
@@ -215,7 +244,8 @@ class ClientCasesTest {
         Throwable error = constructionError;
         if (error == null) {
           try {
-            result = invoke(client, operation, step.has("args") ? step.getAsJsonObject("args") : new JsonObject(), async);
+            RequestOptions callOptions = step.has("requestOptions") ? requestOptions(step.getAsJsonObject("requestOptions")) : null;
+            result = invoke(client, operation, step.has("args") ? step.getAsJsonObject("args") : new JsonObject(), async, callOptions);
           } catch (Throwable thrown) {
             error = thrown;
           }
@@ -253,6 +283,14 @@ class ClientCasesTest {
             assertEquals(cdn, actual, label);
           }
         } else {
+          if (expect.has("lastResponse")) {
+            JsonObject last = new JsonObject();
+            ApiResponse response = result instanceof RawResponse raw ? null : ((CalmLensObject) result).getLastResponse().orElseThrow();
+            last.addProperty("status", response.getStatus());
+            last.addProperty("requestId", response.getRequestId().orElse(null));
+            last.addProperty("idempotencyKey", response.getIdempotencyKey().orElse(null));
+            assertEquals(expect.get("lastResponse"), Fixtures.WITH_NULLS.toJsonTree(last), label + ": lastResponse");
+          }
           JsonElement want = expect.has("result") ? expect.get("result") : JsonNull.INSTANCE;
           JsonElement actual = result instanceof JsonElement json ? json : ContractTest.tree(result);
           if (ITEMS_THE_MODEL_CANNOT_HOLD.containsKey(name))
@@ -268,7 +306,9 @@ class ClientCasesTest {
     JsonArray wanted = clientCase.getAsJsonArray("requests");
     assertEquals(wanted.size(), received.size(), name + ": requests sent");
     Map<String, String> uuids = new HashMap<>();
-    JsonObject every = fixture.getAsJsonObject("everyRequest").getAsJsonObject("headers");
+    JsonObject every = fixture.getAsJsonObject("everyRequest").getAsJsonObject("headers").deepCopy();
+    // A case's own API key is the one every request carries.
+    if (string(options, "apiKey") != null && every.has("x-api-key")) every.addProperty("x-api-key", string(options, "apiKey"));
     for (int i = 0; i < wanted.size(); i++) {
       JsonObject want = wanted.get(i).getAsJsonObject();
       Received got = received.get(i);
@@ -297,6 +337,27 @@ class ClientCasesTest {
         assertEquals(file.get("contentType").isJsonNull() ? null : file.get("contentType").getAsString(), parsed.fileType(), label + ": file type");
         assertRawBody(file, parsed.file(), label + ": file");
       } else assertRawBody(want, got.body(), label + ": body");
+    }
+    if (clientCase.has("attempts")) {
+      JsonArray seen = new JsonArray();
+      for (RequestEvent event : attempts) {
+        JsonObject item = new JsonObject();
+        item.add("operation", event.getOperation().<JsonElement>map(JsonPrimitive::new).orElse(JsonNull.INSTANCE));
+        item.addProperty("method", event.getMethod());
+        item.addProperty("path", event.getPath());
+        item.addProperty("attempt", event.getAttempt());
+        item.add("delayMs", event.getDelay().<JsonElement>map(d -> new JsonPrimitive(d.toMillis())).orElse(JsonNull.INSTANCE));
+        item.addProperty("status", event.getStatus());
+        item.add("requestId", event.getRequestId().<JsonElement>map(JsonPrimitive::new).orElse(JsonNull.INSTANCE));
+        item.add("errorCode", event.getErrorCode().<JsonElement>map(JsonPrimitive::new).orElse(JsonNull.INSTANCE));
+        seen.add(item);
+      }
+      assertEquals(clientCase.get("attempts"), seen, name + ": attempts");
+    }
+    if (clientCase.has("logs")) {
+      assertFalse(logLines.isEmpty(), name + ": the client logged nothing");
+      for (JsonElement secret : clientCase.getAsJsonObject("logs").getAsJsonArray("mustNotContain"))
+        for (String line : logLines) assertFalse(line.contains(secret.getAsString()), name + ": a log line holds " + secret);
     }
     if (clientCase.has("sleepsMs")) {
       JsonArray expected = clientCase.getAsJsonArray("sleepsMs");
@@ -413,11 +474,53 @@ class ClientCasesTest {
     return filled;
   }
 
-  private static Object invoke(CalmLensServerClient client, String operation, JsonObject args, boolean async) throws Throwable {
+  /** A step's request options, from their JavaScript names. */
+  private static RequestOptions requestOptions(JsonObject json) {
+    RequestOptions.Builder options = RequestOptions.builder();
+    if (json.has("timeoutMs")) options.setTimeout(Duration.ofMillis(json.get("timeoutMs").getAsLong()));
+    if (json.has("maxRetries")) options.setMaxRetries(json.get("maxRetries").getAsInt());
+    if (json.has("idempotencyKey")) options.setIdempotencyKey(json.get("idempotencyKey").getAsString());
+    if (json.has("headers")) json.getAsJsonObject("headers").entrySet().forEach(e -> options.putHeader(e.getKey(), e.getValue().getAsString()));
+    if (json.has("extraQuery")) json.getAsJsonObject("extraQuery").entrySet().forEach(e -> options.putExtraQuery(e.getKey(), Json.GSON.fromJson(e.getValue(), Object.class)));
+    if (json.has("extraBody")) json.getAsJsonObject("extraBody").entrySet().forEach(e -> options.putExtraBody(e.getKey(), Json.GSON.fromJson(e.getValue(), Object.class)));
+    return options.build();
+  }
+
+  /** Collects what the client logs, at every level it asks for. */
+  private static final class CapturingLogger implements System.Logger {
+    private final List<String> lines;
+
+    CapturingLogger(List<String> lines) { this.lines = lines; }
+
+    @Override public String getName() { return "capture"; }
+    @Override public boolean isLoggable(Level level) { return true; }
+    @Override public void log(Level level, java.util.ResourceBundle bundle, String message, Throwable thrown) { lines.add(message); }
+    @Override public void log(Level level, java.util.ResourceBundle bundle, String format, Object... params) {
+      lines.add(params == null || params.length == 0 ? format : java.text.MessageFormat.format(format, params));
+    }
+  }
+
+  private static Object invoke(CalmLensServerClient client, String operation, JsonObject args, boolean async, RequestOptions stepOptions) throws Throwable {
     JsonObject options = args.deepCopy();
-    RequestOptions request = options.has("idempotencyKey") ? RequestOptions.builder().setIdempotencyKey(options.remove("idempotencyKey").getAsString()).build() : null;
+    RequestOptions request = stepOptions;
+    if (options.has("idempotencyKey")) {
+      String key = options.remove("idempotencyKey").getAsString();
+      request = (request == null ? RequestOptions.builder() : request.toBuilder()).setIdempotencyKey(key).build();
+    }
+    if (request != null && !request.isEmpty() && !operation.equals("request")) {
+      // A step's own options apply to that call only: through a client derived for it.
+      client = request.getIdempotencyKey().isPresent() ? client : client.withRequestOptions(request);
+    }
     Object root = async ? client.async() : client;
     switch (operation) {
+      case "request": {
+        RequestOptions.Builder raw = request == null ? RequestOptions.builder() : request.toBuilder();
+        if (options.has("headers")) options.getAsJsonObject("headers").entrySet().forEach(e -> raw.putHeader(e.getKey(), e.getValue().getAsString()));
+        Map<String, Object> query = options.has("query") ? Json.GSON.fromJson(options.get("query"), new com.google.gson.reflect.TypeToken<Map<String, Object>>() {}.getType()) : null;
+        Object result = call(root, "request", options.get("method").getAsString(), options.get("path").getAsString(), query,
+            options.has("body") ? options.get("body") : null, raw.build());
+        return ((RawResponse) result).getBody();
+      }
       case "assets.create", "assets.classify": {
         JsonObject content = options.has("content") ? options.remove("content").getAsJsonObject() : null;
         JsonObject part = options.has("part") ? options.remove("part").getAsJsonObject() : null;

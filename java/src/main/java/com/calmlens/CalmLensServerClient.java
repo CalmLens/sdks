@@ -551,7 +551,8 @@ public final class CalmLensServerClient implements AutoCloseable {
      * Reads the API key, project ID and API base URL from the {@code calmlens.apiKey}, {@code
      * calmlens.projectId} and {@code calmlens.baseUrl} system properties, or else the {@value
      * #API_KEY_ENV}, {@value #PROJECT_ID_ENV} and {@value #BASE_URL_ENV} environment variables. A
-     * setting neither has keeps its current value.
+     * property set, even to an empty string, takes the variable's place. A setting neither has
+     * keeps its current value.
      *
      * @return this builder
      */
@@ -564,9 +565,10 @@ public final class CalmLensServerClient implements AutoCloseable {
       return this;
     }
 
+    /** The system property, which overrides the variable even when empty (unset), or else the variable. */
     private static @Nullable String setting(String property, String variable) {
       String value = System.getProperty(property);
-      if (value == null || value.isEmpty()) value = System.getenv(variable);
+      if (value == null) value = System.getenv(variable);
       return value == null || value.isEmpty() ? null : value;
     }
 
@@ -789,7 +791,7 @@ public final class CalmLensServerClient implements AutoCloseable {
     if (idempotency != null) headers.put("Idempotency-Key", idempotencyKey(idempotency));
     boolean retryable = verb.equals("GET") || verb.equals("HEAD") || idempotency != null;
     Reply reply = c.execute(new Call(verb, baseUrl + path + query(queryJson), headers, payload, c.timeout, retryable));
-    return new RawResponse(new ApiResponse(reply.status(), reply.headers()), reply.json() == null ? JsonNull.INSTANCE : reply.json());
+    return new RawResponse(new ApiResponse(reply.status(), reply.headers(), reply.idempotencyKey()), reply.json() == null ? JsonNull.INSTANCE : reply.json());
   }
 
   /** Params as a JSON object: empty for null params. */
@@ -1180,7 +1182,9 @@ public final class CalmLensServerClient implements AutoCloseable {
   private record Call(String method, String url, Map<String, String> headers, Transport.Body body, Duration timeout, boolean retryable) {}
 
   /** A response whose body has been read. */
-  private record Reply(int status, Map<String, List<String>> headers, byte[] body, JsonElement json) {}
+  private record Reply(int status, Map<String, List<String>> headers, byte[] body, JsonElement json, @Nullable String idempotencyKey) {
+    Reply(int status, Map<String, List<String>> headers, byte[] body, JsonElement json) { this(status, headers, body, json, null); }
+  }
 
   private void ensureOpen() {
     if (closed.get()) throw CalmLensException.of(ErrorCodes.SDK_CLIENT_CLOSED, "The client is closed");
@@ -1318,7 +1322,7 @@ public final class CalmLensServerClient implements AutoCloseable {
       Reply reply = parse(response, body);
       if (reply.status() >= 200 && reply.status() < 300) {
         report(call, attempt, started, reply.status(), reply.headers(), null, null);
-        return reply;
+        return new Reply(reply.status(), reply.headers(), reply.body(), reply.json(), call.headers().get("Idempotency-Key"));
       }
       CalmLensException error = error(reply);
       if (canRetry(call, attempt) && error.isRetryable()) {
@@ -1450,7 +1454,7 @@ public final class CalmLensServerClient implements AutoCloseable {
           ? null : Json.GSON.fromJson(value, type);
       if (result == null) throw new JsonParseException("Expected a JSON " + (type.isArray() ? "array" : "object"));
       if (result instanceof CalmLensObject model) {
-        Json.setLastResponse(model, new ApiResponse(reply.status(), reply.headers()));
+        Json.setLastResponse(model, new ApiResponse(reply.status(), reply.headers(), reply.idempotencyKey()));
         if (responseValidation) model.validate();
       }
       if (responseValidation && result instanceof Object[] items) for (Object item : items) if (item instanceof CalmLensObject model) model.validate();
