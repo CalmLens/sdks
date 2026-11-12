@@ -30,7 +30,7 @@ final class HashLists extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $page = $this->session->request('GET', $this->session->project('hash-lists'), query: $api, options: $request);
-        return self::collection(Collection::class, HashList::class, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
+        return $this->collection(Collection::class, HashList::class, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
     /**
@@ -53,7 +53,7 @@ final class HashLists extends Resource
     public function retrieve(array $params, array $requestOptions = []): HashList
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(HashList::class, $this->session->request('GET', $this->path($api, 'hash-lists', 'hashListId'), options: $request));
+        return $this->model(HashList::class, $this->session->request('GET', $this->path($api, 'hash-lists', 'hashListId'), options: $request));
     }
 
     /**
@@ -66,7 +66,7 @@ final class HashLists extends Resource
     public function create(array $params, array $requestOptions = []): HashList
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(HashList::class, $this->session->request('POST', $this->session->project('hash-lists'), body: (object) $api, options: $request));
+        return $this->model(HashList::class, $this->session->request('POST', $this->session->project('hash-lists'), body: (object) $api, options: $request));
     }
 
     /**
@@ -82,7 +82,7 @@ final class HashLists extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'hash-lists', 'hashListId');
-        return self::model(HashList::class, $this->session->request('PATCH', $path, body: (object) $api, options: $request));
+        return $this->model(HashList::class, $this->session->request('PATCH', $path, body: (object) $api, options: $request));
     }
 
     /**
@@ -109,7 +109,7 @@ final class HashLists extends Resource
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'hash-lists', 'hashListId');
         $page = $this->session->request('GET', $path . '/entries', query: $api, options: $request);
-        return self::collection(Collection::class, HashListEntry::class, $page, fn (array $next) => $this->listEntries($next, $requestOptions), $params);
+        return $this->collection(Collection::class, HashListEntry::class, $page, fn (array $next) => $this->listEntries($next, $requestOptions), $params);
     }
 
     /**
@@ -138,7 +138,7 @@ final class HashLists extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'hash-lists', 'hashListId');
-        return self::model(HashListEntry::class, $this->session->request('POST', $path . '/entries', body: (object) $api, options: $request));
+        return $this->model(HashListEntry::class, $this->session->request('POST', $path . '/entries', body: (object) $api, options: $request));
     }
 
     /**

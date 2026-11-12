@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CalmLens\Internal;
 
+use CalmLens\ApiResponse;
 use CalmLens\CalmLensException;
 use CalmLens\Version;
 use GuzzleHttp\Psr7\Request;
@@ -13,6 +14,7 @@ use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
+use Psr\Log\LoggerInterface;
 
 /** @internal */
 final class Session
@@ -35,6 +37,19 @@ final class Session
     public int $partSizeBytes = 8 * 1024 * 1024;
     /** @var array<string, array> The lenses `ensureLenses` saw, by definition, so an unchanged one sends nothing. */
     public array $ensuredLenses = [];
+    /** The most lens definitions the cache keeps; the oldest go first. */
+    public const MAX_ENSURED_LENSES = 1000;
+    /** The response the last API request ended with, for `getLastResponse()`. */
+    public ?ApiResponse $lastResponse = null;
+    /** The operation being sent, such as `assets.retrieve`, for attempt events and logs. */
+    public string $operation = 'request';
+    /** The request options every method takes. */
+    public const REQUEST_OPTIONS = ['timeout', 'connectTimeout', 'uploadTimeout', 'maxRetries', 'maxResponseBytes', 'idempotencyKey',
+        'headers', 'extraQuery', 'extraBody'];
+    /** Headers the SDK sets itself, which `headers` can't replace. */
+    private const PROTECTED_HEADERS = ['x-api-key', 'authorization', 'user-agent', 'idempotency-key', 'content-type', 'content-length',
+        'accept', 'host', 'x-calmlens-upload'];
+    private string $userAgent;
 
     public function __construct(
         #[\SensitiveParameter] private string $apiKey,
@@ -43,7 +58,15 @@ final class Session
         public readonly string $cdnBaseUrl,
         private array $defaults,
         ?ClientInterface $http = null,
+        ?string $appInfo = null,
+        private ?LoggerInterface $logger = null,
+        private ?\Closure $onAttempt = null,
     ) {
+        $this->userAgent = Version::userAgent() . ($appInfo === null ? '' : " $appInfo");
+        $level = strtolower((string) getenv('CALMLENS_LOG'));
+        if ($this->logger === null && in_array($level, ['info', 'debug'], true)) {
+            $this->logger = new StderrLogger($level);
+        }
         try {
             $this->http = $http ?? Psr18ClientDiscovery::find();
         } catch (NotFoundException $error) {
@@ -55,10 +78,40 @@ final class Session
     }
 
     public function __debugInfo(): array { return ['projectId' => $this->projectId]; }
+
+    /** Caches a lens definition `ensureLenses` saw, dropping the oldest beyond `MAX_ENSURED_LENSES`. */
+    public function rememberLens(string $key, array $lens): void
+    {
+        unset($this->ensuredLenses[$key]);
+        $this->ensuredLenses[$key] = $lens;
+        if (count($this->ensuredLenses) > self::MAX_ENSURED_LENSES) {
+            array_shift($this->ensuredLenses);
+        }
+    }
     public function project(string $path): string { return '/projects/' . Values::segment($this->projectId) . '/' . $path; }
 
     private static function validateOptions(array $options, string $code = 'sdk/invalid-argument'): void
     {
+        if ($code === 'sdk/invalid-argument') {
+            $unknown = array_diff(array_map('strval', array_keys($options)), self::REQUEST_OPTIONS);
+            if ($unknown !== []) {
+                Values::invalid('Unknown request option' . (count($unknown) > 1 ? 's' : '') . ': ' . implode(', ', $unknown)
+                    . '; request options are ' . implode(', ', self::REQUEST_OPTIONS));
+            }
+            foreach (['headers', 'extraQuery', 'extraBody'] as $key) {
+                if (isset($options[$key]) && (!is_array($options[$key]) || ($options[$key] !== [] && array_is_list($options[$key])))) {
+                    Values::invalid("$key must be an array keyed by name");
+                }
+            }
+            foreach ($options['headers'] ?? [] as $name => $value) {
+                if (!is_string($value) || !preg_match('/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/D', (string) $name) || preg_match('/[\r\n]/', $value)) {
+                    Values::invalid('Every header needs a token name and a single-line string value');
+                }
+                if (in_array(strtolower((string) $name), self::PROTECTED_HEADERS, true)) {
+                    Values::invalid("The SDK sets the $name header itself");
+                }
+            }
+        }
         foreach (['timeout', 'connectTimeout', 'uploadTimeout'] as $key) {
             if (isset($options[$key]) && ((!is_int($options[$key]) && !is_float($options[$key])) || !is_finite((float) $options[$key]) || $options[$key] <= 0)) {
                 Values::invalid("$key must be a positive number of seconds", $code);
@@ -83,12 +136,20 @@ final class Session
     public function request(string $method, string $path, array $query = [], mixed $body = null,
         ?StreamInterface $raw = null, array $headers = [], bool $idempotent = false, array $options = [], bool $upload = false, ?float $deadline = null): mixed
     {
+        self::validateOptions($options);
         $url = $this->baseUrl . $path;
-        $params = Values::query($query);
+        $params = Values::query(($options['extraQuery'] ?? []) + $query);
         if ($params !== '') {
             $url .= '?' . $params;
         }
+        $headers = ($options['headers'] ?? []) + $headers;
         $headers['Accept'] = 'application/json';
+        if (isset($options['extraBody'])) {
+            if (!is_array($body) && !$body instanceof \stdClass) {
+                Values::invalid('extraBody needs a request with a JSON object body');
+            }
+            $body = (object) ($options['extraBody'] + (array) $body);
+        }
         if ($body !== null) {
             $raw = \GuzzleHttp\Psr7\Utils::streamFor(Values::json($body));
             $headers['Content-Type'] = 'application/json';
@@ -99,7 +160,6 @@ final class Session
         if ($idempotent || isset($options['idempotencyKey'])) {
             $headers['Idempotency-Key'] = $options['idempotencyKey'] ?? Values::uuid();
         }
-        self::validateOptions($options);
         $settings = $options + $this->defaults;
         if ($upload) {
             $settings['timeout'] = $options['uploadTimeout'] ?? $options['timeout'] ?? $this->defaults['uploadTimeout'] ?? null;
@@ -107,6 +167,7 @@ final class Session
         $response = $this->execute($method, $url, $headers, $raw, $settings, deadline: $deadline);
         $status = $response->getStatusCode();
         $bytes = $this->readBounded($response, $settings['maxResponseBytes']);
+        $this->lastResponse = self::apiResponse($response);
         if ($bytes === '' && ($status === 204 || $method === 'DELETE')) {
             return null;
         }
@@ -125,6 +186,7 @@ final class Session
     public function cdn(string $method, string $url, array $headers, array $options): ResponseInterface
     {
         self::validateOptions($options);
+        $headers = ($options['headers'] ?? []) + $headers;
         return $this->execute($method, $url, $headers, null, $options + $this->defaults, true);
     }
 
@@ -146,6 +208,7 @@ final class Session
         if (!is_array($data) || array_is_list($data)) {
             throw $this->responseError('sdk/invalid-response', "Invalid JSON response (HTTP $status)", $response);
         }
+        $this->lastResponse = self::apiResponse($response);
         return $data;
     }
 
@@ -213,7 +276,7 @@ final class Session
         if ($apiKey) {
             $headers['X-Api-Key'] = $this->apiKey;
         }
-        $headers['User-Agent'] = Version::userAgent();
+        $headers['User-Agent'] = $this->userAgent;
         // Reads and requests carrying an Idempotency-Key are safe to repeat, unless their body is a one-shot stream.
         $retryable = (in_array($method, ['GET', 'HEAD'], true) || isset($headers['Idempotency-Key']))
             && ($body === null || $body->isSeekable());
@@ -221,6 +284,7 @@ final class Session
             $remaining = $this->decisionTimeLeft($deadline);
             $attemptTimeout = $remaining === null ? $settings['timeout'] : min($remaining, $settings['timeout'] ?? INF);
             $again = $retryable && $attempt < $settings['maxRetries'];
+            $started = hrtime(true);
             try {
                 $response = $this->send(new Request($method, $url, $headers, $body), $attemptTimeout,
                     min($settings['connectTimeout'], $remaining ?? INF), $cdn);
@@ -230,13 +294,16 @@ final class Session
                 $timeout = self::isTimeout($error);
                 $failure = CalmLensException::create($timeout ? 'sdk/timeout' : 'sdk/transport-error',
                     $timeout ? 'Request timed out' : 'Request failed', previous: $error);
-                if (!$again) {
+                $delay = $again ? self::retryDelayMs($attempt) : null;
+                $this->attempted($method, $url, $cdn, $attempt, null, null, $started, $delay, $failure->errorCode);
+                if ($delay === null) {
                     throw $failure;
                 }
-                $this->wait(self::retryDelayMs($attempt), $deadline);
+                $this->wait($delay, $deadline);
                 $body?->rewind();
                 continue;
             }
+            $requestId = $response->hasHeader('X-Request-Id') ? $response->getHeaderLine('X-Request-Id') : null;
             if ($deadline !== null && ($this->clock)() >= $deadline) {
                 $response->getBody()->close();
                 throw CalmLensException::create('sdk/timeout', 'Decision deadline expired');
@@ -247,6 +314,7 @@ final class Session
                 throw $this->responseError('sdk/http-error', "Unexpected redirect (HTTP $status)", $response);
             }
             if ($status >= 200 && $status < 300) {
+                $this->attempted($method, $url, $cdn, $attempt, $status, $requestId, $started, null);
                 return $response;
             }
             if ($cdn) {
@@ -254,8 +322,10 @@ final class Session
                 $retryAfter = self::retryAfter($response->getHeaderLine('Retry-After'));
                 $delay = $retryAfter !== null ? $retryAfter * 1000 : self::retryDelayMs($attempt);
                 if (!$again || !in_array($status, self::RETRYABLE_STATUSES, true) || $delay > self::RETRY_AFTER_MAX_MS) {
+                    $this->attempted($method, $url, $cdn, $attempt, $status, $requestId, $started, null);
                     return $response;
                 }
+                $this->attempted($method, $url, $cdn, $attempt, $status, $requestId, $started, $delay);
                 $response->getBody()->close();
                 $this->wait($delay);
                 continue;
@@ -263,12 +333,58 @@ final class Session
             $error = $this->apiError($response, $settings['maxResponseBytes']);
             $retryAfter = $error->retryAfter();
             $delay = $retryAfter !== null ? (int) ($retryAfter * 1000) : self::retryDelayMs($attempt);
-            if (!$again || !$error->isRetryable() || $delay > self::RETRY_AFTER_MAX_MS) {
+            $final = !$again || !$error->isRetryable() || $delay > self::RETRY_AFTER_MAX_MS;
+            $this->attempted($method, $url, $cdn, $attempt, $status, $requestId, $started, $final ? null : $delay, $error->errorCode);
+            if ($final) {
                 throw $error;
             }
             $this->wait($delay, $deadline);
             $body?->rewind();
         }
+    }
+
+    /**
+     * Reports one attempt to the `onAttempt` hook and the logger: its operation, method and path,
+     * 1-based attempt number, the delay before the next attempt (null for the last one), status and
+     * request ID (null without a response) and duration in milliseconds. The path has no query, and
+     * a CDN path hides its asset segment, which can be a signed grant; no header or body is reported.
+     */
+    private function attempted(string $method, string $url, bool $cdn, int $attempt, ?int $status, ?string $requestId,
+        int|float $started, ?int $delay, ?string $errorCode = null): void
+    {
+        if ($this->onAttempt === null && $this->logger === null) {
+            return;
+        }
+        $path = (string) parse_url($url, PHP_URL_PATH);
+        $base = (string) parse_url($cdn ? $this->cdnBaseUrl : $this->baseUrl, PHP_URL_PATH);
+        $path = str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
+        if ($cdn) {
+            $path = preg_replace('#^(/assets/[^/]+/)[^/]+#', '$1[redacted]', $path) ?? '[redacted]';
+        }
+        $event = ['operation' => $this->operation, 'method' => $method, 'path' => $path, 'attempt' => $attempt + 1,
+            'delay' => $delay, 'status' => $status, 'requestId' => $requestId,
+            'duration' => round((hrtime(true) - $started) / 1e6, 3)];
+        if ($this->onAttempt !== null) {
+            ($this->onAttempt)($event);
+        }
+        if ($this->logger !== null) {
+            $outcome = $status === null ? ($errorCode ?? 'failed') : (string) $status;
+            $message = "{$event['operation']}: $method $path $outcome in {$event['duration']}ms";
+            $context = array_filter($event + ['errorCode' => $errorCode], fn ($value) => $value !== null);
+            // A retried attempt is detail; the attempt a call ends with is the call's outcome.
+            if ($delay !== null) {
+                $this->logger->debug("$message; retrying in {$delay}ms", $context);
+            } else {
+                $this->logger->info($message, $context);
+            }
+        }
+    }
+
+    /** The response behind a result: its status, headers and request ID. */
+    private static function apiResponse(ResponseInterface $response, mixed $json = null): ApiResponse
+    {
+        return new ApiResponse($response->getStatusCode(), $response->getHeaders(),
+            $response->hasHeader('X-Request-Id') ? $response->getHeaderLine('X-Request-Id') : null, $json);
     }
 
     private function decisionTimeLeft(?float $deadline): ?float
@@ -319,25 +435,27 @@ final class Session
     }
 
     /** An SDK error about a response, with its status, request ID and (unless `retryAfter` is false) headers. */
-    private function responseError(string $code, string $message, ResponseInterface $response, ?\Throwable $previous = null, bool $retryAfter = true): CalmLensException
+    private function responseError(string $code, string $message, ResponseInterface $response, ?\Throwable $previous = null, bool $retryAfter = true, ?string $body = null): CalmLensException
     {
         $headers = $response->getHeaders();
         if (!$retryAfter) {
             $headers = array_filter($headers, fn ($name) => strcasecmp((string) $name, 'retry-after') !== 0, ARRAY_FILTER_USE_KEY);
         }
         return CalmLensException::create($code, $message, $response->getStatusCode(), [], $headers, $previous,
-            $response->hasHeader('X-Request-Id') ? $response->getHeaderLine('X-Request-Id') : null);
+            $response->hasHeader('X-Request-Id') ? $response->getHeaderLine('X-Request-Id') : null, $body);
     }
 
     private function apiError(ResponseInterface $response, int $limit): CalmLensException
     {
-        $data = json_decode($this->readBounded($response, $limit), true);
+        $raw = $this->readBounded($response, $limit);
+        $body = substr($raw, 0, CalmLensException::BODY_LIMIT);
+        $data = json_decode($raw, true);
         if (!is_array($data) || !is_string($data['code'] ?? null)) {
-            return $this->responseError('sdk/http-error', 'HTTP ' . $response->getStatusCode(), $response);
+            return $this->responseError('sdk/http-error', 'HTTP ' . $response->getStatusCode(), $response, body: $body);
         }
         return CalmLensException::create($data['code'], is_string($data['message'] ?? null) ? $data['message'] : $data['code'],
             $response->getStatusCode(), is_array($data['details'] ?? null) ? $data['details'] : [], $response->getHeaders(),
             requestId: $response->hasHeader('X-Request-Id') ? $response->getHeaderLine('X-Request-Id')
-                : (is_string($data['requestId'] ?? null) ? $data['requestId'] : null));
+                : (is_string($data['requestId'] ?? null) ? $data['requestId'] : null), body: $body);
     }
 }

@@ -31,7 +31,7 @@ final class Folders extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $page = $this->session->request('GET', $this->session->project('folders'), query: $api, options: $request);
-        return self::collection(FolderCollection::class, null, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
+        return $this->collection(FolderCollection::class, null, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
     /**
@@ -56,7 +56,7 @@ final class Folders extends Resource
     public function create(array $params, array $requestOptions = []): Folder
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(Folder::class, $this->session->request('POST', $this->session->project('folders'), body: (object) $api, options: $request));
+        return $this->model(Folder::class, $this->session->request('POST', $this->session->project('folders'), body: (object) $api, options: $request));
     }
     /**
      * @param array{folderId: string} $params
@@ -66,7 +66,7 @@ final class Folders extends Resource
     public function retrieve(array $params, array $requestOptions = []): Folder
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(Folder::class, $this->session->request('GET', $this->path($api, 'folders', 'folderId'), options: $request));
+        return $this->model(Folder::class, $this->session->request('GET', $this->path($api, 'folders', 'folderId'), options: $request));
     }
     /**
      * @param array{folderId: string, name?: string} $params
@@ -77,7 +77,7 @@ final class Folders extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->path($api, 'folders', 'folderId');
-        return self::model(Folder::class, $this->session->request('PATCH', $path, body: (object) $api, options: $request));
+        return $this->model(Folder::class, $this->session->request('PATCH', $path, body: (object) $api, options: $request));
     }
     /**
      * @param array{folderId: string, parentId: ?string} $params
@@ -91,7 +91,7 @@ final class Folders extends Resource
         if (!array_key_exists('parentId', $api)) {
             Values::invalid('parentId is required (null moves to root)');
         }
-        return self::model(Folder::class, $this->session->request('POST', $path . '/move', body: ['parentId' => $api['parentId']], options: $request));
+        return $this->model(Folder::class, $this->session->request('POST', $path . '/move', body: ['parentId' => $api['parentId']], options: $request));
     }
     /**
      * @param array{folderId: string} $params

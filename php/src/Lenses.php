@@ -32,7 +32,7 @@ final class Lenses extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $page = $this->session->request('GET', $this->session->project('lenses'), query: $api, options: $request);
-        return self::collection(Collection::class, Lens::class, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
+        return $this->collection(Collection::class, Lens::class, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
     /**
@@ -63,7 +63,7 @@ final class Lenses extends Resource
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $lens = $this->session->request('POST', $this->session->project('lenses'), body: (object) $api, options: $request);
         $this->forget(fn (array $cached) => ($cached['identifier'] ?? null) === ($lens['identifier'] ?? null));
-        return self::model(Lens::class, $lens);
+        return $this->model(Lens::class, $lens);
     }
 
     /**
@@ -74,7 +74,7 @@ final class Lenses extends Resource
     public function retrieve(array $params, array $requestOptions = []): Lens
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(Lens::class, $this->session->request('GET', $this->path($api, 'lenses', 'lensId'), options: $request));
+        return $this->model(Lens::class, $this->session->request('GET', $this->path($api, 'lenses', 'lensId'), options: $request));
     }
 
     /**
@@ -94,7 +94,7 @@ final class Lenses extends Resource
         $path = $this->path($api, 'lenses', 'lensId');
         $lens = $this->session->request('PATCH', $path, body: (object) $api, options: $request);
         $this->forget(fn (array $cached) => ($cached['id'] ?? null) === ($lens['id'] ?? null));
-        return self::model(Lens::class, $lens);
+        return $this->model(Lens::class, $lens);
     }
 
     /**

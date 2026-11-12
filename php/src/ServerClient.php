@@ -8,6 +8,7 @@ use CalmLens\Internal\Session;
 use CalmLens\Internal\Values;
 use CalmLens\Model\Lens;
 use Psr\Http\Client\ClientInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * @phpstan-import-type LensType from Types
@@ -45,11 +46,23 @@ final class ServerClient
     public readonly Cdn $cdn;
     public readonly UploadTokens $uploadTokens;
     private Session $session;
+    public readonly string $projectId;
 
     /**
      * @param ?ClientInterface $httpClient the PSR-18 client that sends requests; by default the one
      *   installed (found with php-http/discovery), such as Guzzle. The timeouts below apply per
      *   attempt when it is Guzzle; configure another client's timeouts on that client.
+     * @param ?string $apiKey the API key; `CALMLENS_API_KEY` when not passed.
+     * @param ?string $projectId the project the client works in; `CALMLENS_PROJECT_ID` when not passed.
+     * @param ?string $baseUrl the API's base URL; `CALMLENS_BASE_URL`, or the default, when not passed.
+     * @param ?array{name: string, version?: string, url?: string} $appInfo your application, added to
+     *   the user agent as ` name/version (url)`.
+     * @param ?LoggerInterface $logger a PSR-3 logger for each request's outcome (info) and retries
+     *   (debug); `CALMLENS_LOG=info` or `debug` logs to standard error instead. Logs never hold the
+     *   API key, bodies, queries or a CDN URL's asset segment.
+     * @param ?\Closure(array{operation: string, method: string, path: string, attempt: int, delay: ?int,
+     *   status: ?int, requestId: ?string, duration: float}): void $onAttempt called after each request
+     *   attempt, with the delay in milliseconds before the next one (null for the last).
      * @param float $timeout seconds each API request attempt may take, reading the response included.
      * @param ?float $uploadTimeout seconds each binary upload attempt (file content and multipart
      *   parts) may take; none by default, since files may be large. Text uploads use `timeout`.
@@ -63,9 +76,9 @@ final class ServerClient
      *   interrupted upload. One-shot streams and text go in one request.
      */
     public function __construct(
-        #[\SensitiveParameter] string $apiKey,
-        public readonly string $projectId,
-        string $baseUrl = self::DEFAULT_BASE_URL,
+        #[\SensitiveParameter] ?string $apiKey = null,
+        ?string $projectId = null,
+        ?string $baseUrl = null,
         string $cdnBaseUrl = self::DEFAULT_CDN_BASE_URL,
         int|float $timeout = self::DEFAULT_TIMEOUT,
         int|float $connectTimeout = 10,
@@ -74,12 +87,23 @@ final class ServerClient
         int|float $maxResponseBytes = self::DEFAULT_MAX_RESPONSE_BYTES,
         int|float|null $uploadTimeout = self::DEFAULT_UPLOAD_TIMEOUT,
         int|float $partSizeBytes = self::DEFAULT_PART_SIZE_BYTES,
+        ?array $appInfo = null,
+        ?LoggerInterface $logger = null,
+        ?\Closure $onAttempt = null,
     ) {
+        $apiKey ??= self::env('CALMLENS_API_KEY');
+        $projectId ??= self::env('CALMLENS_PROJECT_ID');
+        $baseUrl ??= self::env('CALMLENS_BASE_URL') ?? self::DEFAULT_BASE_URL;
+        if ($apiKey === null || $projectId === null) {
+            Values::invalid('Pass apiKey and projectId, or set CALMLENS_API_KEY and CALMLENS_PROJECT_ID', 'sdk/invalid-config');
+        }
         if (!preg_match('/^[\x21-\x7e]+$/D', $apiKey) || $projectId === '' || in_array($projectId, ['.', '..'], true)) {
             Values::invalid('Invalid API key or project ID', 'sdk/invalid-config');
         }
+        $this->projectId = $projectId;
         $this->session = new Session($apiKey, $projectId, Values::url($baseUrl), Values::url($cdnBaseUrl),
-            compact('timeout', 'connectTimeout', 'maxRetries', 'maxResponseBytes', 'uploadTimeout'), $httpClient);
+            compact('timeout', 'connectTimeout', 'maxRetries', 'maxResponseBytes', 'uploadTimeout'), $httpClient,
+            self::appInfo($appInfo), $logger, $onAttempt);
         if (!is_int($partSizeBytes) || $partSizeBytes < self::MIN_PART_SIZE_BYTES || $partSizeBytes > self::MAX_PART_SIZE_BYTES) {
             Values::invalid('partSizeBytes must be an integer from 5 MiB (5242880) to 64 MiB (67108864)', 'sdk/invalid-config');
         }
@@ -99,6 +123,54 @@ final class ServerClient
     }
 
     public function __debugInfo(): array { return ['projectId' => $this->projectId]; }
+
+    /** An environment variable's value, or null when it is unset or empty. */
+    private static function env(string $name): ?string
+    {
+        $value = getenv($name);
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /** `appInfo` as the user agent suffix ` name/version (url)`, or null. */
+    private static function appInfo(?array $appInfo): ?string
+    {
+        if ($appInfo === null) {
+            return null;
+        }
+        $token = '/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/D';
+        $unknown = array_diff(array_map('strval', array_keys($appInfo)), ['name', 'version', 'url']);
+        $name = $appInfo['name'] ?? null;
+        $version = $appInfo['version'] ?? null;
+        $url = $appInfo['url'] ?? null;
+        if ($unknown !== [] || !is_string($name) || !preg_match($token, $name)
+            || ($version !== null && (!is_string($version) || !preg_match($token, $version)))
+            || ($url !== null && (!is_string($url) || !preg_match('#^https?://[\x21-\x7e]+$#D', $url) || str_contains($url, ')')))) {
+            Values::invalid('appInfo takes a name, and an optional version and http(s) url, without spaces', 'sdk/invalid-config');
+        }
+        return $name . ($version === null ? '' : "/$version") . ($url === null ? '' : " ($url)");
+    }
+
+    /**
+     * Sends an API request the SDK has no method for, with the client's API key, retries, timeouts
+     * and error mapping, and returns the response with its decoded JSON body (`json`). `$path` is
+     * beneath the base URL, such as `'/projects/' . $client->projectId . '/assets'`; `$query` becomes
+     * the query string and an array or object `$body` the JSON body. Reads, and writes with an
+     * `idempotencyKey`, are retried like the SDK's own.
+     *
+     * @param array<string, mixed> $query
+     * @param array<string, mixed> $requestOptions
+     */
+    public function request(string $method, string $path, array $query = [], array|object|null $body = null, array $requestOptions = []): ApiResponse
+    {
+        $method = strtoupper($method);
+        if (!preg_match('/^[A-Z]+$/D', $method) || !str_starts_with($path, '/') || str_starts_with($path, '//') || preg_match('/[\s?#]/', $path)) {
+            Values::invalid('Pass an HTTP method and a path beneath the base URL, starting with /, without a query');
+        }
+        $this->session->operation = 'request';
+        $json = $this->session->request($method, $path, query: $query, body: $body, options: $requestOptions);
+        $last = $this->session->lastResponse;
+        return new ApiResponse($last->status ?? 204, $last->headers ?? [], $last?->requestId, $json);
+    }
 
     /**
      * Creates a named lens, or changes it to this definition; `active` is true unless it says
@@ -133,6 +205,7 @@ final class ServerClient
     public function ensureLenses(array $params, array $requestOptions = []): array
     {
         Values::knownOptions($params, 'ensureLenses');
+        $this->session->operation = 'ensureLenses';
         $definitions = $params['lenses'] ?? null;
         if (!is_array($definitions) || !array_is_list($definitions) || $definitions === []) {
             Values::invalid('Supply a non-empty list of lenses');
@@ -169,9 +242,11 @@ final class ServerClient
                         unset($this->session->ensuredLenses[$oldKey]);
                     }
                 }
-                $resolved[$key] = $this->session->ensuredLenses[$key] = $returned[$index];
+                $resolved[$key] = $returned[$index];
+                $this->session->rememberLens($key, $returned[$index]);
             }
         }
-        return array_map(fn ($key) => Lens::constructFrom($resolved[$key]), $keys);
+        $last = $missing === [] ? null : $this->session->lastResponse;
+        return array_map(fn ($key) => Lens::constructFrom($resolved[$key])->withLastResponse($last), $keys);
     }
 }

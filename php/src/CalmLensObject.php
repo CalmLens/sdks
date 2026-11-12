@@ -27,6 +27,8 @@ abstract class CalmLensObject implements \ArrayAccess, \Countable, \IteratorAggr
     /** @var array<string, mixed> */
     private array $values = [];
 
+    private ?ApiResponse $lastResponse = null;
+
     final protected function __construct() {}
 
     /**
@@ -62,6 +64,23 @@ abstract class CalmLensObject implements \ArrayAccess, \Countable, \IteratorAggr
         }
         $item = $field[0] ?? $field['*'];
         return array_map(fn (mixed $entry) => self::convert($item, $entry), $value);
+    }
+
+    /**
+     * The HTTP response this object came from: its `status`, `headers` and `requestId`. Null for
+     * nested objects, and for objects that weren't returned by a request, such as a parsed webhook
+     * event or a lens the client had cached.
+     */
+    public function getLastResponse(): ?ApiResponse
+    {
+        return $this->lastResponse;
+    }
+
+    /** @internal Records the response the object came from. */
+    public function withLastResponse(?ApiResponse $response): static
+    {
+        $this->lastResponse = $response;
+        return $this;
     }
 
     public function __get(string $name): mixed

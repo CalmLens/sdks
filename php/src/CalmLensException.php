@@ -10,7 +10,7 @@ namespace CalmLens;
  * `TimeoutException`, `InvalidArgumentException` and so on). Compare `errorCode` with the
  * constants in `ErrorCodes` and `SdkErrorCodes`, never with the message.
  */
-class CalmLensException extends \RuntimeException
+class CalmLensException extends \RuntimeException implements Exception\ExceptionInterface
 {
     /**
      * The request ID: the `X-Request-Id` response header, or the error body's `requestId` without
@@ -18,9 +18,14 @@ class CalmLensException extends \RuntimeException
      */
     public readonly ?string $requestId;
 
+    /** The most of an error response's body an exception keeps, in bytes. */
+    public const BODY_LIMIT = 16384;
+
     /**
      * @param array $details the API error's `details` object, such as validation issues; empty for transport errors.
      * @param array<string, list<string>|string> $headers response headers (empty without a response).
+     * @param ?string $body the error response's body as received, at most `BODY_LIMIT` bytes, such as
+     *   a proxy's HTML page; null without a response.
      */
     public function __construct(
         public readonly string $errorCode,
@@ -30,6 +35,7 @@ class CalmLensException extends \RuntimeException
         public readonly array $headers = [],
         ?\Throwable $previous = null,
         ?string $requestId = null,
+        public readonly ?string $body = null,
     ) {
         parent::__construct($message ?: $errorCode, 0, $previous);
         $this->requestId = $requestId ?? $this->header('x-request-id');
@@ -40,7 +46,7 @@ class CalmLensException extends \RuntimeException
      * subclass for error statuses, otherwise one chosen by the SDK code.
      */
     public static function create(string $errorCode, string $message = '', ?int $status = null, array $details = [],
-        array $headers = [], ?\Throwable $previous = null, ?string $requestId = null): self
+        array $headers = [], ?\Throwable $previous = null, ?string $requestId = null, ?string $body = null): self
     {
         $class = match (true) {
             $status !== null && $status >= 400 => match (true) {
@@ -63,7 +69,7 @@ class CalmLensException extends \RuntimeException
             in_array($errorCode, [SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE, SdkErrorCodes::INVALID_WEBHOOK_PAYLOAD], true) => Exception\WebhookVerificationException::class,
             default => Exception\InvalidArgumentException::class,
         };
-        return new $class($errorCode, $message, $status, $details, $headers, $previous, $requestId);
+        return new $class($errorCode, $message, $status, $details, $headers, $previous, $requestId, $body);
     }
 
     /** A response header by case-insensitive name, or null. */

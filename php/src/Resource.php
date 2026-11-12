@@ -29,6 +29,7 @@ abstract class Resource
     protected function split(array $params, string $method, array $requestOptions = []): array
     {
         Values::knownOptions($params, static::OPERATIONS . '.' . $method);
+        $this->session->operation = static::OPERATIONS . '.' . $method;
         return [Values::withoutNulls($params, static::OPERATIONS . '.' . $method), $requestOptions];
     }
 
@@ -39,12 +40,12 @@ abstract class Resource
      * @param class-string<T> $class
      * @return T
      */
-    protected static function model(string $class, mixed $data): CalmLensObject
+    protected function model(string $class, mixed $data): CalmLensObject
     {
         if (!is_array($data) || ($data !== [] && array_is_list($data))) {
             throw CalmLensException::create('sdk/invalid-response', 'Expected an object response');
         }
-        return $class::constructFrom($data);
+        return $class::constructFrom($data)->withLastResponse($this->session->lastResponse);
     }
 
     /**
@@ -57,12 +58,12 @@ abstract class Resource
      * @param array<string, mixed> $params
      * @return C
      */
-    protected static function collection(string $class, ?string $item, mixed $data, \Closure $fetch, array $params): Collection
+    protected function collection(string $class, ?string $item, mixed $data, \Closure $fetch, array $params): Collection
     {
         if (!is_array($data) || !is_array($data['items'] ?? null) || !array_is_list($data['items']) || !is_bool($data['hasMore'] ?? null)) {
             throw CalmLensException::create('sdk/invalid-response', 'Invalid page');
         }
-        return $class::page($data, $item, $fetch, $params);
+        return $class::page($data, $item, $fetch, $params)->withLastResponse($this->session->lastResponse);
     }
 
     protected function path(array &$options, string $resource, string $key): string

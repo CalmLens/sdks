@@ -35,3 +35,19 @@ API errors with status 413 and 422 raise `PayloadTooLargeException` and
 `UnprocessableEntityException`, and `TimeoutException` no longer extends `ConnectionException`.
 
 The SDK requires PHP 8.2 or later, so distribution builds that backport security fixes install.
+
+`ServerClient` reads `CALMLENS_API_KEY`, `CALMLENS_PROJECT_ID` and `CALMLENS_BASE_URL` when you
+don't pass them, and `appInfo` (`name`, `version`, `url`) adds your application to the user agent.
+Request options also take `headers`, `extraQuery` and `extraBody`, and an unknown request option
+fails with `sdk/invalid-argument`. `$client->request($method, $path, $query, $body)` sends an API
+request the SDK has no method for, with the client's authentication, retries and errors, and
+returns an `ApiResponse` with its decoded `json`.
+
+Every result's `getLastResponse()` returns the response it came from, with its `status`, `headers`
+and `requestId`. Pass a PSR-3 `logger`, or set `CALMLENS_LOG=info` or `debug`, to log each
+request's outcome and retries; `onAttempt` receives each attempt's operation, method, path,
+attempt number, retry delay, status, request ID and duration. Logs and events never include the
+API key, bodies, queries or a CDN URL's asset segment.
+
+API exceptions keep the response body (`$error->body`, up to 16 KiB), such as a proxy's error page,
+and every SDK exception implements `CalmLens\Exception\ExceptionInterface`.

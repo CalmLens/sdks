@@ -32,7 +32,7 @@ final class UploadPresets extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $page = $this->session->request('GET', $this->session->project('upload-presets'), query: $api, options: $request);
-        return self::collection(Collection::class, UploadPreset::class, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
+        return $this->collection(Collection::class, UploadPreset::class, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
     /**
@@ -67,7 +67,7 @@ final class UploadPresets extends Resource
     public function ensure(array $params, array $requestOptions = []): EnsuredUploadPresets
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(EnsuredUploadPresets::class, $this->session->request('PUT', $this->session->project('upload-presets'), body: (object) $api, options: $request));
+        return $this->model(EnsuredUploadPresets::class, $this->session->request('PUT', $this->session->project('upload-presets'), body: (object) $api, options: $request));
     }
 
     /**

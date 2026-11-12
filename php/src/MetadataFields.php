@@ -29,7 +29,7 @@ final class MetadataFields extends Resource
     public function list(array $params = [], array $requestOptions = []): MetadataFieldsResource
     {
         [, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(MetadataFieldsResource::class, $this->session->request('GET', $this->session->project('metadata-fields'), options: $request));
+        return $this->model(MetadataFieldsResource::class, $this->session->request('GET', $this->session->project('metadata-fields'), options: $request));
     }
 
     /**
@@ -49,7 +49,7 @@ final class MetadataFields extends Resource
     public function ensure(array $params, array $requestOptions = []): MetadataFieldsResource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(MetadataFieldsResource::class, $this->session->request('PUT', $this->session->project('metadata-fields'), body: (object) $api, options: $request));
+        return $this->model(MetadataFieldsResource::class, $this->session->request('PUT', $this->session->project('metadata-fields'), body: (object) $api, options: $request));
     }
 
     /**

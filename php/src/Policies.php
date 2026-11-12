@@ -34,7 +34,7 @@ final class Policies extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $page = $this->session->request('GET', '/policies', query: $api, options: $request);
-        return self::collection(Collection::class, Policy::class, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
+        return $this->collection(Collection::class, Policy::class, $page, fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
     /**
@@ -57,7 +57,7 @@ final class Policies extends Resource
     public function retrieve(array $params, array $requestOptions = []): Policy
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(Policy::class, $this->session->request('GET', $this->policyPath($api), options: $request));
+        return $this->model(Policy::class, $this->session->request('GET', $this->policyPath($api), options: $request));
     }
 
     /**
@@ -75,7 +75,7 @@ final class Policies extends Resource
     public function create(array $params, array $requestOptions = []): Policy
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(Policy::class, $this->session->request('POST', '/policies', body: (object) $api, options: $request));
+        return $this->model(Policy::class, $this->session->request('POST', '/policies', body: (object) $api, options: $request));
     }
 
     /**
@@ -92,7 +92,7 @@ final class Policies extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->policyPath($api);
-        return self::model(Policy::class, $this->session->request('PATCH', $path, body: (object) $api, options: $request));
+        return $this->model(Policy::class, $this->session->request('PATCH', $path, body: (object) $api, options: $request));
     }
 
     /**
@@ -107,7 +107,7 @@ final class Policies extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->policyPath($api);
-        return self::model(Policy::class, $this->session->request('POST', $path . '/reset', body: (object) $api, options: $request));
+        return $this->model(Policy::class, $this->session->request('POST', $path . '/reset', body: (object) $api, options: $request));
     }
 
     /**
@@ -122,7 +122,7 @@ final class Policies extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->policyPath($api);
-        return self::model(Policy::class, $this->session->request('POST', $path . '/upgrade', body: (object) $api, options: $request));
+        return $this->model(Policy::class, $this->session->request('POST', $path . '/upgrade', body: (object) $api, options: $request));
     }
 
     /**
@@ -138,7 +138,7 @@ final class Policies extends Resource
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
         $path = $this->policyPath($api);
-        return self::model(Policy::class, $this->session->request('PUT', $path . '/automatic-updates', body: (object) $api, options: $request));
+        return $this->model(Policy::class, $this->session->request('PUT', $path . '/automatic-updates', body: (object) $api, options: $request));
     }
 
     /**
@@ -164,7 +164,7 @@ final class Policies extends Resource
     public function retrieveAssigned(array $params = [], array $requestOptions = []): Policy
     {
         [, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(Policy::class, $this->session->request('GET', $this->session->project('policy'), options: $request));
+        return $this->model(Policy::class, $this->session->request('GET', $this->session->project('policy'), options: $request));
     }
 
     /**
@@ -177,7 +177,7 @@ final class Policies extends Resource
     public function assign(array $params, array $requestOptions = []): Policy
     {
         [$api, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(Policy::class, $this->session->request('PUT', $this->session->project('policy'), body: (object) $api, options: $request));
+        return $this->model(Policy::class, $this->session->request('PUT', $this->session->project('policy'), body: (object) $api, options: $request));
     }
 
     private function policyPath(array &$options): string

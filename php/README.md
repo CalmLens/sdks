@@ -12,7 +12,8 @@ CVE-2026-109619): 8.2.35, 8.3.36, 8.4.27, 8.5.12 or later, or a distribution bui
 composer require calmlens/sdk guzzlehttp/guzzle
 ```
 
-The client finds an installed PSR-18 client, or takes one as `httpClient`. With Guzzle, the
+The client reads `CALMLENS_API_KEY`, `CALMLENS_PROJECT_ID` and `CALMLENS_BASE_URL` when you
+don't pass them. It finds an installed PSR-18 client, or takes one as `httpClient`. With Guzzle, the
 client's `timeout`, `connectTimeout` and `uploadTimeout` apply to each attempt; configure another
 client's timeouts on that client.
 

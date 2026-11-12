@@ -27,7 +27,7 @@ final class ProjectSettings extends Resource
     public function get(array $params = [], array $requestOptions = []): ProjectSettingsResource
     {
         [, $request] = $this->split($params, __FUNCTION__, $requestOptions);
-        return self::model(ProjectSettingsResource::class, $this->session->request('GET', $this->session->project('settings'), options: $request));
+        return $this->model(ProjectSettingsResource::class, $this->session->request('GET', $this->session->project('settings'), options: $request));
     }
 
     /**
@@ -58,6 +58,6 @@ final class ProjectSettings extends Resource
         if (is_array($api['settings'] ?? null)) {
             $api['settings'] = (object) $api['settings'];
         }
-        return self::model(ProjectSettingsResource::class, $this->session->request('PUT', $this->session->project('settings'), body: (object) $api, options: $request));
+        return $this->model(ProjectSettingsResource::class, $this->session->request('PUT', $this->session->project('settings'), body: (object) $api, options: $request));
     }
 }

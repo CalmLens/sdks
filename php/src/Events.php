@@ -46,7 +46,7 @@ final class Events extends Resource
             // The API takes the types as one comma-separated value.
             $api['types'] = $types === [] ? null : implode(',', $types);
         }
-        return self::collection(EventCollection::class, null, $this->session->request('GET', $this->session->project('events'), query: $api, options: $request), fn (array $next) => $this->list($next, $requestOptions), $params);
+        return $this->collection(EventCollection::class, null, $this->session->request('GET', $this->session->project('events'), query: $api, options: $request), fn (array $next) => $this->list($next, $requestOptions), $params);
     }
 
     /**

@@ -139,7 +139,8 @@ final class Cdn extends Resource
         if (!is_string($signed['url'] ?? null) || $signed['url'] === '') {
             throw CalmLensException::create('sdk/invalid-response', 'The API returned no signed asset URL');
         }
-        return SignedAssetUrl::constructFrom(['url' => self::appendLocation($signed['url'], $api), 'expiresAt' => $signed['expiresAt'] ?? null]);
+        return SignedAssetUrl::constructFrom(['url' => self::appendLocation($signed['url'], $api), 'expiresAt' => $signed['expiresAt'] ?? null])
+            ->withLastResponse($this->session->lastResponse);
     }
 
     /**
@@ -162,6 +163,7 @@ final class Cdn extends Resource
     {
         $options = $params;
         $request = $requestOptions;
+        $this->session->operation = 'cdn.getAssetInfo';
         Values::knownOptions($options, 'cdn.getAssetInfo');
         $parts = parse_url($url);
         if (!is_array($parts) || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) || empty($parts['host'])) {
@@ -186,7 +188,7 @@ final class Cdn extends Resource
             || !is_array($info['content'] ?? null) || !in_array($info['availability'] ?? null, self::AVAILABILITIES, true)) {
             throw CalmLensException::create('sdk/invalid-response', 'The CDN returned no asset info');
         }
-        return AssetInfo::constructFrom($info);
+        return AssetInfo::constructFrom($info)->withLastResponse($this->session->lastResponse);
     }
 
     /**
