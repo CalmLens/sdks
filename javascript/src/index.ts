@@ -22,6 +22,7 @@ export type {
 export { AUTO_PAGING_TO_ARRAY_MAX } from "./client/CalmLensPagination";
 export type {
   AddHashListEntryOptions,
+  AppInfo,
   Asset,
   AssetAvailability,
   AssetBatchOperation,
@@ -59,6 +60,7 @@ export type {
   CdnServeOptions,
   CdnTransform,
   ClassifyTextOptions,
+  ClientRequestDefaults,
   ConnectionOptions,
   CreateFolderOptions,
   CreateHashListOptions,
@@ -109,6 +111,7 @@ export type {
   ProjectSettingsResource,
   PublicProjectSettings,
   RemoveAssetContentOptions,
+  RequestAttempt,
   RequestOptions,
   ResetPolicyOptions,
   RetrieveAssetOptions,

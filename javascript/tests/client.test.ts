@@ -40,7 +40,6 @@ describe("client identity and secrets", () => {
     expect(inspect(client, { depth: 10, showHidden: true })).not.toContain(apiKey);
     expect(JSON.stringify(client)).not.toContain(apiKey);
     expect(JSON.parse(JSON.stringify(client))).toMatchObject({ projectId });
-    expect(inspect(client.withRequestOptions({ timeoutMs: 5 }))).not.toContain(apiKey);
   });
 
   test("rejects the removed requestBackend option with a clear code", () => {

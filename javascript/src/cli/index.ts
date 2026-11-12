@@ -65,7 +65,7 @@ Options:
   --config <path>        For plan and apply: the configuration file (default: calmlens.config.json)
   --prune                For plan and apply: also delete upload presets, lenses and metadata
                          fields the file doesn't list (never policies)
-  --api-url <url>        API base URL (default: $CALMLENS_API_URL or https://api.calmlens.com/v1)
+  --api-url <url>        API base URL (default: $CALMLENS_BASE_URL or https://api.calmlens.com/v1)
   -v, --version          Show the CLI version
   -h, --help             Show this help
 `;
@@ -126,7 +126,7 @@ const main = async () => {
   if (command === "login") {
     try {
       const credentials = await login({
-        apiUrl: values["api-url"] ?? process.env.CALMLENS_API_URL ?? DEFAULT_API_URL,
+        apiUrl: values["api-url"] ?? process.env.CALMLENS_BASE_URL ?? DEFAULT_API_URL,
         readOnly: Boolean(values["read-only"]),
         openBrowser: !values["no-browser"],
         write: (text) => process.stdout.write(text),
@@ -163,7 +163,7 @@ const main = async () => {
         "Both are on the Developer → API Keys page of the CalmLens portal.",
     );
   }
-  const baseUrl = values["api-url"] ?? process.env.CALMLENS_API_URL ?? stored?.apiUrl;
+  const baseUrl = values["api-url"] ?? process.env.CALMLENS_BASE_URL ?? stored?.apiUrl;
   const client = new CalmLensServerClient({
     apiKey: apiKey as string,
     projectId: projectId as string,

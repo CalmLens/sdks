@@ -75,6 +75,28 @@ const validateConnectionOptions = (options: ConnectionOptions) => {
     }
   }
   assertHttpUrl("baseUrl", options.baseUrl);
+  const { appInfo, onAttempt, logger } = options;
+  if (
+    appInfo !== undefined &&
+    (!appInfo ||
+      typeof appInfo.name !== "string" ||
+      !/^[\x21-\x7e]+$/.test(appInfo.name) ||
+      (appInfo.version !== undefined && !/^[\x21-\x7e]+$/.test(String(appInfo.version))) ||
+      (appInfo.url !== undefined && !/^[\x20-\x7e]+$/.test(String(appInfo.url))))
+  ) {
+    throw invalidConfig(
+      "appInfo needs a name, and a version, without spaces, and a url, in printable ASCII",
+    );
+  }
+  if (onAttempt !== undefined && typeof onAttempt !== "function") {
+    throw invalidConfig("onAttempt must be a function");
+  }
+  if (
+    logger !== undefined &&
+    (!logger || typeof logger.debug !== "function" || typeof logger.info !== "function")
+  ) {
+    throw invalidConfig("logger must have debug and info methods, as console does");
+  }
 };
 
 /**
@@ -121,7 +143,7 @@ export const validateAppClientOptions = (options: CalmLensAppClientOptions) => {
   validateConnectionOptions(options);
 };
 
-/** Checks the options `withRequestOptions` accepts. */
+/** Checks a client's request defaults. */
 export const validateRequestOptions = (options: {
   timeoutMs?: number;
   uploadTimeoutMs?: number;

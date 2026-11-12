@@ -18,8 +18,20 @@ const runtimeName = (): string => {
   return "unknown";
 };
 
-/** The `User-Agent` the SDK sends from server runtimes, e.g. `calmlens-js/0.10.0 (node/22.12.0)`. */
-export const getUserAgent = (): string => `calmlens-js/${SDK_VERSION} (${runtimeName()})`;
+/**
+ * The `User-Agent` the SDK sends from server runtimes, e.g. `calmlens-js/0.10.0 (node/22.12.0)`,
+ * followed by the app's `name/version (url)` when `appInfo` names it.
+ */
+export const getUserAgent = (appInfo?: {
+  name: string;
+  version?: string;
+  url?: string;
+}): string => {
+  const sdk = `calmlens-js/${SDK_VERSION} (${runtimeName()})`;
+  if (!appInfo) return sdk;
+  const app = appInfo.version ? `${appInfo.name}/${appInfo.version}` : appInfo.name;
+  return `${sdk} ${app}${appInfo.url ? ` (${appInfo.url})` : ""}`;
+};
 
 /** True in a web page, where API keys would be visible to every visitor. */
 export const isBrowserRuntime = (): boolean =>

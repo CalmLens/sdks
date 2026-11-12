@@ -74,18 +74,31 @@ test("invalid successful uploads and generic HTTP failures have typed diagnostic
   });
 });
 
-test("scoped cancellation applies to REST, uploads and CDN without changing defaults", async () => {
+test("a call's signal cancels REST, uploads and CDN requests without changing the client", async () => {
   const abort = new AbortController();
   abort.abort();
-  const client = new CalmLensServerClient(options);
-  const scoped = client.withRequestOptions({ signal: abort.signal });
+  let sent = 0;
+  const client = new CalmLensServerClient({
+    ...options,
+    fetch: async () => {
+      sent++;
+      return Response.json({ id: "a" });
+    },
+    cdnFetch: async () => {
+      sent++;
+      return new Response("ok");
+    },
+  });
+  const requestOptions = { signal: abort.signal };
   for (const call of [
-    () => scoped.assets.classify(upload),
-    () => scoped.assets.retrieve({ assetId: "a" }),
-    () => scoped.cdn.serve({ assetId: "a" }),
+    () => client.assets.classify(upload, requestOptions),
+    () => client.assets.retrieve({ assetId: "a" }, requestOptions),
+    () => client.cdn.serve({ assetId: "a" }, requestOptions),
   ]) {
     await expect(call()).rejects.toMatchObject({ code: "sdk/cancelled" });
   }
+  expect(sent).toBe(0);
+  expect(await client.assets.retrieve({ assetId: "a" })).toMatchObject({ id: "a" });
   expect(() => new CalmLensServerClient({ ...options, timeoutMs: 0 })).toThrow(CalmLensError);
 });
 

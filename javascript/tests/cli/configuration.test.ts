@@ -157,7 +157,7 @@ test("the CLI's plan prints the differences and changes nothing", async () => {
         PATH: Bun.env.PATH ?? "",
         CALMLENS_API_KEY: "offline-test",
         CALMLENS_PROJECT_ID: EXAMPLE_IDS.proj,
-        CALMLENS_API_URL: `${server.url}v1`,
+        CALMLENS_BASE_URL: `${server.url}v1`,
       },
       stdout: "pipe",
       stderr: "pipe",

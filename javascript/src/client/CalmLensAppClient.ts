@@ -11,6 +11,7 @@ import { APP_OPTION_KEYS } from "./CalmLensOptionKeys";
 import type {
   CalmLensAppClientOptions,
   CdnAssetUrlOptions,
+  RequestOptions,
   RetrieveAssetOptions,
   UploadAssetPartOptions,
   UploadedAsset,
@@ -37,6 +38,13 @@ const checked = <T>(operation: string, options: T): T => {
  * key. It can upload (`assets.create`, `assets.classify`, `assets.uploadPart`) and check its own
  * uploads (`assets.retrieve`). Every method throws `CalmLensError` on failure.
  */
+/** An upload's request options for reading it back: no key or body of the upload's own. */
+const readOptions = (requestOptions: RequestOptions | undefined): RequestOptions | undefined => {
+  if (!requestOptions) return undefined;
+  const { idempotencyKey: _key, extraBody: _body, ...read } = requestOptions;
+  return read;
+};
+
 export default class CalmLensAppClient {
   readonly #uploadPresetId: string;
   readonly #token: CalmLensAppClientOptions["token"];
@@ -86,9 +94,12 @@ export default class CalmLensAppClient {
 
   /** Uploads with a new token, kept for the upload's parts and status checks. */
   private async submit(
+    operation: string,
     options: UploadPresetSubmitAssetOptions,
     wait: boolean,
+    requestOptions: RequestOptions | undefined,
   ): Promise<UploadedAsset> {
+    const connection = this.#connection.forCall(operation, requestOptions);
     if (!options || typeof options !== "object") {
       throw invalidArgument("Upload options are required");
     }
@@ -96,23 +107,23 @@ export default class CalmLensAppClient {
       throw invalidArgument("Uploads through an upload preset need content or a part");
     }
     prepareSubmitAssetOptions(options, {
-      deferUploadChecks: this.#connection.deferUploadChecks,
-      partSizeBytes: this.#connection.partSizeBytes,
+      deferUploadChecks: connection.deferUploadChecks,
+      partSizeBytes: connection.partSizeBytes,
     });
     const token = await this.newUploadToken();
-    if ("content" in options && splitsIntoParts(options.content, this.#connection.partSizeBytes)) {
+    if ("content" in options && splitsIntoParts(options.content, connection.partSizeBytes)) {
       // The token that started the upload authorizes its later parts.
-      const data = await this.#connection.submitInParts(this.uploadsPath, options, wait, {
+      const data = await connection.submitInParts(this.uploadsPath, options, wait, {
         authHeaders: token ? { Authorization: `Bearer ${token}` } : {},
         partPath: (assetId) => `${this.uploadsPath}/${encodeURIComponent(assetId)}/part`,
         onStarted: (assetId) => {
           if (token) this.#uploadTokens.set(assetId, token);
         },
-        retrieve: (assetId) => this.assets.retrieve({ assetId }),
+        retrieve: (assetId) => this.assets.retrieve({ assetId }, readOptions(requestOptions)),
       });
       return expectUploadedAsset(data);
     }
-    const data = await this.#connection.submitUpload(
+    const data = await connection.submitUpload(
       this.uploadsPath,
       options,
       wait,
@@ -147,21 +158,31 @@ export default class CalmLensAppClient {
   get assets() {
     return {
       /** Uploads a file and returns without waiting for its decision. */
-      create: async (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
-        this.submit(checked("assets.create", options), false),
+      create: async (
+        options: UploadPresetSubmitAssetOptions,
+        requestOptions?: RequestOptions,
+      ): Promise<UploadedAsset> =>
+        this.submit("assets.create", checked("assets.create", options), false, requestOptions),
 
       /** Uploads a file and waits for its moderation decision. */
-      classify: async (options: UploadPresetSubmitAssetOptions): Promise<UploadedAsset> =>
-        this.submit(checked("assets.classify", options), true),
+      classify: async (
+        options: UploadPresetSubmitAssetOptions,
+        requestOptions?: RequestOptions,
+      ): Promise<UploadedAsset> =>
+        this.submit("assets.classify", checked("assets.classify", options), true, requestOptions),
 
       /**
        * Uploads the next part of a multipart upload this client started. The upload's wait
        * mode, chosen when it started, applies when the final part arrives.
        */
-      uploadPart: async (partOptions: UploadAssetPartOptions): Promise<UploadedAsset> => {
+      uploadPart: async (
+        partOptions: UploadAssetPartOptions,
+        requestOptions?: RequestOptions,
+      ): Promise<UploadedAsset> => {
         const { assetId, ...options } = checked("assets.uploadPart", partOptions);
         const encodedAssetId = encodePathSegment(assetId, "Asset ID");
-        const data = await this.#connection.uploadPart(
+        const connection = this.#connection.forCall("assets.uploadPart", requestOptions);
+        const data = await connection.uploadPart(
           `${this.uploadsPath}/${encodedAssetId}/part`,
           options,
           this.authHeaders(assetId),
@@ -170,10 +191,14 @@ export default class CalmLensAppClient {
       },
 
       /** Checks an upload this client made. `status` is present when the preset shows decisions. */
-      retrieve: async (options: RetrieveAssetOptions): Promise<UploadedAsset> => {
+      retrieve: async (
+        options: RetrieveAssetOptions,
+        requestOptions?: RequestOptions,
+      ): Promise<UploadedAsset> => {
         const { assetId } = checked("assets.retrieve", options);
         const encodedAssetId = encodePathSegment(assetId, "Asset ID");
-        const data = await this.#connection.json<unknown>(
+        const connection = this.#connection.forCall("assets.retrieve", requestOptions);
+        const data = await connection.json<unknown>(
           "GET",
           `${this.uploadsPath}/${encodedAssetId}`,
           { headers: this.authHeaders(assetId) },

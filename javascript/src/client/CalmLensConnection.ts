@@ -15,6 +15,7 @@ import {
 } from "../contract/SharedConstants.js";
 import { CalmLensError, invalidArgument, SDK_ERROR_CODES } from "./CalmLensError";
 import { API_ERROR_CODES } from "./CalmLensErrorCodes";
+import { type LogLevel, resolveLogLevel } from "./CalmLensLogging";
 import type { CalmLensResponse } from "./CalmLensPagination";
 import { CalmLensTransport, sleep, type TransportRequest } from "./CalmLensTransport";
 import type {
@@ -22,6 +23,7 @@ import type {
   ConnectionOptions,
   CreateMultipartUploadPartOptions,
   MultipartUploadPartOptions,
+  RequestOptions,
   SubmitAssetOptions,
   UploadAssetPartOptions,
   UploadedAsset,
@@ -417,6 +419,56 @@ export const expectAsset = (data: unknown): CalmLensResponse<Asset> => {
 
 export type ResolvedConnectionOptions = Omit<ConnectionOptions, "baseUrl"> & { baseUrl: string };
 
+/** The call a connection's requests belong to: the client method and its request options. */
+export interface CallContext extends RequestOptions {
+  /** The client method, such as `assets.retrieve`, for the attempt hook and logs. */
+  operation?: string;
+}
+
+/** Checks one call's request options. */
+export const validateCallOptions = (options: RequestOptions | undefined) => {
+  if (options === undefined) return;
+  if (!options || typeof options !== "object" || Array.isArray(options)) {
+    throw invalidArgument("Request options must be an object");
+  }
+  const known = [
+    "signal",
+    "timeoutMs",
+    "maxRetries",
+    "idempotencyKey",
+    "headers",
+    "extraQuery",
+    "extraBody",
+  ];
+  const unknown = Object.keys(options).filter((key) => !known.includes(key));
+  if (unknown.length) {
+    throw invalidArgument(`Unknown request options: ${unknown.join(", ")}`, {
+      options: unknown,
+    });
+  }
+  const { timeoutMs, maxRetries, idempotencyKey, headers, extraQuery, extraBody } = options;
+  if (timeoutMs !== undefined && (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1)) {
+    throw invalidArgument("timeoutMs must be a positive integer");
+  }
+  if (maxRetries !== undefined && (!Number.isSafeInteger(maxRetries) || maxRetries < 0)) {
+    throw invalidArgument("maxRetries must be a non-negative integer");
+  }
+  if (idempotencyKey !== undefined && (typeof idempotencyKey !== "string" || !idempotencyKey)) {
+    throw invalidArgument("idempotencyKey must be a non-empty string");
+  }
+  for (const [name, value] of Object.entries({ headers, extraQuery, extraBody })) {
+    if (value !== undefined && (!value || typeof value !== "object" || Array.isArray(value))) {
+      throw invalidArgument(`${name} must be an object`);
+    }
+  }
+  if (options.signal !== undefined && !(options.signal instanceof AbortSignal)) {
+    throw invalidArgument("signal must be an AbortSignal");
+  }
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+
 /** Fills in the default API base URL and drops trailing slashes. */
 export const resolveConnectionOptions = <T extends ConnectionOptions>(
   options: T,
@@ -431,10 +483,28 @@ export class CalmLensConnection {
   /** Set by a mock client; see `MOCK_HOOKS`. */
   readonly hooks: MockHooks | undefined;
 
+  /** The call this connection's requests belong to; empty for the client's own connection. */
+  readonly call: CallContext;
+
   constructor(
     readonly options: ResolvedConnectionOptions,
     apiKey?: string,
+    {
+      readEnvironment = false,
+      shared,
+    }: {
+      /** Whether `CALMLENS_LOG` may set the log level (the server client only). */
+      readEnvironment?: boolean;
+      shared?: { transport: CalmLensTransport; hooks: MockHooks | undefined; call: CallContext };
+    } = {},
   ) {
+    if (shared) {
+      this.transport = shared.transport;
+      this.hooks = shared.hooks;
+      this.call = shared.call;
+      return;
+    }
+    this.call = {};
     const resolveFetch = () => {
       const fetchImpl = this.options.fetch ?? globalThis.fetch;
       if (typeof fetchImpl !== "function") {
@@ -445,6 +515,7 @@ export class CalmLensConnection {
       return fetchImpl;
     };
     this.hooks = getMockHooks(options);
+    const logLevel: LogLevel = resolveLogLevel(options.logLevel, readEnvironment);
     this.transport = new CalmLensTransport({
       apiKey,
       sleep: this.hooks?.sleep,
@@ -452,7 +523,50 @@ export class CalmLensConnection {
       signal: options.signal,
       maxRetries: options.maxRetries ?? DEFAULT_MAX_RETRIES,
       maxResponseBytes: options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES,
+      appInfo: options.appInfo,
+      logLevel,
+      logger: logLevel === "off" ? undefined : (options.logger ?? console),
+      onAttempt: options.onAttempt,
+      now: this.hooks?.now,
     });
+  }
+
+  /**
+   * This connection for one call: its requests carry `operation` to the attempt hook and logs, and
+   * follow `requestOptions` (checked here) over the client's.
+   */
+  forCall(operation: string | undefined, requestOptions?: RequestOptions): CalmLensConnection {
+    validateCallOptions(requestOptions);
+    return new CalmLensConnection(this.options, undefined, {
+      shared: {
+        transport: this.transport,
+        hooks: this.hooks,
+        call: { ...this.call, ...requestOptions, operation },
+      },
+    });
+  }
+
+  /** The call's transport settings, for a request built here or by the client. */
+  callRequest(): Pick<TransportRequest, "operation" | "signal" | "maxRetries"> {
+    const { operation, signal, maxRetries } = this.call;
+    return { operation, signal, maxRetries };
+  }
+
+  /** The call's extra headers under the SDK's own, which win. */
+  callHeaders(headers: Record<string, string> | undefined): Record<string, string> | undefined {
+    return this.call.headers ? { ...this.call.headers, ...headers } : headers;
+  }
+
+  /** The call's `extraBody` merged into a JSON body. */
+  callBody(method: TransportRequest["method"], body: unknown): unknown {
+    const { extraBody } = this.call;
+    if (!extraBody) return body;
+    if (method === "GET" || method === "HEAD") {
+      throw invalidArgument("extraBody needs a request with a body");
+    }
+    if (body === undefined) return extraBody;
+    if (!isPlainObject(body)) throw invalidArgument("extraBody needs a JSON object body");
+    return { ...body, ...extraBody };
   }
 
   /** How the client waits between polls and retries. */
@@ -466,12 +580,17 @@ export class CalmLensConnection {
   }
 
   get timeoutMs() {
-    return this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    return this.call.timeoutMs ?? this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
+  /** The URL of `path` (which may carry a query already) with `query` and the call's `extraQuery`. */
   url(path: string, query?: Record<string, unknown>): string {
-    const search = query ? stringifyQuery(query) : "";
-    return `${this.options.baseUrl}${path}${search ? `?${search}` : ""}`;
+    const search = [query, this.call.extraQuery]
+      .map((values) => (values ? stringifyQuery(values) : ""))
+      .filter(Boolean)
+      .join("&");
+    const separator = path.includes("?") ? "&" : "?";
+    return `${this.options.baseUrl}${path}${search ? `${separator}${search}` : ""}`;
   }
 
   /** A JSON request whose deadline covers reading the response. */
@@ -490,12 +609,16 @@ export class CalmLensConnection {
       idempotencyKey?: string;
     } = {},
   ): Promise<T> {
+    const sent = this.callBody(method, body);
     return this.transport.json<T>({
+      ...this.callRequest(),
       method,
       url: this.url(path, query),
-      headers: body === undefined ? headers : { ...headers, "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      idempotencyKey,
+      headers: this.callHeaders(
+        sent === undefined ? headers : { ...headers, "Content-Type": "application/json" },
+      ),
+      body: sent === undefined ? undefined : JSON.stringify(sent),
+      idempotencyKey: idempotencyKey ?? this.call.idempotencyKey,
       timeoutMs: this.timeoutMs,
       deadline: "body",
     });
@@ -509,12 +632,13 @@ export class CalmLensConnection {
     text: boolean,
   ): Promise<unknown> {
     return this.transport.json<unknown>({
+      ...this.callRequest(),
       method: "POST",
       url,
-      headers,
+      headers: this.callHeaders(headers),
       body,
       idempotencyKey,
-      timeoutMs: text ? this.timeoutMs : this.options.uploadTimeoutMs,
+      timeoutMs: text ? this.timeoutMs : (this.call.timeoutMs ?? this.options.uploadTimeoutMs),
       deadline: "body",
       fetch: this.options.uploadFetch,
     });
@@ -537,8 +661,12 @@ export class CalmLensConnection {
       SubmitAssetOptions,
       { part: CreateMultipartUploadPartOptions }
     >;
-    const idempotencyKey = options.idempotencyKey ?? newIdempotencyKey();
-    const fields = uploadFields(options as unknown as Record<string, unknown>);
+    const idempotencyKey =
+      options.idempotencyKey ?? this.call.idempotencyKey ?? newIdempotencyKey();
+    const fields = {
+      ...uploadFields(options as unknown as Record<string, unknown>),
+      ...this.call.extraBody,
+    };
 
     if (isTextPayload(payload)) {
       const { sizeInBytes: _size, ...text } = payload as AssetBinaryPayloadInput & {
@@ -626,7 +754,7 @@ export class CalmLensConnection {
     const source = getSplittableContent(content)!;
     const partSize = this.partSizeBytes;
     const count = Math.ceil(source.size / partSize);
-    const key = idempotencyKey ?? newIdempotencyKey();
+    const key = idempotencyKey ?? this.call.idempotencyKey ?? newIdempotencyKey();
     const part = (partNumber: number) =>
       source.slice((partNumber - 1) * partSize, Math.min(partNumber * partSize, source.size));
     const first = (await this.submitUpload(
@@ -642,11 +770,19 @@ export class CalmLensConnection {
     )) as { id?: unknown };
     const assetId = expectUploadedAsset(first).id;
     onStarted?.(assetId);
+    // The call's extraBody went with the first part's fields; later parts' bodies are their bytes.
+    const laterParts = new CalmLensConnection(this.options, undefined, {
+      shared: {
+        transport: this.transport,
+        hooks: this.hooks,
+        call: { ...this.call, extraBody: undefined },
+      },
+    });
     let result: unknown = first;
     for (let partNumber = 2; partNumber <= count; ) {
       const isFinal = partNumber === count;
       try {
-        result = await this.uploadPart(
+        result = await laterParts.uploadPart(
           partPath(assetId),
           {
             part: { ...part(partNumber), partNumber, isFinal } as MultipartUploadPartOptions,
@@ -683,6 +819,8 @@ export class CalmLensConnection {
     authHeaders: Record<string, string> = {},
   ): Promise<unknown> {
     if (!part) throw invalidArgument("Part options are required");
+    if (this.call.extraBody)
+      throw invalidArgument("A part's body is its bytes: extraBody can't apply");
     assertDeclaredPayloadSize(part);
     const validation = validateAssetPayload(part, {
       multipart: true,
@@ -703,7 +841,7 @@ export class CalmLensConnection {
       this.url(`${partPath}?${query}`),
       toRawUploadBody(part as AssetBinaryPayloadInput),
       { ...authHeaders, "X-CalmLens-Upload": "part" },
-      idempotencyKey ?? newIdempotencyKey(),
+      idempotencyKey ?? this.call.idempotencyKey ?? newIdempotencyKey(),
       isTextPayload(part as AssetBinaryPayloadInput),
     );
   }

@@ -43,7 +43,9 @@ export type {
 } from "./MockCalmLensApi";
 
 export interface MockCalmLensServerClientOptions
-  extends Omit<CalmLensServerClientOptions, "projectId"> {
+  extends Omit<CalmLensServerClientOptions, "apiKey" | "projectId"> {
+  /** A key from `createMockApiKey`, whose grants the mock API enforces. Never read from the environment. */
+  apiKey: string;
   /** Defaults to `project-1`. */
   projectId?: string;
   mockOptions?: {

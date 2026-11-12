@@ -1,5 +1,7 @@
 import { CalmLensError, SDK_ERROR_CODES } from "./CalmLensError";
+import { type CalmLensLogger, describeAttempt, type LogLevel } from "./CalmLensLogging";
 import { withLastResponse } from "./CalmLensPagination";
+import type { AppInfo, RequestAttempt } from "./CalmLensTypes";
 import { getUserAgent, isBrowserRuntime } from "./CalmLensVersion";
 
 /** Retry delays grow from this base, doubling per attempt, with jitter. */
@@ -18,9 +20,20 @@ export interface TransportSettings {
   maxResponseBytes: number;
   /** Replaces the wait between retries; mock clients wait without real time passing. */
   sleep?: (ms: number, signal: AbortSignal | undefined) => Promise<void>;
+  /** Appended to the user agent. */
+  appInfo?: AppInfo;
+  /** Where attempts are logged, and how much. */
+  logger?: CalmLensLogger;
+  logLevel?: LogLevel;
+  /** Called after every attempt. */
+  onAttempt?: (attempt: RequestAttempt) => void;
+  /** The clock attempt durations are measured with; mock clients pass their own. */
+  now?: () => number;
 }
 
 export interface TransportRequest {
+  /** The client method sending the request, such as `assets.retrieve`, for hooks and logs. */
+  operation?: string;
   method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE";
   url: string;
   headers?: Record<string, string>;
@@ -34,6 +47,10 @@ export interface TransportRequest {
   fetch?: typeof fetch;
   /** Extra fetch options, such as `cache`; credentials, redirects and signals stay the SDK's. */
   init?: RequestInit;
+  /** Cancels this request, as well as the client's signal. */
+  signal?: AbortSignal;
+  /** Overrides the client's `maxRetries` for this request. */
+  maxRetries?: number;
 }
 
 const timeoutReason = () => {
@@ -232,6 +249,15 @@ export const toHttpError = (response: Response, bytes: Uint8Array): CalmLensErro
   });
 };
 
+/** A URL's path without its query, which can hold viewer claims, for hooks and logs. */
+const pathOf = (url: string): string => {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url.split(/[?#]/)[0] ?? "";
+  }
+};
+
 /** Sends requests with the client's credentials, deadlines, retries and response limits. */
 export class CalmLensTransport {
   private readonly sleep: (ms: number, signal: AbortSignal | undefined) => Promise<void>;
@@ -248,17 +274,14 @@ export class CalmLensTransport {
     }
     if (this.settings.apiKey) headers.set("x-api-key", this.settings.apiKey);
     // Browsers set their own User-Agent, and a custom one would need a CORS preflight.
-    if (!isBrowserRuntime()) headers.set("user-agent", getUserAgent());
+    if (!isBrowserRuntime()) headers.set("user-agent", getUserAgent(this.settings.appInfo));
     if (request.idempotencyKey) headers.set("idempotency-key", request.idempotencyKey);
     return Object.fromEntries(headers.entries());
   }
 
   /** Waits before a retry. Either the client's or the request's signal cancels the wait. */
   private async backoff(ms: number, request: TransportRequest) {
-    const callers = createAttemptSignal(
-      [this.settings.signal, request.init?.signal ?? undefined],
-      undefined,
-    );
+    const callers = createAttemptSignal(this.signalsFor(request), undefined);
     try {
       await this.sleep(ms, callers.signal);
     } finally {
@@ -266,9 +289,31 @@ export class CalmLensTransport {
     }
   }
 
+  private signalsFor(request: TransportRequest) {
+    return [this.settings.signal, request.signal, request.init?.signal ?? undefined];
+  }
+
+  private maxRetriesFor(request: TransportRequest) {
+    return request.maxRetries ?? this.settings.maxRetries;
+  }
+
+  /** Tells the hook and the logger how an attempt went. Neither ever sees a key or a body. */
+  private report(attempt: RequestAttempt) {
+    const { onAttempt, logger, logLevel } = this.settings;
+    try {
+      onAttempt?.(attempt);
+    } catch {
+      // A failing hook must not fail the request.
+    }
+    if (!logger || !logLevel || logLevel === "off") return;
+    const failed = attempt.status === null || attempt.status >= 400;
+    if (logLevel === "debug") logger.debug(describeAttempt(attempt));
+    else if (attempt.delayMs !== null || failed) logger.info(describeAttempt(attempt));
+  }
+
   private canRetry(request: TransportRequest) {
     return (
-      this.settings.maxRetries > 0 &&
+      this.maxRetriesFor(request) > 0 &&
       (request.method === "GET" || request.method === "HEAD" || !!request.idempotencyKey) &&
       isReplayableBody(request.body)
     );
@@ -286,12 +331,28 @@ export class CalmLensTransport {
     const fetchImpl = request.fetch ?? this.settings.fetch;
     const retryable = this.canRetry(request);
     const headers = this.headersFor(request);
+    const now = this.settings.now ?? Date.now;
+    const path = pathOf(request.url);
     for (let attemptNumber = 0; ; attemptNumber++) {
-      const canRetryAgain = retryable && attemptNumber < this.settings.maxRetries;
-      const attempt = createAttemptSignal(
-        [this.settings.signal, request.init?.signal ?? undefined],
-        request.timeoutMs,
-      );
+      const canRetryAgain = retryable && attemptNumber < this.maxRetriesFor(request);
+      const attempt = createAttemptSignal(this.signalsFor(request), request.timeoutMs);
+      const started = now();
+      const report = (
+        outcome: { response?: Response; error?: CalmLensError },
+        delayMs: number | null,
+      ) =>
+        this.report({
+          operation: request.operation ?? null,
+          method: request.method,
+          path,
+          attempt: attemptNumber + 1,
+          delayMs,
+          status: outcome.response?.status ?? outcome.error?.status ?? null,
+          requestId:
+            outcome.response?.headers.get("x-request-id") ?? outcome.error?.requestId ?? null,
+          durationMs: Math.max(0, now() - started),
+          errorCode: outcome.error?.code ?? null,
+        });
       let response: Response;
       try {
         // Not `throwIfAborted()`: React Native's AbortSignal doesn't have it.
@@ -321,13 +382,19 @@ export class CalmLensTransport {
         const failure = toFailure(cause, attempt);
         // Transport failures and timeouts; a cancellation is never retried.
         if (canRetryAgain && failure.isRetryable()) {
-          await this.backoff(getRetryDelayMs(attemptNumber), request);
+          const delayMs = getRetryDelayMs(attemptNumber);
+          report({ error: failure }, delayMs);
+          await this.backoff(delayMs, request);
           continue;
         }
+        report({ error: failure }, null);
         throw failure;
       }
       if (request.deadline === "headers") attempt.clearDeadline();
-      if (response.ok) return { response, attempt };
+      if (response.ok) {
+        report({ response }, null);
+        return { response, attempt };
+      }
       if (allowHttpErrors) {
         const retryAfter = parseRetryAfter(response.headers.get("retry-after"));
         const delayMs =
@@ -337,8 +404,10 @@ export class CalmLensTransport {
           !RETRYABLE_STATUSES.has(response.status) ||
           delayMs > RETRY_AFTER_MAX_MS
         ) {
+          report({ response }, null);
           return { response, attempt };
         }
+        report({ response }, delayMs);
         attempt.release();
         await response.body?.cancel().catch(() => {});
         await this.backoff(delayMs, request);
@@ -358,9 +427,11 @@ export class CalmLensTransport {
       const shouldRetry =
         canRetryAgain && retryDelayMs <= RETRY_AFTER_MAX_MS && error.isRetryable();
       if (shouldRetry) {
+        report({ error }, retryDelayMs);
         await this.backoff(retryDelayMs, request);
         continue;
       }
+      report({ error }, null);
       throw error;
     }
   }

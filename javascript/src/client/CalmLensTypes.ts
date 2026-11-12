@@ -291,8 +291,9 @@ export type Lens = Omit<zod.infer<typeof PUBLIC_LENS_SCHEMA>, "transform"> & {
 
 // ---- Client options -----------------------------------------------------------------------
 
-export interface RequestOptions {
-  /** Cancels every request made with these options. */
+/** How a client's requests are sent: its defaults for every call. */
+export interface ClientRequestDefaults {
+  /** Cancels every request the client makes. */
   signal?: AbortSignal;
   /**
    * Deadline in milliseconds for each API request attempt, including reading the response
@@ -314,9 +315,73 @@ export interface RequestOptions {
   maxRetries?: number;
 }
 
+/**
+ * Options for one call, the optional last argument of every method that sends a request. They
+ * override the client's for that call only, and apply to every request it sends: each page a
+ * list's iteration fetches, each check `waitForDecision` makes, each part of an upload.
+ */
+export interface RequestOptions {
+  /** Cancels this call, as well as the client's `signal`. */
+  signal?: AbortSignal;
+  /** Deadline in milliseconds for each attempt of this call's requests. */
+  timeoutMs?: number;
+  /** How many times to retry this call's requests; 0 turns retries off. */
+  maxRetries?: number;
+  /**
+   * Sent as `Idempotency-Key`, which also makes a create, upload or other POST safe to retry.
+   * Uploads generate one when you pass none.
+   */
+  idempotencyKey?: string;
+  /** Extra headers. The SDK's own (`X-Api-Key`, `User-Agent`, `Idempotency-Key`) win. */
+  headers?: Record<string, string>;
+  /**
+   * Query parameters to add, sent as they are without the SDK's option check, for API fields
+   * this SDK version doesn't know yet.
+   */
+  extraQuery?: Record<string, unknown>;
+  /**
+   * Fields to add to a JSON body (or an upload's options), sent without the SDK's option check,
+   * for API fields this SDK version doesn't know yet.
+   */
+  extraBody?: Record<string, unknown>;
+}
+
+/** The app a client is part of, which the SDK appends to its user agent as `name/version (url)`. */
+export interface AppInfo {
+  name: string;
+  version?: string;
+  url?: string;
+}
+
+/**
+ * One attempt of a request, as the `onAttempt` hook receives it. It never holds the API key, an
+ * upload token, the query (which can hold viewer claims) or a body.
+ */
+export interface RequestAttempt {
+  /** The client method that sent it, such as `assets.retrieve`; `null` for `client.request`. */
+  operation: string | null;
+  method: string;
+  /** The URL path, without the query. */
+  path: string;
+  /** 1 for the first attempt, 2 for the first retry, and so on. */
+  attempt: number;
+  /** How long the client waits before retrying, or `null` when this attempt is the last. */
+  delayMs: number | null;
+  /** The HTTP status, or `null` when no response arrived. */
+  status: number | null;
+  /** The `X-Request-Id` header, or `null`. */
+  requestId: string | null;
+  durationMs: number;
+  /** The error's code when the attempt failed, such as `sdk/timeout` or `asset/not-found`. */
+  errorCode: string | null;
+}
+
 /** Where a client sends requests and how. */
-export interface ConnectionOptions extends RequestOptions {
-  /** Defaults to `https://api.calmlens.com/v1`. */
+export interface ConnectionOptions extends ClientRequestDefaults {
+  /**
+   * Defaults to `https://api.calmlens.com/v1`. The server client reads `CALMLENS_BASE_URL` from
+   * the environment when you leave it out.
+   */
   baseUrl?: string;
   /** The `fetch` used for every request. Defaults to the global `fetch`. */
   fetch?: typeof fetch;
@@ -331,13 +396,28 @@ export interface ConnectionOptions extends RequestOptions {
    * defaults to 8 MiB.
    */
   partSizeBytes?: number;
+  /** Your app, appended to the user agent as `name/version (url)`. Server runtimes only. */
+  appInfo?: AppInfo;
+  /**
+   * `info` logs retries and failed requests, `debug` every attempt. The server client reads
+   * `CALMLENS_LOG` from the environment when you leave it out; otherwise it is `off`.
+   */
+  logLevel?: "off" | "info" | "debug";
+  /** Where the client logs. Defaults to `console`. */
+  logger?: { debug(message: string): void; info(message: string): void };
+  /**
+   * Called after every request attempt, with its operation, path, status, request ID, duration
+   * and the delay before a retry. Errors it throws are ignored.
+   */
+  onAttempt?: (attempt: RequestAttempt) => void;
 }
 
 /** Options for `CalmLensServerClient`, which runs on your server with a project API key. */
 export interface CalmLensServerClientOptions extends ConnectionOptions {
-  /** A project API key. Keep it on your server. */
-  apiKey: string;
-  projectId: string;
+  /** A project API key. Keep it on your server. Defaults to `CALMLENS_API_KEY`. */
+  apiKey?: string;
+  /** Defaults to `CALMLENS_PROJECT_ID`. */
+  projectId?: string;
   /** Defaults to `https://cdn.calmlens.com/v1`. */
   cdnBaseUrl?: string;
   /** Overrides `fetch` for `cdn.serve`. */

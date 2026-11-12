@@ -55,7 +55,7 @@ for (const kind of ["node", "binary"] as const) {
       const envFile = join(directory, ".env");
       await Bun.write(
         envFile,
-        `CALMLENS_API_KEY=offline-test\nCALMLENS_PROJECT_ID=${projectId}\nCALMLENS_API_URL=${server.url}v1\n`,
+        `CALMLENS_API_KEY=offline-test\nCALMLENS_PROJECT_ID=${projectId}\nCALMLENS_BASE_URL=${server.url}v1\n`,
       );
       // Exercise the runtime's environment-file loader as well as the SDK transport.
       const result = await run(["trigger", "clean", "--env-file", envFile]);
