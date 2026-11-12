@@ -30,3 +30,35 @@ export async function* eventPages<
     page = await page.getNextPage();
   }
 }
+
+interface ErrorKind {
+  id: string;
+  parent: string | null;
+  names: { javascript: string };
+}
+
+/**
+ * Checks that `error` is of `kind` (from surface.json's `errorKinds`): its `kind` is the kind's id,
+ * and it is an instance of the kind's class and every ancestor kind's class. `classes` holds the
+ * SDK's exports.
+ */
+export const expectErrorKind = (
+  error: unknown,
+  kind: string,
+  classes: Record<string, unknown>,
+  label: string,
+) => {
+  const kinds: ErrorKind[] = testdata("surface.json").errorKinds;
+  const byId = new Map(kinds.map((entry) => [entry.id, entry]));
+  if (!byId.has(kind)) throw new Error(`${label}: unknown error kind ${kind}`);
+  const chain: string[] = [];
+  for (let id: string | null = kind; id; id = byId.get(id)!.parent) chain.push(id);
+  const of = (name: string) => classes[name] as abstract new (...args: never[]) => unknown;
+  expect(
+    {
+      kind: (error as { kind?: unknown }).kind,
+      instanceOf: chain.map((id) => error instanceof of(byId.get(id)!.names.javascript)),
+    },
+    label,
+  ).toEqual({ kind, instanceOf: chain.map(() => true) });
+};

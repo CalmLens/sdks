@@ -1,4 +1,4 @@
-import { CalmLensError, SDK_ERROR_CODES } from "./CalmLensError";
+import { CalmLensError, MAX_ERROR_BODY_LENGTH, SDK_ERROR_CODES } from "./CalmLensError";
 import { type CalmLensLogger, describeAttempt, type LogLevel } from "./CalmLensLogging";
 import { withLastResponse } from "./CalmLensPagination";
 import type { AppInfo, RequestAttempt } from "./CalmLensTypes";
@@ -229,6 +229,10 @@ const responseInfo = (response: Response) => ({
 
 /** The `CalmLensError` for a non-2xx response whose body has been read. */
 export const toHttpError = (response: Response, bytes: Uint8Array): CalmLensError => {
+  // Only what the error keeps is decoded, so a large error page costs little.
+  const body = new TextDecoder()
+    .decode(bytes.subarray(0, MAX_ERROR_BODY_LENGTH * 4))
+    .slice(0, MAX_ERROR_BODY_LENGTH);
   let data: unknown;
   try {
     data = JSON.parse(new TextDecoder().decode(bytes));
@@ -241,11 +245,13 @@ export const toHttpError = (response: Response, bytes: Uint8Array): CalmLensErro
       ...info,
       requestId: info.requestId ?? (typeof requestId === "string" ? requestId : undefined),
       details,
+      body,
     });
   }
   return new CalmLensError(SDK_ERROR_CODES.HTTP_ERROR, {
     message: `HTTP ${response.status}`,
     ...responseInfo(response),
+    body,
   });
 };
 

@@ -24,8 +24,9 @@ import {
   DEFAULT_DECISION_TIMEOUT_MS,
 } from "../src/client/CalmLensUtils";
 import { UPLOAD_TOKEN_DEFAULT_TTL_SECONDS } from "../src/contract/UploadToken.js";
+import * as server from "../src/server";
 import { CalmLensError, CalmLensServerClient } from "../src/server";
-import { testdata } from "./testdata";
+import { expectErrorKind, testdata } from "./testdata";
 import { readUploadForm } from "./upload-form";
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
@@ -170,25 +171,31 @@ describe("path fixtures", () => {
 describe("API error fixtures", () => {
   const fixtures: {
     code: string;
+    kind: string;
     operation: string;
     args: unknown;
-    response: { status: number; headers: Record<string, string>; body: Json };
+    response: { status: number; headers: Record<string, string>; body?: Json; bodyText?: string };
     expected: ReturnType<typeof errorFields>;
   }[] = testdata("errors.json");
-  for (const { code, operation, args, response, expected } of fixtures) {
+  for (const { code, kind, operation, args, response, expected } of fixtures) {
     test(`${code} becomes a typed error with every field`, async () => {
       const client = new CalmLensServerClient({
         apiKey: "key",
         projectId: "project-1",
         maxRetries: 0,
         fetch: (async () =>
-          new Response(JSON.stringify(response.body), {
+          new Response(response.bodyText ?? JSON.stringify(response.body), {
             status: response.status,
             headers: response.headers,
           })) as unknown as typeof fetch,
       });
       const error = await invoke(client, operation, args).then(fail(operation), (e: unknown) => e);
       expect(errorFields(error)).toEqual(expected);
+      expectErrorKind(error, kind, server, code);
+      // The raw body stays on the error, so a proxy's HTML isn't lost.
+      expect((error as CalmLensError).body).toBe(
+        response.bodyText ?? JSON.stringify(response.body),
+      );
     });
   }
 });

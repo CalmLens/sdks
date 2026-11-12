@@ -2,7 +2,15 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { inspect } from "node:util";
 import { renderErrorCodes } from "../scripts/generate-error-codes";
-import { CalmLensError, CalmLensServerClient, SDK_VERSION } from "../src/server";
+import {
+  CalmLensApiError,
+  CalmLensError,
+  CalmLensNotFoundError,
+  CalmLensServerClient,
+  CalmLensServerError,
+  CalmLensTimeoutError,
+  SDK_VERSION,
+} from "../src/server";
 
 const projectId = "project-1";
 const apiKey = "sk_live_secret_value";
@@ -92,6 +100,40 @@ describe("CalmLensError", () => {
     expect(CalmLensError.isCalmLensError(foreign)).toBe(true);
     expect(new Error("plain") instanceof CalmLensError).toBe(false);
     expect(CalmLensError.isCalmLensError({ code: "asset/not-found" })).toBe(false);
+    // A kind's class recognises another copy's error of that kind, or of a kind beneath it.
+    const foreignNotFound = Object.defineProperty(
+      Object.assign(new Error("from the CommonJS build"), { kind: "not-found" }),
+      Symbol.for("calmlens.sdk.CalmLensError"),
+      { value: true },
+    );
+    expect(foreignNotFound instanceof CalmLensNotFoundError).toBe(true);
+    expect(foreignNotFound instanceof CalmLensApiError).toBe(true);
+    expect(foreignNotFound instanceof CalmLensTimeoutError).toBe(false);
+    expect(foreign instanceof CalmLensNotFoundError).toBe(false);
+  });
+
+  test("errors are their kind's class, whoever creates them", async () => {
+    const notFound = new CalmLensError("asset/not-found", { status: 404 });
+    expect(notFound).toBeInstanceOf(CalmLensNotFoundError);
+    expect(notFound).toBeInstanceOf(CalmLensApiError);
+    expect(notFound.kind).toBe("not-found");
+    expect(notFound.name).toBe("CalmLensNotFoundError");
+    expect(new CalmLensError("sdk/invalid-config").isKind("invalid-argument")).toBe(true);
+    expect(new CalmLensError("upload/unsupported-type").kind).toBe("invalid-argument");
+    expect(new CalmLensError("sdk/response-too-large", { status: 200 }).kind).toBe(
+      "invalid-response",
+    );
+    expect(new CalmLensError("payment/required", { status: 402 }).kind).toBe("api");
+
+    // A proxy's HTML error page is kept, cut to 4 KiB.
+    const page = `<html>${"x".repeat(5000)}</html>`;
+    const { fetchImpl } = recordingFetch(
+      () => new Response(page, { status: 502, headers: { "content-type": "text/html" } }),
+    );
+    const client = new CalmLensServerClient({ apiKey, projectId, fetch: fetchImpl, maxRetries: 0 });
+    const failure = await client.assets.retrieve({ assetId: "a" }).catch((error) => error);
+    expect(failure).toBeInstanceOf(CalmLensServerError);
+    expect(failure.body).toBe(page.slice(0, 4096));
   });
 
   test("the exported API error codes match shared/PublicErrorCodes", () => {

@@ -9,7 +9,7 @@ import * as server from "../src/server";
 import { CalmLensError, parseWebhookEvent } from "../src/server";
 import * as testing from "../src/testing";
 import { createMockApiKey, MockCalmLensServerClient } from "../src/testing";
-import { eventPages, testdata } from "./testdata";
+import { eventPages, expectErrorKind, testdata } from "./testdata";
 
 describe("webhook parsing", () => {
   const { parsing } = testdata("webhooks.json") as {
@@ -459,7 +459,14 @@ const surface: {
     body: unknown;
     expected: { code: string; status: number; requestId: string; retryAfterSeconds: number };
   };
-  retryable: { code: string; status: number | null; retryable: boolean; local: boolean }[];
+  retryable: {
+    code: string;
+    status: number | null;
+    retryable: boolean;
+    local: boolean;
+    kind: string;
+  }[];
+  errorKinds: { id: string; parent: string | null; names: { javascript: string } }[];
 } = testdata("surface.json");
 
 // Server entry exports, and `testing.*` for `@calmlens/sdk/testing`.
@@ -570,19 +577,44 @@ describe("SDK surface", () => {
 });
 
 describe("retryable errors", () => {
-  for (const { code, status, retryable, local } of surface.retryable) {
+  for (const { code, status, retryable, local, kind } of surface.retryable) {
     test(`${code}${status === null ? "" : ` (HTTP ${status})`} is ${retryable ? "" : "not "}retryable`, () => {
       const error = new CalmLensError(code, status === null ? {} : { status });
       expect(error.isRetryable()).toBe(retryable);
       expect(error.isLocal()).toBe(local);
+      expectErrorKind(error, kind, server, code);
+    });
+  }
+});
+
+describe("error kinds", () => {
+  for (const { id, parent, names } of surface.errorKinds) {
+    test(`${id} is ${names.javascript}${parent ? `, a kind of ${parent}` : ""}`, () => {
+      const KindClass = (server as Record<string, unknown>)[names.javascript] as {
+        kind: string;
+        prototype: object;
+      };
+      expect(typeof KindClass).toBe("function");
+      expect(KindClass.kind).toBe(id);
+      const parentName = surface.errorKinds.find((kind) => kind.id === parent)?.names.javascript;
+      expect(Object.getPrototypeOf(KindClass.prototype)).toBe(
+        parentName
+          ? ((server as Record<string, unknown>)[parentName] as { prototype: object }).prototype
+          : Error.prototype,
+      );
     });
   }
 });
 
 describe("rejections", () => {
-  const rejections: { name: string; operation: string; options: object; error: string }[] =
-    testdata("rejections.json");
-  for (const { name, operation, options, error } of rejections) {
+  const rejections: {
+    name: string;
+    operation: string;
+    options: object;
+    error: string;
+    kind: string;
+  }[] = testdata("rejections.json");
+  for (const { name, operation, options, error, kind } of rejections) {
     test(name, async () => {
       let sent = 0;
       const counting = async () => {
@@ -608,6 +640,7 @@ describe("rejections", () => {
         requestId: failure?.requestId,
         sent,
       }).toEqual({ code: error, local: true, status: undefined, requestId: undefined, sent: 0 });
+      expectErrorKind(failure, kind, server, name);
     });
   }
 });

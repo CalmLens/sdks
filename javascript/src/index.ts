@@ -6,10 +6,31 @@ export { CDN_RESOURCES, getAssetInfo } from "./client/CalmLensCdn";
 export type {
   CalmLensErrorCode,
   CalmLensErrorDetails,
+  CalmLensErrorKind,
   CalmLensErrorOptions,
   SdkErrorCode,
 } from "./client/CalmLensError";
-export { CALMLENS_ERROR_CODES, CalmLensError } from "./client/CalmLensError";
+export {
+  CALMLENS_ERROR_CODES,
+  CalmLensApiError,
+  CalmLensAuthenticationError,
+  CalmLensBadRequestError,
+  CalmLensCancelledError,
+  CalmLensConfigurationError,
+  CalmLensConflictError,
+  CalmLensConnectionError,
+  CalmLensError,
+  CalmLensInvalidArgumentError,
+  CalmLensInvalidResponseError,
+  CalmLensNotFoundError,
+  CalmLensPayloadTooLargeError,
+  CalmLensPermissionDeniedError,
+  CalmLensRateLimitError,
+  CalmLensServerError,
+  CalmLensTimeoutError,
+  CalmLensUnprocessableEntityError,
+  CalmLensWebhookVerificationError,
+} from "./client/CalmLensError";
 export type { ApiErrorCode } from "./client/CalmLensErrorCodes";
 export type {
   AutoPaging,
