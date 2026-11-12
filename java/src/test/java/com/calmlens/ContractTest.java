@@ -939,7 +939,6 @@ class ContractTest {
       Map.entry("close", "closes the client"),
       Map.entry("withRequestOptions", "a client with changed per-call options"),
       Map.entry("async", "the asynchronous form of the same capabilities (surface.json asyncClient)"),
-      Map.entry("request", "the raw request for API paths the SDK has no method for yet (client cases)"),
       Map.entry("getProjectId", "reads the client's configuration"),
       Map.entry("getBaseUrl", "reads the client's configuration"),
       Map.entry("getCdnBaseUrl", "reads the client's configuration"),
