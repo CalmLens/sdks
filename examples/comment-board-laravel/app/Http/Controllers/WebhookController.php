@@ -24,18 +24,18 @@ final class WebhookController
             $status = $error->errorCode === SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE ? 401 : 400;
             return response()->json(['code' => $error->errorCode], $status);
         }
-        if ($event['projectId'] !== config('calmlens.project_id')) {
+        if ($event->projectId !== config('calmlens.project_id')) {
             return response()->json(['code' => 'example/project-mismatch'], 403);
         }
         if (Webhooks::isTest($event)) {
             return response()->noContent();
         }
-        if (!Cache::add('calmlens-event:' . $event['id'], true, now()->addDay())) {
+        if (!Cache::add('calmlens-event:' . $event->id, true, now()->addDay())) {
             return response()->noContent();
         }
         // Demonstrate verified delivery without publishing or altering the visitor's comments.
         Cache::put('calmlens-last-event', [
-            'id' => $event['id'], 'type' => $event['type'], 'facts' => $event['facts'] ?? [],
+            'id' => $event->id, 'type' => $event->type, 'facts' => $event->toArray()['facts'] ?? [],
         ], now()->addDay());
         return response()->noContent();
     }

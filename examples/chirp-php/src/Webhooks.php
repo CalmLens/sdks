@@ -36,15 +36,15 @@ final class Webhooks
             // A forged or stale delivery is 401; a verified body that is not an event is 400.
             return $error->errorCode === SdkErrorCodes::INVALID_WEBHOOK_SIGNATURE ? 401 : 400;
         }
-        if ($event['projectId'] !== $this->projectId) {
+        if ($event->projectId !== $this->projectId) {
             return 403;
         }
         // Test sends from the portal carry the registered `test` fact and change nothing.
-        if (CalmLensWebhooks::isTest($event) || in_array($event['id'], $this->store->read()['deliveries'], true)) {
+        if (CalmLensWebhooks::isTest($event) || in_array($event->id, $this->store->read()['deliveries'], true)) {
             return 204;
         }
-        $assetId = $event['assetId'] ?? null;
-        if (in_array($event['type'], self::SYNC_EVENTS, true) && is_string($assetId) && $assetId !== '') {
+        $assetId = $event->assetId;
+        if (in_array($event->type, self::SYNC_EVENTS, true) && is_string($assetId) && $assetId !== '') {
             try {
                 // The event's snapshot may be stale by the time it arrives: fetch the asset's current state.
                 $this->content->syncAsset($assetId);
@@ -55,7 +55,7 @@ final class Webhooks
             }
         }
         $this->store->update(function (array &$data) use ($event) {
-            $data['deliveries'] = array_slice([...$data['deliveries'], $event['id']], -self::REMEMBERED_DELIVERIES);
+            $data['deliveries'] = array_slice([...$data['deliveries'], $event->id], -self::REMEMBERED_DELIVERIES);
         });
         return 204;
     }

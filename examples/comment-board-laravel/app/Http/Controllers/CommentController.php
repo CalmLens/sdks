@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use CalmLens\CalmLensException;
+use CalmLens\Model\Moderation;
 use CalmLens\ServerClient;
 use Illuminate\Http\Request;
 
@@ -19,12 +20,12 @@ final class CommentController
         }
         // Allowed and limited comments publish (limited is only marked so an app can reduce its reach);
         // pending, age-restricted, blocked, purged and unknown statuses do not.
-        if (!in_array($asset['classification']['moderation']['status'] ?? null, ['allowed', 'limited'], true)) {
+        if (!in_array($asset->classification?->moderation?->status, [Moderation::STATUS_ALLOWED, Moderation::STATUS_LIMITED], true)) {
             return back()->withInput()->withErrors(['comment' => 'This comment cannot be published yet.']);
         }
         // Session storage keeps this demo database-free and private to the visitor.
         $comments = $request->session()->get('comments', []);
-        $comments[] = ['text' => $input['comment'], 'assetId' => $asset['id']];
+        $comments[] = ['text' => $input['comment'], 'assetId' => $asset->id];
         $request->session()->put('comments', array_slice($comments, -50));
         return redirect('/');
     }

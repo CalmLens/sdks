@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Chirp;
 
 use CalmLens\CalmLensException;
+use CalmLens\Model\Asset;
+use CalmLens\Model\AssetClassification;
+use CalmLens\Model\CategoryResult;
 use CalmLens\ServerClient;
 
 /**
@@ -101,22 +104,22 @@ final class Moderation
      * Chirp's view of an asset: its moderation status (or `error` when processing failed) and the
      * evaluated categories, highest score first.
      */
-    public static function outcome(array $asset): array
+    public static function outcome(Asset $asset): array
     {
-        $classification = $asset['classification'] ?? [];
-        $status = $classification['moderation']['status'] ?? null;
+        $classification = $asset->classification;
+        $status = $classification?->moderation?->status;
         $findings = [];
-        foreach ($classification['moderation']['raw']['categories'] ?? [] as $category => $result) {
+        foreach ($classification?->moderation?->raw?->categories ?? [] as $category => $result) {
             // `not-evaluated` means unknown, not safe: never read it as a zero score.
-            if (is_array($result) && in_array($result['status'] ?? null, ['evaluated', 'partial'], true) && is_numeric($result['score'] ?? null)) {
-                $findings[] = ['category' => (string) $category, 'score' => (float) $result['score']];
+            if (in_array($result->status, [CategoryResult::STATUS_EVALUATED, CategoryResult::STATUS_PARTIAL], true) && is_numeric($result->score)) {
+                $findings[] = ['category' => (string) $category, 'score' => (float) $result->score];
             }
         }
         usort($findings, fn ($a, $b) => $b['score'] <=> $a['score']);
         return [
-            'assetId' => (string) $asset['id'],
-            'externalId' => $asset['externalId'] ?? null,
-            'status' => ($classification['status'] ?? null) === 'failed' ? 'error' : (in_array($status, self::DECIDED, true) ? $status : 'pending'),
+            'assetId' => $asset->id,
+            'externalId' => $asset->externalId,
+            'status' => $classification?->status === AssetClassification::STATUS_FAILED ? 'error' : (in_array($status, self::DECIDED, true) ? $status : 'pending'),
             'findings' => $findings,
         ];
     }
