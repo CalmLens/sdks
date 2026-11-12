@@ -953,10 +953,10 @@
       "description": "Iterates events after a cursor across pages.",
       "names": {
         "javascript": "events.list",
-        "python": "events.iter_pages",
+        "python": "events.iter",
         "go": "Events.ListAll",
         "rust": "events().pages",
-        "java": "events().pages",
+        "java": "events().iterate",
         "ruby": "events.list",
         "php": "events->eachPage"
       }
@@ -1437,7 +1437,7 @@
         "python": "viewer_claims",
         "go": "CDNAssetURLOptions.ViewerClaims",
         "rust": "CdnRequest::viewer_claims",
-        "java": "CdnRequest.viewerClaims",
+        "java": "CdnRequestParams.Builder.setViewerClaims",
         "ruby": "viewer_claims",
         "php": "viewerClaims"
       }
@@ -1451,7 +1451,7 @@
         "python": "external_id",
         "go": "CDNAssetURLOptions.ExternalID",
         "rust": "CdnRequest::external_id",
-        "java": "CdnRequest.externalId",
+        "java": "CdnRequestParams.Builder.setExternalId",
         "ruby": "external_id",
         "php": "externalId"
       }
@@ -1613,7 +1613,6 @@
         "php": "SdkErrorCodes::CANCELLED"
       },
       "notApplicable": {
-        "python": "The client is synchronous and has no way to cancel a call while it runs.",
         "ruby": "The client is synchronous and has no way to cancel a call while it runs.",
         "php": "The client is synchronous and has no way to cancel a call while it runs.",
         "rust": "A call is cancelled by dropping its future, which leaves no error to report."
@@ -1806,7 +1805,7 @@
       "status": null,
       "retryable": false,
       "local": true,
-      "kind": "invalid-argument"
+      "kind": "api"
     },
     {
       "code": "sdk/response-too-large",
