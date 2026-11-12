@@ -958,7 +958,7 @@
         "rust": "events().pages",
         "java": "events().iterate",
         "ruby": "events.list",
-        "php": "events->eachPage"
+        "php": "events->each"
       }
     },
     {
@@ -1029,6 +1029,20 @@
         "java": "cdn().serve",
         "ruby": "cdn.serve",
         "php": "cdn->serve"
+      }
+    },
+    {
+      "id": "request",
+      "kind": "method",
+      "description": "Sends a request to any API path with the client's key, retries and error handling (the raw request).",
+      "names": {
+        "javascript": "request",
+        "python": "request",
+        "go": "Request",
+        "rust": "request",
+        "java": "request",
+        "ruby": "request",
+        "php": "request"
       }
     },
     {
